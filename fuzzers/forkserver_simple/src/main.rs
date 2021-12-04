@@ -24,9 +24,36 @@ use libafl::{
 };
 use std::path::PathBuf;
 
+use clap::{App, Arg};
+
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let corpus_dirs = vec![PathBuf::from("./corpus")];
+    let res = App::new("forkserver_simple")
+        .about("Example Forkserver fuzer")
+        .arg(
+            Arg::new("executable")
+                .about("The instrumented binary we want to fuzz")
+                .required(true)
+                .index(1)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("in")
+                .about("The directory to read initial inputs from ('seeds')")
+                .required(true)
+                .index(2)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("timeout")
+                .about("Timeout for each individual execution, in milliseconds")
+                .short('t')
+                .long("timeout")
+                .default_value("1200"),
+        )
+        .get_matches();
+
+    let corpus_dirs = vec![PathBuf::from(res.value_of("in").unwrap().to_string())];
 
     const MAP_SIZE: usize = 65536;
 
@@ -99,13 +126,19 @@ pub fn main() {
     // Create the executor for the forkserver
     let mut executor = TimeoutForkserverExecutor::new(
         ForkserverExecutor::new(
-            "./target/release/program".to_string(),
+            res.value_of("executable").unwrap().to_string(),
             &[],
             true,
             tuple_list!(edges_observer, time_observer),
         )
         .unwrap(),
-        Duration::from_millis(5000),
+        Duration::from_millis(
+            res.value_of("timeout")
+                .unwrap()
+                .to_string()
+                .parse()
+                .expect("Could not parse timeout in milliseconds"),
+        ),
     )
     .expect("Failed to create the executor.");
 
