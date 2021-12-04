@@ -361,7 +361,7 @@ where
                 self.objective_mut().discard_metadata(state, &input)?;
 
                 // Add the input to the main corpus
-                let mut testcase = Testcase::new(input.clone());
+                let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
                 self.feedback_mut().append_metadata(state, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
@@ -393,7 +393,7 @@ where
                 self.feedback_mut().discard_metadata(state, &input)?;
 
                 // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::new(input);
+                let mut testcase = Testcase::with_executions(input, *state.executions());
                 self.objective_mut().append_metadata(state, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
@@ -487,7 +487,7 @@ where
         self.objective_mut().discard_metadata(state, &input)?;
 
         // Add the input to the main corpus
-        let mut testcase = Testcase::new(input.clone());
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         self.feedback_mut().append_metadata(state, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
