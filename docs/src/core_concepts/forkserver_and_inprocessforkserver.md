@@ -12,11 +12,11 @@ This executor uses [_SanitizerCoverage_](https://clang.llvm.org/docs/SanitizerCo
 Next, we'll look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFLplusplus/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Hopefully, we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage.
 As you can see from the forkserver example,
 ```rust,ignore
-    //Coverage map shared between observer and executor
-    let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
-    //let the forkserver know the shmid
-    shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let mut shmem_map = shmem.map_mut();
+//Coverage map shared between observer and executor
+let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
+//let the forkserver know the shmid
+shmem.write_to_env("__AFL_SHM_ID").unwrap();
+let mut shmem_map = shmem.map_mut();
 ```
 Here we make a shared memory region; `shmem`, and write this to environmental variable `__AFL_SHM_ID`. Then the instrumented binary, or the forkserver, finds this shared memory region (from the aforementioned env var) to record its coverage. On your fuzzer side, you can pass this shmem map to your `Observer` to obtain coverage feedbacks combined with any `Feedback`.
 
