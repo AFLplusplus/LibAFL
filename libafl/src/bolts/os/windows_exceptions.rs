@@ -222,7 +222,7 @@ impl Display for ExceptionCode {
     }
 }
 
-pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 45] = [
+pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 46] = [
     ExceptionCode::AccessViolation,
     ExceptionCode::ArrayBoundsExceeded,
     ExceptionCode::Breakpoint,
