@@ -18,7 +18,7 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use num_enum::TryFromPrimitive;
 
 //const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
@@ -83,7 +83,7 @@ pub const STATUS_ASSERTION_FAILURE: u32 = 0xC0000420;
 pub const STATUS_SXS_EARLY_DEACTIVATION: u32 = 0xC015000F;
 pub const STATUS_SXS_INVALID_DEACTIVATION: u32 = 0xC0150010;
 
-#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
+#[derive(TryFromPrimitive, Clone, Copy)]
 #[repr(u32)]
 pub enum ExceptionCode {
     // From https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode

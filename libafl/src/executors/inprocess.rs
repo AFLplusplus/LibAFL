@@ -753,7 +753,7 @@ mod windows_exception_handler {
     }
 
     pub unsafe fn inproc_crash_handler<E, EM, I, OC, OF, OT, S, Z>(
-        code: ExceptionCode,
+        _code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -770,6 +770,18 @@ mod windows_exception_handler {
         if let Some(x) = (data.timer_queue as *mut HANDLE).as_mut() {
             windows_delete_timer_queue(*x);
         }
+
+        let code = ExceptionCode::try_from(
+            exception_pointers
+                .as_mut()
+                .unwrap()
+                .ExceptionRecord
+                .as_mut()
+                .unwrap()
+                .ExceptionCode
+                .0,
+        )
+        .unwrap();
 
         #[cfg(feature = "std")]
         println!("Crashed with {}", code);
