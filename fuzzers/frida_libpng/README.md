@@ -10,7 +10,7 @@ To build this example, run `cargo build --release` in this folder.
 This will call (the build.rs)[./build.rs], which in turn downloads a libpng archive from the web.
 Then, it will link (the fuzzer)[./src/fuzzer.rs] against (the C++ harness)[./harness.cc] and the instrumented `libpng`.
 Afterwards, the fuzzer will be ready to run, from `target/frida_libpng`.  
-On unix-platforms, you'll need [libc++](https://libcxx.llvm.org/) to build it.
+On unix platforms, you'll need [libc++](https://libcxx.llvm.org/) to build it.
 
 ### Build For Android
 When building for android using a cross-compiler, make sure you have a _standalone toolchain_, and then add the following:
@@ -31,7 +31,7 @@ After building the libpng-harness, too, you can run `find . -name libpng-harness
 `./target/release/frida_libpng ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0`
 
 ## Windows
-You can also fuzz libpng-1.6.37 on windows with frida mode! (still experimental)
+You can also fuzz libpng-1.6.37 on windows with frida mode! (still experimental, we have an issue on frida-gum.)
 
 ### To build it with visual studio
 1. Install clang for windows (make sure you add LLVM to the system path!) 
