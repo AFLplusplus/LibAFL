@@ -1,11 +1,11 @@
-# ForkserverExecutor, and InprocessForkExecutor
+# ForkserverExecutor and InprocessForkExecutor
 
 ## Introduction
 We have `ForkserverExecutor` and `InprocessForkExecutor` in libafl crate.  
 On this page, we'll quickly explain how they work and see how they compare to normal `InProcessExecutor`
 
 ## InprocessExecutor
-Let's begin with the basecase; `InProcessExecutor`.
+Let's begin with the base case; `InProcessExecutor`.
 This executor uses [_SanitizerCoverage_](https://clang.llvm.org/docs/SanitizerCoverage.html) as its backend, as you can find the related code in `libafl_targets/src/sancov_pcguards`. Here we allocate a map called `EDGES_MAP` and then our compiler wrapper compiles the harness to write the coverage into this map.  
 
 ## ForkserverExecutor
