@@ -21,7 +21,7 @@ let mut shmem_map = shmem.map_mut();
 Here we make a shared memory region; `shmem`, and write this to environmental variable `__AFL_SHM_ID`. Then the instrumented binary, or the forkserver, finds this shared memory region (from the aforementioned env var) to record its coverage. On your fuzzer side, you can pass this shmem map to your `Observer` to obtain coverage feedbacks combined with any `Feedback`.
 
 Another feature of the `ForkserverExecutor` to mention is the shared memory testcases. In normal cases, the mutated input is passed between the forkserver and the instrumented binary via `.cur_input` file. You can improve your forkserver fuzzer's performance by passing the input with shared memory.
-See AFL++'s [_documentation_](https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md) or the fuzzer example in `forkserver_simple/src/program.c` for reference.  
+See AFL++'s [_documentation_](https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md#5-shared-memory-fuzzing) or the fuzzer example in `forkserver_simple/src/program.c` for reference.  
 It is very simple, when you call `ForkserverExecutor::new()` with `use_shmem_testcase` true, the `ForkserverExecutor` sets things up and your harness can just fetch the input from `__AFL_FUZZ_TESTCASE_BUF`
 
 ## InprocessForkExecutor
