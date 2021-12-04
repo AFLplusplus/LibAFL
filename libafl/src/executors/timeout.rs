@@ -29,7 +29,10 @@ use windows::Win32::{
 };
 
 #[cfg(all(windows, feature = "std"))]
-use core::{ffi::c_void, ptr::{write, write_volatile}};
+use core::{
+    ffi::c_void,
+    ptr::{write, write_volatile},
+};
 
 #[repr(C)]
 #[cfg(unix)]
