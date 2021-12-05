@@ -34,14 +34,12 @@ pub fn main() {
             Arg::new("executable")
                 .about("The instrumented binary we want to fuzz")
                 .required(true)
-                .index(1)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
                 .about("The directory to read initial inputs from ('seeds')")
                 .required(true)
-                .index(2)
                 .takes_value(true),
         )
         .arg(
@@ -50,6 +48,11 @@ pub fn main() {
                 .short('t')
                 .long("timeout")
                 .default_value("1200"),
+        )
+        .arg(
+            Arg::new("arguments")
+                .setting(clap::ArgSettings::MultipleValues)
+                .takes_value(true),
         )
         .get_matches();
 
@@ -124,10 +127,15 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for the forkserver
+    let args = match res.values_of("arguments") {
+        Some(vec) => vec.map(|s| s.to_string()).collect::<Vec<String>>().to_vec(),
+        None => [].to_vec(),
+    };
+
     let mut executor = TimeoutForkserverExecutor::new(
         ForkserverExecutor::new(
             res.value_of("executable").unwrap().to_string(),
-            &[],
+            &args,
             true,
             tuple_list!(edges_observer, time_observer),
         )
