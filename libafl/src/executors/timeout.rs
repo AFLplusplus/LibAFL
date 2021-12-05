@@ -185,7 +185,7 @@ where
             ft.dwHighDateTime = (tm >> 32) as u32;
 
             EnterCriticalSection(&mut self.critical);
-            write(&mut data.in_target, 1);
+            data.in_target = 1;
             LeaveCriticalSection(&mut self.critical);
 
             SetThreadpoolTimer(self.tp_timer, &ft, 0, 0);
@@ -194,7 +194,7 @@ where
 
             EnterCriticalSection(&mut self.critical);
             // Timeout handler will do nothing after we increment in_target value.
-            write(&mut data.in_target, 0);
+            data.in_target = 0;
             LeaveCriticalSection(&mut self.critical);
 
             write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());

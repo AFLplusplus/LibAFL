@@ -75,7 +75,7 @@ debug = true
 Opening `src/main.rs`, we have an empty `main` function.
 To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`.
 
-```rust,ignore
+```rust
 extern crate libafl;
 use libafl::inputs::{BytesInput, HasTargetBytes};
 
@@ -178,7 +178,7 @@ state
 
 Now you can prepend the necessary `use` directives to your main.rs and compile the fuzzer.
 
-```rust,ignore
+```rust
 extern crate libafl;
 
 use std::path::PathBuf;
@@ -215,7 +215,7 @@ To do that, we need a way to keep track of if a condition is satisfied. The comp
 We represent such map as a `static mut` variable.
 As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions in a map modyfing our tested function:
 
-```rust,ignore
+```rust
 extern crate libafl;
 use libafl::{
     inputs::{BytesInput, HasTargetBytes},
