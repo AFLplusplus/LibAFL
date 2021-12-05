@@ -170,10 +170,7 @@ where
     ) -> Result<ExitKind, Error> {
         unsafe {
             let data = &mut GLOBAL_STATE;
-            write_volatile(
-                &mut data.tp_timer,
-                self.tp_timer as *mut _ as *mut c_void,
-            );
+            write_volatile(&mut data.tp_timer, self.tp_timer as *mut _ as *mut c_void);
             write_volatile(
                 &mut data.critical,
                 &mut self.critical as *mut _ as *mut c_void,
