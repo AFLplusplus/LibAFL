@@ -172,7 +172,7 @@ where
             let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.tp_timer,
-                &mut self.tp_timer as *mut _ as *mut c_void,
+                self.tp_timer as *mut _ as *mut c_void,
             );
             write_volatile(
                 &mut data.critical,

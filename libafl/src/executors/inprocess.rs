@@ -140,6 +140,16 @@ where
     pub fn harness_mut(&mut self) -> &mut H {
         self.harness_fn
     }
+
+    #[inline]
+    pub fn handlers(&self) -> &InProcessHandlers {
+        &self.handlers
+    }
+
+    #[inline]
+    pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
+        &mut self.handlers
+    }
 }
 
 #[derive(Debug)]
@@ -801,6 +811,7 @@ mod windows_exception_handler {
             (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
         {
             windows_delete_timer_queue(x);
+            data.tp_timer = ptr::null_mut();
         }
 
         #[cfg(feature = "std")]
