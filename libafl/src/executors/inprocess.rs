@@ -817,9 +817,9 @@ mod windows_exception_handler {
                 Timeout handler runs if it has access to the critical section or data.in_target == 0
                 Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
             */
-            EnterCriticalSection(&mut self.critical);
+            EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
             write(&mut data.in_target, 0);
-            LeaveCriticalSection(&mut self.critical);
+            LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
 
             windows_delete_timer_queue(x);
             data.tp_timer = ptr::null_mut();
