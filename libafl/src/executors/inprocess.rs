@@ -812,6 +812,15 @@ mod windows_exception_handler {
         if let Some(x) =
             (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
         {
+            /*
+                We want to prevent the timeout handler being run while the main thread is executing the crash handler
+                Timeout handler runs if it has access to the critical section or data.in_target == 0
+                Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
+            */
+            EnterCriticalSection(&mut self.critical);
+            write(&mut data.in_target, 0);
+            LeaveCriticalSection(&mut self.critical);
+
             windows_delete_timer_queue(x);
             data.tp_timer = ptr::null_mut();
         }
