@@ -12,7 +12,7 @@ edition = "2021"
 
 [features]
 python = ["pyo3", "pyo3-build-config"]
-default = ["x86_64"]
+default = []
 x86_64 = []
 i386 = []
 arm = []

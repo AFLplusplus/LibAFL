@@ -26,6 +26,7 @@ macro_rules! assert_unique_feature {
 #[allow(clippy::too_many_lines)]
 fn main() {
     // Make sure we have at least and at most one architecutre feature set
+    // Else, we default to `x86_64` - having a default makes CI easier :)
     assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
     #[cfg(not(any(
         feature = "arm",
@@ -33,8 +34,8 @@ fn main() {
         feature = "i368",
         feature = "x86_64"
     )))]
-    compile_error!(
-        "No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i368, i86_64"
+    println!(
+        "cargo:warning=No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i368, x86_64 - defaulting to x86_64"
     );
 
     let cpu_target = if cfg!(feature = "arm") {
@@ -43,16 +44,17 @@ fn main() {
         "aarch64"
     } else if cfg!(feature = "i368") {
         "368"
-    } else if cfg!(feature = "x86_64") {
-        "x86_64"
     } else {
+        // if cfg!(feature = "x86_64") {
+        "x86_64"
+        /*} else {
         panic!("No architecture feture enabled for libafl_qemu");
+        */
     };
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/asan-giovese.c");
     println!("cargo:rerun-if-changed=src/asan-giovese.h");
-    println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rerun-if-env-changed=CROSS_CC");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();

@@ -15,9 +15,26 @@ pub mod i386;
 #[cfg(feature = "i386")]
 pub use i386::*;
 
-#[cfg(feature = "x86_64")]
+/// We default to x86_64, having a default makes CI easier :)
+#[cfg(any(
+    feature = "x86_64",
+    not(any(
+        feature = "arm",
+        feature = "aarch64",
+        feature = "i368",
+        feature = "x86_64"
+    ))
+))]
 pub mod x86_64;
-#[cfg(feature = "x86_64")]
+#[cfg(any(
+    feature = "x86_64",
+    not(any(
+        feature = "arm",
+        feature = "aarch64",
+        feature = "i368",
+        feature = "x86_64"
+    ))
+))]
 pub use x86_64::*;
 
 pub mod elf;
