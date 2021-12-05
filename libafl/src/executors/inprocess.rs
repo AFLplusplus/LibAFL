@@ -774,6 +774,7 @@ mod windows_exception_handler {
                 println!("Bye!");
 
                 event_mgr.await_restart_safe();
+                compiler_fence(Ordering::SeqCst);
 
                 LeaveCriticalSection(
                     (data.critical as *mut RTL_CRITICAL_SECTION)
