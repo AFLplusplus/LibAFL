@@ -666,7 +666,7 @@ mod windows_exception_handler {
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
-    use coresync::atomic::{compiler_fence, Ordering};
+    use core::sync::atomic::{compiler_fence, Ordering};
     use windows::Win32::System::Threading::ExitProcess;
 
     pub type HandlerFuncPtr =
