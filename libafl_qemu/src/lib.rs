@@ -1,17 +1,23 @@
 use std::env;
 
+#[cfg(feature = "aarch64")]
 pub mod aarch64;
-pub mod arm;
-pub mod i386;
-pub mod x86_64;
-
-#[cfg(cpu_target = "aarch64")]
+#[cfg(feature = "aarch64")]
 pub use aarch64::*;
-#[cfg(cpu_target = "arm")]
+
+#[cfg(feature = "arm")]
+pub mod arm;
+#[cfg(feature = "arm")]
 pub use arm::*;
-#[cfg(cpu_target = "i386")]
+
+#[cfg(feature = "i386")]
+pub mod i386;
+#[cfg(feature = "i386")]
 pub use i386::*;
-#[cfg(cpu_target = "x86_64")]
+
+#[cfg(feature = "x86_64")]
+pub mod x86_64;
+#[cfg(feature = "x86_64")]
 pub use x86_64::*;
 
 pub mod elf;

@@ -12,7 +12,11 @@ edition = "2021"
 
 [features]
 python = ["pyo3", "pyo3-build-config"]
-default = []
+default = ["x86_64"]
+x86_64 = []
+i386 = []
+arm = []
+aarch64 = []
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.7.0" }

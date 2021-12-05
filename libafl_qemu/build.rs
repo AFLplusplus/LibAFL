@@ -11,8 +11,44 @@ fn build_dep_check(tools: &[&str]) {
     }
 }
 
+#[macro_export]
+macro_rules! assert_unique_feature {
+    () => {};
+    ($first:tt $(,$rest:tt)*) => {
+        $(
+            #[cfg(all(feature = $first, feature = $rest))]
+            compile_error!(concat!("features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
+        )*
+        assert_unique_feature!($($rest),*);
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 fn main() {
+    // Make sure we have at least and at most one architecutre feature set
+    assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
+    #[cfg(not(any(
+        feature = "arm",
+        feature = "aarch64",
+        feature = "i368",
+        feature = "x86_64"
+    )))]
+    compile_error!(
+        "No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i368, i86_64"
+    );
+
+    let cpu_target = if cfg!(feature = "arm") {
+        "arm"
+    } else if cfg!(feature = "aarch64") {
+        "aarch64"
+    } else if cfg!(feature = "i368") {
+        "368"
+    } else if cfg!(feature = "x86_64") {
+        "x86_64"
+    } else {
+        panic!("No architecture feture enabled for libafl_qemu");
+    };
+
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/asan-giovese.c");
     println!("cargo:rerun-if-changed=src/asan-giovese.h");
@@ -25,12 +61,9 @@ fn main() {
     }
 
     let jobs = env::var("CARGO_BUILD_JOBS");
-    let cpu_target = env::var("CPU_TARGET").unwrap_or_else(|_| {
-        println!("cargo:warning=CPU_TARGET is not set, default to x86_64");
-        "x86_64".to_owned()
-    });
+
     let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
-        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if CPU_TARGET is not the host arch)");
+        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({}) is not the host arch ({}))", cpu_target, env::consts::ARCH);
         "cc".to_owned()
     });
 
