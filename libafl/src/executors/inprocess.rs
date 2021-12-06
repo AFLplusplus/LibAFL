@@ -218,7 +218,6 @@ impl InProcessHandlers {
         }
     }
 
-    #[must_use]
     pub fn new<E, EM, I, OC, OF, OT, S, Z>() -> Result<Self, Error>
     where
         I: Input,
