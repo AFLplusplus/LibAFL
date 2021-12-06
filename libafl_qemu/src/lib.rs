@@ -21,7 +21,7 @@ pub use i386::*;
     not(any(
         feature = "arm",
         feature = "aarch64",
-        feature = "i368",
+        feature = "i386",
         feature = "x86_64"
     ))
 ))]
@@ -31,7 +31,7 @@ pub mod x86_64;
     not(any(
         feature = "arm",
         feature = "aarch64",
-        feature = "i368",
+        feature = "i386",
         feature = "x86_64"
     ))
 ))]

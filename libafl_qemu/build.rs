@@ -31,18 +31,18 @@ fn main() {
     #[cfg(not(any(
         feature = "arm",
         feature = "aarch64",
-        feature = "i368",
+        feature = "i386",
         feature = "x86_64"
     )))]
     println!(
-        "cargo:warning=No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i368, x86_64 - defaulting to x86_64"
+        "cargo:warning=No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
     );
 
     let cpu_target = if cfg!(feature = "arm") {
         "arm"
     } else if cfg!(feature = "aarch64") {
         "aarch64"
-    } else if cfg!(feature = "i368") {
+    } else if cfg!(feature = "i386") {
         "368"
     } else {
         // if cfg!(feature = "x86_64") {
