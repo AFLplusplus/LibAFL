@@ -246,7 +246,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                 assert_eq!(bits_to_insert % 8, 0, "can only insert full bytes");
                 let after_len = (u64::from(target.get_size()) / 8) - offset - (bits_to_insert / 8);
                 Some(
-                    std::array::IntoIter::new([
+                    std::array::IntoIter::into_iter([
                         if offset == 0 {
                             None
                         } else {
