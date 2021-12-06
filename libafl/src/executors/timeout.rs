@@ -34,6 +34,9 @@ use core::{
     ptr::{write, write_volatile},
 };
 
+#[cfg(windows)]
+use core::sync::atomic::{compiler_fence, Ordering};
+
 #[repr(C)]
 #[cfg(unix)]
 struct Timeval {
@@ -184,18 +187,26 @@ where
             ft.dwLowDateTime = (tm & 0xffffffff) as u32;
             ft.dwHighDateTime = (tm >> 32) as u32;
 
+            compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(&mut self.critical);
-            data.in_target = 1;
+            compiler_fence(Ordering::SeqCst);
+            write(&mut data.in_target, 1);
+            compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(&mut self.critical);
+            compiler_fence(Ordering::SeqCst);
 
             SetThreadpoolTimer(self.tp_timer, &ft, 0, 0);
 
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
 
+            compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(&mut self.critical);
+            compiler_fence(Ordering::SeqCst);
             // Timeout handler will do nothing after we increment in_target value.
-            data.in_target = 0;
+            write(&mut data.in_target, 0);
+            compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(&mut self.critical);
+            compiler_fence(Ordering::SeqCst);
 
             write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());
 
