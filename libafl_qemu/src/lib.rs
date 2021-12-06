@@ -2,17 +2,17 @@ use std::env;
 
 #[cfg(feature = "aarch64")]
 pub mod aarch64;
-#[cfg(feature = "aarch64")]
+#[cfg(all(feature = "aarch64", not(feature = "clippy")))]
 pub use aarch64::*;
 
 #[cfg(feature = "arm")]
 pub mod arm;
-#[cfg(feature = "arm")]
+#[cfg(all(feature = "arm", not(feature = "clippy")))]
 pub use arm::*;
 
 #[cfg(feature = "i386")]
 pub mod i386;
-#[cfg(feature = "i386")]
+#[cfg(all(feature = "i386", not(feature = "clippy")))]
 pub use i386::*;
 
 // We default to x86_64, having a default makes CI easier :)
