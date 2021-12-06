@@ -190,7 +190,7 @@ where
             compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(&mut self.critical);
             compiler_fence(Ordering::SeqCst);
-            write(&mut data.in_target, 1);
+            data.in_target = 1;
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(&mut self.critical);
             compiler_fence(Ordering::SeqCst);
@@ -203,7 +203,7 @@ where
             EnterCriticalSection(&mut self.critical);
             compiler_fence(Ordering::SeqCst);
             // Timeout handler will do nothing after we increment in_target value.
-            write(&mut data.in_target, 0);
+            data.in_target = 0;
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(&mut self.critical);
             compiler_fence(Ordering::SeqCst);
