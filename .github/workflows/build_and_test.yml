@@ -32,7 +32,7 @@ jobs:
         run: cd docs && mdbook build
       - name: Test the book
         # TODO: fix books test fail with updated windows-rs
-        if: runnner.os != 'Windows'
+        if: runner.os != 'Windows'
         run: cd docs && mdbook test -L ../target/debug/deps
       - name: Run tests
         run: cargo test
