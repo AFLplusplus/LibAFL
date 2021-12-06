@@ -16,6 +16,7 @@ macro_rules! assert_unique_feature {
     () => {};
     ($first:tt $(,$rest:tt)*) => {
         $(
+            #[cfg(not(feature = "clippy"))] // ignore multiple definition for clippy
             #[cfg(all(feature = $first, feature = $rest))]
             compile_error!(concat!("features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
         )*
@@ -25,6 +26,16 @@ macro_rules! assert_unique_feature {
 
 #[allow(clippy::too_many_lines)]
 fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/asan-giovese.c");
+    println!("cargo:rerun-if-changed=src/asan-giovese.h");
+    println!("cargo:rerun-if-env-changed=CROSS_CC");
+
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    if target_os != "linux" {
+        return;
+    }
+
     // Make sure we have at least and at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
     assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
@@ -38,7 +49,10 @@ fn main() {
         "cargo:warning=No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
     );
 
-    let cpu_target = if cfg!(feature = "arm") {
+    let cpu_target = if cfg!(feature = "clippy") {
+        // assume x86_64 for clippy
+        "x86_64"
+    } else if cfg!(feature = "arm") {
         "arm"
     } else if cfg!(feature = "aarch64") {
         "aarch64"
@@ -51,16 +65,6 @@ fn main() {
         panic!("No architecture feture enabled for libafl_qemu");
         */
     };
-
-    println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=src/asan-giovese.c");
-    println!("cargo:rerun-if-changed=src/asan-giovese.h");
-    println!("cargo:rerun-if-env-changed=CROSS_CC");
-
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-    if target_os != "linux" {
-        return;
-    }
 
     let jobs = env::var("CARGO_BUILD_JOBS");
 
