@@ -268,6 +268,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                             ))
                         },
                     ]
+                    .into_iter()
                     .reduce(|acc: Option<BV>, val: Option<BV>| match (acc, val) {
                         (Some(prev), Some(next)) => Some(prev.concat(&next)),
                         (Some(prev), None) => Some(prev),
