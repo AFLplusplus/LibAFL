@@ -118,6 +118,29 @@ impl<E> TimeoutExecutor<E> {
         }
     }
 
+    #[cfg(unix)]
+    pub fn set_timeout(&mut self, exec_tmout: Duration) {
+        let milli_sec = exec_tmout.as_millis();
+        let it_value = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_interval = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_interval,
+            it_value,
+        };
+        self.itimerval = itimerval;
+    }
+
+    #[cfg(windows)]
+    pub fn set_timeout(&mut self, exec_tmout: Duration) {
+        self.milli_sec = exec_tmout.as_millis() as u32;
+    }
+
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
     pub fn inner(&mut self) -> &mut E {
         &mut self.executor
