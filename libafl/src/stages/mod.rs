@@ -31,21 +31,16 @@ pub mod sync;
 #[cfg(feature = "std")]
 pub use sync::*;
 
-use crate::events::EventFirer;
-use crate::events::EventRestarter;
-use crate::events::HasEventManagerId;
-use crate::events::ProgressReporter;
-use crate::state::HasExecutions;
 use crate::{
     bolts::rands::Rand,
-    corpus::Corpus,
-    corpus::CorpusScheduler,
-    executors::Executor,
-    executors::HasObservers,
+    corpus::{Corpus, CorpusScheduler},
+    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
+    executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
-    state::HasRand,
-    state::{HasClientPerfMonitor, HasCorpus},
+    state::{
+        HasExecutions, HasRand, {HasClientPerfMonitor, HasCorpus},
+    },
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasCorpusScheduler,
 };
 use core::{convert::From, marker::PhantomData};

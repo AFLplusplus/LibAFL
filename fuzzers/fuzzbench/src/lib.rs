@@ -22,7 +22,9 @@ use libafl::{
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
-    corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{
+        Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
+    },
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
@@ -36,7 +38,11 @@ use libafl::{
         tokens_mutations, Tokens,
     },
     observers::{StdMapObserver, TimeObserver},
-    stages::{StdMutationalStage, TracingStage},
+    stages::{
+        calibrate::CalibrationStage,
+        power::{PowerMutationalStage, PowerSchedule},
+        StdMutationalStage, TracingStage,
+    },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
@@ -248,8 +254,14 @@ fn fuzz(
         println!("Warning: LLVMFuzzerInitialize failed with -1")
     }
 
+    let calibration = CalibrationStage::new(&mut state, &edges_observer);
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+
+    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
+
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    //let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -297,7 +309,7 @@ fn fuzz(
     let mutational = StdMutationalStage::new(mutator);
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(tracing, i2s, mutational);
+    let mut stages = tuple_list!(calibration, tracing, i2s, mutational, power);
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
@@ -324,6 +336,7 @@ fn fuzz(
         dup2(null_fd, io::stdout().as_raw_fd())?;
         dup2(null_fd, io::stderr().as_raw_fd())?;
     }
+
     // reopen file to make sure we're at the end
     log.replace(
         OpenOptions::new()

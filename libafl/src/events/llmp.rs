@@ -177,14 +177,18 @@ where
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Forward)
             }
-            Event::UpdateExecutions {
+            Event::UpdateExecStats {
                 time,
                 executions,
+                stability,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -202,6 +206,7 @@ where
             Event::UpdatePerfMonitor {
                 time,
                 executions,
+                stability,
                 introspection_monitor,
                 phantom: _,
             } => {
@@ -212,6 +217,10 @@ where
 
                 // Update the normal monitor for this client
                 client.update_executions(*executions as u64, *time);
+
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
 
                 // Update the performance monitor for this client
                 client.update_introspection_monitor((**introspection_monitor).clone());
