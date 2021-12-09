@@ -195,15 +195,22 @@ impl Forkserver {
         out_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
+        debug_output: bool,
     ) -> Result<Self, Error> {
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
+        let (stdout, stderr) = if debug_output {
+            (Stdio::inherit(), Stdio::inherit())
+        } else {
+            (Stdio::null(), Stdio::null())
+        };
+
         match Command::new(target)
             .args(args)
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(stdout)
+            .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
             .setlimit(memlimit)
             .setsid()
@@ -467,6 +474,16 @@ where
         use_shmem_testcase: bool,
         observers: OT,
     ) -> Result<Self, Error> {
+        Self::with_debug(target, arguments, use_shmem_testcase, observers, false)
+    }
+
+    pub fn with_debug(
+        target: String,
+        arguments: &[String],
+        use_shmem_testcase: bool,
+        observers: OT,
+        debug_output: bool,
+    ) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
         let out_filename = ".cur_input".to_string();
@@ -500,6 +517,7 @@ where
             out_file.as_raw_fd(),
             use_stdin,
             0,
+            debug_output,
         )?;
 
         let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
