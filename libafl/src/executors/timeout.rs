@@ -164,7 +164,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 
     #[cfg(windows)]
     pub fn set_timeout(&mut self, exec_tmout: Duration) {
-        self.milli_sec = exec_tmout.as_millis() as u32;
+        self.milli_sec = exec_tmout.as_millis() as i64;
     }
 
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
