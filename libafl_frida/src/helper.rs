@@ -87,7 +87,7 @@ pub trait FridaHelper<'a> {
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
 
     /// Called after execution of an input
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 
     /// Returns `true` if stalker is enabled
     fn stalker_enabled(&self) -> bool;
@@ -142,13 +142,14 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
         }
     }
 
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
         if self.options.drcov_enabled() {
             let mut hasher = AHasher::new_with_keys(0, 0);
             hasher.write(input.target_bytes().as_slice());
 
             let filename = format!("./coverage/{:016x}.drcov", hasher.finish(),);
-            DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
+            DrCovWriter::new(&self.ranges).write(&filename, &self.drcov_basic_blocks)?;
+            self.drcov_basic_blocks.clear();
         }
 
         #[cfg(unix)]
@@ -163,6 +164,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
                 .poison(slice.as_ptr() as usize, slice.len());
             self.asan_runtime.reset_allocations();
         }
+        Ok(())
     }
 
     fn stalker_enabled(&self) -> bool {
