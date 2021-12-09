@@ -371,12 +371,13 @@ where
 
         match &mut self.executor.map_mut() {
             Some(map) => {
-                let size = input.target_bytes().as_slice().len();
+                let target_bytes = input.target_bytes();
+                let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
                 map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
                 map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                    .copy_from_slice(input.target_bytes().as_slice());
+                    .copy_from_slice(target_bytes.as_slice());
             }
             None => {
                 self.executor
