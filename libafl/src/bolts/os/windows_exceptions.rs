@@ -363,9 +363,9 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     }
     // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
     // See https://github.com/AFLplusplus/LibAFL/pull/403
-    if let prev = AddVectoredExceptionHandler(
+    AddVectoredExceptionHandler(
         1,
         Some(core::mem::transmute(handle_exception as *const c_void)),
-    ) {}
+    );
     Ok(())
 }
