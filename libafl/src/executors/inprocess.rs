@@ -137,10 +137,7 @@ where
                 This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
             */
             let mut stack_reserved = 0x20000;
-            let ret = SetThreadStackGuarantee(&mut stack_reserved);
-            if ret.0 == 0 {
-                return Err(Error::Unknown("SetThreadStackGuarantee failed".to_string()));
-            }
+            SetThreadStackGuarantee(&mut stack_reserved);
         }
         Ok(Self {
             harness_fn,

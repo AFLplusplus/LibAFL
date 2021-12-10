@@ -309,8 +309,6 @@ unsafe fn internal_handle_exception(
     }
 }
 
-type NativeHandlerType = extern "system" fn(*mut EXCEPTION_POINTERS) -> c_long;
-
 /// Internal function that is being called whenever an exception arrives (stdcall).
 unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_POINTERS) -> c_long {
     let code = exception_pointers
