@@ -4,13 +4,14 @@ use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
 use serde::{Deserialize, Serialize};
 use std::{fs::OpenOptions, path::PathBuf};
+use uuid::Uuid;
 
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
 
 use crate::{
-    bolts::current_nanos, bolts::serdeany::SerdeAnyMap, corpus::Corpus, corpus::Testcase, inputs::Input,
-    state::HasMetadata, Error,
+    bolts::current_nanos, bolts::serdeany::SerdeAnyMap, corpus::Corpus, corpus::Testcase,
+    inputs::Input, state::HasMetadata, Error,
 };
 
 /// Options for the the format of the on-disk metadata
@@ -63,11 +64,7 @@ where
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
-            let file_orig = testcase
-                .input()
-                .as_ref()
-                .unwrap()
-                .generate_name(current_nanos() as usize);
+            let file_orig = testcase.input().as_ref().unwrap().generate_name(0);
 
             let mut file = file_orig.clone();
 

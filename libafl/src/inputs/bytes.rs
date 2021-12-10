@@ -8,6 +8,7 @@ use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
+use uuid::Uuid;
 
 #[cfg(feature = "std")]
 use crate::{bolts::fs::write_file_atomic, Error};
@@ -46,10 +47,8 @@ impl Input for BytesInput {
     }
 
     /// Generate a name for this input
-    fn generate_name(&self, timestamp: usize) -> String {
-        let mut hasher = AHasher::new_with_keys(0, 0);
-        hasher.write(self.bytes());
-        format!("{}{:016x}", timestamp, hasher.finish())
+    fn generate_name(&self, _idx: usize) -> String {
+        format!("{}", Uuid::new_v4().to_simple())
     }
 }
 

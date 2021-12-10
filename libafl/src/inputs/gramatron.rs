@@ -4,6 +4,7 @@ use core::hash::Hasher;
 use alloc::{rc::Rc, string::String, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
@@ -34,12 +35,8 @@ pub struct GramatronInput {
 impl Input for GramatronInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, timestamp: usize) -> String {
-        let mut hasher = AHasher::new_with_keys(0, 0);
-        for term in &self.terms {
-            hasher.write(term.symbol.as_bytes());
-        }
-        format!("{}{:016x}", timestamp, hasher.finish())
+    fn generate_name(&self, _idx: usize) -> String {
+        format!("{}", Uuid::new_v4().to_simple())
     }
 }
 

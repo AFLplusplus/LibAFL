@@ -12,6 +12,7 @@ use hashbrown::HashMap;
 #[cfg(feature = "std")]
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
@@ -177,12 +178,8 @@ pub struct EncodedInput {
 impl Input for EncodedInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, timestamp: usize) -> String {
-        let mut hasher = AHasher::new_with_keys(0, 0);
-        for code in &self.codes {
-            hasher.write(&code.to_le_bytes());
-        }
-        format!("{}{:016x}", timestamp, hasher.finish())
+    fn generate_name(&self, _idx: usize) -> String {
+        format!("{}", Uuid::new_v4().to_simple())
     }
 }
 

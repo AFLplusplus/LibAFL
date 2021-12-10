@@ -103,43 +103,21 @@ mod tests {
 
     #[cfg(feature = "nautilus")]
     use grammartec::{context::Context, tree::Tree};
+    use uuid::Uuid;
 
     static TEST_INPUT: &str = "I'm a test case";
 
     #[test]
-    /// test that `current_nanos` increment; basis of uniqueness assertion in `generate_name` methods
-    fn test_current_nanos_increment_on_each_call() {
-        // no appreciable time spent here, even tho iterations seem high
-        for _ in 1..1000000 {
-            let first = current_nanos();
-            let second = current_nanos();
-
-            assert!(first < second);
-        }
-    }
-
-    #[test]
-    /// create a `BytesInput` ensuring filename is created as expected
+    /// create a `BytesInput` ensuring filename is a parseable uuid
     fn test_bytesinput_generate_name() {
-        let nanos = current_nanos();
-        let str_nanos = nanos.to_string();
-        let expected = "bb05e9ace8a57564";
-
         let bytes = BytesInput::new(Vec::from(TEST_INPUT));
-        let name = bytes.generate_name(nanos as usize);
-
-        assert!(name.starts_with(&str_nanos));
-        assert!(name.ends_with(expected));
-        assert_eq!(name.len(), str_nanos.len() + expected.len());
+        let name = bytes.generate_name(0);
+        assert!(Uuid::parse_str(&name).is_ok());
     }
 
     #[test]
-    /// create an `EncodedInput` ensuring filename is created as expected
+    /// create an `EncodedInput` ensuring filename is a parseable uuid
     fn test_encodedinput_generate_name() {
-        let nanos = current_nanos();
-        let str_nanos = nanos.to_string();
-        let expected = "a507786c9e0cd22b";
-
         let encoded = TEST_INPUT
             .to_string()
             .as_bytes()
@@ -149,42 +127,30 @@ mod tests {
 
         let encoded_input = EncodedInput::new(encoded);
 
-        let name = encoded_input.generate_name(nanos as usize);
+        let name = encoded_input.generate_name(0);
 
-        assert!(name.starts_with(&str_nanos));
-        assert!(name.ends_with(expected));
-        assert_eq!(name.len(), str_nanos.len() + expected.len());
+        assert!(Uuid::parse_str(&name).is_ok());
     }
 
     #[test]
-    /// create a `GramatronInput` ensuring filename is created as expected
+    /// create a `GramatronInput` ensuring filename is a parseable uuid
     fn test_gramatroninput_generate_name() {
-        let nanos = current_nanos();
-        let str_nanos = nanos.to_string();
-        let expected = "eea01212d2afb28c";
-
         let term = Terminal::new(0, 0, String::from("terminal"));
 
         let gramatron_input = GramatronInput::new(vec![term]);
 
-        let name = gramatron_input.generate_name(nanos as usize);
+        let name = gramatron_input.generate_name(0);
 
-        assert!(name.starts_with(&str_nanos));
-        assert!(name.ends_with(expected));
-        assert_eq!(name.len(), str_nanos.len() + expected.len());
+        assert!(Uuid::parse_str(&name).is_ok());
     }
 
     #[test]
     #[cfg(feature = "nautilus")]
-    /// create a `NautilusInput` ensuring filename is created as expected
+    /// create a `NautilusInput` ensuring filename is a parseable uuid
     ///
     /// invoked via
     ///   `cargo +nightly test test_nautilusinput_generate_name --features nautilus`
     fn test_nautilusinput_generate_name() {
-        let nanos = current_nanos();
-        let str_nanos = nanos.to_string();
-        let expected = "307168d563cde098";
-
         let mut ctx = Context::new();
         let _ = ctx.add_rule("E", b"({E}+{E})");
         let _ = ctx.add_rule("E", b"1");
@@ -194,10 +160,8 @@ mod tests {
 
         let nautilus_input = NautilusInput::new(tree);
 
-        let name = nautilus_input.generate_name(nanos as usize);
+        let name = nautilus_input.generate_name(0);
 
-        assert!(name.starts_with(&str_nanos));
-        assert!(name.ends_with(expected));
-        assert_eq!(name.len(), str_nanos.len() + expected.len());
+        assert!(Uuid::parse_str(&name).is_ok());
     }
 }

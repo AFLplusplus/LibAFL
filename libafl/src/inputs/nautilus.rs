@@ -4,6 +4,7 @@ use core::hash::Hasher;
 use alloc::{rc::Rc, string::String};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input};
 
@@ -22,18 +23,8 @@ pub struct NautilusInput {
 impl Input for NautilusInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, timestamp: usize) -> String {
-        let mut hasher = AHasher::new_with_keys(0, 0);
-
-        for term in &self.tree.rules {
-            match term {
-                RuleIDOrCustom::Rule(rule_id) | RuleIDOrCustom::Custom(rule_id, _) => {
-                    hasher.write_usize(rule_id.to_i());
-                }
-            }
-        }
-
-        format!("{}{:016x}", timestamp, hasher.finish())
+    fn generate_name(&self, _idx: usize) -> String {
+        format!("{}", Uuid::new_v4().to_simple())
     }
 }
 
