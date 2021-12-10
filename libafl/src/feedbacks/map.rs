@@ -115,7 +115,7 @@ where
                     new_val.rotate_left(10 + bit_length - val.leading_zeros())
                 }
             }
-            _ => {
+            64 => {
                 // u64 or u128 (if ever) we treat this the same
                 let max_val = T::one();
                 if val >= max_val.rotate_left(37) {
@@ -124,6 +124,7 @@ where
                     new_val.rotate_left(25 + bit_length - val.leading_zeros())
                 }
             }
+            _ => panic!("Unsupported byte width size: {}", bit_length / 8),
         }
     }
 }
@@ -226,11 +227,7 @@ where
     #[inline]
     fn is_interesting(old: T, new: T) -> bool {
         // check if the bit is already set
-        if new & old == new {
-            false
-        } else {
-            true
-        }
+        (new & old) != new
     }
 }
 
