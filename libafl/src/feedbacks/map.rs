@@ -55,9 +55,10 @@ pub struct AflReducer {}
    the difference that there:
      [32 ... 127] = 64,
      [128 ... 255] = 128
-   but we do
+   but we do:
      [32 ... 63] = 64,
      [64 ... 255] = 128
+   because it is easier to implement and unlikely noticable better or worse
 */
 impl<T> Reducer<T> for AflReducer
 where
