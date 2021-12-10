@@ -32,25 +32,26 @@ pub fn main() {
         .about("Example Forkserver fuzer")
         .arg(
             Arg::new("executable")
-                .about("The instrumented binary we want to fuzz")
+                .help("The instrumented binary we want to fuzz")
                 .required(true)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
-                .about("The directory to read initial inputs from ('seeds')")
+                .help("The directory to read initial inputs from ('seeds')")
                 .required(true)
                 .takes_value(true),
         )
         .arg(
             Arg::new("timeout")
-                .about("Timeout for each individual execution, in milliseconds")
+                .help("Timeout for each individual execution, in milliseconds")
                 .short('t')
                 .long("timeout")
                 .default_value("1200"),
         )
         .arg(
             Arg::new("arguments")
+                .help("Arguments passed to the target")
                 .setting(clap::ArgSettings::MultipleValues)
                 .takes_value(true),
         )
