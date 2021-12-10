@@ -3,11 +3,24 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "a6b44da636a6baab71c79c715f23c0306744631b";
+const QEMU_REVISION: &str = "e97deaae59c1825823037c2d549f8697a05d157c";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
         which(tool).unwrap_or_else(|_| panic!("Build tool {} not found", tool));
+    }
+}
+
+#[macro_export]
+macro_rules! assert_unique_feature {
+    () => {};
+    ($first:tt $(,$rest:tt)*) => {
+        $(
+            #[cfg(not(feature = "clippy"))] // ignore multiple definition for clippy
+            #[cfg(all(feature = $first, feature = $rest))]
+            compile_error!(concat!("features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
+        )*
+        assert_unique_feature!($($rest),*);
     }
 }
 
@@ -16,7 +29,6 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/asan-giovese.c");
     println!("cargo:rerun-if-changed=src/asan-giovese.h");
-    println!("cargo:rerun-if-env-changed=CPU_TARGET");
     println!("cargo:rerun-if-env-changed=CROSS_CC");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
@@ -24,13 +36,40 @@ fn main() {
         return;
     }
 
+    // Make sure we have at least and at most one architecutre feature set
+    // Else, we default to `x86_64` - having a default makes CI easier :)
+    assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
+    #[cfg(not(any(
+        feature = "arm",
+        feature = "aarch64",
+        feature = "i386",
+        feature = "x86_64"
+    )))]
+    println!(
+        "cargo:warning=No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
+    );
+
+    let cpu_target = if cfg!(feature = "clippy") {
+        // assume x86_64 for clippy
+        "x86_64"
+    } else if cfg!(feature = "arm") {
+        "arm"
+    } else if cfg!(feature = "aarch64") {
+        "aarch64"
+    } else if cfg!(feature = "i386") {
+        "368"
+    } else {
+        // if cfg!(feature = "x86_64") {
+        "x86_64"
+        /*} else {
+        panic!("No architecture feture enabled for libafl_qemu");
+        */
+    };
+
     let jobs = env::var("CARGO_BUILD_JOBS");
-    let cpu_target = env::var("CPU_TARGET").unwrap_or_else(|_| {
-        println!("cargo:warning=CPU_TARGET is not set, default to x86_64");
-        "x86_64".to_owned()
-    });
+
     let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
-        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if CPU_TARGET is not the host arch)");
+        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({}) is not the host arch ({}))", cpu_target, env::consts::ARCH);
         "cc".to_owned()
     });
 

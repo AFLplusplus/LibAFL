@@ -246,7 +246,6 @@ impl InProcessHandlers {
         }
     }
 
-    #[must_use]
     pub fn new<E, EM, I, OC, OF, OT, S, Z>() -> Result<Self, Error>
     where
         I: Input,
@@ -687,6 +686,7 @@ mod windows_exception_handler {
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
+    use core::sync::atomic::{compiler_fence, Ordering};
     use windows::Win32::System::Threading::ExitProcess;
 
     pub type HandlerFuncPtr =
@@ -736,11 +736,14 @@ mod windows_exception_handler {
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
+        compiler_fence(Ordering::SeqCst);
         EnterCriticalSection(
             (data.critical as *mut RTL_CRITICAL_SECTION)
                 .as_mut()
                 .unwrap(),
         );
+        compiler_fence(Ordering::SeqCst);
+
         if data.in_target == 1 {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
@@ -795,6 +798,7 @@ mod windows_exception_handler {
                 eprintln!("Bye!");
 
                 event_mgr.await_restart_safe();
+                compiler_fence(Ordering::SeqCst);
 
                 LeaveCriticalSection(
                     (data.critical as *mut RTL_CRITICAL_SECTION)
@@ -805,11 +809,13 @@ mod windows_exception_handler {
                 ExitProcess(1);
             }
         }
+        compiler_fence(Ordering::SeqCst);
         LeaveCriticalSection(
             (data.critical as *mut RTL_CRITICAL_SECTION)
                 .as_mut()
                 .unwrap(),
         );
+        compiler_fence(Ordering::SeqCst);
         // println!("TIMER INVOKED!");
     }
 
@@ -831,6 +837,19 @@ mod windows_exception_handler {
         if let Some(x) =
             (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
         {
+            /*
+                We want to prevent the timeout handler being run while the main thread is executing the crash handler
+                Timeout handler runs if it has access to the critical section or data.in_target == 0
+                Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
+            */
+            compiler_fence(Ordering::SeqCst);
+            EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+            compiler_fence(Ordering::SeqCst);
+            data.in_target = 0;
+            compiler_fence(Ordering::SeqCst);
+            LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+            compiler_fence(Ordering::SeqCst);
+
             windows_delete_timer_queue(x);
             data.tp_timer = ptr::null_mut();
         }

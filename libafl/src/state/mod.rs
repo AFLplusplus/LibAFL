@@ -78,6 +78,12 @@ pub trait HasClientPerfMonitor {
 
     /// Mutatable ref to [`ClientPerfMonitor`]
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
+
+    /// This node's stability
+    fn stability(&self) -> &Option<f32>;
+
+    /// This node's stability (mut)
+    fn stability_mut(&mut self) -> &mut Option<f32>;
 }
 
 /// Trait for elements offering metadata
@@ -163,6 +169,8 @@ where
     metadata: SerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
+    /// The stability of the current fuzzing process
+    stability: Option<f32>,
 
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
@@ -552,6 +560,7 @@ where
         Self {
             rand,
             executions: 0,
+            stability: None,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             corpus,
@@ -581,6 +590,18 @@ where
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         &mut self.introspection_monitor
     }
+
+    /// This node's stability
+    #[inline]
+    fn stability(&self) -> &Option<f32> {
+        &self.stability
+    }
+
+    /// This node's stability (mut)
+    #[inline]
+    fn stability_mut(&mut self) -> &mut Option<f32> {
+        &mut self.stability
+    }
 }
 
 #[cfg(not(feature = "introspection"))]
@@ -598,5 +619,17 @@ where
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         unimplemented!()
+    }
+
+    /// This node's stability
+    #[inline]
+    fn stability(&self) -> &Option<f32> {
+        &self.stability
+    }
+
+    /// This node's stability (mut)
+    #[inline]
+    fn stability_mut(&mut self) -> &mut Option<f32> {
+        &mut self.stability
     }
 }

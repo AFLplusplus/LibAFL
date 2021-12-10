@@ -40,7 +40,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 
 /// How an execution finished.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ExitKind {
     /// The run exited normally.
     Ok,

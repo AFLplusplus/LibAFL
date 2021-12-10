@@ -243,7 +243,9 @@ where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn reset(&mut self) -> Result<(), Error> {
-        self.history_map.iter_mut().for_each(|x| *x = T::default());
+        self.history_map
+            .iter_mut()
+            .for_each(|x| *x = T::min_value());
         Ok(())
     }
 }
@@ -266,7 +268,7 @@ where
     #[must_use]
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
-            history_map: vec![T::default(); map_size],
+            history_map: vec![T::min_value(); map_size],
             name: name.to_string(),
         }
     }
@@ -278,7 +280,7 @@ where
         T: Debug,
     {
         Self {
-            history_map: vec![T::default(); map_observer.len()],
+            history_map: vec![T::min_value(); map_observer.len()],
             name: map_observer.name().to_string(),
         }
     }

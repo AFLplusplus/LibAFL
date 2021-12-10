@@ -34,6 +34,9 @@ use core::{
     ptr::{write, write_volatile},
 };
 
+#[cfg(windows)]
+use core::sync::atomic::{compiler_fence, Ordering};
+
 #[repr(C)]
 #[cfg(unix)]
 struct Timeval {
@@ -141,6 +144,29 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         }
     }
 
+    #[cfg(unix)]
+    pub fn set_timeout(&mut self, exec_tmout: Duration) {
+        let milli_sec = exec_tmout.as_millis();
+        let it_value = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_interval = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_interval,
+            it_value,
+        };
+        self.itimerval = itimerval;
+    }
+
+    #[cfg(windows)]
+    pub fn set_timeout(&mut self, exec_tmout: Duration) {
+        self.milli_sec = exec_tmout.as_millis() as i64;
+    }
+
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
     pub fn inner(&mut self) -> &mut E {
         &mut self.executor
@@ -184,18 +210,26 @@ where
             ft.dwLowDateTime = (tm & 0xffffffff) as u32;
             ft.dwHighDateTime = (tm >> 32) as u32;
 
+            compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(&mut self.critical);
-            write(&mut data.in_target, 1);
+            compiler_fence(Ordering::SeqCst);
+            data.in_target = 1;
+            compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(&mut self.critical);
+            compiler_fence(Ordering::SeqCst);
 
             SetThreadpoolTimer(self.tp_timer, &ft, 0, 0);
 
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
 
+            compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(&mut self.critical);
+            compiler_fence(Ordering::SeqCst);
             // Timeout handler will do nothing after we increment in_target value.
-            write(&mut data.in_target, 0);
+            data.in_target = 0;
+            compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(&mut self.critical);
+            compiler_fence(Ordering::SeqCst);
 
             write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());
 

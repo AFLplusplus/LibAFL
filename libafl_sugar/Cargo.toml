@@ -23,8 +23,8 @@ libafl = { path = "../libafl", version = "0.7.0" }
 libafl_targets = { path = "../libafl_targets", version = "0.7.0" }
 libafl_qemu = { path = "../libafl_qemu", version = "0.7.0" }
 typed-builder = "0.9.0" # Implement the builder pattern at compiletime
-#pyo3 = { version = "0.14.3", features = ["extension-module"], optional = true }
-pyo3 = { version = "0.14.3", optional = true }
+#pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.15", optional = true }
 
 [lib]
 name = "libafl_sugar"

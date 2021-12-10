@@ -14,6 +14,14 @@ edition = "2021"
 python = ["pyo3", "pyo3-build-config"]
 default = []
 
+# The following architecture features are mutually exclusive.
+x86_64 = [] # build qemu for x86_64 (default)
+i386 = [] # build qemu for i386
+arm = [] # build qemu for arm
+aarch64 = [] # build qemu for aarch64
+
+clippy = [] # special feature for clippy, don't use in normal projects§
+
 [dependencies]
 libafl = { path = "../libafl", version = "0.7.0" }
 libafl_targets = { path = "../libafl_targets", version = "0.7.0" }
@@ -26,8 +34,8 @@ libc = "0.2"
 strum = "0.21"
 strum_macros = "0.21"
 syscall-numbers = "2.0.0"
-#pyo3 = { version = "0.14.3", features = ["extension-module"], optional = true }
-pyo3 = { version = "0.14.3", optional = true }
+#pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.15", optional = true }
 
 [build-dependencies]
 cc = { version = "1.0" }

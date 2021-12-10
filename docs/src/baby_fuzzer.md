@@ -178,7 +178,7 @@ state
 
 Now you can prepend the necessary `use` directives to your main.rs and compile the fuzzer.
 
-```rust,ignore
+```rust
 extern crate libafl;
 
 use std::path::PathBuf;
