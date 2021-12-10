@@ -1,9 +1,6 @@
 //! The `EncodedInput` is the "normal" input, a map of codes, that can be sent directly to the client
 //! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
 
-use ahash::AHasher;
-use core::hash::Hasher;
-
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 #[cfg(feature = "std")]
 use core::str::from_utf8;

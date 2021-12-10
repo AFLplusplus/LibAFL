@@ -1,6 +1,3 @@
-use ahash::AHasher;
-use core::hash::Hasher;
-
 use alloc::{rc::Rc, string::String, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};

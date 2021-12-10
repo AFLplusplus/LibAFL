@@ -4,14 +4,13 @@ use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
 use serde::{Deserialize, Serialize};
 use std::{fs::OpenOptions, path::PathBuf};
-use uuid::Uuid;
 
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
 
 use crate::{
-    bolts::current_nanos, bolts::serdeany::SerdeAnyMap, corpus::Corpus, corpus::Testcase,
-    inputs::Input, state::HasMetadata, Error,
+    bolts::serdeany::SerdeAnyMap, corpus::Corpus, corpus::Testcase, inputs::Input,
+    state::HasMetadata, Error,
 };
 
 /// Options for the the format of the on-disk metadata

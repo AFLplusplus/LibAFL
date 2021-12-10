@@ -99,7 +99,6 @@ pub trait HasBytesVec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bolts::current_nanos;
 
     #[cfg(feature = "nautilus")]
     use grammartec::{context::Context, tree::Tree};

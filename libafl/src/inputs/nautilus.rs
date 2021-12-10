@@ -1,6 +1,3 @@
-use ahash::AHasher;
-use core::hash::Hasher;
-
 use alloc::{rc::Rc, string::String};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
@@ -10,7 +7,6 @@ use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input}
 
 use grammartec::{
     newtypes::NodeID,
-    rule::RuleIDOrCustom,
     tree::{Tree, TreeLike},
 };
 
