@@ -17,6 +17,9 @@ use libafl::{
 #[cfg(unix)]
 use crate::asan_errors::ASAN_ERRORS;
 
+#[cfg(windows)]
+use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
+
 pub struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
@@ -123,5 +126,21 @@ where
             followed: false,
             _phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(windows)]
+impl<'a, 'b, 'c, FH, H, I, OT, S> HasInProcessHandlers
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple<I, S>,
+    FH: FridaHelper<'b>,
+{
+    /// the timeout handler
+    #[inline]
+    fn inprocess_handlers(&self) -> &InProcessHandlers {
+        &self.base.handlers()
     }
 }

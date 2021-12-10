@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
@@ -243,7 +243,9 @@ where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn reset(&mut self) -> Result<(), Error> {
-        self.history_map.iter_mut().for_each(|x| *x = T::default());
+        self.history_map
+            .iter_mut()
+            .for_each(|x| *x = T::min_value());
         Ok(())
     }
 }
@@ -266,7 +268,7 @@ where
     #[must_use]
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
-            history_map: vec![T::default(); map_size],
+            history_map: vec![T::min_value(); map_size],
             name: name.to_string(),
         }
     }
@@ -275,9 +277,10 @@ where
     pub fn with_observer<O>(map_observer: &O) -> Self
     where
         O: MapObserver<T>,
+        T: Debug,
     {
         Self {
-            history_map: vec![T::default(); map_observer.len()],
+            history_map: vec![T::min_value(); map_observer.len()],
             name: map_observer.name().to_string(),
         }
     }
@@ -298,7 +301,7 @@ where
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct MapFeedback<FT, I, MF, O, R, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
     MF: MapFindFilter<T>,
@@ -319,7 +322,7 @@ where
 
 impl<FT, I, MF, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, MF, O, R, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
     MF: MapFindFilter<T>,
@@ -428,7 +431,7 @@ where
 
 impl<FT, I, MF, O, R, S, T> Named for MapFeedback<FT, I, MF, O, R, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     MF: MapFindFilter<T>,
     O: MapObserver<T>,
@@ -449,7 +452,8 @@ where
         + 'static
         + serde::Serialize
         + serde::de::DeserializeOwned
-        + PartialOrd,
+        + PartialOrd
+        + Debug,
     R: Reducer<T>,
     MF: MapFindFilter<T>,
     O: MapObserver<T>,

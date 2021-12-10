@@ -1,6 +1,6 @@
 [package]
 name = "libafl"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
@@ -57,9 +57,9 @@ ctor = "0.1.20"
 num_enum = { version = "0.5.1", default-features = false }
 typed-builder = "0.9.0" # Implement the builder pattern at compiletime
 ahash = { version = "0.7", default-features=false, features=["compile-time-rng"] } # The hash function already used in hashbrown
-intervaltree = { git = "https://github.com/andreafioraldi/rust-intervaltree", version = "0.2.6", default-features = false, features = ["serde"] }
+intervaltree = { version = "0.2.7", default-features = false, features = ["serde"] }
 
-libafl_derive = { version = "0.6.1", optional = true, path = "../libafl_derive" }
+libafl_derive = { version = "0.7.0", optional = true, path = "../libafl_derive" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] } # an easy way to debug print SerdeAnyMap
 miniz_oxide = { version = "0.4.4", optional = true}
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs", rev = "6648a7a", optional = true }
@@ -68,7 +68,7 @@ rand_core = { version = "0.5.1", optional = true } # This dependency allows us t
 nix = { version = "0.23.0", optional = true }
 regex = { version = "1", optional = true }
 build_id = { version = "0.2.1", git = "https://github.com/domenukk/build_id", rev = "6a61943", optional = true }
-uuid = { version = "0.8.2", optional = true, features = ["serde"] }
+uuid = { version = "0.8.2", optional = true, features = ["serde", "v4"] }
 libm = "0.2.1"
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
@@ -76,7 +76,7 @@ wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to
 z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for concolic mutation
 
 # AGPL
-grammartec = { git = "https://github.com/andreafioraldi/nautilus", optional = true }
+grammartec = { version = "0.1", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
@@ -86,11 +86,10 @@ regex = "1.4.5"
 backtrace = "0.3"
 
 [target.'cfg(windows)'.dependencies]
-windows = "0.18.0"
-uuid = { version = "0.8", features = ["v4"] }
+windows = { version = "0.28.0", features = ["std", "Win32_Foundation", "Win32_System_Threading", "Win32_System_Diagnostics_Debug", "Win32_System_Kernel", "Win32_System_Memory", "Win32_Security"] }
 
 [target.'cfg(windows)'.build-dependencies]
-windows = "0.18.0"
+windows = "0.28.0"
 
 [[bench]]
 name = "rand_speeds"

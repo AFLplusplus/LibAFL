@@ -18,6 +18,8 @@ use std::ffi::CString;
 pub use libc::c_ulong;
 
 #[cfg(target_arch = "arm")]
+#[allow(non_camel_case_types)]
+#[repr(C)]
 pub struct mcontext_t {
     pub trap_no: c_ulong,
     pub error_code: c_ulong,
@@ -43,6 +45,8 @@ pub struct mcontext_t {
 }
 
 #[cfg(target_arch = "arm")]
+#[allow(non_camel_case_types)]
+#[repr(C)]
 pub struct ucontext_t {
     pub uc_flags: u32,
     pub uc_link: *mut ucontext_t,

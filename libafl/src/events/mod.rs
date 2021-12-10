@@ -176,9 +176,11 @@ where
         executions: usize,
     },
     /// New stats event to monitor.
-    UpdateExecutions {
+    UpdateExecStats {
         /// The time of generation of the [`Event`]
         time: Duration,
+        /// The stability of this fuzzer node, if known
+        stability: Option<f32>,
         /// The executions of this client
         executions: usize,
         /// [`PhantomData`]
@@ -198,10 +200,10 @@ where
     UpdatePerfMonitor {
         /// The time of generation of the event
         time: Duration,
-
         /// The executions of this client
         executions: usize,
-
+        /// The stability of this fuzzer node, if known
+        stability: Option<f32>,
         /// Current performance statistics
         introspection_monitor: Box<ClientPerfMonitor>,
 
@@ -243,8 +245,9 @@ where
                 time: _,
                 executions: _,
             } => "Testcase",
-            Event::UpdateExecutions {
+            Event::UpdateExecStats {
                 time: _,
+                stability: _,
                 executions: _,
                 phantom: _,
             }
@@ -257,6 +260,7 @@ where
             Event::UpdatePerfMonitor {
                 time: _,
                 executions: _,
+                stability: _,
                 introspection_monitor: _,
                 phantom: _,
             } => "PerfMonitor",
@@ -287,6 +291,24 @@ where
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-cases.
     fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+
+    /// Send off an [`Event::Log`] event to the broker
+    /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
+    fn log<S>(
+        &mut self,
+        state: &mut S,
+        severity_level: LogSeverity,
+        message: String,
+    ) -> Result<(), Error> {
+        self.fire(
+            state,
+            Event::Log {
+                severity_level,
+                message,
+                phantom: PhantomData,
+            },
+        )
+    }
 
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT, S>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
@@ -320,6 +342,7 @@ where
         S: HasExecutions + HasClientPerfMonitor,
     {
         let executions = *state.executions();
+        let stability = *state.stability();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
@@ -327,8 +350,9 @@ where
             #[cfg(not(feature = "introspection"))]
             self.fire(
                 state,
-                Event::UpdateExecutions {
+                Event::UpdateExecStats {
                     executions,
+                    stability,
                     time: cur,
                     phantom: PhantomData,
                 },
@@ -348,6 +372,7 @@ where
                     Event::UpdatePerfMonitor {
                         executions,
                         time: cur,
+                        stability,
                         introspection_monitor: Box::new(state.introspection_monitor().clone()),
                         phantom: PhantomData,
                     },

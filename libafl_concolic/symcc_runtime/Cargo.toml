@@ -1,6 +1,6 @@
 [package]
 name = "symcc_runtime"
-version = "0.1.2"
+version = "0.7.0"
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>", "Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Build Concolic Tracing tools based on SymCC in Rust"
@@ -21,7 +21,7 @@ no-cpp-runtime = []
 unchecked_unwrap = "3"
 ctor = "0.1"
 libc = "0.2"
-libafl = {path = "../../libafl", version="0.6", default-features=false, features=["std"]}
+libafl = {path = "../../libafl", version="0.7", default-features=false, features=["std"]}
 
 [build-dependencies]
 cmake = "0.1"
@@ -29,4 +29,4 @@ bindgen = "0.59"
 regex = "1"
 lazy_static = "1.4"
 which = "4.1"
-symcc_libafl = {path = "../symcc_libafl", version="0.1"}
+symcc_libafl = {path = "../symcc_libafl", version="0.7"}

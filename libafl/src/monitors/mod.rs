@@ -3,15 +3,13 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
-use serde::{Deserialize, Serialize};
-
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt, time, time::Duration};
-
 use hashbrown::HashMap;
-
-#[cfg(feature = "introspection")]
-use alloc::string::ToString;
+use serde::{Deserialize, Serialize};
 
 use crate::bolts::{current_time, format_duration_hms};
 
@@ -59,7 +57,8 @@ pub struct ClientStats {
     pub last_execs_per_sec: f32,
     /// User-defined monitor
     pub user_monitor: HashMap<String, UserStats>,
-
+    /// Stability, and if we ever received a stability value
+    pub stability: Option<f32>,
     /// Client performance statistics
     #[cfg(feature = "introspection")]
     pub introspection_monitor: ClientPerfMonitor,
@@ -87,6 +86,11 @@ impl ClientStats {
     /// We got a new information about objective corpus size for this client, insert them.
     pub fn update_objective_size(&mut self, objective_size: u64) {
         self.objective_size = objective_size;
+    }
+
+    /// we got a new information about stability for this client, insert it.
+    pub fn update_stability(&mut self, stability: f32) {
+        self.stability = Some(stability);
     }
 
     /// Get the calculated executions per second for this client
@@ -149,6 +153,24 @@ pub trait Monitor {
 
     /// show the monitor to the user
     fn display(&mut self, event_msg: String, sender_id: u32);
+
+    /// Show the Stabiliity
+    fn stability(&self) -> Option<f32> {
+        let mut stability_total = 0_f32;
+        let mut num = 0_usize;
+        for stat in self.client_stats() {
+            if let Some(stability) = stat.stability {
+                stability_total += stability;
+                num += 1;
+            }
+        }
+        if num == 0 {
+            None
+        } else {
+            #[allow(clippy::cast_precision_loss)]
+            Some(stability_total / num as f32)
+        }
+    }
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
@@ -269,13 +291,18 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, {} exec/sec: {}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
+            if let Some(stability) = self.stability() {
+                format!(", stability: {:.2}", stability)
+            } else {
+                "".to_string()
+            },
             self.total_execs(),
             self.execs_per_sec()
         );
