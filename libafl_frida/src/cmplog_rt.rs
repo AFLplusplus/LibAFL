@@ -8,11 +8,14 @@ extern "C" {
 }
 
 #[cfg(target_arch = "aarch64")]
-use frida_gum::{instruction_writer::{Aarch64Register, IndexMode}, stalker::StalkerOutput};
+use frida_gum::{
+    instruction_writer::{Aarch64Register, IndexMode, InstructionWriter},
+    stalker::StalkerOutput,
+};
 
 use crate::helper::FridaInstrumentationHelper;
 
-enum SpecialCmpLogCase {
+pub enum SpecialCmpLogCase {
     Tbz,
     Tbnz,
 }
@@ -35,7 +38,7 @@ pub struct CmpLogRuntime {
 }
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-enum CmplogOperandType {
+pub enum CmplogOperandType {
     Regid(capstone::RegId),
     Imm(u64),
     Cimm(u64),

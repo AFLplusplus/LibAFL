@@ -515,5 +515,4 @@ impl<'a> FridaInstrumentationHelper<'a> {
             _ => X86Register::None, // Ignore Xax..Xip
         }
     }
-
 }
