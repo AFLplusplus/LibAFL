@@ -2069,7 +2069,7 @@ impl AsanRuntime {
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
-                    self.instruction_width(instr, &operands),
+                    FridaInstrumentationHelper::instruction_width(instr, &operands),
                     arm64operand.shift,
                     arm64operand.ext,
                 ));
