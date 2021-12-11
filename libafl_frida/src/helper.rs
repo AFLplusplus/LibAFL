@@ -394,7 +394,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
             }
             #[cfg(feature = "cmplog")]
             if helper.options.cmplog_enabled() {
-                helper.cmplog_runtime.cmplog_runtime.init();
+                helper.cmplog_runtime.init();
             }
         }
         helper
