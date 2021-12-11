@@ -595,7 +595,6 @@ impl CmpLogRuntime {
             Err(())
         }
     }
-
 }
 
 impl Default for CmpLogRuntime {
