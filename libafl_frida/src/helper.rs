@@ -54,13 +54,7 @@ use crate::coverage_rt::CoverageRuntime;
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
 
-#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-enum CmplogOperandType {
-    Regid(capstone::RegId),
-    Imm(u64),
-    Cimm(u64),
-    Mem(capstone::RegId, capstone::RegId, i32, u32),
-}
+
 
 enum SpecialCmpLogCase {
     Tbz,

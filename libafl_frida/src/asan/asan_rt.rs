@@ -25,7 +25,8 @@ use capstone::{
     Capstone, Insn,
 };
 
-
+#[cfg(target_arch = "aarch64")]
+use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{

@@ -8,6 +8,9 @@ extern "C" {
 }
 
 #[cfg(target_arch = "aarch64")]
+use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
+
+#[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{
         self,
@@ -22,6 +25,14 @@ pub struct CmpLogRuntime {
     ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
     ops_handle_tbz_masking: Option<Box<[u8]>>,
     ops_handle_tbnz_masking: Option<Box<[u8]>>,
+}
+
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+enum CmplogOperandType {
+    Regid(capstone::RegId),
+    Imm(u64),
+    Cimm(u64),
+    Mem(capstone::RegId, capstone::RegId, i32, u32),
 }
 
 impl CmpLogRuntime {
