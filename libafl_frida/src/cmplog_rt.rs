@@ -179,7 +179,7 @@ impl CmpLogRuntime {
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[inline]
     /// Emit the instrumentation code which is responsible for opernads value extraction and cmplog map population
-    fn emit_comparison_handling(
+    pub fn emit_comparison_handling(
         &self,
         _address: u64,
         output: &StalkerOutput,
@@ -270,10 +270,10 @@ impl CmpLogRuntime {
                 match special_case {
                     Some(inst) => match inst {
                         SpecialCmpLogCase::Tbz => {
-                            writer.put_bytes(&self.cmplog_runtime.ops_handle_tbz_masking());
+                            writer.put_bytes(&self.ops_handle_tbz_masking());
                         }
                         SpecialCmpLogCase::Tbnz => {
-                            writer.put_bytes(&self.cmplog_runtime.ops_handle_tbnz_masking());
+                            writer.put_bytes(&self.ops_handle_tbnz_masking());
                         }
                     },
                     None => (),
@@ -482,7 +482,7 @@ impl CmpLogRuntime {
         }
 
         //call cmplog runtime to populate the values map
-        writer.put_bytes(&self.cmplog_runtime.ops_save_register_and_blr_to_populate());
+        writer.put_bytes(&self.ops_save_register_and_blr_to_populate());
 
         // Restore x0, x1
         assert!(writer.put_ldp_reg_reg_reg_offset(
@@ -497,8 +497,9 @@ impl CmpLogRuntime {
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
-    fn cmplog_is_interesting_instruction(
+    pub fn cmplog_is_interesting_instruction(
         &self,
+        capstone: &Capstone,
         _address: u64,
         instr: &Insn,
     ) -> Result<
@@ -515,8 +516,7 @@ impl CmpLogRuntime {
             | "cbnz" | "tbz" | "tbnz" | "adcs" => (),
             _ => return Err(()),
         }
-        let mut operands = self
-            .capstone
+        let mut operands = capstone
             .insn_detail(instr)
             .unwrap()
             .arch_detail()

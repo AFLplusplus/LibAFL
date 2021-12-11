@@ -16,9 +16,16 @@ use backtrace::Backtrace;
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
-    arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
+    arch::{
+        self,
+        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+        ArchOperand::Arm64Operand,
+        BuildsCapstone,
+    },
     Capstone, Insn,
 };
+
+
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{
