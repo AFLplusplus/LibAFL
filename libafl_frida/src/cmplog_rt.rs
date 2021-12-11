@@ -8,7 +8,7 @@ extern "C" {
 }
 
 #[cfg(target_arch = "aarch64")]
-use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
+use frida_gum::{instruction_writer::{Aarch64Register, IndexMode}, stalker::StalkerOutput};
 
 use crate::helper::FridaInstrumentationHelper;
 

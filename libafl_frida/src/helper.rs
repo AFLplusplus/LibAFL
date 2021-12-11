@@ -58,13 +58,6 @@ use crate::coverage_rt::CoverageRuntime;
 #[cfg(feature = "cmplog")]
 use crate::cmplog_rt::CmpLogRuntime;
 
-
-
-enum SpecialCmpLogCase {
-    Tbz,
-    Tbnz,
-}
-
 #[cfg(any(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
