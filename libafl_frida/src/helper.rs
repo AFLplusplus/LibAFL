@@ -326,8 +326,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
                         if helper.options().asan_enabled() {
                             #[cfg(all(target_arch = "x86_64", unix))]
-                            if let Ok((segment, width, basereg, indexreg, scale, disp)) =
-                                helper.asan_runtime.asan_is_interesting_instruction(&helper.capstone, address, instr)
+                            if let Ok((segment, width, basereg, indexreg, scale, disp)) = helper
+                                .asan_runtime
+                                .asan_is_interesting_instruction(&helper.capstone, address, instr)
                             {
                                 helper.asan_runtime.emit_shadow_check(
                                     address, &output, segment, width, basereg, indexreg, scale,
@@ -336,7 +337,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
                             }
                             #[cfg(target_arch = "aarch64")]
                             if let Ok((basereg, indexreg, displacement, width, shift, extender)) =
-                                helper.asan_runtime.asan_is_interesting_instruction(&helper.capstone, address, instr)
+                                helper.asan_runtime.asan_is_interesting_instruction(
+                                    &helper.capstone,
+                                    address,
+                                    instr,
+                                )
                             {
                                 helper.asan_runtime.emit_shadow_check(
                                     address,

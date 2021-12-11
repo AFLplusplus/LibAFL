@@ -23,7 +23,7 @@ use capstone::{
 #[cfg(target_arch = "x86_64")]
 use capstone::{
     arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, RegAccessType, RegId, Insn,
+    Capstone, Insn, RegAccessType, RegId,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -31,7 +31,9 @@ use frida_gum::instruction_writer::X86Register;
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use frida_gum::interceptor::Interceptor;
-use frida_gum::{Gum, Module, ModuleMap, stalker::StalkerOutput, instruction_writer::InstructionWriter};
+use frida_gum::{
+    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleMap,
+};
 #[cfg(unix)]
 use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
