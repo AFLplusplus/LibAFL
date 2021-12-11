@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt::Debug, marker::PhantomData, mem::size_of};
+use core::{fmt::Debug, marker::PhantomData};
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
@@ -47,19 +47,14 @@ where
     fn reduce(first: T, second: T) -> T;
 }
 
-/// A [`MaxReducer`] reduces int values and returns their maximum.
+/// A [`AflReducer`] combines the bits for the history map and the bit
+/// from HitcountsMapObserver. is_interesting then just needs to check
+/// if they history == new, and if not we have a new find.
+/// We have to do it like this because MapFeedback does:
+///   map_state.history_map[i] = reduced;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AflReducer {}
 
-/* The AflReducer is very close to AFL++'s count_class_lookup8 - with
-   the difference that there:
-     [32 ... 127] = 64,
-     [128 ... 255] = 128
-   but we do:
-     [32 ... 63] = 64,
-     [64 ... 255] = 128
-   because it is easier to implement and unlikely noticable better or worse
-*/
 impl<T> Reducer<T> for AflReducer
 where
     T: PrimInt
@@ -71,62 +66,8 @@ where
         + PartialOrd,
 {
     #[inline]
-    fn reduce(_ignore: T, val: T) -> T {
-        // most are zero, second most are one, then two - handle these first
-        // these are always the same for all Integer types. speed.
-        if val <= T::from(2).unwrap() {
-            return val;
-        }
-
-        // for all other values it depends on the bit length of the PrimInt
-        // to what bit we reduce the value
-        let bit_length = size_of::<T>() as u32 * 8;
-
-        // if the value is smaller/equal half of the bitsize we dedicate
-        // one specific bit for this
-        if bit_length as u64 / 2 <= val.to_u64().unwrap() {
-            let new_val = T::one();
-            return new_val.rotate_left(val.to_u32().unwrap() - 1);
-        }
-
-        // if it is larger we keep the highest bit and shift left to compensate
-        // for the dedicated lower bits.
-        // Of course this can overflow so check for the max value first for
-        // which onwards we set the highest bit
-        let new_val = T::one();
-        match bit_length {
-            8 => {
-                if val >= T::from(64 as u8).unwrap() {
-                    new_val.rotate_left(7)
-                } else {
-                    new_val.rotate_left(bit_length - val.leading_zeros())
-                }
-            }
-            16 => {
-                if val >= T::from(2048 as u16).unwrap() {
-                    new_val.rotate_left(15)
-                } else {
-                    new_val.rotate_left(3 + bit_length - val.leading_zeros())
-                }
-            }
-            32 => {
-                if val >= T::from(1048576 as u32).unwrap() {
-                    new_val.rotate_left(31)
-                } else {
-                    new_val.rotate_left(10 + bit_length - val.leading_zeros())
-                }
-            }
-            64 => {
-                // u64 or u128 (if ever) we treat this the same
-                let max_val = T::one();
-                if val >= max_val.rotate_left(37) {
-                    new_val.rotate_left(63)
-                } else {
-                    new_val.rotate_left(25 + bit_length - val.leading_zeros())
-                }
-            }
-            _ => panic!("Unsupported byte width size: {}", bit_length / 8),
-        }
+    fn reduce(history: T, new: T) -> T {
+        history | new
     }
 }
 
@@ -218,7 +159,8 @@ fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
     }
 }
 
-/// A filter that only saves values which are at least the next pow2 class
+/// A filter that is similar to AFL++
+/// It must be combined with HitcountsMapObserver.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MapAflFilter {}
 impl<T> MapFindFilter<T> for MapAflFilter
@@ -227,8 +169,7 @@ where
 {
     #[inline]
     fn is_interesting(old: T, new: T) -> bool {
-        // check if the bit is already set
-        (new & old) != new
+        old != new
     }
 }
 
