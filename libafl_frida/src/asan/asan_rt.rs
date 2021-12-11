@@ -221,7 +221,7 @@ impl AsanRuntime {
         &mut self.allocator
     }
 
-    pub fn shadow_check_func(&self) -> & Option<extern "C" fn(*const c_void, usize) -> bool> {
+    pub fn shadow_check_func(&self) -> &Option<extern "C" fn(*const c_void, usize) -> bool> {
         &self.shadow_check_func
     }
 
