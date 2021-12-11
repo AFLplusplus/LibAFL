@@ -12,6 +12,11 @@ use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 
 use crate::helper::FridaInstrumentationHelper;
 
+enum SpecialCmpLogCase {
+    Tbz,
+    Tbnz,
+}
+
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{
