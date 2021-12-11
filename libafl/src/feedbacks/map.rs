@@ -48,10 +48,10 @@ where
 }
 
 /// A [`AflReducer`] combines the bits for the history map and the bit
-/// from HitcountsMapObserver. is_interesting then just needs to check
+/// from ``HitcountsMapObserver``. ``is_interesting`` then just needs to check
 /// if they history == new, and if not we have a new find.
-/// We have to do it like this because MapFeedback does:
-///   map_state.history_map[i] = reduced;
+/// We have to do it like this because ``MapFeedback`` does:
+///   ``map_state.history_map``[i] = reduced;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AflReducer {}
 
@@ -160,7 +160,7 @@ fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
 }
 
 /// A filter that is similar to AFL++
-/// It must be combined with HitcountsMapObserver.
+/// It must be combined with ``HitcountsMapObserver``.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MapAflFilter {}
 impl<T> MapFindFilter<T> for MapAflFilter
