@@ -13,11 +13,11 @@ use serde::{Deserialize, Serialize};
 use std::{ffi::c_void, io};
 
 use crate::{
-    asan_errors::{AsanError, AsanErrors},
+    asan::asan_errors::{AsanError, AsanErrors},
     FridaOptions,
 };
 
-pub(crate) struct Allocator {
+pub struct Allocator {
     #[allow(dead_code)]
     options: FridaOptions,
     page_size: usize,
@@ -44,7 +44,7 @@ macro_rules! map_to_shadow {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(crate) struct AllocationMetadata {
+pub struct AllocationMetadata {
     pub address: usize,
     pub size: usize,
     pub actual_size: usize,
