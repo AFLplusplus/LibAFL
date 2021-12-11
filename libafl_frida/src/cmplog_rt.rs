@@ -7,6 +7,17 @@ extern "C" {
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
 
+#[cfg(target_arch = "aarch64")]
+use capstone::{
+    arch::{
+        self,
+        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+        ArchOperand::Arm64Operand,
+        BuildsCapstone,
+    },
+    Capstone, Insn,
+};
+
 pub struct CmpLogRuntime {
     ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
     ops_handle_tbz_masking: Option<Box<[u8]>>,
