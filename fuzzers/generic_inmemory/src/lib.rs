@@ -1,9 +1,9 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The `launcher` will spawn new processes for each cpu core.
 
-use clap::{load_yaml, App};
 use core::time::Duration;
-use std::{env, path::PathBuf};
+use std::{env, net::SocketAddr, path::PathBuf};
+use structopt::StructOpt;
 
 use libafl::{
     bolts::{
@@ -39,6 +39,76 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "generic_inmemory",
+    about = "A generic libfuzzer-like fuzzer with llmp-multithreading support",
+    author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+)]
+struct Opt {
+    #[structopt(
+        short,
+        long,
+        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+        name = "CORES"
+    )]
+    cores: String,
+
+    #[structopt(
+        short = "p",
+        long,
+        help = "Choose the broker TCP port, default is 1337",
+        name = "PORT"
+    )]
+    broker_port: u16,
+
+    #[structopt(
+        parse(try_from_str),
+        short = "a",
+        long,
+        help = "Specify a remote broker",
+        name = "REMOTE"
+    )]
+    remote_broker_addr: Option<SocketAddr>,
+
+    #[structopt(
+        parse(try_from_str),
+        short,
+        long,
+        help = "Set an initial corpus directory",
+        name = "INPUT"
+    )]
+    input: Vec<PathBuf>,
+
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str),
+        help = "Set the output directory, default is ./out",
+        name = "INPUT",
+        default_value = "./out"
+    )]
+    output: PathBuf,
+
+    #[structopt(
+        short,
+        long,
+        help = "Set the exeucution timeout in milliseconds, default is 1000",
+        name = "TIMEOUT"
+    )]
+    timeout: u64,
+
+    #[structopt(
+        parse(from_os_str),
+        short = "x",
+        long,
+        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
+        name = "TOKENS",
+        multiple = true
+    )]
+    tokens: Vec<PathBuf>,
+}
+
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
 pub fn libafl_main() {
@@ -48,34 +118,15 @@ pub fn libafl_main() {
 
     let workdir = env::current_dir().unwrap();
 
-    let yaml = load_yaml!("clap-config.yaml");
-    let matches = App::from(yaml).get_matches();
+    let opt = Opt::from_args();
 
-    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
-        .expect("No valid core count given!");
-    let broker_port = matches
-        .value_of("broker_port")
-        .map(|s| s.parse().expect("Invalid broker port"))
-        .unwrap_or(1337);
-    let remote_broker_addr = matches
-        .value_of("remote_broker_addr")
-        .map(|s| s.parse().expect("Invalid broker address"));
-    let input_dirs: Vec<PathBuf> = matches
-        .values_of("input")
-        .map(|v| v.map(PathBuf::from).collect())
-        .unwrap_or_default();
-    let output_dir = matches
-        .value_of("output")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| workdir.clone());
-    let token_files: Vec<&str> = matches
-        .values_of("tokens")
-        .map(|v| v.collect())
-        .unwrap_or_default();
-    let timeout_ms = matches
-        .value_of("timeout")
-        .map(|s| s.parse().expect("Invalid timeout"))
-        .unwrap_or(10000);
+    let cores = parse_core_bind_arg(&opt.cores).expect("No valid core count given!");
+    let broker_port = opt.broker_port;
+    let remote_broker_addr = opt.remote_broker_addr;
+    let input_dirs = opt.input;
+    let output_dir = opt.output;
+    let token_files = opt.tokens;
+    let timeout_ms = opt.timeout;
     // let cmplog_enabled = matches.is_present("cmplog");
 
     println!("Workdir: {:?}", workdir.to_string_lossy().to_string());
