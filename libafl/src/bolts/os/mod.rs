@@ -94,37 +94,71 @@ pub fn dup2(fd: i32, device: i32) -> Result<(), Error> {
     }
 }
 
+/// The core ids to use for fuzzing
+#[cfg(feature = "std")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Cores {
+    /// The original commandline used during parsing
+    pub cmdline: String,
+
+    /// Vec of core ids
+    pub cores: Vec<usize>,
+}
+
+#[cfg(feature = "std")]
+impl Cores {
+    /// Parses core binding args from user input
+    /// Returns a Vec of CPU IDs.
+    /// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
+    /// ` ./fuzzer --cores all` -> one client runs on each available core
+    #[must_use]
+    pub fn from_cmdline(args: &str) -> Result<Self, Error> {
+        let mut cores: Vec<usize> = vec![];
+        if args == "all" {
+            let num_cores = core_affinity::get_core_ids().unwrap().len();
+            for x in 0..num_cores {
+                cores.push(x);
+            }
+        } else {
+            let core_args: Vec<&str> = args.split(',').collect();
+
+            // ./fuzzer --cores 1,2-4,6 -> clients run in cores 1,2,3,4,6
+            // ./fuzzer --cores all -> one client runs in each available core
+            for csv in core_args {
+                let core_range: Vec<&str> = csv.split('-').collect();
+                if core_range.len() == 1 {
+                    cores.push(core_range[0].parse::<usize>().unwrap());
+                } else if core_range.len() == 2 {
+                    for x in core_range[0].parse::<usize>().unwrap()
+                        ..=(core_range[1].parse::<usize>().unwrap())
+                    {
+                        cores.push(x);
+                    }
+                }
+            }
+        }
+
+        if cores.is_empty() {
+            return Err(Error::IllegalArgument(format!(
+                "No cores specified! parsed: {}",
+                args
+            )));
+        }
+
+        Ok(Self {
+            cmdline: args.to_string(),
+            cores,
+        })
+    }
+}
+
 /// Parses core binding args from user input
 /// Returns a Vec of CPU IDs.
 /// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
 /// ` ./fuzzer --cores all` -> one client runs on each available core
 #[must_use]
 #[cfg(feature = "std")]
+#[deprecated(since = "0.7.1", note = "Use Cores::from_cmdline instead")]
 pub fn parse_core_bind_arg(args: &str) -> Option<Vec<usize>> {
-    let mut cores: Vec<usize> = vec![];
-    if args == "all" {
-        let num_cores = core_affinity::get_core_ids().unwrap().len();
-        for x in 0..num_cores {
-            cores.push(x);
-        }
-    } else {
-        let core_args: Vec<&str> = args.split(',').collect();
-
-        // ./fuzzer --cores 1,2-4,6 -> clients run in cores 1,2,3,4,6
-        // ./fuzzer --cores all -> one client runs in each available core
-        for csv in core_args {
-            let core_range: Vec<&str> = csv.split('-').collect();
-            if core_range.len() == 1 {
-                cores.push(core_range[0].parse::<usize>().unwrap());
-            } else if core_range.len() == 2 {
-                for x in core_range[0].parse::<usize>().unwrap()
-                    ..=(core_range[1].parse::<usize>().unwrap())
-                {
-                    cores.push(x);
-                }
-            }
-        }
-    }
-
-    Some(cores)
+    Cores::from_cmdline(&args).ok().map(|cores| cores.cores)
 }

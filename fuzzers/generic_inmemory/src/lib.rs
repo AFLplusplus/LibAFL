@@ -9,7 +9,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::parse_core_bind_arg,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -39,6 +39,7 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
+
 #[derive(Debug, StructOpt)]
 #[structopt(
     name = "generic_inmemory",
@@ -49,10 +50,11 @@ struct Opt {
     #[structopt(
         short,
         long,
+        parse(try_from_str = Cores::from_cmdline),
         help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
         name = "CORES"
     )]
-    cores: String,
+    cores: Cores,
 
     #[structopt(
         short = "p",
@@ -120,7 +122,7 @@ pub fn libafl_main() {
 
     let opt = Opt::from_args();
 
-    let cores = parse_core_bind_arg(&opt.cores).expect("No valid core count given!");
+    let cores = opt.cores;
     let broker_port = opt.broker_port;
     let remote_broker_addr = opt.remote_broker_addr;
     let input_dirs = opt.input;
@@ -287,7 +289,7 @@ pub fn libafl_main() {
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
         .run_client(&mut run_client)
-        .cores(&cores)
+        .cores(&cores.cores)
         .broker_port(broker_port)
         .remote_broker_addr(remote_broker_addr)
         //.stdout_file(Some("/dev/null"))
