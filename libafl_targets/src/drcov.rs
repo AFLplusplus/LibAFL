@@ -6,7 +6,8 @@ use libafl::Error;
 use rangemap::RangeMap;
 use std::{
     fs::File,
-    io::{BufWriter, Write}, path::Path,
+    io::{BufWriter, Write},
+    path::Path,
 };
 
 /// A basic block struct
@@ -44,21 +45,17 @@ impl DrCovBasicBlock {
 }
 
 impl<'a> DrCovWriter<'a> {
-
     /// Create a new [`DrCovWriter`]
     pub fn new(module_mapping: &'a RangeMap<usize, (u16, String)>) -> Self {
-        Self {
-            module_mapping,
-        }
+        Self { module_mapping }
     }
 
     /// Write the list of basic blocks to a `DrCov` file.
     pub fn write<P>(&mut self, path: P, basic_blocks: &[DrCovBasicBlock]) -> Result<(), Error>
     where
-        P: AsRef<Path>
+        P: AsRef<Path>,
     {
-        let mut writer =
-            BufWriter::new(File::create(path)?);
+        let mut writer = BufWriter::new(File::create(path)?);
 
         writer
             .write_all(b"DRCOV VERSION: 2\nDRCOV FLAVOR: libafl\n")
