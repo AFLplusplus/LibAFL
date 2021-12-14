@@ -1,4 +1,10 @@
 //! Operating System specific abstractions
+//!
+
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
@@ -143,7 +149,6 @@ impl From<core_affinity::CoreId> for CoreId {
 }
 
 /// A list of [`CoreId`] to use for fuzzing
-#[cfg(feature = "std")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cores {
     /// The original commandline used during parsing
@@ -209,7 +214,6 @@ impl Cores {
     }
 }
 
-#[cfg(feature = "std")]
 impl From<&[usize]> for Cores {
     fn from(cores: &[usize]) -> Self {
         let cmdline = cores
