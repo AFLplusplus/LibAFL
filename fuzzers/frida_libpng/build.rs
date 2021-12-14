@@ -47,34 +47,30 @@ fn main() {
         let zlib_path = Path::new(&zlib);
         let zlib_tar = format!("{}/zlib-1.2.11.tar.gz", &cwd);
 
-        if !libpng_path.is_dir() {
-            if !Path::new(&libpng_tar).is_file() {
-                println!("cargo:warning=Libpng not found, downloading...");
-                // Download libpng
-                let mut resp = reqwest::blocking::get(LIBPNG_URL).expect("Libpng download failed");
-                let mut out = File::create(&libpng_tar).expect("Libpng download failed");
-                io::copy(&mut resp, &mut out).expect("Libpng downlaod failed");
+        if !libpng_path.is_dir() && !Path::new(&libpng_tar).is_file() {
+            println!("cargo:warning=Libpng not found, downloading...");
+            // Download libpng
+            let mut resp = reqwest::blocking::get(LIBPNG_URL).expect("Libpng download failed");
+            let mut out = File::create(&libpng_tar).expect("Libpng download failed");
+            io::copy(&mut resp, &mut out).expect("Libpng downlaod failed");
 
-                let tar_xz = File::open(&libpng_tar).expect("Libpng extraction failed");
-                let tar = XzDecoder::new(tar_xz);
-                let mut archive = Archive::new(tar);
-                archive.unpack(&cwd).expect("Libpng extraction failed");
-            }
+            let tar_xz = File::open(&libpng_tar).expect("Libpng extraction failed");
+            let tar = XzDecoder::new(tar_xz);
+            let mut archive = Archive::new(tar);
+            archive.unpack(&cwd).expect("Libpng extraction failed");
         }
-        if !zlib_path.is_dir() {
-            if !Path::new(&zlib_tar).is_file() {
-                println!("cargo:warning=Zlib not found, downloading...");
-                // Download Zlib
-                let mut resp = reqwest::blocking::get(ZLIB_URL).expect("Zlib download failed");
-                let mut out = File::create(&zlib_tar).expect("Zlib download failed");
-                io::copy(&mut resp, &mut out).expect("Zlib downlaod failed");
+        if !zlib_path.is_dir() && !Path::new(&zlib_tar).is_file() {
+            println!("cargo:warning=Zlib not found, downloading...");
+            // Download Zlib
+            let mut resp = reqwest::blocking::get(ZLIB_URL).expect("Zlib download failed");
+            let mut out = File::create(&zlib_tar).expect("Zlib download failed");
+            io::copy(&mut resp, &mut out).expect("Zlib downlaod failed");
 
-                let tar_gz = File::open(&zlib_tar).expect("Zlib extraction failed");
-                let tar = GzDecoder::new(tar_gz);
-                let mut archive = Archive::new(tar);
-                archive.unpack(&cwd).expect("Zlib extraction failed");
-                rename(zlib_1_2_11, zlib).expect("Zlib extraction failed");
-            }
+            let tar_gz = File::open(&zlib_tar).expect("Zlib extraction failed");
+            let tar = GzDecoder::new(tar_gz);
+            let mut archive = Archive::new(tar);
+            archive.unpack(&cwd).expect("Zlib extraction failed");
+            rename(zlib_1_2_11, zlib).expect("Zlib extraction failed");
         }
 
         println!("cargo:warning=Now compile libpng with either visual studio or msys2");
