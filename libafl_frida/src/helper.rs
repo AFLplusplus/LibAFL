@@ -7,12 +7,7 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
-    arch::{
-        self,
-        arm64::Arm64OperandType,
-        ArchOperand::Arm64Operand,
-        BuildsCapstone,
-    },
+    arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
 
@@ -32,9 +27,7 @@ use frida_gum::instruction_writer::Aarch64Register;
 use frida_gum::instruction_writer::X86Register;
 
 use frida_gum::{
-    instruction_writer::InstructionWriter,
-    stalker::Transformer,
-    ModuleDetails, ModuleMap,
+    instruction_writer::InstructionWriter, stalker::Transformer, ModuleDetails, ModuleMap,
 };
 
 #[cfg(unix)]
