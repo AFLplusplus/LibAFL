@@ -12,6 +12,42 @@ use std::{
 
 use libafl::generators::gramatron::{Automaton, Trigger};
 
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "construct_automata"
+    about = "Generate a serialized Automaton using a json GNF grammar",
+    author = "Andrea Fioraldi <andreafioraldi@gmail.com>"
+)]
+struct Opt {
+    #[structopt(
+        parse(try_from_str),
+        short,
+        long = "grammar-file"
+        name = "GRAMMAR",
+        help = "The grammar to use during fuzzing"
+    )]
+    grammar: PathBuf,
+
+    #[structopt(
+        parse(try_from_str)
+        short,
+        long,
+        name = "LIMIT",
+        help = "The max stack size after which a generated input is abandoned"
+        default_value = 0
+    )]
+    limit: usize,
+
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str),
+        help = "Set the output file",
+        name = "OUTPUT"
+    )]
+    output: PathBuf,
+}
+
 fn read_grammar_from_file<P: AsRef<Path>>(path: P) -> Value {
     let file = fs::File::open(path).unwrap();
     let reader = BufReader::new(file);
@@ -268,12 +304,11 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
 }
 
 fn main() {
-    let yaml = load_yaml!("clap-config.yaml");
-    let matches = App::from(yaml).get_matches();
+    opt = Opt::from_args();
 
-    let grammar_file = matches.value_of("grammar").unwrap();
-    let output_file = matches.value_of("output").unwrap();
-    let stack_limit = matches.value_of_t::<usize>("limit").unwrap_or(0);
+    let grammar_file = opt.grammar;
+    let output_file = opt.output;
+    let stack_limit = opt.limit;
 
     let mut worklist = VecDeque::new();
     let mut state_count = 1;
