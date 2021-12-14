@@ -67,6 +67,26 @@ where
     }
 }
 
+/// A [`AndReducer`] reduces the values returning the bitwise AND with the old value
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AndReducer {}
+
+impl<T> Reducer<T> for AndReducer
+where
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd,
+{
+    #[inline]
+    fn reduce(history: T, new: T) -> T {
+        history & new
+    }
+}
+
 /// A [`MaxReducer`] reduces int values and returns their maximum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MaxReducer {}
