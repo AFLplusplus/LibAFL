@@ -101,7 +101,7 @@ pub fn main() {
         )
         .get_matches();
 
-    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap().to_string()).unwrap();
+    let cores = Cores::from_cmdline(&matches.value_of("cores").unwrap().to_string()).unwrap();
 
     color_backtrace::install();
 
@@ -127,7 +127,7 @@ pub fn main() {
             &[PathBuf::from("./corpus")],
             &PathBuf::from("./crashes"),
             1337,
-            &cores,
+            cores,
             matches.value_of("output"),
             broker_addr,
             matches
@@ -150,7 +150,7 @@ unsafe fn fuzz(
     corpus_dirs: &[PathBuf],
     objective_dir: &Path,
     broker_port: u16,
-    cores: &[usize],
+    cores: Cores,
     stdout_file: Option<&str>,
     broker_addr: Option<SocketAddr>,
     configuration: String,
