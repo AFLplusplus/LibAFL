@@ -1,20 +1,21 @@
-use clap::{load_yaml, App};
 use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
-use std::collections::{HashMap, HashSet, VecDeque};
 use std::{
+    collections::{HashMap, HashSet, VecDeque},
     fs,
     io::{BufReader, Write},
     path::Path,
+    path::PathBuf,
     rc::Rc,
 };
+use structopt::StructOpt;
 
 use libafl::generators::gramatron::{Automaton, Trigger};
 
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "construct_automata"
+    name = "construct_automata",
     about = "Generate a serialized Automaton using a json GNF grammar",
     author = "Andrea Fioraldi <andreafioraldi@gmail.com>"
 )]
@@ -22,26 +23,26 @@ struct Opt {
     #[structopt(
         parse(try_from_str),
         short,
-        long = "grammar-file"
+        long = "grammar-file",
         name = "GRAMMAR",
         help = "The grammar to use during fuzzing"
     )]
     grammar: PathBuf,
 
     #[structopt(
-        parse(try_from_str)
+        parse(try_from_str),
         short,
         long,
         name = "LIMIT",
-        help = "The max stack size after which a generated input is abandoned"
-        default_value = 0
+        help = "The max stack size after which a generated input is abandoned",
+        default_value = "0"
     )]
     limit: usize,
 
     #[structopt(
+        parse(try_from_str),
         short,
         long,
-        parse(try_from_str),
         help = "Set the output file",
         name = "OUTPUT"
     )]
@@ -304,7 +305,7 @@ fn postprocess(pda: &[Transition], stack_limit: usize) -> Automaton {
 }
 
 fn main() {
-    opt = Opt::from_args();
+    let opt = Opt::from_args();
 
     let grammar_file = opt.grammar;
     let output_file = opt.output;

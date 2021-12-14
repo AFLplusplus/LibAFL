@@ -114,7 +114,7 @@ where
         // Spawn clients
         let mut index = 0_u64;
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
-            if self.cores.ids.iter().any(|&x| x == id) {
+            if self.cores.ids.iter().any(|&x| x == id.into()) {
                 index += 1;
                 self.shmem_provider.pre_fork()?;
                 match unsafe { fork() }? {
