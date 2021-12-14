@@ -19,7 +19,6 @@ use crate::helper::FridaInstrumentationHelper;
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{
-        self,
         arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
         ArchOperand::Arm64Operand,
         BuildsCapstone,
@@ -29,9 +28,6 @@ use capstone::{
 
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-
-#[cfg(target_arch = "aarch64")]
-use num_traits::FromPrimitive;
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{

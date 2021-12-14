@@ -9,7 +9,7 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use capstone::{
     arch::{
         self,
-        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+        arm64::Arm64OperandType,
         ArchOperand::Arm64Operand,
         BuildsCapstone,
     },
@@ -26,14 +26,14 @@ use capstone::{
 use num_traits::cast::FromPrimitive;
 
 #[cfg(target_arch = "aarch64")]
-use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
+use frida_gum::instruction_writer::Aarch64Register;
 
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 
 use frida_gum::{
     instruction_writer::InstructionWriter,
-    stalker::{StalkerOutput, Transformer},
+    stalker::Transformer,
     ModuleDetails, ModuleMap,
 };
 

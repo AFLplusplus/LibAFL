@@ -23,10 +23,8 @@ pub enum SpecialCmpLogCase {
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{
-        self,
-        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+        arm64::Arm64OperandType,
         ArchOperand::Arm64Operand,
-        BuildsCapstone,
     },
     Capstone, Insn,
 };
