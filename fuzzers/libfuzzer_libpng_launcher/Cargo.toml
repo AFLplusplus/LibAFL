@@ -24,7 +24,7 @@ libafl = { path = "../../libafl/", features = ["std", "anymap_debug", "derive", 
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
-clap = { version = "3.0.0-beta.2", features = ["yaml"] }
+structopt = "0.3.25"
 
 [lib]
 name = "libfuzzer_libpng"

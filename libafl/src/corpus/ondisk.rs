@@ -3,7 +3,10 @@
 use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, path::{Path, PathBuf}};
+use std::{
+    fs::OpenOptions,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
