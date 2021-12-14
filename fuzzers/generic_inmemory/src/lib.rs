@@ -41,6 +41,9 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -95,12 +98,14 @@ struct Opt {
     output: PathBuf,
 
     #[structopt(
+        parse(try_from_str = timeout_from_millis_str),
         short,
         long,
         help = "Set the exeucution timeout in milliseconds, default is 1000",
-        name = "TIMEOUT"
+        name = "TIMEOUT",
+        default_value = "1000"
     )]
-    timeout: u64,
+    timeout: Duration,
 
     #[structopt(
         parse(from_os_str),
@@ -212,7 +217,7 @@ pub fn libafl_main() {
                 &mut state,
                 &mut mgr,
             )?,
-            Duration::from_millis(timeout_ms),
+            timeout_ms,
         );
 
         // Secondary harness due to mut ownership
