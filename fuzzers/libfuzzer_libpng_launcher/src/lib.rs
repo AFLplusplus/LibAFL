@@ -45,8 +45,8 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 /// The commandline args this fuzzer accepts
 #[derive(Debug, StructOpt)]
 #[structopt(
-    name = "generic_inmemory",
-    about = "A generic libfuzzer-like fuzzer with llmp-multithreading support",
+    name = "libfuzzer_libpng_launcher",
+    about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
     author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
 )]
 struct Opt {
@@ -90,7 +90,7 @@ struct Opt {
         long,
         parse(try_from_str),
         help = "Set the output directory, default is ./out",
-        name = "INPUT",
+        name = "OUTPUT",
         default_value = "./out"
     )]
     output: PathBuf,

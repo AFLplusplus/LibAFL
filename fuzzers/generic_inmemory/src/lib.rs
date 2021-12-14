@@ -41,6 +41,7 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
+/// Parses a millseconds int into a [`Duration`], used for commandline arg parsing
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(time.parse()?))
 }
@@ -92,7 +93,7 @@ struct Opt {
         long,
         parse(try_from_str),
         help = "Set the output directory, default is ./out",
-        name = "INPUT",
+        name = "OUTPUT",
         default_value = "./out"
     )]
     output: PathBuf,
