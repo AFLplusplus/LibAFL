@@ -26,8 +26,10 @@ use libafl::{
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::{I2SRandReplace, Tokens},
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::{I2SRandReplace, Tokens},
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
@@ -289,7 +291,7 @@ pub fn libafl_main() {
         .configuration(EventConfig::from_name("default"))
         .monitor(monitor)
         .run_client(&mut run_client)
-        .cores(&cores.cores)
+        .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(remote_broker_addr)
         //.stdout_file(Some("/dev/null"))

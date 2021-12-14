@@ -16,7 +16,7 @@ use crate::bolts::os::startable_self;
 use crate::bolts::os::{dup2, fork, ForkResult};
 #[cfg(feature = "std")]
 use crate::{
-    bolts::shmem::ShMemProvider,
+    bolts::{os::Cores, shmem::ShMemProvider},
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
     monitors::Monitor,
@@ -67,7 +67,7 @@ where
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
-    cores: &'a [usize],
+    cores: &'a Cores,
     /// A file name to write all client output to
     #[builder(default = None)]
     stdout_file: Option<&'a str>,
@@ -114,7 +114,7 @@ where
         // Spawn clients
         let mut index = 0_u64;
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
-            if self.cores.iter().any(|&x| x == id) {
+            if self.cores.ids.iter().any(|&x| x == id) {
                 index += 1;
                 self.shmem_provider.pre_fork()?;
                 match unsafe { fork() }? {

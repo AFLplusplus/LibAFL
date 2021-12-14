@@ -94,7 +94,30 @@ pub fn dup2(fd: i32, device: i32) -> Result<(), Error> {
     }
 }
 
-/// The core ids to use for fuzzing
+/// Core ID
+pub struct CoreId {
+    pub id: usize,
+}
+
+impl From<usize> for CoreId {
+    fn from(id: usize) -> Self {
+        Self { id }
+    }
+}
+
+impl From<&CoreId> for core_affinity::CoreId {
+    fn from(core_id: &CoreId) -> Self {
+        core_affinity::CoreId { id: core_id.id }
+    }
+}
+
+impl CoreId {
+    /// Set the affinity of the current process to this [`CoreId`]
+    pub fn set_affinity(&self) {
+        core_affinity::set_for_current(self.into());
+    }
+}
+/// A list of [`CoreId`] to use for fuzzing
 #[cfg(feature = "std")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cores {
@@ -102,11 +125,16 @@ pub struct Cores {
     pub cmdline: String,
 
     /// Vec of core ids
-    pub cores: Vec<usize>,
+    pub ids: Vec<usize>,
 }
 
 #[cfg(feature = "std")]
 impl Cores {
+    /// Pick all cores
+    pub fn all() -> Result<Self, Error> {
+        Self::from_cmdline(&"all")
+    }
+
     /// Parses core binding args from user input
     /// Returns a Vec of CPU IDs.
     /// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
@@ -114,6 +142,8 @@ impl Cores {
     #[must_use]
     pub fn from_cmdline(args: &str) -> Result<Self, Error> {
         let mut cores: Vec<usize> = vec![];
+
+        // ./fuzzer --cores all -> one client runs in each available core
         if args == "all" {
             let num_cores = core_affinity::get_core_ids().unwrap().len();
             for x in 0..num_cores {
@@ -123,7 +153,6 @@ impl Cores {
             let core_args: Vec<&str> = args.split(',').collect();
 
             // ./fuzzer --cores 1,2-4,6 -> clients run in cores 1,2,3,4,6
-            // ./fuzzer --cores all -> one client runs in each available core
             for csv in core_args {
                 let core_range: Vec<&str> = csv.split('-').collect();
                 if core_range.len() == 1 {
@@ -147,8 +176,23 @@ impl Cores {
 
         Ok(Self {
             cmdline: args.to_string(),
-            cores,
+            ids: cores,
         })
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<&[usize]> for Cores {
+    fn from(cores: &[usize]) -> Self {
+        let cmdline = cores
+            .iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+        Self {
+            cmdline,
+            ids: cores.to_vec(),
+        }
     }
 }
 
@@ -160,5 +204,5 @@ impl Cores {
 #[cfg(feature = "std")]
 #[deprecated(since = "0.7.1", note = "Use Cores::from_cmdline instead")]
 pub fn parse_core_bind_arg(args: &str) -> Option<Vec<usize>> {
-    Cores::from_cmdline(&args).ok().map(|cores| cores.cores)
+    Cores::from_cmdline(&args).ok().map(|cores| cores.ids)
 }
