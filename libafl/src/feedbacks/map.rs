@@ -21,22 +21,22 @@ use crate::{
     Error,
 };
 
-/// A [`MapFeedback`] that implements the afl algorithm
-pub type AflMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, MapAflFilter, O, AflReducer, S, T>;
+/// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
+pub type AflMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, OrReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, MapNopFilter, O, MaxReducer, S, T>;
+pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, MapNopFilter, O, MinReducer, S, T>;
+pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, MinReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
 pub type MaxMapPow2Feedback<FT, I, O, S, T> =
-    MapFeedback<FT, I, MaxMapPow2Filter, O, MaxReducer, S, T>;
+    MapFeedback<FT, I, NextPow2IsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
 pub type MaxMapOneOrFilledFeedback<FT, I, O, S, T> =
-    MapFeedback<FT, I, MaxMapOneOrFilledFilter, O, MaxReducer, S, T>;
+    MapFeedback<FT, I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
@@ -47,15 +47,11 @@ where
     fn reduce(first: T, second: T) -> T;
 }
 
-/// A [`AflReducer`] combines the bits for the history map and the bit
-/// from ``HitcountsMapObserver``. ``is_interesting`` then just needs to check
-/// if they history == new, and if not we have a new find.
-/// We have to do it like this because ``MapFeedback`` does:
-///   ``map_state.history_map``[i] = reduced;
+/// A [`OrReducer`] reduces the values returning the bitwise OR with the old value
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AflReducer {}
+pub struct OrReducer {}
 
-impl<T> Reducer<T> for AflReducer
+impl<T> Reducer<T> for OrReducer
 where
     T: PrimInt
         + Default
@@ -119,28 +115,26 @@ where
     }
 }
 
-/// A `MapFindFilter` function gets called after the `MapFeedback` found a new entry.
-pub trait MapFindFilter<T>: Serialize + serde::de::DeserializeOwned + 'static
+/// A `IsNovel` function is used to discriminate if a reduced value is interesting.
+pub trait IsNovel<T>: Serialize + serde::de::DeserializeOwned + 'static
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// If a new value in the [`MapFeedback`] was found,
     /// this filter can decide if the result is intersting or not.
-    /// This way, you can restrict the finds further.
-    fn is_interesting(old: T, new: T) -> bool;
+    fn is_novel(old: T, new: T) -> bool;
 }
 
-/// A filter that never filters out any finds.
-/// The default
+/// [`AllIsNovel`] consider everything a novelty. Here mostly just for debugging.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MapNopFilter {}
+pub struct AllIsNovel {}
 
-impl<T> MapFindFilter<T> for MapNopFilter
+impl<T> IsNovel<T> for AllIsNovel
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn is_interesting(_old: T, _new: T) -> bool {
+    fn is_novel(_old: T, _new: T) -> bool {
         true
     }
 }
@@ -159,29 +153,28 @@ fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
     }
 }
 
-/// A filter that is similar to AFL++
-/// It must be combined with ``HitcountsMapObserver``.
+/// Consider as novelty if the reduced value is different from the old value.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MapAflFilter {}
-impl<T> MapFindFilter<T> for MapAflFilter
+pub struct DifferentIsNovel {}
+impl<T> IsNovel<T> for DifferentIsNovel
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn is_interesting(old: T, new: T) -> bool {
+    fn is_novel(old: T, new: T) -> bool {
         old != new
     }
 }
 
-/// A filter that only saves values which are at least the next pow2 class
+/// Only consider as novel the values which are at least the next pow2 class of the old value
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MaxMapPow2Filter {}
-impl<T> MapFindFilter<T> for MaxMapPow2Filter
+pub struct NextPow2IsNovel {}
+impl<T> IsNovel<T> for NextPow2IsNovel
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn is_interesting(old: T, new: T) -> bool {
+    fn is_novel(old: T, new: T) -> bool {
         // We use a trait so we build our numbers from scratch here.
         // This way it works with Nums of any size.
         if new <= old {
@@ -195,13 +188,13 @@ where
 
 /// A filter that only saves values which are at least the next pow2 class
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MaxMapOneOrFilledFilter {}
-impl<T> MapFindFilter<T> for MaxMapOneOrFilledFilter
+pub struct OneOrFilledIsNovel {}
+impl<T> IsNovel<T> for OneOrFilledIsNovel
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
-    fn is_interesting(old: T, new: T) -> bool {
+    fn is_novel(old: T, new: T) -> bool {
         (new == T::one() || new == T::max_value()) && new > old
     }
 }
@@ -340,12 +333,12 @@ where
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<FT, I, MF, O, R, S, T>
+pub struct MapFeedback<FT, I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
-    MF: MapFindFilter<T>,
+    N: IsNovel<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
 {
@@ -358,15 +351,15 @@ where
     /// Name identifier of the observer
     observer_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(FT, I, MF, S, R, O, T)>,
+    phantom: PhantomData<(FT, I, N, S, R, O, T)>,
 }
 
-impl<FT, I, MF, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, MF, O, R, S, T>
+impl<FT, I, N, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
-    MF: MapFindFilter<T>,
+    N: IsNovel<T>,
     I: Input,
     S: HasFeedbackStates<FT> + HasClientPerfMonitor,
     FT: FeedbackStatesTuple,
@@ -404,7 +397,7 @@ where
                 let item = *observer.get(i);
 
                 let reduced = R::reduce(history, item);
-                if history != reduced && MF::is_interesting(history, reduced) {
+                if N::is_novel(history, reduced) {
                     map_state.history_map[i] = reduced;
                     interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
@@ -416,7 +409,7 @@ where
                 let item = *observer.get(i);
 
                 let reduced = R::reduce(history, item);
-                if history != reduced && MF::is_interesting(history, reduced) {
+                if N::is_novel(history, reduced) {
                     map_state.history_map[i] = reduced;
                     interesting = true;
                 }
@@ -470,11 +463,11 @@ where
     }
 }
 
-impl<FT, I, MF, O, R, S, T> Named for MapFeedback<FT, I, MF, O, R, S, T>
+impl<FT, I, N, O, R, S, T> Named for MapFeedback<FT, I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
-    MF: MapFindFilter<T>,
+    N: IsNovel<T>,
     O: MapObserver<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
@@ -485,7 +478,7 @@ where
     }
 }
 
-impl<FT, I, MF, O, R, S, T> MapFeedback<FT, I, MF, O, R, S, T>
+impl<FT, I, N, O, R, S, T> MapFeedback<FT, I, N, O, R, S, T>
 where
     T: PrimInt
         + Default
@@ -496,7 +489,7 @@ where
         + PartialOrd
         + Debug,
     R: Reducer<T>,
-    MF: MapFindFilter<T>,
+    N: IsNovel<T>,
     O: MapObserver<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
@@ -655,25 +648,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::feedbacks::{MapFindFilter, MapNopFilter, MaxMapPow2Filter};
+    use crate::feedbacks::{AllIsNovel, IsNovel, NextPow2IsNovel};
 
     #[test]
     fn test_map_max_pow2_filter() {
         // sanity check
-        assert!(MapNopFilter::is_interesting(0_u8, 0));
+        assert!(AllIsNovel::is_interesting(0_u8, 0));
 
-        assert!(!MaxMapPow2Filter::is_interesting(0_u8, 0));
-        assert!(MaxMapPow2Filter::is_interesting(0_u8, 1));
-        assert!(!MaxMapPow2Filter::is_interesting(1_u8, 1));
-        assert!(MaxMapPow2Filter::is_interesting(1_u8, 2));
-        assert!(!MaxMapPow2Filter::is_interesting(2_u8, 2));
-        assert!(!MaxMapPow2Filter::is_interesting(2_u8, 3));
-        assert!(MaxMapPow2Filter::is_interesting(2_u8, 4));
-        assert!(!MaxMapPow2Filter::is_interesting(128_u8, 128));
-        assert!(!MaxMapPow2Filter::is_interesting(129_u8, 128));
-        assert!(MaxMapPow2Filter::is_interesting(128_u8, 255));
-        assert!(!MaxMapPow2Filter::is_interesting(255_u8, 128));
-        assert!(MaxMapPow2Filter::is_interesting(254_u8, 255));
-        assert!(!MaxMapPow2Filter::is_interesting(255_u8, 255));
+        assert!(!NextPow2IsNovel::is_interesting(0_u8, 0));
+        assert!(NextPow2IsNovel::is_interesting(0_u8, 1));
+        assert!(!NextPow2IsNovel::is_interesting(1_u8, 1));
+        assert!(NextPow2IsNovel::is_interesting(1_u8, 2));
+        assert!(!NextPow2IsNovel::is_interesting(2_u8, 2));
+        assert!(!NextPow2IsNovel::is_interesting(2_u8, 3));
+        assert!(NextPow2IsNovel::is_interesting(2_u8, 4));
+        assert!(!NextPow2IsNovel::is_interesting(128_u8, 128));
+        assert!(!NextPow2IsNovel::is_interesting(129_u8, 128));
+        assert!(NextPow2IsNovel::is_interesting(128_u8, 255));
+        assert!(!NextPow2IsNovel::is_interesting(255_u8, 128));
+        assert!(NextPow2IsNovel::is_interesting(254_u8, 255));
+        assert!(!NextPow2IsNovel::is_interesting(255_u8, 255));
     }
 }
