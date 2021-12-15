@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use std::{ffi::c_void, io};
 
 use crate::{
-    asan::asan_errors::{AsanError, AsanErrors},
+    asan::errors::{AsanError, AsanErrors},
     FridaOptions,
 };
 

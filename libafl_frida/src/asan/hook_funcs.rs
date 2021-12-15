@@ -1,7 +1,7 @@
 use crate::{
     alloc::Allocator,
     asan::{
-        asan_errors::{AsanError, AsanErrors},
+        errors::{AsanError, AsanErrors},
         asan_rt::AsanRuntime,
     },
 };

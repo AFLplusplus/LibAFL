@@ -15,7 +15,7 @@ use libafl::{
 };
 
 #[cfg(unix)]
-use crate::asan::asan_errors::ASAN_ERRORS;
+use crate::asan::errors::ASAN_ERRORS;
 
 #[cfg(windows)]
 use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
