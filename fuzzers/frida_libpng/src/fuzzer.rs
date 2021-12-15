@@ -6,6 +6,7 @@ use std::{
     env,
     net::SocketAddr,
     path::{Path, PathBuf},
+    time::Duration,
 };
 use structopt::StructOpt;
 
@@ -49,6 +50,10 @@ use libafl_frida::{
     FridaOptions,
 };
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
+
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -128,10 +133,16 @@ struct Opt {
     #[structopt(
         long,
         help = "The configuration this fuzzer runs with, for multiprocessing",
-        name = "CONF"
+        name = "CONF",
         default_value = "default launcher"
     )]
     configuration: String,
+
+    #[structopt(
+        long,
+        help = "The file to redirect stdout input to (/dev/null if unset)"
+    )]
+    stdout_file: Option<String>,
 
     #[structopt(help = "The harness")]
     harness: String,
@@ -149,7 +160,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let opt = Opt::from_cmdline();
+    let opt = Opt::from_args();
     color_backtrace::install();
 
     println!(
@@ -157,19 +168,17 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let broker_addr = opt.remote_broker_addr;
-
     unsafe {
         match fuzz(
-            opt.harness,
-            opt.symbol,
-            opt.modules_to_instrument.split(':').collect::<Vec<_>>(),
+            &opt.harness,
+            &opt.symbol,
+            &opt.modules_to_instrument.split(':').collect::<Vec<_>>(),
             //modules_to_instrument,
-            &[PathBuf::from("./corpus")],
-            &PathBuf::from("./crashes"),
+            &opt.input,
+            &opt.output,
             opt.broker_port,
-            opt.cores,
-            opt.output,
+            &opt.cores,
+            opt.stdout_file.as_deref(),
             opt.remote_broker_addr,
             opt.configuration,
         ) {
