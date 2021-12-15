@@ -237,7 +237,7 @@ where
 
                 //spawn clients
                 for (id, _) in core_ids.iter().enumerate().take(num_cores) {
-                    if self.cores.iter().any(|&x| x == id) {
+                    if self.cores.ids.iter().any(|&x| x == id.into()) {
                         let stdio = if self.stdout_file.is_some() {
                             Stdio::inherit()
                         } else {

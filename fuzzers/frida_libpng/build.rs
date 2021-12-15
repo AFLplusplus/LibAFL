@@ -124,7 +124,7 @@ fn main() {
                 .arg(&libpng_tar)
                 .status()
                 .unwrap();
-            Command::new(format!("{}/configure", &libpng))
+            Command::new("./configure")
                 .current_dir(&libpng_path)
                 .args(&[
                     "--disable-shared",
