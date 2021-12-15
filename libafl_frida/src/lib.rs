@@ -26,7 +26,8 @@ pub mod helper;
 pub mod executor;
 
 // for parsing asan and cmplog cores
-use libafl::bolts::os::parse_core_bind_arg;
+use libafl::bolts::os::{CoreId, Cores};
+
 // for getting current core_id
 use core_affinity::get_core_ids;
 
@@ -85,7 +86,7 @@ impl FridaOptions {
                         options.asan_max_allocation_panics = value.parse().unwrap();
                     }
                     "asan-cores" => {
-                        asan_cores = parse_core_bind_arg(value);
+                        asan_cores = Cores::from_cmdline(value).ok();
                     }
                     "instrument-suppress-locations" => {
                         options.instrument_suppress_locations = Some(
@@ -132,7 +133,7 @@ impl FridaOptions {
                         }
                     }
                     "cmplog-cores" => {
-                        cmplog_cores = parse_core_bind_arg(value);
+                        cmplog_cores = Cores::from_cmdline(value).ok();
                     }
                     _ => {
                         panic!("unknown FRIDA option: '{}'", option);
@@ -148,8 +149,8 @@ impl FridaOptions {
                         1,
                         "Client should only be bound to a single core"
                     );
-                    let core_id = core_ids[0].id;
-                    options.enable_asan = asan_cores.contains(&core_id);
+                    let core_id: CoreId = core_ids[0].into();
+                    options.enable_asan = asan_cores.ids.contains(&core_id);
                 }
             }
             if options.enable_cmplog {
@@ -160,8 +161,8 @@ impl FridaOptions {
                         1,
                         "Client should only be bound to a single core"
                     );
-                    let core_id = core_ids[0].id;
-                    options.enable_cmplog = cmplog_cores.contains(&core_id);
+                    let core_id = core_ids[0].into();
+                    options.enable_cmplog = cmplog_cores.ids.contains(&core_id);
                 }
             }
         }
