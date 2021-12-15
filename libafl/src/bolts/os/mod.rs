@@ -233,7 +233,7 @@ impl From<Vec<usize>> for Cores {
 }
 
 impl TryFrom<&str> for Cores {
-    type Error;
+    type Error = Error;
     fn try_from(cores: &str) -> Result<Self, Self::Error> {
         Self::from_cmdline(cores)
     }
