@@ -18,13 +18,13 @@ pub fn main() {
     fuzz(
         &[PathBuf::from("./input")],
         PathBuf::from("./output"),
-        &[1],
+        &Cores::all(),
         1337,
     );
 }
 
 /// The actual fuzzer
-fn fuzz(input_dirs: &[PathBuf], output_dir: PathBuf, cores: &[usize], broker_port: u16) {
+fn fuzz(input_dirs: &[PathBuf], output_dir: PathBuf, cores: &Cores, broker_port: u16) {
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
