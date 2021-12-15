@@ -7,7 +7,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::parse_core_bind_arg,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
