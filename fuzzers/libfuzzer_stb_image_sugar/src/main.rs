@@ -19,7 +19,7 @@ pub fn main() {
     fuzz(
         &[PathBuf::from("./input")],
         PathBuf::from("./output"),
-        &Cores::all(),
+        &Cores::all().unwrap(),
         1337,
     );
 }
