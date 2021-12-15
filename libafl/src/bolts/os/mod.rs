@@ -232,6 +232,13 @@ impl From<Vec<usize>> for Cores {
     }
 }
 
+impl TryFrom<&str> for Cores {
+    type Error;
+    fn try_from(cores: &str) -> Result<Self, Self::Error> {
+        Self::from_cmdline(cores)
+    }
+}
+
 /// Parses core binding args from user input
 /// Returns a Vec of CPU IDs.
 /// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
