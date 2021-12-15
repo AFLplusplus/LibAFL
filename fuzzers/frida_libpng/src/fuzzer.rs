@@ -1,13 +1,20 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
-use clap::{App, Arg};
+use frida_gum::Gum;
+use std::{
+    env,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    time::Duration,
+};
+use structopt::StructOpt;
 
 use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::parse_core_bind_arg,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -34,25 +41,118 @@ use libafl::{
     Error,
 };
 
-use frida_gum::Gum;
-
-use std::{
-    env,
-    net::SocketAddr,
-    path::{Path, PathBuf},
-};
-
 use libafl_frida::{
     coverage_rt::MAP_SIZE,
     executor::FridaInProcessExecutor,
     helper::{FridaHelper, FridaInstrumentationHelper},
     FridaOptions,
 };
+use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 #[cfg(unix)]
-use libafl_frida::asan::asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
+use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
 
-use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "libafl_frida",
+    version = "0.1.0",
+    about = "A frida-based binary-only libfuzzer-style fuzzer for with llmp-multithreading support",
+    author = "s1341 <github@shmarya.net>,
+    Dongjia Zhang <toka@aflplus.plus>, Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+)]
+struct Opt {
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str = Cores::from_cmdline),
+        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+        name = "CORES"
+    )]
+    cores: Cores,
+
+    #[structopt(
+        short = "p",
+        long,
+        help = "Choose the broker TCP port, default is 1337",
+        name = "PORT",
+        default_value = "1337"
+    )]
+    broker_port: u16,
+
+    #[structopt(
+        parse(try_from_str),
+        short = "a",
+        long,
+        help = "Specify a remote broker",
+        name = "REMOTE"
+    )]
+    remote_broker_addr: Option<SocketAddr>,
+
+    #[structopt(
+        parse(try_from_str),
+        short,
+        long,
+        help = "Set an initial corpus directory",
+        name = "INPUT"
+    )]
+    input: Vec<PathBuf>,
+
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str),
+        help = "Set the output directory, default is ./out",
+        name = "OUTPUT",
+        default_value = "./out"
+    )]
+    output: PathBuf,
+
+    #[structopt(
+        parse(try_from_str = timeout_from_millis_str),
+        short,
+        long,
+        help = "Set the exeucution timeout in milliseconds, default is 1000",
+        name = "TIMEOUT",
+        default_value = "1000"
+    )]
+    timeout: Duration,
+
+    #[structopt(
+        parse(from_os_str),
+        short = "x",
+        long,
+        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
+        name = "TOKENS",
+        multiple = true
+    )]
+    tokens: Vec<PathBuf>,
+
+    #[structopt(
+        long,
+        help = "The configuration this fuzzer runs with, for multiprocessing",
+        name = "CONF",
+        default_value = "default launcher"
+    )]
+    configuration: String,
+
+    #[structopt(
+        long,
+        help = "The file to redirect stdout input to (/dev/null if unset)"
+    )]
+    stdout_file: Option<String>,
+
+    #[structopt(help = "The harness")]
+    harness: String,
+
+    #[structopt(help = "The symbol name to look up and hook")]
+    symbol: String,
+
+    #[structopt(help = "The modules to instrument, separated by colons")]
+    modules_to_instrument: String,
+}
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
@@ -60,49 +160,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let matches = App::new("libafl_frida")
-        .version("0.1.0")
-        .arg(
-            Arg::with_name("cores")
-                .short("c")
-                .long("cores")
-                .value_name("CORES")
-                .required(true)
-                .takes_value(true),
-        )
-        .arg(Arg::with_name("harness").required(true).index(1))
-        .arg(Arg::with_name("symbol").required(true).index(2))
-        .arg(
-            Arg::with_name("modules_to_instrument")
-                .required(true)
-                .index(3),
-        )
-        .arg(
-            Arg::with_name("configuration")
-                .required(false)
-                .value_name("CONF")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("output")
-                .short("o")
-                .long("output")
-                .value_name("OUTPUT")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("b2baddr")
-                .short("B")
-                .long("b2baddr")
-                .value_name("B2BADDR")
-                .required(false)
-                .takes_value(true),
-        )
-        .get_matches();
-
-    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap().to_string()).unwrap();
-
+    let opt = Opt::from_args();
     color_backtrace::install();
 
     println!(
@@ -110,30 +168,19 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let broker_addr = matches
-        .value_of("b2baddr")
-        .map(|addrstr| addrstr.parse().unwrap());
-
     unsafe {
         match fuzz(
-            matches.value_of("harness").unwrap(),
-            matches.value_of("symbol").unwrap(),
-            &matches
-                .value_of("modules_to_instrument")
-                .unwrap()
-                .split(':')
-                .collect::<Vec<_>>(),
+            &opt.harness,
+            &opt.symbol,
+            &opt.modules_to_instrument.split(':').collect::<Vec<_>>(),
             //modules_to_instrument,
-            &[PathBuf::from("./corpus")],
-            &PathBuf::from("./crashes"),
-            1337,
-            &cores,
-            matches.value_of("output"),
-            broker_addr,
-            matches
-                .value_of("configuration")
-                .unwrap_or("default launcher")
-                .to_string(),
+            &opt.input,
+            &opt.output,
+            opt.broker_port,
+            &opt.cores,
+            opt.stdout_file.as_deref(),
+            opt.remote_broker_addr,
+            opt.configuration,
         ) {
             Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
             Err(e) => panic!("Error during fuzzing: {:?}", e),
@@ -150,7 +197,7 @@ unsafe fn fuzz(
     corpus_dirs: &[PathBuf],
     objective_dir: &Path,
     broker_port: u16,
-    cores: &[usize],
+    cores: &Cores,
     stdout_file: Option<&str>,
     broker_addr: Option<SocketAddr>,
     configuration: String,
