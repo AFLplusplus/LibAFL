@@ -63,7 +63,8 @@ struct Opt {
         short = "p",
         long,
         help = "Choose the broker TCP port, default is 1337",
-        name = "PORT"
+        name = "PORT",
+        default_value = "1337"
     )]
     broker_port: u16,
 
