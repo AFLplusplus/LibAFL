@@ -232,6 +232,7 @@ impl From<Vec<usize>> for Cores {
     }
 }
 
+#[cfg(feature = "std")]
 impl TryFrom<&str> for Cores {
     type Error = Error;
     fn try_from(cores: &str) -> Result<Self, Self::Error> {
