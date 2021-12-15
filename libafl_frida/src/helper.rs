@@ -13,7 +13,7 @@ use capstone::{
 
 #[cfg(all(target_arch = "x86_64", unix))]
 use capstone::{
-    arch::{self,  BuildsCapstone},
+    arch::{self, BuildsCapstone},
     Capstone, RegId,
 };
 

@@ -1,8 +1,8 @@
 use crate::{
     alloc::Allocator,
     asan::{
-        errors::{AsanError, AsanErrors},
         asan_rt::AsanRuntime,
+        errors::{AsanError, AsanErrors},
     },
 };
 use backtrace::Backtrace;
