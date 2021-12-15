@@ -18,8 +18,8 @@ use capstone::{
 
 #[cfg(all(target_arch = "x86_64", unix))]
 use capstone::{
-    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, Insn, RegId,
+    arch::{self,  BuildsCapstone},
+    Capstone, RegId,
 };
 
 #[cfg(target_arch = "aarch64")]
