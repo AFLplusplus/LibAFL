@@ -3,6 +3,7 @@
 
 use std::{env, path::PathBuf};
 
+use libafl::bolts::os::Cores;
 use libafl_sugar::InMemoryBytesCoverageSugar;
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input};
 
