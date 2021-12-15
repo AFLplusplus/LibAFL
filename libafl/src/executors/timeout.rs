@@ -61,13 +61,18 @@ const ITIMER_REAL: c_int = 0;
 
 /// Reset and remove the timeout
 #[cfg(unix)]
-pub unsafe fn unix_remove_timeout() {
-    let mut itimerval_zero: Itimerval = zeroed();
-    setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+pub(crate) fn unix_remove_timeout() {
+    unsafe {
+        let mut itimerval_zero: Itimerval = zeroed();
+        setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+    }
 }
 
+/// Deletes this timer queue
+/// # Safety
+/// Will dereference the given `tp_timer` pointer, unchecked.
 #[cfg(all(windows, feature = "std"))]
-pub unsafe fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
+pub(crate) unsafe fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
     CloseThreadpoolTimer(tp_timer);
 }
 

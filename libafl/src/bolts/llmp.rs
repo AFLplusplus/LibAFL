@@ -1435,7 +1435,7 @@ where
         let last_msg = self.last_msg_recvd;
         if !last_msg.is_null() {
             assert!(
-                !((*last_msg).tag == LLMP_TAG_END_OF_PAGE && !llmp_msg_in_page(page, last_msg)),
+                (*last_msg).tag != LLMP_TAG_END_OF_PAGE || llmp_msg_in_page(page, last_msg),
                 "BUG: full page passed to await_message_blocking or reset failed"
             );
 

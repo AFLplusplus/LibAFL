@@ -15,7 +15,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::parse_core_bind_arg,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -179,7 +179,7 @@ pub fn LLVMFuzzerRunDriver(
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
+    let cores = Cores::from_cmdline(matches.value_of("cores").unwrap())
         .expect("No valid core count given!");
     let broker_port = matches
         .value_of("broker_port")

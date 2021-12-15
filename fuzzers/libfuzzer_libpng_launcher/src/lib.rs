@@ -3,15 +3,15 @@
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
 
-use clap::{load_yaml, App};
 use core::time::Duration;
-use std::{env, path::PathBuf};
+use std::{env, net::SocketAddr, path::PathBuf};
+use structopt::StructOpt;
 
 use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::parse_core_bind_arg,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -37,19 +37,98 @@ use libafl::{
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
+/// Parse a millis string to a [`Duration`]. Used for arg parsing.
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
+
+/// The commandline args this fuzzer accepts
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "libfuzzer_libpng_launcher",
+    about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
+    author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+)]
+struct Opt {
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str = Cores::from_cmdline),
+        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+        name = "CORES"
+    )]
+    cores: Cores,
+
+    #[structopt(
+        short = "p",
+        long,
+        help = "Choose the broker TCP port, default is 1337",
+        name = "PORT",
+        default_value = "1337"
+    )]
+    broker_port: u16,
+
+    #[structopt(
+        parse(try_from_str),
+        short = "a",
+        long,
+        help = "Specify a remote broker",
+        name = "REMOTE"
+    )]
+    remote_broker_addr: Option<SocketAddr>,
+
+    #[structopt(
+        parse(try_from_str),
+        short,
+        long,
+        help = "Set an initial corpus directory",
+        name = "INPUT"
+    )]
+    input: Vec<PathBuf>,
+
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str),
+        help = "Set the output directory, default is ./out",
+        name = "OUTPUT",
+        default_value = "./out"
+    )]
+    output: PathBuf,
+
+    #[structopt(
+        parse(try_from_str = timeout_from_millis_str),
+        short,
+        long,
+        help = "Set the exeucution timeout in milliseconds, default is 10000",
+        name = "TIMEOUT",
+        default_value = "10000"
+    )]
+    timeout: Duration,
+    /*
+    /// This fuzzer has hard-coded tokens
+    #[structopt(
+        parse(from_os_str),
+        short = "x",
+        long,
+        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
+        name = "TOKENS",
+        multiple = true
+    )]
+    tokens: Vec<PathBuf>,
+    */
+}
+
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
 pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-    let yaml = load_yaml!("clap-config.yaml");
-    let matches = App::from(yaml).get_matches();
+    let opt = Opt::from_args();
 
-    let broker_port = 1337;
-
-    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
-        .expect("No valid core count given!");
+    let broker_port = opt.broker_port;
+    let cores = opt.cores;
 
     println!(
         "Workdir: {:?}",
@@ -61,9 +140,6 @@ pub fn libafl_main() {
     let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
-        let corpus_dirs = &[PathBuf::from("./corpus")];
-        let objective_dir = PathBuf::from("./crashes");
-
         // Create an observation channel using the coverage map
         let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
@@ -95,7 +171,7 @@ pub fn libafl_main() {
                 InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
-                OnDiskCorpus::new(objective_dir).unwrap(),
+                OnDiskCorpus::new(&opt.output).unwrap(),
                 // States of the feedbacks.
                 // They are the data related to the feedbacks that you want to persist in the State.
                 tuple_list!(feedback_state),
@@ -143,7 +219,7 @@ pub fn libafl_main() {
                 &mut restarting_mgr,
             )?,
             // 10 seconds timeout
-            Duration::new(10, 0),
+            opt.timeout,
         );
 
         // The actual target run starts here.
@@ -156,8 +232,8 @@ pub fn libafl_main() {
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
             state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
-                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", corpus_dirs));
+                .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
+                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
@@ -172,6 +248,7 @@ pub fn libafl_main() {
         .run_client(&mut run_client)
         .cores(&cores)
         .broker_port(broker_port)
+        .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
         .build()
         .launch()
