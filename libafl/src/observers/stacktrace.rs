@@ -53,7 +53,7 @@ where
             true
         });
         let st_hash = hasher.finish();
-        println!("hash={}", &st_hash);
+        // println!("hash={}", &st_hash);
         self.hash = Some(st_hash);
         Ok(())
     }

@@ -1,6 +1,6 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use std::{hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use hashbrown::HashSet;
 use num_traits::PrimInt;
@@ -80,7 +80,14 @@ where
 }
 impl<T> HashSetState<T> for NewHashFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Hash,
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + Hash
+        + Debug,
 {
     /// Create new `NewHashFeedbackState` using a name and a hash set.
     /// The map can be shared.
@@ -94,6 +101,7 @@ where
 
     fn update_hash_set(&mut self, value: T) -> Result<bool, Error> {
         let r = self.hash_set.insert(value);
+        // print!("{:?}", &self.hash_set);
         Ok(r)
     }
 }
