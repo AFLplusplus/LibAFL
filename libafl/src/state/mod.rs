@@ -505,6 +505,7 @@ where
                 added += 1;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
+                println!("{:?}", res);
                 if res != ExecuteInputResult::None {
                     added += 1;
                 }
