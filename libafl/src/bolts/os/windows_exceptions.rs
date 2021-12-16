@@ -1,7 +1,7 @@
 //! Exception handling for Windows
 
 pub use windows::Win32::System::Diagnostics::Debug::{
-    SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
+    AddVectoredExceptionHandler, EXCEPTION_POINTERS,
 };
 
 pub use windows::Win32::Foundation::NTSTATUS;
@@ -309,8 +309,6 @@ unsafe fn internal_handle_exception(
     }
 }
 
-type NativeHandlerType = extern "system" fn(*mut EXCEPTION_POINTERS) -> c_long;
-
 /// Internal function that is being called whenever an exception arrives (stdcall).
 unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_POINTERS) -> c_long {
     let code = exception_pointers
@@ -361,8 +359,11 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     if catch_assertions {
         signal(SIGABRT, handle_signal);
     }
-    if let Some(prev) = SetUnhandledExceptionFilter(Some(core::mem::transmute(
-        handle_exception as *const c_void,
-    ))) {}
+    // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
+    // See https://github.com/AFLplusplus/LibAFL/pull/403
+    AddVectoredExceptionHandler(
+        1,
+        Some(core::mem::transmute(handle_exception as *const c_void)),
+    );
     Ok(())
 }
