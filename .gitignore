@@ -1,7 +1,9 @@
 target
 out
 Cargo.lock
+vendor
 
+.DS_Store
 .env
 
 *.o
