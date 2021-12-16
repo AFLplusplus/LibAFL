@@ -25,6 +25,9 @@ use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 
+#[cfg(windows)]
+use windows::Win32::System::Threading::SetThreadStackGuarantee;
+
 use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter},
@@ -121,6 +124,21 @@ where
         Z: HasObjective<I, OF, S>,
     {
         let handlers = InProcessHandlers::new::<Self, EM, I, OC, OF, OT, S, Z>()?;
+        #[cfg(windows)]
+        unsafe {
+            /*
+                See https://github.com/AFLplusplus/LibAFL/pull/403
+                This one reserves certain amount of memory for the stack.
+                If stack overflow happens during fuzzing on windows, the program is transferred to our exception handler for windows.
+                However, if we run out of the stack memory again in this exception handler, we'll crash with STATUS_ACCESS_VIOLATION.
+                We need this API call because with the llmp_compression
+                feature enabled, the exception handler uses a lot of stack memory (in the compression lib code) on release build.
+                As far as I have observed, the compression uses around 0x10000 bytes, but for safety let's just reserve 0x20000 bytes for our exception handlers.
+                This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
+            */
+            let mut stack_reserved = 0x20000;
+            SetThreadStackGuarantee(&mut stack_reserved);
+        }
         Ok(Self {
             harness_fn,
             observers,
@@ -569,7 +587,7 @@ mod unix_signal_handler {
 
             #[cfg(feature = "std")]
             {
-                println!("Type QUIT to restart the child");
+                eprintln!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
                     std::io::stdin().read_line(&mut line).unwrap();
@@ -629,10 +647,10 @@ mod unix_signal_handler {
             event_mgr.on_restart(state).unwrap();
 
             #[cfg(feature = "std")]
-            println!("Waiting for broker...");
+            eprintln!("Waiting for broker...");
             event_mgr.await_restart_safe();
             #[cfg(feature = "std")]
-            println!("Bye!");
+            eprintln!("Bye!");
         }
 
         libc::_exit(128 + (signal as i32));
@@ -735,7 +753,7 @@ mod windows_exception_handler {
                 dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
             } else {
                 #[cfg(feature = "std")]
-                println!("Timeout in fuzz run.");
+                eprintln!("Timeout in fuzz run.");
                 #[cfg(feature = "std")]
                 let _res = stdout().flush();
 
@@ -771,10 +789,10 @@ mod windows_exception_handler {
                 event_mgr.on_restart(state).unwrap();
 
                 #[cfg(feature = "std")]
-                println!("Waiting for broker...");
+                eprintln!("Waiting for broker...");
                 event_mgr.await_restart_safe();
                 #[cfg(feature = "std")]
-                println!("Bye!");
+                eprintln!("Bye!");
 
                 event_mgr.await_restart_safe();
                 compiler_fence(Ordering::SeqCst);
@@ -834,11 +852,11 @@ mod windows_exception_handler {
         }
 
         #[cfg(feature = "std")]
-        println!("Crashed with {}", code);
+        eprintln!("Crashed with {}", code);
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
             {
-                println!("Double crash\n");
+                eprintln!("Double crash\n");
                 let crash_addr = exception_pointers
                     .as_mut()
                     .unwrap()
@@ -847,14 +865,14 @@ mod windows_exception_handler {
                     .unwrap()
                     .ExceptionAddress as usize;
 
-                println!(
+                eprintln!(
                 "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
                     crash_addr
                 );
             }
             #[cfg(feature = "std")]
             {
-                println!("Type QUIT to restart the child");
+                eprintln!("Type QUIT to restart the child");
                 let mut line = String::new();
                 while line.trim() != "QUIT" {
                     std::io::stdin().read_line(&mut line).unwrap();
@@ -870,7 +888,7 @@ mod windows_exception_handler {
             let observers = executor.observers();
 
             #[cfg(feature = "std")]
-            println!("Child crashed!");
+            eprintln!("Child crashed!");
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
@@ -908,10 +926,10 @@ mod windows_exception_handler {
             event_mgr.on_restart(state).unwrap();
 
             #[cfg(feature = "std")]
-            println!("Waiting for broker...");
+            eprintln!("Waiting for broker...");
             event_mgr.await_restart_safe();
             #[cfg(feature = "std")]
-            println!("Bye!");
+            eprintln!("Bye!");
         }
         ExitProcess(1);
     }

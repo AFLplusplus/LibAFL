@@ -4,8 +4,11 @@ use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
-    Gum, MemoryRange, NativePointer,
+    Gum, NativePointer,
 };
+
+#[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
+use frida_gum::MemoryRange;
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -15,7 +18,7 @@ use libafl::{
 };
 
 #[cfg(unix)]
-use crate::asan_errors::ASAN_ERRORS;
+use crate::asan::errors::ASAN_ERRORS;
 
 #[cfg(windows)]
 use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
@@ -108,9 +111,12 @@ where
     OT: ObserversTuple<I, S>,
 {
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
+        #[cfg(not(all(not(debug_assertions), target_arch = "x86_64")))]
+        let stalker = Stalker::new(gum);
+        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
         let mut stalker = Stalker::new(gum);
 
-        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
+        #[cfg(not(all(debug_assertions, target_arch = "x86_64")))]
         for range in helper.ranges().gaps(&(0..usize::MAX)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
             stalker.exclude(&MemoryRange::new(

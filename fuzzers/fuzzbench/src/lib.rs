@@ -28,7 +28,7 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{AflMapFeedback, CrashFeedback, MapFeedbackState, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -37,7 +37,7 @@ use libafl::{
         token_mutations::I2SRandReplace,
         tokens_mutations, Tokens,
     },
-    observers::{StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
@@ -64,14 +64,14 @@ pub fn libafl_main() {
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
             Arg::new("out")
-                .about("The directory to place finds in ('corpus')")
+                .help("The directory to place finds in ('corpus')")
                 .required(true)
                 .index(1)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
-                .about("The directory to read initial inputs from ('seeds')")
+                .help("The directory to read initial inputs from ('seeds')")
                 .required(true)
                 .index(2)
                 .takes_value(true),
@@ -80,21 +80,21 @@ pub fn libafl_main() {
             Arg::new("tokens")
                 .short('x')
                 .long("tokens")
-                .about("A file to read tokens from, to be used during fuzzing")
+                .help("A file to read tokens from, to be used during fuzzing")
                 .takes_value(true),
         )
         .arg(
             Arg::new("logfile")
                 .short('l')
                 .long("logfile")
-                .about("Duplicates all output to this file")
+                .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
         )
         .arg(
             Arg::new("timeout")
                 .short('t')
                 .long("timeout")
-                .about("Timeout for each individual execution, in milliseconds")
+                .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
         )
         .try_get_matches()
@@ -206,7 +206,7 @@ fn fuzz(
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = StdMapObserver::new("edges", edges);
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -221,7 +221,7 @@ fn fuzz(
     // This one is composed by two Feedbacks in OR
     let feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        AflMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );

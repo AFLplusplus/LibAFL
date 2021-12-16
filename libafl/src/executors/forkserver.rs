@@ -195,15 +195,22 @@ impl Forkserver {
         out_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
+        debug_output: bool,
     ) -> Result<Self, Error> {
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
+        let (stdout, stderr) = if debug_output {
+            (Stdio::inherit(), Stdio::inherit())
+        } else {
+            (Stdio::null(), Stdio::null())
+        };
+
         match Command::new(target)
             .args(args)
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(stdout)
+            .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
             .setlimit(memlimit)
             .setsid()
@@ -364,12 +371,13 @@ where
 
         match &mut self.executor.map_mut() {
             Some(map) => {
-                let size = input.target_bytes().as_slice().len();
+                let target_bytes = input.target_bytes();
+                let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
                 map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
                 map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                    .copy_from_slice(input.target_bytes().as_slice());
+                    .copy_from_slice(target_bytes.as_slice());
             }
             None => {
                 self.executor
@@ -467,6 +475,16 @@ where
         use_shmem_testcase: bool,
         observers: OT,
     ) -> Result<Self, Error> {
+        Self::with_debug(target, arguments, use_shmem_testcase, observers, false)
+    }
+
+    pub fn with_debug(
+        target: String,
+        arguments: &[String],
+        use_shmem_testcase: bool,
+        observers: OT,
+        debug_output: bool,
+    ) -> Result<Self, Error> {
         let mut args = Vec::<String>::new();
         let mut use_stdin = true;
         let out_filename = ".cur_input".to_string();
@@ -500,6 +518,7 @@ where
             out_file.as_raw_fd(),
             use_stdin,
             0,
+            debug_output,
         )?;
 
         let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
@@ -573,12 +592,13 @@ where
         // Write to testcase
         match &mut self.map {
             Some(map) => {
-                let size = input.target_bytes().as_slice().len();
+                let target_bytes = input.target_bytes();
+                let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
                 map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
                 map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                    .copy_from_slice(input.target_bytes().as_slice());
+                    .copy_from_slice(target_bytes.as_slice());
             }
             None => {
                 self.out_file.write_buf(input.target_bytes().as_slice());

@@ -63,14 +63,14 @@ pub fn libafl_main() {
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
             Arg::new("out")
-                .about("The directory to place finds in ('corpus')")
+                .help("The directory to place finds in ('corpus')")
                 .required(true)
                 .index(1)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
-                .about("The directory to read initial inputs from ('seeds')")
+                .help("The directory to read initial inputs from ('seeds')")
                 .required(true)
                 .index(2)
                 .takes_value(true),
@@ -79,21 +79,21 @@ pub fn libafl_main() {
             Arg::new("tokens")
                 .short('x')
                 .long("tokens")
-                .about("A file to read tokens from, to be used during fuzzing")
+                .help("A file to read tokens from, to be used during fuzzing")
                 .takes_value(true),
         )
         .arg(
             Arg::new("logfile")
                 .short('l')
                 .long("logfile")
-                .about("Duplicates all output to this file")
+                .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
         )
         .arg(
             Arg::new("timeout")
                 .short('t')
                 .long("timeout")
-                .about("Timeout for each individual execution, in milliseconds")
+                .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
         )
         .try_get_matches()

@@ -12,25 +12,37 @@ use hashbrown::HashMap;
 
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
-use nix::libc::memset;
-
 use backtrace::Backtrace;
+
+use crate::helper::FridaInstrumentationHelper;
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
-    arch::{arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
+    arch::{
+        arm64::{Arm64Extender, Arm64OperandType, Arm64Shift},
+        ArchOperand::Arm64Operand,
+        BuildsCapstone,
+    },
     Capstone, Insn,
 };
+
+#[cfg(target_arch = "aarch64")]
+use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 
 #[cfg(target_arch = "x86_64")]
 use capstone::{
     arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, RegAccessType, RegId,
+    Capstone, Insn, RegAccessType, RegId,
 };
+
+#[cfg(target_arch = "x86_64")]
+use frida_gum::instruction_writer::X86Register;
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use frida_gum::interceptor::Interceptor;
-use frida_gum::{Gum, Module, ModuleMap};
+use frida_gum::{
+    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleMap,
+};
 #[cfg(unix)]
 use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
@@ -42,7 +54,7 @@ use std::{ffi::c_void, ptr::write_volatile};
 
 use crate::{
     alloc::Allocator,
-    asan_errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     FridaOptions,
 };
 
@@ -96,6 +108,7 @@ pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 /// even if the target would not have crashed under normal conditions.
 /// this helps finding mem errors early.
 pub struct AsanRuntime {
+    current_report_impl: u64,
     allocator: Allocator,
     regs: [usize; ASAN_SAVE_REGISTER_COUNT],
     blob_report: Option<Box<[u8]>>,
@@ -123,6 +136,7 @@ impl AsanRuntime {
     #[must_use]
     pub fn new(options: FridaOptions) -> AsanRuntime {
         Self {
+            current_report_impl: 0,
             allocator: Allocator::new(options.clone()),
             regs: [0; ASAN_SAVE_REGISTER_COUNT],
             blob_report: None,
@@ -213,6 +227,20 @@ impl AsanRuntime {
     #[allow(clippy::unused_self)]
     pub fn reset_allocations(&mut self) {
         self.allocator.reset();
+    }
+
+    #[must_use]
+    pub fn allocator(&self) -> &Allocator {
+        &self.allocator
+    }
+
+    pub fn allocator_mut(&mut self) -> &mut Allocator {
+        &mut self.allocator
+    }
+
+    #[must_use]
+    pub fn shadow_check_func(&self) -> &Option<extern "C" fn(*const c_void, usize) -> bool> {
+        &self.shadow_check_func
     }
 
     /// Check if the test leaked any memory and report it if so.
@@ -357,1105 +385,17 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
+    #[must_use]
     #[inline]
-    fn pc() -> usize {
+    pub fn pc() -> usize {
         Interceptor::current_invocation().cpu_context().pc() as usize
     }
 
     #[cfg(target_arch = "x86_64")]
+    #[must_use]
     #[inline]
-    fn pc() -> usize {
+    pub fn pc() -> usize {
         Interceptor::current_invocation().cpu_context().rip() as usize
-    }
-
-    #[inline]
-    fn hook_malloc(&mut self, size: usize) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, 8) }
-    }
-
-    #[allow(non_snake_case)]
-    #[inline]
-    fn hook__Znam(&mut self, size: usize) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, 8) }
-    }
-
-    #[allow(non_snake_case)]
-    #[inline]
-    fn hook__ZnamRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, 8) }
-    }
-
-    #[allow(non_snake_case)]
-    #[inline]
-    fn hook__ZnamSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, alignment) }
-    }
-
-    #[allow(non_snake_case)]
-    #[inline]
-    fn hook__ZnamSt11align_val_tRKSt9nothrow_t(
-        &mut self,
-        size: usize,
-        alignment: usize,
-        _nothrow: *const c_void,
-    ) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, alignment) }
-    }
-
-    #[allow(non_snake_case)]
-    #[inline]
-    fn hook__Znwm(&mut self, size: usize) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, 8) }
-    }
-
-    #[allow(non_snake_case)]
-    #[inline]
-    fn hook__ZnwmRKSt9nothrow_t(&mut self, size: usize, _nothrow: *const c_void) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, 8) }
-    }
-
-    #[allow(non_snake_case)]
-    #[inline]
-    fn hook__ZnwmSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, alignment) }
-    }
-
-    #[allow(non_snake_case)]
-    #[inline]
-    fn hook__ZnwmSt11align_val_tRKSt9nothrow_t(
-        &mut self,
-        size: usize,
-        alignment: usize,
-        _nothrow: *const c_void,
-    ) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, alignment) }
-    }
-
-    #[inline]
-    fn hook_calloc(&mut self, nmemb: usize, size: usize) -> *mut c_void {
-        let ret = unsafe { self.allocator.alloc(size * nmemb, 8) };
-        unsafe {
-            memset(ret, 0, size * nmemb);
-        }
-        ret
-    }
-
-    #[inline]
-    #[allow(clippy::cmp_null)]
-    fn hook_realloc(&mut self, ptr: *mut c_void, size: usize) -> *mut c_void {
-        unsafe {
-            let ret = self.allocator.alloc(size, 0x8);
-            if ptr != std::ptr::null_mut() && ret != std::ptr::null_mut() {
-                let old_size = self.allocator.get_usable_size(ptr);
-                let copy_size = if size < old_size { size } else { old_size };
-                (ptr as *mut u8).copy_to(ret as *mut u8, copy_size);
-            }
-            self.allocator.release(ptr);
-            ret
-        }
-    }
-
-    #[inline]
-    fn hook_check_free(&mut self, ptr: *mut c_void) -> bool {
-        self.allocator.is_managed(ptr)
-    }
-
-    #[inline]
-    #[allow(clippy::cmp_null)]
-    fn hook_free(&mut self, ptr: *mut c_void) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[cfg(not(target_vendor = "apple"))]
-    #[inline]
-    fn hook_memalign(&mut self, alignment: usize, size: usize) -> *mut c_void {
-        unsafe { self.allocator.alloc(size, alignment) }
-    }
-
-    #[inline]
-    fn hook_posix_memalign(
-        &mut self,
-        pptr: *mut *mut c_void,
-        alignment: usize,
-        size: usize,
-    ) -> i32 {
-        unsafe {
-            *pptr = self.allocator.alloc(size, alignment);
-        }
-        0
-    }
-
-    #[inline]
-    #[cfg(all(not(target_vendor = "apple")))]
-    fn hook_malloc_usable_size(&mut self, ptr: *mut c_void) -> usize {
-        self.allocator.get_usable_size(ptr)
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdaPv(&mut self, ptr: *mut c_void) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdaPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdaPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdaPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdaPvSt11align_val_tRKSt9nothrow_t(
-        &mut self,
-        ptr: *mut c_void,
-        _alignment: usize,
-        _nothrow: *const c_void,
-    ) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdaPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdlPv(&mut self, ptr: *mut c_void) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdlPvm(&mut self, ptr: *mut c_void, _ulong: u64) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdlPvmSt11align_val_t(&mut self, ptr: *mut c_void, _ulong: u64, _alignment: usize) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdlPvRKSt9nothrow_t(&mut self, ptr: *mut c_void, _nothrow: *const c_void) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdlPvSt11align_val_tRKSt9nothrow_t(
-        &mut self,
-        ptr: *mut c_void,
-        _alignment: usize,
-        _nothrow: *const c_void,
-    ) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[allow(non_snake_case)]
-    #[allow(clippy::cmp_null)]
-    #[inline]
-    fn hook__ZdlPvSt11align_val_t(&mut self, ptr: *mut c_void, _alignment: usize) {
-        if ptr != std::ptr::null_mut() {
-            unsafe { self.allocator.release(ptr) }
-        }
-    }
-
-    #[inline]
-    fn hook_mmap(
-        &mut self,
-        addr: *const c_void,
-        length: usize,
-        prot: i32,
-        flags: i32,
-        fd: i32,
-        offset: usize,
-    ) -> *mut c_void {
-        extern "C" {
-            fn mmap(
-                addr: *const c_void,
-                length: usize,
-                prot: i32,
-                flags: i32,
-                fd: i32,
-                offset: usize,
-            ) -> *mut c_void;
-        }
-        let res = unsafe { mmap(addr, length, prot, flags, fd, offset) };
-        if res != (-1_isize as *mut c_void) {
-            self.allocator
-                .map_shadow_for_region(res as usize, res as usize + length, true);
-        }
-        res
-    }
-
-    #[inline]
-    fn hook_munmap(&mut self, addr: *const c_void, length: usize) -> i32 {
-        extern "C" {
-            fn munmap(addr: *const c_void, length: usize) -> i32;
-        }
-        let res = unsafe { munmap(addr, length) };
-        if res != -1 {
-            Allocator::poison(self.allocator.map_to_shadow(addr as usize), length);
-        }
-        res
-    }
-
-    #[inline]
-    fn hook_write(&mut self, fd: i32, buf: *const c_void, count: usize) -> usize {
-        extern "C" {
-            fn write(fd: i32, buf: *const c_void, count: usize) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(buf, count) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "write".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                buf as usize,
-                count,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { write(fd, buf, count) }
-    }
-
-    #[inline]
-    fn hook_read(&mut self, fd: i32, buf: *mut c_void, count: usize) -> usize {
-        extern "C" {
-            fn read(fd: i32, buf: *mut c_void, count: usize) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(buf, count) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "read".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                buf as usize,
-                count,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { read(fd, buf, count) }
-    }
-
-    #[inline]
-    fn hook_fgets(&mut self, s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void {
-        extern "C" {
-            fn fgets(s: *mut c_void, size: u32, stream: *mut c_void) -> *mut c_void;
-        }
-        if !(self.shadow_check_func.unwrap())(s, size as usize) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "fgets".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                size as usize,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { fgets(s, size, stream) }
-    }
-
-    #[inline]
-    fn hook_memcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
-        extern "C" {
-            fn memcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
-        }
-        if !(self.shadow_check_func.unwrap())(s1, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memcmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s1 as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(s2, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memcmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s2 as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { memcmp(s1, s2, n) }
-    }
-
-    #[inline]
-    fn hook_memcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
-        extern "C" {
-            fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
-        }
-        if !(self.shadow_check_func.unwrap())(dest, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "memcpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                dest as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(src, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memcpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                src as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { memcpy(dest, src, n) }
-    }
-
-    #[inline]
-    #[cfg(not(target_vendor = "apple"))]
-    fn hook_mempcpy(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
-        extern "C" {
-            fn mempcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
-        }
-        if !(self.shadow_check_func.unwrap())(dest, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "mempcpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                dest as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(src, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "mempcpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                src as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { mempcpy(dest, src, n) }
-    }
-
-    #[inline]
-    fn hook_memmove(&mut self, dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
-        extern "C" {
-            fn memmove(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void;
-        }
-        if !(self.shadow_check_func.unwrap())(dest, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "memmove".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                dest as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(src, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memmove".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                src as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { memmove(dest, src, n) }
-    }
-
-    #[inline]
-    fn hook_memset(&mut self, dest: *mut c_void, c: i32, n: usize) -> *mut c_void {
-        extern "C" {
-            fn memset(dest: *mut c_void, c: i32, n: usize) -> *mut c_void;
-        }
-        if !(self.shadow_check_func.unwrap())(dest, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "memset".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                dest as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { memset(dest, c, n) }
-    }
-
-    #[inline]
-    fn hook_memchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
-        extern "C" {
-            fn memchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
-        }
-        if !(self.shadow_check_func.unwrap())(s, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memchr".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { memchr(s, c, n) }
-    }
-
-    #[inline]
-    #[cfg(not(target_vendor = "apple"))]
-    fn hook_memrchr(&mut self, s: *mut c_void, c: i32, n: usize) -> *mut c_void {
-        extern "C" {
-            fn memrchr(s: *mut c_void, c: i32, n: usize) -> *mut c_void;
-        }
-        if !(self.shadow_check_func.unwrap())(s, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memrchr".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { memrchr(s, c, n) }
-    }
-
-    #[inline]
-    fn hook_memmem(
-        &mut self,
-        haystack: *const c_void,
-        haystacklen: usize,
-        needle: *const c_void,
-        needlelen: usize,
-    ) -> *mut c_void {
-        extern "C" {
-            fn memmem(
-                haystack: *const c_void,
-                haystacklen: usize,
-                needle: *const c_void,
-                needlelen: usize,
-            ) -> *mut c_void;
-        }
-        if !(self.shadow_check_func.unwrap())(haystack, haystacklen) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memmem".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                haystack as usize,
-                haystacklen,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(needle, needlelen) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "memmem".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                needle as usize,
-                needlelen,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { memmem(haystack, haystacklen, needle, needlelen) }
-    }
-
-    #[cfg(all(not(target_os = "android")))]
-    #[inline]
-    fn hook_bzero(&mut self, s: *mut c_void, n: usize) {
-        extern "C" {
-            fn bzero(s: *mut c_void, n: usize);
-        }
-        if !(self.shadow_check_func.unwrap())(s, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "bzero".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { bzero(s, n) }
-    }
-
-    #[cfg(all(not(target_os = "android"), not(target_vendor = "apple")))]
-    #[inline]
-    fn hook_explicit_bzero(&mut self, s: *mut c_void, n: usize) {
-        extern "C" {
-            fn explicit_bzero(s: *mut c_void, n: usize);
-        }
-        if !(self.shadow_check_func.unwrap())(s, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "explicit_bzero".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { explicit_bzero(s, n) }
-    }
-
-    #[cfg(all(not(target_os = "android")))]
-    #[inline]
-    fn hook_bcmp(&mut self, s1: *const c_void, s2: *const c_void, n: usize) -> i32 {
-        extern "C" {
-            fn bcmp(s1: *const c_void, s2: *const c_void, n: usize) -> i32;
-        }
-        if !(self.shadow_check_func.unwrap())(s1, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "bcmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s1 as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(s2, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "bcmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s2 as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { bcmp(s1, s2, n) }
-    }
-
-    #[inline]
-    fn hook_strchr(&mut self, s: *mut c_char, c: i32) -> *mut c_char {
-        extern "C" {
-            fn strchr(s: *mut c_char, c: i32) -> *mut c_char;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strchr".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                unsafe { strlen(s) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strchr(s, c) }
-    }
-
-    #[inline]
-    fn hook_strrchr(&mut self, s: *mut c_char, c: i32) -> *mut c_char {
-        extern "C" {
-            fn strrchr(s: *mut c_char, c: i32) -> *mut c_char;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strrchr".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                unsafe { strlen(s) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strrchr(s, c) }
-    }
-
-    #[inline]
-    fn hook_strcasecmp(&mut self, s1: *const c_char, s2: *const c_char) -> i32 {
-        extern "C" {
-            fn strcasecmp(s1: *const c_char, s2: *const c_char) -> i32;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcasecmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s1 as usize,
-                unsafe { strlen(s1) },
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcasecmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s2 as usize,
-                unsafe { strlen(s2) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strcasecmp(s1, s2) }
-    }
-
-    #[inline]
-    fn hook_strncasecmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
-        extern "C" {
-            fn strncasecmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
-        }
-        if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strncasecmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s1 as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strncasecmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s2 as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strncasecmp(s1, s2, n) }
-    }
-
-    #[inline]
-    fn hook_strcat(&mut self, s1: *mut c_char, s2: *const c_char) -> *mut c_char {
-        extern "C" {
-            fn strcat(s1: *mut c_char, s2: *const c_char) -> *mut c_char;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcat".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s1 as usize,
-                unsafe { strlen(s1) },
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcat".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s2 as usize,
-                unsafe { strlen(s2) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strcat(s1, s2) }
-    }
-
-    #[inline]
-    fn hook_strcmp(&mut self, s1: *const c_char, s2: *const c_char) -> i32 {
-        extern "C" {
-            fn strcmp(s1: *const c_char, s2: *const c_char) -> i32;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { strlen(s1) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s1 as usize,
-                unsafe { strlen(s1) },
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { strlen(s2) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s2 as usize,
-                unsafe { strlen(s2) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strcmp(s1, s2) }
-    }
-
-    #[inline]
-    fn hook_strncmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
-        extern "C" {
-            fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
-        }
-        if !(self.shadow_check_func.unwrap())(s1 as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strncmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s1 as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(s2 as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strncmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s2 as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strncmp(s1, s2, n) }
-    }
-
-    #[inline]
-    fn hook_strcpy(&mut self, dest: *mut c_char, src: *const c_char) -> *mut c_char {
-        extern "C" {
-            fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "strcpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                dest as usize,
-                unsafe { strlen(src) },
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                src as usize,
-                unsafe { strlen(src) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strcpy(dest, src) }
-    }
-
-    #[inline]
-    fn hook_strncpy(&mut self, dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char {
-        extern "C" {
-            fn strncpy(dest: *mut c_char, src: *const c_char, n: usize) -> *mut c_char;
-        }
-        if !(self.shadow_check_func.unwrap())(dest as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "strncpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                dest as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(src as *const c_void, n) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strncpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                src as usize,
-                n,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strncpy(dest, src, n) }
-    }
-
-    #[inline]
-    fn hook_stpcpy(&mut self, dest: *mut c_char, src: *const c_char) -> *mut c_char {
-        extern "C" {
-            fn stpcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe { strlen(src) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "stpcpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                dest as usize,
-                unsafe { strlen(src) },
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe { strlen(src) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "stpcpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                src as usize,
-                unsafe { strlen(src) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { stpcpy(dest, src) }
-    }
-
-    #[inline]
-    fn hook_strdup(&mut self, s: *const c_char) -> *mut c_char {
-        extern "C" {
-            fn strlen(s: *const c_char) -> usize;
-            fn strcpy(dest: *mut c_char, src: *const c_char) -> *mut c_char;
-        }
-        let size = unsafe { strlen(s) };
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strdup".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                unsafe { strlen(s) },
-                Backtrace::new(),
-            )));
-        }
-
-        unsafe {
-            let ret = self.allocator.alloc(size, 8) as *mut c_char;
-            strcpy(ret, s);
-            ret
-        }
-    }
-
-    #[inline]
-    fn hook_strlen(&mut self, s: *const c_char) -> usize {
-        extern "C" {
-            fn strlen(s: *const c_char) -> usize;
-        }
-        let size = unsafe { strlen(s) };
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strlen".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                size,
-                Backtrace::new(),
-            )));
-        }
-        size
-    }
-
-    #[inline]
-    fn hook_strnlen(&mut self, s: *const c_char, n: usize) -> usize {
-        extern "C" {
-            fn strnlen(s: *const c_char, n: usize) -> usize;
-        }
-        let size = unsafe { strnlen(s, n) };
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, size) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strnlen".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                size,
-                Backtrace::new(),
-            )));
-        }
-        size
-    }
-
-    #[inline]
-    fn hook_strstr(&mut self, haystack: *const c_char, needle: *const c_char) -> *mut c_char {
-        extern "C" {
-            fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe {
-            strlen(haystack)
-        }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strstr".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                haystack as usize,
-                unsafe { strlen(haystack) },
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strstr".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                needle as usize,
-                unsafe { strlen(needle) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strstr(haystack, needle) }
-    }
-
-    #[inline]
-    fn hook_strcasestr(&mut self, haystack: *const c_char, needle: *const c_char) -> *mut c_char {
-        extern "C" {
-            fn strcasestr(haystack: *const c_char, needle: *const c_char) -> *mut c_char;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(haystack as *const c_void, unsafe {
-            strlen(haystack)
-        }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcasestr".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                haystack as usize,
-                unsafe { strlen(haystack) },
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(needle as *const c_void, unsafe { strlen(needle) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "strcasestr".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                needle as usize,
-                unsafe { strlen(needle) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { strcasestr(haystack, needle) }
-    }
-
-    #[inline]
-    fn hook_atoi(&mut self, s: *const c_char) -> i32 {
-        extern "C" {
-            fn atoi(s: *const c_char) -> i32;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "atoi".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                unsafe { strlen(s) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { atoi(s) }
-    }
-
-    #[inline]
-    fn hook_atol(&mut self, s: *const c_char) -> i32 {
-        extern "C" {
-            fn atol(s: *const c_char) -> i32;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "atol".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                unsafe { strlen(s) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { atol(s) }
-    }
-
-    #[inline]
-    fn hook_atoll(&mut self, s: *const c_char) -> i64 {
-        extern "C" {
-            fn atoll(s: *const c_char) -> i64;
-            fn strlen(s: *const c_char) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, unsafe { strlen(s) }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "atoll".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                unsafe { strlen(s) },
-                Backtrace::new(),
-            )));
-        }
-        unsafe { atoll(s) }
-    }
-
-    #[inline]
-    fn hook_wcslen(&mut self, s: *const wchar_t) -> usize {
-        extern "C" {
-            fn wcslen(s: *const wchar_t) -> usize;
-        }
-        let size = unsafe { wcslen(s) };
-        if !(self.shadow_check_func.unwrap())(s as *const c_void, (size + 1) * 2) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "wcslen".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s as usize,
-                (size + 1) * 2,
-                Backtrace::new(),
-            )));
-        }
-        size
-    }
-
-    #[inline]
-    fn hook_wcscpy(&mut self, dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t {
-        extern "C" {
-            fn wcscpy(dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t;
-            fn wcslen(s: *const wchar_t) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(dest as *const c_void, unsafe {
-            (wcslen(src) + 1) * 2
-        }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
-                "wcscpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                dest as usize,
-                (unsafe { wcslen(src) } + 1) * 2,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(src as *const c_void, unsafe {
-            (wcslen(src) + 1) * 2
-        }) {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "wcscpy".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                src as usize,
-                (unsafe { wcslen(src) } + 1) * 2,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { wcscpy(dest, src) }
-    }
-
-    #[inline]
-    fn hook_wcscmp(&mut self, s1: *const wchar_t, s2: *const wchar_t) -> i32 {
-        extern "C" {
-            fn wcscmp(s1: *const wchar_t, s2: *const wchar_t) -> i32;
-            fn wcslen(s: *const wchar_t) -> usize;
-        }
-        if !(self.shadow_check_func.unwrap())(s1 as *const c_void, unsafe { (wcslen(s1) + 1) * 2 })
-        {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "wcscmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s1 as usize,
-                (unsafe { wcslen(s1) } + 1) * 2,
-                Backtrace::new(),
-            )));
-        }
-        if !(self.shadow_check_func.unwrap())(s2 as *const c_void, unsafe { (wcslen(s2) + 1) * 2 })
-        {
-            AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
-                "wcscmp".to_string(),
-                self.real_address_for_stalked(AsanRuntime::pc()),
-                s2 as usize,
-                (unsafe { wcslen(s2) } + 1) * 2,
-                Backtrace::new(),
-            )));
-        }
-        unsafe { wcscmp(s1, s2) }
     }
 
     /// Hook all functions required for ASAN to function, replacing them with our own
@@ -3085,5 +2025,488 @@ impl AsanRuntime {
     #[inline]
     pub fn blob_check_mem_64bytes(&self) -> &[u8] {
         self.blob_check_mem_64bytes.as_ref().unwrap()
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[inline]
+    pub fn asan_is_interesting_instruction(
+        &self,
+        capstone: &Capstone,
+        _address: u64,
+        instr: &Insn,
+    ) -> Result<
+        (
+            capstone::RegId,
+            capstone::RegId,
+            i32,
+            u32,
+            Arm64Shift,
+            Arm64Extender,
+        ),
+        (),
+    > {
+        // We have to ignore these instructions. Simulating them with their side effects is
+        // complex, to say the least.
+        match instr.mnemonic().unwrap() {
+            "ldaxr" | "stlxr" | "ldxr" | "stxr" | "ldar" | "stlr" | "ldarb" | "ldarh" | "ldaxp"
+            | "ldaxrb" | "ldaxrh" | "stlrb" | "stlrh" | "stlxp" | "stlxrb" | "stlxrh" | "ldxrb"
+            | "ldxrh" | "stxrb" | "stxrh" => return Err(()),
+            _ => (),
+        }
+
+        let operands = capstone
+            .insn_detail(instr)
+            .unwrap()
+            .arch_detail()
+            .operands();
+        if operands.len() < 2 {
+            return Err(());
+        }
+
+        if let Arm64Operand(arm64operand) = operands.last().unwrap() {
+            if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
+                return Ok((
+                    opmem.base(),
+                    opmem.index(),
+                    opmem.disp(),
+                    FridaInstrumentationHelper::instruction_width(instr, &operands),
+                    arm64operand.shift,
+                    arm64operand.ext,
+                ));
+            }
+        }
+
+        Err(())
+    }
+
+    #[cfg(all(target_arch = "x86_64", unix))]
+    #[inline]
+    #[allow(clippy::unused_self)]
+    #[allow(clippy::result_unit_err)]
+    pub fn asan_is_interesting_instruction(
+        &self,
+        capstone: &Capstone,
+        _address: u64,
+        instr: &Insn,
+    ) -> Result<(RegId, u8, RegId, RegId, i32, i64), ()> {
+        let operands = capstone
+            .insn_detail(instr)
+            .unwrap()
+            .arch_detail()
+            .operands();
+
+        // Ignore lea instruction
+        // put nop into the white-list so that instructions like
+        // like `nop dword [rax + rax]` does not get caught.
+        match instr.mnemonic().unwrap() {
+            "lea" | "nop" => return Err(()),
+
+            _ => (),
+        }
+
+        // This is a TODO! In this case, both the src and the dst are mem operand
+        // so we would need to return two operadns?
+        if instr.mnemonic().unwrap().starts_with("rep") {
+            return Err(());
+        }
+
+        for operand in operands {
+            if let X86Operand(x86operand) = operand {
+                if let X86OperandType::Mem(opmem) = x86operand.op_type {
+                    /*
+                    println!(
+                        "insn: {:#?} {:#?} width: {}, segment: {:#?}, base: {:#?}, index: {:#?}, scale: {}, disp: {}",
+                        insn_id,
+                        instr,
+                        x86operand.size,
+                        opmem.segment(),
+                        opmem.base(),
+                        opmem.index(),
+                        opmem.scale(),
+                        opmem.disp(),
+                    );
+                    */
+                    if opmem.segment() == RegId(0) {
+                        return Ok((
+                            opmem.segment(),
+                            x86operand.size,
+                            opmem.base(),
+                            opmem.index(),
+                            opmem.scale(),
+                            opmem.disp(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        Err(())
+    }
+
+    #[inline]
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_arguments)]
+    #[cfg(all(target_arch = "x86_64", unix))]
+    pub fn emit_shadow_check(
+        &mut self,
+        address: u64,
+        output: &StalkerOutput,
+        _segment: RegId,
+        width: u8,
+        basereg: RegId,
+        indexreg: RegId,
+        scale: i32,
+        disp: i64,
+    ) {
+        let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
+        let writer = output.writer();
+        let true_rip = address;
+
+        let basereg = if basereg.0 == 0 {
+            None
+        } else {
+            let reg = FridaInstrumentationHelper::writer_register(basereg);
+            Some(reg)
+        };
+
+        let indexreg = if indexreg.0 == 0 {
+            None
+        } else {
+            let reg = FridaInstrumentationHelper::writer_register(indexreg);
+            Some(reg)
+        };
+
+        let scale = match scale {
+            2 => 1,
+            4 => 2,
+            8 => 3,
+            _ => 0,
+        };
+        if self.current_report_impl == 0
+            || !writer.can_branch_directly_to(self.current_report_impl)
+            || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
+        {
+            let after_report_impl = writer.code_offset() + 2;
+
+            #[cfg(target_arch = "x86_64")]
+            writer.put_jmp_near_label(after_report_impl);
+            #[cfg(target_arch = "aarch64")]
+            writer.put_b_label(after_report_impl);
+
+            self.current_report_impl = writer.pc();
+            #[cfg(unix)]
+            writer.put_bytes(self.blob_report());
+
+            writer.put_label(after_report_impl);
+        }
+
+        /* Save registers that we'll use later in shadow_check_blob
+                                        | addr  | rip   |
+                                        | Rcx   | Rax   |
+                                        | Rsi   | Rdx   |
+            Old Rsp - (redsone_size) -> | flags | Rdi   |
+                                        |       |       |
+            Old Rsp                  -> |       |       |
+        */
+        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
+        writer.put_pushfx();
+        writer.put_push_reg(X86Register::Rdi);
+        writer.put_push_reg(X86Register::Rsi);
+        writer.put_push_reg(X86Register::Rdx);
+        writer.put_push_reg(X86Register::Rcx);
+        writer.put_push_reg(X86Register::Rax);
+
+        /*
+        Things are a bit different when Rip is either base register or index register.
+        Suppose we have an instruction like
+        `bnd jmp qword ptr [rip + 0x2e4b5]`
+        We can't just emit code like
+        `mov rdi, rip` to get RIP loaded into RDI,
+        because this RIP is NOT the orginal RIP (, which is usually within .text) anymore, rather it is pointing to the memory allocated by the frida stalker.
+        Please confer https://frida.re/docs/stalker/ for details.
+        */
+        // Init Rdi
+        match basereg {
+            Some(reg) => match reg {
+                X86Register::Rip => {
+                    writer.put_mov_reg_address(X86Register::Rdi, true_rip);
+                }
+                _ => {
+                    writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
+                }
+            },
+            None => {
+                writer.put_xor_reg_reg(X86Register::Rdi, X86Register::Rdi);
+            }
+        }
+
+        match indexreg {
+            Some(reg) => match reg {
+                X86Register::Rip => {
+                    writer.put_mov_reg_address(X86Register::Rsi, true_rip);
+                }
+                _ => {
+                    writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
+                }
+            },
+            None => {
+                writer.put_xor_reg_reg(X86Register::Rsi, X86Register::Rsi);
+            }
+        }
+
+        // Scale
+        if scale > 0 {
+            writer.put_shl_reg_u8(X86Register::Rsi, scale);
+        }
+
+        // Finally set Rdi to base + index * scale + disp
+        writer.put_add_reg_reg(X86Register::Rdi, X86Register::Rsi);
+        writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rdi, disp);
+
+        writer.put_mov_reg_address(X86Register::Rsi, true_rip); // load true_rip into rsi in case we need them in handle_trap
+        writer.put_push_reg(X86Register::Rsi); // save true_rip
+        writer.put_push_reg(X86Register::Rdi); // save accessed_address
+
+        #[cfg(unix)]
+        let checked: bool = match width {
+            1 => writer.put_bytes(self.blob_check_mem_byte()),
+            2 => writer.put_bytes(self.blob_check_mem_halfword()),
+            4 => writer.put_bytes(self.blob_check_mem_dword()),
+            8 => writer.put_bytes(self.blob_check_mem_qword()),
+            16 => writer.put_bytes(self.blob_check_mem_16bytes()),
+            _ => false,
+        };
+
+        if checked {
+            writer.put_jmp_address(self.current_report_impl);
+            for _ in 0..10 {
+                // shadow_check_blob's done will land somewhere in these nops
+                // on amd64 jump can takes 10 bytes at most, so that's why I put 10 bytes.
+                writer.put_nop();
+            }
+        }
+
+        writer.put_pop_reg(X86Register::Rdi);
+        writer.put_pop_reg(X86Register::Rsi);
+
+        writer.put_pop_reg(X86Register::Rax);
+        writer.put_pop_reg(X86Register::Rcx);
+        writer.put_pop_reg(X86Register::Rdx);
+        writer.put_pop_reg(X86Register::Rsi);
+        writer.put_pop_reg(X86Register::Rdi);
+        writer.put_popfx();
+        writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    #[inline]
+    pub fn emit_shadow_check(
+        &mut self,
+        _address: u64,
+        output: &StalkerOutput,
+        basereg: capstone::RegId,
+        indexreg: capstone::RegId,
+        displacement: i32,
+        width: u32,
+        shift: Arm64Shift,
+        extender: Arm64Extender,
+    ) {
+        let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
+        let writer = output.writer();
+
+        let basereg = FridaInstrumentationHelper::writer_register(basereg);
+        let indexreg = if indexreg.0 != 0 {
+            Some(FridaInstrumentationHelper::writer_register(indexreg))
+        } else {
+            None
+        };
+
+        if self.current_report_impl == 0
+            || !writer.can_branch_directly_to(self.current_report_impl)
+            || !writer.can_branch_directly_between(writer.pc() + 128, self.current_report_impl)
+        {
+            let after_report_impl = writer.code_offset() + 2;
+
+            #[cfg(target_arch = "x86_64")]
+            writer.put_jmp_near_label(after_report_impl);
+            #[cfg(target_arch = "aarch64")]
+            writer.put_b_label(after_report_impl);
+
+            self.current_report_impl = writer.pc();
+
+            #[cfg(unix)]
+            writer.put_bytes(self.blob_report());
+
+            writer.put_label(after_report_impl);
+        }
+        //writer.put_brk_imm(1);
+
+        // Preserve x0, x1:
+        writer.put_stp_reg_reg_reg_offset(
+            Aarch64Register::X0,
+            Aarch64Register::X1,
+            Aarch64Register::Sp,
+            -(16 + redzone_size) as i64,
+            IndexMode::PreAdjust,
+        );
+
+        // Make sure the base register is copied into x0
+        match basereg {
+            Aarch64Register::X0 | Aarch64Register::W0 => {}
+            Aarch64Register::X1 | Aarch64Register::W1 => {
+                writer.put_mov_reg_reg(Aarch64Register::X0, Aarch64Register::X1);
+            }
+            _ => {
+                if !writer.put_mov_reg_reg(Aarch64Register::X0, basereg) {
+                    writer.put_mov_reg_reg(Aarch64Register::W0, basereg);
+                }
+            }
+        }
+
+        // Make sure the index register is copied into x1
+        if indexreg.is_some() {
+            if let Some(indexreg) = indexreg {
+                match indexreg {
+                    Aarch64Register::X0 | Aarch64Register::W0 => {
+                        writer.put_ldr_reg_reg_offset(
+                            Aarch64Register::X1,
+                            Aarch64Register::Sp,
+                            0u64,
+                        );
+                    }
+                    Aarch64Register::X1 | Aarch64Register::W1 => {}
+                    _ => {
+                        if !writer.put_mov_reg_reg(Aarch64Register::X1, indexreg) {
+                            writer.put_mov_reg_reg(Aarch64Register::W1, indexreg);
+                        }
+                    }
+                }
+            }
+
+            if let (Arm64Extender::ARM64_EXT_INVALID, Arm64Shift::Invalid) = (extender, shift) {
+                writer.put_add_reg_reg_reg(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    Aarch64Register::X1,
+                );
+            } else {
+                let extender_encoding: i32 = match extender {
+                    Arm64Extender::ARM64_EXT_UXTB => 0b000,
+                    Arm64Extender::ARM64_EXT_UXTH => 0b001,
+                    Arm64Extender::ARM64_EXT_UXTW => 0b010,
+                    Arm64Extender::ARM64_EXT_UXTX => 0b011,
+                    Arm64Extender::ARM64_EXT_SXTB => 0b100,
+                    Arm64Extender::ARM64_EXT_SXTH => 0b101,
+                    Arm64Extender::ARM64_EXT_SXTW => 0b110,
+                    Arm64Extender::ARM64_EXT_SXTX => 0b111,
+                    _ => -1,
+                };
+                let (shift_encoding, shift_amount): (i32, u32) = match shift {
+                    Arm64Shift::Lsl(amount) => (0b00, amount),
+                    Arm64Shift::Lsr(amount) => (0b01, amount),
+                    Arm64Shift::Asr(amount) => (0b10, amount),
+                    _ => (-1, 0),
+                };
+
+                if extender_encoding != -1 && shift_amount < 0b1000 {
+                    // emit add extended register: https://developer.arm.com/documentation/ddi0602/latest/Base-Instructions/ADD--extended-register---Add--extended-register--
+                    writer.put_bytes(
+                        &(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10))
+                            .to_le_bytes(),
+                    );
+                } else if shift_encoding != -1 {
+                    writer.put_bytes(
+                        &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
+                            .to_le_bytes(),
+                    );
+                } else {
+                    panic!("extender: {:?}, shift: {:?}", extender, shift);
+                }
+            };
+        }
+
+        let displacement = displacement
+            + if basereg == Aarch64Register::Sp {
+                16 + redzone_size
+            } else {
+                0
+            };
+
+        #[allow(clippy::comparison_chain)]
+        if displacement < 0 {
+            if displacement > -4096 {
+                // Subtract the displacement into x0
+                writer.put_sub_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement.abs() as u64,
+                );
+            } else {
+                let displacement_hi = displacement.abs() / 4096;
+                let displacement_lo = displacement.abs() % 4096;
+                writer.put_bytes(&(0xd1400000u32 | ((displacement_hi as u32) << 10)).to_le_bytes());
+                writer.put_sub_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement_lo as u64,
+                );
+            }
+        } else if displacement > 0 {
+            if displacement < 4096 {
+                // Add the displacement into x0
+                writer.put_add_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement as u64,
+                );
+            } else {
+                let displacement_hi = displacement / 4096;
+                let displacement_lo = displacement % 4096;
+                writer.put_bytes(&(0x91400000u32 | ((displacement_hi as u32) << 10)).to_le_bytes());
+                writer.put_add_reg_reg_imm(
+                    Aarch64Register::X0,
+                    Aarch64Register::X0,
+                    displacement_lo as u64,
+                );
+            }
+        }
+        // Insert the check_shadow_mem code blob
+        #[cfg(unix)]
+        match width {
+            1 => writer.put_bytes(&self.blob_check_mem_byte()),
+            2 => writer.put_bytes(&self.blob_check_mem_halfword()),
+            3 => writer.put_bytes(&self.blob_check_mem_3bytes()),
+            4 => writer.put_bytes(&self.blob_check_mem_dword()),
+            6 => writer.put_bytes(&self.blob_check_mem_6bytes()),
+            8 => writer.put_bytes(&self.blob_check_mem_qword()),
+            12 => writer.put_bytes(&self.blob_check_mem_12bytes()),
+            16 => writer.put_bytes(&self.blob_check_mem_16bytes()),
+            24 => writer.put_bytes(&self.blob_check_mem_24bytes()),
+            32 => writer.put_bytes(&self.blob_check_mem_32bytes()),
+            48 => writer.put_bytes(&self.blob_check_mem_48bytes()),
+            64 => writer.put_bytes(&self.blob_check_mem_64bytes()),
+            _ => false,
+        };
+
+        // Add the branch to report
+        //writer.put_brk_imm(0x12);
+        writer.put_branch_address(self.current_report_impl);
+
+        match width {
+            3 | 6 | 12 | 24 | 32 | 48 | 64 => {
+                let msr_nvcz_x0: u32 = 0xd51b4200;
+                writer.put_bytes(&msr_nvcz_x0.to_le_bytes());
+            }
+            _ => (),
+        }
+
+        // Restore x0, x1
+        assert!(writer.put_ldp_reg_reg_reg_offset(
+            Aarch64Register::X0,
+            Aarch64Register::X1,
+            Aarch64Register::Sp,
+            16 + redzone_size as i64,
+            IndexMode::PostAdjust,
+        ));
     }
 }

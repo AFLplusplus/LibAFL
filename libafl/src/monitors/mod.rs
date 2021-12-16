@@ -291,19 +291,19 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, {} exec/sec: {}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}{}, exec/sec: {}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
+            self.total_execs(),
             if let Some(stability) = self.stability() {
                 format!(", stability: {:.2}", stability)
             } else {
                 "".to_string()
             },
-            self.total_execs(),
             self.execs_per_sec()
         );
         (self.print_fn)(fmt);
