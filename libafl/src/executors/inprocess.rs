@@ -524,11 +524,22 @@ mod unix_signal_handler {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
-            let observers = executor.observers();
-
+            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+            let observers = executor.observers_mut();
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
+
+            println!("Triggering post_exec_all from crash_handler");
+            observers
+                .post_exec_all(state, input)
+                .expect("Observers post_exec_all failed");
+            // let potential_st_observer =
+            //     observers.match_name_mut::<StacktraceObserver>("StacktraceObserver");
+
+            // match potential_st_observer {
+            //     Some(observer) => observer.post_exec(state, input).unwrap(),
+            //     _ => (),
+            // }
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
