@@ -10,6 +10,7 @@ use libc::{c_char, wchar_t};
 use nix::libc::memset;
 use std::ffi::c_void;
 
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 impl AsanRuntime {
     #[inline]
     pub fn hook_malloc(&mut self, size: usize) -> *mut c_void {

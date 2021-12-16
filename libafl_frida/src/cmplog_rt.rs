@@ -13,6 +13,7 @@ use frida_gum::{
     stalker::StalkerOutput,
 };
 
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::helper::FridaInstrumentationHelper;
 
 pub enum SpecialCmpLogCase {

@@ -55,6 +55,7 @@ pub struct AllocationMetadata {
 }
 
 impl Allocator {
+    #[must_use]
     pub fn new(options: FridaOptions) -> Self {
         let ret = unsafe { sysconf(_SC_PAGESIZE) };
         assert!(
@@ -193,6 +194,7 @@ impl Allocator {
     }
 
     #[must_use]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
         let size = if size == 0 {
@@ -270,6 +272,7 @@ impl Allocator {
         address
     }
 
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
             metadata
@@ -443,6 +446,7 @@ impl Allocator {
         (shadow_mapping_start, (end - start) / 8)
     }
 
+    #[must_use]
     pub fn map_to_shadow(&self, start: usize) -> usize {
         map_to_shadow!(self, start)
     }

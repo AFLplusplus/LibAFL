@@ -229,6 +229,7 @@ impl AsanRuntime {
         self.allocator.reset();
     }
 
+    #[must_use]
     pub fn allocator(&self) -> &Allocator {
         &self.allocator
     }
@@ -237,6 +238,7 @@ impl AsanRuntime {
         &mut self.allocator
     }
 
+    #[must_use]
     pub fn shadow_check_func(&self) -> &Option<extern "C" fn(*const c_void, usize) -> bool> {
         &self.shadow_check_func
     }
@@ -383,12 +385,14 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
+    #[must_use]
     #[inline]
     pub fn pc() -> usize {
         Interceptor::current_invocation().cpu_context().pc() as usize
     }
 
     #[cfg(target_arch = "x86_64")]
+    #[must_use]
     #[inline]
     pub fn pc() -> usize {
         Interceptor::current_invocation().cpu_context().rip() as usize
@@ -2077,6 +2081,8 @@ impl AsanRuntime {
 
     #[cfg(all(target_arch = "x86_64", unix))]
     #[inline]
+    #[allow(clippy::unused_self)]
+    #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
         &self,
         capstone: &Capstone,
