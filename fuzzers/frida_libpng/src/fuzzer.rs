@@ -41,8 +41,6 @@ use libafl::{
     Error,
 };
 
-#[cfg(unix)]
-use libafl_frida::asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
 use libafl_frida::{
     coverage_rt::MAP_SIZE,
     executor::FridaInProcessExecutor,
@@ -51,6 +49,8 @@ use libafl_frida::{
 };
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
+#[cfg(unix)]
+use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(time.parse()?))
 }
