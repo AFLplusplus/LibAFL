@@ -39,7 +39,7 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 macro_rules! map_to_shadow {
     ($self:expr, $address:expr) => {
-        (($address >> 3) + $self.shadow_offset) & ((1 << ($self.shadow_bit + 1)) - 1)
+        $self.shadow_offset + (($address >> 3) & ((1 << ($self.shadow_bit + 1)) - 1))
     };
 }
 
