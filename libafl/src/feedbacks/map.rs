@@ -135,13 +135,13 @@ where
     }
 }
 
-/// A `IsNovel` function is used to discriminate if a reduced value is interesting.
+/// A `IsNovel` function is used to discriminate if a reduced value is considered novel.
 pub trait IsNovel<T>: Serialize + serde::de::DeserializeOwned + 'static
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// If a new value in the [`MapFeedback`] was found,
-    /// this filter can decide if the result is intersting or not.
+    /// this filter can decide if the result is considered novel or not.
     fn is_novel(old: T, new: T) -> bool;
 }
 
@@ -671,22 +671,22 @@ mod tests {
     use crate::feedbacks::{AllIsNovel, IsNovel, NextPow2IsNovel};
 
     #[test]
-    fn test_map_max_pow2_filter() {
+    fn test_map_is_novel() {
         // sanity check
-        assert!(AllIsNovel::is_interesting(0_u8, 0));
+        assert!(AllIsNovel::is_novel(0_u8, 0));
 
-        assert!(!NextPow2IsNovel::is_interesting(0_u8, 0));
-        assert!(NextPow2IsNovel::is_interesting(0_u8, 1));
-        assert!(!NextPow2IsNovel::is_interesting(1_u8, 1));
-        assert!(NextPow2IsNovel::is_interesting(1_u8, 2));
-        assert!(!NextPow2IsNovel::is_interesting(2_u8, 2));
-        assert!(!NextPow2IsNovel::is_interesting(2_u8, 3));
-        assert!(NextPow2IsNovel::is_interesting(2_u8, 4));
-        assert!(!NextPow2IsNovel::is_interesting(128_u8, 128));
-        assert!(!NextPow2IsNovel::is_interesting(129_u8, 128));
-        assert!(NextPow2IsNovel::is_interesting(128_u8, 255));
-        assert!(!NextPow2IsNovel::is_interesting(255_u8, 128));
-        assert!(NextPow2IsNovel::is_interesting(254_u8, 255));
-        assert!(!NextPow2IsNovel::is_interesting(255_u8, 255));
+        assert!(!NextPow2IsNovel::is_novel(0_u8, 0));
+        assert!(NextPow2IsNovel::is_novel(0_u8, 1));
+        assert!(!NextPow2IsNovel::is_novel(1_u8, 1));
+        assert!(NextPow2IsNovel::is_novel(1_u8, 2));
+        assert!(!NextPow2IsNovel::is_novel(2_u8, 2));
+        assert!(!NextPow2IsNovel::is_novel(2_u8, 3));
+        assert!(NextPow2IsNovel::is_novel(2_u8, 4));
+        assert!(!NextPow2IsNovel::is_novel(128_u8, 128));
+        assert!(!NextPow2IsNovel::is_novel(129_u8, 128));
+        assert!(NextPow2IsNovel::is_novel(128_u8, 255));
+        assert!(!NextPow2IsNovel::is_novel(255_u8, 128));
+        assert!(NextPow2IsNovel::is_novel(254_u8, 255));
+        assert!(!NextPow2IsNovel::is_novel(255_u8, 255));
     }
 }
