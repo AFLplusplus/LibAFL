@@ -1173,7 +1173,7 @@ impl AsanRuntime {
         println!("actual rip: {:x}", self.regs[18]);
     }
 
-    // https://godbolt.org/z/Y87PYGd69
+    // https://godbolt.org/z/oajhcP5sv
     /*
     #include <stdio.h>
     #include <stdint.h>
@@ -1181,11 +1181,11 @@ impl AsanRuntime {
 
     uint64_t generate_shadow_check_function(uint64_t start, uint64_t size){
         // calculate the shadow address
-        uint64_t addr = 1;
-        addr = addr << shadow_bit;
+        uint64_t addr = 0;
         addr = addr + (start >> 3);
         uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
         addr = addr & mask;
+        addr = addr + (1ULL << shadow_bit);
 
         if(size == 0){
             // goto return_success
@@ -1292,117 +1292,117 @@ impl AsanRuntime {
         // Rdi start, Rsi size
         dynasm!(ops
         ;       .arch x64
-        ;       mov     cl, shadow_bit as i8
-        ;       mov     eax, 1
-        ;       mov     edx, 1
-        ;       shl     rdx, cl
-        ;       mov     r10d, 2
-        ;       shl     r10, cl
-        ;       test    rsi, rsi
-        ;       je      >LBB0_15
-        ;       mov     rcx, rdi
-        ;       shr     rcx, 3
-        ;       add     rdx, rcx
-        ;       add     r10, -1
-        ;       and     r10, rdx
-        ;       and     edi, 7
-        ;       je      >LBB0_4
-        ;       mov     cl, 8
-        ;       sub     cl, dil
-        ;       cmp     rsi, 8
-        ;       movzx   ecx, cl
-        ;       mov     r8d, esi
-        ;       cmovae  r8d, ecx
-        ;       mov     r9d, -1
-        ;       mov     ecx, r8d
-        ;       shl     r9d, cl
-        ;       movzx   ecx, WORD [r10]
-        ;       rol     cx, 8
-        ;       mov     edx, ecx
-        ;       shr     edx, 4
-        ;       and     edx, 3855
-        ;       shl     ecx, 4
-        ;       and     ecx, -3856
-        ;       or      ecx, edx
-        ;       mov     edx, ecx
-        ;       shr     edx, 2
-        ;       and     edx, 13107
-        ;       and     ecx, -3277
-        ;       lea     ecx, [rdx + 4*rcx]
-        ;       mov     edx, ecx
-        ;       shr     edx, 1
-        ;       and     edx, 21845
-        ;       and     ecx, -10923
-        ;       lea     ecx, [rdx + 2*rcx]
-        ;       rol     cx, 8
-        ;       movzx   edx, cx
-        ;       mov     ecx, edi
-        ;       shr     edx, cl
-        ;       not     r9d
-        ;       movzx   ecx, r9b
-        ;       and     edx, ecx
-        ;       cmp     edx, ecx
-        ;       jne     >LBB0_11
-        ;       movzx   ecx, r8b
-        ;       sub     rsi, rcx
-        ;       add     r10, 1
+        ;        mov     cl, BYTE shadow_bit as i8
+        ;        mov     r10, -2
+        ;        shl     r10, cl
+        ;        mov     eax, 1
+        ;        mov     edx, 1
+        ;        shl     rdx, cl
+        ;        test    rsi, rsi
+        ;        je      >LBB0_15
+        ;        mov     rcx, rdi
+        ;        shr     rcx, 3
+        ;        not     r10
+        ;        and     r10, rcx
+        ;        add     r10, rdx
+        ;        and     edi, 7
+        ;        je      >LBB0_4
+        ;        mov     cl, 8
+        ;        sub     cl, dil
+        ;        cmp     rsi, 8
+        ;        movzx   ecx, cl
+        ;        mov     r8d, esi
+        ;        cmovae  r8d, ecx
+        ;        mov     r9d, -1
+        ;        mov     ecx, r8d
+        ;        shl     r9d, cl
+        ;        movzx   ecx, WORD [r10]
+        ;        rol     cx, 8
+        ;        mov     edx, ecx
+        ;        shr     edx, 4
+        ;        and     edx, 3855
+        ;        shl     ecx, 4
+        ;        and     ecx, -3856
+        ;        or      ecx, edx
+        ;        mov     edx, ecx
+        ;        shr     edx, 2
+        ;        and     edx, 13107
+        ;        and     ecx, -3277
+        ;        lea     ecx, [rdx + 4*rcx]
+        ;        mov     edx, ecx
+        ;        shr     edx, 1
+        ;        and     edx, 21845
+        ;        and     ecx, -10923
+        ;        lea     ecx, [rdx + 2*rcx]
+        ;        rol     cx, 8
+        ;        movzx   edx, cx
+        ;        mov     ecx, edi
+        ;        shr     edx, cl
+        ;        not     r9d
+        ;        movzx   ecx, r9b
+        ;        and     edx, ecx
+        ;        cmp     edx, ecx
+        ;        jne     >LBB0_11
+        ;        movzx   ecx, r8b
+        ;        sub     rsi, rcx
+        ;        add     r10, 1
         ;LBB0_4:
-        ;       mov     r8, rsi
-        ;       shr     r8, 3
-        ;       mov     r9, r8
-        ;       and     r9, -8
-        ;       mov     edi, r8d
-        ;       and     edi, 7
-        ;       add     r9, r10
-        ;       and     esi, 63
-        ;       mov     rdx, r8
-        ;       mov     rcx, r10
+        ;        mov     r8, rsi
+        ;        shr     r8, 3
+        ;        mov     r9, r8
+        ;        and     r9, -8
+        ;        mov     edi, r8d
+        ;        and     edi, 7
+        ;        add     r9, r10
+        ;        and     esi, 63
+        ;        mov     rdx, r8
+        ;        mov     rcx, r10
         ;LBB0_5:
-        ;       cmp     rdx, 7
-        ;       jbe     >LBB0_8
-        ;       add     rdx, -8
-        ;       cmp     QWORD [rcx], -1
-        ;       lea     rcx, [rcx + 8]
-        ;       je      <LBB0_5
-        ;       jmp     >LBB0_11
+        ;        cmp     rdx, 7
+        ;        jbe     >LBB0_8
+        ;        add     rdx, -8
+        ;        cmp     QWORD [rcx], -1
+        ;        lea     rcx, [rcx + 8]
+        ;        je      <LBB0_5
+        ;        jmp     >LBB0_11
         ;LBB0_8:
-        ;       lea     rcx, [8*rdi]
-        ;       sub     rsi, rcx
+        ;        lea     rcx, [8*rdi]
+        ;        sub     rsi, rcx
         ;LBB0_9:
-        ;       test    rdi, rdi
-        ;       je      >LBB0_13
-        ;       add     rdi, -1
-        ;       cmp     BYTE [r9], -1
-        ;       lea     r9, [r9 + 1]
-        ;       je      <LBB0_9
+        ;        test    rdi, rdi
+        ;        je      >LBB0_13
+        ;        add     rdi, -1
+        ;        cmp     BYTE [r9], -1
+        ;        lea     r9, [r9 + 1]
+        ;        je      <LBB0_9
         ;LBB0_11:
-        ;       xor     eax, eax
-        ;       ret
+        ;        xor     eax, eax
+        ;        ret
         ;LBB0_13:
-        ;       test    rsi, rsi
-        ;       je      >LBB0_15
-        ;       and     sil, 7
-        ;       mov     dl, -1
-        ;       mov     ecx, esi
-        ;       shl     dl, cl
-        ;       not     dl
-        ;       mov     cl, BYTE [r8 + r10]
-        ;       rol     cl, 4
-        ;       mov     eax, ecx
-        ;       shr     al, 2
-        ;       shl     cl, 2
-        ;       and     cl, -52
-        ;       or      cl, al
-        ;       mov     eax, ecx
-        ;       shr     al, 1
-        ;       and     al, 85
-        ;       add     cl, cl
-        ;       and     cl, -86
-        ;       or      cl, al
-        ;       and     cl, dl
-        ;       xor     eax, eax
-        ;       cmp     cl, dl
-        ;       sete    al
+        ;        test    rsi, rsi
+        ;        je      >LBB0_15
+        ;        and     sil, 7
+        ;        mov     dl, -1
+        ;        mov     ecx, esi
+        ;        shl     dl, cl
+        ;        not     dl
+        ;        mov     cl, BYTE [r8 + r10]
+        ;        rol     cl, 4
+        ;        mov     eax, ecx
+        ;        shr     al, 2
+        ;        shl     cl, 2
+        ;        and     cl, -52
+        ;        or      cl, al
+        ;        mov     eax, ecx
+        ;        shr     al, 1
+        ;        and     al, 85
+        ;        add     cl, cl
+        ;        and     cl, -86
+        ;        or      cl, al
+        ;        and     cl, dl
+        ;        xor     eax, eax
+        ;        cmp     cl, dl
+        ;        sete    al
         ;LBB0_15:
         ;       ret
             );
@@ -1545,18 +1545,18 @@ impl AsanRuntime {
         }
     }
 
-    // https://godbolt.org/z/cqEKf63e1
+    // https://godbolt.org/z/ah8vG8sWo
     /*
     #include <stdio.h>
     #include <stdint.h>
     uint8_t shadow_bit = 8;
     uint8_t bit = 3;
     uint64_t generate_shadow_check_blob(uint64_t start){
-        uint64_t addr = 1;
-        addr = addr << shadow_bit;
+        uint64_t addr = 0;
         addr = addr + (start >> 3);
         uint64_t mask = (1ULL << (shadow_bit + 1)) - 1;
         addr = addr & mask;
+        addr = addr + (1ULL << shadow_bit);
 
         uint8_t remainder = start & 0b111;
         uint16_t val = *(uint16_t *)addr;
@@ -1586,17 +1586,16 @@ impl AsanRuntime {
         macro_rules! shadow_check{
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ;   .arch x64
-                ;   mov     cl, shadow_bit as i8
-                ;   mov     eax, 1
+                ;   mov     cl, BYTE shadow_bit as i8
+                ;   mov     rax, -2
                 ;   shl     rax, cl
                 ;   mov     rdx, rdi
-                ;   mov     esi, 2
-                ;   shl     rsi, cl
                 ;   shr     rdx, 3
-                ;   add     rdx, rax
-                ;   add     rsi, -1
-                ;   and     rsi, rdx
-                ;   movzx   eax, WORD [rsi]
+                ;   not     rax
+                ;   and     rax, rdx
+                ;   mov     edx, 1
+                ;   shl     rdx, cl
+                ;   movzx   eax, WORD [rax + rdx]
                 ;   rol     ax, 8
                 ;   mov     ecx, eax
                 ;   shr     ecx, 4
