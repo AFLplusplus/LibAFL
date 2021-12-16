@@ -9,7 +9,9 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_and,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback},
+    feedbacks::{
+        CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
+    },
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
@@ -50,7 +52,7 @@ pub fn main() {
                 }
                 if buf.len() > 2 && buf[2] == b'e' {
                     #[cfg(unix)]
-                    panic!("panic 1");
+                    panic!("panic 3");
                 }
             }
         }
@@ -64,18 +66,19 @@ pub fn main() {
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
+    let hash_state = NewHashFeedbackState::<u64>::with_observer(&another_observer);
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
-    let feedback = feedback_and!(
-        MaxMapFeedback::new(&feedback_state, &observer),
+    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+
+    // A feedback to choose if an input is a solution or not
+    let objective = feedback_and!(
+        CrashFeedback::new(),
         NewHashFeedback::new(
             "NewHashFeedback".to_string(),
             "StacktraceObserver".to_string()
         )
     );
-
-    // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -88,7 +91,7 @@ pub fn main() {
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
         // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
+        tuple_list!(feedback_state, hash_state),
     );
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
