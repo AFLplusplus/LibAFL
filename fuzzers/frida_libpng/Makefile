@@ -29,12 +29,12 @@ clean:
 	rm $(FUZZER_NAME)
 
 run: all
-	./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0
+	./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0 --input=./corpus
 
 short_test: all
 	rm -rf libafl_unix_shmem_server || true
 	# We allow exit code 124 too, which is sigterm
-	(timeout 3s ./libafl_frida ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1 || [ $$? -eq 124 ])
+	(timeout 3s ./libafl_frida ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1 --input=./corpus || [ $$? -eq 124 ])
 
 test: all
-	(timeout 60s ./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1 || [ $$? -eq 124 ])
+	(timeout 60s ./$(FUZZER_NAME) ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0,1 --input=./corpus || [ $$? -eq 124 ])
