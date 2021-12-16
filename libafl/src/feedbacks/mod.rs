@@ -13,6 +13,8 @@ pub use concolic::ConcolicFeedback;
 pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub use new_hash_feedback::NewHashFeedback;
+#[cfg(feature = "std")]
+pub use new_hash_feedback::NewHashFeedbackState;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
