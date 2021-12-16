@@ -111,6 +111,13 @@ where
 
         println!("spawning on cores: {:?}", self.cores);
 
+        #[cfg(feature = "std")]
+        let stdout_file = if let Some(filename) = self.stdout_file {
+            Some(File::create(filename).unwrap())
+        } else {
+            None
+        };
+
         // Spawn clients
         let mut index = 0_u64;
         for (id, bind_to) in core_ids.iter().enumerate().take(num_cores) {
@@ -132,8 +139,7 @@ where
                         std::thread::sleep(std::time::Duration::from_millis(index * 100));
 
                         #[cfg(feature = "std")]
-                        if let Some(filename) = self.stdout_file {
-                            let file = File::create(filename).unwrap();
+                        if let Some(file) = stdout_file {
                             dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
                             dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
                         }
