@@ -529,17 +529,13 @@ mod unix_signal_handler {
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
 
-            println!("Triggering post_exec_all from crash_handler");
+            #[cfg(feature = "std")]
+            eprintln!("Triggering post_exec_all from crash_handler");
+
+            // We can also filter the stacktrace observers exclusively and run their post_exec
             observers
                 .post_exec_all(state, input)
                 .expect("Observers post_exec_all failed");
-            // let potential_st_observer =
-            //     observers.match_name_mut::<StacktraceObserver>("StacktraceObserver");
-
-            // match potential_st_observer {
-            //     Some(observer) => observer.post_exec(state, input).unwrap(),
-            //     _ => (),
-            // }
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");

@@ -161,7 +161,7 @@ impl<FT> NewHashFeedback<FT> {
     #[must_use]
     pub fn new(feedback_name: String, observer_name: String) -> Self {
         Self {
-            phantom_val: PhantomData {},
+            phantom_val: PhantomData,
             feedback_name,
             observer_name,
         }
