@@ -61,7 +61,7 @@ where
         + serde::de::DeserializeOwned
         + PartialOrd,
 {
-    #[inline(always)]
+    #[inline]
     fn reduce(history: T, new: T) -> T {
         history | new
     }
@@ -81,7 +81,7 @@ where
         + serde::de::DeserializeOwned
         + PartialOrd,
 {
-    #[inline(always)]
+    #[inline]
     fn reduce(history: T, new: T) -> T {
         history & new
     }
@@ -153,7 +153,7 @@ impl<T> IsNovel<T> for AllIsNovel
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    #[inline(always)]
+    #[inline]
     fn is_novel(_old: T, _new: T) -> bool {
         true
     }
@@ -180,7 +180,7 @@ impl<T> IsNovel<T> for DifferentIsNovel
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
-    #[inline(always)]
+    #[inline]
     fn is_novel(old: T, new: T) -> bool {
         old != new
     }
