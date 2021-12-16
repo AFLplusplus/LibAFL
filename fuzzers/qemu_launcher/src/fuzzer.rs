@@ -7,6 +7,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::tuple_list,
@@ -36,7 +37,7 @@ pub fn fuzz() {
     // Hardcoded parameters
     let timeout = Duration::from_secs(1);
     let broker_port = 1337;
-    let cores = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    let cores = Cores::from_cmdline("0-11").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
     let objective_dir = PathBuf::from("./crashes");
 
