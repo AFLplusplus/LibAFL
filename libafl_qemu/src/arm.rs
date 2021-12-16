@@ -4,10 +4,12 @@ use strum_macros::EnumIter;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+pub use syscall_numbers::arm::*;
+
 /// Registers for the ARM instruction set.
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
 #[repr(i32)]
-pub enum ArmRegs {
+pub enum Regs {
     R0 = 0,
     R1 = 1,
     R2 = 2,
@@ -28,18 +30,18 @@ pub enum ArmRegs {
 
 /// alias registers
 #[allow(non_upper_case_globals)]
-impl ArmRegs {
-    pub const Sp: ArmRegs = ArmRegs::R13;
-    pub const Lr: ArmRegs = ArmRegs::R14;
-    pub const Pc: ArmRegs = ArmRegs::R15;
-    pub const Sb: ArmRegs = ArmRegs::R9;
-    pub const Sl: ArmRegs = ArmRegs::R10;
-    pub const Fp: ArmRegs = ArmRegs::R11;
-    pub const Ip: ArmRegs = ArmRegs::R12;
+impl Regs {
+    pub const Sp: Regs = Regs::R13;
+    pub const Lr: Regs = Regs::R14;
+    pub const Pc: Regs = Regs::R15;
+    pub const Sb: Regs = Regs::R9;
+    pub const Sl: Regs = Regs::R10;
+    pub const Fp: Regs = Regs::R11;
+    pub const Ip: Regs = Regs::R12;
 }
 
 #[cfg(feature = "python")]
-impl IntoPy<PyObject> for ArmRegs {
+impl IntoPy<PyObject> for Regs {
     fn into_py(self, py: Python) -> PyObject {
         let n: i32 = self.into();
         n.into_py(py)

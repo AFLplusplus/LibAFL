@@ -31,8 +31,21 @@ pub mod sync;
 #[cfg(feature = "std")]
 pub use sync::*;
 
-use crate::Error;
+use crate::{
+    bolts::rands::Rand,
+    corpus::{Corpus, CorpusScheduler},
+    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
+    executors::{Executor, HasObservers},
+    inputs::Input,
+    observers::ObserversTuple,
+    state::{
+        HasExecutions, HasRand, {HasClientPerfMonitor, HasCorpus},
+    },
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasCorpusScheduler,
+};
 use core::{convert::From, marker::PhantomData};
+
+use self::push::PushStage;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -141,5 +154,102 @@ where
     #[must_use]
     fn from(closure: CB) -> Self {
         Self::new(closure)
+    }
+}
+
+/// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
+#[allow(clippy::type_complexity)]
+pub struct PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
+    R: Rand,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+{
+    push_stage: PS,
+    phantom: PhantomData<(C, CS, EM, I, OT, R, S, Z)>,
+}
+
+impl<C, CS, EM, I, OT, PS, R, S, Z> PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
+    R: Rand,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+{
+    /// Create a new [`PushStageAdapter`], warpping the given [`PushStage`]
+    /// to be used as a normal [`Stage`]
+    #[must_use]
+    pub fn new(push_stage: PS) -> Self {
+        Self {
+            push_stage,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<C, CS, E, EM, I, OT, PS, R, S, Z> Stage<E, EM, S, Z>
+    for PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+where
+    C: Corpus<I>,
+    CS: CorpusScheduler<I, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
+    R: Rand,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    Z: ExecutesInput<I, OT, S, Z>
+        + ExecutionProcessor<I, OT, S>
+        + EvaluatorObservers<I, OT, S>
+        + HasCorpusScheduler<CS, I, S>,
+{
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        event_mgr: &mut EM,
+        corpus_idx: usize,
+    ) -> Result<(), Error> {
+        let push_stage = &mut self.push_stage;
+
+        push_stage.set_current_corpus_idx(corpus_idx);
+
+        push_stage.init(fuzzer, state, event_mgr, executor.observers_mut())?;
+
+        loop {
+            let input =
+                match push_stage.pre_exec(fuzzer, state, event_mgr, executor.observers_mut()) {
+                    Some(Ok(next_input)) => next_input,
+                    Some(Err(err)) => return Err(err),
+                    None => break,
+                };
+
+            let exit_kind = fuzzer.execute_input(state, executor, event_mgr, &input)?;
+
+            push_stage.post_exec(
+                fuzzer,
+                state,
+                event_mgr,
+                executor.observers_mut(),
+                input,
+                exit_kind,
+            )?;
+        }
+
+        self.push_stage
+            .deinit(fuzzer, state, event_mgr, executor.observers_mut())
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "forkserver_simple"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["tokatoka <tokazerkje@outlook.com>"]
 edition = "2021"
 
@@ -17,3 +17,4 @@ opt-level = 3
 
 [dependencies]
 libafl = { path = "../../libafl/" }
+clap = { version = "3.0.0-rc.4", features = ["default"] }

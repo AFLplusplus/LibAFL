@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "dd66ee9d0ec90221eb6476c63800f2671ad2a0c8";
+const QEMU_REVISION: &str = "e97deaae59c1825823037c2d549f8697a05d157c";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -11,21 +11,69 @@ fn build_dep_check(tools: &[&str]) {
     }
 }
 
+#[macro_export]
+macro_rules! assert_unique_feature {
+    () => {};
+    ($first:tt $(,$rest:tt)*) => {
+        $(
+            #[cfg(not(feature = "clippy"))] // ignore multiple definition for clippy
+            #[cfg(all(feature = $first, feature = $rest))]
+            compile_error!(concat!("features \"", $first, "\" and \"", $rest, "\" cannot be used together"));
+        )*
+        assert_unique_feature!($($rest),*);
+    }
+}
+
 #[allow(clippy::too_many_lines)]
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-env-changed=CPU_TARGET");
+    println!("cargo:rerun-if-changed=src/asan-giovese.c");
+    println!("cargo:rerun-if-changed=src/asan-giovese.h");
+    println!("cargo:rerun-if-env-changed=CROSS_CC");
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     if target_os != "linux" {
         return;
     }
 
-    let jobs = env::var("CARGO_BUILD_JOBS").unwrap_or_else(|_| "1".to_owned());
-    let cpu_target = env::var("CPU_TARGET").unwrap_or_else(|_| {
-        println!("cargo:warning=CPU_TARGET is not set, default to x86_64");
-        "x86_64".to_owned()
+    // Make sure we have at least and at most one architecutre feature set
+    // Else, we default to `x86_64` - having a default makes CI easier :)
+    assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
+    #[cfg(not(any(
+        feature = "arm",
+        feature = "aarch64",
+        feature = "i386",
+        feature = "x86_64"
+    )))]
+    println!(
+        "cargo:warning=No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
+    );
+
+    let cpu_target = if cfg!(feature = "clippy") {
+        // assume x86_64 for clippy
+        "x86_64"
+    } else if cfg!(feature = "arm") {
+        "arm"
+    } else if cfg!(feature = "aarch64") {
+        "aarch64"
+    } else if cfg!(feature = "i386") {
+        "368"
+    } else {
+        // if cfg!(feature = "x86_64") {
+        "x86_64"
+        /*} else {
+        panic!("No architecture feture enabled for libafl_qemu");
+        */
+    };
+
+    let jobs = env::var("CARGO_BUILD_JOBS");
+
+    let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
+        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({}) is not the host arch ({}))", cpu_target, env::consts::ARCH);
+        "cc".to_owned()
     });
+
+    println!("cargo:rustc-cfg=cpu_target=\"{}\"", cpu_target);
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
@@ -34,7 +82,16 @@ fn main() {
     target_dir.pop();
     target_dir.pop();
     target_dir.pop();
+    let qasan_dir = Path::new("libqasan");
+    let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
+    let src_dir = Path::new("src");
     //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
+
+    println!("cargo:rerun-if-changed={}/libqasan.so", qasan_dir.display());
+    println!(
+        "cargo:rerun-if-changed={}/libqasan.so",
+        target_dir.display()
+    );
 
     build_dep_check(&["git", "make"]);
 
@@ -44,7 +101,7 @@ fn main() {
     if qemu_rev.exists()
         && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != QEMU_REVISION
     {
-        fs::remove_dir_all(&qemu_path).unwrap();
+        drop(fs::remove_dir_all(&qemu_path));
     }
 
     if !qemu_path.is_dir() {
@@ -149,12 +206,20 @@ fn main() {
             ])
             .status()
             .expect("Configure failed");
-        Command::new("make")
-            .current_dir(&qemu_path)
-            .arg("-j")
-            .arg(&jobs)
-            .status()
-            .expect("Make failed");
+        if let Ok(j) = jobs {
+            Command::new("make")
+                .current_dir(&qemu_path)
+                .arg("-j")
+                .arg(&j)
+                .status()
+                .expect("Make failed");
+        } else {
+            Command::new("make")
+                .current_dir(&qemu_path)
+                .arg("-j")
+                .status()
+                .expect("Make failed");
+        }
         //let _ = remove_file(build_dir.join(&format!("libqemu-{}.so", cpu_target)));
     }
 
@@ -243,6 +308,31 @@ fn main() {
 
         println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
     }
+
+    drop(
+        Command::new("make")
+            .current_dir(&out_dir_path)
+            .env("CC", &cross_cc)
+            .env("OUT_DIR", &target_dir)
+            .arg("-C")
+            .arg(&qasan_dir)
+            .arg("clean")
+            .status(),
+    );
+    drop(
+        Command::new("make")
+            .current_dir(&out_dir_path)
+            .env("CC", &cross_cc)
+            .env("OUT_DIR", &target_dir)
+            .arg("-C")
+            .arg(&qasan_dir)
+            .status(),
+    );
+
+    cc::Build::new()
+        .warnings(false)
+        .file(src_dir.join("asan-giovese.c"))
+        .compile("asan_giovese");
 }
 
 /*

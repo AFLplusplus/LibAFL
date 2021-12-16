@@ -1,13 +1,20 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
 
-use clap::{App, Arg};
+use frida_gum::Gum;
+use std::{
+    env,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    time::Duration,
+};
+use structopt::StructOpt;
 
 use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::parse_core_bind_arg,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -17,162 +24,134 @@ use libafl::{
         IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
     },
     events::{llmp::LlmpRestartingEventManager, EventConfig},
-    executors::{
-        inprocess::InProcessExecutor, timeout::TimeoutExecutor, Executor, ExitKind, HasObservers,
-        ShadowExecutor,
-    },
+    executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes, Input},
+    inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, ObserversTuple, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
 
-use frida_gum::{
-    stalker::{NoneEventSink, Stalker},
-    Gum, MemoryRange, NativePointer,
-};
-
-use std::{
-    env,
-    ffi::c_void,
-    marker::PhantomData,
-    net::SocketAddr,
-    path::{Path, PathBuf},
-    time::Duration,
-};
-
 use libafl_frida::{
-    helper::{FridaHelper, FridaInstrumentationHelper, MAP_SIZE},
+    coverage_rt::MAP_SIZE,
+    executor::FridaInProcessExecutor,
+    helper::{FridaHelper, FridaInstrumentationHelper},
     FridaOptions,
 };
-
-#[cfg(unix)]
-use libafl_frida::asan_errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
-
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
-struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    base: TimeoutExecutor<InProcessExecutor<'a, H, I, OT, S>>,
-    /// Frida's dynamic rewriting engine
-    stalker: Stalker<'a>,
-    /// User provided callback for instrumentation
-    helper: &'c mut FH,
-    followed: bool,
-    _phantom: PhantomData<&'b u8>,
+#[cfg(unix)]
+use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
 }
 
-impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> Executor<EM, I, S, Z>
-    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    /// Instruct the target about the input and run
-    #[inline]
-    fn run_target(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<ExitKind, Error> {
-        self.helper.pre_exec(input);
-        if self.helper.stalker_enabled() {
-            if self.followed {
-                self.stalker.activate(NativePointer(
-                    self.base.inner().harness_mut() as *mut _ as *mut c_void
-                ))
-            } else {
-                self.followed = true;
-                self.stalker
-                    .follow_me::<NoneEventSink>(self.helper.transformer(), None);
-            }
-        }
-        let res = self.base.run_target(fuzzer, state, mgr, input);
-        if self.helper.stalker_enabled() {
-            self.stalker.deactivate();
-        }
-        #[cfg(unix)]
-        if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
-            println!("Crashing target as it had ASAN errors");
-            unsafe {
-                libc::raise(libc::SIGABRT);
-            }
-        }
-        self.helper.post_exec(input);
-        res
-    }
-}
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "libafl_frida",
+    version = "0.1.0",
+    about = "A frida-based binary-only libfuzzer-style fuzzer for with llmp-multithreading support",
+    author = "s1341 <github@shmarya.net>,
+    Dongjia Zhang <toka@aflplus.plus>, Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+)]
+struct Opt {
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str = Cores::from_cmdline),
+        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+        name = "CORES"
+    )]
+    cores: Cores,
 
-impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<I, OT, S>
-    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        self.base.observers()
-    }
+    #[structopt(
+        short = "p",
+        long,
+        help = "Choose the broker TCP port, default is 1337",
+        name = "PORT",
+        default_value = "1337"
+    )]
+    broker_port: u16,
 
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        self.base.observers_mut()
-    }
-}
+    #[structopt(
+        parse(try_from_str),
+        short = "a",
+        long,
+        help = "Specify a remote broker",
+        name = "REMOTE"
+    )]
+    remote_broker_addr: Option<SocketAddr>,
 
-impl<'a, 'b, 'c, FH, H, I, OT, S> FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
-where
-    FH: FridaHelper<'b>,
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    pub fn new(
-        gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
-        helper: &'c mut FH,
-        timeout: Duration,
-    ) -> Self {
-        let mut stalker = Stalker::new(gum);
+    #[structopt(
+        parse(try_from_str),
+        short,
+        long,
+        help = "Set an initial corpus directory",
+        name = "INPUT"
+    )]
+    input: Vec<PathBuf>,
 
-        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
-        for range in helper.ranges().gaps(&(0..usize::MAX)) {
-            println!("excluding range: {:x}-{:x}", range.start, range.end);
-            stalker.exclude(&MemoryRange::new(
-                NativePointer(range.start as *mut c_void),
-                range.end - range.start,
-            ));
-        }
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str),
+        help = "Set the output directory, default is ./out",
+        name = "OUTPUT",
+        default_value = "./out"
+    )]
+    output: PathBuf,
 
-        Self {
-            base: TimeoutExecutor::new(base, timeout),
-            stalker,
-            helper,
-            followed: false,
-            _phantom: PhantomData,
-        }
-    }
+    #[structopt(
+        parse(try_from_str = timeout_from_millis_str),
+        short,
+        long,
+        help = "Set the exeucution timeout in milliseconds, default is 1000",
+        name = "TIMEOUT",
+        default_value = "1000"
+    )]
+    timeout: Duration,
+
+    #[structopt(
+        parse(from_os_str),
+        short = "x",
+        long,
+        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
+        name = "TOKENS",
+        multiple = true
+    )]
+    tokens: Vec<PathBuf>,
+
+    #[structopt(
+        long,
+        help = "The configuration this fuzzer runs with, for multiprocessing",
+        name = "CONF",
+        default_value = "default launcher"
+    )]
+    configuration: String,
+
+    #[structopt(
+        long,
+        help = "The file to redirect stdout input to (/dev/null if unset)"
+    )]
+    stdout_file: Option<String>,
+
+    #[structopt(help = "The harness")]
+    harness: String,
+
+    #[structopt(help = "The symbol name to look up and hook")]
+    symbol: String,
+
+    #[structopt(help = "The modules to instrument, separated by colons")]
+    modules_to_instrument: String,
 }
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
@@ -181,49 +160,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let matches = App::new("libafl_frida")
-        .version("0.1.0")
-        .arg(
-            Arg::with_name("cores")
-                .short("c")
-                .long("cores")
-                .value_name("CORES")
-                .required(true)
-                .takes_value(true),
-        )
-        .arg(Arg::with_name("harness").required(true).index(1))
-        .arg(Arg::with_name("symbol").required(true).index(2))
-        .arg(
-            Arg::with_name("modules_to_instrument")
-                .required(true)
-                .index(3),
-        )
-        .arg(
-            Arg::with_name("configuration")
-                .required(false)
-                .value_name("CONF")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("output")
-                .short("o")
-                .long("output")
-                .value_name("OUTPUT")
-                .required(false)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("b2baddr")
-                .short("B")
-                .long("b2baddr")
-                .value_name("B2BADDR")
-                .required(false)
-                .takes_value(true),
-        )
-        .get_matches();
-
-    let cores = parse_core_bind_arg(&matches.value_of("cores").unwrap().to_string()).unwrap();
-
+    let opt = Opt::from_args();
     color_backtrace::install();
 
     println!(
@@ -231,30 +168,19 @@ pub fn main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let broker_addr = matches
-        .value_of("b2baddr")
-        .map(|addrstr| addrstr.parse().unwrap());
-
     unsafe {
         match fuzz(
-            matches.value_of("harness").unwrap(),
-            matches.value_of("symbol").unwrap(),
-            &matches
-                .value_of("modules_to_instrument")
-                .unwrap()
-                .split(':')
-                .collect::<Vec<_>>(),
+            &opt.harness,
+            &opt.symbol,
+            &opt.modules_to_instrument.split(':').collect::<Vec<_>>(),
             //modules_to_instrument,
-            &[PathBuf::from("./corpus")],
-            &PathBuf::from("./crashes"),
-            1337,
-            &cores,
-            matches.value_of("output"),
-            broker_addr,
-            matches
-                .value_of("configuration")
-                .unwrap_or("default launcher")
-                .to_string(),
+            &opt.input,
+            &opt.output,
+            opt.broker_port,
+            &opt.cores,
+            opt.stdout_file.as_deref(),
+            opt.remote_broker_addr,
+            opt.configuration,
         ) {
             Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
             Err(e) => panic!("Error during fuzzing: {:?}", e),
@@ -271,7 +197,7 @@ unsafe fn fuzz(
     corpus_dirs: &[PathBuf],
     objective_dir: &Path,
     broker_port: u16,
-    cores: &[usize],
+    cores: &Cores,
     stdout_file: Option<&str>,
     broker_addr: Option<SocketAddr>,
     configuration: String,
@@ -312,7 +238,7 @@ unsafe fn fuzz(
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
-            frida_helper.map_ptr(),
+            frida_helper.map_ptr_mut(),
             MAP_SIZE,
         ));
 
@@ -402,7 +328,6 @@ unsafe fn fuzz(
                 &mut mgr,
             )?,
             &mut frida_helper,
-            Duration::new(30, 0),
         );
 
         #[cfg(windows)]
@@ -416,7 +341,6 @@ unsafe fn fuzz(
                 &mut mgr,
             )?,
             &mut frida_helper,
-            Duration::new(30, 0),
         );
 
         // In case the corpus is empty (on first run), reset

@@ -10,6 +10,7 @@ use crate::bolts::os::unix_signals::{ucontext_t, Signal};
 
 /// Write the contens of all important registers
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
@@ -63,6 +64,34 @@ pub fn dump_registers<W: Write>(
         }
     }
     writeln!(writer, "pc : 0x{:016x} ", ucontext.uc_mcontext.pc)?;
+
+    Ok(())
+}
+
+/// Write the contens of all important registers
+#[cfg(all(target_os = "linux", target_arch = "arm"))]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    write!(writer, "r0 : {:#016x}, ", ucontext.uc_mcontext.arm_r0)?;
+    write!(writer, "r1 : {:#016x}, ", ucontext.uc_mcontext.arm_r1)?;
+    write!(writer, "r2: {:#016x}, ", ucontext.uc_mcontext.arm_r2)?;
+    writeln!(writer, "r3: {:#016x}, ", ucontext.uc_mcontext.arm_r3)?;
+    write!(writer, "r4: {:#016x}, ", ucontext.uc_mcontext.arm_r4)?;
+    write!(writer, "r5: {:#016x}, ", ucontext.uc_mcontext.arm_r5)?;
+    write!(writer, "r6: {:#016x}, ", ucontext.uc_mcontext.arm_r6)?;
+    writeln!(writer, "r7: {:#016x}, ", ucontext.uc_mcontext.arm_r7)?;
+    write!(writer, "r8: {:#016x}, ", ucontext.uc_mcontext.arm_r8)?;
+    write!(writer, "r9: {:#016x}, ", ucontext.uc_mcontext.arm_r9)?;
+    write!(writer, "r10: {:#016x}, ", ucontext.uc_mcontext.arm_r10)?;
+    writeln!(writer, "fp: {:#016x}, ", ucontext.uc_mcontext.arm_fp)?;
+    write!(writer, "ip: {:#016x}, ", ucontext.uc_mcontext.arm_ip)?;
+    write!(writer, "sp: {:#016x}, ", ucontext.uc_mcontext.arm_sp)?;
+    write!(writer, "lr: {:#016x}, ", ucontext.uc_mcontext.arm_lr)?;
+    writeln!(writer, "cpsr: {:#016x}, ", ucontext.uc_mcontext.arm_cpsr)?;
+
+    writeln!(writer, "pc : 0x{:016x} ", ucontext.uc_mcontext.arm_pc)?;
 
     Ok(())
 }
@@ -168,6 +197,21 @@ fn write_crash<W: Write>(
         writer,
         "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
         signal, ucontext.uc_mcontext.pc, ucontext.uc_mcontext.fault_address
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "linux", target_arch = "arm"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
+        signal, ucontext.uc_mcontext.arm_pc, ucontext.uc_mcontext.fault_address
     )?;
 
     Ok(())

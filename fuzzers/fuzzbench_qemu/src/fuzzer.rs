@@ -40,13 +40,15 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    amd64::Amd64Regs,
+    asan::QemuAsanHelper,
+    cmplog,
+    cmplog::{CmpLogObserver, QemuCmpLogHelper},
+    edges,
+    edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    emu, filter_qemu_args,
-    helpers::{QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuSnapshotHelper},
-    hooks,
-    hooks::CmpLogObserver,
-    MmapPerms, QemuExecutor,
+    emu, filter_qemu_args, init_with_asan,
+    snapshot::QemuSnapshotHelper,
+    MmapPerms, QemuExecutor, Regs,
 };
 
 /// The fuzzer main
@@ -55,9 +57,9 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
-    emu::init(&args, &env);
+    let mut args: Vec<String> = env::args().collect();
+    let mut env: Vec<(String, String)> = env::vars().collect();
+    init_with_asan(&mut args, &mut env);
 
     let res = match App::new("libafl_qemu_fuzzbench")
         .version("0.4.0")
@@ -65,14 +67,14 @@ pub fn main() {
         .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
         .arg(
             Arg::new("out")
-                .about("The directory to place finds in ('corpus')")
+                .help("The directory to place finds in ('corpus')")
                 .long("libafl-out")
                 .required(true)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
-                .about("The directory to read initial inputs from ('seeds')")
+                .help("The directory to read initial inputs from ('seeds')")
                 .long("libafl-in")
                 .required(true)
                 .takes_value(true),
@@ -80,19 +82,19 @@ pub fn main() {
         .arg(
             Arg::new("tokens")
                 .long("libafl-tokens")
-                .about("A file to read tokens from, to be used during fuzzing")
+                .help("A file to read tokens from, to be used during fuzzing")
                 .takes_value(true),
         )
         .arg(
             Arg::new("logfile")
                 .long("libafl-logfile")
-                .about("Duplicates all output to this file")
+                .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
         )
         .arg(
             Arg::new("timeout")
                 .long("libafl-timeout")
-                .about("Timeout for each individual execution, in milliseconds")
+                .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1000"),
         )
         .try_get_matches_from(filter_qemu_args())
@@ -172,10 +174,10 @@ fn fuzz(
 
     println!(
         "Break at {:#x}",
-        emu::read_reg::<_, u64>(Amd64Regs::Rip).unwrap()
+        emu::read_reg::<_, u64>(Regs::Rip).unwrap()
     );
 
-    let stack_ptr: u64 = emu::read_reg(Amd64Regs::Rsp).unwrap();
+    let stack_ptr: u64 = emu::read_reg(Regs::Rsp).unwrap();
     let mut ret_addr = [0u64];
     emu::read_mem(stack_ptr, &mut ret_addr);
     let ret_addr = ret_addr[0];
@@ -230,8 +232,8 @@ fn fuzz(
     };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut hooks::EDGES_MAP };
-    let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
+    let edges = unsafe { &mut edges::EDGES_MAP };
+    let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
     let edges_observer =
         HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
 
@@ -239,7 +241,7 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut hooks::CMPLOG_MAP }, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
@@ -290,10 +292,10 @@ fn fuzz(
 
         emu::write_mem(input_addr, buf);
 
-        emu::write_reg(Amd64Regs::Rdi, input_addr).unwrap();
-        emu::write_reg(Amd64Regs::Rsi, len).unwrap();
-        emu::write_reg(Amd64Regs::Rip, test_one_input_ptr).unwrap();
-        emu::write_reg(Amd64Regs::Rsp, stack_ptr).unwrap();
+        emu::write_reg(Regs::Rdi, input_addr).unwrap();
+        emu::write_reg(Regs::Rsi, len).unwrap();
+        emu::write_reg(Regs::Rip, test_one_input_ptr).unwrap();
+        emu::write_reg(Regs::Rsp, stack_ptr).unwrap();
 
         emu::run();
 
@@ -305,7 +307,8 @@ fn fuzz(
         tuple_list!(
             QemuEdgeCoverageHelper::new(),
             QemuCmpLogHelper::new(),
-            QemuSnapshotHelper::new()
+            QemuAsanHelper::new(),
+            //QemuSnapshotHelper::new()
         ),
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,

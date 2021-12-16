@@ -1,6 +1,6 @@
 [package]
 name = "libafl_cc"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Commodity library to wrap compilers and link LibAFL"
 documentation = "https://docs.rs/libafl_cc"
@@ -14,6 +14,7 @@ edition = "2021"
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
+which = "4.2.2"
 
 [target.'cfg(target_vendor = "apple")'.build-dependencies]
 glob = "0.3"

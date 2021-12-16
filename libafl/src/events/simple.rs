@@ -29,6 +29,8 @@ use crate::{
     state::{HasCorpus, HasSolutions},
 };
 
+use super::ProgressReporter;
+
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
 const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
@@ -48,12 +50,12 @@ where
     events: Vec<Event<I>>,
 }
 
-impl<I, MT, S> EventFirer<I, S> for SimpleEventManager<I, MT>
+impl<I, MT> EventFirer<I> for SimpleEventManager<I, MT>
 where
     I: Input,
     MT: Monitor, //CE: CustomEvent<I, OT>,
 {
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S>(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
@@ -90,6 +92,13 @@ where
 }
 
 impl<E, I, MT, S, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, MT>
+where
+    I: Input,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
+{
+}
+
+impl<I, MT> ProgressReporter<I> for SimpleEventManager<I, MT>
 where
     I: Input,
     MT: Monitor, //CE: CustomEvent<I, OT>,
@@ -141,15 +150,20 @@ where
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateExecutions {
+            Event::UpdateExecStats {
                 time,
                 executions,
+                stability,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor
-                    .client_stats_mut_for(0)
-                    .update_executions(*executions as u64, *time);
+                let client = monitor.client_stats_mut_for(0);
+
+                client.update_executions(*executions as u64, *time);
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
+
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
@@ -168,13 +182,17 @@ where
             Event::UpdatePerfMonitor {
                 time,
                 executions,
+                stability,
                 introspection_monitor,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                monitor.client_stats_mut()[0]
-                    .update_introspection_monitor((**introspection_monitor).clone());
+                let client = &mut monitor.client_stats_mut()[0];
+                client.update_executions(*executions as u64, *time);
+                client.update_introspection_monitor((**introspection_monitor).clone());
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
@@ -230,7 +248,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, I, MT, S, SC, SP> EventFirer<I, S>
+impl<'a, C, I, MT, S, SC, SP> EventFirer<I>
     for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
@@ -239,7 +257,7 @@ where
     SP: ShMemProvider,
     MT: Monitor, //CE: CustomEvent<I, OT>,
 {
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
         self.simple_event_mgr.fire(_state, event)
     }
 }
@@ -283,6 +301,18 @@ impl<'a, C, E, I, S, SC, SP, MT, Z> EventManager<E, I, S, Z>
 where
     C: Corpus<I>,
     I: Input,
+    S: Serialize,
+    SP: ShMemProvider,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
+{
+}
+
+#[cfg(feature = "std")]
+impl<'a, C, I, MT, S, SC, SP> ProgressReporter<I>
+    for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
+where
+    I: Input,
+    C: Corpus<I>,
     S: Serialize,
     SP: ShMemProvider,
     MT: Monitor, //CE: CustomEvent<I, OT>,
@@ -387,8 +417,6 @@ where
             // A staterestorer and a receiver for single communication
             StateRestorer::from_env(shmem_provider, _ENV_FUZZER_SENDER)?
         };
-
-        println!("We're a client, let's fuzz :)");
 
         // If we're restarting, deserialize the old state.
         let (state, mgr) = match staterestorer.restore::<S>()? {

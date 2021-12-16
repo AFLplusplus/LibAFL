@@ -1,6 +1,6 @@
 [package]
 name = "fuzzbench"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 
@@ -24,7 +24,7 @@ libafl = { path = "../../libafl/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
-clap = { version = "3.0.0-beta.2", features = ["default"] }
+clap = { version = "3.0.0-rc.4", features = ["default"] }
 nix = "0.23.0"
 
 [lib]

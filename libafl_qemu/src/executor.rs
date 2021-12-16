@@ -15,7 +15,7 @@ use libafl::{
 };
 
 pub use crate::emu::SyscallHookResult;
-use crate::{emu, emu::SKIP_EXEC_HOOK, helpers::QemuHelperTuple};
+use crate::{emu, emu::SKIP_EXEC_HOOK, helper::QemuHelperTuple};
 
 static mut QEMU_HELPERS_PTR: *const c_void = ptr::null();
 
@@ -383,7 +383,7 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
         S: HasSolutions<OC, I> + HasClientPerfMonitor,

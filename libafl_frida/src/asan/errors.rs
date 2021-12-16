@@ -21,9 +21,9 @@ use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
 #[cfg(target_arch = "x86_64")]
-use crate::asan_rt::ASAN_SAVE_REGISTER_NAMES;
+use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 
-use crate::{alloc::AllocationMetadata, asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
+use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -126,7 +126,7 @@ impl AsanErrors {
         self.errors.is_empty()
     }
 
-    /// Get a mutable reference to the global [`AsanErrors`] object
+    /// Get a mutable reference to the global [`struct@AsanErrors`] object
     #[must_use]
     pub fn get_mut<'a>() -> &'a mut Self {
         unsafe { ASAN_ERRORS.as_mut().unwrap() }
@@ -595,7 +595,7 @@ impl AsanErrorsObserver {
         }
     }
 
-    /// gets the [`AsanErrors`] from the previous run
+    /// gets the [`struct@AsanErrors`] from the previous run
     #[must_use]
     pub fn errors(&self) -> Option<&AsanErrors> {
         match &self.errors {
@@ -605,7 +605,7 @@ impl AsanErrorsObserver {
     }
 }
 
-/// A feedback reporting potential [`AsanErrors`] from an `AsanErrorsObserver`
+/// A feedback reporting potential [`struct@AsanErrors`] from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,
@@ -625,7 +625,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         let observer = observers

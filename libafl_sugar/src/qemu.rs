@@ -6,6 +6,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -30,7 +31,7 @@ use libafl::{
 };
 
 pub use libafl_qemu::emu;
-use libafl_qemu::{hooks, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
+use libafl_qemu::{cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
 use libafl_targets::CmpLogObserver;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -59,7 +60,7 @@ where
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
-    cores: &'a [usize],
+    cores: &'a Cores,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
     #[builder(default = None, setter(strip_option))]
@@ -103,8 +104,8 @@ where
 
         let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Create an observation channel using the coverage map
-            let edges = unsafe { &mut hooks::EDGES_MAP };
-            let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
+            let edges = unsafe { &mut edges::EDGES_MAP };
+            let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
             let edges_observer =
                 HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
 
@@ -112,7 +113,7 @@ where
             let time_observer = TimeObserver::new("time");
 
             // Keep tracks of CMPs
-            let cmplog = unsafe { &mut hooks::CMPLOG_MAP };
+            let cmplog = unsafe { &mut cmplog::CMPLOG_MAP };
             let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
             // The state of the edges feedback.
@@ -330,6 +331,7 @@ where
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::qemu;
+    use libafl::bolts::os::Cores;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
     use std::path::PathBuf;
@@ -339,7 +341,7 @@ pub mod pybind {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,
         broker_port: u16,
-        cores: Vec<usize>,
+        cores: Cores,
     }
 
     #[pymethods]
@@ -355,7 +357,7 @@ pub mod pybind {
                 input_dirs,
                 output_dir,
                 broker_port,
-                cores,
+                cores: cores.into(),
             }
         }
 

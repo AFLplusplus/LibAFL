@@ -1,6 +1,6 @@
 [package]
 name = "fuzzbench_qemu"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 
@@ -13,6 +13,6 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_qemu = { path = "../../libafl_qemu/" }
-clap = { version = "3.0.0-beta.2", features = ["default"] }
+libafl_qemu = { path = "../../libafl_qemu/", features = ["x86_64"] }
+clap = { version = "3.0.0-rc.4", features = ["default"] }
 nix = "0.23.0"
