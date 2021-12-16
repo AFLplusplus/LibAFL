@@ -1,12 +1,9 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use std::{
-    collections::hash_map::DefaultHasher,
-    hash::{Hash, Hasher},
-};
-
-use backtrace::Backtrace;
+use ahash::AHasher;
+use core::hash::Hasher;
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 use crate::{bolts::tuples::Named, observers::Observer, Error};
 
@@ -40,16 +37,24 @@ impl Default for StacktraceObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for StacktraceObserver {
+impl<I, S> Observer<I, S> for StacktraceObserver
+where
+    I: Debug,
+{
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        let bt = Backtrace::new();
-        let mut hasher = DefaultHasher::new();
-        format!("<START> {:?}", bt).hash(&mut hasher);
-        self.hash = Some(hasher.finish());
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        backtrace::trace(|frame| {
+            let sp = frame.sp() as u64;
+            hasher.write_u64(sp);
+            true
+        });
+        let st_hash = hasher.finish();
+        println!("hash={}", &st_hash);
+        self.hash = Some(st_hash);
         Ok(())
     }
 }
