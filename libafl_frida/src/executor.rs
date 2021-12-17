@@ -113,7 +113,7 @@ where
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
         #[cfg(not(all(not(debug_assertions), target_arch = "x86_64")))]
         let stalker = Stalker::new(gum);
-        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
+        #[cfg(all(debug_assertions, target_arch = "x86_64"))]
         let mut stalker = Stalker::new(gum);
 
         #[cfg(not(all(debug_assertions, target_arch = "x86_64")))]
