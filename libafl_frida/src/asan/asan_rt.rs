@@ -1432,10 +1432,11 @@ impl AsanRuntime {
             ; .arch aarch64
 
             // calculate the shadow address
-            ; mov x5, #1
-            ; add x5, xzr, x5, lsl #shadow_bit
+            ; mov x5, #0
+            // ; add x5, xzr, x5, lsl #shadow_bit
             ; add x5, x5, x0, lsr #3
             ; ubfx x5, x5, #0, #(shadow_bit + 1)
+            ; add x5, xzr, x5, lsr #shadow_bit
 
             ; cmp x1, #0
             ; b.eq >return_success
@@ -1687,10 +1688,11 @@ impl AsanRuntime {
             ($ops:ident, $val:expr) => {dynasm!($ops
                 ; .arch aarch64
 
-                ; mov x1, #1
-                ; add x1, xzr, x1, lsl #shadow_bit
+                ; mov x1, #0
+                // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
+                ; add x1, xzr, x1, lsl #shadow_bit
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
