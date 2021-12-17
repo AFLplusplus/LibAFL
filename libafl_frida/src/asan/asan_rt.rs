@@ -1436,7 +1436,7 @@ impl AsanRuntime {
             // ; add x5, xzr, x5, lsl #shadow_bit
             ; add x5, x5, x0, lsr #3
             ; ubfx x5, x5, #0, #(shadow_bit + 1)
-            ; add x5, xzr, x5, lsr #shadow_bit
+            ; add x5, xzr, x5, lsl #shadow_bit
 
             ; cmp x1, #0
             ; b.eq >return_success
