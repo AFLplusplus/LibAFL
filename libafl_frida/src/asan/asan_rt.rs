@@ -10,7 +10,7 @@ use frida_gum::NativePointer;
 use frida_gum::{ModuleDetails, RangeDetails};
 use hashbrown::HashMap;
 
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+use nix::sys::mman::{mmap, MapFlags, ProtFlags, mprotect};
 
 use backtrace::Backtrace;
 
