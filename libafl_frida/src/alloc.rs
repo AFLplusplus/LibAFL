@@ -67,18 +67,9 @@ impl Allocator {
         #[allow(clippy::cast_sign_loss)]
         let page_size = ret as usize;
         // probe to find a usable shadow bit:
-        #[cfg(any(
-            target_arch = "aarch64",
-            all(target_arch = "x86_64", target_os = "linux")
-        ))]
-        let mut shadow_bit: usize = 0;
-        #[cfg(not(any(
-            target_arch = "aarch64",
-            all(target_arch = "x86_64", target_os = "linux")
-        )))]
-        let shadow_bit = 0;
+        let mut shadow_bit = 0;
 
-        #[cfg(target_arch = "aarch64")]
+        #[cfg(all(target_arch = "aarch64", target_os = "android"))]
         for try_shadow_bit in &[46usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {
@@ -104,7 +95,7 @@ impl Allocator {
         // x86_64's userspace's up to 0x7fff-ffff-ffff so 46 is not available. (0x4000-0000-0000 - 0xc000-0000-0000)
         // we'd also want to avoid 0x5555-xxxx-xxxx because programs are mapped there. so 45 is not available either (0x2000-0000-0000 - 0x6000-0000-0000).
         // This memory map is for amd64 linux.
-        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        #[cfg(target_os = "linux")]
         {
             let try_shadow_bit: usize = 44;
             let addr: usize = 1 << try_shadow_bit;
