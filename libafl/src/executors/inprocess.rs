@@ -255,6 +255,218 @@ where
     }
 }
 
+// #[derive(Debug)] TODO: put back
+pub struct OwnedInProcessExecutor<I, OT, S>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    /// The harness function, being executed for each fuzzing loop execution
+    harness_fn: Box<dyn FnMut(&I) -> ExitKind>,
+    /// The observers, observing each run
+    observers: OT,
+    /// On crash C function pointer
+    crash_handler: *const c_void,
+    /// On timeout C function pointer
+    timeout_handler: *const c_void,
+    phantom: PhantomData<(I, S)>,
+}
+
+impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for OwnedInProcessExecutor<I, OT, S>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    #[inline]
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        #[cfg(unix)]
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+            write_volatile(
+                &mut data.current_input_ptr,
+                input as *const _ as *const c_void,
+            );
+            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+            // println!("{:p}", data.crash_handler);
+            data.crash_handler = self.crash_handler;
+            data.timeout_handler = self.timeout_handler;
+            // Direct raw pointers access /aliasing is pretty undefined behavior.
+            // Since the state and event may have moved in memory, refresh them right before the signal may happen
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+            compiler_fence(Ordering::SeqCst);
+        }
+        #[cfg(all(windows, feature = "std"))]
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+            write_volatile(
+                &mut data.current_input_ptr,
+                input as *const _ as *const c_void,
+            );
+            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+            data.crash_handler = self.crash_handler;
+            data.timeout_handler = self.timeout_handler;
+            // Direct raw pointers access /aliasing is pretty undefined behavior.
+            // Since the state and event may have moved in memory, refresh them right before the signal may happen
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+            compiler_fence(Ordering::SeqCst);
+        }
+
+        let ret = (self.harness_fn)(input);
+
+        #[cfg(unix)]
+        unsafe {
+            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
+            compiler_fence(Ordering::SeqCst);
+        }
+        #[cfg(all(windows, feature = "std"))]
+        unsafe {
+            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
+            compiler_fence(Ordering::SeqCst);
+        }
+
+        Ok(ret)
+    }
+}
+
+impl<I, OT, S> HasObservers<I, OT, S> for OwnedInProcessExecutor<I, OT, S>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
+    }
+}
+
+impl<I, OT, S> OwnedInProcessExecutor<I, OT, S>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    /// Create a new in mem executor.
+    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
+    /// depending on different corpus or state.
+    /// * `harness_fn` - the harness, executiong the function
+    /// * `observers` - the observers observing the target during execution
+    /// This may return an error on unix, if signal handler setup fails
+    pub fn new<EM, OC, OF, Z>(
+        harness_fn: Box<dyn FnMut(&I) -> ExitKind>,
+        observers: OT,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<I, S> + EventRestarter<S>,
+        OC: Corpus<I>,
+        OF: Feedback<I, S>,
+        S: HasSolutions<OC, I> + HasClientPerfStats,
+        Z: HasObjective<I, OF, S>,
+    {
+        #[cfg(unix)]
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+            setup_signal_handler(data)?;
+            compiler_fence(Ordering::SeqCst);
+
+            Ok(Self {
+                harness_fn,
+                observers,
+                crash_handler: unix_signal_handler::inproc_crash_handler::<
+                    Self,
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                > as *const _,
+                timeout_handler: unix_signal_handler::inproc_timeout_handler::<
+                    Self,
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                > as *const _,
+                phantom: PhantomData,
+            })
+        }
+        #[cfg(all(windows, feature = "std"))]
+        unsafe {
+            let data = &mut GLOBAL_STATE;
+            setup_exception_handler(data)?;
+            compiler_fence(Ordering::SeqCst);
+
+            Ok(Self {
+                harness_fn,
+                observers,
+                crash_handler: windows_exception_handler::inproc_crash_handler::<
+                    Self,
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                > as *const _,
+                timeout_handler: windows_exception_handler::inproc_timeout_handler::<
+                    Self,
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                > as *const c_void,
+                // timeout_handler: ptr::null(),
+                phantom: PhantomData,
+            })
+        }
+        #[cfg(not(any(unix, all(windows, feature = "std"))))]
+        Ok(Self {
+            harness_fn,
+            observers,
+            crash_handler: ptr::null(),
+            timeout_handler: ptr::null(),
+            phantom: PhantomData,
+        })
+    }
+
+    /// Retrieve the harness function.
+    #[inline]
+    pub fn harness(&self) -> &impl FnMut(&I) -> ExitKind {
+        &self.harness_fn
+    }
+
+    /// Retrieve the harness function for a mutable reference.
+    #[inline]
+    pub fn harness_mut(&mut self) -> &mut impl FnMut(&I) -> ExitKind {
+        &mut self.harness_fn
+    }
+}
+
 pub struct InProcessExecutorHandlerData {
     pub state_ptr: *mut c_void,
     pub event_mgr_ptr: *mut c_void,
@@ -1053,5 +1265,85 @@ mod tests {
         assert!(in_process_fork_executor
             .run_target(&mut (), &mut (), &mut (), &input)
             .is_ok());
+    }
+}
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use pyo3::prelude::*;
+    use crate::bolts::{rands::StdRand, tuples::tuple_list};
+    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
+    use crate::feedbacks::MapFeedbackState;
+    use crate::inputs::{BytesInput, HasBytesVec, HasTargetBytes};
+    use crate::state::{StdState, pybind::PythonStdState};
+    use crate::events::simple::pybind::PythonSimpleEventManager;
+    use crate::fuzzer::pybind::PythonStdFuzzerI32;
+    use crate::executors::{ExitKind, inprocess::OwnedInProcessExecutor};
+    use crate::observers::pybind::{PythonOwnedMapObserverI32};
+    use crate::observers::map::OwnedMapObserver;
+
+    #[pyclass(unsendable, name = "OwnedInProcessExecutorI32")]
+    pub struct  PythonOwnedInProcessExecutorI32{
+        pub owned_in_process_executor: OwnedInProcessExecutor<
+            BytesInput, 
+            (OwnedMapObserver<i32>, ()),
+            StdState<
+                InMemoryCorpus<BytesInput>, 
+                (MapFeedbackState<i32>, ()), 
+                BytesInput, 
+                StdRand, 
+                OnDiskCorpus<BytesInput>
+                >,
+            >
+    }
+
+    #[pymethods]
+    impl PythonOwnedInProcessExecutorI32{
+        #[new]
+        fn new(
+            // harness: PyObject,
+            py_observer: PythonOwnedMapObserverI32,
+            py_fuzzer: &mut PythonStdFuzzerI32,
+            py_state: &mut PythonStdState,
+            py_event_manager: &mut PythonSimpleEventManager
+        ) -> Self{
+            Self{
+                owned_in_process_executor: OwnedInProcessExecutor::new(
+                    // Box::new(move |input: &BytesInput| {
+                    //     Python::with_gil(|py| -> PyResult<()> {
+                    //         let args = (PyBytes::new(py, input.bytes()),);
+                    //         harness.call1(py, args)?;
+                    //         Ok(())
+                    //     }).unwrap();
+                    //     ExitKind::Ok
+                    // }), 
+                    Box::new(|input: &BytesInput| {
+                        let target = input.target_bytes();
+                        let buf = target.as_slice();
+                        // signals_set(0);
+                        if buf.len() > 0 && buf[0] == 'a' as u8 {
+                            // signals_set(1);
+                            if buf.len() > 1 && buf[1] == 'b' as u8 {
+                                // signals_set(2);
+                                if buf.len() > 2 && buf[2] == 'c' as u8 {
+                                    panic!("=)");
+                                }
+                            }
+                        }
+                        ExitKind::Ok
+                    }), 
+                    tuple_list!(py_observer.owned_map_observer), 
+                    &mut py_fuzzer.std_fuzzer, 
+                    &mut py_state.std_state, 
+                    &mut py_event_manager.simple_event_manager).expect("Failed to create the Executor".into())
+            }
+        }
+    }
+
+
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonOwnedInProcessExecutorI32>()?;
+        Ok(())
     }
 }

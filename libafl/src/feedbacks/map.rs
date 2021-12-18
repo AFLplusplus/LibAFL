@@ -492,3 +492,72 @@ where
         self.name.as_str()
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::bolts::rands::StdRand;
+    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
+    use crate::feedbacks::map::{MapFeedbackState, MaxMapFeedback};
+    use crate::inputs::BytesInput;
+    use crate::observers::map::{OwnedMapObserver, pybind::PythonOwnedMapObserverI32};
+    use crate::state::StdState;
+    use pyo3::prelude::*;
+
+    #[pyclass(unsendable, name = "MapFeedbackStateI32")]
+    #[derive(Clone)]
+    pub struct PythonMapFeedbackStateI32 {
+        pub map_feedback_state: MapFeedbackState<i32>,
+    }
+
+    #[pymethods]
+    impl PythonMapFeedbackStateI32 {
+        #[new]
+        fn new(py_observer: &mut PythonOwnedMapObserverI32) -> Self {
+            Self {
+                map_feedback_state: MapFeedbackState::with_observer(
+                    &py_observer.owned_map_observer,
+                ),
+            }
+        }
+    }
+
+    #[pyclass(unsendable, name = "MaxMapFeedbackI32")]
+    #[derive(Clone)]
+    pub struct PythonMaxMapFeedbackI32 {
+        pub max_map_feedback: MaxMapFeedback<
+            (MapFeedbackState<i32>, ()),
+            BytesInput,
+            OwnedMapObserver<i32>,
+            StdState<
+                InMemoryCorpus<BytesInput>, 
+                (MapFeedbackState<i32>, ()), 
+                BytesInput, 
+                StdRand, 
+                OnDiskCorpus<BytesInput>
+            >,
+            i32,
+        >,
+    }
+
+    #[pymethods]
+    impl PythonMaxMapFeedbackI32 {
+        #[new]
+        fn new(
+            py_feedback_state: &PythonMapFeedbackStateI32,
+            py_observer: &PythonOwnedMapObserverI32,
+        ) -> Self {
+            Self {
+                max_map_feedback: MaxMapFeedback::new(
+                    &py_feedback_state.map_feedback_state,
+                    &py_observer.owned_map_observer,
+                ),
+            }
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonMapFeedbackStateI32>()?;
+        m.add_class::<PythonMaxMapFeedbackI32>()?;
+        Ok(())
+    }
+}

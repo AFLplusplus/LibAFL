@@ -770,3 +770,37 @@ impl Default for ClientPerfStats {
         Self::new()
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::stats::SimpleStats;
+    use pyo3::prelude::*;
+
+    #[pyclass(unsendable, name = "SimpleStats")]
+    #[derive(Clone)]
+    pub struct PythonSimpleStats {
+        pub simple_stats: SimpleStats<fn(String)>,
+    }
+
+    #[pymethods]
+    impl PythonSimpleStats {
+        #[new]
+        fn new(/*_print_fn: PyObject */) -> Self {
+            // TODO: "Fix can't capture dynamic environment in a fn item" error -> Use move
+            // fn a (s: String){
+            //     Python::with_gil(|py| -> PyResult<()> {
+            //         print_fn.call1(py, (PyUnicode::new(py, &s),));
+            //         Ok(())
+            //     });
+            // }
+            Self {
+                simple_stats: SimpleStats::new(|s| println!("{}", s))
+            }
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonSimpleStats>()?;
+        Ok(())
+    }
+}

@@ -666,3 +666,88 @@ where
         Ok(exit_kind)
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use pyo3::prelude::*;
+    use tuple_list::tuple_list;
+    use crate::bolts::rands::StdRand;
+    use crate::feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback};
+    use crate::feedbacks::map::pybind::PythonMaxMapFeedbackI32;
+    use crate::fuzzer::{StdFuzzer, Fuzzer};
+    use crate::corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler};
+    use crate::inputs::BytesInput;
+    use crate::observers::map::OwnedMapObserver;
+    use crate::state::{StdState, pybind::PythonStdState};
+    use crate::events::simple::pybind::PythonSimpleEventManager;
+    use crate::executors::inprocess::pybind::PythonOwnedInProcessExecutorI32;
+    use crate::mutators::scheduled::{havoc_mutations, StdScheduledMutator};
+    use crate::stages::StdMutationalStage;
+
+    type MyState = StdState<
+        InMemoryCorpus<BytesInput>,
+        (MapFeedbackState<i32>, ()),
+        BytesInput,
+        StdRand, 
+        OnDiskCorpus<BytesInput>
+    >;
+
+    #[pyclass(unsendable, name = "StdFuzzerI32")]
+    pub struct PythonStdFuzzerI32 {
+        pub std_fuzzer: StdFuzzer<
+            InMemoryCorpus<BytesInput>,
+            QueueCorpusScheduler<
+                InMemoryCorpus<BytesInput>,
+                BytesInput, 
+                MyState,
+            >,
+            MaxMapFeedback<
+                (MapFeedbackState<i32>, ()),
+                BytesInput,
+                OwnedMapObserver<i32>,
+                MyState,
+                i32,
+            >,
+            BytesInput,
+            CrashFeedback,
+            (OwnedMapObserver<i32>, ()),
+            MyState,
+            OnDiskCorpus<BytesInput>
+        >
+    }
+
+    #[pymethods]
+    impl PythonStdFuzzerI32 {
+        #[new]
+        fn new(
+            py_max_map_feedback: PythonMaxMapFeedbackI32,
+        ) -> Self {
+            Self{
+                std_fuzzer: StdFuzzer::new(
+                    QueueCorpusScheduler::new(), 
+                    py_max_map_feedback.max_map_feedback, 
+                    CrashFeedback::new()
+                )
+            }
+        }
+
+        pub fn fuzz_loop(
+            &mut self,
+            py_executor: &mut PythonOwnedInProcessExecutorI32,
+            py_state: &mut PythonStdState,
+            py_mgr: &mut PythonSimpleEventManager,
+        ){
+            self.std_fuzzer.fuzz_loop(
+                &mut tuple_list!(StdMutationalStage::new(StdScheduledMutator::new(havoc_mutations()))),
+                &mut py_executor.owned_in_process_executor,
+                &mut py_state.std_state,
+                &mut py_mgr.simple_event_manager
+            ).expect("Failed to generate the initial corpus".into());
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdFuzzerI32>()?;
+        Ok(())
+    }
+}

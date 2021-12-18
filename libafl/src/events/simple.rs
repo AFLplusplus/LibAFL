@@ -425,3 +425,37 @@ where
         Ok((state, mgr))
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use pyo3::prelude::*;
+    use crate::inputs::BytesInput;
+    use crate::stats::SimpleStats;
+    use crate::stats::pybind::PythonSimpleStats;
+    use crate::events::SimpleEventManager;
+    
+    #[pyclass(unsendable, name = "SimpleEventManager")]
+    pub struct PythonSimpleEventManager {
+        pub simple_event_manager: SimpleEventManager<
+                BytesInput /* ?? */, 
+                SimpleStats<fn(String)>
+            >
+    }
+
+    #[pymethods]
+    impl PythonSimpleEventManager {
+        #[new]
+        fn new(
+            py_simple_stats: PythonSimpleStats
+        ) -> Self {
+            Self{
+                simple_event_manager: SimpleEventManager::new(py_simple_stats.simple_stats)
+            }
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonSimpleEventManager>()?;
+        Ok(())
+    }
+}

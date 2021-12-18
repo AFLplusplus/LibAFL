@@ -259,5 +259,13 @@ use pyo3::prelude::*;
 #[pymodule]
 #[pyo3(name = "libafl")]
 pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+    observers::map::pybind::register(py, m)?;
+    feedbacks::map::pybind::register(py, m)?;
+    state::pybind::register(py, m)?;
+    stats::pybind::register(py, m)?;
+    events::simple::pybind::register(py, m)?;
+    fuzzer::pybind::register(py, m)?;
+    executors::inprocess::pybind::register(py, m)?;
+    generators::pybind::register(py, m)?;
     Ok(())
 }

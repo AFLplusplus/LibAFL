@@ -505,3 +505,117 @@ where
         Self { base }
     }
 }
+
+/// OwnedMapObserver is like a StdMapObserver that always owns its map
+/// The motivation behind is to have a MapObserver with no lifetime specifiers for python bindings
+#[derive(Serialize, Deserialize, Debug, Clone)] // TODO: Is Clone needed?
+#[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
+pub struct OwnedMapObserver<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    pub map: Vec<T>,
+    initial: T,
+    name: String,
+}
+
+impl<I, S, T> Observer<I, S> for OwnedMapObserver<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    Self: MapObserver<T>,
+{
+    #[inline]
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        self.reset_map()
+    }
+}
+
+impl<T> Named for OwnedMapObserver<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<T> MapObserver<T> for OwnedMapObserver<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn map(&self) -> &[T] {
+        self.map.as_slice()
+    }
+
+    #[inline]
+    fn map_mut(&mut self) -> &mut [T] {
+        self.map.as_mut_slice()
+    }
+
+    #[inline]
+    fn initial(&self) -> T {
+        self.initial
+    }
+
+    #[inline]
+    fn initial_mut(&mut self) -> &mut T {
+        &mut self.initial
+    }
+
+    #[inline]
+    fn set_initial(&mut self, initial: T) {
+        self.initial = initial;
+    }
+}
+
+impl<T> OwnedMapObserver<T>
+where
+    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`OwnedMapObserver`]
+    #[must_use]
+    pub fn new(name: &'static str, map: Vec<T>) -> Self {
+        let initial = if map.is_empty() { T::default() } else { map[0] };
+        Self {
+            map: map,
+            name: name.to_string(),
+            initial,
+        }
+    }
+}
+impl OwnedMapObserver<u8> {
+    pub fn signals_set(&mut self, idx: usize) {
+        self.map[idx] = 1;
+    }
+}
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use pyo3::prelude::*;
+    use crate::observers::map::{OwnedMapObserver};
+
+    #[pyclass(unsendable, name = "OwnedMapObserverI32")]
+    #[derive(Clone)] 
+    pub struct PythonOwnedMapObserverI32 {
+        pub owned_map_observer: OwnedMapObserver<i32>,
+    }
+
+    #[pymethods]
+    impl PythonOwnedMapObserverI32 {
+        #[new]
+        fn new(name: String, map: Vec<i32>) -> Self {
+            Self {
+                //TODO: Not leak memory
+                owned_map_observer: OwnedMapObserver::new(Box::leak(name.into_boxed_str()), map),
+            }
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonOwnedMapObserverI32>()?;
+        Ok(())
+    }
+}

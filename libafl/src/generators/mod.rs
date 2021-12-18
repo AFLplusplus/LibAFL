@@ -126,3 +126,47 @@ where
         }
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use pyo3::prelude::*;
+    use crate::bolts::rands::StdRand;
+    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
+    use crate::feedbacks::MapFeedbackState;
+    use crate::inputs::BytesInput;
+    use crate::state::StdState;
+    use crate::generators::RandPrintablesGenerator;
+
+    #[pyclass(unsendable, name = "RandPrintablesGenerator")]
+    pub struct  PythonRandPrintablesGeneratorI32{ 
+        pub rand_printable_generator: RandPrintablesGenerator<
+            StdRand,
+            StdState<
+                InMemoryCorpus<BytesInput>, 
+                (MapFeedbackState<i32>, ()), 
+                BytesInput, 
+                StdRand, 
+                OnDiskCorpus<BytesInput>
+            >,
+        >
+    }
+
+    #[pymethods]
+    impl PythonRandPrintablesGeneratorI32{
+        #[new]
+        fn new(
+            max_size: usize
+        ) -> Self{
+            Self{
+                rand_printable_generator: RandPrintablesGenerator::new(max_size)
+            }
+        }
+    }
+
+
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonRandPrintablesGeneratorI32>()?;
+        Ok(())
+    }
+}

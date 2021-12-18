@@ -600,3 +600,71 @@ where
         unimplemented!()
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use pyo3::prelude::*;
+    use std::path::PathBuf;
+    use crate::bolts::{rands::StdRand, tuples::tuple_list};
+    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
+    use crate::inputs::BytesInput;
+    use crate::feedbacks::map::{MapFeedbackState, pybind::PythonMapFeedbackStateI32};
+    use crate::state::StdState;
+    use crate::events::simple::pybind::PythonSimpleEventManager;
+    use crate::fuzzer::pybind::PythonStdFuzzerI32;
+    use crate::executors::inprocess::pybind::PythonOwnedInProcessExecutorI32;
+    use crate::generators::pybind::PythonRandPrintablesGeneratorI32;
+
+    #[pyclass(unsendable, name = "StdState")]
+    pub struct PythonStdState { // I32 ??
+        pub std_state: StdState<
+            InMemoryCorpus<BytesInput>,
+            (MapFeedbackState<i32>, ()),
+            BytesInput,
+            StdRand, 
+            OnDiskCorpus<BytesInput>
+        >
+
+    }
+
+    #[pymethods]
+    impl PythonStdState {
+        #[new]
+        fn new(
+            seed: u64,
+            dir_path_name: String,
+            py_map_feedback_state: PythonMapFeedbackStateI32
+        ) -> Self {
+            Self{
+                std_state: StdState::new(
+                    StdRand::with_seed(seed),
+                    InMemoryCorpus::new(),
+                    OnDiskCorpus::new(PathBuf::from(dir_path_name)).unwrap(),
+                    tuple_list!(py_map_feedback_state.map_feedback_state),
+                )
+            }
+        }
+
+        fn generate_initial_inputs(
+            &mut self,
+            py_fuzzer: &mut PythonStdFuzzerI32,
+            py_executor: &mut PythonOwnedInProcessExecutorI32,
+            py_generator: &mut PythonRandPrintablesGeneratorI32,
+            py_mgr: &mut PythonSimpleEventManager,
+            num: usize
+        ) {
+            self.std_state.generate_initial_inputs(
+                &mut py_fuzzer.std_fuzzer, 
+                &mut py_executor.owned_in_process_executor, 
+                &mut py_generator.rand_printable_generator,
+                &mut py_mgr.simple_event_manager,
+                num
+            ).expect("Failed to generate the initial corpus".into());
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdState>()?;
+        Ok(())
+    }
+}
