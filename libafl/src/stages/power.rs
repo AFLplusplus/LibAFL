@@ -1,8 +1,8 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
 
 use alloc::string::{String, ToString};
-use core::marker::PhantomData;
-use num::Integer;
+use core::{fmt::Debug, marker::PhantomData};
+use num_traits::PrimInt;
 
 use crate::{
     corpus::{Corpus, IsFavoredMetadata, PowerScheduleTestcaseMetaData, Testcase},
@@ -12,7 +12,7 @@ use crate::{
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     stages::{MutationalStage, PowerScheduleMetadata, Stage},
-    state::{HasClientPerfStats, HasCorpus, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,
 };
 
@@ -34,14 +34,14 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     map_observer_name: String,
@@ -55,14 +55,14 @@ where
 impl<C, E, EM, I, M, O, OT, S, T, Z> MutationalStage<C, E, EM, I, M, S, Z>
     for PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -156,14 +156,14 @@ where
 impl<C, E, EM, I, M, O, OT, S, T, Z> Stage<E, EM, S, Z>
     for PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -183,14 +183,14 @@ where
 
 impl<C, E, EM, I, M, O, OT, S, T, Z> PowerMutationalStage<C, E, EM, I, M, O, OT, S, T, Z>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     pub fn new(mutator: M, strat: PowerSchedule, map_observer_name: &O) -> Self {

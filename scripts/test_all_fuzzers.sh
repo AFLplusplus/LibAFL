@@ -30,6 +30,9 @@ do
         cargo build || exit 1
         echo "[+] Done building $fuzzer"
     fi
+
+    # Save disk space
+    cargo clean
     cd ..
     echo ""
 done

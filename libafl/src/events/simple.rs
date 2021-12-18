@@ -6,22 +6,21 @@ use crate::{
         EventRestarter, HasEventManagerId,
     },
     inputs::Input,
-    stats::Stats,
+    monitors::Monitor,
     Error,
 };
 use alloc::{string::ToString, vec::Vec};
 #[cfg(feature = "std")]
 use core::{
-    convert::TryInto,
     marker::PhantomData,
     sync::atomic::{compiler_fence, Ordering},
 };
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
-#[cfg(all(feature = "std", windows))]
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
 #[cfg(feature = "std")]
 use crate::{
@@ -29,6 +28,8 @@ use crate::{
     corpus::Corpus,
     state::{HasCorpus, HasSolutions},
 };
+
+use super::ProgressReporter;
 
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
@@ -38,24 +39,24 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 /// A simple, single-threaded event manager that just logs
 #[derive(Clone, Debug)]
-pub struct SimpleEventManager<I, ST>
+pub struct SimpleEventManager<I, MT>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
-    /// The stats
-    stats: ST,
+    /// The monitor
+    monitor: MT,
     /// The events that happened since the last handle_in_broker
     events: Vec<Event<I>>,
 }
 
-impl<I, S, ST> EventFirer<I, S> for SimpleEventManager<I, ST>
+impl<I, MT> EventFirer<I> for SimpleEventManager<I, MT>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        match Self::handle_in_broker(&mut self.stats, &event)? {
+    fn fire<S>(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+        match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
         };
@@ -63,17 +64,17 @@ where
     }
 }
 
-impl<I, S, ST> EventRestarter<S> for SimpleEventManager<I, ST>
+impl<I, MT, S> EventRestarter<S> for SimpleEventManager<I, MT>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
 }
 
-impl<E, I, S, ST, Z> EventProcessor<E, I, S, Z> for SimpleEventManager<I, ST>
+impl<E, I, MT, S, Z> EventProcessor<E, I, S, Z> for SimpleEventManager<I, MT>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
     fn process(
         &mut self,
@@ -90,39 +91,46 @@ where
     }
 }
 
-impl<E, I, S, ST, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, ST>
+impl<E, I, MT, S, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, MT>
 where
     I: Input,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
 }
 
-impl<I, ST> HasEventManagerId for SimpleEventManager<I, ST>
+impl<I, MT> ProgressReporter<I> for SimpleEventManager<I, MT>
 where
     I: Input,
-    ST: Stats,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
+{
+}
+
+impl<I, MT> HasEventManagerId for SimpleEventManager<I, MT>
+where
+    I: Input,
+    MT: Monitor,
 {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId { id: 0 }
     }
 }
 
-impl<I, ST> SimpleEventManager<I, ST>
+impl<I, MT> SimpleEventManager<I, MT>
 where
     I: Input,
-    ST: Stats, //TODO CE: CustomEvent,
+    MT: Monitor, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
-    pub fn new(stats: ST) -> Self {
+    pub fn new(monitor: MT) -> Self {
         Self {
-            stats,
+            monitor,
             events: vec![],
         }
     }
 
     // Handle arriving events in the broker
     #[allow(clippy::unnecessary_wraps)]
-    fn handle_in_broker(stats: &mut ST, event: &Event<I>) -> Result<BrokerEventResult, Error> {
+    fn handle_in_broker(monitor: &mut MT, event: &Event<I>) -> Result<BrokerEventResult, Error> {
         match event {
             Event::NewTestcase {
                 input: _,
@@ -133,25 +141,30 @@ where
                 time,
                 executions,
             } => {
-                stats
+                monitor
                     .client_stats_mut_for(0)
                     .update_corpus_size(*corpus_size as u64);
-                stats
+                monitor
                     .client_stats_mut_for(0)
                     .update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateStats {
+            Event::UpdateExecStats {
                 time,
                 executions,
+                stability,
                 phantom: _,
             } => {
-                // TODO: The stats buffer should be added on client add.
-                stats
-                    .client_stats_mut_for(0)
-                    .update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string(), 0);
+                // TODO: The monitor buffer should be added on client add.
+                let client = monitor.client_stats_mut_for(0);
+
+                client.update_executions(*executions as u64, *time);
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
+
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats {
@@ -159,31 +172,35 @@ where
                 value,
                 phantom: _,
             } => {
-                stats
+                monitor
                     .client_stats_mut_for(0)
                     .update_user_stats(name.clone(), value.clone());
-                stats.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfStats {
+            Event::UpdatePerfMonitor {
                 time,
                 executions,
-                introspection_stats,
+                stability,
+                introspection_monitor,
                 phantom: _,
             } => {
-                // TODO: The stats buffer should be added on client add.
-                stats.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                stats.client_stats_mut()[0]
-                    .update_introspection_stats((**introspection_stats).clone());
-                stats.display(event.name().to_string(), 0);
+                // TODO: The monitor buffer should be added on client add.
+                let client = &mut monitor.client_stats_mut()[0];
+                client.update_executions(*executions as u64, *time);
+                client.update_introspection_monitor((**introspection_monitor).clone());
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
-                stats
+                monitor
                     .client_stats_mut_for(0)
                     .update_objective_size(*objective_size as u64);
-                stats.display(event.name().to_string(), 0);
+                monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -214,16 +231,16 @@ where
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
-pub struct SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
+pub struct SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
     /// The actual simple event mgr
-    simple_event_mgr: SimpleEventManager<I, ST>,
+    simple_event_mgr: SimpleEventManager<I, MT>,
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SP>,
     /// Phantom data
@@ -231,29 +248,29 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, I, S, SC, SP, ST> EventFirer<I, S>
-    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
+impl<'a, C, I, MT, S, SC, SP> EventFirer<I>
+    for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
         self.simple_event_mgr.fire(_state, event)
     }
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, I, S, SC, SP, ST> EventRestarter<S>
-    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
+impl<'a, C, I, MT, S, SC, SP> EventRestarter<S>
+    for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
@@ -264,14 +281,14 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, E, I, S, SC, SP, ST, Z> EventProcessor<E, I, S, Z>
-    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
+impl<'a, C, E, I, S, SC, SP, MT, Z> EventProcessor<E, I, S, Z>
+    for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         self.simple_event_mgr.process(fuzzer, state, executor)
@@ -279,26 +296,38 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, E, I, S, SC, SP, ST, Z> EventManager<E, I, S, Z>
-    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
+impl<'a, C, E, I, S, SC, SP, MT, Z> EventManager<E, I, S, Z>
+    for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats, //CE: CustomEvent<I, OT>,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
 {
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, I, S, SC, SP, ST> HasEventManagerId
-    for SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
+impl<'a, C, I, MT, S, SC, SP> ProgressReporter<I>
+    for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
+where
+    I: Input,
+    C: Corpus<I>,
+    S: Serialize,
+    SP: ShMemProvider,
+    MT: Monitor, //CE: CustomEvent<I, OT>,
+{
+}
+
+#[cfg(feature = "std")]
+impl<'a, C, I, MT, S, SC, SP> HasEventManagerId
+    for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
-    ST: Stats,
+    MT: Monitor,
 {
     fn mgr_id(&self) -> EventManagerId {
         self.simple_event_mgr.mgr_id()
@@ -307,20 +336,20 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<'a, C, I, S, SC, SP, ST> SimpleRestartingEventManager<'a, C, I, S, SC, SP, ST>
+impl<'a, C, I, MT, S, SC, SP> SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
     I: Input,
     S: DeserializeOwned + Serialize + HasCorpus<C, I> + HasSolutions<SC, I>,
     SC: Corpus<I>,
     SP: ShMemProvider,
-    ST: Stats, //TODO CE: CustomEvent,
+    MT: Monitor, //TODO CE: CustomEvent,
 {
     /// Creates a new [`SimpleEventManager`].
-    fn new_launched(stats: ST, staterestorer: StateRestorer<SP>) -> Self {
+    fn new_launched(monitor: MT, staterestorer: StateRestorer<SP>) -> Self {
         Self {
             staterestorer,
-            simple_event_mgr: SimpleEventManager::new(stats),
+            simple_event_mgr: SimpleEventManager::new(monitor),
             _phantom: PhantomData {},
         }
     }
@@ -329,7 +358,7 @@ where
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     #[allow(clippy::similar_names)]
-    pub fn launch(mut stats: ST, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error> {
+    pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error> {
         // We start ourself as child process to actually fuzz
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a place to store state in, for restarts.
@@ -344,7 +373,7 @@ where
                 dbg!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
-                #[cfg(unix)]
+                #[cfg(all(unix, feature = "fork"))]
                 let child_status = {
                     shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
@@ -359,14 +388,17 @@ where
                     }
                 };
 
-                // On windows, we spawn ourself again
-                #[cfg(windows)]
+                // On windows (or in any case without forks), we spawn ourself again
+                #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
+                #[cfg(all(unix, not(feature = "fork")))]
+                let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
 
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
+                    #[allow(clippy::manual_assert)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
@@ -374,7 +406,7 @@ where
                     }
 
                     // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! (Child exited with: {})", child_status);
+                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {})", child_status);
                 }
 
                 ctr = ctr.wrapping_add(1);
@@ -386,8 +418,6 @@ where
             StateRestorer::from_env(shmem_provider, _ENV_FUZZER_SENDER)?
         };
 
-        println!("We're a client, let's fuzz :)");
-
         // If we're restarting, deserialize the old state.
         let (state, mgr) = match staterestorer.restore::<S>()? {
             None => {
@@ -395,7 +425,7 @@ where
                 // Mgr to send and receive msgs from/to all other fuzzer instances
                 (
                     None,
-                    SimpleRestartingEventManager::new_launched(stats, staterestorer),
+                    SimpleRestartingEventManager::new_launched(monitor, staterestorer),
                 )
             }
             // Restoring from a previous run, deserialize state and corpus.
@@ -404,14 +434,14 @@ where
                 // We reset the staterestorer, the next staterestorer and receiver (after crash) will reuse the page from the initial message.
                 staterestorer.reset();
 
-                // load the corpus size into stats to still display the correct numbers after restart.
-                let client_stats = stats.client_stats_mut_for(0);
+                // load the corpus size into monitor to still display the correct numbers after restart.
+                let client_stats = monitor.client_stats_mut_for(0);
                 client_stats.update_corpus_size(state.corpus().count().try_into()?);
                 client_stats.update_objective_size(state.solutions().count().try_into()?);
 
                 (
                     Some(state),
-                    SimpleRestartingEventManager::new_launched(stats, staterestorer),
+                    SimpleRestartingEventManager::new_launched(monitor, staterestorer),
                 )
             }
         };
@@ -430,15 +460,15 @@ where
 pub mod pybind {
     use pyo3::prelude::*;
     use crate::inputs::BytesInput;
-    use crate::stats::SimpleStats;
-    use crate::stats::pybind::PythonSimpleStats;
+    use crate::monitors::SimpleMonitor;
+    use crate::monitors::pybind::PythonSimpleMonitor;
     use crate::events::SimpleEventManager;
     
     #[pyclass(unsendable, name = "SimpleEventManager")]
     pub struct PythonSimpleEventManager {
         pub simple_event_manager: SimpleEventManager<
                 BytesInput /* ?? */, 
-                SimpleStats<fn(String)>
+                SimpleMonitor<fn(String)>
             >
     }
 
@@ -446,10 +476,10 @@ pub mod pybind {
     impl PythonSimpleEventManager {
         #[new]
         fn new(
-            py_simple_stats: PythonSimpleStats
+            py_simple_monitor: PythonSimpleMonitor
         ) -> Self {
             Self{
-                simple_event_manager: SimpleEventManager::new(py_simple_stats.simple_stats)
+                simple_event_manager: SimpleEventManager::new(py_simple_monitor.simple_monitor)
             }
         }
     }

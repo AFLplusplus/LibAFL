@@ -1,8 +1,8 @@
 [package]
 name = "tutorial"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["std"]

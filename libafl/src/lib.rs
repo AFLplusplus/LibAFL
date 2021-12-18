@@ -31,14 +31,35 @@ pub mod executors;
 pub mod feedbacks;
 pub mod generators;
 pub mod inputs;
+pub mod monitors;
 pub mod mutators;
 pub mod observers;
 pub mod stages;
 pub mod state;
-pub mod stats;
 
 pub mod fuzzer;
 pub use fuzzer::*;
+
+/// The `stats` module got renamed to [`monitors`].
+/// It monitors and displays the statistics of the fuzzing process.
+#[deprecated(since = "0.7.0", note = "The `stats` module got renamed to `monitors`")]
+pub mod stats {
+    #[deprecated(
+        since = "0.7.0",
+        note = "Use monitors::MultiMonitor instead of stats::MultiStats!"
+    )]
+    pub use crate::monitors::MultiMonitor as MultiStats;
+    #[deprecated(
+        since = "0.7.0",
+        note = "Use monitors::SimpleMonitor instead of stats::SimpleStats!"
+    )]
+    pub use crate::monitors::SimpleMonitor as SimpleStats;
+    #[deprecated(
+        since = "0.7.0",
+        note = "Use monitors::UserMonitor instead of stats::SimpleStats!"
+    )]
+    pub use crate::monitors::UserStats;
+}
 
 use alloc::string::String;
 use core::fmt;
@@ -173,10 +194,10 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
+        monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        stats::SimpleStats,
         Fuzzer, StdFuzzer,
     };
 
@@ -199,10 +220,10 @@ mod tests {
             tuple_list!(),
         );
 
-        let stats = SimpleStats::new(|s| {
+        let monitor = SimpleMonitor::new(|s| {
             println!("{}", s);
         });
-        let mut event_manager = SimpleEventManager::new(stats);
+        let mut event_manager = SimpleEventManager::new(monitor);
 
         let scheduler = RandCorpusScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, (), ());
@@ -262,7 +283,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     observers::map::pybind::register(py, m)?;
     feedbacks::map::pybind::register(py, m)?;
     state::pybind::register(py, m)?;
-    stats::pybind::register(py, m)?;
+    monitors::pybind::register(py, m)?;
     events::simple::pybind::register(py, m)?;
     fuzzer::pybind::register(py, m)?;
     executors::inprocess::pybind::register(py, m)?;

@@ -1,6 +1,6 @@
 [package]
 name = "libafl_sugar"
-version = "0.6.1"
+version = "0.7.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Sugar builders to create common fuzzers with LibAFL"
 documentation = "https://docs.rs/libafl_sugar"
@@ -8,7 +8,7 @@ repository = "https://github.com/AFLplusplus/LibAFL/"
 readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing"]
-edition = "2018"
+edition = "2021"
 build = "build.rs"
 
 [features]
@@ -19,12 +19,12 @@ default = []
 pyo3-build-config = { version = "0.14.5", optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.6.1" }
-libafl_targets = { path = "../libafl_targets", version = "0.6.1" }
-libafl_qemu = { path = "../libafl_qemu", version = "0.6.1" }
+libafl = { path = "../libafl", version = "0.7.0" }
+libafl_targets = { path = "../libafl_targets", version = "0.7.0" }
+libafl_qemu = { path = "../libafl_qemu", version = "0.7.0", features = ["x86_64"] }
 typed-builder = "0.9.0" # Implement the builder pattern at compiletime
-#pyo3 = { version = "0.14.3", features = ["extension-module"], optional = true }
-pyo3 = { version = "0.14.3", optional = true }
+#pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.15", optional = true }
 
 [lib]
 name = "libafl_sugar"

@@ -4,44 +4,102 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::marker::PhantomData;
-use num::Integer;
+use core::{fmt::Debug, marker::PhantomData};
+use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{tuples::Named, AsSlice},
+    bolts::{tuples::Named, AsSlice, HasRefCnt},
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
     inputs::Input,
+    monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
-    state::{HasClientPerfStats, HasFeedbackStates, HasMetadata},
-    stats::UserStats,
+    state::{HasClientPerfMonitor, HasFeedbackStates, HasMetadata},
     Error,
 };
 
-/// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, O, MaxReducer, S, T>;
-/// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, O, MinReducer, S, T>;
+/// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
+pub type AflMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, OrReducer, S, T>;
 
-/// A Reducer function is used to aggregate values for the novelty search
+/// A [`MapFeedback`] that strives to maximize the map contents.
+pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, MaxReducer, S, T>;
+/// A [`MapFeedback`] that strives to minimize the map contents.
+pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, MinReducer, S, T>;
+
+/// A [`MapFeedback`] that strives to maximize the map contents,
+/// but only, if a value is larger than `pow2` of the previous.
+pub type MaxMapPow2Feedback<FT, I, O, S, T> =
+    MapFeedback<FT, I, NextPow2IsNovel, O, MaxReducer, S, T>;
+/// A [`MapFeedback`] that strives to maximize the map contents,
+/// but only, if a value is larger than `pow2` of the previous.
+pub type MaxMapOneOrFilledFeedback<FT, I, O, S, T> =
+    MapFeedback<FT, I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
+
+/// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Reduce two values to one value, with the current [`Reducer`].
     fn reduce(first: T, second: T) -> T;
 }
 
-/// A [`MinReducer`] reduces [`Integer`] values and returns their maximum.
+/// A [`OrReducer`] reduces the values returning the bitwise OR with the old value
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct OrReducer {}
+
+impl<T> Reducer<T> for OrReducer
+where
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd,
+{
+    #[inline]
+    fn reduce(history: T, new: T) -> T {
+        history | new
+    }
+}
+
+/// A [`AndReducer`] reduces the values returning the bitwise AND with the old value
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AndReducer {}
+
+impl<T> Reducer<T> for AndReducer
+where
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd,
+{
+    #[inline]
+    fn reduce(history: T, new: T) -> T {
+        history & new
+    }
+}
+
+/// A [`MaxReducer`] reduces int values and returns their maximum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MaxReducer {}
 
 impl<T> Reducer<T> for MaxReducer
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -53,13 +111,19 @@ where
     }
 }
 
-/// A [`MinReducer`] reduces [`Integer`] values and returns their minimum.
+/// A [`MinReducer`] reduces int values and returns their minimum.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MinReducer {}
 
 impl<T> Reducer<T> for MinReducer
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -71,11 +135,97 @@ where
     }
 }
 
+/// A `IsNovel` function is used to discriminate if a reduced value is considered novel.
+pub trait IsNovel<T>: Serialize + serde::de::DeserializeOwned + 'static
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    /// If a new value in the [`MapFeedback`] was found,
+    /// this filter can decide if the result is considered novel or not.
+    fn is_novel(old: T, new: T) -> bool;
+}
+
+/// [`AllIsNovel`] consider everything a novelty. Here mostly just for debugging.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AllIsNovel {}
+
+impl<T> IsNovel<T> for AllIsNovel
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn is_novel(_old: T, _new: T) -> bool {
+        true
+    }
+}
+
+/// Calculate the next power of two
+/// See <https://stackoverflow.com/a/66253960/1345238>
+/// Will saturate at the max value.
+/// In case of negative values, returns 1.
+#[inline]
+fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
+    if n <= T::one() {
+        T::one()
+    } else {
+        (T::max_value() >> (n - T::one()).leading_zeros().try_into().unwrap())
+            .saturating_add(T::one())
+    }
+}
+
+/// Consider as novelty if the reduced value is different from the old value.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DifferentIsNovel {}
+impl<T> IsNovel<T> for DifferentIsNovel
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn is_novel(old: T, new: T) -> bool {
+        old != new
+    }
+}
+
+/// Only consider as novel the values which are at least the next pow2 class of the old value
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct NextPow2IsNovel {}
+impl<T> IsNovel<T> for NextPow2IsNovel
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn is_novel(old: T, new: T) -> bool {
+        // We use a trait so we build our numbers from scratch here.
+        // This way it works with Nums of any size.
+        if new <= old {
+            false
+        } else {
+            let pow2 = saturating_next_power_of_two(old.saturating_add(T::one()));
+            new >= pow2
+        }
+    }
+}
+
+/// A filter that only saves values which are at least the next pow2 class
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct OneOrFilledIsNovel {}
+impl<T> IsNovel<T> for OneOrFilledIsNovel
+where
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn is_novel(old: T, new: T) -> bool {
+        (new == T::one() || new == T::max_value()) && new > old
+    }
+}
+
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Serialize, Deserialize)]
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
+    /// A refcount used to know when remove this meta
+    pub tcref: isize,
 }
 
 crate::impl_serdeany!(MapIndexesMetadata);
@@ -87,11 +237,21 @@ impl AsSlice<usize> for MapIndexesMetadata {
     }
 }
 
+impl HasRefCnt for MapIndexesMetadata {
+    fn refcnt(&self) -> isize {
+        self.tcref
+    }
+
+    fn refcnt_mut(&mut self) -> &mut isize {
+        &mut self.tcref
+    }
+}
+
 impl MapIndexesMetadata {
     /// Creates a new [`struct@MapIndexesMetadata`].
     #[must_use]
     pub fn new(list: Vec<usize>) -> Self {
-        Self { list }
+        Self { list, tcref: 0 }
     }
 }
 
@@ -124,7 +284,7 @@ impl MapNoveltiesMetadata {
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct MapFeedbackState<T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,
@@ -134,17 +294,19 @@ where
 
 impl<T> FeedbackState for MapFeedbackState<T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     fn reset(&mut self) -> Result<(), Error> {
-        self.history_map.iter_mut().for_each(|x| *x = T::default());
+        self.history_map
+            .iter_mut()
+            .for_each(|x| *x = T::min_value());
         Ok(())
     }
 }
 
 impl<T> Named for MapFeedbackState<T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -154,13 +316,13 @@ where
 
 impl<T> MapFeedbackState<T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
 {
     /// Create new `MapFeedbackState`
     #[must_use]
     pub fn new(name: &'static str, map_size: usize) -> Self {
         Self {
-            history_map: vec![T::default(); map_size],
+            history_map: vec![T::min_value(); map_size],
             name: name.to_string(),
         }
     }
@@ -169,9 +331,10 @@ where
     pub fn with_observer<O>(map_observer: &O) -> Self
     where
         O: MapObserver<T>,
+        T: Debug,
     {
         Self {
-            history_map: vec![T::default(); map_observer.map().len()],
+            history_map: vec![T::min_value(); map_observer.len()],
             name: map_observer.name().to_string(),
         }
     }
@@ -190,11 +353,12 @@ where
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<FT, I, O, R, S, T>
+pub struct MapFeedback<FT, I, N, O, R, S, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
+    N: IsNovel<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
 {
@@ -207,16 +371,17 @@ where
     /// Name identifier of the observer
     observer_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(FT, I, S, R, O, T)>,
+    phantom: PhantomData<(FT, I, N, S, R, O, T)>,
 }
 
-impl<I, FT, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, O, R, S, T>
+impl<FT, I, N, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, N, O, R, S, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
+    N: IsNovel<T>,
     I: Input,
-    S: HasFeedbackStates<FT> + HasClientPerfStats,
+    S: HasFeedbackStates<FT> + HasClientPerfMonitor,
     FT: FeedbackStatesTuple,
 {
     fn is_interesting<EM, OT>(
@@ -228,7 +393,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         let mut interesting = false;
@@ -242,18 +407,17 @@ where
             .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
-        if size > map_state.history_map.len() {
-            panic!("The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
-        }
-        assert!(size <= observer.map().len());
+        assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
+
+        assert!(size <= observer.len());
 
         if self.novelties.is_some() {
             for i in 0..size {
                 let history = map_state.history_map[i];
-                let item = observer.map()[i];
+                let item = *observer.get(i);
 
                 let reduced = R::reduce(history, item);
-                if history != reduced {
+                if N::is_novel(history, reduced) {
                     map_state.history_map[i] = reduced;
                     interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
@@ -262,10 +426,10 @@ where
         } else {
             for i in 0..size {
                 let history = map_state.history_map[i];
-                let item = observer.map()[i];
+                let item = *observer.get(i);
 
                 let reduced = R::reduce(history, item);
-                if history != reduced {
+                if N::is_novel(history, reduced) {
                     map_state.history_map[i] = reduced;
                     interesting = true;
                 }
@@ -319,10 +483,11 @@ where
     }
 }
 
-impl<FT, I, O, R, S, T> Named for MapFeedback<FT, I, O, R, S, T>
+impl<FT, I, N, O, R, S, T> Named for MapFeedback<FT, I, N, O, R, S, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
+    N: IsNovel<T>,
     O: MapObserver<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
@@ -333,10 +498,18 @@ where
     }
 }
 
-impl<FT, I, O, R, S, T> MapFeedback<FT, I, O, R, S, T>
+impl<FT, I, N, O, R, S, T> MapFeedback<FT, I, N, O, R, S, T>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt
+        + Default
+        + Copy
+        + 'static
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + PartialOrd
+        + Debug,
     R: Reducer<T>,
+    N: IsNovel<T>,
     O: MapObserver<T>,
     S: HasFeedbackStates<FT>,
     FT: FeedbackStatesTuple,
@@ -437,7 +610,7 @@ impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<usize>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -448,7 +621,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         // TODO Replace with match_name_type when stable
@@ -457,7 +630,7 @@ where
         let mut hit_target: bool = false;
         //check if we've hit any targets.
         for i in 0..size {
-            if observer.map()[i] > 0 {
+            if *observer.get(i) > 0 {
                 self.target_idx.push(i);
                 hit_target = true;
             }
@@ -490,6 +663,30 @@ where
     #[inline]
     fn name(&self) -> &str {
         self.name.as_str()
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::feedbacks::{AllIsNovel, IsNovel, NextPow2IsNovel};
+
+    #[test]
+    fn test_map_is_novel() {
+        // sanity check
+        assert!(AllIsNovel::is_novel(0_u8, 0));
+
+        assert!(!NextPow2IsNovel::is_novel(0_u8, 0));
+        assert!(NextPow2IsNovel::is_novel(0_u8, 1));
+        assert!(!NextPow2IsNovel::is_novel(1_u8, 1));
+        assert!(NextPow2IsNovel::is_novel(1_u8, 2));
+        assert!(!NextPow2IsNovel::is_novel(2_u8, 2));
+        assert!(!NextPow2IsNovel::is_novel(2_u8, 3));
+        assert!(NextPow2IsNovel::is_novel(2_u8, 4));
+        assert!(!NextPow2IsNovel::is_novel(128_u8, 128));
+        assert!(!NextPow2IsNovel::is_novel(129_u8, 128));
+        assert!(NextPow2IsNovel::is_novel(128_u8, 255));
+        assert!(!NextPow2IsNovel::is_novel(255_u8, 128));
+        assert!(NextPow2IsNovel::is_novel(254_u8, 255));
+        assert!(!NextPow2IsNovel::is_novel(255_u8, 255));
     }
 }
 

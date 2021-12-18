@@ -2,10 +2,10 @@
 // with testcases only from a subset of the total corpus.
 
 use crate::{
-    bolts::{rands::Rand, serdeany::SerdeAny, AsSlice},
+    bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasLen, HasRefCnt},
     corpus::{Corpus, CorpusScheduler, Testcase},
     feedbacks::MapIndexesMetadata,
-    inputs::{HasLen, Input},
+    inputs::Input,
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -84,7 +84,7 @@ where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
-    M: AsSlice<usize> + SerdeAny,
+    M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<C, I> + HasMetadata,
     C: Corpus<I>,
 {
@@ -98,7 +98,7 @@ where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
-    M: AsSlice<usize> + SerdeAny,
+    M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<C, I> + HasMetadata + HasRand<R>,
     C: Corpus<I>,
     R: Rand,
@@ -148,13 +148,14 @@ where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
-    M: AsSlice<usize> + SerdeAny,
+    M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<C, I> + HasMetadata + HasRand<R>,
     C: Corpus<I>,
     R: Rand,
 {
     /// Update the `Corpus` score using the `MinimizerCorpusScheduler`
     #[allow(clippy::unused_self)]
+    #[allow(clippy::cast_possible_wrap)]
     pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata().get::<TopRatedsMetadata>().is_none() {
@@ -165,7 +166,7 @@ where
         {
             let mut entry = state.corpus().get(idx)?.borrow_mut();
             let factor = F::compute(&mut *entry)?;
-            let meta = entry.metadata().get::<M>().ok_or_else(|| {
+            let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
                 Error::KeyNotFound(format!(
                     "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
                     idx
@@ -179,22 +180,52 @@ where
                     .map
                     .get(elem)
                 {
-                    if factor > F::compute(&mut *state.corpus().get(*old_idx)?.borrow_mut())? {
+                    let mut old = state.corpus().get(*old_idx)?.borrow_mut();
+                    if factor > F::compute(&mut *old)? {
                         continue;
+                    }
+
+                    let must_remove = {
+                        let old_meta = old.metadata_mut().get_mut::<M>().ok_or_else(|| {
+                            Error::KeyNotFound(format!(
+                                "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
+                                old_idx
+                            ))
+                        })?;
+                        *old_meta.refcnt_mut() -= 1;
+                        old_meta.refcnt() <= 0
+                    };
+
+                    if must_remove {
+                        drop(old.metadata_mut().remove::<M>());
                     }
                 }
 
-                new_favoreds.push((*elem, idx));
+                new_favoreds.push(*elem);
             }
+
+            *meta.refcnt_mut() = new_favoreds.len() as isize;
         }
 
-        for pair in new_favoreds {
+        if new_favoreds.is_empty() {
+            drop(
+                state
+                    .corpus()
+                    .get(idx)?
+                    .borrow_mut()
+                    .metadata_mut()
+                    .remove::<M>(),
+            );
+            return Ok(());
+        }
+
+        for elem in new_favoreds {
             state
                 .metadata_mut()
                 .get_mut::<TopRatedsMetadata>()
                 .unwrap()
                 .map
-                .insert(pair.0, pair.1);
+                .insert(elem, idx);
         }
         Ok(())
     }

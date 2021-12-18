@@ -6,6 +6,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -21,12 +22,12 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::{I2SRandReplace, Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
     Error,
 };
 
@@ -58,7 +59,7 @@ where
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
-    cores: &'a [usize],
+    cores: &'a Cores,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
     #[builder(default = None, setter(strip_option))]
@@ -85,9 +86,11 @@ where
         let mut out_dir = self.output_dir.clone();
         if fs::create_dir(&out_dir).is_err() {
             println!("Out dir at {:?} already exists.", &out_dir);
-            if !out_dir.is_dir() {
-                panic!("Out dir at {:?} is not a valid directory!", &out_dir);
-            }
+            assert!(
+                out_dir.is_dir(),
+                "Out dir at {:?} is not a valid directory!",
+                &out_dir
+            );
         }
         let mut crashes = out_dir.clone();
         crashes.push("crashes");
@@ -97,7 +100,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let stats = MultiStats::new(|s| println!("{}", s));
+        let monitor = MultiMonitor::new(|s| println!("{}", s));
 
         let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Create an observation channel using the coverage map
@@ -252,7 +255,7 @@ where
         let launcher = Launcher::builder()
             .shmem_provider(shmem_provider)
             .configuration(conf)
-            .stats(stats)
+            .monitor(monitor)
             .run_client(&mut run_client)
             .cores(self.cores)
             .broker_port(self.broker_port)
@@ -270,6 +273,7 @@ where
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::inmemory;
+    use libafl::bolts::os::Cores;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
     use std::path::PathBuf;
@@ -279,7 +283,7 @@ pub mod pybind {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,
         broker_port: u16,
-        cores: Vec<usize>,
+        cores: Cores,
     }
 
     #[pymethods]
@@ -295,7 +299,7 @@ pub mod pybind {
                 input_dirs,
                 output_dir,
                 broker_port,
-                cores,
+                cores: cores.into(),
             }
         }
 

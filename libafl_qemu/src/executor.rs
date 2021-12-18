@@ -10,12 +10,12 @@ use libafl::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfStats, HasSolutions},
+    state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
 
 pub use crate::emu::SyscallHookResult;
-use crate::{emu, emu::SKIP_EXEC_HOOK, helpers::QemuHelperTuple};
+use crate::{emu, emu::SKIP_EXEC_HOOK, helper::QemuHelperTuple};
 
 static mut QEMU_HELPERS_PTR: *const c_void = ptr::null();
 
@@ -333,6 +333,7 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let mut res = SyscallHookResult::new(None);
     for hook in unsafe { &SYSCALL_HOOKS } {
+        #[allow(clippy::type_complexity)]
         let func: fn(
             &mut QT,
             &mut S,
@@ -382,10 +383,10 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I, S> + EventRestarter<S>,
+        EM: EventFirer<I> + EventRestarter<S>,
         OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfStats,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let slf = Self {
@@ -585,6 +586,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
+    #[allow(clippy::type_complexity)]
     pub fn hook_syscalls(
         &self,
         hook: fn(

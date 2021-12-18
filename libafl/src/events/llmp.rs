@@ -31,8 +31,8 @@ use crate::{
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::Input,
+    monitors::Monitor,
     observers::ObserversTuple,
-    stats::Stats,
     Error,
 };
 
@@ -42,14 +42,16 @@ use crate::bolts::{
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 
-#[cfg(all(feature = "std", windows))]
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
 
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
+
+use super::ProgressReporter;
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
@@ -66,30 +68,30 @@ const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
 const COMPRESS_THRESHOLD: usize = 1024;
 
 #[derive(Debug)]
-pub struct LlmpEventBroker<I, SP, ST>
+pub struct LlmpEventBroker<I, MT, SP>
 where
     I: Input,
     SP: ShMemProvider + 'static,
-    ST: Stats,
+    MT: Monitor,
     //CE: CustomEvent<I>,
 {
-    stats: ST,
+    monitor: MT,
     llmp: llmp::LlmpBroker<SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     phantom: PhantomData<I>,
 }
 
-impl<I, SP, ST> LlmpEventBroker<I, SP, ST>
+impl<I, MT, SP> LlmpEventBroker<I, MT, SP>
 where
     I: Input,
     SP: ShMemProvider + 'static,
-    ST: Stats,
+    MT: Monitor,
 {
     /// Create an even broker from a raw broker.
-    pub fn new(llmp: llmp::LlmpBroker<SP>, stats: ST) -> Result<Self, Error> {
+    pub fn new(llmp: llmp::LlmpBroker<SP>, monitor: MT) -> Result<Self, Error> {
         Ok(Self {
-            stats,
+            monitor,
             llmp,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
@@ -100,9 +102,9 @@ where
     /// Create llmp on a port
     /// The port must not be bound yet to have a broker.
     #[cfg(feature = "std")]
-    pub fn new_on_port(shmem_provider: SP, stats: ST, port: u16) -> Result<Self, Error> {
+    pub fn new_on_port(shmem_provider: SP, monitor: MT, port: u16) -> Result<Self, Error> {
         Ok(Self {
-            stats,
+            monitor,
             llmp: llmp::LlmpBroker::create_attach_to_tcp(shmem_provider, port)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
@@ -120,7 +122,7 @@ where
 
     /// Run forever in the broker
     pub fn broker_loop(&mut self) -> Result<(), Error> {
-        let stats = &mut self.stats;
+        let monitor = &mut self.monitor;
         #[cfg(feature = "llmp_compression")]
         let compressor = &self.compressor;
         self.llmp.loop_forever(
@@ -138,7 +140,7 @@ where
                         msg
                     };
                     let event: Event<I> = postcard::from_bytes(event_bytes)?;
-                    match Self::handle_in_broker(stats, client_id, &event)? {
+                    match Self::handle_in_broker(monitor, client_id, &event)? {
                         BrokerEventResult::Forward => Ok(llmp::LlmpMsgHookResult::ForwardToClients),
                         BrokerEventResult::Handled => Ok(llmp::LlmpMsgHookResult::Handled),
                     }
@@ -155,7 +157,7 @@ where
     /// Handle arriving events in the broker
     #[allow(clippy::unnecessary_wraps)]
     fn handle_in_broker(
-        stats: &mut ST,
+        monitor: &mut MT,
         client_id: u32,
         event: &Event<I>,
     ) -> Result<BrokerEventResult, Error> {
@@ -169,21 +171,25 @@ where
                 time,
                 executions,
             } => {
-                let client = stats.client_stats_mut_for(client_id);
+                let client = monitor.client_stats_mut_for(client_id);
                 client.update_corpus_size(*corpus_size as u64);
                 client.update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string(), client_id);
+                monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Forward)
             }
-            Event::UpdateStats {
+            Event::UpdateExecStats {
                 time,
                 executions,
+                stability,
                 phantom: _,
             } => {
-                // TODO: The stats buffer should be added on client add.
-                let client = stats.client_stats_mut_for(client_id);
+                // TODO: The monitor buffer should be added on client add.
+                let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
-                stats.display(event.name().to_string(), client_id);
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
+                monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::UpdateUserStats {
@@ -191,39 +197,44 @@ where
                 value,
                 phantom: _,
             } => {
-                let client = stats.client_stats_mut_for(client_id);
+                let client = monitor.client_stats_mut_for(client_id);
                 client.update_user_stats(name.clone(), value.clone());
-                stats.display(event.name().to_string(), client_id);
+                monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             #[cfg(feature = "introspection")]
-            Event::UpdatePerfStats {
+            Event::UpdatePerfMonitor {
                 time,
                 executions,
-                introspection_stats,
+                stability,
+                introspection_monitor,
                 phantom: _,
             } => {
-                // TODO: The stats buffer should be added on client add.
+                // TODO: The monitor buffer should be added on client add.
 
                 // Get the client for the staterestorer ID
-                let client = stats.client_stats_mut_for(client_id);
+                let client = monitor.client_stats_mut_for(client_id);
 
-                // Update the normal stats for this client
+                // Update the normal monitor for this client
                 client.update_executions(*executions as u64, *time);
 
-                // Update the performance stats for this client
-                client.update_introspection_stats((**introspection_stats).clone());
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
 
-                // Display the stats via `.display` only on core #1
-                stats.display(event.name().to_string(), client_id);
+                // Update the performance monitor for this client
+                client.update_introspection_monitor((**introspection_monitor).clone());
+
+                // Display the monitor via `.display` only on core #1
+                monitor.display(event.name().to_string(), client_id);
 
                 // Correctly handled the event
                 Ok(BrokerEventResult::Handled)
             }
             Event::Objective { objective_size } => {
-                let client = stats.client_stats_mut_for(client_id);
+                let client = monitor.client_stats_mut_for(client_id);
                 client.update_objective_size(*objective_size as u64);
-                stats.display(event.name().to_string(), client_id);
+                monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
             Event::Log {
@@ -232,7 +243,7 @@ where
                 phantom: _,
             } => {
                 let (_, _) = (severity_level, message);
-                // TODO rely on Stats
+                // TODO rely on Monitor
                 #[cfg(feature = "std")]
                 println!("[LOG {}]: {}", severity_level, message);
                 Ok(BrokerEventResult::Handled)
@@ -400,7 +411,7 @@ where
     }
 }
 
-impl<I, OT, S, SP> EventFirer<I, S> for LlmpEventManager<I, OT, S, SP>
+impl<I, OT, S, SP> EventFirer<I> for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -408,7 +419,7 @@ where
     //CE: CustomEvent<I>,
 {
     #[cfg(feature = "llmp_compression")]
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         let flags: Flags = LLMP_FLAG_INITIALIZED;
 
@@ -428,7 +439,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn fire(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())
@@ -467,9 +478,11 @@ where
         let mut events = vec![];
         let self_id = self.llmp.sender.id;
         while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
-            if tag == _LLMP_TAG_EVENT_TO_BROKER {
-                panic!("EVENT_TO_BROKER parcel should not have arrived in the client!");
-            }
+            assert!(
+                tag != _LLMP_TAG_EVENT_TO_BROKER,
+                "EVENT_TO_BROKER parcel should not have arrived in the client!"
+            );
+
             if client_id == self_id {
                 continue;
             }
@@ -505,6 +518,14 @@ where
 {
 }
 
+impl<I, OT, S, SP> ProgressReporter<I> for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    SP: ShMemProvider,
+{
+}
+
 impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
@@ -536,15 +557,24 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, OT, S, SP> EventFirer<I, S> for LlmpRestartingEventManager<I, OT, S, SP>
+impl<I, OT, S, SP> ProgressReporter<I> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
     S: Serialize,
     SP: ShMemProvider,
+{
+}
+
+#[cfg(feature = "std")]
+impl<I, OT, S, SP> EventFirer<I> for LlmpRestartingEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
-    fn fire(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn fire<S2>(&mut self, state: &mut S2, event: Event<I>) -> Result<(), Error> {
         // Check if we are going to crash in the event, in which case we store our current state for the next runner
         self.llmp_mgr.fire(state, event)
     }
@@ -670,8 +700,8 @@ pub enum ManagerKind {
 /// The restarter will spawn a new process each time the child crashes or timeouts.
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity)]
-pub fn setup_restarting_mgr_std<I, OT, S, ST>(
-    stats: ST,
+pub fn setup_restarting_mgr_std<I, MT, OT, S>(
+    monitor: MT,
     broker_port: u16,
     configuration: EventConfig,
 ) -> Result<
@@ -684,13 +714,13 @@ pub fn setup_restarting_mgr_std<I, OT, S, ST>(
 where
     I: Input,
     S: DeserializeOwned,
-    ST: Stats + Clone,
+    MT: Monitor + Clone,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
-        .stats(Some(stats))
+        .monitor(Some(monitor))
         .broker_port(broker_port)
         .configuration(configuration)
         .build()
@@ -703,13 +733,13 @@ where
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<I, OT, S, SP, ST>
+pub struct RestartingMgr<I, MT, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider + 'static,
-    ST: Stats,
+    MT: Monitor,
     //CE: CustomEvent<I>,
 {
     /// The shared memory provider to use for the broker or client spawned by the restarting
@@ -717,9 +747,9 @@ where
     shmem_provider: SP,
     /// The configuration
     configuration: EventConfig,
-    /// The stats to use
+    /// The monitor to use
     #[builder(default = None)]
-    stats: Option<ST>,
+    monitor: Option<MT>,
     /// The broker port to use
     #[builder(default = 1337_u16)]
     broker_port: u16,
@@ -729,19 +759,19 @@ where
     /// The type of manager to build
     #[builder(default = ManagerKind::Any)]
     kind: ManagerKind,
-    #[builder(setter(skip), default = PhantomData {})]
-    _phantom: PhantomData<(I, OT, S)>,
+    #[builder(setter(skip), default = PhantomData)]
+    phantom_data: PhantomData<(I, OT, S)>,
 }
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<I, OT, S, SP, ST> RestartingMgr<I, OT, S, SP, ST>
+impl<I, MT, OT, S, SP> RestartingMgr<I, MT, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider,
-    ST: Stats + Clone,
+    MT: Monitor + Clone,
 {
     /// Launch the restarting manager
     pub fn launch(
@@ -751,7 +781,7 @@ where
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
-            let broker_things = |mut broker: LlmpEventBroker<I, SP, ST>, remote_broker_addr| {
+            let broker_things = |mut broker: LlmpEventBroker<I, MT, SP>, remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     println!("B2b: Connecting to {:?}", &remote_broker_addr);
                     broker.connect_b2b(remote_broker_addr)?;
@@ -760,16 +790,16 @@ where
                 broker.broker_loop()
             };
 
-            // We get here if we are on Unix, or we are a broker on Windows.
+            // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
                 ManagerKind::Any => {
                     let connection =
                         LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
-                            let event_broker = LlmpEventBroker::<I, SP, ST>::new(
+                            let event_broker = LlmpEventBroker::<I, MT, SP>::new(
                                 broker,
-                                self.stats.take().unwrap(),
+                                self.monitor.take().unwrap(),
                             )?;
 
                             // Yep, broker. Just loop here.
@@ -789,9 +819,9 @@ where
                     }
                 }
                 ManagerKind::Broker => {
-                    let event_broker = LlmpEventBroker::<I, SP, ST>::new_on_port(
+                    let event_broker = LlmpEventBroker::<I, MT, SP>::new_on_port(
                         self.shmem_provider.clone(),
-                        self.stats.take().unwrap(),
+                        self.monitor.take().unwrap(),
                         self.broker_port,
                     )?;
 
@@ -831,7 +861,7 @@ where
                 dbg!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
-                #[cfg(unix)]
+                #[cfg(all(unix, feature = "fork"))]
                 let child_status = {
                     self.shmem_provider.pre_fork()?;
                     match unsafe { fork() }? {
@@ -846,14 +876,17 @@ where
                     }
                 };
 
-                // On windows, we spawn ourself again
-                #[cfg(windows)]
+                // On windows (or in any case without fork), we spawn ourself again
+                #[cfg(any(windows, not(feature = "fork")))]
                 let child_status = startable_self()?.status()?;
+                #[cfg(all(unix, not(feature = "fork")))]
+                let child_status = child_status.code().unwrap_or_default();
 
                 compiler_fence(Ordering::SeqCst);
 
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
+                    #[allow(clippy::manual_assert)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
@@ -861,7 +894,7 @@ where
                     }
 
                     // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! (Child exited with: {})", child_status);
+                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {})", child_status);
                 }
 
                 ctr = ctr.wrapping_add(1);
@@ -880,8 +913,6 @@ where
         if let Some(core_id) = core_id {
             core_affinity::set_for_current(core_id);
         }
-
-        println!("We're a client, let's fuzz :)");
 
         // If we're restarting, deserialize the old state.
         let (state, mut mgr) = if let Some((state, mgr_description)) = staterestorer.restore()? {

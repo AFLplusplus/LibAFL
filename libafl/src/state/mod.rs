@@ -19,7 +19,7 @@ use crate::{
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::Input,
-    stats::ClientPerfStats,
+    monitors::ClientPerfMonitor,
     Error,
 };
 
@@ -71,13 +71,19 @@ where
     fn rand_mut(&mut self) -> &mut R;
 }
 
-/// Trait for offering a [`ClientPerfStats`]
-pub trait HasClientPerfStats {
-    /// [`ClientPerfStats`] itself
-    fn introspection_stats(&self) -> &ClientPerfStats;
+/// Trait for offering a [`ClientPerfMonitor`]
+pub trait HasClientPerfMonitor {
+    /// [`ClientPerfMonitor`] itself
+    fn introspection_monitor(&self) -> &ClientPerfMonitor;
 
-    /// Mutatable ref to [`ClientPerfStats`]
-    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats;
+    /// Mutatable ref to [`ClientPerfMonitor`]
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
+
+    /// This node's stability
+    fn stability(&self) -> &Option<f32>;
+
+    /// This node's stability (mut)
+    fn stability_mut(&mut self) -> &mut Option<f32>;
 }
 
 /// Trait for elements offering metadata
@@ -163,10 +169,12 @@ where
     metadata: SerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
+    /// The stability of the current fuzzing process
+    stability: Option<f32>,
 
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
-    introspection_stats: ClientPerfStats,
+    introspection_monitor: ClientPerfMonitor,
 
     phantom: PhantomData<I>,
 }
@@ -411,7 +419,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(
@@ -446,7 +454,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
     }
@@ -461,7 +469,7 @@ where
     ) -> Result<(), Error>
     where
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
@@ -487,7 +495,7 @@ where
     where
         G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -525,7 +533,7 @@ where
     where
         G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
     }
@@ -542,7 +550,7 @@ where
     where
         G: Generator<I, Self>,
         Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I, Self>,
+        EM: EventFirer<I>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
@@ -552,6 +560,7 @@ where
         Self {
             rand,
             executions: 0,
+            stability: None,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             corpus,
@@ -559,14 +568,14 @@ where
             solutions,
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
-            introspection_stats: ClientPerfStats::new(),
+            introspection_monitor: ClientPerfMonitor::new(),
             phantom: PhantomData,
         }
     }
 }
 
 #[cfg(feature = "introspection")]
-impl<C, FT, I, R, SC> HasClientPerfStats for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -574,17 +583,29 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    fn introspection_stats(&self) -> &ClientPerfStats {
-        &self.introspection_stats
+    fn introspection_monitor(&self) -> &ClientPerfMonitor {
+        &self.introspection_monitor
     }
 
-    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
-        &mut self.introspection_stats
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+        &mut self.introspection_monitor
+    }
+
+    /// This node's stability
+    #[inline]
+    fn stability(&self) -> &Option<f32> {
+        &self.stability
+    }
+
+    /// This node's stability (mut)
+    #[inline]
+    fn stability_mut(&mut self) -> &mut Option<f32> {
+        &mut self.stability
     }
 }
 
 #[cfg(not(feature = "introspection"))]
-impl<C, FT, I, R, SC> HasClientPerfStats for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -592,12 +613,24 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    fn introspection_stats(&self) -> &ClientPerfStats {
+    fn introspection_monitor(&self) -> &ClientPerfMonitor {
         unimplemented!()
     }
 
-    fn introspection_stats_mut(&mut self) -> &mut ClientPerfStats {
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         unimplemented!()
+    }
+
+    /// This node's stability
+    #[inline]
+    fn stability(&self) -> &Option<f32> {
+        &self.stability
+    }
+
+    /// This node's stability (mut)
+    #[inline]
+    fn stability_mut(&mut self) -> &mut Option<f32> {
+        &mut self.stability
     }
 }
 

@@ -9,6 +9,11 @@ pub mod concolic;
 #[cfg(feature = "std")]
 pub use concolic::ConcolicFeedback;
 
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +24,7 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     observers::{ObserversTuple, TimeObserver},
-    state::HasClientPerfStats,
+    state::HasClientPerfMonitor,
     Error,
 };
 
@@ -31,7 +36,7 @@ use core::{marker::PhantomData, time::Duration};
 pub trait Feedback<I, S>: Named
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// `is_interesting ` return if an input is worth the addition to the corpus
     fn is_interesting<EM, OT>(
@@ -43,7 +48,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>;
 
     #[cfg(feature = "introspection")]
@@ -57,7 +62,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         // Start a timer for this feedback
@@ -71,7 +76,7 @@ where
 
         // Add this stat to the feedback metrics
         state
-            .introspection_stats_mut()
+            .introspection_monitor_mut()
             .update_feedback(self.name(), elapsed);
 
         ret
@@ -131,7 +136,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     pub first: A,
     pub second: B,
@@ -145,7 +150,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name(&self) -> &str {
         self.name.as_ref()
@@ -158,7 +163,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     pub fn new(first: A, second: B) -> Self {
         let name = format!("{} ({},{})", FL::name(), first.name(), second.name());
@@ -177,7 +182,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -188,7 +193,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         FL::is_pair_interesting(
@@ -212,7 +217,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         FL::is_pair_interesting_introspection(
@@ -244,7 +249,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str;
 
@@ -258,7 +263,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>;
 
     #[cfg(feature = "introspection")]
@@ -273,7 +278,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>;
 }
 
@@ -287,7 +292,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str {
         "Eager OR"
@@ -303,7 +308,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -322,7 +327,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
@@ -338,7 +343,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str {
         "Fast OR"
@@ -354,7 +359,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -376,7 +381,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
@@ -395,7 +400,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str {
         "Eager AND"
@@ -411,7 +416,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -430,7 +435,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
@@ -446,7 +451,7 @@ where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn name() -> &'static str {
         "Fast AND"
@@ -462,7 +467,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -484,7 +489,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
@@ -521,7 +526,7 @@ pub struct NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// The feedback to invert
     pub first: A,
@@ -534,7 +539,7 @@ impl<A, I, S> Feedback<I, S> for NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -545,7 +550,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         Ok(!self
@@ -568,7 +573,7 @@ impl<A, I, S> Named for NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -580,7 +585,7 @@ impl<A, I, S> NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
@@ -648,7 +653,7 @@ macro_rules! feedback_not {
 impl<I, S> Feedback<I, S> for ()
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -659,7 +664,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         Ok(false)
@@ -680,7 +685,7 @@ pub struct CrashFeedback {}
 impl<I, S> Feedback<I, S> for CrashFeedback
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -691,7 +696,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         if let ExitKind::Crash = exit_kind {
@@ -730,7 +735,7 @@ pub struct TimeoutFeedback {}
 impl<I, S> Feedback<I, S> for TimeoutFeedback
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -741,7 +746,7 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         if let ExitKind::Timeout = exit_kind {
@@ -785,7 +790,7 @@ pub struct TimeFeedback {
 impl<I, S> Feedback<I, S> for TimeFeedback
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -796,7 +801,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         // TODO Replace with match_name_type when stable

@@ -142,9 +142,7 @@ macro_rules! create_serde_registry_for_trait {
                 where
                     T: $trait_name + Serialize + serde::de::DeserializeOwned,
                 {
-                    if self.finalized {
-                        panic!("Registry is already finalized!");
-                    }
+                    assert!(!self.finalized, "Registry is already finalized!");
 
                     let deserializers = self.deserializers.get_or_insert_with(HashMap::default);
                     deserializers.insert(unpack_type_id(TypeId::of::<T>()), |de| {

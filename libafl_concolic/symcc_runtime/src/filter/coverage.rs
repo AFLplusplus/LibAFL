@@ -1,6 +1,5 @@
 use std::{
     collections::hash_map::DefaultHasher,
-    convert::TryInto,
     hash::{BuildHasher, BuildHasherDefault, Hash, Hasher},
     marker::PhantomData,
 };

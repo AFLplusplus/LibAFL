@@ -5,7 +5,7 @@ use libafl::{
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
-    state::{HasClientPerfStats, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
 };
 
@@ -39,7 +39,7 @@ pub struct PacketLenFeedback {
 
 impl<S> Feedback<PacketData, S> for PacketLenFeedback
 where
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -50,7 +50,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<PacketData, S>,
+        EM: EventFirer<PacketData>,
         OT: ObserversTuple<PacketData, S>,
     {
         self.len = input.length;

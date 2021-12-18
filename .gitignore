@@ -1,7 +1,9 @@
 target
 out
 Cargo.lock
+vendor
 
+.DS_Store
 .env
 
 *.o
@@ -35,3 +37,5 @@ AFLplusplus
 a
 
 forkserver_test
+__pycache__
+*.lafl_lock

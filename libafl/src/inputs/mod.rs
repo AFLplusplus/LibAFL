@@ -9,6 +9,11 @@ pub use encoded::*;
 pub mod gramatron;
 pub use gramatron::*;
 
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -89,15 +94,4 @@ pub trait HasBytesVec {
     fn bytes(&self) -> &[u8];
     /// The internal bytes map (as mutable borrow)
     fn bytes_mut(&mut self) -> &mut Vec<u8>;
-}
-
-/// Has a length field
-pub trait HasLen {
-    /// The length
-    fn len(&self) -> usize;
-
-    /// Returns `true` if it has no elements.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }

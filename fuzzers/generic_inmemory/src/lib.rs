@@ -1,15 +1,15 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The `launcher` will spawn new processes for each cpu core.
 
-use clap::{load_yaml, App};
 use core::time::Duration;
-use std::{env, path::PathBuf};
+use std::{env, net::SocketAddr, path::PathBuf};
+use structopt::StructOpt;
 
 use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::parse_core_bind_arg,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -25,18 +25,99 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::{I2SRandReplace, Tokens},
+    monitors::MultiMonitor,
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::{I2SRandReplace, Tokens},
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
+    Error,
 };
 
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,
 };
+
+/// Parses a millseconds int into a [`Duration`], used for commandline arg parsing
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
+
+#[derive(Debug, StructOpt)]
+#[structopt(
+    name = "generic_inmemory",
+    about = "A generic libfuzzer-like fuzzer with llmp-multithreading support",
+    author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+)]
+struct Opt {
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str = Cores::from_cmdline),
+        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+        name = "CORES"
+    )]
+    cores: Cores,
+
+    #[structopt(
+        short = "p",
+        long,
+        help = "Choose the broker TCP port, default is 1337",
+        name = "PORT"
+    )]
+    broker_port: u16,
+
+    #[structopt(
+        parse(try_from_str),
+        short = "a",
+        long,
+        help = "Specify a remote broker",
+        name = "REMOTE"
+    )]
+    remote_broker_addr: Option<SocketAddr>,
+
+    #[structopt(
+        parse(try_from_str),
+        short,
+        long,
+        help = "Set an initial corpus directory",
+        name = "INPUT"
+    )]
+    input: Vec<PathBuf>,
+
+    #[structopt(
+        short,
+        long,
+        parse(try_from_str),
+        help = "Set the output directory, default is ./out",
+        name = "OUTPUT",
+        default_value = "./out"
+    )]
+    output: PathBuf,
+
+    #[structopt(
+        parse(try_from_str = timeout_from_millis_str),
+        short,
+        long,
+        help = "Set the exeucution timeout in milliseconds, default is 1000",
+        name = "TIMEOUT",
+        default_value = "1000"
+    )]
+    timeout: Duration,
+
+    #[structopt(
+        parse(from_os_str),
+        short = "x",
+        long,
+        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
+        name = "TOKENS",
+        multiple = true
+    )]
+    tokens: Vec<PathBuf>,
+}
 
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
@@ -47,41 +128,22 @@ pub fn libafl_main() {
 
     let workdir = env::current_dir().unwrap();
 
-    let yaml = load_yaml!("clap-config.yaml");
-    let matches = App::from(yaml).get_matches();
+    let opt = Opt::from_args();
 
-    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
-        .expect("No valid core count given!");
-    let broker_port = matches
-        .value_of("broker_port")
-        .map(|s| s.parse().expect("Invalid broker port"))
-        .unwrap_or(1337);
-    let remote_broker_addr = matches
-        .value_of("remote_broker_addr")
-        .map(|s| s.parse().expect("Invalid broker address"));
-    let input_dirs: Vec<PathBuf> = matches
-        .values_of("input")
-        .map(|v| v.map(PathBuf::from).collect())
-        .unwrap_or_default();
-    let output_dir = matches
-        .value_of("output")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| workdir.clone());
-    let token_files: Vec<&str> = matches
-        .values_of("tokens")
-        .map(|v| v.collect())
-        .unwrap_or_default();
-    let timeout_ms = matches
-        .value_of("timeout")
-        .map(|s| s.parse().expect("Invalid timeout"))
-        .unwrap_or(10000);
+    let cores = opt.cores;
+    let broker_port = opt.broker_port;
+    let remote_broker_addr = opt.remote_broker_addr;
+    let input_dirs = opt.input;
+    let output_dir = opt.output;
+    let token_files = opt.tokens;
+    let timeout_ms = opt.timeout;
     // let cmplog_enabled = matches.is_present("cmplog");
 
     println!("Workdir: {:?}", workdir.to_string_lossy().to_string());
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
@@ -156,7 +218,7 @@ pub fn libafl_main() {
                 &mut state,
                 &mut mgr,
             )?,
-            Duration::from_millis(timeout_ms),
+            timeout_ms,
         );
 
         // Secondary harness due to mut ownership
@@ -230,10 +292,10 @@ pub fn libafl_main() {
         Ok(())
     };
 
-    Launcher::builder()
+    match Launcher::builder()
         .shmem_provider(shmem_provider)
         .configuration(EventConfig::from_name("default"))
-        .stats(stats)
+        .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
         .broker_port(broker_port)
@@ -241,5 +303,8 @@ pub fn libafl_main() {
         //.stdout_file(Some("/dev/null"))
         .build()
         .launch()
-        .expect("Launcher failed");
+    {
+        Ok(_) | Err(Error::ShuttingDown) => (),
+        Err(e) => panic!("{:?}", e),
+    };
 }

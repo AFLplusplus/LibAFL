@@ -3,7 +3,7 @@
 use crate::{
     bolts::current_time,
     corpus::{Corpus, CorpusScheduler, Testcase},
-    events::{Event, EventConfig, EventFirer, EventManager},
+    events::{Event, EventConfig, EventFirer, EventManager, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
@@ -11,20 +11,18 @@ use crate::{
     observers::ObserversTuple,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfStats, HasCorpus, HasExecutions, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     Error,
 };
 
 #[cfg(feature = "introspection")]
-use crate::stats::PerfFeature;
-#[cfg(feature = "introspection")]
-use alloc::boxed::Box;
+use crate::monitors::PerfFeature;
 
 use alloc::string::ToString;
 use core::{marker::PhantomData, time::Duration};
 
-/// Send a stats update all 3 (or more) seconds
-const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_millis(3 * 1000);
+/// Send a monitor update all 15 (or more) seconds
+const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
 pub trait HasCorpusScheduler<CS, I, S>
@@ -44,7 +42,7 @@ pub trait HasFeedback<F, I, S>
 where
     F: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// The feedback
     fn feedback(&self) -> &F;
@@ -58,7 +56,7 @@ pub trait HasObjective<I, OF, S>
 where
     OF: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     /// The objective feedback
     fn objective(&self) -> &OF;
@@ -84,7 +82,7 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        EM: EventFirer<I, S>;
+        EM: EventFirer<I>;
 }
 
 /// Evaluate an input modyfing the state of the fuzzer
@@ -148,7 +146,12 @@ pub trait Evaluator<E, EM, I, S> {
 }
 
 /// The main fuzzer trait.
-pub trait Fuzzer<E, EM, I, S, ST> {
+pub trait Fuzzer<E, EM, I, S, ST>
+where
+    I: Input,
+    EM: ProgressReporter<I>,
+    S: HasExecutions + HasClientPerfMonitor,
+{
     /// Fuzz for a single iteration
     /// Returns the index of the last fuzzed corpus item
     ///
@@ -172,10 +175,10 @@ pub trait Fuzzer<E, EM, I, S, ST> {
         manager: &mut EM,
     ) -> Result<usize, Error> {
         let mut last = current_time();
-        let stats_timeout = STATS_TIMEOUT_DEFAULT;
+        let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
             self.fuzz_one(stages, executor, state, manager)?;
-            last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
+            last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
     }
 
@@ -188,8 +191,8 @@ pub trait Fuzzer<E, EM, I, S, ST> {
     fn fuzz_loop_for(
         &mut self,
         stages: &mut ST,
-        state: &mut S,
         executor: &mut E,
+        state: &mut S,
         manager: &mut EM,
         iters: u64,
     ) -> Result<usize, Error> {
@@ -201,11 +204,11 @@ pub trait Fuzzer<E, EM, I, S, ST> {
 
         let mut ret = 0;
         let mut last = current_time();
-        let stats_timeout = STATS_TIMEOUT_DEFAULT;
+        let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
         for _ in 0..iters {
             ret = self.fuzz_one(stages, executor, state, manager)?;
-            last = Self::maybe_report_stats(state, manager, last, stats_timeout)?;
+            last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
 
         // If we would assume the fuzzer loop will always exit after this, we could do this here:
@@ -215,16 +218,6 @@ pub trait Fuzzer<E, EM, I, S, ST> {
 
         Ok(ret)
     }
-
-    /// Given the last time, if `stats_timeout` seconds passed, send off an info/stats/heartbeat message to the broker.
-    /// Returns the new `last` time (so the old one, unless `stats_timeout` time has passed and stats have been sent)
-    /// Will return an [`crate::Error`], if the stats could not be sent.
-    fn maybe_report_stats(
-        state: &mut S,
-        manager: &mut EM,
-        last: Duration,
-        stats_timeout: Duration,
-    ) -> Result<Duration, Error>;
 }
 
 #[derive(Debug, PartialEq)]
@@ -242,7 +235,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     scheduler: CS,
     feedback: F,
@@ -257,7 +250,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn scheduler(&self) -> &CS {
         &self.scheduler
@@ -274,7 +267,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn feedback(&self) -> &F {
         &self.feedback
@@ -291,7 +284,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn objective(&self) -> &OF {
         &self.objective
@@ -312,7 +305,7 @@ where
     I: Input,
     OF: Feedback<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats + HasExecutions,
+    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -325,7 +318,7 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
     {
         let mut res = ExecuteInputResult::None;
 
@@ -368,7 +361,7 @@ where
                 self.objective_mut().discard_metadata(state, &input)?;
 
                 // Add the input to the main corpus
-                let mut testcase = Testcase::new(input.clone());
+                let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
                 self.feedback_mut().append_metadata(state, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
@@ -385,7 +378,7 @@ where
                         Event::NewTestcase {
                             input,
                             observers_buf,
-                            exit_kind: exit_kind.clone(),
+                            exit_kind: *exit_kind,
                             corpus_size: state.corpus().count(),
                             client_config: manager.configuration(),
                             time: current_time(),
@@ -400,7 +393,7 @@ where
                 self.feedback_mut().discard_metadata(state, &input)?;
 
                 // The input is a solution, add it to the respective corpus
-                let mut testcase = Testcase::new(input);
+                let mut testcase = Testcase::with_executions(input, *state.executions());
                 self.objective_mut().append_metadata(state, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
@@ -428,7 +421,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
+    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
     SC: Corpus<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
@@ -462,7 +455,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfStats,
+    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
     SC: Corpus<I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
@@ -494,7 +487,7 @@ where
         self.objective_mut().discard_metadata(state, &input)?;
 
         // Add the input to the main corpus
-        let mut testcase = Testcase::new(input.clone());
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
         self.feedback_mut().append_metadata(state, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
@@ -527,58 +520,10 @@ where
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
-    S: HasExecutions + HasClientPerfStats,
+    S: HasClientPerfMonitor + HasExecutions,
     OF: Feedback<I, S>,
     ST: StagesTuple<E, EM, S, Self>,
 {
-    #[inline]
-    fn maybe_report_stats(
-        state: &mut S,
-        manager: &mut EM,
-        last: Duration,
-        stats_timeout: Duration,
-    ) -> Result<Duration, Error> {
-        let cur = current_time();
-        // default to 0 here to avoid crashes on clock skew
-        if cur.checked_sub(last).unwrap_or_default() > stats_timeout {
-            // Default no introspection implmentation
-            #[cfg(not(feature = "introspection"))]
-            manager.fire(
-                state,
-                Event::UpdateStats {
-                    executions: *state.executions(),
-                    time: cur,
-                    phantom: PhantomData,
-                },
-            )?;
-
-            // If performance stats are requested, fire the `UpdatePerfStats` event
-            #[cfg(feature = "introspection")]
-            {
-                state
-                    .introspection_stats_mut()
-                    .set_current_time(crate::bolts::cpu::read_time_counter());
-
-                // Send the current stats over to the manager. This `.clone` shouldn't be
-                // costly as `ClientPerfStats` impls `Copy` since it only contains `u64`s
-                manager.fire(
-                    state,
-                    Event::UpdatePerfStats {
-                        executions: *state.executions(),
-                        time: cur,
-                        introspection_stats: Box::new(state.introspection_stats().clone()),
-                        phantom: PhantomData,
-                    },
-                )?;
-            }
-
-            Ok(cur)
-        } else {
-            if cur.as_millis() % 1000 == 0 {}
-            Ok(last)
-        }
-    }
-
     fn fuzz_one(
         &mut self,
         stages: &mut ST,
@@ -588,32 +533,32 @@ where
     ) -> Result<usize, Error> {
         // Init timer for scheduler
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().start_timer();
+        state.introspection_monitor_mut().start_timer();
 
         // Get the next index from the scheduler
         let idx = self.scheduler.next(state)?;
 
         // Mark the elapsed time for the scheduler
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().mark_scheduler_time();
+        state.introspection_monitor_mut().mark_scheduler_time();
 
         // Mark the elapsed time for the scheduler
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().reset_stage_index();
+        state.introspection_monitor_mut().reset_stage_index();
 
         // Execute all stages
         stages.perform_all(self, executor, state, manager, idx)?;
 
         // Init timer for manager
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().start_timer();
+        state.introspection_monitor_mut().start_timer();
 
         // Execute the manager
         manager.process(self, state, executor)?;
 
         // Mark the elapsed time for the manager
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().mark_manager_time();
+        state.introspection_monitor_mut().mark_manager_time();
 
         Ok(idx)
     }
@@ -625,7 +570,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasClientPerfStats,
+    S: HasExecutions + HasClientPerfMonitor,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
@@ -666,6 +611,65 @@ where
         Ok(exit_kind)
     }
 }
+
+pub trait ExecutesInput<I, OT, S, Z>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    /// Runs the input and triggers observers and feedback
+    fn execute_input<E, EM>(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error>
+    where
+        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+        OT: ObserversTuple<I, S>;
+}
+
+impl<C, CS, F, I, OF, OT, S, SC> ExecutesInput<I, OT, S, Self>
+    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+where
+    CS: CorpusScheduler<I, S>,
+    F: Feedback<I, S>,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    OF: Feedback<I, S>,
+    S: HasExecutions + HasClientPerfMonitor,
+{
+    /// Runs the input and triggers observers and feedback
+    fn execute_input<E, EM>(
+        &mut self,
+        state: &mut S,
+        executor: &mut E,
+        event_mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error>
+    where
+        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
+        OT: ObserversTuple<I, S>,
+    {
+        start_timer!(state);
+        executor.observers_mut().pre_exec_all(state, input)?;
+        mark_feature_time!(state, PerfFeature::PreExecObservers);
+
+        start_timer!(state);
+        let exit_kind = executor.run_target(self, state, event_mgr, input)?;
+        mark_feature_time!(state, PerfFeature::TargetExecution);
+
+        *state.executions_mut() += 1;
+
+        start_timer!(state);
+        executor.observers_mut().post_exec_all(state, input)?;
+        mark_feature_time!(state, PerfFeature::PostExecObservers);
+
+        Ok(exit_kind)
+    }
+}
+
 
 #[cfg(feature = "python")]
 pub mod pybind {

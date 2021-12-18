@@ -66,19 +66,18 @@ where
         let testcase = { self.inner.get(idx)? };
         if testcase.borrow().input().is_none() {
             let _ = testcase.borrow_mut().load_input()?;
-            let current = *self.current();
+            let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
                 let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
-                if let Some(cur) = current {
-                    if cur == removed {
-                        self.cached_indexes.borrow_mut().push_back(cur);
-                        if self.cache_max_len == 1 {
-                            break;
-                        }
-                        continue;
+                if let Ok(mut borrowed) = self.inner.get(removed)?.try_borrow_mut() {
+                    *borrowed.input_mut() = None;
+                } else {
+                    self.cached_indexes.borrow_mut().push_back(removed);
+                    borrowed_num += 1;
+                    if self.cache_max_len == borrowed_num {
+                        break;
                     }
                 }
-                *self.inner.get(removed)?.borrow_mut().input_mut() = None;
             }
             self.cached_indexes.borrow_mut().push_back(idx);
         }

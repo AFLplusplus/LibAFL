@@ -4,7 +4,12 @@
 
 Advanced Fuzzing Library - Slot your own fuzzers together and extend their features using Rust.
 
-LibAFL is written and maintained by Andrea Fioraldi <andreafioraldi@gmail.com> and Dominik Maier <mail@dmnk.co>.
+LibAFL is written and maintained by
+
+ * [Andrea Fioraldi](https://twitter.com/andreafioraldi) <andrea@aflplus.plus>
+ * [Dominik Maier](https://twitter.com/domenuk) <dominik@aflplus.plus>
+ * [s1341](https://twitter.com/srubenst1341) <github@shmarya.net>
+ * [Dongjia Zhang](https://github.com/tokatoka) <toka@aflplus.plus>
 
 ## Why LibAFL?
 
@@ -27,7 +32,7 @@ It offers a main crate that provide building blocks for custom fuzzers, [libafl]
 LibAFL offers integrations with popular instrumentation frameworks. At the moment, the supported backends are:
 
 + SanitizerCoverage, in [libafl_targets](./libafl_targets)
-+ Frida, in [libafl_frida](./libafl_frida), by s1341 <github@shmarya.net>
++ Frida, in [libafl_frida](./libafl_frida)
 + QEMU user-mode, in [libafl_qemu](./libafl_qemu)
 
 ## Getting started
@@ -69,11 +74,15 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 
 + [Installation guide](./docs/src/getting_started/setup.md)
 
-+ Our RC3 [talk](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO") explaining the core concepts
-
 + [Online API documentation](https://docs.rs/libafl/)
 
-+ The LibAFL book (very WIP) [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
++ The LibAFL book (WIP) [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
+
++ Our RC3 [talk](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO") explaining the core concepts
+
++ Our Fuzzcon Europe [talk](https://www.youtube.com/watch?v=PWB8GIhFAaI "LibAFL: The Advanced Fuzzing Library") with a (a bit but not so much outdated) step-by-step discussion on how to build some example fuzzers
+
++ The Fuzzing101 [solutions](https://github.com/epi052/fuzzing-101-solutions) & series of [blog posts](https://epi052.gitlab.io/notes-to-self/blog/2021-11-01-fuzzing-101-with-libafl/) by [epi](https://github.com/epi052)
 
 ## Contributing
 
@@ -82,7 +91,7 @@ Check the [TODO.md](./TODO.md) file for features that we plan to support.
 For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
 
 Even though we will gladly assist you in finishing up your PR, try to
-- use *stable* rust
+- keep all the crates compiling with *stable* rust (hide the eventual non-stable code under [`cfg`s](https://github.com/AFLplusplus/LibAFL/blob/main/libafl/build.rs#L26))
 - run `cargo fmt` on your code before pushing
 - check the output of `cargo clippy --all` or `./clippy.sh`
 - run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
@@ -104,3 +113,10 @@ for inclusion in this crate by you, as defined in the Apache-2.0 license, shall
 be dual licensed as above, without any additional terms or conditions.
 </sub>
 
+<br>
+
+<sub>
+Dependencies under more restrictive licenses, such as GPL or AGPL, can be enabled
+using the respective feature in each crate when it is present, such as the
+'agpl' feature of the libafl crate.
+</sub>

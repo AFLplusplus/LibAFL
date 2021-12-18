@@ -1,13 +1,65 @@
 use std::env;
 
+#[cfg(feature = "aarch64")]
 pub mod aarch64;
-pub mod amd64;
+#[cfg(all(feature = "aarch64", not(feature = "clippy")))]
+pub use aarch64::*;
+
+#[cfg(feature = "arm")]
 pub mod arm;
-pub mod x86;
+#[cfg(all(feature = "arm", not(feature = "clippy")))]
+pub use arm::*;
+
+#[cfg(feature = "i386")]
+pub mod i386;
+#[cfg(all(feature = "i386", not(feature = "clippy")))]
+pub use i386::*;
+
+// We default to x86_64, having a default makes CI easier :)
+#[cfg(any(
+    feature = "x86_64",
+    not(any(
+        feature = "arm",
+        feature = "aarch64",
+        feature = "i386",
+        feature = "x86_64"
+    ))
+))]
+pub mod x86_64;
+#[cfg(any(
+    feature = "x86_64",
+    not(any(
+        feature = "arm",
+        feature = "aarch64",
+        feature = "i386",
+        feature = "x86_64"
+    ))
+))]
+pub use x86_64::*;
 
 pub mod elf;
+
 #[cfg(target_os = "linux")]
-pub mod hooks;
+pub mod helper;
+#[cfg(target_os = "linux")]
+pub use helper::*;
+
+#[cfg(target_os = "linux")]
+pub mod edges;
+#[cfg(target_os = "linux")]
+pub use edges::QemuEdgeCoverageHelper;
+#[cfg(target_os = "linux")]
+pub mod cmplog;
+#[cfg(target_os = "linux")]
+pub use cmplog::QemuCmpLogHelper;
+#[cfg(target_os = "linux")]
+pub mod snapshot;
+#[cfg(target_os = "linux")]
+pub use snapshot::QemuSnapshotHelper;
+#[cfg(target_os = "linux")]
+pub mod asan;
+#[cfg(target_os = "linux")]
+pub use asan::{init_with_asan, QemuAsanHelper};
 
 #[cfg(target_os = "linux")]
 pub mod executor;
@@ -18,11 +70,6 @@ pub use executor::QemuExecutor;
 pub mod emu;
 #[cfg(target_os = "linux")]
 pub use emu::*;
-
-#[cfg(target_os = "linux")]
-pub mod helpers;
-#[cfg(target_os = "linux")]
-pub use helpers::*;
 
 #[must_use]
 pub fn filter_qemu_args() -> Vec<String> {
@@ -151,7 +198,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
                     if any.is_none() {
                         SyscallHookResult::new(None)
                     } else {
-                        let a: Result<&PyInt, _> = any.try_into();
+                        let a: Result<&PyInt, _> = any.cast_as();
                         if let Ok(i) = a {
                             SyscallHookResult::new(Some(
                                 i.extract().expect("Invalid syscall hook return value"),
@@ -195,19 +242,12 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
         emu::remove_hook(addr);
     }
 
-    let x86m = PyModule::new(py, "x86")?;
-    for r in x86::X86Regs::iter() {
+    let regsm = PyModule::new(py, "regs")?;
+    for r in Regs::iter() {
         let v: i32 = r.into();
-        x86m.add(&format!("{:?}", r), v)?;
+        regsm.add(&format!("{:?}", r), v)?;
     }
-    m.add_submodule(x86m)?;
-
-    let amd64m = PyModule::new(py, "amd64")?;
-    for r in amd64::Amd64Regs::iter() {
-        let v: i32 = r.into();
-        amd64m.add(&format!("{:?}", r), v)?;
-    }
-    m.add_submodule(amd64m)?;
+    m.add_submodule(regsm)?;
 
     let mmapm = PyModule::new(py, "mmap")?;
     for r in emu::MmapPerms::iter() {

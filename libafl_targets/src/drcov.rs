@@ -45,7 +45,7 @@ impl<'a> DrCovWriter<'a> {
     ) -> Self {
         Self {
             writer: BufWriter::new(
-                File::create(path).expect("unable to create file for coverage data"),
+                File::create(path).expect("Unable to create file for coverage data"),
             ),
             module_mapping,
             basic_blocks,

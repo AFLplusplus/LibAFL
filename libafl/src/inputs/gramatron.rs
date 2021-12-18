@@ -5,10 +5,7 @@ use alloc::{rc::Rc, string::String, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    inputs::{HasLen, Input},
-    Error,
-};
+use crate::{bolts::HasLen, inputs::Input, Error};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Terminal {

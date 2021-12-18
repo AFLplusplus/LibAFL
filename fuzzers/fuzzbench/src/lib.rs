@@ -22,22 +22,28 @@ use libafl::{
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
-    corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{
+        Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
+    },
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{AflMapFeedback, CrashFeedback, MapFeedbackState, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::{
         scheduled::{havoc_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
         tokens_mutations, Tokens,
     },
-    observers::{StdMapObserver, TimeObserver},
-    stages::{StdMutationalStage, TracingStage},
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    stages::{
+        calibrate::CalibrationStage,
+        power::{PowerMutationalStage, PowerSchedule},
+        StdMutationalStage, TracingStage,
+    },
     state::{HasCorpus, HasMetadata, StdState},
-    stats::SimpleStats,
     Error,
 };
 use libafl_targets::{
@@ -58,14 +64,14 @@ pub fn libafl_main() {
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
             Arg::new("out")
-                .about("The directory to place finds in ('corpus')")
+                .help("The directory to place finds in ('corpus')")
                 .required(true)
                 .index(1)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
-                .about("The directory to read initial inputs from ('seeds')")
+                .help("The directory to read initial inputs from ('seeds')")
                 .required(true)
                 .index(2)
                 .takes_value(true),
@@ -74,21 +80,21 @@ pub fn libafl_main() {
             Arg::new("tokens")
                 .short('x')
                 .long("tokens")
-                .about("A file to read tokens from, to be used during fuzzing")
+                .help("A file to read tokens from, to be used during fuzzing")
                 .takes_value(true),
         )
         .arg(
             Arg::new("logfile")
                 .short('l')
                 .long("logfile")
-                .about("Duplicates all output to this file")
+                .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
         )
         .arg(
             Arg::new("timeout")
                 .short('t')
                 .long("timeout")
-                .about("Timeout for each individual execution, in milliseconds")
+                .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
         )
         .try_get_matches()
@@ -171,7 +177,7 @@ fn fuzz(
     let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = SimpleStats::new(|s| {
+    let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
         #[cfg(windows)]
@@ -183,7 +189,8 @@ fn fuzz(
     // This way, we are able to continue fuzzing afterwards.
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,
         Err(err) => match err {
@@ -199,7 +206,7 @@ fn fuzz(
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
-    let edges_observer = StdMapObserver::new("edges", edges);
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -214,7 +221,7 @@ fn fuzz(
     // This one is composed by two Feedbacks in OR
     let feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        AflMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
@@ -247,8 +254,14 @@ fn fuzz(
         println!("Warning: LLVMFuzzerInitialize failed with -1")
     }
 
+    let calibration = CalibrationStage::new(&mut state, &edges_observer);
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+
+    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
+
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    //let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -296,7 +309,7 @@ fn fuzz(
     let mutational = StdMutationalStage::new(mutator);
 
     // The order of the stages matter!
-    let mut stages = tuple_list!(tracing, i2s, mutational);
+    let mut stages = tuple_list!(calibration, tracing, i2s, mutational, power);
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
@@ -323,6 +336,7 @@ fn fuzz(
         dup2(null_fd, io::stdout().as_raw_fd())?;
         dup2(null_fd, io::stderr().as_raw_fd())?;
     }
+
     // reopen file to make sure we're at the end
     log.replace(
         OpenOptions::new()

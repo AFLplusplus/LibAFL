@@ -31,6 +31,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, Tokens,
@@ -42,7 +43,6 @@ use libafl::{
         TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
-    stats::SimpleStats,
     Error,
 };
 use libafl_targets::{
@@ -63,14 +63,14 @@ pub fn libafl_main() {
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
             Arg::new("out")
-                .about("The directory to place finds in ('corpus')")
+                .help("The directory to place finds in ('corpus')")
                 .required(true)
                 .index(1)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
-                .about("The directory to read initial inputs from ('seeds')")
+                .help("The directory to read initial inputs from ('seeds')")
                 .required(true)
                 .index(2)
                 .takes_value(true),
@@ -79,21 +79,21 @@ pub fn libafl_main() {
             Arg::new("tokens")
                 .short('x')
                 .long("tokens")
-                .about("A file to read tokens from, to be used during fuzzing")
+                .help("A file to read tokens from, to be used during fuzzing")
                 .takes_value(true),
         )
         .arg(
             Arg::new("logfile")
                 .short('l')
                 .long("logfile")
-                .about("Duplicates all output to this file")
+                .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
         )
         .arg(
             Arg::new("timeout")
                 .short('t')
                 .long("timeout")
-                .about("Timeout for each individual execution, in milliseconds")
+                .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
         )
         .try_get_matches()
@@ -175,8 +175,8 @@ fn fuzz(
     #[cfg(unix)]
     let file_null = File::open("/dev/null")?;
 
-    // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = SimpleStats::new(|s| {
+    // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
+    let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
         #[cfg(windows)]
@@ -188,7 +188,8 @@ fn fuzz(
     // This way, we are able to continue fuzzing afterwards.
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,
         Err(err) => match err {

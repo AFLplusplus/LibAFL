@@ -16,17 +16,48 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
+    monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
-    stats::SimpleStats,
 };
 use std::path::PathBuf;
 
+use clap::{App, Arg};
+
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let corpus_dirs = vec![PathBuf::from("./corpus")];
+    let res = App::new("forkserver_simple")
+        .about("Example Forkserver fuzer")
+        .arg(
+            Arg::new("executable")
+                .help("The instrumented binary we want to fuzz")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("in")
+                .help("The directory to read initial inputs from ('seeds')")
+                .required(true)
+                .takes_value(true),
+        )
+        .arg(
+            Arg::new("timeout")
+                .help("Timeout for each individual execution, in milliseconds")
+                .short('t')
+                .long("timeout")
+                .default_value("1200"),
+        )
+        .arg(
+            Arg::new("arguments")
+                .help("Arguments passed to the target")
+                .setting(clap::ArgSettings::MultipleValues)
+                .takes_value(true),
+        )
+        .get_matches();
+
+    let corpus_dirs = vec![PathBuf::from(res.value_of("in").unwrap().to_string())];
 
     const MAP_SIZE: usize = 65536;
 
@@ -83,12 +114,12 @@ pub fn main() {
         tuple_list!(feedback_state, objective_state),
     );
 
-    // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| println!("{}", s));
+    // The Monitor trait define how the fuzzer stats are reported to the user
+    let monitor = SimpleMonitor::new(|s| println!("{}", s));
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(stats);
+    let mut mgr = SimpleEventManager::new(monitor);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
@@ -97,15 +128,26 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for the forkserver
+    let args = match res.values_of("arguments") {
+        Some(vec) => vec.map(|s| s.to_string()).collect::<Vec<String>>().to_vec(),
+        None => [].to_vec(),
+    };
+
     let mut executor = TimeoutForkserverExecutor::new(
         ForkserverExecutor::new(
-            "./target/release/program".to_string(),
-            &[],
+            res.value_of("executable").unwrap().to_string(),
+            &args,
             true,
             tuple_list!(edges_observer, time_observer),
         )
         .unwrap(),
-        Duration::from_millis(5000),
+        Duration::from_millis(
+            res.value_of("timeout")
+                .unwrap()
+                .to_string()
+                .parse()
+                .expect("Could not parse timeout in milliseconds"),
+        ),
     )
     .expect("Failed to create the executor.");
 

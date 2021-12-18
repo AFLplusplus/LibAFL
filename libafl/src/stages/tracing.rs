@@ -1,4 +1,6 @@
-use core::{marker::PhantomData, mem::drop};
+//! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
+
+use core::marker::PhantomData;
 
 use crate::{
     corpus::Corpus,
@@ -8,12 +10,12 @@ use crate::{
     observers::ObserversTuple,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfStats, HasCorpus, HasExecutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions},
     Error,
 };
 
 #[cfg(feature = "introspection")]
-use crate::stats::PerfFeature;
+use crate::monitors::PerfFeature;
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
@@ -23,7 +25,7 @@ where
     C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     tracer_executor: TE,
     #[allow(clippy::type_complexity)]
@@ -36,7 +38,7 @@ where
     C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     #[inline]
     fn perform(
@@ -63,10 +65,9 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        drop(
-            self.tracer_executor
-                .run_target(fuzzer, state, manager, &input)?,
-        );
+        let _ = self
+            .tracer_executor
+            .run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -87,7 +88,7 @@ where
     C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
@@ -117,7 +118,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     #[inline]
     fn perform(
@@ -145,7 +146,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        drop(executor.run_target(fuzzer, state, manager, &input)?);
+        let _ = executor.run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -168,7 +169,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfStats + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {

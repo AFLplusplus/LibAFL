@@ -13,11 +13,11 @@ use serde::{Deserialize, Serialize};
 use std::{ffi::c_void, io};
 
 use crate::{
-    asan_errors::{AsanError, AsanErrors},
+    asan::errors::{AsanError, AsanErrors},
     FridaOptions,
 };
 
-pub(crate) struct Allocator {
+pub struct Allocator {
     #[allow(dead_code)]
     options: FridaOptions,
     page_size: usize,
@@ -27,11 +27,8 @@ pub(crate) struct Allocator {
     allocations: HashMap<usize, AllocationMetadata>,
     shadow_pages: RangeSet<usize>,
     allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
-    #[cfg(target_arch = "aarch64")]
     largest_allocation: usize,
-    #[cfg(target_arch = "aarch64")]
     base_mapping_addr: usize,
-    #[cfg(target_arch = "aarch64")]
     current_mapping_addr: usize,
 }
 
@@ -47,7 +44,7 @@ macro_rules! map_to_shadow {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-pub(crate) struct AllocationMetadata {
+pub struct AllocationMetadata {
     pub address: usize,
     pub size: usize,
     pub actual_size: usize,
@@ -58,16 +55,30 @@ pub(crate) struct AllocationMetadata {
 }
 
 impl Allocator {
+    #[must_use]
     pub fn new(options: FridaOptions) -> Self {
         let ret = unsafe { sysconf(_SC_PAGESIZE) };
-        if ret < 0 {
-            panic!("Failed to read pagesize {:?}", io::Error::last_os_error());
-        }
+        assert!(
+            ret >= 0,
+            "Failed to read pagesize {:?}",
+            io::Error::last_os_error()
+        );
+
         #[allow(clippy::cast_sign_loss)]
         let page_size = ret as usize;
         // probe to find a usable shadow bit:
+        #[cfg(any(
+            target_arch = "aarch64",
+            all(target_arch = "x86_64", target_os = "linux")
+        ))]
         let mut shadow_bit: usize = 0;
+        #[cfg(not(any(
+            target_arch = "aarch64",
+            all(target_arch = "x86_64", target_os = "linux")
+        )))]
+        let shadow_bit = 0;
 
+        #[cfg(target_arch = "aarch64")]
         for try_shadow_bit in &[46usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {
@@ -89,9 +100,36 @@ impl Allocator {
                 break;
             }
         }
+
+        // x86_64's userspace's up to 0x7fff-ffff-ffff so 46 is not available. (0x4000-0000-0000 - 0xc000-0000-0000)
+        // we'd also want to avoid 0x5555-xxxx-xxxx because programs are mapped there. so 45 is not available either (0x2000-0000-0000 - 0x6000-0000-0000).
+        // This memory map is for amd64 linux.
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        {
+            let try_shadow_bit: usize = 44;
+            let addr: usize = 1 << try_shadow_bit;
+            if unsafe {
+                mmap(
+                    addr as *mut c_void,
+                    page_size,
+                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                    MapFlags::MAP_PRIVATE
+                        | ANONYMOUS_FLAG
+                        | MapFlags::MAP_FIXED
+                        | MapFlags::MAP_NORESERVE,
+                    -1,
+                    0,
+                )
+            }
+            .is_ok()
+            {
+                shadow_bit = try_shadow_bit;
+            }
+        }
         assert!(shadow_bit != 0);
 
         // attempt to pre-map the entire shadow-memory space
+
         let addr: usize = 1 << shadow_bit;
         let pre_allocated_shadow = unsafe {
             mmap(
@@ -117,11 +155,8 @@ impl Allocator {
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
             allocation_queue: HashMap::new(),
-            #[cfg(target_arch = "aarch64")]
             largest_allocation: 0,
-            #[cfg(target_arch = "aarch64")]
             base_mapping_addr: addr + addr + addr,
-            #[cfg(target_arch = "aarch64")]
             current_mapping_addr: addr + addr + addr,
         }
     }
@@ -144,7 +179,6 @@ impl Allocator {
         (value / self.page_size) * self.page_size
     }
 
-    #[cfg(target_arch = "aarch64")]
     fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
         let mut current_size = size;
         while current_size <= self.largest_allocation {
@@ -159,21 +193,23 @@ impl Allocator {
         None
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[must_use]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
         let mut is_malloc_zero = false;
         let size = if size == 0 {
-            println!("zero-sized allocation!");
+            // println!("zero-sized allocation!");
             is_malloc_zero = true;
             16
         } else {
             size
         };
         if size > self.options.asan_max_allocation() {
+            #[allow(clippy::manual_assert)]
             if self.options.asan_max_allocation_panics() {
-                panic!("Allocation is too large: 0x{:x}", size);
+                panic!("ASAN: Allocation is too large: 0x{:x}", size);
             }
+
             return std::ptr::null_mut();
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;
@@ -187,6 +223,7 @@ impl Allocator {
             }
             metadata
         } else {
+            // println!("{:x}, {:x}", self.current_mapping_addr, rounded_up_size);
             let mapping = match mmap(
                 self.current_mapping_addr as *mut c_void,
                 rounded_up_size,
@@ -214,7 +251,6 @@ impl Allocator {
                 actual_size: rounded_up_size,
                 ..AllocationMetadata::default()
             };
-
             if self.options.enable_asan_allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
@@ -232,11 +268,11 @@ impl Allocator {
 
         self.allocations
             .insert(metadata.address + self.page_size, metadata);
-        //println!("serving address: {:?}, size: {:x}", address, size);
+        // println!("serving address: {:?}, size: {:x}", address, size);
         address
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
             metadata
@@ -320,7 +356,6 @@ impl Allocator {
         }
     }
 
-    #[cfg(target_arch = "aarch64")]
     pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
         match self.allocations.get(&(ptr as usize)) {
             Some(metadata) => metadata.size,
@@ -334,14 +369,14 @@ impl Allocator {
     }
 
     fn unpoison(start: usize, size: usize) {
-        //println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
+        // println!("unpoisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
-            //println!("memset: {:?}", start as *mut c_void);
+            // println!("memset: {:?}", start as *mut c_void);
             memset(start as *mut c_void, 0xff, size / 8);
 
             let remainder = size % 8;
             if remainder > 0 {
-                //println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
+                // println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
                 memset(
                     (start + size / 8) as *mut c_void,
                     (0xff << (8 - remainder)) & 0xff,
@@ -352,14 +387,14 @@ impl Allocator {
     }
 
     pub fn poison(start: usize, size: usize) {
-        //println!("poisoning {:x} for {:x}", start, size / 8 + 1);
+        // println!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
-            //println!("memset: {:?}", start as *mut c_void);
+            // println!("memset: {:?}", start as *mut c_void);
             memset(start as *mut c_void, 0x00, size / 8);
 
             let remainder = size % 8;
             if remainder > 0 {
-                //println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
+                // println!("remainder: {:x}, offset: {:x}", remainder, start + size / 8);
                 memset((start + size / 8) as *mut c_void, 0x00, 1);
             }
         }
@@ -381,7 +416,12 @@ impl Allocator {
             let shadow_end =
                 self.round_up_to_page((end - start) / 8) + self.page_size + shadow_start;
             for range in self.shadow_pages.gaps(&(shadow_start..shadow_end)) {
-                //println!("range: {:x}-{:x}, pagesize: {}", range.start, range.end, self.page_size);
+                /*
+                println!(
+                    "range: {:x}-{:x}, pagesize: {}",
+                    range.start, range.end, self.page_size
+                );
+                */
                 unsafe {
                     mmap(
                         range.start as *mut c_void,
@@ -406,12 +446,11 @@ impl Allocator {
         (shadow_mapping_start, (end - start) / 8)
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[must_use]
     pub fn map_to_shadow(&self, start: usize) -> usize {
         map_to_shadow!(self, start)
     }
 
-    #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))

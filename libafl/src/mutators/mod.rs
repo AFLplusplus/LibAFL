@@ -13,8 +13,13 @@ pub use mopt_mutator::*;
 pub mod gramatron;
 pub use gramatron::*;
 
+#[cfg(feature = "nautilus")]
+pub mod nautilus;
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+
 use crate::{
-    bolts::tuples::{HasLen, Named},
+    bolts::tuples::{HasConstLen, Named},
     inputs::Input,
     Error,
 };
@@ -59,7 +64,7 @@ where
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
-pub trait MutatorsTuple<I, S>: HasLen
+pub trait MutatorsTuple<I, S>: HasConstLen
 where
     I: Input,
 {

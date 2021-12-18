@@ -1,7 +1,7 @@
 [package]
 name = "example_runtime"
-version = "0.1.0"
-edition = "2018"
+version = "0.7.0"
+edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 
 [lib]

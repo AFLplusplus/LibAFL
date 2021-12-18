@@ -6,8 +6,8 @@ use core::{convert::Into, default::Default, option::Option, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::serdeany::SerdeAnyMap,
-    inputs::{HasLen, Input},
+    bolts::{serdeany::SerdeAnyMap, HasLen},
+    inputs::Input,
     state::HasMetadata,
     Error,
 };
@@ -29,6 +29,8 @@ where
     exec_time: Option<Duration>,
     /// Cached len of the input, if any
     cached_len: Option<usize>,
+    /// Number of executions done at discovery time
+    executions: usize,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -136,6 +138,18 @@ where
         self.exec_time = Some(time);
     }
 
+    /// Get the executions
+    #[inline]
+    pub fn executions(&self) -> &usize {
+        &self.executions
+    }
+
+    /// Get the executions (mut)
+    #[inline]
+    pub fn executions_mut(&mut self) -> &mut usize {
+        &mut self.executions
+    }
+
     /// Create a new Testcase instace given an input
     #[inline]
     pub fn new<T>(input: T) -> Self
@@ -148,6 +162,7 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
+            executions: 0,
         }
     }
 
@@ -160,6 +175,20 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
+            executions: 0,
+        }
+    }
+
+    /// Create a new Testcase instance given an [`Input`] and the number of executions
+    #[inline]
+    pub fn with_executions(input: I, executions: usize) -> Self {
+        Testcase {
+            input: Some(input),
+            filename: None,
+            metadata: SerdeAnyMap::new(),
+            exec_time: None,
+            cached_len: None,
+            executions,
         }
     }
 
@@ -173,6 +202,7 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
+            executions: 0,
         }
     }
 }

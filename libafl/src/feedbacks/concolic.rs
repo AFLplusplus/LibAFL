@@ -9,7 +9,7 @@ use crate::{
         concolic::{ConcolicMetadata, ConcolicObserver},
         ObserversTuple,
     },
-    state::{HasClientPerfStats, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
 
@@ -42,7 +42,7 @@ impl Named for ConcolicFeedback {
 impl<I, S> Feedback<I, S> for ConcolicFeedback
 where
     I: Input,
-    S: HasClientPerfStats,
+    S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -53,7 +53,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I, S>,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
         self.metadata = observers

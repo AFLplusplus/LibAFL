@@ -1,11 +1,20 @@
-use std::{env, fs::File, io::Write, path::Path, process::Command, str};
-
 #[cfg(target_vendor = "apple")]
 use glob::glob;
-
 #[cfg(target_vendor = "apple")]
 use std::path::PathBuf;
+use std::{env, fs::File, io::Write, path::Path, process::Command, str};
+#[cfg(not(target_vendor = "apple"))]
+use which::which;
 
+/// The max version of `LLVM` we're looking for
+#[cfg(not(target_vendor = "apple"))]
+const LLVM_VERSION_MAX: u32 = 33;
+
+/// The min version of `LLVM` we're looking for
+#[cfg(not(target_vendor = "apple"))]
+const LLVM_VERSION_MIN: u32 = 6;
+
+/// Get the extension for a shared object
 fn dll_extension<'a>() -> &'a str {
     match env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
         "windwos" => "dll",
@@ -53,6 +62,13 @@ fn find_llvm_config() -> String {
             }
         }
         #[cfg(not(target_vendor = "apple"))]
+        for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
+            let llvm_config_name = format!("llvm-config-{}", version);
+            if which(&llvm_config_name).is_ok() {
+                return llvm_config_name;
+            }
+        }
+        #[cfg(not(target_vendor = "apple"))]
         "llvm-config".to_string()
     })
 }
@@ -62,8 +78,18 @@ fn main() {
     let out_dir = Path::new(&out_dir);
     let src_dir = Path::new("src");
 
+    println!("cargo:rerun-if-env-changed=LLVM_CONFIG");
+    println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
+
+    let mut custom_flags = vec![];
+
     let dest_path = Path::new(&out_dir).join("clang_constants.rs");
     let mut clang_constants_file = File::create(&dest_path).expect("Could not create file");
+
+    let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
+        .map_or(Ok(65536), str::parse)
+        .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
+    custom_flags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={}", edges_map_size));
 
     let llvm_config = find_llvm_config();
 
@@ -80,13 +106,15 @@ fn main() {
 
             pub const CLANG_PATH: &str = {:?};
             pub const CLANGXX_PATH: &str = {:?};
+            
+            /// The size of the edges map
+            pub const EDGES_MAP_SIZE: usize = {};
             ",
             llvm_bindir.join("clang"),
-            llvm_bindir.join("clang++")
+            llvm_bindir.join("clang++"),
+            edges_map_size
         )
         .expect("Could not write file");
-
-        println!("cargo:rerun-if-changed=src/cmplog-routines-pass.cc");
 
         let output = Command::new(&llvm_config)
             .args(&["--cxxflags"])
@@ -110,14 +138,28 @@ fn main() {
             ldflags.push("dynamic_lookup");
         };
 
+        println!("cargo:rerun-if-changed=src/cmplog-routines-pass.cc");
+        println!("cargo:rerun-if-changed=src/afl-coverage-pass.cc");
+
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
+            .args(&custom_flags)
             .arg(src_dir.join("cmplog-routines-pass.cc"))
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])
             .arg(out_dir.join(format!("cmplog-routines-pass.{}", dll_extension())))
             .status()
             .expect("Failed to compile cmplog-routines-pass.cc");
+
+        let _ = Command::new(llvm_bindir.join("clang++"))
+            .args(&cxxflags)
+            .args(&custom_flags)
+            .arg(src_dir.join("afl-coverage-pass.cc"))
+            .args(&ldflags)
+            .args(&["-fPIC", "-shared", "-o"])
+            .arg(out_dir.join(format!("afl-coverage-pass.{}", dll_extension())))
+            .status()
+            .expect("Failed to compile afl-coverage-pass.cc");
     } else {
         write!(
             &mut clang_constants_file,
@@ -130,8 +172,9 @@ pub const CLANGXX_PATH: &str = \"clang++\";
         .expect("Could not write file");
 
         println!(
-            "cargo:warning=Failed to locate the LLVM path using {}, we will not build LLVM passes",
-            llvm_config
+            "cargo:warning=Failed to locate the LLVM path using {}, we will not build LLVM passes
+            (if you need them, set point the LLVM_CONFIG env to a recent llvm-config, or make sure {} is available)",
+            llvm_config, llvm_config
         );
     }
 

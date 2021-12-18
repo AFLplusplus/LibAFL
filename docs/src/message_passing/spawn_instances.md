@@ -4,7 +4,7 @@ Multiple fuzzer instances can be spawned using different ways.
 
 ## Manually, via a TCP port
 
-The straightforward way to do Multi-Threading is to use the `LlmpRestartingEventManager`, and specifically to use `setup_restarting_mgr_std`.
+The straightforward way to do Multi-Threading is to use the `LlmpRestartingEventManager`, specifically to use `setup_restarting_mgr_std`.
 It abstracts away all the pesky details about restarts on crash handling (for in-memory fuzzers) and multi-threading.
 With it, every instance you launch manually tries to connect to a TCP port on the local machine.
 
@@ -20,14 +20,14 @@ While it's called "restarting" manager, it uses `fork` on Unix operating systems
 ## Launcher
 
 The Launcher is the lazy way to do multiprocessing.
-You can use the Launcher builder to create a fuzzer that spawns multiple nodes, all using restaring event managers.
+You can use the Launcher builder to create a fuzzer that spawns multiple nodes, all using restarting event managers.
 An example may look like this:
 
 ```rust,ignore
     Launcher::builder()
         .configuration(EventConfig::from_name(&configuration))
         .shmem_provider(shmem_provider)
-        .stats(stats)
+        .monitor(mon)
         .run_client(&mut run_client)
         .cores(cores)
         .broker_port(broker_port)
@@ -40,7 +40,7 @@ An example may look like this:
 This first starts a broker, then spawns `n` clients, according to the value passed to `cores`.
 The value is a string indicating the cores to bind to, for example, `0,2,5` or `0-3`.
 For each client, `run_client` will be called.
-On Windows, the Launcher will restart each client, while on Unix it will use `fork`.
+On Windows, the Launcher will restart each client, while on Unix, it will use `fork`.
 
 ## Other ways
 
