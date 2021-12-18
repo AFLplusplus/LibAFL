@@ -3,7 +3,10 @@
 use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
 use serde::{Deserialize, Serialize};
-use std::{fs::OpenOptions, path::PathBuf};
+use std::{
+    fs::OpenOptions,
+    path::{Path, PathBuf},
+};
 
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
@@ -171,14 +174,20 @@ where
 {
     /// Creates the [`OnDiskCorpus`].
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
-    pub fn new(dir_path: PathBuf) -> Result<Self, Error> {
-        fs::create_dir_all(&dir_path)?;
-        Ok(Self {
-            entries: vec![],
-            current: None,
-            dir_path,
-            meta_format: None,
-        })
+    pub fn new<P>(dir_path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
+            fs::create_dir_all(&dir_path)?;
+            Ok(OnDiskCorpus {
+                entries: vec![],
+                current: None,
+                dir_path,
+                meta_format: None,
+            })
+        }
+        new(dir_path.as_ref().to_path_buf())
     }
 
     /// Creates the [`OnDiskCorpus`] specifying the type of `Metadata` to be saved to disk.

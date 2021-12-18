@@ -1,10 +1,10 @@
 //! Exception handling for Windows
 
-pub use crate::bolts::bindings::Windows::Win32::System::Diagnostics::Debug::{
-    SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
+pub use windows::Win32::System::Diagnostics::Debug::{
+    AddVectoredExceptionHandler, EXCEPTION_POINTERS,
 };
 
-pub use crate::bolts::bindings::Windows::Win32::Foundation::NTSTATUS;
+pub use windows::Win32::Foundation::NTSTATUS;
 
 use crate::Error;
 use std::os::raw::{c_long, c_void};
@@ -314,9 +314,6 @@ unsafe fn internal_handle_exception(
     }
 }
 
-type NativeHandlerType = extern "system" fn(*mut EXCEPTION_POINTERS) -> c_long;
-static mut PREVIOUS_HANDLER: Option<NativeHandlerType> = None;
-
 /// Internal function that is being called whenever an exception arrives (stdcall).
 unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_POINTERS) -> c_long {
     let code = exception_pointers
@@ -329,7 +326,7 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
     let exception_code = ExceptionCode::try_from(code.0).unwrap();
     // println!("Received {}", exception_code);
     let ret = internal_handle_exception(exception_code, exception_pointers);
-    PREVIOUS_HANDLER.map_or(ret, |prev_handler| prev_handler(exception_pointers))
+    ret
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
@@ -367,10 +364,11 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     if catch_assertions {
         signal(SIGABRT, handle_signal);
     }
-    if let Some(prev) = SetUnhandledExceptionFilter(Some(core::mem::transmute(
-        handle_exception as *const c_void,
-    ))) {
-        PREVIOUS_HANDLER = Some(core::mem::transmute(prev as *const c_void));
-    }
+    // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
+    // See https://github.com/AFLplusplus/LibAFL/pull/403
+    AddVectoredExceptionHandler(
+        1,
+        Some(core::mem::transmute(handle_exception as *const c_void)),
+    );
     Ok(())
 }

@@ -6,6 +6,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -59,7 +60,7 @@ where
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
-    cores: &'a [usize],
+    cores: &'a Cores,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
     #[builder(default = None, setter(strip_option))]
@@ -330,6 +331,7 @@ where
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::qemu;
+    use libafl::bolts::os::Cores;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
     use std::path::PathBuf;
@@ -339,7 +341,7 @@ pub mod pybind {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,
         broker_port: u16,
-        cores: Vec<usize>,
+        cores: Cores,
     }
 
     #[pymethods]
@@ -355,7 +357,7 @@ pub mod pybind {
                 input_dirs,
                 output_dir,
                 broker_port,
-                cores,
+                cores: cores.into(),
             }
         }
 

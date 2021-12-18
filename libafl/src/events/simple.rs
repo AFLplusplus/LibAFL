@@ -150,15 +150,20 @@ where
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
-            Event::UpdateExecutions {
+            Event::UpdateExecStats {
                 time,
                 executions,
+                stability,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor
-                    .client_stats_mut_for(0)
-                    .update_executions(*executions as u64, *time);
+                let client = monitor.client_stats_mut_for(0);
+
+                client.update_executions(*executions as u64, *time);
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
+
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }
@@ -177,13 +182,17 @@ where
             Event::UpdatePerfMonitor {
                 time,
                 executions,
+                stability,
                 introspection_monitor,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
-                monitor.client_stats_mut()[0].update_executions(*executions as u64, *time);
-                monitor.client_stats_mut()[0]
-                    .update_introspection_monitor((**introspection_monitor).clone());
+                let client = &mut monitor.client_stats_mut()[0];
+                client.update_executions(*executions as u64, *time);
+                client.update_introspection_monitor((**introspection_monitor).clone());
+                if let Some(stability) = stability {
+                    client.update_stability(*stability);
+                }
                 monitor.display(event.name().to_string(), 0);
                 Ok(BrokerEventResult::Handled)
             }

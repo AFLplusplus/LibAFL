@@ -640,7 +640,7 @@ where
                     continue;
                 }
             };
-            let copied_poll_fds: Vec<PollFd> = poll_fds.iter().copied().collect();
+            let copied_poll_fds: Vec<PollFd> = poll_fds.clone();
             for poll_fd in copied_poll_fds {
                 let revents = poll_fd.revents().expect("revents should not be None");
                 let raw_polled_fd =

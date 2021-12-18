@@ -6,6 +6,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
+        os::Cores,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -31,10 +32,10 @@ use libafl::{
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
-pub const MAP_SIZE: usize = 65536;
+pub const DEFAULT_MAP_SIZE: usize = 65536;
 
 #[derive(TypedBuilder)]
-pub struct ForkserverBytesCoverageSugar<'a> {
+pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
     /// Laucher configuration (default is random)
     #[builder(default = None, setter(strip_option))]
     configuration: Option<String>,
@@ -54,7 +55,7 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
-    cores: &'a [usize],
+    cores: &'a Cores,
     /// The `ip:port` address of another broker to connect our new broker to for multi-machine
     /// clusters.
     #[builder(default = None, setter(strip_option))]
@@ -66,13 +67,13 @@ pub struct ForkserverBytesCoverageSugar<'a> {
     #[builder(default = false)]
     /// Use shared mem testcase delivery
     shmem_testcase: bool,
-    // Coverage map size
-    //#[builder(default = MAP_SIZE)]
-    //map_size: usize,
+    #[builder(default = false)]
+    /// Print target program output
+    debug_output: bool,
 }
 
 #[allow(clippy::similar_names)]
-impl<'a> ForkserverBytesCoverageSugar<'a> {
+impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = match self.configuration.as_ref() {
@@ -166,11 +167,12 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = TimeoutForkserverExecutor::new(
-                ForkserverExecutor::new(
+                ForkserverExecutor::with_debug(
                     self.program.clone(),
                     self.arguments,
                     self.shmem_testcase,
                     tuple_list!(edges_observer, time_observer),
+                    self.debug_output,
                 )
                 .expect("Failed to create the executor."),
                 timeout,
@@ -248,24 +250,23 @@ impl<'a> ForkserverBytesCoverageSugar<'a> {
     }
 }
 
-/*
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::inmemory;
+    use crate::forkserver;
+    use libafl::bolts::os::Cores;
     use pyo3::prelude::*;
-    use pyo3::types::PyBytes;
     use std::path::PathBuf;
 
     #[pyclass(unsendable)]
-    struct InMemoryBytesCoverageSugar {
+    struct ForkserverBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
         output_dir: PathBuf,
         broker_port: u16,
-        cores: Vec<usize>,
+        cores: Cores,
     }
 
     #[pymethods]
-    impl InMemoryBytesCoverageSugar {
+    impl ForkserverBytesCoverageSugar {
         #[new]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -277,32 +278,26 @@ pub mod pybind {
                 input_dirs,
                 output_dir,
                 broker_port,
-                cores,
+                cores: cores.into(),
             }
         }
 
         #[allow(clippy::needless_pass_by_value)]
-        pub fn run(&self, harness: PyObject) {
-            inmemory::InMemoryBytesCoverageSugar::builder()
+        pub fn run(&self, program: String, arguments: Vec<String>) {
+            forkserver::ForkserverBytesCoverageSugar::<{ forkserver::DEFAULT_MAP_SIZE }>::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
                 .broker_port(self.broker_port)
                 .cores(&self.cores)
-                .harness(|buf| {
-                    Python::with_gil(|py| -> PyResult<()> {
-                        let args = (PyBytes::new(py, buf),); // TODO avoid copy
-                        harness.call1(py, args)?;
-                        Ok(())
-                    })
-                    .unwrap();
-                })
+                .program(program)
+                .arguments(&arguments)
                 .build()
                 .run();
         }
     }
 
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<InMemoryBytesCoverageSugar>()?;
+        m.add_class::<ForkserverBytesCoverageSugar>()?;
         Ok(())
     }
-}*/
+}

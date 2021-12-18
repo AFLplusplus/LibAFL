@@ -4,8 +4,11 @@ use std::{ffi::c_void, marker::PhantomData};
 
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
-    Gum, MemoryRange, NativePointer,
+    Gum, NativePointer,
 };
+
+#[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
+use frida_gum::MemoryRange;
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -15,7 +18,10 @@ use libafl::{
 };
 
 #[cfg(unix)]
-use crate::asan_errors::ASAN_ERRORS;
+use crate::asan::errors::ASAN_ERRORS;
+
+#[cfg(windows)]
+use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 
 pub struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
@@ -105,9 +111,12 @@ where
     OT: ObserversTuple<I, S>,
 {
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
+        #[cfg(not(all(not(debug_assertions), target_arch = "x86_64")))]
+        let stalker = Stalker::new(gum);
+        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
         let mut stalker = Stalker::new(gum);
 
-        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
+        #[cfg(not(all(debug_assertions, target_arch = "x86_64")))]
         for range in helper.ranges().gaps(&(0..usize::MAX)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
             stalker.exclude(&MemoryRange::new(
@@ -123,5 +132,21 @@ where
             followed: false,
             _phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(windows)]
+impl<'a, 'b, 'c, FH, H, I, OT, S> HasInProcessHandlers
+    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple<I, S>,
+    FH: FridaHelper<'b>,
+{
+    /// the timeout handler
+    #[inline]
+    fn inprocess_handlers(&self) -> &InProcessHandlers {
+        &self.base.handlers()
     }
 }

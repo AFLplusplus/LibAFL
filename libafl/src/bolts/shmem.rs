@@ -1053,16 +1053,7 @@ pub mod unix_shmem {
 pub mod win32_shmem {
 
     use crate::{
-        bolts::{
-            bindings::{
-                Windows::Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
-                Windows::Win32::System::Memory::{
-                    CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
-                    FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
-                },
-            },
-            shmem::{ShMem, ShMemId, ShMemProvider},
-        },
+        bolts::shmem::{ShMem, ShMemId, ShMemProvider},
         Error,
     };
 
@@ -1071,6 +1062,14 @@ pub mod win32_shmem {
     use uuid::Uuid;
 
     const INVALID_HANDLE_VALUE: isize = -1;
+
+    use windows::{
+        Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
+        Win32::System::Memory::{
+            CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+            FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+        },
+    };
 
     /// The default Sharedmap impl for windows using shmctl & shmget
     #[derive(Clone, Debug)]
