@@ -10,7 +10,7 @@ use frida_gum::NativePointer;
 use frida_gum::{ModuleDetails, RangeDetails};
 use hashbrown::HashMap;
 
-use nix::sys::mman::{mmap, MapFlags, ProtFlags, mprotect};
+use nix::sys::mman::{mmap, mprotect, MapFlags, ProtFlags};
 
 use backtrace::Backtrace;
 
@@ -183,42 +183,79 @@ impl AsanRuntime {
 
         self.hook_functions(_gum);
 
-
         unsafe {
-        let mem = self.allocator.alloc(0xac + 2, 8);
-        unsafe {mprotect((self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void, 0x1000, ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC)};
-        println!("Test0");
-        /*
-        0x555555916ce9 <libafl_frida::asan_rt::AsanRuntime::init+13033>    je     libafl_frida::asan_rt::AsanRuntime::init+14852 <libafl_frida::asan_rt::AsanRuntime::init+14852>
-        0x555555916cef <libafl_frida::asan_rt::AsanRuntime::init+13039>    mov    rdi, r15 <0x555558392338>
-        */
-        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0x00));
-        println!("Test1");
-        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 0) as *const c_void, 0xac));
-        println!("Test2");
-        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2) as *const c_void, 0xac));
-        println!("Test3");
-        assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 3) as *const c_void, 0xac));
-        println!("Test4");
-        assert!(!(self.shadow_check_func.unwrap())(((mem as isize) + -1) as *const c_void, 0xac));
-        println!("Test5");
-        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa4) as *const c_void, 8));
-        println!("Test6");
-        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa6) as *const c_void, 6));
-        println!("Test7");
-        assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 6));
-        println!("Test8");
-        assert!(!(self.shadow_check_func.unwrap())(((mem as usize) + 2 + 0xa8) as *const c_void, 0xac));
-        println!("Test9");
-        assert!((self.shadow_check_func.unwrap())(((mem as usize) + 4 + 0xa8) as *const c_void, 0x1));
-        println!("FIN");
+            let mem = self.allocator.alloc(0xac + 2, 8);
+            unsafe {
+                mprotect(
+                    (self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void,
+                    0x1000,
+                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC,
+                )
+            };
+            println!("Test0");
+            /*
+            0x555555916ce9 <libafl_frida::asan_rt::AsanRuntime::init+13033>    je     libafl_frida::asan_rt::AsanRuntime::init+14852 <libafl_frida::asan_rt::AsanRuntime::init+14852>
+            0x555555916cef <libafl_frida::asan_rt::AsanRuntime::init+13039>    mov    rdi, r15 <0x555558392338>
+            */
+            assert!((self.shadow_check_func.unwrap())(
+                ((mem as usize) + 0) as *const c_void,
+                0x00
+            ));
+            println!("Test1");
+            assert!((self.shadow_check_func.unwrap())(
+                ((mem as usize) + 0) as *const c_void,
+                0xac
+            ));
+            println!("Test2");
+            assert!((self.shadow_check_func.unwrap())(
+                ((mem as usize) + 2) as *const c_void,
+                0xac
+            ));
+            println!("Test3");
+            assert!(!(self.shadow_check_func.unwrap())(
+                ((mem as usize) + 3) as *const c_void,
+                0xac
+            ));
+            println!("Test4");
+            assert!(!(self.shadow_check_func.unwrap())(
+                ((mem as isize) + -1) as *const c_void,
+                0xac
+            ));
+            println!("Test5");
+            assert!((self.shadow_check_func.unwrap())(
+                ((mem as usize) + 2 + 0xa4) as *const c_void,
+                8
+            ));
+            println!("Test6");
+            assert!((self.shadow_check_func.unwrap())(
+                ((mem as usize) + 2 + 0xa6) as *const c_void,
+                6
+            ));
+            println!("Test7");
+            assert!(!(self.shadow_check_func.unwrap())(
+                ((mem as usize) + 2 + 0xa8) as *const c_void,
+                6
+            ));
+            println!("Test8");
+            assert!(!(self.shadow_check_func.unwrap())(
+                ((mem as usize) + 2 + 0xa8) as *const c_void,
+                0xac
+            ));
+            println!("Test9");
+            assert!((self.shadow_check_func.unwrap())(
+                ((mem as usize) + 4 + 0xa8) as *const c_void,
+                0x1
+            ));
+            println!("FIN");
 
-        for i in 0..0xad {
-            assert!((self.shadow_check_func.unwrap())(((mem as usize) + i) as *const c_void, 0x01));
+            for i in 0..0xad {
+                assert!((self.shadow_check_func.unwrap())(
+                    ((mem as usize) + i) as *const c_void,
+                    0x01
+                ));
+            }
+            // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
-        // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
-        }
-
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -1655,18 +1692,20 @@ impl AsanRuntime {
             ($ops:ident, $bit:expr) => {dynasm!($ops
                 ; .arch aarch64
 
+                ; stp x2, x3, [sp, #-0x10]!
                 ; mov x1, #0
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
-                ; mov x0, #1
-                ; add x1, x1, x0, lsl #shadow_bit
+                ; mov x2, #1
+                ; add x1, x1, x2, lsl #shadow_bit
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
                 ; rbit w1, w1
                 ; lsr x1, x1, #16
                 ; lsr x1, x1, x0
+                ; ldp x2, x3, [sp], 0x10
                 ; tbnz x1, #$bit, >done
 
                 ; adr x1, >done
@@ -1689,12 +1728,13 @@ impl AsanRuntime {
             ($ops:ident, $val:expr) => {dynasm!($ops
                 ; .arch aarch64
 
+                ; stp x2, x3, [sp, #-0x10]!
                 ; mov x1, #0
                 // ; add x1, xzr, x1, lsl #shadow_bit
                 ; add x1, x1, x0, lsr #3
                 ; ubfx x1, x1, #0, #(shadow_bit + 1)
-                ; mov x0, #1
-                ; add x1, x1, x0, lsl #shadow_bit
+                ; mov x2, #1
+                ; add x1, x1, x2, lsl #shadow_bit
                 ; ldrh w1, [x1, #0]
                 ; and x0, x0, #7
                 ; rev16 w1, w1
@@ -1702,7 +1742,6 @@ impl AsanRuntime {
                 ; lsr x1, x1, #16
                 ; lsr x1, x1, x0
                 ; .dword -717536768 // 0xd53b4200 //mrs x0, NZCV
-                ; stp x2, x3, [sp, #-0x10]!
                 ; mov x2, $val
                 ; ands x1, x1, x2
                 ; ldp x2, x3, [sp], 0x10
