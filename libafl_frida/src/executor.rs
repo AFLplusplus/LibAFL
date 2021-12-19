@@ -7,7 +7,7 @@ use frida_gum::{
     Gum, NativePointer,
 };
 
-#[cfg(not(all(debug_assertions, target_arch = "x86_64")))]
+#[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
 use frida_gum::MemoryRange;
 
 use libafl::{
@@ -111,9 +111,9 @@ where
     OT: ObserversTuple<I, S>,
 {
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
-        #[cfg(all(debug_assertions, target_arch = "x86_64"))]
+        #[cfg(not(all(not(debug_assertions), target_arch = "x86_64")))]
         let stalker = Stalker::new(gum);
-        #[cfg(not(all(debug_assertions, target_arch = "x86_64")))]
+        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
         let mut stalker = Stalker::new(gum);
 
         #[cfg(not(all(debug_assertions, target_arch = "x86_64")))]
