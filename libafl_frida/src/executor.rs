@@ -7,7 +7,6 @@ use frida_gum::{
     Gum, NativePointer,
 };
 
-#[cfg(any(debug_assertions, target_arch = "aarch64"))]
 use frida_gum::MemoryRange;
 
 use libafl::{
