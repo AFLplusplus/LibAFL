@@ -1,4 +1,4 @@
-//! A singlethreade libfuzzer-like fuzzer that can auto-restart.
+//! A singlethreaded libfuzzer-like fuzzer that can auto-restart.
 
 use clap::{App, Arg};
 use core::{cell::RefCell, time::Duration};
@@ -28,14 +28,13 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
-    feedbacks::{AflMapFeedback, CrashFeedback, MapFeedbackState, TimeFeedback},
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
-        token_mutations::I2SRandReplace,
-        tokens_mutations, Tokens,
+        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
@@ -176,7 +175,7 @@ fn fuzz(
     #[cfg(unix)]
     let file_null = File::open("/dev/null")?;
 
-    // 'While the stats are state, they are usually used in the broker - which is likely never restarted
+    // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
@@ -221,7 +220,7 @@ fn fuzz(
     // This one is composed by two Feedbacks in OR
     let feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        AflMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
@@ -255,13 +254,17 @@ fn fuzz(
     }
 
     let calibration = CalibrationStage::new(&mut state, &edges_observer);
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
+    // Setup a MOPT mutator
+    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
 
     let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
 
     // A minimization+queue policy to get testcasess from the corpus
-    //let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -301,15 +304,8 @@ fn fuzz(
         timeout * 10,
     ));
 
-    // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
-
-    // Setup a basic mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-    let mutational = StdMutationalStage::new(mutator);
-
     // The order of the stages matter!
-    let mut stages = tuple_list!(calibration, tracing, i2s, mutational, power);
+    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
     if let Some(tokenfile) = tokenfile {
@@ -336,7 +332,6 @@ fn fuzz(
         dup2(null_fd, io::stdout().as_raw_fd())?;
         dup2(null_fd, io::stderr().as_raw_fd())?;
     }
-
     // reopen file to make sure we're at the end
     log.replace(
         OpenOptions::new()
@@ -350,3 +345,4 @@ fn fuzz(
     // Never reached
     Ok(())
 }
+
