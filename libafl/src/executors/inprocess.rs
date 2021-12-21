@@ -686,8 +686,7 @@ mod windows_exception_handler {
     use core::sync::atomic::{compiler_fence, Ordering};
     use windows::Win32::System::Threading::ExitProcess;
 
-    pub type HandlerFuncPtr =
-        unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+    pub type HandlerFuncPtr = unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
 
     /*pub unsafe fn nop_handler(
         _code: ExceptionCode,
