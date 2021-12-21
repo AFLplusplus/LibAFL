@@ -18,7 +18,7 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use num_enum::TryFromPrimitive;
 
 //const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
@@ -83,7 +83,7 @@ pub const STATUS_ASSERTION_FAILURE: u32 = 0xC0000420;
 pub const STATUS_SXS_EARLY_DEACTIVATION: u32 = 0xC015000F;
 pub const STATUS_SXS_INVALID_DEACTIVATION: u32 = 0xC0150010;
 
-#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
+#[derive(TryFromPrimitive, Clone, Copy)]
 #[repr(u32)]
 pub enum ExceptionCode {
     // From https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode
@@ -133,6 +133,8 @@ pub enum ExceptionCode {
     AssertionFailure = STATUS_ASSERTION_FAILURE,
     SXSEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
     SXSInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
+    #[num_enum(default)]
+    Other,
 }
 
 pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
@@ -150,6 +152,7 @@ pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
     ExceptionCode::HeapCorruption,
     ExceptionCode::StackBufferOverrun,
     ExceptionCode::AssertionFailure,
+    ExceptionCode::Other,
 ];
 
 impl PartialEq for ExceptionCode {
@@ -212,13 +215,14 @@ impl Display for ExceptionCode {
             ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE")?,
             ExceptionCode::SXSEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION")?,
             ExceptionCode::SXSInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION")?,
+            ExceptionCode::Other => write!(f, "Other/User defined exception")?,
         };
 
         Ok(())
     }
 }
 
-pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 45] = [
+pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 46] = [
     ExceptionCode::AccessViolation,
     ExceptionCode::ArrayBoundsExceeded,
     ExceptionCode::Breakpoint,
@@ -264,6 +268,7 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 45] = [
     ExceptionCode::AssertionFailure,
     ExceptionCode::SXSEarlyDeactivation,
     ExceptionCode::SXSInvalidDeactivation,
+    ExceptionCode::Other,
 ];
 
 pub trait Handler {

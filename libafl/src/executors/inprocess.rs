@@ -686,8 +686,7 @@ mod windows_exception_handler {
     use core::sync::atomic::{compiler_fence, Ordering};
     use windows::Win32::System::Threading::ExitProcess;
 
-    pub type HandlerFuncPtr =
-        unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+    pub type HandlerFuncPtr = unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
 
     /*pub unsafe fn nop_handler(
         _code: ExceptionCode,
@@ -703,7 +702,7 @@ mod windows_exception_handler {
                 let data = &mut GLOBAL_STATE;
                 if !data.crash_handler.is_null() {
                     let func: HandlerFuncPtr = transmute(data.crash_handler);
-                    (func)(code, exception_pointers, data);
+                    (func)(exception_pointers, data);
                 }
             }
         }
@@ -817,7 +816,6 @@ mod windows_exception_handler {
     }
 
     pub unsafe fn inproc_crash_handler<E, EM, I, OC, OF, OT, S, Z>(
-        code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -850,6 +848,18 @@ mod windows_exception_handler {
             windows_delete_timer_queue(x);
             data.tp_timer = ptr::null_mut();
         }
+
+        let code = ExceptionCode::try_from(
+            exception_pointers
+                .as_mut()
+                .unwrap()
+                .ExceptionRecord
+                .as_mut()
+                .unwrap()
+                .ExceptionCode
+                .0,
+        )
+        .unwrap();
 
         #[cfg(feature = "std")]
         eprintln!("Crashed with {}", code);
