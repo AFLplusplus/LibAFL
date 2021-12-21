@@ -281,12 +281,15 @@ impl AsanErrors {
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " ALLOCATION INFO ").unwrap();
-                let offset: i64 = fault_address as i64 - error.metadata.address as i64;
+                let offset: i64 = fault_address as i64 - (error.metadata.address + 0x1000) as i64;
                 let direction = if offset > 0 { "right" } else { "left" };
                 writeln!(
                     output,
-                    "access is {} to the {} of the 0x{:x} byte allocation at 0x{:x}",
-                    offset, direction, error.metadata.size, error.metadata.address
+                    "access is {:#x} to the {} of the {:#x} byte allocation at {:#x}",
+                    offset,
+                    direction,
+                    error.metadata.size,
+                    error.metadata.address + 0x1000
                 )
                 .unwrap();
 
@@ -369,7 +372,8 @@ impl AsanErrors {
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address, metadata.size
+                    metadata.address + 0x1000,
+                    metadata.size
                 )
                 .unwrap();
                 if metadata.is_malloc_zero {
@@ -403,7 +407,8 @@ impl AsanErrors {
                 writeln!(
                     output,
                     "allocation at 0x{:x}, with size 0x{:x}",
-                    metadata.address, metadata.size
+                    metadata.address + 0x1000,
+                    metadata.size
                 )
                 .unwrap();
                 if metadata.is_malloc_zero {
