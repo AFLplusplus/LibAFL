@@ -110,7 +110,6 @@ where
 {
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
         let mut stalker = Stalker::new(gum);
-
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
         // we don't add it to the INSTRUMENTED ranges.
         let mut ranges = helper.ranges().clone();
