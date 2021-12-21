@@ -78,6 +78,8 @@ pub trait FridaHelper<'a> {
     fn map_ptr_mut(&mut self) -> *mut u8;
 
     fn ranges(&self) -> &RangeMap<usize, (u16, String)>;
+
+    fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)>;
 }
 
 /// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
@@ -155,6 +157,10 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
 
     fn ranges(&self) -> &RangeMap<usize, (u16, String)> {
         &self.ranges
+    }
+
+    fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)> {
+        &mut self.ranges
     }
 }
 
@@ -279,13 +285,13 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     let instr = instruction.instr();
                     let address = instr.address();
                     // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                    /*
-                    println!(
-                        "address: {:x} contains: {:?}",
-                        address,
-                        helper.ranges.contains_key(&(address as usize))
-                    );
-                    */
+
+                    //println!(
+                    //"address: {:x} contains: {:?}",
+                    //address,
+                    //helper.ranges.contains_key(&(address as usize))
+                    //);
+
                     // println!("Ranges: {:#?}", helper.ranges);
                     if helper.ranges.contains_key(&(address as usize)) {
                         if first {

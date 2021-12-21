@@ -59,9 +59,7 @@ where
         self.helper.pre_exec(input);
         if self.helper.stalker_enabled() {
             if self.followed {
-                self.stalker.activate(NativePointer(
-                    self.base.harness_mut() as *mut _ as *mut c_void
-                ));
+                self.stalker.activate(NativePointer(core::ptr::null_mut()));
             } else {
                 self.followed = true;
                 self.stalker
@@ -111,13 +109,23 @@ where
     OT: ObserversTuple<I, S>,
 {
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
-        #[cfg(all(not(debug_assertions), target_arch = "x86_64"))]
-        let stalker = Stalker::new(gum);
-        #[cfg(any(debug_assertions, target_arch = "aarch64"))]
         let mut stalker = Stalker::new(gum);
 
-        #[cfg(any(debug_assertions, target_arch = "aarch64"))]
-        for range in helper.ranges().gaps(&(0..usize::MAX)) {
+        // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
+        // we don't add it to the INSTRUMENTED ranges.
+        let mut ranges = helper.ranges().clone();
+        for module in frida_gum::Module::enumerate_modules() {
+            if module.base_address < Self::new as usize
+                && (Self::new as usize) < module.base_address + module.size
+            {
+                ranges.insert(
+                    module.base_address..(module.base_address + module.size),
+                    (0xffff, "fuzzer".to_string()),
+                );
+                break;
+            }
+        }
+        for range in ranges.gaps(&(0..usize::MAX)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
             stalker.exclude(&MemoryRange::new(
                 NativePointer(range.start as *mut c_void),
