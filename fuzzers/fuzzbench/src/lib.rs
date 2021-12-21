@@ -345,4 +345,3 @@ fn fuzz(
     // Never reached
     Ok(())
 }
-
