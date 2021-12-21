@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "29ff57375301a144ed2a3e847cc01acfd1b29855";
+const QEMU_REVISION: &str = "652155bab71357380420f90a944e463ba4bcd372";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -112,6 +112,8 @@ fn main() {
         Command::new("git")
             .current_dir(&out_dir_path)
             .arg("clone")
+            .arg("--depth")
+            .arg("1")
             .arg(QEMU_URL)
             .status()
             .unwrap();
