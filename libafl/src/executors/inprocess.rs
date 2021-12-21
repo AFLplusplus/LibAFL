@@ -687,7 +687,7 @@ mod windows_exception_handler {
     use windows::Win32::System::Threading::ExitProcess;
 
     pub type HandlerFuncPtr =
-        unsafe fn(ExceptionCode, *mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+        unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
 
     /*pub unsafe fn nop_handler(
         _code: ExceptionCode,
@@ -703,7 +703,7 @@ mod windows_exception_handler {
                 let data = &mut GLOBAL_STATE;
                 if !data.crash_handler.is_null() {
                     let func: HandlerFuncPtr = transmute(data.crash_handler);
-                    (func)(code, exception_pointers, data);
+                    (func)(exception_pointers, data);
                 }
             }
         }
@@ -817,7 +817,6 @@ mod windows_exception_handler {
     }
 
     pub unsafe fn inproc_crash_handler<E, EM, I, OC, OF, OT, S, Z>(
-        _code: ExceptionCode,
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where

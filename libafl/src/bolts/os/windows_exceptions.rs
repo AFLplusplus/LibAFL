@@ -134,7 +134,7 @@ pub enum ExceptionCode {
     SXSEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
     SXSInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
     #[num_enum(default)]
-    Others,
+    Other,
 }
 
 pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
@@ -152,7 +152,7 @@ pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
     ExceptionCode::HeapCorruption,
     ExceptionCode::StackBufferOverrun,
     ExceptionCode::AssertionFailure,
-    ExceptionCode::Others,
+    ExceptionCode::Other,
 ];
 
 impl PartialEq for ExceptionCode {
@@ -215,7 +215,7 @@ impl Display for ExceptionCode {
             ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE")?,
             ExceptionCode::SXSEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION")?,
             ExceptionCode::SXSInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION")?,
-            ExceptionCode::Others => write!(f, "Other/User defined exception")?,
+            ExceptionCode::Other => write!(f, "Other/User defined exception")?,
         };
 
         Ok(())
@@ -268,7 +268,7 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 46] = [
     ExceptionCode::AssertionFailure,
     ExceptionCode::SXSEarlyDeactivation,
     ExceptionCode::SXSInvalidDeactivation,
-    ExceptionCode::Others,
+    ExceptionCode::Other,
 ];
 
 pub trait Handler {
