@@ -2,7 +2,6 @@ use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, stat
 use std::collections::HashMap;
 
 use crate::{
-    emu,
     emu::{Emulator, GuestMaps, SyscallHookResult},
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple},
