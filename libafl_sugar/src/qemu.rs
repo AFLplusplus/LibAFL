@@ -30,7 +30,7 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
 };
 
-pub use libafl_qemu::emu;
+pub use libafl_qemu::emu::Emulator;
 use libafl_qemu::{cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
 use libafl_targets::CmpLogObserver;
 
@@ -75,7 +75,7 @@ where
     H: FnMut(&[u8]),
 {
     #[allow(clippy::too_many_lines, clippy::similar_names)]
-    pub fn run(&mut self) {
+    pub fn run(&mut self, emulator: &Emulator) {
         let conf = match self.configuration.as_ref() {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
@@ -172,6 +172,7 @@ where
             if self.use_cmplog {
                 let executor = QemuExecutor::new(
                     &mut harness,
+                    emulator,
                     tuple_list!(QemuEdgeCoverageHelper::new(), QemuCmpLogHelper::new()),
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -247,6 +248,7 @@ where
             } else {
                 let executor = QemuExecutor::new(
                     &mut harness,
+                    emulator,
                     tuple_list!(QemuEdgeCoverageHelper::new()),
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
