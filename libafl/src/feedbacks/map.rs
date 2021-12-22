@@ -696,7 +696,7 @@ pub mod pybind {
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
     use crate::feedbacks::map::{MapFeedbackState, MaxMapFeedback};
     use crate::inputs::BytesInput;
-    use crate::observers::map::{OwnedMapObserver, pybind::PythonOwnedMapObserverI32};
+    use crate::observers::map::{OwnedMapObserver, pybind::{PythonOwnedMapObserverI32, PythonMapObserverI32}};
     use crate::state::StdState;
     use pyo3::prelude::*;
 
@@ -708,11 +708,11 @@ pub mod pybind {
 
     #[pymethods]
     impl PythonMapFeedbackStateI32 {
-        #[new]
-        fn new(py_observer: &mut PythonOwnedMapObserverI32) -> Self {
+        #[staticmethod]
+        fn with_observer(py_observer: &mut PythonMapObserverI32) -> Self {
             Self {
                 map_feedback_state: MapFeedbackState::with_observer(
-                    &py_observer.owned_map_observer,
+                    py_observer.get_map_observer(),
                 ),
             }
         }

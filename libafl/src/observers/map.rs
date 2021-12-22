@@ -847,7 +847,7 @@ where
 #[cfg(feature = "python")]
 pub mod pybind {
     use pyo3::prelude::*;
-    use crate::observers::map::{OwnedMapObserver};
+    use crate::observers::{MapObserver, map::{OwnedMapObserver}};
 
     #[pyclass(unsendable, name = "OwnedMapObserverI32")]
     #[derive(Clone)] 
@@ -866,8 +866,39 @@ pub mod pybind {
         }
     }
 
+    pub enum PythonMapObserverWrapperI32 {
+        Owned(PythonOwnedMapObserverI32)
+        // Other observers to be added
+    }
+    #[pyclass(unsendable, name = "MapObserverI32")]
+    pub struct PythonMapObserverI32 {
+        pub map_observer: PythonMapObserverWrapperI32
+    }
+
+    impl PythonMapObserverI32 {
+        pub fn get_map_observer(&self) -> &impl MapObserver<i32>{
+            match &self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => &map_observer.owned_map_observer
+            }
+        }
+    }
+
+    #[pymethods]
+    impl PythonMapObserverI32 {
+        #[new]
+        fn new(map_observer: PyObject, type_name: &str) -> Self{
+            Python::with_gil(|py| {
+                match type_name {
+                    "OwnedMapObserverI32" => Self {map_observer: PythonMapObserverWrapperI32::Owned(map_observer.extract(py).unwrap())},
+                    _ => panic!("MapObserver not supported: {}", type_name)
+                }            
+            })
+        }
+    }
+
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonOwnedMapObserverI32>()?;
+        m.add_class::<PythonMapObserverI32>()?;
         Ok(())
     }
 }
