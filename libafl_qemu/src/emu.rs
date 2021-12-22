@@ -297,7 +297,6 @@ pub struct Emulator {
     _private: (),
 }
 
-
 #[allow(clippy::unused_self)]
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
