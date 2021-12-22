@@ -56,10 +56,10 @@ pub use cmplog::QemuCmpLogHelper;
 pub mod snapshot;
 #[cfg(target_os = "linux")]
 pub use snapshot::QemuSnapshotHelper;
-#[cfg(target_os = "linux")]
+/*#[cfg(target_os = "linux")]
 pub mod asan;
 #[cfg(target_os = "linux")]
-pub use asan::{init_with_asan, QemuAsanHelper};
+pub use asan::{init_with_asan, QemuAsanHelper};*/
 
 #[cfg(target_os = "linux")]
 pub mod executor;
