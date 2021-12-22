@@ -616,3 +616,166 @@ impl Emulator {
         }
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use super::{MmapPerms, SyscallHookResult};
+    use core::mem::transmute;
+    use pyo3::exceptions::PyValueError;
+    use pyo3::{prelude::*, types::PyInt};
+    use std::convert::TryFrom;
+
+    static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
+    static mut PY_GENERIC_HOOKS: Vec<(u64, PyObject)> = vec![];
+
+    extern "C" fn py_syscall_hook_wrapper(
+        sys_num: i32,
+        a0: u64,
+        a1: u64,
+        a2: u64,
+        a3: u64,
+        a4: u64,
+        a5: u64,
+        a6: u64,
+        a7: u64,
+    ) -> SyscallHookResult {
+        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+            || SyscallHookResult::new(None),
+            |obj| {
+                let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
+                Python::with_gil(|py| {
+                    let ret = obj.call1(py, args).expect("Error in the syscall hook");
+                    let any = ret.as_ref(py);
+                    if any.is_none() {
+                        SyscallHookResult::new(None)
+                    } else {
+                        let a: Result<&PyInt, _> = any.cast_as();
+                        if let Ok(i) = a {
+                            SyscallHookResult::new(Some(
+                                i.extract().expect("Invalid syscall hook return value"),
+                            ))
+                        } else {
+                            SyscallHookResult::extract(any)
+                                .expect("The syscall hook must return a SyscallHookResult")
+                        }
+                    }
+                })
+            },
+        )
+    }
+
+    extern "C" fn py_generic_hook_wrapper(idx: u64) {
+        let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
+        Python::with_gil(|py| {
+            obj.call0(py).expect("Error in the hook");
+        });
+    }
+
+    #[pyclass(unsendable)]
+    pub struct Emulator {
+        pub emu: super::Emulator,
+    }
+
+    #[pymethods]
+    impl Emulator {
+        #[allow(clippy::needless_pass_by_value)]
+        #[new]
+        fn new(args: Vec<String>, env: Vec<(String, String)>) -> Emulator {
+            Emulator {
+                emu: super::Emulator::new(&args, &env),
+            }
+        }
+
+        fn write_mem(&self, addr: u64, buf: &[u8]) {
+            unsafe {
+                self.emu.write_mem(addr, buf);
+            }
+        }
+
+        fn read_mem(&self, addr: u64, size: usize) -> Vec<u8> {
+            let mut buf = vec![0; size];
+            unsafe {
+                self.emu.read_mem(addr, &mut buf);
+            }
+            buf
+        }
+
+        fn num_regs(&self) -> i32 {
+            self.emu.num_regs()
+        }
+
+        fn write_reg(&self, reg: i32, val: u64) -> PyResult<()> {
+            self.emu.write_reg(reg, val).map_err(PyValueError::new_err)
+        }
+
+        fn read_reg(&self, reg: i32) -> PyResult<u64> {
+            self.emu.read_reg(reg).map_err(PyValueError::new_err)
+        }
+
+        fn set_breakpoint(&self, addr: u64) {
+            self.emu.set_breakpoint(addr);
+        }
+
+        fn remove_breakpoint(&self, addr: u64) {
+            self.emu.remove_breakpoint(addr);
+        }
+
+        fn run(&self) {
+            unsafe {
+                self.emu.run();
+            }
+        }
+
+        fn g2h(&self, addr: u64) -> u64 {
+            self.emu.g2h::<*const u8>(addr) as u64
+        }
+
+        fn h2g(&self, addr: u64) -> u64 {
+            self.emu.h2g(unsafe { transmute::<_, *const u8>(addr) })
+        }
+
+        fn binary_path(&self) -> String {
+            self.emu.binary_path().to_owned()
+        }
+
+        fn load_addr(&self) -> u64 {
+            self.emu.load_addr()
+        }
+
+        fn map_private(&self, addr: u64, size: usize, perms: i32) -> PyResult<u64> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.emu
+                    .map_private(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
+
+        fn unmap(&self, addr: u64, size: usize) -> PyResult<()> {
+            self.emu.unmap(addr, size).map_err(PyValueError::new_err)
+        }
+
+        fn set_syscall_hook(&self, hook: PyObject) {
+            unsafe {
+                PY_SYSCALL_HOOK = Some(hook);
+            }
+            self.emu.set_pre_syscall_hook(py_syscall_hook_wrapper);
+        }
+
+        fn set_hook(&self, addr: u64, hook: PyObject) {
+            unsafe {
+                let idx = PY_GENERIC_HOOKS.len();
+                PY_GENERIC_HOOKS.push((addr, hook));
+                self.emu.set_hook(addr, py_generic_hook_wrapper, idx as u64);
+            }
+        }
+
+        fn remove_hook(&self, addr: u64) {
+            unsafe {
+                PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
+            }
+            self.emu.remove_hook(addr);
+        }
+    }
+}

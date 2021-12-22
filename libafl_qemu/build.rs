@@ -36,34 +36,25 @@ fn main() {
         return;
     }
 
-    // Make sure we have at least and at most one architecutre feature set
+    // Make sure we have at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
     assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
-    #[cfg(not(any(
-        feature = "arm",
-        feature = "aarch64",
-        feature = "i386",
-        feature = "x86_64"
-    )))]
-    println!(
-        "cargo:warning=No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
-    );
 
-    let cpu_target = if cfg!(feature = "clippy") {
-        // assume x86_64 for clippy
-        "x86_64"
+    let cpu_target = if cfg!(feature = "x86_64") {
+        "x86_64".to_string()
     } else if cfg!(feature = "arm") {
-        "arm"
+        "arm".to_string()
     } else if cfg!(feature = "aarch64") {
-        "aarch64"
+        "aarch64".to_string()
     } else if cfg!(feature = "i386") {
-        "368"
+        "i368".to_string()
     } else {
-        // if cfg!(feature = "x86_64") {
-        "x86_64"
-        /*} else {
-        panic!("No architecture feture enabled for libafl_qemu");
-        */
+        env::var("CPU_TARGET").unwrap_or_else(|_| {
+            println!(
+                "cargo:warning=No architecture feature enabled or CPU_TARGET env specified for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
+            );
+            "x86_64".to_string()
+        })
     };
 
     let jobs = env::var("CARGO_BUILD_JOBS");

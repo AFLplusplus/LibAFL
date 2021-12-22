@@ -334,6 +334,7 @@ where
 pub mod pybind {
     use crate::qemu;
     use libafl::bolts::os::Cores;
+    use libafl_qemu::emu::pybind::Emulator;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
     use std::path::PathBuf;
@@ -364,7 +365,7 @@ pub mod pybind {
         }
 
         #[allow(clippy::needless_pass_by_value)]
-        pub fn run(&self, harness: PyObject) {
+        pub fn run(&self, emulator: &Emulator, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
                 .input_dirs(&self.input_dirs)
                 .output_dir(self.output_dir.clone())
@@ -379,7 +380,7 @@ pub mod pybind {
                     .unwrap();
                 })
                 .build()
-                .run();
+                .run(&emulator.emu);
         }
     }
 
