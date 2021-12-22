@@ -486,7 +486,7 @@ where
     }
 
     pub fn emulator(&self) -> &Emulator {
-        &self.emulator
+        self.emulator
     }
 
     #[allow(clippy::unused_self)]

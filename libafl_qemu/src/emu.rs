@@ -297,6 +297,8 @@ pub struct Emulator {
     _private: (),
 }
 
+
+#[allow(clippy::unused_self)]
 impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(args: &[String], env: &[(String, String)]) -> Emulator {
@@ -326,10 +328,12 @@ impl Emulator {
         Emulator { _private: () }
     }
 
+    #[must_use]
     pub(crate) fn new_empty() -> Emulator {
         Emulator { _private: () }
     }
 
+    #[must_use]
     pub fn mappings(&self) -> GuestMaps {
         GuestMaps::new()
     }
