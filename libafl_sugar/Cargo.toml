@@ -15,13 +15,20 @@ build = "build.rs"
 python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]
 default = []
 
+# for libafl_qemu
+# The following architecture features are mutually exclusive.
+x86_64 = ["libafl_qemu/x86_64"] # build qemu for x86_64 (default)
+i386 = ["libafl_qemu/i386"] # build qemu for i386
+arm = ["libafl_qemu/arm"] # build qemu for arm
+aarch64 = ["libafl_qemu/aarch64"] # build qemu for aarch64
+
 [build-dependencies]
 pyo3-build-config = { version = "0.14.5", optional = true }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.7.0" }
 libafl_targets = { path = "../libafl_targets", version = "0.7.0" }
-libafl_qemu = { path = "../libafl_qemu", version = "0.7.0", features = ["x86_64"] }
+libafl_qemu = { path = "../libafl_qemu", version = "0.7.0" }
 typed-builder = "0.9.1" # Implement the builder pattern at compiletime
 #pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
 pyo3 = { version = "0.15", optional = true }

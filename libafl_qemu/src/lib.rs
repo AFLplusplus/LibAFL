@@ -1,40 +1,23 @@
 use std::env;
 
-#[cfg(feature = "aarch64")]
+#[cfg(cpu_target = "aarch64")]
 pub mod aarch64;
-#[cfg(all(feature = "aarch64", not(feature = "clippy")))]
+#[cfg(all(cpu_target = "aarch64", not(feature = "clippy")))]
 pub use aarch64::*;
 
-#[cfg(feature = "arm")]
+#[cfg(cpu_target = "arm")]
 pub mod arm;
-#[cfg(all(feature = "arm", not(feature = "clippy")))]
+#[cfg(all(cpu_target = "arm", not(feature = "clippy")))]
 pub use arm::*;
 
-#[cfg(feature = "i386")]
+#[cfg(cpu_target = "i386")]
 pub mod i386;
-#[cfg(all(feature = "i386", not(feature = "clippy")))]
+#[cfg(all(cpu_target = "i386", not(feature = "clippy")))]
 pub use i386::*;
 
-// We default to x86_64, having a default makes CI easier :)
-#[cfg(any(
-    feature = "x86_64",
-    not(any(
-        feature = "arm",
-        feature = "aarch64",
-        feature = "i386",
-        feature = "x86_64"
-    ))
-))]
+#[cfg(cpu_target = "x86_64")]
 pub mod x86_64;
-#[cfg(any(
-    feature = "x86_64",
-    not(any(
-        feature = "arm",
-        feature = "aarch64",
-        feature = "i386",
-        feature = "x86_64"
-    ))
-))]
+#[cfg(cpu_target = "x86_64")]
 pub use x86_64::*;
 
 pub mod elf;
