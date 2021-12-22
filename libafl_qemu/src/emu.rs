@@ -238,9 +238,10 @@ pub struct GuestMaps {
     c_iter: *const c_void,
 }
 
-impl Default for GuestMaps {
+// Consider a private new only for Emulator
+impl GuestMaps {
     #[must_use]
-    fn default() -> Self {
+    pub(crate) fn new() -> Self {
         unsafe {
             let maps = read_self_maps();
             Self {
@@ -248,25 +249,6 @@ impl Default for GuestMaps {
                 c_iter: maps,
             }
         }
-    }
-}
-
-// Consider a private new only for Emulator
-#[cfg(feature = "python")]
-#[pymethods]
-impl GuestMaps {
-    #[new]
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[cfg(not(feature = "python"))]
-impl GuestMaps {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
     }
 }
 
@@ -346,6 +328,10 @@ impl Emulator {
 
     pub(crate) fn new_empty() -> Emulator {
         Emulator { _private: () }
+    }
+
+    pub fn mappings(&self) -> GuestMaps {
+        GuestMaps::new()
     }
 
     pub unsafe fn write_mem<T>(&self, addr: u64, buf: &[T]) {

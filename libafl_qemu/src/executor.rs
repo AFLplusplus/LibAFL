@@ -388,6 +388,51 @@ where
     res
 }
 
+static mut SYSCALL_POST_HOOKS: Vec<*const c_void> = vec![];
+extern "C" fn syscall_after_hooks_wrapper<I, QT, S>(
+    result: u64,
+    sys_num: i32,
+    a0: u64,
+    a1: u64,
+    a2: u64,
+    a3: u64,
+    a4: u64,
+    a5: u64,
+    a6: u64,
+    a7: u64,
+) -> u64
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
+    let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
+    let mut res = result;
+    for hook in unsafe { &SYSCALL_POST_HOOKS } {
+        #[allow(clippy::type_complexity)]
+        let func: fn(
+            &Emulator,
+            &mut QT,
+            &mut S,
+            u64,
+            i32,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+        ) -> u64 = unsafe { transmute(*hook) };
+        res = (func)(
+            &emulator, helpers, state, res, sys_num, a0, a1, a2, a3, a4, a5, a6, a7,
+        );
+    }
+    res
+}
+
 pub struct QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -690,6 +735,33 @@ where
         }
         self.emulator
             .set_pre_syscall_hook(syscall_hooks_wrapper::<I, QT, S>);
+    }
+
+    #[allow(clippy::unused_self)]
+    #[allow(clippy::type_complexity)]
+    pub fn hook_after_syscalls(
+        &self,
+        hook: fn(
+            &Emulator,
+            &mut QT,
+            &mut S,
+            result: u64,
+            sys_num: i32,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+        ) -> u64,
+    ) {
+        unsafe {
+            SYSCALL_POST_HOOKS.push(hook as *const _);
+        }
+        self.emulator
+            .set_post_syscall_hook(syscall_after_hooks_wrapper::<I, QT, S>);
     }
 }
 

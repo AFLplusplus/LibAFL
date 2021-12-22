@@ -2,7 +2,7 @@ use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, stat
 use std::collections::HashMap;
 
 use crate::{
-    emu::{Emulator, GuestMaps, SyscallHookResult},
+    emu::Emulator,
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple},
     SYS_mmap, SYS_mremap,
@@ -44,7 +44,7 @@ impl QemuSnapshotHelper {
     pub fn snapshot(&mut self, emulator: &Emulator) {
         self.brk = emulator.get_brk();
         self.pages.clear();
-        for map in GuestMaps::new() {
+        for map in emulator.mappings() {
             // TODO track all the pages OR track mproctect
             if !map.flags().is_w() {
                 continue;
@@ -141,7 +141,7 @@ where
         executor.hook_write1_execution(trace_write1_snapshot::<I, QT, S>);
         executor.hook_write_n_execution(trace_write_n_snapshot::<I, QT, S>);
 
-        executor.hook_syscalls(trace_mmap_snapshot::<I, QT, S>);
+        executor.hook_after_syscalls(trace_mmap_snapshot::<I, QT, S>);
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, _input: &I) {
@@ -239,30 +239,36 @@ pub fn trace_mmap_snapshot<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
     _state: &mut S,
+    result: u64,
     sys_num: i32,
     a0: u64,
     a1: u64,
-    _a2: u64,
+    a2: u64,
     _a3: u64,
     _a4: u64,
     _a5: u64,
     _a6: u64,
     _a7: u64,
-) -> SyscallHookResult
+) -> u64
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
+    if result == u64::MAX
+    /* -1 */
+    {
+        return result;
+    }
     if i64::from(sys_num) == SYS_mmap {
         let h = helpers
             .match_first_type_mut::<QemuSnapshotHelper>()
             .unwrap();
-        h.add_mapped(a0, a1 as usize);
-    } /*else if i64::from(sys_num) == SYS_mremap {
-          let h = helpers
-              .match_first_type_mut::<QemuSnapshotHelper>()
-              .unwrap();
-          h.add_mapped(a0, a1 as usize);
-      }*/
-    SyscallHookResult::new(None)
+        h.add_mapped(result, a1 as usize);
+    } else if i64::from(sys_num) == SYS_mremap {
+        let h = helpers
+            .match_first_type_mut::<QemuSnapshotHelper>()
+            .unwrap();
+        h.add_mapped(a0, a2 as usize);
+    }
+    result
 }
