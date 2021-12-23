@@ -53,6 +53,7 @@ pub fn fuzz() {
     let objective_dir = PathBuf::from("./crashes");
 
     // Initialize QEMU
+    env::remove_var("LD_LIBRARY_PATH");
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
     let emu = Emulator::new(&args, &env);
