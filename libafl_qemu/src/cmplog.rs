@@ -6,7 +6,7 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu,
+    emu::Emulator,
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
 };
@@ -70,14 +70,15 @@ where
         QT: QemuHelperTuple<I, S>,
     {
         executor.hook_cmp_generation(gen_unique_cmp_ids::<I, QT, S>);
-        emu::set_exec_cmp8_hook(trace_cmp8_cmplog);
-        emu::set_exec_cmp4_hook(trace_cmp4_cmplog);
-        emu::set_exec_cmp2_hook(trace_cmp2_cmplog);
-        emu::set_exec_cmp1_hook(trace_cmp1_cmplog);
+        executor.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
+        executor.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
+        executor.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
+        executor.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
     }
 }
 
 pub fn gen_unique_cmp_ids<I, QT, S>(
+    _emulator: &Emulator,
     helpers: &mut QT,
     state: &mut S,
     pc: u64,

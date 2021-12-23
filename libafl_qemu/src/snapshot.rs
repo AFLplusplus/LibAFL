@@ -2,11 +2,10 @@ use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, stat
 use std::collections::HashMap;
 
 use crate::{
-    emu,
-    emu::{GuestMaps, SyscallHookResult},
+    emu::Emulator,
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple},
-    SYS_mmap,
+    SYS_mmap, SYS_mremap,
 };
 
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
@@ -42,10 +41,10 @@ impl QemuSnapshotHelper {
         }
     }
 
-    pub fn snapshot(&mut self) {
-        self.brk = emu::get_brk();
+    pub fn snapshot(&mut self, emulator: &Emulator) {
+        self.brk = emulator.get_brk();
         self.pages.clear();
-        for map in GuestMaps::new() {
+        for map in emulator.mappings() {
             // TODO track all the pages OR track mproctect
             if !map.flags().is_w() {
                 continue;
@@ -57,7 +56,7 @@ impl QemuSnapshotHelper {
                     dirty: false,
                     data: [0; SNAPSHOT_PAGE_SIZE],
                 };
-                emu::read_mem(addr, &mut info.data);
+                unsafe { emulator.read_mem(addr, &mut info.data) };
                 self.pages.insert(addr, info);
                 addr += SNAPSHOT_PAGE_SIZE as u64;
             }
@@ -94,26 +93,26 @@ impl QemuSnapshotHelper {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self, emulator: &Emulator) {
         self.access_cache = [u64::MAX; 4];
         self.access_cache_idx = 0;
         while let Some(page) = self.dirty.pop() {
             if let Some(info) = self.pages.get_mut(&page) {
-                emu::write_mem(page, &info.data);
+                unsafe { emulator.write_mem(page, &info.data) };
                 info.dirty = false;
             }
         }
-        emu::set_brk(self.brk);
-        self.reset_maps();
+        emulator.set_brk(self.brk);
+        self.reset_maps(emulator);
     }
 
     pub fn add_mapped(&mut self, start: u64, size: usize) {
         self.new_maps.push((start, size));
     }
 
-    pub fn reset_maps(&mut self) {
+    pub fn reset_maps(&mut self, emulator: &Emulator) {
         for (addr, size) in &self.new_maps {
-            drop(emu::unmap(*addr, *size));
+            drop(emulator.unmap(*addr, *size));
         }
         self.new_maps.clear();
     }
@@ -142,20 +141,25 @@ where
         executor.hook_write1_execution(trace_write1_snapshot::<I, QT, S>);
         executor.hook_write_n_execution(trace_write_n_snapshot::<I, QT, S>);
 
-        executor.hook_syscalls(trace_mmap_snapshot::<I, QT, S>);
+        executor.hook_after_syscalls(trace_mmap_snapshot::<I, QT, S>);
     }
 
-    fn pre_exec(&mut self, _input: &I) {
+    fn pre_exec(&mut self, emulator: &Emulator, _input: &I) {
         if self.empty {
-            self.snapshot();
+            self.snapshot(emulator);
         } else {
-            self.reset();
+            self.reset(emulator);
         }
     }
 }
 
-pub fn trace_write1_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_write1_snapshot<I, QT, S>(
+    _emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
@@ -165,8 +169,13 @@ where
     h.access(addr, 1);
 }
 
-pub fn trace_write2_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_write2_snapshot<I, QT, S>(
+    _emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
@@ -176,8 +185,13 @@ where
     h.access(addr, 2);
 }
 
-pub fn trace_write4_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_write4_snapshot<I, QT, S>(
+    _emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
@@ -187,8 +201,13 @@ where
     h.access(addr, 4);
 }
 
-pub fn trace_write8_snapshot<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_write8_snapshot<I, QT, S>(
+    _emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
@@ -199,6 +218,7 @@ where
 }
 
 pub fn trace_write_n_snapshot<I, QT, S>(
+    _emulator: &Emulator,
     helpers: &mut QT,
     _state: &mut S,
     _id: u64,
@@ -216,27 +236,39 @@ pub fn trace_write_n_snapshot<I, QT, S>(
 
 #[allow(clippy::too_many_arguments)]
 pub fn trace_mmap_snapshot<I, QT, S>(
+    _emulator: &Emulator,
     helpers: &mut QT,
     _state: &mut S,
+    result: u64,
     sys_num: i32,
     a0: u64,
     a1: u64,
-    _a2: u64,
+    a2: u64,
     _a3: u64,
     _a4: u64,
     _a5: u64,
     _a6: u64,
     _a7: u64,
-) -> SyscallHookResult
+) -> u64
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
+    if result == u64::MAX
+    /* -1 */
+    {
+        return result;
+    }
     if i64::from(sys_num) == SYS_mmap {
         let h = helpers
             .match_first_type_mut::<QemuSnapshotHelper>()
             .unwrap();
-        h.add_mapped(a0, a1 as usize);
+        h.add_mapped(result, a1 as usize);
+    } else if i64::from(sys_num) == SYS_mremap {
+        let h = helpers
+            .match_first_type_mut::<QemuSnapshotHelper>()
+            .unwrap();
+        h.add_mapped(a0, a2 as usize);
     }
-    SyscallHookResult::new(None)
+    result
 }

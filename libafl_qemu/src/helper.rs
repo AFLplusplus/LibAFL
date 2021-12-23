@@ -3,7 +3,7 @@ use libafl::{
 };
 use std::ops::Range;
 
-use crate::executor::QemuExecutor;
+use crate::{emu::Emulator, executor::QemuExecutor};
 
 // TODO remove 'static when specialization will be stable
 pub trait QemuHelper<I, S>: 'static
@@ -18,9 +18,9 @@ where
     {
     }
 
-    fn pre_exec(&mut self, _input: &I) {}
+    fn pre_exec(&mut self, _emulator: &Emulator, _input: &I) {}
 
-    fn post_exec(&mut self, _input: &I) {}
+    fn post_exec(&mut self, _emulator: &Emulator, _input: &I) {}
 }
 
 pub trait QemuHelperTuple<I, S>: MatchFirstType
@@ -33,9 +33,9 @@ where
         OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>;
 
-    fn pre_exec_all(&mut self, input: &I);
+    fn pre_exec_all(&mut self, _emulator: &Emulator, input: &I);
 
-    fn post_exec_all(&mut self, input: &I);
+    fn post_exec_all(&mut self, _emulator: &Emulator, input: &I);
 }
 
 impl<I, S> QemuHelperTuple<I, S> for ()
@@ -50,9 +50,9 @@ where
     {
     }
 
-    fn pre_exec_all(&mut self, _input: &I) {}
+    fn pre_exec_all(&mut self, _emulator: &Emulator, _input: &I) {}
 
-    fn post_exec_all(&mut self, _input: &I) {}
+    fn post_exec_all(&mut self, _emulator: &Emulator, _input: &I) {}
 }
 
 impl<Head, Tail, I, S> QemuHelperTuple<I, S> for (Head, Tail)
@@ -71,14 +71,14 @@ where
         self.1.init_all(executor);
     }
 
-    fn pre_exec_all(&mut self, input: &I) {
-        self.0.pre_exec(input);
-        self.1.pre_exec_all(input);
+    fn pre_exec_all(&mut self, emulator: &Emulator, input: &I) {
+        self.0.pre_exec(emulator, input);
+        self.1.pre_exec_all(emulator, input);
     }
 
-    fn post_exec_all(&mut self, input: &I) {
-        self.0.post_exec(input);
-        self.1.post_exec_all(input);
+    fn post_exec_all(&mut self, emulator: &Emulator, input: &I) {
+        self.0.post_exec(emulator, input);
+        self.1.post_exec_all(emulator, input);
     }
 }
 

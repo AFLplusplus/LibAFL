@@ -226,31 +226,10 @@ extern "C" {
     static mut libafl_exec_cmp_hook8: unsafe extern "C" fn(u64, u64, u64);
     static mut libafl_gen_cmp_hook: unsafe extern "C" fn(u64, u32) -> u64;
 
-    static mut libafl_syscall_hook:
+    static mut libafl_pre_syscall_hook:
         unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
-}
-
-#[allow(clippy::must_use_candidate, clippy::similar_names)]
-pub fn init(args: &[String], env: &[(String, String)]) -> i32 {
-    assert!(!args.is_empty());
-    let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
-    let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
-    assert!(argv.len() < i32::MAX as usize);
-    let env_strs: Vec<String> = env
-        .iter()
-        .map(|(k, v)| format!("{}={}\0", &k, &v))
-        .collect();
-    let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
-    envp.push(null());
-    #[allow(clippy::cast_possible_wrap)]
-    let argc = argv.len() as i32;
-    unsafe {
-        qemu_user_init(
-            argc,
-            argv.as_ptr() as *const *const u8,
-            envp.as_ptr() as *const *const u8,
-        )
-    }
+    static mut libafl_post_syscall_hook:
+        unsafe extern "C" fn(u64, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> u64;
 }
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
@@ -259,9 +238,10 @@ pub struct GuestMaps {
     c_iter: *const c_void,
 }
 
-impl Default for GuestMaps {
+// Consider a private new only for Emulator
+impl GuestMaps {
     #[must_use]
-    fn default() -> Self {
+    pub(crate) fn new() -> Self {
         unsafe {
             let maps = read_self_maps();
             Self {
@@ -269,24 +249,6 @@ impl Default for GuestMaps {
                 c_iter: maps,
             }
         }
-    }
-}
-
-#[cfg(feature = "python")]
-#[pymethods]
-impl GuestMaps {
-    #[new]
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[cfg(not(feature = "python"))]
-impl GuestMaps {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
     }
 }
 
@@ -329,280 +291,494 @@ impl Drop for GuestMaps {
     }
 }
 
-pub fn write_mem<T>(addr: u64, buf: &[T]) {
-    let host_addr = g2h(addr);
-    unsafe {
+static mut EMULATOR_IS_INITIALIZED: bool = false;
+
+pub struct Emulator {
+    _private: (),
+}
+
+#[allow(clippy::unused_self)]
+impl Emulator {
+    #[allow(clippy::must_use_candidate, clippy::similar_names)]
+    pub fn new(args: &[String], env: &[(String, String)]) -> Emulator {
+        unsafe {
+            assert!(!EMULATOR_IS_INITIALIZED);
+        }
+        assert!(!args.is_empty());
+        let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();
+        let argv: Vec<*const u8> = args.iter().map(|x| x.as_bytes().as_ptr()).collect();
+        assert!(argv.len() < i32::MAX as usize);
+        let env_strs: Vec<String> = env
+            .iter()
+            .map(|(k, v)| format!("{}={}\0", &k, &v))
+            .collect();
+        let mut envp: Vec<*const u8> = env_strs.iter().map(|x| x.as_bytes().as_ptr()).collect();
+        envp.push(null());
+        #[allow(clippy::cast_possible_wrap)]
+        let argc = argv.len() as i32;
+        unsafe {
+            qemu_user_init(
+                argc,
+                argv.as_ptr() as *const *const u8,
+                envp.as_ptr() as *const *const u8,
+            );
+            EMULATOR_IS_INITIALIZED = true;
+        }
+        Emulator { _private: () }
+    }
+
+    #[must_use]
+    pub(crate) fn new_empty() -> Emulator {
+        Emulator { _private: () }
+    }
+
+    #[must_use]
+    pub fn mappings(&self) -> GuestMaps {
+        GuestMaps::new()
+    }
+
+    pub unsafe fn write_mem<T>(&self, addr: u64, buf: &[T]) {
+        let host_addr = self.g2h(addr);
         copy_nonoverlapping(
             buf.as_ptr() as *const _ as *const u8,
             host_addr,
             buf.len() * size_of::<T>(),
         );
     }
-}
 
-pub fn read_mem<T>(addr: u64, buf: &mut [T]) {
-    let host_addr = g2h(addr);
-    unsafe {
+    pub unsafe fn read_mem<T>(&self, addr: u64, buf: &mut [T]) {
+        let host_addr = self.g2h(addr);
         copy_nonoverlapping(
             host_addr as *const u8,
             buf.as_mut_ptr() as *mut _ as *mut u8,
             buf.len() * size_of::<T>(),
         );
     }
-}
 
-#[must_use]
-pub fn num_regs() -> i32 {
-    unsafe { libafl_qemu_num_regs() }
-}
-
-pub fn write_reg<R, T>(reg: R, val: T) -> Result<(), String>
-where
-    T: Num + PartialOrd + Copy,
-    R: Into<i32>,
-{
-    let reg = reg.into();
-    let success = unsafe { libafl_qemu_write_reg(reg, &val as *const _ as *const u8) };
-    if success == 0 {
-        Err(format!("Failed to write to register {}", reg))
-    } else {
-        Ok(())
+    #[must_use]
+    pub fn num_regs(&self) -> i32 {
+        unsafe { libafl_qemu_num_regs() }
     }
-}
 
-pub fn read_reg<R, T>(reg: R) -> Result<T, String>
-where
-    T: Num + PartialOrd + Copy,
-    R: Into<i32>,
-{
-    let reg = reg.into();
-    let mut val = T::zero();
-    let success = unsafe { libafl_qemu_read_reg(reg, &mut val as *mut _ as *mut u8) };
-    if success == 0 {
-        Err(format!("Failed to read register {}", reg))
-    } else {
-        Ok(val)
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    where
+        T: Num + PartialOrd + Copy,
+        R: Into<i32>,
+    {
+        let reg = reg.into();
+        let success = unsafe { libafl_qemu_write_reg(reg, &val as *const _ as *const u8) };
+        if success == 0 {
+            Err(format!("Failed to write to register {}", reg))
+        } else {
+            Ok(())
+        }
     }
-}
 
-pub fn set_breakpoint(addr: u64) {
-    unsafe {
-        libafl_qemu_set_breakpoint(addr);
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    where
+        T: Num + PartialOrd + Copy,
+        R: Into<i32>,
+    {
+        let reg = reg.into();
+        let mut val = T::zero();
+        let success = unsafe { libafl_qemu_read_reg(reg, &mut val as *mut _ as *mut u8) };
+        if success == 0 {
+            Err(format!("Failed to read register {}", reg))
+        } else {
+            Ok(val)
+        }
     }
-}
 
-pub fn remove_breakpoint(addr: u64) {
-    unsafe {
-        libafl_qemu_remove_breakpoint(addr);
+    pub fn set_breakpoint(&self, addr: u64) {
+        unsafe {
+            libafl_qemu_set_breakpoint(addr);
+        }
     }
-}
 
-pub fn set_hook(addr: u64, callback: extern "C" fn(u64), val: u64) {
-    unsafe {
-        libafl_qemu_set_hook(addr, callback, val);
+    pub fn remove_breakpoint(&self, addr: u64) {
+        unsafe {
+            libafl_qemu_remove_breakpoint(addr);
+        }
     }
-}
 
-pub fn remove_hook(addr: u64) {
-    unsafe {
-        libafl_qemu_remove_hook(addr);
+    pub fn set_hook(&self, addr: u64, callback: extern "C" fn(u64), val: u64) {
+        unsafe {
+            libafl_qemu_set_hook(addr, callback, val);
+        }
     }
-}
 
-pub fn run() {
-    unsafe {
+    pub fn remove_hook(&self, addr: u64) {
+        unsafe {
+            libafl_qemu_remove_hook(addr);
+        }
+    }
+
+    pub unsafe fn run(&self) {
         libafl_qemu_run();
     }
+
+    #[must_use]
+    pub fn g2h<T>(&self, addr: u64) -> *mut T {
+        unsafe { transmute(addr + guest_base as u64) }
+    }
+
+    #[must_use]
+    pub fn h2g<T>(&self, addr: *const T) -> u64 {
+        unsafe { (addr as usize - guest_base) as u64 }
+    }
+
+    #[must_use]
+    pub fn binary_path<'a>(&self) -> &'a str {
+        unsafe { from_utf8_unchecked(from_raw_parts(exec_path, strlen(exec_path))) }
+    }
+
+    #[must_use]
+    pub fn load_addr(&self) -> u64 {
+        unsafe { libafl_load_addr() }
+    }
+
+    #[must_use]
+    pub fn get_brk(&self) -> u64 {
+        unsafe { libafl_get_brk() }
+    }
+
+    pub fn set_brk(&self, brk: u64) {
+        unsafe { libafl_set_brk(brk) };
+    }
+
+    pub fn map_private(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
+        let res = unsafe {
+            target_mmap(
+                addr,
+                size as u64,
+                perms.into(),
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                -1,
+                0,
+            )
+        };
+        if res == 0 {
+            Err(format!("Failed to map {}", addr))
+        } else {
+            Ok(res)
+        }
+    }
+
+    pub fn unmap(&self, addr: u64, size: usize) -> Result<(), String> {
+        if unsafe { target_munmap(addr, size as u64) } == 0 {
+            Ok(())
+        } else {
+            Err(format!("Failed to unmap {}", addr))
+        }
+    }
+
+    // TODO add has_X_hook() and panic when setting a hook for the second time
+
+    pub fn set_exec_edge_hook(&self, hook: extern "C" fn(id: u64)) {
+        unsafe {
+            libafl_exec_edge_hook = hook;
+        }
+    }
+
+    pub fn set_gen_edge_hook(&self, hook: extern "C" fn(src: u64, dest: u64) -> u64) {
+        unsafe {
+            libafl_gen_edge_hook = hook;
+        }
+    }
+
+    pub fn set_exec_block_hook(&self, hook: extern "C" fn(pc: u64)) {
+        unsafe {
+            libafl_exec_block_hook = hook;
+        }
+    }
+
+    pub fn set_gen_block_hook(&self, hook: extern "C" fn(pc: u64) -> u64) {
+        unsafe {
+            libafl_gen_block_hook = hook;
+        }
+    }
+
+    pub fn set_exec_read1_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
+        unsafe {
+            libafl_exec_read_hook1 = hook;
+        }
+    }
+
+    pub fn set_exec_read2_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
+        unsafe {
+            libafl_exec_read_hook2 = hook;
+        }
+    }
+
+    pub fn set_exec_read4_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
+        unsafe {
+            libafl_exec_read_hook4 = hook;
+        }
+    }
+
+    pub fn set_exec_read8_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
+        unsafe {
+            libafl_exec_read_hook8 = hook;
+        }
+    }
+
+    pub fn set_exec_read_n_hook(&self, hook: extern "C" fn(id: u64, addr: u64, size: u32)) {
+        unsafe {
+            libafl_exec_read_hookN = hook;
+        }
+    }
+
+    pub fn set_gen_read_hook(&self, hook: extern "C" fn(size: u32) -> u64) {
+        unsafe {
+            libafl_gen_read_hook = hook;
+        }
+    }
+
+    pub fn set_exec_write1_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
+        unsafe {
+            libafl_exec_write_hook1 = hook;
+        }
+    }
+
+    pub fn set_exec_write2_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
+        unsafe {
+            libafl_exec_write_hook2 = hook;
+        }
+    }
+
+    pub fn set_exec_write4_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
+        unsafe {
+            libafl_exec_write_hook4 = hook;
+        }
+    }
+
+    pub fn set_exec_write8_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
+        unsafe {
+            libafl_exec_write_hook8 = hook;
+        }
+    }
+
+    pub fn set_exec_write_n_hook(&self, hook: extern "C" fn(id: u64, addr: u64, size: u32)) {
+        unsafe {
+            libafl_exec_write_hookN = hook;
+        }
+    }
+
+    // TODO add pc arg
+    pub fn set_gen_write_hook(&self, hook: extern "C" fn(size: u32) -> u64) {
+        unsafe {
+            libafl_gen_write_hook = hook;
+        }
+    }
+
+    pub fn set_exec_cmp1_hook(&self, hook: extern "C" fn(id: u64, v0: u8, v1: u8)) {
+        unsafe {
+            libafl_exec_cmp_hook1 = hook;
+        }
+    }
+
+    pub fn set_exec_cmp2_hook(&self, hook: extern "C" fn(id: u64, v0: u16, v1: u16)) {
+        unsafe {
+            libafl_exec_cmp_hook2 = hook;
+        }
+    }
+
+    pub fn set_exec_cmp4_hook(&self, hook: extern "C" fn(id: u64, v0: u32, v1: u32)) {
+        unsafe {
+            libafl_exec_cmp_hook4 = hook;
+        }
+    }
+
+    pub fn set_exec_cmp8_hook(&self, hook: extern "C" fn(id: u64, v0: u64, v1: u64)) {
+        unsafe {
+            libafl_exec_cmp_hook8 = hook;
+        }
+    }
+
+    pub fn set_gen_cmp_hook(&self, hook: extern "C" fn(pc: u64, size: u32) -> u64) {
+        unsafe {
+            libafl_gen_cmp_hook = hook;
+        }
+    }
+
+    pub fn set_pre_syscall_hook(
+        &self,
+        hook: extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
+    ) {
+        unsafe {
+            libafl_pre_syscall_hook = hook;
+        }
+    }
+
+    pub fn set_post_syscall_hook(
+        &self,
+        hook: extern "C" fn(u64, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> u64,
+    ) {
+        unsafe {
+            libafl_post_syscall_hook = hook;
+        }
+    }
 }
 
-#[must_use]
-pub fn g2h<T>(addr: u64) -> *mut T {
-    unsafe { transmute(addr + guest_base as u64) }
-}
+#[cfg(feature = "python")]
+pub mod pybind {
+    use super::{MmapPerms, SyscallHookResult};
+    use core::mem::transmute;
+    use pyo3::exceptions::PyValueError;
+    use pyo3::{prelude::*, types::PyInt};
+    use std::convert::TryFrom;
 
-#[must_use]
-pub fn h2g<T>(addr: *const T) -> u64 {
-    unsafe { (addr as usize - guest_base) as u64 }
-}
+    static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
+    static mut PY_GENERIC_HOOKS: Vec<(u64, PyObject)> = vec![];
 
-#[must_use]
-pub fn binary_path<'a>() -> &'a str {
-    unsafe { from_utf8_unchecked(from_raw_parts(exec_path, strlen(exec_path))) }
-}
-
-#[must_use]
-pub fn load_addr() -> u64 {
-    unsafe { libafl_load_addr() }
-}
-
-#[must_use]
-pub fn get_brk() -> u64 {
-    unsafe { libafl_get_brk() }
-}
-
-pub fn set_brk(brk: u64) {
-    unsafe { libafl_set_brk(brk) };
-}
-
-pub fn map_private(addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
-    let res = unsafe {
-        target_mmap(
-            addr,
-            size as u64,
-            perms.into(),
-            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-            -1,
-            0,
+    extern "C" fn py_syscall_hook_wrapper(
+        sys_num: i32,
+        a0: u64,
+        a1: u64,
+        a2: u64,
+        a3: u64,
+        a4: u64,
+        a5: u64,
+        a6: u64,
+        a7: u64,
+    ) -> SyscallHookResult {
+        unsafe { PY_SYSCALL_HOOK.as_ref() }.map_or_else(
+            || SyscallHookResult::new(None),
+            |obj| {
+                let args = (sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
+                Python::with_gil(|py| {
+                    let ret = obj.call1(py, args).expect("Error in the syscall hook");
+                    let any = ret.as_ref(py);
+                    if any.is_none() {
+                        SyscallHookResult::new(None)
+                    } else {
+                        let a: Result<&PyInt, _> = any.cast_as();
+                        if let Ok(i) = a {
+                            SyscallHookResult::new(Some(
+                                i.extract().expect("Invalid syscall hook return value"),
+                            ))
+                        } else {
+                            SyscallHookResult::extract(any)
+                                .expect("The syscall hook must return a SyscallHookResult")
+                        }
+                    }
+                })
+            },
         )
-    };
-    if res == 0 {
-        Err(format!("Failed to map {}", addr))
-    } else {
-        Ok(res)
     }
-}
 
-pub fn unmap(addr: u64, size: usize) -> Result<(), String> {
-    if unsafe { target_munmap(addr, size as u64) } == 0 {
-        Ok(())
-    } else {
-        Err(format!("Failed to unmap {}", addr))
+    extern "C" fn py_generic_hook_wrapper(idx: u64) {
+        let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
+        Python::with_gil(|py| {
+            obj.call0(py).expect("Error in the hook");
+        });
     }
-}
 
-// TODO add has_X_hook() and panic when setting a hook for the second time
-
-pub fn set_exec_edge_hook(hook: extern "C" fn(id: u64)) {
-    unsafe {
-        libafl_exec_edge_hook = hook;
+    #[pyclass(unsendable)]
+    pub struct Emulator {
+        pub emu: super::Emulator,
     }
-}
 
-pub fn set_gen_edge_hook(hook: extern "C" fn(src: u64, dest: u64) -> u64) {
-    unsafe {
-        libafl_gen_edge_hook = hook;
-    }
-}
+    #[pymethods]
+    impl Emulator {
+        #[allow(clippy::needless_pass_by_value)]
+        #[new]
+        fn new(args: Vec<String>, env: Vec<(String, String)>) -> Emulator {
+            Emulator {
+                emu: super::Emulator::new(&args, &env),
+            }
+        }
 
-pub fn set_exec_block_hook(hook: extern "C" fn(pc: u64)) {
-    unsafe {
-        libafl_exec_block_hook = hook;
-    }
-}
+        fn write_mem(&self, addr: u64, buf: &[u8]) {
+            unsafe {
+                self.emu.write_mem(addr, buf);
+            }
+        }
 
-pub fn set_gen_block_hook(hook: extern "C" fn(pc: u64) -> u64) {
-    unsafe {
-        libafl_gen_block_hook = hook;
-    }
-}
+        fn read_mem(&self, addr: u64, size: usize) -> Vec<u8> {
+            let mut buf = vec![0; size];
+            unsafe {
+                self.emu.read_mem(addr, &mut buf);
+            }
+            buf
+        }
 
-pub fn set_exec_read1_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe {
-        libafl_exec_read_hook1 = hook;
-    }
-}
+        fn num_regs(&self) -> i32 {
+            self.emu.num_regs()
+        }
 
-pub fn set_exec_read2_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe {
-        libafl_exec_read_hook2 = hook;
-    }
-}
+        fn write_reg(&self, reg: i32, val: u64) -> PyResult<()> {
+            self.emu.write_reg(reg, val).map_err(PyValueError::new_err)
+        }
 
-pub fn set_exec_read4_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe {
-        libafl_exec_read_hook4 = hook;
-    }
-}
+        fn read_reg(&self, reg: i32) -> PyResult<u64> {
+            self.emu.read_reg(reg).map_err(PyValueError::new_err)
+        }
 
-pub fn set_exec_read8_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe {
-        libafl_exec_read_hook8 = hook;
-    }
-}
+        fn set_breakpoint(&self, addr: u64) {
+            self.emu.set_breakpoint(addr);
+        }
 
-pub fn set_exec_read_n_hook(hook: extern "C" fn(id: u64, addr: u64, size: u32)) {
-    unsafe {
-        libafl_exec_read_hookN = hook;
-    }
-}
+        fn remove_breakpoint(&self, addr: u64) {
+            self.emu.remove_breakpoint(addr);
+        }
 
-pub fn set_gen_read_hook(hook: extern "C" fn(size: u32) -> u64) {
-    unsafe {
-        libafl_gen_read_hook = hook;
-    }
-}
+        fn run(&self) {
+            unsafe {
+                self.emu.run();
+            }
+        }
 
-pub fn set_exec_write1_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe {
-        libafl_exec_write_hook1 = hook;
-    }
-}
+        fn g2h(&self, addr: u64) -> u64 {
+            self.emu.g2h::<*const u8>(addr) as u64
+        }
 
-pub fn set_exec_write2_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe {
-        libafl_exec_write_hook2 = hook;
-    }
-}
+        fn h2g(&self, addr: u64) -> u64 {
+            self.emu.h2g(unsafe { transmute::<_, *const u8>(addr) })
+        }
 
-pub fn set_exec_write4_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe {
-        libafl_exec_write_hook4 = hook;
-    }
-}
+        fn binary_path(&self) -> String {
+            self.emu.binary_path().to_owned()
+        }
 
-pub fn set_exec_write8_hook(hook: extern "C" fn(id: u64, addr: u64)) {
-    unsafe {
-        libafl_exec_write_hook8 = hook;
-    }
-}
+        fn load_addr(&self) -> u64 {
+            self.emu.load_addr()
+        }
 
-pub fn set_exec_write_n_hook(hook: extern "C" fn(id: u64, addr: u64, size: u32)) {
-    unsafe {
-        libafl_exec_write_hookN = hook;
-    }
-}
+        fn map_private(&self, addr: u64, size: usize, perms: i32) -> PyResult<u64> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.emu
+                    .map_private(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
 
-// TODO add pc arg
-pub fn set_gen_write_hook(hook: extern "C" fn(size: u32) -> u64) {
-    unsafe {
-        libafl_gen_write_hook = hook;
-    }
-}
+        fn unmap(&self, addr: u64, size: usize) -> PyResult<()> {
+            self.emu.unmap(addr, size).map_err(PyValueError::new_err)
+        }
 
-pub fn set_exec_cmp1_hook(hook: extern "C" fn(id: u64, v0: u8, v1: u8)) {
-    unsafe {
-        libafl_exec_cmp_hook1 = hook;
-    }
-}
+        fn set_syscall_hook(&self, hook: PyObject) {
+            unsafe {
+                PY_SYSCALL_HOOK = Some(hook);
+            }
+            self.emu.set_pre_syscall_hook(py_syscall_hook_wrapper);
+        }
 
-pub fn set_exec_cmp2_hook(hook: extern "C" fn(id: u64, v0: u16, v1: u16)) {
-    unsafe {
-        libafl_exec_cmp_hook2 = hook;
-    }
-}
+        fn set_hook(&self, addr: u64, hook: PyObject) {
+            unsafe {
+                let idx = PY_GENERIC_HOOKS.len();
+                PY_GENERIC_HOOKS.push((addr, hook));
+                self.emu.set_hook(addr, py_generic_hook_wrapper, idx as u64);
+            }
+        }
 
-pub fn set_exec_cmp4_hook(hook: extern "C" fn(id: u64, v0: u32, v1: u32)) {
-    unsafe {
-        libafl_exec_cmp_hook4 = hook;
-    }
-}
-
-pub fn set_exec_cmp8_hook(hook: extern "C" fn(id: u64, v0: u64, v1: u64)) {
-    unsafe {
-        libafl_exec_cmp_hook8 = hook;
-    }
-}
-
-pub fn set_gen_cmp_hook(hook: extern "C" fn(pc: u64, size: u32) -> u64) {
-    unsafe {
-        libafl_gen_cmp_hook = hook;
-    }
-}
-
-pub fn set_syscall_hook(
-    hook: extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
-) {
-    unsafe {
-        libafl_syscall_hook = hook;
+        fn remove_hook(&self, addr: u64) {
+            unsafe {
+                PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
+            }
+            self.emu.remove_hook(addr);
+        }
     }
 }

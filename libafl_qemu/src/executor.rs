@@ -15,7 +15,10 @@ use libafl::{
 };
 
 pub use crate::emu::SyscallHookResult;
-use crate::{emu, emu::SKIP_EXEC_HOOK, helper::QemuHelperTuple};
+use crate::{
+    emu::{Emulator, SKIP_EXEC_HOOK},
+    helper::QemuHelperTuple,
+};
 
 static mut QEMU_HELPERS_PTR: *const c_void = ptr::null();
 
@@ -28,8 +31,10 @@ where
     unsafe {
         let helpers = (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap();
         let state = inprocess_get_state::<S>().unwrap();
-        let func: fn(&mut QT, &mut S, u64, u64) -> Option<u64> = transmute(GEN_EDGE_HOOK_PTR);
-        (func)(helpers, state, src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
+        let emulator = Emulator::new_empty();
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) -> Option<u64> =
+            transmute(GEN_EDGE_HOOK_PTR);
+        (func)(&emulator, helpers, state, src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
 
@@ -41,9 +46,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &EDGE_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id);
+        let func: fn(&Emulator, &mut QT, &mut S, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id);
     }
 }
 
@@ -56,8 +62,9 @@ where
     unsafe {
         let helpers = (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap();
         let state = inprocess_get_state::<S>().unwrap();
-        let func: fn(&mut QT, &mut S, u64) -> Option<u64> = transmute(GEN_EDGE_HOOK_PTR);
-        (func)(helpers, state, pc).map_or(SKIP_EXEC_HOOK, |id| id)
+        let emulator = Emulator::new_empty();
+        let func: fn(&Emulator, &mut QT, &mut S, u64) -> Option<u64> = transmute(GEN_EDGE_HOOK_PTR);
+        (func)(&emulator, helpers, state, pc).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
 
@@ -69,9 +76,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &BLOCK_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id);
+        let func: fn(&Emulator, &mut QT, &mut S, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id);
     }
 }
 
@@ -84,8 +92,10 @@ where
     unsafe {
         let helpers = (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap();
         let state = inprocess_get_state::<S>().unwrap();
-        let func: fn(&mut QT, &mut S, usize) -> Option<u64> = transmute(GEN_READ_HOOK_PTR);
-        (func)(helpers, state, size as usize).map_or(SKIP_EXEC_HOOK, |id| id)
+        let emulator = Emulator::new_empty();
+        let func: fn(&Emulator, &mut QT, &mut S, usize) -> Option<u64> =
+            transmute(GEN_READ_HOOK_PTR);
+        (func)(&emulator, helpers, state, size as usize).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
 
@@ -98,8 +108,10 @@ where
     unsafe {
         let helpers = (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap();
         let state = inprocess_get_state::<S>().unwrap();
-        let func: fn(&mut QT, &mut S, usize) -> Option<u64> = transmute(GEN_WRITE_HOOK_PTR);
-        (func)(helpers, state, size as usize).map_or(SKIP_EXEC_HOOK, |id| id)
+        let emulator = Emulator::new_empty();
+        let func: fn(&Emulator, &mut QT, &mut S, usize) -> Option<u64> =
+            transmute(GEN_WRITE_HOOK_PTR);
+        (func)(&emulator, helpers, state, size as usize).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
 
@@ -111,9 +123,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &READ1_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr);
     }
 }
 
@@ -125,9 +138,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &READ2_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr);
     }
 }
 
@@ -139,9 +153,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &READ4_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr);
     }
 }
 
@@ -153,9 +168,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &READ8_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr);
     }
 }
 
@@ -167,9 +183,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &READ_N_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64, usize) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr, size as usize);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64, usize) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr, size as usize);
     }
 }
 
@@ -181,9 +198,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE1_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr);
     }
 }
 
@@ -195,9 +213,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE2_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr);
     }
 }
 
@@ -209,9 +228,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE4_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr);
     }
 }
 
@@ -223,9 +243,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE8_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr);
     }
 }
 
@@ -237,9 +258,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE_N_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64, usize) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, addr, size as usize);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64, usize) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr, size as usize);
     }
 }
 
@@ -252,8 +274,10 @@ where
     unsafe {
         let helpers = (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap();
         let state = inprocess_get_state::<S>().unwrap();
-        let func: fn(&mut QT, &mut S, u64, usize) -> Option<u64> = transmute(GEN_CMP_HOOK_PTR);
-        (func)(helpers, state, pc, size as usize).map_or(SKIP_EXEC_HOOK, |id| id)
+        let emulator = Emulator::new_empty();
+        let func: fn(&Emulator, &mut QT, &mut S, u64, usize) -> Option<u64> =
+            transmute(GEN_CMP_HOOK_PTR);
+        (func)(&emulator, helpers, state, pc, size as usize).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
 
@@ -265,9 +289,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &CMP1_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u8, u8) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, v0, v1);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u8, u8) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, v0, v1);
     }
 }
 
@@ -279,9 +304,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &CMP2_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u16, u16) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, v0, v1);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u16, u16) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, v0, v1);
     }
 }
 
@@ -293,9 +319,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &CMP4_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u32, u32) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, v0, v1);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u32, u32) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, v0, v1);
     }
 }
 
@@ -307,9 +334,10 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     for hook in unsafe { &CMP8_HOOKS } {
-        let func: fn(&mut QT, &mut S, u64, u64, u64) = unsafe { transmute(*hook) };
-        (func)(helpers, state, id, v0, v1);
+        let func: fn(&Emulator, &mut QT, &mut S, u64, u64, u64) = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, v0, v1);
     }
 }
 
@@ -331,10 +359,12 @@ where
 {
     let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
     let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
     let mut res = SyscallHookResult::new(None);
     for hook in unsafe { &SYSCALL_HOOKS } {
         #[allow(clippy::type_complexity)]
         let func: fn(
+            &Emulator,
             &mut QT,
             &mut S,
             i32,
@@ -347,11 +377,58 @@ where
             u64,
             u64,
         ) -> SyscallHookResult = unsafe { transmute(*hook) };
-        let r = (func)(helpers, state, sys_num, a0, a1, a2, a3, a4, a5, a6, a7);
+        let r = (func)(
+            &emulator, helpers, state, sys_num, a0, a1, a2, a3, a4, a5, a6, a7,
+        );
         if r.skip_syscall {
             res.skip_syscall = true;
             res.retval = r.retval;
         }
+    }
+    res
+}
+
+static mut SYSCALL_POST_HOOKS: Vec<*const c_void> = vec![];
+extern "C" fn syscall_after_hooks_wrapper<I, QT, S>(
+    result: u64,
+    sys_num: i32,
+    a0: u64,
+    a1: u64,
+    a2: u64,
+    a3: u64,
+    a4: u64,
+    a5: u64,
+    a6: u64,
+    a7: u64,
+) -> u64
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    let helpers = unsafe { (QEMU_HELPERS_PTR as *mut QT).as_mut().unwrap() };
+    let state = inprocess_get_state::<S>().unwrap();
+    let emulator = Emulator::new_empty();
+    let mut res = result;
+    for hook in unsafe { &SYSCALL_POST_HOOKS } {
+        #[allow(clippy::type_complexity)]
+        let func: fn(
+            &Emulator,
+            &mut QT,
+            &mut S,
+            u64,
+            i32,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+        ) -> u64 = unsafe { transmute(*hook) };
+        res = (func)(
+            &emulator, helpers, state, res, sys_num, a0, a1, a2, a3, a4, a5, a6, a7,
+        );
     }
     res
 }
@@ -364,6 +441,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     helpers: QT,
+    emulator: &'a Emulator,
     inner: InProcessExecutor<'a, H, I, OT, S>,
 }
 
@@ -376,6 +454,7 @@ where
 {
     pub fn new<EM, OC, OF, Z>(
         harness_fn: &'a mut H,
+        emulator: &'a Emulator,
         helpers: QT,
         observers: OT,
         fuzzer: &mut Z,
@@ -391,6 +470,7 @@ where
     {
         let slf = Self {
             helpers,
+            emulator,
             inner: InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?,
         };
         slf.helpers.init_all(&slf);
@@ -405,184 +485,230 @@ where
         &mut self.inner
     }
 
+    pub fn emulator(&self) -> &Emulator {
+        self.emulator
+    }
+
     #[allow(clippy::unused_self)]
     pub fn hook_edge_generation(
         &self,
-        hook: fn(&mut QT, &mut S, src: u64, dest: u64) -> Option<u64>,
+        hook: fn(&Emulator, &mut QT, &mut S, src: u64, dest: u64) -> Option<u64>,
     ) {
         unsafe {
             GEN_EDGE_HOOK_PTR = hook as *const _;
         }
-        emu::set_gen_edge_hook(gen_edge_hook_wrapper::<I, QT, S>);
+        self.emulator
+            .set_gen_edge_hook(gen_edge_hook_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_edge_execution(&self, hook: fn(&mut QT, &mut S, id: u64)) {
+    pub fn hook_edge_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64)) {
         unsafe {
             EDGE_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_edge_hook(edge_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_edge_hook(edge_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_block_generation(&self, hook: fn(&mut QT, &mut S, pc: u64) -> Option<u64>) {
+    pub fn hook_block_generation(
+        &self,
+        hook: fn(&Emulator, &mut QT, &mut S, pc: u64) -> Option<u64>,
+    ) {
         unsafe {
             GEN_BLOCK_HOOK_PTR = hook as *const _;
         }
-        emu::set_gen_block_hook(gen_block_hook_wrapper::<I, QT, S>);
+        self.emulator
+            .set_gen_block_hook(gen_block_hook_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_block_execution(&self, hook: fn(&mut QT, &mut S, id: u64)) {
+    pub fn hook_block_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64)) {
         unsafe {
             BLOCK_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_block_hook(block_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_block_hook(block_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read_generation(&self, hook: fn(&mut QT, &mut S, size: usize) -> Option<u64>) {
+    pub fn hook_read_generation(
+        &self,
+        hook: fn(&Emulator, &mut QT, &mut S, size: usize) -> Option<u64>,
+    ) {
         unsafe {
             GEN_READ_HOOK_PTR = hook as *const _;
         }
-        emu::set_gen_read_hook(gen_read_hook_wrapper::<I, QT, S>);
+        self.emulator
+            .set_gen_read_hook(gen_read_hook_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read1_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_read1_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
         unsafe {
             READ1_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_read1_hook(read1_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_read1_hook(read1_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read2_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_read2_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
         unsafe {
             READ2_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_read2_hook(read2_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_read2_hook(read2_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read4_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_read4_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
         unsafe {
             READ4_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_read4_hook(read4_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_read4_hook(read4_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read8_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_read8_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
         unsafe {
             READ8_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_read8_hook(read8_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_read8_hook(read8_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
     pub fn hook_read_n_execution(
         &self,
-        hook: fn(&mut QT, &mut S, id: u64, addr: u64, size: usize),
+        hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64, size: usize),
     ) {
         unsafe {
             READ_N_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_read_n_hook(read_n_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_read_n_hook(read_n_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write_generation(&self, hook: fn(&mut QT, &mut S, size: usize) -> Option<u64>) {
+    pub fn hook_write_generation(
+        &self,
+        hook: fn(&Emulator, &mut QT, &mut S, size: usize) -> Option<u64>,
+    ) {
         unsafe {
             GEN_WRITE_HOOK_PTR = hook as *const _;
         }
-        emu::set_gen_write_hook(gen_write_hook_wrapper::<I, QT, S>);
+        self.emulator
+            .set_gen_write_hook(gen_write_hook_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write1_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_write1_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
         unsafe {
             WRITE1_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_write1_hook(write1_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_write1_hook(write1_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write2_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_write2_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
         unsafe {
             WRITE2_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_write2_hook(write2_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_write2_hook(write2_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write4_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_write4_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
         unsafe {
             WRITE4_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_write4_hook(write4_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_write4_hook(write4_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write8_execution(&self, hook: fn(&mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_write8_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
         unsafe {
             WRITE8_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_write8_hook(write8_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_write8_hook(write8_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
     pub fn hook_write_n_execution(
         &self,
-        hook: fn(&mut QT, &mut S, id: u64, addr: u64, size: usize),
+        hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64, size: usize),
     ) {
         unsafe {
             WRITE_N_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_write_n_hook(write_n_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_write_n_hook(write_n_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
     pub fn hook_cmp_generation(
         &self,
-        hook: fn(&mut QT, &mut S, pc: u64, size: usize) -> Option<u64>,
+        hook: fn(&Emulator, &mut QT, &mut S, pc: u64, size: usize) -> Option<u64>,
     ) {
         unsafe {
             GEN_CMP_HOOK_PTR = hook as *const _;
         }
-        emu::set_gen_cmp_hook(gen_cmp_hook_wrapper::<I, QT, S>);
+        self.emulator
+            .set_gen_cmp_hook(gen_cmp_hook_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_cmp1_execution(&self, hook: fn(&mut QT, &mut S, id: u64, v0: u8, v1: u8)) {
+    pub fn hook_cmp1_execution(
+        &self,
+        hook: fn(&Emulator, &mut QT, &mut S, id: u64, v0: u8, v1: u8),
+    ) {
         unsafe {
             CMP1_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_cmp1_hook(cmp1_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_cmp1_hook(cmp1_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_cmp2_execution(&self, hook: fn(&mut QT, &mut S, id: u64, v0: u16, v1: u16)) {
+    pub fn hook_cmp2_execution(
+        &self,
+        hook: fn(&Emulator, &mut QT, &mut S, id: u64, v0: u16, v1: u16),
+    ) {
         unsafe {
             CMP2_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_cmp2_hook(cmp2_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_cmp2_hook(cmp2_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_cmp4_execution(&self, hook: fn(&mut QT, &mut S, id: u64, v0: u32, v1: u32)) {
+    pub fn hook_cmp4_execution(
+        &self,
+        hook: fn(&Emulator, &mut QT, &mut S, id: u64, v0: u32, v1: u32),
+    ) {
         unsafe {
             CMP4_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_cmp4_hook(cmp4_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_cmp4_hook(cmp4_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_cmp8_execution(&self, hook: fn(&mut QT, &mut S, id: u64, v0: u64, v1: u64)) {
+    pub fn hook_cmp8_execution(
+        &self,
+        hook: fn(&Emulator, &mut QT, &mut S, id: u64, v0: u64, v1: u64),
+    ) {
         unsafe {
             CMP8_HOOKS.push(hook as *const _);
         }
-        emu::set_exec_cmp8_hook(cmp8_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_exec_cmp8_hook(cmp8_hooks_wrapper::<I, QT, S>);
     }
 
     #[allow(clippy::unused_self)]
@@ -590,6 +716,7 @@ where
     pub fn hook_syscalls(
         &self,
         hook: fn(
+            &Emulator,
             &mut QT,
             &mut S,
             sys_num: i32,
@@ -606,7 +733,35 @@ where
         unsafe {
             SYSCALL_HOOKS.push(hook as *const _);
         }
-        emu::set_syscall_hook(syscall_hooks_wrapper::<I, QT, S>);
+        self.emulator
+            .set_pre_syscall_hook(syscall_hooks_wrapper::<I, QT, S>);
+    }
+
+    #[allow(clippy::unused_self)]
+    #[allow(clippy::type_complexity)]
+    pub fn hook_after_syscalls(
+        &self,
+        hook: fn(
+            &Emulator,
+            &mut QT,
+            &mut S,
+            result: u64,
+            sys_num: i32,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+            u64,
+        ) -> u64,
+    ) {
+        unsafe {
+            SYSCALL_POST_HOOKS.push(hook as *const _);
+        }
+        self.emulator
+            .set_post_syscall_hook(syscall_after_hooks_wrapper::<I, QT, S>);
     }
 }
 
@@ -625,9 +780,9 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         unsafe { QEMU_HELPERS_PTR = &self.helpers as *const _ as *const c_void };
-        self.helpers.pre_exec_all(input);
+        self.helpers.pre_exec_all(self.emulator, input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
-        self.helpers.post_exec_all(input);
+        self.helpers.post_exec_all(self.emulator, input);
         unsafe { QEMU_HELPERS_PTR = ptr::null() };
         r
     }
