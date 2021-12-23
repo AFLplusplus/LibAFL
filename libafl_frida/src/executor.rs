@@ -76,7 +76,7 @@ where
                 libc::raise(libc::SIGABRT);
             }
         }
-        self.helper.post_exec(input);
+        self.helper.post_exec(input)?;
         res
     }
 }
