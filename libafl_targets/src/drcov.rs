@@ -46,6 +46,7 @@ impl DrCovBasicBlock {
 
 impl<'a> DrCovWriter<'a> {
     /// Create a new [`DrCovWriter`]
+    #[must_use]
     pub fn new(module_mapping: &'a RangeMap<usize, (u16, String)>) -> Self {
         Self { module_mapping }
     }

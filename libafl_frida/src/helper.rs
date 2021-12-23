@@ -2,7 +2,7 @@ use ahash::AHasher;
 use std::hash::Hasher;
 
 use libafl::inputs::{HasTargetBytes, Input};
-
+use libafl::Error;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 
 #[cfg(target_arch = "aarch64")]
