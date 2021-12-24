@@ -1,9 +1,6 @@
-use ahash::AHasher;
-use std::hash::Hasher;
-
 use libafl::inputs::{HasTargetBytes, Input};
 use libafl::Error;
-use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
+use libafl_targets::drcov::{DrCovBasicBlock};
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
@@ -46,6 +43,8 @@ use crate::{asan::asan_rt::AsanRuntime, FridaOptions};
 #[cfg(windows)]
 use crate::FridaOptions;
 
+use crate::drcov_rt::DrCovRuntime;
+
 use crate::coverage_rt::CoverageRuntime;
 
 #[cfg(feature = "cmplog")]
@@ -66,7 +65,7 @@ pub trait FridaHelper<'a> {
     fn register_thread(&mut self);
 
     /// Called prior to execution of an input
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 
     /// Called after execution of an input
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
@@ -93,10 +92,10 @@ pub struct FridaInstrumentationHelper<'a> {
     asan_runtime: AsanRuntime,
     #[cfg(feature = "cmplog")]
     cmplog_runtime: CmpLogRuntime,
+    drcov_runtime: DrCovRuntime,
     ranges: RangeMap<usize, (u16, String)>,
     module_map: ModuleMap,
     options: &'a FridaOptions,
-    drcov_basic_blocks: Vec<DrCovBasicBlock>,
 }
 
 impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
@@ -114,7 +113,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
 
     #[cfg(unix)]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>{
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:#x}: {:02x?}", slice.as_ptr() as usize, slice);
@@ -122,18 +121,11 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
             self.asan_runtime
                 .unpoison(slice.as_ptr() as usize, slice.len());
         }
+        Ok(())
     }
 
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        if self.options.drcov_enabled() {
-            let mut hasher = AHasher::new_with_keys(0, 0);
-            hasher.write(input.target_bytes().as_slice());
-
-            let filename = format!("./coverage/{:016x}.drcov", hasher.finish(),);
-            DrCovWriter::new(&self.ranges).write(&filename, &self.drcov_basic_blocks)?;
-            self.drcov_basic_blocks.clear();
-        }
-
+        self.drcov_runtime.post_exec(input)?;
         #[cfg(unix)]
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
@@ -246,10 +238,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
             asan_runtime: AsanRuntime::new(options.clone()),
             #[cfg(feature = "cmplog")]
             cmplog_runtime: CmpLogRuntime::new(),
+            drcov_runtime: DrCovRuntime::new(),
             ranges: RangeMap::new(),
             module_map: ModuleMap::new_from_names(modules_to_instrument),
             options,
-            drcov_basic_blocks: vec![],
         };
 
         if helper.options().stalker_enabled() {
@@ -309,8 +301,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                         helper.asan_runtime.real_address_for_stalked(pc(&context));
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
-                                    helper
-                                        .drcov_basic_blocks
+                                    helper.drcov_runtime.drcov_basic_blocks
                                         .push(DrCovBasicBlock::new(real_address, real_address + 4));
                                 });
                             }
