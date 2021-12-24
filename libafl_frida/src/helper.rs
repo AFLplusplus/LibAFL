@@ -1,6 +1,6 @@
 use libafl::inputs::{HasTargetBytes, Input};
 use libafl::Error;
-use libafl_targets::drcov::{DrCovBasicBlock};
+use libafl_targets::drcov::DrCovBasicBlock;
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
@@ -113,7 +113,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
 
     #[cfg(unix)]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>{
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:#x}: {:02x?}", slice.as_ptr() as usize, slice);
@@ -301,7 +301,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                         helper.asan_runtime.real_address_for_stalked(pc(&context));
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
-                                    helper.drcov_runtime.drcov_basic_blocks
+                                    helper
+                                        .drcov_runtime
+                                        .drcov_basic_blocks
                                         .push(DrCovBasicBlock::new(real_address, real_address + 4));
                                 });
                             }

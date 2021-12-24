@@ -1,10 +1,9 @@
-use std::hash::Hasher;
 use ahash::AHasher;
 use libafl::inputs::{HasTargetBytes, Input};
-use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use libafl::Error;
+use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
-
+use std::hash::Hasher;
 
 pub struct DrCovRuntime {
     pub drcov_basic_blocks: Vec<DrCovBasicBlock>,
@@ -33,6 +32,4 @@ impl DrCovRuntime {
 
         Ok(())
     }
-
-
 }
