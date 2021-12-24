@@ -11,6 +11,7 @@ pub struct DrCovRuntime {
 }
 
 impl DrCovRuntime {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             drcov_basic_blocks: vec![],
@@ -18,6 +19,11 @@ impl DrCovRuntime {
         }
     }
 
+    pub fn init(&mut self, ranges: &RangeMap<usize, (u16, String)>) {
+        self.ranges = ranges.clone();
+    }
+
+    #[allow(clippy::unused_self)]
     pub fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }

@@ -377,6 +377,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper.asan_runtime.init(gum, modules_to_instrument);
             }
+
+            helper.drcov_runtime.init(&helper.ranges);
             #[cfg(feature = "cmplog")]
             if helper.options.cmplog_enabled() {
                 helper.cmplog_runtime.init();
