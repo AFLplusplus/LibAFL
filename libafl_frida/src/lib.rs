@@ -37,6 +37,7 @@ pub struct FridaOptions {
     enable_asan_continue_after_error: bool,
     enable_asan_allocation_backtraces: bool,
     asan_max_allocation: usize,
+    asan_max_total_allocation: usize,
     asan_max_allocation_panics: bool,
     enable_coverage: bool,
     enable_drcov: bool,
@@ -78,6 +79,9 @@ impl FridaOptions {
                     }
                     "asan-max-allocation" => {
                         options.asan_max_allocation = value.parse().unwrap();
+                    }
+                    "asan-max-total-allocation" => {
+                        options.asan_max_total_allocation = value.parse().unwrap();
                     }
                     "asan-max-allocation-panics" => {
                         options.asan_max_allocation_panics = value.parse().unwrap();
@@ -208,6 +212,13 @@ impl FridaOptions {
         self.asan_max_allocation
     }
 
+    /// The maximum total allocation size that the ASAN allocator should allocate
+    #[must_use]
+    #[inline]
+    pub fn asan_max_total_allocation(&self) -> usize {
+        self.asan_max_total_allocation
+    }
+
     /// Should we panic if the max ASAN allocation size is exceeded
     #[must_use]
     #[inline]
@@ -252,6 +263,7 @@ impl Default for FridaOptions {
             enable_asan_continue_after_error: false,
             enable_asan_allocation_backtraces: true,
             asan_max_allocation: 1 << 30,
+            asan_max_total_allocation: 1 << 32,
             asan_max_allocation_panics: false,
             enable_coverage: true,
             enable_drcov: false,
