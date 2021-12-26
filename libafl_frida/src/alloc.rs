@@ -352,6 +352,8 @@ impl Allocator {
         for allocation in tmp_allocations {
             self.allocations.insert(allocation.address, allocation);
         }
+
+        self.total_allocation_size = 0;
     }
 
     pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
