@@ -19,6 +19,8 @@ pub mod cmplog_rt;
 /// The `LibAFL` firda helper
 pub mod helper;
 
+pub mod drcov_rt;
+
 /// The frida executor
 pub mod executor;
 
