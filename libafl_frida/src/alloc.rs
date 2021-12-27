@@ -28,6 +28,7 @@ pub struct Allocator {
     shadow_pages: RangeSet<usize>,
     allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
     largest_allocation: usize,
+    total_allocation_size: usize,
     base_mapping_addr: usize,
     current_mapping_addr: usize,
 }
@@ -70,7 +71,7 @@ impl Allocator {
         let mut shadow_bit = 0;
 
         #[cfg(all(target_arch = "aarch64", target_os = "android"))]
-        for try_shadow_bit in &[46usize, 36usize] {
+        for try_shadow_bit in &[44usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
             if unsafe {
                 mmap(
@@ -147,6 +148,7 @@ impl Allocator {
             shadow_pages: RangeSet::new(),
             allocation_queue: HashMap::new(),
             largest_allocation: 0,
+            total_allocation_size: 0,
             base_mapping_addr: addr + addr + addr,
             current_mapping_addr: addr + addr + addr,
         }
@@ -204,6 +206,11 @@ impl Allocator {
             return std::ptr::null_mut();
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;
+
+        if self.total_allocation_size + rounded_up_size > self.options.asan_max_total_allocation() {
+            return std::ptr::null_mut();
+        }
+        self.total_allocation_size += rounded_up_size;
 
         let metadata = if let Some(mut metadata) = self.find_smallest_fit(rounded_up_size) {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
@@ -345,6 +352,8 @@ impl Allocator {
         for allocation in tmp_allocations {
             self.allocations.insert(allocation.address, allocation);
         }
+
+        self.total_allocation_size = 0;
     }
 
     pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
