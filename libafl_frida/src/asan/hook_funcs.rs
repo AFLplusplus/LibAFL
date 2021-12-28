@@ -768,8 +768,9 @@ impl AsanRuntime {
     pub fn hook_strncmp(&mut self, s1: *const c_char, s2: *const c_char, n: usize) -> i32 {
         extern "C" {
             fn strncmp(s1: *const c_char, s2: *const c_char, n: usize) -> i32;
+            fn strnlen(s: *const c_char, n: usize) -> usize;
         }
-        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, n) {
+        if !(self.shadow_check_func().unwrap())(s1 as *const c_void, unsafe { strnlen(s1, n) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
@@ -778,7 +779,7 @@ impl AsanRuntime {
                 Backtrace::new(),
             )));
         }
-        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, n) {
+        if !(self.shadow_check_func().unwrap())(s2 as *const c_void, unsafe { strnlen(s2, n) }) {
             AsanErrors::get_mut().report_error(AsanError::BadFuncArgRead((
                 "strncmp".to_string(),
                 self.real_address_for_stalked(AsanRuntime::pc()),
