@@ -47,7 +47,7 @@ fn main() {
     } else if cfg!(feature = "aarch64") {
         "aarch64".to_string()
     } else if cfg!(feature = "i386") {
-        "i368".to_string()
+        "i386".to_string()
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             println!(
@@ -57,7 +57,7 @@ fn main() {
         })
     };
 
-    let jobs = env::var("CARGO_BUILD_JOBS");
+    let jobs = env::var("NUM_JOBS");
 
     let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
         println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({}) is not the host arch ({}))", cpu_target, env::consts::ARCH);
