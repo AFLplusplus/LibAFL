@@ -118,8 +118,13 @@ impl Allocator {
                 shadow_bit = try_shadow_bit;
             }
         }
-        assert!(shadow_bit != 0);
+        #[cfg(not(any(
+            target_os = "linux",
+            all(target_arch = "aarch64", target_os = "android")
+        )))]
+        todo!("Shadow region not yet supported for this platform!");
 
+        assert!(shadow_bit != 0);
         // attempt to pre-map the entire shadow-memory space
 
         let addr: usize = 1 << shadow_bit;
@@ -173,7 +178,7 @@ impl Allocator {
     }
 
     fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
-        for (current_size, list) in self.allocation_queue.iter_mut() {
+        for (current_size, list) in &mut self.allocation_queue {
             if *current_size >= size {
                 if let Some(metadata) = list.pop() {
                     return Some(metadata);

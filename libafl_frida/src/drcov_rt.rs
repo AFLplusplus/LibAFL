@@ -5,6 +5,7 @@ use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use std::hash::Hasher;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DrCovRuntime {
     pub drcov_basic_blocks: Vec<DrCovBasicBlock>,
     ranges: RangeMap<usize, (u16, String)>,
@@ -37,5 +38,11 @@ impl DrCovRuntime {
         self.drcov_basic_blocks.clear();
 
         Ok(())
+    }
+}
+
+impl Default for DrCovRuntime {
+    fn default() -> Self {
+        Self::new()
     }
 }

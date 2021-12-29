@@ -110,7 +110,7 @@ struct Opt {
     )]
     output: PathBuf,
 
-    /* 
+    /*
     #[structopt(
         parse(try_from_str = timeout_from_millis_str),
         short,
@@ -131,7 +131,6 @@ struct Opt {
     )]
     tokens: Vec<PathBuf>,
     */
-
     #[structopt(
         long,
         help = "The configuration this fuzzer runs with, for multiprocessing",

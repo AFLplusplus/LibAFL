@@ -112,11 +112,9 @@ where
         println!("spawning on cores: {:?}", self.cores);
 
         #[cfg(feature = "std")]
-        let stdout_file = if let Some(filename) = self.stdout_file {
-            Some(File::create(filename).unwrap())
-        } else {
-            None
-        };
+        let stdout_ffile = self
+            .stdout_file
+            .map(|filename| File::create(filename).unwrap());
 
         // Spawn clients
         let mut index = 0_u64;
