@@ -6,13 +6,10 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use frida_gum::NativePointer;
-use frida_gum::{ModuleDetails, RangeDetails};
-use hashbrown::HashMap;
-
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-
 use backtrace::Backtrace;
+use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
+use hashbrown::HashMap;
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 use crate::helper::FridaInstrumentationHelper;
 
