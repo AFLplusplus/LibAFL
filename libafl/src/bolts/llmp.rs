@@ -425,7 +425,7 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
     let map_size = shmem.len();
     let page = shmem2page_mut(shmem);
     #[cfg(all(feature = "llmp_debug", feature = "std"))]
-    dbg!("_llmp_page_init: page {}", *page);
+    dbg!("_llmp_page_init: page {}", &(*page));
 
     if !allow_reinit {
         assert!(
@@ -964,7 +964,7 @@ where
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         dbg!(
             page,
-            *page,
+            &(*page),
             (*page).size_used,
             buf_len_padded,
             EOP_MSG_SIZE,
@@ -1587,7 +1587,7 @@ where
                 &ret.shmem
             );
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            dbg!("PAGE: {}", *ret.page());
+            dbg!("PAGE: {}", &(*ret.page()));
         }
         ret
     }
@@ -1904,6 +1904,7 @@ where
         }
 
         while !self.is_shutting_down() {
+            compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
 
