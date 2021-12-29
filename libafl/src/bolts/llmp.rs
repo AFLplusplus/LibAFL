@@ -66,7 +66,7 @@ use core::{
     hint,
     mem::size_of,
     ptr, slice,
-    sync::atomic::{compiler_fence, fence, AtomicU16, AtomicU64, Ordering},
+    sync::atomic::{fence, AtomicU16, AtomicU64, Ordering},
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
@@ -1866,7 +1866,6 @@ where
     where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
-        compiler_fence(Ordering::SeqCst);
         for i in 0..self.llmp_clients.len() {
             unsafe {
                 self.handle_new_msgs(i as u32, on_new_msg)?;
@@ -1906,7 +1905,6 @@ where
         }
 
         while !self.is_shutting_down() {
-            compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
 
