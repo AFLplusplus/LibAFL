@@ -1,7 +1,6 @@
 //! Generates `DrCov` traces
 use ahash::AHasher;
 use libafl::{
-    self,
     inputs::{HasTargetBytes, Input},
     Error,
 };
