@@ -110,6 +110,7 @@ struct Opt {
     )]
     output: PathBuf,
 
+    /* 
     #[structopt(
         parse(try_from_str = timeout_from_millis_str),
         short,
@@ -129,6 +130,7 @@ struct Opt {
         multiple = true
     )]
     tokens: Vec<PathBuf>,
+    */
 
     #[structopt(
         long,
