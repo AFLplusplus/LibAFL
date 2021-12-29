@@ -3,6 +3,7 @@ use ahash::AHasher;
 use libafl::{
     self,
     inputs::{HasTargetBytes, Input},
+    Error,
 };
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
