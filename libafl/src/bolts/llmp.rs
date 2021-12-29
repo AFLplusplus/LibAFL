@@ -446,7 +446,7 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
     (*(*page).messages.as_mut_ptr()).message_id = 0;
     (*(*page).messages.as_mut_ptr()).tag = LLMP_TAG_UNSET;
     (*page).safe_to_unmap.store(0, Ordering::Relaxed);
-    ptr::write_volatile(ptr::addr_of_mut!((*page).sender_dead), 0);
+    (*page).sender_dead.store(0, Ordering::Relaxed);
     assert!((*page).size_total != 0);
 }
 
@@ -682,7 +682,7 @@ pub struct LlmpPage {
     /// (The os may have tidied up the memory when the receiver starts to map)
     pub safe_to_unmap: AtomicU16,
     /// Not used at the moment (would indicate that the sender is no longer there)
-    pub sender_dead: u16,
+    pub sender_dead: AtomicU16,
     /// The current message ID
     pub current_msg_id: AtomicU64,
     /// How much space is available on this page in bytes
@@ -813,10 +813,10 @@ where
         #[cfg(feature = "std")]
         let mut ctr = 0_u16;
         loop {
+            hint::spin_loop();
             if self.safe_to_unmap() {
                 return;
             }
-            hint::spin_loop();
             // We log that we're looping -> see when we're blocking.
             #[cfg(feature = "std")]
             {
@@ -1450,7 +1450,7 @@ where
             current_msg_id = (*last_msg).message_id;
         }
         loop {
-            compiler_fence(Ordering::SeqCst);
+            hint::spin_loop();
             if (*page).current_msg_id.load(Ordering::Relaxed) != current_msg_id {
                 return match self.recv()? {
                     Some(msg) => Ok(msg),
@@ -1904,7 +1904,6 @@ where
         }
 
         while !self.is_shutting_down() {
-            compiler_fence(Ordering::SeqCst);
             self.once(on_new_msg)
                 .expect("An error occurred when brokering. Exiting.");
 
