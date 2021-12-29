@@ -112,7 +112,7 @@ where
         println!("spawning on cores: {:?}", self.cores);
 
         #[cfg(feature = "std")]
-        let stdout_ffile = self
+        let stdout_file = self
             .stdout_file
             .map(|filename| File::create(filename).unwrap());
 
