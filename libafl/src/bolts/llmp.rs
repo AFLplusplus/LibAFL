@@ -63,9 +63,10 @@ use alloc::{string::String, vec::Vec};
 use core::{
     cmp::max,
     fmt::Debug,
+    hint,
     mem::size_of,
     ptr, slice,
-    sync::atomic::{compiler_fence, Ordering},
+    sync::atomic::{compiler_fence, fence, AtomicPtr, Ordering},
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
@@ -815,6 +816,7 @@ where
             if self.safe_to_unmap() {
                 return;
             }
+            hint::spin_loop();
             // We log that we're looping -> see when we're blocking.
             #[cfg(feature = "std")]
             {
@@ -829,10 +831,15 @@ where
     /// If we are allowed to unmap this client
     pub fn safe_to_unmap(&self) -> bool {
         let current_out_map = self.out_maps.last().unwrap();
+        // Casting to *mut should(tm) be safe, because we only read a value afterwards.
+        // There is no non-nightly way to do `atomic_load` on a `*cost T` atm.
         unsafe {
-            compiler_fence(Ordering::SeqCst);
             // println!("Reading safe_to_unmap from {:?}", current_out_map.page() as *const _);
-            ptr::read_volatile(ptr::addr_of!((*current_out_map.page()).safe_to_unmap)) != 0
+            *AtomicPtr::new(ptr::addr_of_mut!(
+                (*(current_out_map.page() as *mut LlmpPage)).safe_to_unmap
+            ))
+            .load(Ordering::Acquire)
+                != 0
         }
     }
 
