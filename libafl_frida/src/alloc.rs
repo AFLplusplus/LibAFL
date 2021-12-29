@@ -10,7 +10,7 @@ use backtrace::Backtrace;
 use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
-use std::{ffi::c_void, io};
+use std::{collections::BTreeMap, ffi::c_void, io};
 
 use crate::{
     asan::errors::{AsanError, AsanErrors},
@@ -26,7 +26,7 @@ pub struct Allocator {
     pre_allocated_shadow: bool,
     allocations: HashMap<usize, AllocationMetadata>,
     shadow_pages: RangeSet<usize>,
-    allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
+    allocation_queue: BTreeMap<usize, Vec<AllocationMetadata>>,
     largest_allocation: usize,
     total_allocation_size: usize,
     base_mapping_addr: usize,
@@ -146,7 +146,7 @@ impl Allocator {
             shadow_bit,
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
-            allocation_queue: HashMap::new(),
+            allocation_queue: BTreeMap::new(),
             largest_allocation: 0,
             total_allocation_size: 0,
             base_mapping_addr: addr + addr + addr,
@@ -173,15 +173,12 @@ impl Allocator {
     }
 
     fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
-        let mut current_size = size;
-        while current_size <= self.largest_allocation {
-            if self.allocation_queue.contains_key(&current_size) {
-                if let Some(metadata) = self.allocation_queue.entry(current_size).or_default().pop()
-                {
+        for (current_size, list) in self.allocation_queue.iter_mut() {
+            if *current_size >= size {
+                if let Some(metadata) = list.pop() {
                     return Some(metadata);
                 }
             }
-            current_size *= 2;
         }
         None
     }
