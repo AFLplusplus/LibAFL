@@ -6,13 +6,10 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use frida_gum::NativePointer;
-use frida_gum::{ModuleDetails, RangeDetails};
-use hashbrown::HashMap;
-
-use nix::sys::mman::{mmap, mprotect, MapFlags, ProtFlags};
-
 use backtrace::Backtrace;
+use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
+use hashbrown::HashMap;
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 use crate::helper::FridaInstrumentationHelper;
 
@@ -182,10 +179,9 @@ impl AsanRuntime {
         }
 
         self.hook_functions(_gum);
-
+        /*
         unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
-            unsafe {
                 mprotect(
                     (self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void,
                     0x1000,
@@ -256,6 +252,7 @@ impl AsanRuntime {
             }
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
+        */
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
