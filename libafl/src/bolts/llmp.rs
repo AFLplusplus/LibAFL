@@ -696,6 +696,26 @@ pub struct LlmpPage {
     pub messages: [LlmpMsg; 0],
 }
 
+impl LlmpPage {
+    /// Atomically read `save_to_unmap` from the given [`LlmpPage`] ptr.
+    ///
+    /// # Safety
+    /// The page will be dereferenced
+    #[inline]
+    fn save_to_unmap(&self) -> bool {
+        // Even though we don't need write access, but AtomicPtr needs it.
+        // `AtomicPtr` should not change the data for `load`,
+        // so this should(tm) not break rust's assumptons.
+        unsafe {
+            *AtomicPtr::new(ptr::addr_of_mut!(
+                (*(self as *const _ as *mut LlmpPage)).safe_to_unmap
+            ))
+            .load(Ordering::Acquire)
+                != 0
+        }
+    }
+}
+
 /// Message payload when a client got added */
 /// This is an internal message!
 /// [`LLMP_TAG_END_OF_PAGE_V1`]
@@ -831,15 +851,12 @@ where
     /// If we are allowed to unmap this client
     pub fn safe_to_unmap(&self) -> bool {
         let current_out_map = self.out_maps.last().unwrap();
-        // Casting to *mut should(tm) be safe, because we only read a value afterwards.
-        // There is no non-nightly way to do `atomic_load` on a `*cost T` atm.
         unsafe {
             // println!("Reading safe_to_unmap from {:?}", current_out_map.page() as *const _);
-            *AtomicPtr::new(ptr::addr_of_mut!(
-                (*(current_out_map.page() as *mut LlmpPage)).safe_to_unmap
-            ))
-            .load(Ordering::Acquire)
-                != 0
+
+            // Casting to *mut should(tm) be safe, because we only read a value afterwards.
+            // There is no non-nightly way to do `atomic_load` on a `*cost T` atm.
+            (*current_out_map.page()).save_to_unmap()
         }
     }
 
@@ -847,8 +864,10 @@ where
     /// # Safety
     /// If this method is called, the page may be unmapped before it is read by any receiver.
     pub unsafe fn mark_safe_to_unmap(&mut self) {
-        // No need to do this volatile, as we should be the same thread in this scenario.
         (*self.out_maps.last_mut().unwrap().page_mut()).safe_to_unmap = 1;
+        // Technically no need to do this volatile, as we should be the same thread in this scenario.
+        // But it's not a hot code path, so better be safe than racey.
+        fence(Ordering::Release);
     }
 
     /// Reattach to a vacant `out_map`.
@@ -883,7 +902,7 @@ where
         // Exclude the current page by splitting of the last element for this iter
         let mut unmap_until_excl = 0;
         for map in self.out_maps.split_last_mut().unwrap().1 {
-            if (*map.page_mut()).safe_to_unmap == 0 {
+            if !(*map.page()).save_to_unmap() {
                 // The broker didn't read this page yet, no more pages to unmap.
                 break;
             }
@@ -1041,9 +1060,11 @@ where
             )));
         }
         (*msg).message_id = (*page).current_msg_id + 1;
-        compiler_fence(Ordering::SeqCst);
-        ptr::write_volatile(ptr::addr_of_mut!((*page).current_msg_id), (*msg).message_id);
-        compiler_fence(Ordering::SeqCst);
+        fence(Ordering::Release); // Make sure all things have been written to the page
+                                  // Commit the message to the page
+        AtomicPtr::new(ptr::addr_of_mut!((*page).current_msg_id))
+            .store((&mut (*msg).message_id) as *mut _, Ordering::Release);
+
         self.last_msg_sent = msg;
         self.has_unsent_message = false;
         Ok(())
@@ -1342,7 +1363,7 @@ where
     #[inline(never)]
     unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
         /* DBG("recv %p %p\n", page, last_msg); */
-        compiler_fence(Ordering::SeqCst);
+        compiler_fence(Ordering::Acquire);
         let mut page = self.current_recv_map.page_mut();
         let last_msg = self.last_msg_recvd;
         let current_msg_id = ptr::read_volatile(ptr::addr_of!((*page).current_msg_id));
@@ -1353,12 +1374,14 @@ where
             None
         } else if last_msg.is_null() {
             /* We never read a message from this queue. Return first. */
+            fence(Ordering::Acquire);
             Some((*page).messages.as_mut_ptr())
         } else if (*last_msg).message_id == current_msg_id {
             /* Oops! No new message! */
             None
         } else {
             // We don't know how big the msg wants to be, assert at least the header has space.
+            fence(Ordering::Acquire);
             Some(llmp_next_msg_ptr_checked(
                 &mut self.current_recv_map,
                 last_msg,
@@ -1412,7 +1435,8 @@ where
                         )?);
                     page = self.current_recv_map.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
-                    ptr::write_volatile(ptr::addr_of_mut!((*page).safe_to_unmap), 1);
+                    AtomicPtr::new(ptr::addr_of_mut!((*page).safe_to_unmap))
+                        .store((&mut 1_u16) as *mut u16, Ordering::Release);
 
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     println!(
