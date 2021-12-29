@@ -66,7 +66,7 @@ use core::{
     hint,
     mem::size_of,
     ptr, slice,
-    sync::atomic::{compiler_fence, AtomicU16, AtomicU64, Ordering},
+    sync::atomic::{compiler_fence, fence, AtomicU16, AtomicU64, Ordering},
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
@@ -1346,7 +1346,7 @@ where
         /* DBG("recv %p %p\n", page, last_msg); */
         let mut page = self.current_recv_map.page_mut();
         let last_msg = self.last_msg_recvd;
-        let current_msg_id = (*page).current_msg_id.load(Ordering::Acquire);
+        let current_msg_id = (*page).current_msg_id.load(Ordering::Relaxed);
 
         // Read the message from the page
         let ret = if current_msg_id == 0 {
@@ -1354,12 +1354,14 @@ where
             None
         } else if last_msg.is_null() {
             /* We never read a message from this queue. Return first. */
+            fence(Ordering::Acquire);
             Some((*page).messages.as_mut_ptr())
         } else if (*last_msg).message_id == current_msg_id {
             /* Oops! No new message! */
             None
         } else {
             // We don't know how big the msg wants to be, assert at least the header has space.
+            fence(Ordering::Acquire);
             Some(llmp_next_msg_ptr_checked(
                 &mut self.current_recv_map,
                 last_msg,
