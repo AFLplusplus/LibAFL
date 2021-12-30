@@ -1,5 +1,8 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The `launcher` will spawn new processes for each cpu core.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};

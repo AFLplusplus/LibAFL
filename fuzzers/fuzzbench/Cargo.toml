@@ -26,6 +26,7 @@ libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_h
 libafl_cc = { path = "../../libafl_cc/" }
 clap = { version = "3.0.0-rc.4", features = ["default"] }
 nix = "0.23.0"
+mimalloc = { version = "*", default-features = false }
 
 [lib]
 name = "fuzzbench"

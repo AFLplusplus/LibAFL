@@ -1,5 +1,8 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 use frida_gum::Gum;
 use std::{
@@ -110,6 +113,7 @@ struct Opt {
     )]
     output: PathBuf,
 
+    /*
     #[structopt(
         parse(try_from_str = timeout_from_millis_str),
         short,
@@ -129,7 +133,7 @@ struct Opt {
         multiple = true
     )]
     tokens: Vec<PathBuf>,
-
+    */
     #[structopt(
         long,
         help = "The configuration this fuzzer runs with, for multiprocessing",

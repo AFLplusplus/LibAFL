@@ -25,6 +25,7 @@ libafl_targets = { path = "../../libafl_targets/", features = ["libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 structopt = "0.3.25"
+mimalloc = { version = "*", default-features = false }
 
 [lib]
 name = "libfuzzer_libpng"

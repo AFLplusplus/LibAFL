@@ -6,13 +6,10 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use frida_gum::NativePointer;
-use frida_gum::{ModuleDetails, RangeDetails};
-use hashbrown::HashMap;
-
-use nix::sys::mman::{mmap, mprotect, MapFlags, ProtFlags};
-
 use backtrace::Backtrace;
+use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
+use hashbrown::HashMap;
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 use crate::helper::FridaInstrumentationHelper;
 
@@ -182,28 +179,27 @@ impl AsanRuntime {
         }
 
         self.hook_functions(_gum);
-
+        /*
         unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
-            unsafe {
-                mprotect(
-                    (self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void,
-                    0x1000,
-                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC,
-                )
-            };
+            mprotect(
+                (self.shadow_check_func.unwrap() as usize & 0xffffffffffff000) as *mut c_void,
+                0x1000,
+                ProtFlags::PROT_READ | ProtFlags::PROT_WRITE | ProtFlags::PROT_EXEC,
+            )
+            .unwrap();
             println!("Test0");
             /*
             0x555555916ce9 <libafl_frida::asan_rt::AsanRuntime::init+13033>    je     libafl_frida::asan_rt::AsanRuntime::init+14852 <libafl_frida::asan_rt::AsanRuntime::init+14852>
             0x555555916cef <libafl_frida::asan_rt::AsanRuntime::init+13039>    mov    rdi, r15 <0x555558392338>
             */
             assert!((self.shadow_check_func.unwrap())(
-                ((mem as usize) + 0) as *const c_void,
+                (mem as usize) as *const c_void,
                 0x00
             ));
             println!("Test1");
             assert!((self.shadow_check_func.unwrap())(
-                ((mem as usize) + 0) as *const c_void,
+                (mem as usize) as *const c_void,
                 0xac
             ));
             println!("Test2");
@@ -256,6 +252,7 @@ impl AsanRuntime {
             }
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
+        */
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.

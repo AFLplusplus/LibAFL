@@ -55,7 +55,7 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.helper.pre_exec(input);
+        self.helper.pre_exec(input)?;
         if self.helper.stalker_enabled() {
             if self.followed {
                 self.stalker.activate(NativePointer(core::ptr::null_mut()));

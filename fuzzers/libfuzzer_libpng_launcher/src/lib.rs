@@ -2,6 +2,9 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};

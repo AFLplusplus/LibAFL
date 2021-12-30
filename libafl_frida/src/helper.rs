@@ -125,7 +125,9 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     }
 
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        self.drcov_runtime.post_exec(input)?;
+        if self.options().enable_drcov {
+            self.drcov_runtime.post_exec(input)?;
+        }
         #[cfg(unix)]
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
