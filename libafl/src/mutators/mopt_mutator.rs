@@ -239,7 +239,7 @@ impl MOpt {
         Ok(())
     }
 
-    /// Update the PSO algorithm parameters
+    /// Update the `PSO` algorithm parameters
     /// See <https://github.com/puppet-meteor/MOpt-AFL/blob/master/MOpt/afl-fuzz.c#L10623>
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_update(&mut self) -> Result<(), Error> {
@@ -358,8 +358,8 @@ pub enum MOptMode {
     Corefuzzing,
 }
 
-/// This is the main struct of MOpt, an AFL mutator.
-/// See the original MOpt implementation in <https://github.com/puppet-meteor/MOpt-AFL>
+/// This is the main struct of `MOpt`, an `AFL` mutator.
+/// See the original `MOpt` implementation in <https://github.com/puppet-meteor/MOpt-AFL>
 pub struct StdMOptMutator<C, I, MT, R, S, SC>
 where
     C: Corpus<I>,

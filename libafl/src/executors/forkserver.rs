@@ -39,7 +39,7 @@ const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
 
-/// Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
+/// Configure the target, `limit`, `setsid`, `pipe_stdin`, the code was borrowed from the [`Angora`](https://github.com/AngoraFuzzer/Angora) fuzzer
 pub trait ConfigTarget {
     /// Sets the sid
     fn setsid(&mut self) -> &mut Self;
