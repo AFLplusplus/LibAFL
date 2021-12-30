@@ -1,19 +1,28 @@
 //! A generic sharememory region to be used by any functions (queues or feedbacks
 // too.)
 
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::os::pipes::Pipe;
+use crate::Error;
 use alloc::{rc::Rc, string::ToString};
 use core::{
     cell::RefCell,
     fmt::{self, Debug, Display},
     mem::ManuallyDrop,
 };
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::env;
+#[cfg(all(unix, feature = "std"))]
+use std::io::Read;
+#[cfg(feature = "std")]
+use std::io::Write;
+
 #[cfg(all(feature = "std", unix, not(target_os = "android")))]
 pub use unix_shmem::{MmapShMem, MmapShMemProvider};
 
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
-
-use crate::Error;
 
 #[cfg(all(feature = "std", unix))]
 pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
@@ -69,15 +78,6 @@ pub type StdShMem = UnixShMem;
     not(feature = "std")
 ))]
 pub type StdShMemService = DummyShMemService;
-
-use serde::{Deserialize, Serialize};
-#[cfg(feature = "std")]
-use std::env;
-
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::pipes::Pipe;
-#[cfg(all(unix, feature = "std"))]
-use std::io::{Read, Write};
 
 /// Description of a shared map.
 /// May be used to restore the map by id.

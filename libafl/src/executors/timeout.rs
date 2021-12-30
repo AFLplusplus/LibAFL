@@ -24,15 +24,12 @@ use windows::Win32::{
     System::Threading::{
         CloseThreadpoolTimer, CreateThreadpoolTimer, EnterCriticalSection,
         InitializeCriticalSection, LeaveCriticalSection, SetThreadpoolTimer, RTL_CRITICAL_SECTION,
-        TP_CALLBACK_ENVIRON_V3, TP_TIMER,
+        TP_CALLBACK_ENVIRON_V3, TP_CALLBACK_INSTANCE, TP_TIMER,
     },
 };
 
 #[cfg(all(windows, feature = "std"))]
-use core::{
-    ffi::c_void,
-    ptr::{write, write_volatile},
-};
+use core::{ffi::c_void, ptr::write_volatile};
 
 #[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};
@@ -93,9 +90,9 @@ pub struct TimeoutExecutor<E> {
 #[cfg(windows)]
 #[allow(non_camel_case_types)]
 type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
-    param0: *mut windows::Win32::System::Threading::TP_CALLBACK_INSTANCE,
+    param0: *mut TP_CALLBACK_INSTANCE,
     param1: *mut c_void,
-    param2: *mut windows::Win32::System::Threading::TP_TIMER,
+    param2: *mut TP_TIMER,
 );
 
 #[cfg(unix)]
