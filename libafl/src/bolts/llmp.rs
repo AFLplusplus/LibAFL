@@ -1350,16 +1350,16 @@ where
         let mut page = self.current_recv_map.page_mut();
         let last_msg = self.last_msg_recvd;
 
-        let current_msg_id = if !last_msg.is_null() && self.highest_msg_id > (*last_msg).message_id
-        {
-            // read the msg_id from cache
-            self.highest_msg_id
-        } else {
-            // read the msg_id from shared map
-            let current_msg_id = (*page).current_msg_id.load(Ordering::Relaxed);
-            self.highest_msg_id = current_msg_id;
-            current_msg_id
-        };
+        let (current_msg_id, loaded) =
+            if !last_msg.is_null() && self.highest_msg_id > (*last_msg).message_id {
+                // read the msg_id from cache
+                (self.highest_msg_id, false)
+            } else {
+                // read the msg_id from shared map
+                let current_msg_id = (*page).current_msg_id.load(Ordering::Relaxed);
+                self.highest_msg_id = current_msg_id;
+                (current_msg_id, true)
+            };
 
         // Read the message from the page
         let ret = if current_msg_id == 0 {
@@ -1374,7 +1374,10 @@ where
             None
         } else {
             // We don't know how big the msg wants to be, assert at least the header has space.
-            fence(Ordering::Acquire);
+            if loaded {
+                // we read a higher id from this page, fetch.
+                fence(Ordering::Acquire);
+            }
             Some(llmp_next_msg_ptr_checked(
                 &mut self.current_recv_map,
                 last_msg,
