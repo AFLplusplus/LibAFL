@@ -776,10 +776,7 @@ mod tests {
         let bin = "echo";
         let args = vec![String::from("@@")];
 
-        let mut shmem = StdShMemProvider::new()
-            .unwrap()
-            .new_map(MAP_SIZE as usize)
-            .unwrap();
+        let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
         let shmem_map = shmem.map_mut();
 
