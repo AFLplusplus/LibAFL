@@ -1,32 +1,24 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
-use alloc::string::ToString;
-use core::{marker::PhantomData, time::Duration};
-
-#[cfg(feature = "std")]
-use core::sync::atomic::{compiler_fence, Ordering};
-#[cfg(feature = "std")]
-use core_affinity::CoreId;
-#[cfg(feature = "std")]
-use serde::{de::DeserializeOwned, Serialize};
-#[cfg(feature = "std")]
-use std::net::{SocketAddr, ToSocketAddrs};
-
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::bolts::os::startable_self;
+#[cfg(all(feature = "std", feature = "fork", unix))]
+use crate::bolts::os::{fork, ForkResult};
+#[cfg(feature = "llmp_compression")]
 use crate::bolts::{
-    llmp::{LlmpClient, LlmpConnection},
-    shmem::StdShMemProvider,
-    staterestore::StateRestorer,
+    compress::GzipCompressor,
+    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
-
+#[cfg(feature = "std")]
+use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
 use crate::{
     bolts::{
-        llmp::{self, Flags, LlmpClientDescription, Tag},
+        llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
         shmem::ShMemProvider,
     },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId,
+        EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -35,23 +27,19 @@ use crate::{
     observers::ObserversTuple,
     Error,
 };
-
-#[cfg(feature = "llmp_compression")]
-use crate::bolts::{
-    compress::GzipCompressor,
-    llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
-};
-
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::os::startable_self;
-
-#[cfg(all(feature = "std", feature = "fork", unix))]
-use crate::bolts::os::{fork, ForkResult};
-
+use alloc::string::ToString;
+#[cfg(feature = "std")]
+use core::sync::atomic::{compiler_fence, Ordering};
+use core::{marker::PhantomData, time::Duration};
+#[cfg(feature = "std")]
+use core_affinity::CoreId;
+use serde::de::DeserializeOwned;
+#[cfg(feature = "std")]
+use serde::Serialize;
+#[cfg(feature = "std")]
+use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
-
-use super::ProgressReporter;
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: Tag = 0x2C11E471;

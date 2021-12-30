@@ -639,6 +639,7 @@ macro_rules! impl_serdeany {
     };
 }
 
+/// Implement [`SerdeAny`] for a type
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! impl_serdeany {
