@@ -19,7 +19,7 @@ A common pattern when creating an Executor is wrapping an existing one, for inst
 Let's begin with the base case; `InProcessExecutor`.
 This executor uses [_SanitizerCoverage_](https://clang.llvm.org/docs/SanitizerCoverage.html) as its backend, as you can find the related code in `libafl_targets/src/sancov_pcguards`. Here we allocate a map called `EDGES_MAP` and then our compiler wrapper compiles the harness to write the coverage into this map. 
 When you want to execute the harness as fast as possible, you will most probably want to use this `InprocessExecutor`.  
- One thing to note here is, when your harness is likely to have heap corruption bugs, you want to use another allocator so that corrupted heap does not affect the fuzzer itself. (For example, we adopt MiMalloc in some of our fuzzers.)
+ One thing to note here is, when your harness is likely to have heap corruption bugs, you want to use another allocator so that corrupted heap does not affect the fuzzer itself. (For example, we adopt MiMalloc in some of our fuzzers.). Alternatively you can compile your harness with address sanitizer to make sure you can catch these heap bugs.
 
 ## ForkserverExecutor
 Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFLplusplus/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Hopefully, we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage.
