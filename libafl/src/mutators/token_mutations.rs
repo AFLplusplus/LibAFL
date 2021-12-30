@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// A state metadata holding a list of tokens
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Tokens {
     token_vec: Vec<Vec<u8>>,
 }
@@ -126,7 +126,7 @@ impl Tokens {
 }
 
 /// Inserts a random token at a random position in the `Input`.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TokenInsert<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -212,7 +212,7 @@ where
 
 /// A `TokenReplace` [`Mutator`] replaces a random part of the input with one of a range of tokens.
 /// From AFL terms, this is called as `Dictionary` mutation (which doesn't really make sense ;) ).
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct TokenReplace<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -294,7 +294,7 @@ where
 
 /// A `I2SRandReplace` [`Mutator`] replaces a random matching input-2-state comparison operand with the other.
 /// it needs a valid [`CmpValuesMetadata`] in the state.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct I2SRandReplace<I, R, S>
 where
     I: Input + HasBytesVec,

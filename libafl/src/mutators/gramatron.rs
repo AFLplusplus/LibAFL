@@ -1,3 +1,5 @@
+//! Gramatron is the rewritten gramatron fuzzer in rust.
+//! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
 use alloc::vec::Vec;
 use core::{cmp::max, marker::PhantomData};
 use hashbrown::HashMap;
@@ -13,6 +15,8 @@ use crate::{
     Error,
 };
 
+/// A random mutator for grammar fuzzing
+#[derive(Debug)]
 pub struct GramatronRandomMutator<'a, R, S>
 where
     S: HasRand<R> + HasMetadata,
@@ -66,7 +70,9 @@ where
     }
 }
 
-#[derive(Serialize, Deserialize)]
+/// The metadata used for `gramatron`
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct GramatronIdxMapMetadata {
     pub map: HashMap<usize, Vec<usize>>,
 }
@@ -74,6 +80,7 @@ pub struct GramatronIdxMapMetadata {
 crate::impl_serdeany!(GramatronIdxMapMetadata);
 
 impl GramatronIdxMapMetadata {
+    /// Creates a new [`GramatronIdxMapMetadata`].
     #[must_use]
     pub fn new(input: &GramatronInput) -> Self {
         let mut map = HashMap::default();
@@ -85,7 +92,8 @@ impl GramatronIdxMapMetadata {
     }
 }
 
-#[derive(Default)]
+/// A [`Mutator`] that mutates a [`GramatronInput`] by splicing inputs together.
+#[derive(Default, Debug)]
 pub struct GramatronSpliceMutator<C, R, S>
 where
     C: Corpus<GramatronInput>,
@@ -173,7 +181,8 @@ where
     }
 }
 
-#[derive(Default)]
+/// A mutator that uses Gramatron for grammar fuzzing and mutation.
+#[derive(Default, Debug)]
 pub struct GramatronRecursionMutator<R, S>
 where
     S: HasRand<R> + HasMetadata,

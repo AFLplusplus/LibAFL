@@ -220,10 +220,14 @@ where
     }
 }
 
+/// The corpus this input should be added to
 #[derive(Debug, PartialEq)]
 pub enum ExecuteInputResult {
+    /// No special input
     None,
+    /// This input should be stored ini the corpus
     Corpus,
+    /// This input leads to a solution
     Solution,
 }
 
@@ -612,6 +616,7 @@ where
     }
 }
 
+/// Structs with this trait will execute an [`Input`]
 pub trait ExecutesInput<I, OT, S, Z>
 where
     I: Input,

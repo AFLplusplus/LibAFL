@@ -10,9 +10,13 @@ use crate::{
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
+#[allow(missing_debug_implementations)]
 pub struct ShadowExecutor<E, I, S, SOT> {
+    /// The wrapped executor
     executor: E,
+    /// The shadow observers
     shadow_observers: SOT,
+    /// phantom data
     phantom: PhantomData<(I, S)>,
 }
 
@@ -29,11 +33,13 @@ where
         }
     }
 
+    /// The shadow observers are not considered by the feedbacks and the manager, mutable
     #[inline]
     pub fn shadow_observers(&self) -> &SOT {
         &self.shadow_observers
     }
 
+    /// The shadow observers are not considered by the feedbacks and the manager, mutable
     #[inline]
     pub fn shadow_observers_mut(&mut self) -> &mut SOT {
         &mut self.shadow_observers

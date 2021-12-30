@@ -54,19 +54,20 @@ use typed_builder::TypedBuilder;
 use super::ProgressReporter;
 
 /// Forward this to the client
-const _LLMP_TAG_EVENT_TO_CLIENT: llmp::Tag = 0x2C11E471;
+const _LLMP_TAG_EVENT_TO_CLIENT: Tag = 0x2C11E471;
 /// Only handle this in the broker
-const _LLMP_TAG_EVENT_TO_BROKER: llmp::Tag = 0x2B80438;
+const _LLMP_TAG_EVENT_TO_BROKER: Tag = 0x2B80438;
 /// Handle in both
 ///
-const LLMP_TAG_EVENT_TO_BOTH: llmp::Tag = 0x2B0741;
-const _LLMP_TAG_RESTART: llmp::Tag = 0x8357A87;
-const _LLMP_TAG_NO_RESTART: llmp::Tag = 0x57A7EE71;
+const LLMP_TAG_EVENT_TO_BOTH: Tag = 0x2B0741;
+const _LLMP_TAG_RESTART: Tag = 0x8357A87;
+const _LLMP_TAG_NO_RESTART: Tag = 0x57A7EE71;
 
 /// The minimum buffer size at which to compress LLMP IPC messages.
 #[cfg(feature = "llmp_compression")]
 const COMPRESS_THRESHOLD: usize = 1024;
 
+/// An LLMP-backed event manager for scalable multi-processed fuzzing
 #[derive(Debug)]
 pub struct LlmpEventBroker<I, MT, SP>
 where
@@ -112,6 +113,7 @@ where
         })
     }
 
+    /// Connect to an llmp broker on the givien address
     #[cfg(feature = "std")]
     pub fn connect_b2b<A>(&mut self, addr: A) -> Result<(), Error>
     where
@@ -262,7 +264,7 @@ where
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
-    llmp: llmp::LlmpClient<SP>,
+    llmp: LlmpClient<SP>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     configuration: EventConfig,
@@ -288,7 +290,7 @@ where
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw llmp client
-    pub fn new(llmp: llmp::LlmpClient<SP>, configuration: EventConfig) -> Result<Self, Error> {
+    pub fn new(llmp: LlmpClient<SP>, configuration: EventConfig) -> Result<Self, Error> {
         Ok(Self {
             llmp,
             #[cfg(feature = "llmp_compression")]
@@ -369,7 +371,7 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+        OT: ObserversTuple<I, S> + DeserializeOwned,
         E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
         Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
     {
@@ -470,7 +472,7 @@ where
     SP: ShMemProvider,
     E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
@@ -512,7 +514,7 @@ impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S,
 where
     E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
@@ -521,7 +523,7 @@ where
 impl<I, OT, S, SP> ProgressReporter<I> for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider,
 {
 }
@@ -529,7 +531,7 @@ where
 impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider,
 {
     /// Gets the id assigned to this staterestorer.
@@ -615,7 +617,7 @@ where
     E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -631,7 +633,7 @@ where
     I: Input,
     S: Serialize,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -641,7 +643,7 @@ where
 impl<I, OT, S, SP> HasEventManagerId for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: Serialize,
     SP: ShMemProvider + 'static,
 {
@@ -660,7 +662,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -690,7 +692,10 @@ pub enum ManagerKind {
     /// Any kind will do
     Any,
     /// A client, getting messages from a local broker.
-    Client { cpu_core: Option<CoreId> },
+    Client {
+        /// The cpu core id of this client
+        cpu_core: Option<CoreId>,
+    },
     /// A [`llmp::LlmpBroker`], forwarding the packets of local clients.
     Broker,
 }
@@ -715,7 +720,7 @@ where
     I: Input,
     S: DeserializeOwned,
     MT: Monitor + Clone,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
 {
     RestartingMgr::builder()
@@ -736,7 +741,7 @@ where
 pub struct RestartingMgr<I, MT, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider + 'static,
     MT: Monitor,
@@ -768,7 +773,7 @@ where
 impl<I, MT, OT, S, SP> RestartingMgr<I, MT, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider,
     MT: Monitor + Clone,

@@ -1,6 +1,6 @@
 //! Poor-rust-man's downcasts for stuff we send over the wire (or shared maps)
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
 
 use alloc::boxed::Box;
 use core::any::{Any, TypeId};
@@ -40,6 +40,7 @@ pub trait SerdeAny: Any + erased_serde::Serialize {
 }
 
 /// Wrap a type for serialization
+#[allow(missing_debug_implementations)]
 pub struct Wrap<'a, T: ?Sized>(pub &'a T);
 impl<'a, T> Serialize for Wrap<'a, T>
 where
@@ -59,6 +60,7 @@ pub type DeserializeCallback<B> =
     fn(&mut dyn erased_serde::Deserializer) -> Result<Box<B>, erased_serde::Error>;
 
 /// Callback struct for deserialization of a [`SerdeAny`] type.
+#[allow(missing_debug_implementations)]
 pub struct DeserializeCallbackSeed<B>
 where
     B: ?Sized,
@@ -67,7 +69,7 @@ where
     pub cb: DeserializeCallback<B>,
 }
 
-impl<'de, B> serde::de::DeserializeSeed<'de> for DeserializeCallbackSeed<B>
+impl<'de, B> DeserializeSeed<'de> for DeserializeCallbackSeed<B>
 where
     B: ?Sized,
 {
@@ -75,7 +77,7 @@ where
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
-        D: serde::de::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
         let mut erased = <dyn erased_serde::Deserializer>::erase(deserializer);
         (self.cb)(&mut erased).map_err(serde::de::Error::custom)
@@ -105,7 +107,9 @@ macro_rules! create_serde_registry_for_trait {
             use $crate::Error;
 
             /// Visitor object used internally for the [`SerdeAny`] registry.
+            #[derive(Debug)]
             pub struct BoxDynVisitor {}
+            #[allow(unused_qualifications)]
             impl<'de> serde::de::Visitor<'de> for BoxDynVisitor {
                 type Value = Box<dyn $trait_name>;
 
@@ -132,11 +136,13 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
+            #[allow(unused_qualifications)]
             struct Registry {
                 deserializers: Option<HashMap<u64, DeserializeCallback<dyn $trait_name>>>,
                 finalized: bool,
             }
 
+            #[allow(unused_qualifications)]
             impl Registry {
                 pub fn register<T>(&mut self)
                 where
@@ -162,8 +168,10 @@ macro_rules! create_serde_registry_for_trait {
 
             /// This shugar must be used to register all the structs which
             /// have trait objects that can be serialized and deserialized in the program
+            #[derive(Debug)]
             pub struct RegistryBuilder {}
 
+            #[allow(unused_qualifications)]
             impl RegistryBuilder {
                 /// Register a given struct type for trait object (de)serialization
                 pub fn register<T>()
@@ -214,6 +222,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
+            #[allow(unused_qualifications)]
             impl SerdeAnyMap {
                 /// Get an element from the map.
                 #[must_use]
@@ -309,11 +318,13 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             /// A serializable [`HashMap`] wrapper for [`SerdeAny`] types, addressable by name.
+            #[allow(unused_qualifications, missing_debug_implementations)]
             #[derive(Serialize, Deserialize)]
             pub struct NamedSerdeAnyMap {
                 map: HashMap<u64, HashMap<u64, Box<dyn $trait_name>>>,
             }
 
+            #[allow(unused_qualifications)]
             impl NamedSerdeAnyMap {
                 /// Get an element by name
                 #[must_use]
@@ -332,6 +343,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get an element of a given type contained in this map by [`TypeId`].
                 #[must_use]
+                #[allow(unused_qualifications)]
                 #[inline]
                 pub fn by_typeid(&self, name: &str, typeid: &TypeId) -> Option<&dyn $trait_name> {
                     match self.map.get(&unpack_type_id(*typeid)) {
@@ -375,6 +387,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all elements of a type contained in this map.
                 #[must_use]
+                #[allow(unused_qualifications)]
                 #[inline]
                 pub fn get_all<T>(
                     &self,
@@ -398,6 +411,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all elements of a given type contained in this map by [`TypeId`].
                 #[must_use]
+                #[allow(unused_qualifications)]
                 #[inline]
                 pub fn all_by_typeid(
                     &self,
@@ -417,6 +431,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all elements contained in this map, as mut.
                 #[inline]
+                #[allow(unused_qualifications)]
                 pub fn get_all_mut<T>(
                     &mut self,
                 ) -> Option<
@@ -440,6 +455,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all [`TypeId`]`s` contained in this map, as mut.
                 #[inline]
+                #[allow(unused_qualifications)]
                 pub fn all_by_typeid_mut(
                     &mut self,
                     typeid: &TypeId,
@@ -458,6 +474,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all [`TypeId`]`s` contained in this map.
                 #[inline]
+                #[allow(unused_qualifications)]
                 pub fn all_typeids(
                     &self,
                 ) -> core::iter::Map<
@@ -469,6 +486,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Run `func` for each element in this map.
                 #[inline]
+                #[allow(unused_qualifications)]
                 pub fn for_each(
                     &self,
                     func: fn(&TypeId, &Box<dyn $trait_name>) -> Result<(), Error>,
@@ -497,6 +515,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Insert an element into this map.
                 #[inline]
+                #[allow(unused_qualifications)]
                 pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &str) {
                     let id = unpack_type_id((*val).type_id());
                     if !self.map.contains_key(&id) {
@@ -560,6 +579,7 @@ macro_rules! create_serde_registry_for_trait {
             }
         }
 
+        #[allow(unused_qualifications)]
         impl<'a> Serialize for dyn $trait_name {
             fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
             where
@@ -575,6 +595,7 @@ macro_rules! create_serde_registry_for_trait {
             }
         }
 
+        #[allow(unused_qualifications)]
         impl<'de> Deserialize<'de> for Box<dyn $trait_name> {
             fn deserialize<D>(deserializer: D) -> Result<Box<dyn $trait_name>, D::Error>
             where

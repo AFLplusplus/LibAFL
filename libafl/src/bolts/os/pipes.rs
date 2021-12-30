@@ -11,15 +11,19 @@ use std::{
 #[cfg(not(feature = "std"))]
 type RawFd = i32;
 
+/// A unix pipe wrapper for `LibAFL`
 #[cfg(feature = "std")]
 #[derive(Debug, Clone)]
 pub struct Pipe {
+    /// The read end of the pipe
     read_end: Option<RawFd>,
+    /// The write end of the pipe
     write_end: Option<RawFd>,
 }
 
 #[cfg(feature = "std")]
 impl Pipe {
+    /// Create a new `Unix` pipe
     pub fn new() -> Result<Self, Error> {
         let (read_end, write_end) = pipe()?;
         Ok(Self {
@@ -28,6 +32,7 @@ impl Pipe {
         })
     }
 
+    /// Close the read end of a pipe
     pub fn close_read_end(&mut self) {
         if let Some(read_end) = self.read_end {
             let _ = close(read_end);
@@ -35,6 +40,7 @@ impl Pipe {
         }
     }
 
+    /// Close the write end of a pipe
     pub fn close_write_end(&mut self) {
         if let Some(write_end) = self.write_end {
             let _ = close(write_end);
@@ -42,11 +48,13 @@ impl Pipe {
         }
     }
 
+    /// The read end
     #[must_use]
     pub fn read_end(&self) -> Option<RawFd> {
         self.read_end
     }
 
+    /// The write end
     #[must_use]
     pub fn write_end(&self) -> Option<RawFd> {
         self.write_end

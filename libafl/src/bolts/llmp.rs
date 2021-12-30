@@ -192,7 +192,7 @@ pub enum TcpRequest {
 }
 
 impl TryFrom<&Vec<u8>> for TcpRequest {
-    type Error = crate::Error;
+    type Error = Error;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
         Ok(postcard::from_bytes(bytes)?)
@@ -213,7 +213,7 @@ pub struct TcpRemoteNewMessage {
 }
 
 impl TryFrom<&Vec<u8>> for TcpRemoteNewMessage {
-    type Error = crate::Error;
+    type Error = Error;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
         Ok(postcard::from_bytes(bytes)?)
@@ -249,7 +249,7 @@ pub enum TcpResponse {
 }
 
 impl TryFrom<&Vec<u8>> for TcpResponse {
-    type Error = crate::Error;
+    type Error = Error;
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
         Ok(postcard::from_bytes(bytes)?)
@@ -258,6 +258,7 @@ impl TryFrom<&Vec<u8>> for TcpResponse {
 
 /// Abstraction for listeners
 #[cfg(feature = "std")]
+#[derive(Debug)]
 pub enum Listener {
     /// Listener listening on `tcp`.
     Tcp(TcpListener),
@@ -265,6 +266,7 @@ pub enum Listener {
 
 /// A listener stream abstraction
 #[cfg(feature = "std")]
+#[derive(Debug)]
 pub enum ListenerStream {
     /// Listener listening on `tcp`.
     Tcp(TcpStream, SocketAddr),
@@ -389,11 +391,11 @@ fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
         stream.read_timeout().unwrap_or(None)
     );
 
-    let mut size_bytes = [0u8; 4];
+    let mut size_bytes = [0_u8; 4];
     stream.read_exact(&mut size_bytes)?;
     let size = u32::from_be_bytes(size_bytes);
     let mut bytes = vec![];
-    bytes.resize(size as usize, 0u8);
+    bytes.resize(size as usize, 0_u8);
 
     #[cfg(feature = "llmp_debug")]
     println!("LLMP TCP: Receiving payload of size {}", size);
@@ -556,8 +558,7 @@ impl LlmpMsg {
             let map_size = map.shmem.map().len();
             let buf_ptr = self.buf.as_ptr();
             if buf_ptr > (map.page_mut() as *const u8).add(size_of::<LlmpPage>())
-                && buf_ptr
-                    <= (map.page_mut() as *const u8).add(map_size - size_of::<LlmpMsg>() as usize)
+                && buf_ptr <= (map.page_mut() as *const u8).add(map_size - size_of::<LlmpMsg>())
             {
                 // The message header is in the page. Continue with checking the body.
                 let len = self.buf_len_padded as usize + size_of::<LlmpMsg>();
@@ -1185,7 +1186,7 @@ where
 
         // Doing this step by step will catch underflows in debug builds :)
         (*page).size_used -= old_len_padded as usize;
-        (*page).size_used += buf_len_padded as usize;
+        (*page).size_used += buf_len_padded;
 
         (*_llmp_next_msg_ptr(msg)).tag = LLMP_TAG_UNSET;
 
@@ -1691,6 +1692,7 @@ where
 
 /// A signal handler for the [`LlmpBroker`].
 #[cfg(unix)]
+#[derive(Debug, Clone)]
 pub struct LlmpBrokerSignalHandler {
     shutting_down: bool,
 }

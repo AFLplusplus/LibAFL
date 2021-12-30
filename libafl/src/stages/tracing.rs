@@ -98,6 +98,7 @@ where
         }
     }
 
+    /// Gets the underlying tracer executor
     pub fn executor(&self) -> &TE {
         &self.tracer_executor
     }

@@ -19,14 +19,17 @@ use crate::{
     Error,
 };
 
-#[derive(Serialize, Deserialize)]
+/// Metadata used to store information about disk sync time
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromDiskMetadata {
+    /// The last time the sync was done
     pub last_time: SystemTime,
 }
 
 crate::impl_serdeany!(SyncFromDiskMetadata);
 
 impl SyncFromDiskMetadata {
+    /// Create a new [`SyncFromDiskMetadata`]
     #[must_use]
     pub fn new(last_time: SystemTime) -> Self {
         Self { last_time }
@@ -34,6 +37,7 @@ impl SyncFromDiskMetadata {
 }
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
+#[derive(Debug)]
 pub struct SyncFromDiskStage<C, CB, E, EM, I, R, S, Z>
 where
     C: Corpus<I>,

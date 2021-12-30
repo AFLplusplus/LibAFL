@@ -1,3 +1,4 @@
+//! The command executor executes a sub program for each run
 use core::marker::PhantomData;
 
 #[cfg(feature = "std")]
@@ -14,13 +15,16 @@ use std::time::Duration;
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
+#[allow(missing_debug_implementations)]
 pub struct CommandExecutor<EM, I, S, Z, T, OT> {
     inner: T,
+    /// [`crate::observers::Observer`]s for this executor
     observers: OT,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
 impl<EM, I, S, Z, T, OT> CommandExecutor<EM, I, S, Z, T, OT> {
+    /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
         &mut self.inner
     }
@@ -119,6 +123,7 @@ where
 /// ```
 #[cfg(all(feature = "std", unix))]
 pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized {
+    /// Spawns a new process with the given configuration.
     fn spawn_child(
         &mut self,
         fuzzer: &mut Z,
@@ -127,6 +132,7 @@ pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized {
         input: &I,
     ) -> Result<Child, Error>;
 
+    /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT>(self, observers: OT) -> CommandExecutor<EM, I, S, Z, Self, OT>
     where
         OT: ObserversTuple<I, S>,

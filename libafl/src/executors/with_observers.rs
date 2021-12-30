@@ -1,8 +1,10 @@
+//! A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 use crate::{inputs::Input, observers::ObserversTuple, Error};
 
 use super::{Executor, ExitKind, HasObservers};
 
 /// A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
+#[allow(missing_debug_implementations)]
 pub struct WithObservers<E, OT> {
     executor: E,
     observers: OT,

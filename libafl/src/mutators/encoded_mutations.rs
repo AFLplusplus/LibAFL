@@ -1,3 +1,5 @@
+//! Mutations for [`EncodedInput`]s
+//!
 use alloc::vec::Vec;
 use core::{
     cmp::{max, min},
@@ -20,7 +22,7 @@ use crate::{
 };
 
 /// Set a code in the input as a random value
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedRandMutator<R, S>
 where
     S: HasRand<R>,
@@ -75,7 +77,7 @@ where
 }
 
 /// Increment a random code in the input
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedIncMutator<R, S>
 where
     S: HasRand<R>,
@@ -130,7 +132,7 @@ where
 }
 
 /// Decrement a random code in the input
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedDecMutator<R, S>
 where
     S: HasRand<R>,
@@ -185,7 +187,7 @@ where
 }
 
 /// Adds or subtracts a random value up to `ARITH_MAX` to a random place in the codes [`Vec`].
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedAddMutator<R, S>
 where
     S: HasRand<R>,
@@ -244,7 +246,7 @@ where
 }
 
 /// Codes delete mutation for encoded inputs
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedDeleteMutator<R, S>
 where
     S: HasRand<R>,
@@ -302,7 +304,7 @@ where
 }
 
 /// Insert mutation for encoded inputs
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedInsertCopyMutator<R, S>
 where
     S: HasRand<R> + HasMaxSize,
@@ -382,7 +384,7 @@ where
 }
 
 /// Codes copy mutation for encoded inputs
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedCopyMutator<R, S>
 where
     S: HasRand<R>,
@@ -442,7 +444,7 @@ where
 }
 
 /// Crossover insert mutation for encoded inputs
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedCrossoverInsertMutator<C, R, S>
 where
     C: Corpus<EncodedInput>,
@@ -537,7 +539,7 @@ where
 }
 
 /// Crossover replace mutation for encoded inputs
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct EncodedCrossoverReplaceMutator<C, R, S>
 where
     C: Corpus<EncodedInput>,

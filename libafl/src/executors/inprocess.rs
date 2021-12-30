@@ -159,17 +159,20 @@ where
         self.harness_fn
     }
 
+    /// The inprocess handlers
     #[inline]
     pub fn handlers(&self) -> &InProcessHandlers {
         &self.handlers
     }
 
+    /// The inprocess handlers, mut
     #[inline]
     pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
         &mut self.handlers
     }
 }
 
+/// The inmem executor's handlers.
 #[derive(Debug)]
 pub struct InProcessHandlers {
     /// On crash C function pointer
@@ -179,6 +182,7 @@ pub struct InProcessHandlers {
 }
 
 impl InProcessHandlers {
+    /// Call before running a target.
     pub fn pre_run_target<E, EM, I, S, Z>(
         &self,
         executor: &E,
@@ -229,6 +233,7 @@ impl InProcessHandlers {
         }
     }
 
+    /// Call after running a target.
     #[allow(clippy::unused_self)]
     pub fn post_run_target(&self) {
         #[cfg(unix)]
@@ -243,6 +248,7 @@ impl InProcessHandlers {
         }
     }
 
+    /// Create new [`InProcessHandlers`].
     pub fn new<E, EM, I, OC, OF, OT, S, Z>() -> Result<Self, Error>
     where
         I: Input,
@@ -311,6 +317,7 @@ impl InProcessHandlers {
         })
     }
 
+    /// Replace the handlers with `nop` handlers, deactivating the handlers
     #[must_use]
     pub fn nop() -> Self {
         Self {
@@ -320,6 +327,9 @@ impl InProcessHandlers {
     }
 }
 
+/// The global state of the in-process harness.
+#[derive(Debug)]
+#[allow(missing_docs)]
 pub struct InProcessExecutorHandlerData {
     pub state_ptr: *mut c_void,
     pub event_mgr_ptr: *mut c_void,
@@ -367,21 +377,25 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     timeout_input_ptr: ptr::null_mut(),
 };
 
+/// Get the inprocess [`State`]
 #[must_use]
 pub fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
 }
 
+/// Get the [`EventManager`]
 #[must_use]
 pub fn inprocess_get_event_manager<'a, EM>() -> Option<&'a mut EM> {
     unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
 }
 
+/// Gets the inprocess [`Fuzzer`]
 #[must_use]
 pub fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
     unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
 }
 
+/// Gets the inprocess [`Executor`]
 #[must_use]
 pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
     unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
@@ -964,7 +978,9 @@ where
     }
 }
 
+/// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
+#[allow(missing_debug_implementations)]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
@@ -1033,6 +1049,7 @@ where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
+    /// Creates a new [`InProcessForkExecutor`]
     pub fn new<EM, OC, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,

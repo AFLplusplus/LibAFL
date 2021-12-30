@@ -18,13 +18,13 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
 
 /// A testcase metadata saying if a testcase is favored
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IsFavoredMetadata {}
 
 crate::impl_serdeany!(IsFavoredMetadata);
 
 /// A state metadata holding a map of favoreds testcases for each map entry
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TopRatedsMetadata {
     /// map index -> corpus index
     pub map: HashMap<usize, usize>,
@@ -59,6 +59,7 @@ where
 
 /// Multiply the testcase size with the execution time.
 /// This favors small and quick testcases.
+#[derive(Debug, Clone)]
 pub struct LenTimeMulFavFactor<I>
 where
     I: Input + HasLen,
@@ -79,6 +80,7 @@ where
 /// The [`MinimizerCorpusScheduler`] employs a genetic algorithm to compute a subset of the
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
 /// prioritizing [`Testcase`]`s` using [`FavFactor`]
+#[derive(Debug, Clone)]
 pub struct MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
 where
     CS: CorpusScheduler<I, S>,

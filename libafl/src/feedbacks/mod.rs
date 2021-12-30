@@ -101,7 +101,7 @@ where
 
 /// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
 /// of the fuzzer State
-pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {
+pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned {
     /// Reset the internal state
     fn reset(&mut self) -> Result<(), Error> {
         Ok(())
@@ -109,7 +109,8 @@ pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned 
 }
 
 /// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {
+pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwned {
+    /// Resets all the feedback states of the tuple
     fn reset_all(&mut self) -> Result<(), Error>;
 }
 
@@ -130,6 +131,8 @@ where
     }
 }
 
+/// A cobined feedback consisting of ultiple [`Feedback`]s
+#[allow(missing_debug_implementations)]
 pub struct CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
@@ -138,7 +141,9 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// First [`Feedback`]
     pub first: A,
+    /// Second [`Feedback`]
     pub second: B,
     name: String,
     phantom: PhantomData<(I, S, FL)>,
@@ -165,6 +170,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// Create a new combined feedback
     pub fn new(first: A, second: B) -> Self {
         let name = format!("{} ({},{})", FL::name(), first.name(), second.name());
         Self {
@@ -244,6 +250,7 @@ where
     }
 }
 
+/// Logical combination of two feedbacks
 pub trait FeedbackLogic<A, B, I, S>: 'static
 where
     A: Feedback<I, S>,
@@ -251,8 +258,10 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// The name of this cobination
     fn name() -> &'static str;
 
+    /// If the feedback pair is interesting
     fn is_pair_interesting<EM, OT>(
         first: &mut A,
         second: &mut B,
@@ -266,6 +275,7 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>;
 
+    /// If this pair is interesting (with introspection features enabled)
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
     fn is_pair_interesting_introspection<EM, OT>(
@@ -282,9 +292,20 @@ where
         OT: ObserversTuple<I, S>;
 }
 
+/// Eager `OR` combination of two feedbacks
+#[derive(Debug, Clone)]
 pub struct LogicEagerOr {}
+
+/// Fast `OR` combination of two feedbacks
+#[derive(Debug, Clone)]
 pub struct LogicFastOr {}
+
+/// Eager `AND` combination of two feedbacks
+#[derive(Debug, Clone)]
 pub struct LogicEagerAnd {}
+
+/// Fast `AND` combination of two feedbacks
+#[derive(Debug, Clone)]
 pub struct LogicFastAnd {}
 
 impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicEagerOr
@@ -521,7 +542,8 @@ pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicEagerOr
 /// `TimeFeedback`
 pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicFastOr>;
 
-/// Compose feedbacks with an OR operation
+/// Compose feedbacks with an `NOT` operation
+#[derive(Clone, Debug)]
 pub struct NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
@@ -631,6 +653,7 @@ macro_rules! feedback_or {
     };
 }
 
+/// Combines multiple feedbacks with an `OR` operation, not executing feedbacks after the first positive result
 #[macro_export]
 macro_rules! feedback_or_fast {
     ( $last:expr ) => { $last };

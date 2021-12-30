@@ -20,24 +20,32 @@ pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService}
 
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
+/// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMemProvider = Win32ShMemProvider;
+/// The standard sharedmem type
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMem = Win32ShMem;
 
+/// The standard sharedmem provider
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemProvider =
     RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
+/// The standard sharedmem type
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMem = RcShMem<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
+/// The standard sharedmem service
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemService = ShMemService<unix_shmem::ashmem::AshmemShMemProvider>;
 
+/// The standard sharedmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
+/// The standard sharedmem type
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMem = RcShMem<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", target_vendor = "apple"))]
+/// The standard sharedmem service
 pub type StdShMemService = ShMemService<MmapShMemProvider>;
 
 /// The default [`ShMemProvider`] for this os.
@@ -262,7 +270,7 @@ pub struct RcShMem<T: ShMemProvider> {
 
 impl<T> ShMem for RcShMem<T>
 where
-    T: ShMemProvider + alloc::fmt::Debug,
+    T: ShMemProvider + Debug,
 {
     fn id(&self) -> ShMemId {
         self.internal.id()
@@ -314,7 +322,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 impl<SP> ShMemProvider for RcShMemProvider<SP>
 where
-    SP: ShMemProvider + alloc::fmt::Debug,
+    SP: ShMemProvider + Debug,
 {
     type Mem = RcShMem<SP>;
 
@@ -391,7 +399,7 @@ where
     fn pipe_set(pipe: &mut Option<Pipe>) -> Result<(), Error> {
         match pipe {
             Some(pipe) => {
-                let ok = [0u8; 4];
+                let ok = [0_u8; 4];
                 pipe.write_all(&ok)?;
                 Ok(())
             }
@@ -405,7 +413,7 @@ where
     fn pipe_await(pipe: &mut Option<Pipe>) -> Result<(), Error> {
         match pipe {
             Some(pipe) => {
-                let ok = [0u8; 4];
+                let ok = [0_u8; 4];
                 let mut ret = ok;
                 pipe.read_exact(&mut ret)?;
                 if ret == ok {
@@ -447,7 +455,7 @@ where
 #[cfg(all(unix, feature = "std"))]
 impl<SP> Default for RcShMemProvider<SP>
 where
-    SP: ShMemProvider + alloc::fmt::Debug,
+    SP: ShMemProvider + Debug,
 {
     fn default() -> Self {
         Self::new().unwrap()
@@ -489,7 +497,7 @@ pub mod unix_shmem {
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
             perror, shm_open, shm_unlink, shmat, shmctl, shmget,
         };
-        use std::{io::Write, process, ptr::null_mut};
+        use std::{io::Write, process};
 
         use crate::{
             bolts::shmem::{ShMem, ShMemId, ShMemProvider},
@@ -549,6 +557,7 @@ pub mod unix_shmem {
         }
 
         impl MmapShMem {
+            /// Create a new [`MmapShMem`]
             pub fn new(map_size: usize, shmem_ctr: usize) -> Result<Self, Error> {
                 unsafe {
                     let mut filename_path = [0_u8; MAX_MMAP_FILENAME_LEN];
@@ -585,7 +594,7 @@ pub mod unix_shmem {
 
                     /* map the shared memory segment to the address space of the process */
                     let map = mmap(
-                        null_mut(),
+                        ptr::null_mut(),
                         map_size,
                         libc::PROT_READ | libc::PROT_WRITE,
                         libc::MAP_SHARED,
@@ -618,7 +627,7 @@ pub mod unix_shmem {
 
                     /* map the shared memory segment to the address space of the process */
                     let map = mmap(
-                        null_mut(),
+                        ptr::null_mut(),
                         map_size,
                         libc::PROT_READ | libc::PROT_WRITE,
                         libc::MAP_SHARED,
@@ -766,7 +775,7 @@ pub mod unix_shmem {
                     let id_int: i32 = id.into();
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
-                    if map.is_null() || map == null_mut::<c_uchar>().wrapping_sub(1) {
+                    if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
                         return Err(Error::Unknown(
                             "Failed to map the shared mapping".to_string(),
                         ));
@@ -842,7 +851,7 @@ pub mod unix_shmem {
     /// Module containing `ashmem` shared memory support, commonly used on Android.
     #[cfg(all(unix, feature = "std"))]
     pub mod ashmem {
-        use core::slice;
+        use core::{ptr, slice};
         use libc::{
             c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
             PROT_WRITE,
@@ -909,6 +918,7 @@ pub mod unix_shmem {
                     //return Err(Error::Unknown("Failed to set the ashmem mapping's name".to_string()));
                     //};
 
+                    #[allow(trivial_numeric_casts)]
                     if ioctl(fd, ASHMEM_SET_SIZE as _, map_size) != 0 {
                         close(fd);
                         return Err(Error::Unknown(
@@ -917,7 +927,7 @@ pub mod unix_shmem {
                     };
 
                     let map = mmap(
-                        std::ptr::null_mut(),
+                        ptr::null_mut(),
                         map_size,
                         PROT_READ | PROT_WRITE,
                         MAP_SHARED,
@@ -943,7 +953,7 @@ pub mod unix_shmem {
             pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
-                    #[allow(clippy::cast_sign_loss)]
+                    #[allow(trivial_numeric_casts, clippy::cast_sign_loss)]
                     if ioctl(fd, ASHMEM_GET_SIZE as _) as u32 as usize != map_size {
                         return Err(Error::Unknown(
                             "The mapping's size differs from the requested size".to_string(),
@@ -951,7 +961,7 @@ pub mod unix_shmem {
                     };
 
                     let map = mmap(
-                        std::ptr::null_mut(),
+                        ptr::null_mut(),
                         map_size,
                         PROT_READ | PROT_WRITE,
                         MAP_SHARED,
@@ -996,10 +1006,12 @@ pub mod unix_shmem {
         /// [`Drop`] implementation for [`AshmemShMem`], which cleans up the mapping.
         #[cfg(unix)]
         impl Drop for AshmemShMem {
+            #[allow(trivial_numeric_casts)]
             fn drop(&mut self) {
                 unsafe {
                     let fd: i32 = self.id.to_string().parse().unwrap();
 
+                    #[allow(trivial_numeric_casts)]
                     #[allow(clippy::cast_sign_loss)]
                     let length = ioctl(fd, ASHMEM_GET_SIZE as _) as u32;
 
@@ -1219,8 +1231,9 @@ impl DummyShMemService {
     }
 }
 
-#[cfg(feature = "std")]
 /// A cursor around [`ShMem`] that immitates [`std::io::Cursor`]. Notably, this implements [`Write`] for [`ShMem`] in std environments.
+#[cfg(feature = "std")]
+#[derive(Debug)]
 pub struct ShMemCursor<T: ShMem> {
     inner: T,
     pos: usize,
@@ -1228,6 +1241,7 @@ pub struct ShMemCursor<T: ShMem> {
 
 #[cfg(feature = "std")]
 impl<T: ShMem> ShMemCursor<T> {
+    /// Create a new [`ShMemCursor`] around [`ShMem`]
     pub fn new(shmem: T) -> Self {
         Self {
             inner: shmem,
@@ -1242,7 +1256,7 @@ impl<T: ShMem> ShMemCursor<T> {
 }
 
 #[cfg(feature = "std")]
-impl<T: ShMem> std::io::Write for ShMemCursor<T> {
+impl<T: ShMem> Write for ShMemCursor<T> {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         match self.empty_slice_mut().write(buf) {
             Ok(w) => {

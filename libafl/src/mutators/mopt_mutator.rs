@@ -30,9 +30,13 @@ pub struct MOpt {
     pub finds_until_last_swarm: usize,
     /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
     pub w_init: f64,
+    /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
     pub w_end: f64,
+    /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
     pub w_now: f64,
+    /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
     pub g_now: f64,
+    /// These w_* and g_* values are the coefficients for updating variables according to the PSO algorithms
     pub g_max: f64,
     /// The number of mutation operators
     pub operator_num: usize,
@@ -48,11 +52,15 @@ pub struct MOpt {
     pub core_time: usize,
     /// The swarm identifier that we are currently using in the pilot fuzzing mode
     pub swarm_now: usize,
-    /// These are the parameters for the PSO algorithm
+    /// A parameter for the PSO algorithm
     x_now: Vec<Vec<f64>>,
+    /// A parameter for the PSO algorithm
     l_best: Vec<Vec<f64>>,
+    /// A parameter for the PSO algorithm
     eff_best: Vec<Vec<f64>>,
+    /// A parameter for the PSO algorithm
     g_best: Vec<f64>,
+    /// A parameter for the PSO algorithm
     v_now: Vec<Vec<f64>>,
     /// The probability that we want to use to choose the mutation operator.
     probability_now: Vec<Vec<f64>>,
@@ -84,7 +92,7 @@ pub struct MOpt {
 
 crate::impl_serdeany!(MOpt);
 
-impl fmt::Debug for MOpt {
+impl Debug for MOpt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MOpt")
             .field("\ntotal_finds", &self.total_finds)
@@ -129,6 +137,7 @@ impl fmt::Debug for MOpt {
 const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 impl MOpt {
+    /// Creates a new [`MOpt`] instance.
     pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
         let mut mopt = Self {
             rand: StdRand::with_seed(0),
@@ -169,6 +178,7 @@ impl MOpt {
         Ok(mopt)
     }
 
+    /// initialize pso
     #[allow(clippy::cast_precision_loss)]
     pub fn pso_initialize(&mut self) -> Result<(), Error> {
         if self.g_now > self.g_max {
@@ -339,12 +349,17 @@ impl MOpt {
 const V_MAX: f64 = 1.0;
 const V_MIN: f64 = 0.05;
 
+/// The `MOpt` mode to use
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub enum MOptMode {
+    /// Pilot fuzzing mode
     Pilotfuzzing,
+    /// Core fuzzing mode
     Corefuzzing,
 }
 
+/// This is the main struct of MOpt, an AFL mutator.
+/// See the original MOpt implementation in <https://github.com/puppet-meteor/MOpt-AFL>
 pub struct StdMOptMutator<C, I, MT, R, S, SC>
 where
     C: Corpus<I>,
@@ -526,6 +541,7 @@ where
     S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
     SC: Corpus<I>,
 {
+    /// Create a new [`StdMOptMutator`].
     pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
         state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
         Ok(Self {
