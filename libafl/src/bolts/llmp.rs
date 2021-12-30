@@ -813,10 +813,10 @@ where
         #[cfg(feature = "std")]
         let mut ctr = 0_u16;
         loop {
-            hint::spin_loop();
             if self.safe_to_unmap() {
                 return;
             }
+            hint::spin_loop();
             // We log that we're looping -> see when we're blocking.
             #[cfg(feature = "std")]
             {
@@ -1469,13 +1469,13 @@ where
             current_msg_id = (*last_msg).message_id;
         }
         loop {
-            hint::spin_loop();
             if (*page).current_msg_id.load(Ordering::Relaxed) != current_msg_id {
                 return match self.recv()? {
                     Some(msg) => Ok(msg),
                     None => panic!("BUG: blocking llmp message should never be NULL"),
                 };
             }
+            hint::spin_loop();
         }
     }
 
