@@ -1373,11 +1373,11 @@ where
             /* Oops! No new message! */
             None
         } else {
-            // We don't know how big the msg wants to be, assert at least the header has space.
             if loaded {
                 // we read a higher id from this page, fetch.
                 fence(Ordering::Acquire);
             }
+            // We don't know how big the msg wants to be, assert at least the header has space.
             Some(llmp_next_msg_ptr_checked(
                 &mut self.current_recv_map,
                 last_msg,
@@ -1385,14 +1385,18 @@ where
             )?)
         };
 
-        // Let's see what we go here.
+        // Let's see what we got.
         if let Some(msg) = ret {
             if !(*msg).in_map(&mut self.current_recv_map) {
                 return Err(Error::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
             }
             // Handle special, LLMP internal, messages.
             match (*msg).tag {
-                LLMP_TAG_UNSET => panic!("BUG: Read unallocated msg"),
+                LLMP_TAG_UNSET => panic!(
+                    "BUG: Read unallocated msg (tag was {:x} - msg header: {:?}",
+                    LLMP_TAG_UNSET,
+                    &(*msg)
+                ),
                 LLMP_TAG_EXITING => {
                     // The other side is done.
                     assert_eq!((*msg).buf_len, 0);
