@@ -1789,6 +1789,7 @@ where
             current_recv_map: client_page,
             last_msg_recvd: ptr::null_mut(),
             shmem_provider: self.shmem_provider.clone(),
+            highest_msg_id: 0,
         });
     }
 
@@ -2310,6 +2311,7 @@ where
                                     current_recv_map: new_page,
                                     last_msg_recvd: ptr::null_mut(),
                                     shmem_provider: self.shmem_provider.clone(),
+                                    highest_msg_id: 0,
                                 });
                             }
                             Err(e) => {
@@ -2489,6 +2491,7 @@ where
                 current_recv_map: initial_broker_map,
                 last_msg_recvd: ptr::null_mut(),
                 shmem_provider,
+                highest_msg_id: 0,
             },
         })
     }
