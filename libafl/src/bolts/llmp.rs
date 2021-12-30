@@ -1291,6 +1291,8 @@ where
     pub shmem_provider: SP,
     /// current page. After EOP, this gets replaced with the new one
     pub current_recv_map: LlmpSharedMap<SP::Mem>,
+    /// Caches the highest msg id we've seen so far
+    highest_msg_id: u64,
 }
 
 /// Receiving end of an llmp channel
@@ -1336,6 +1338,7 @@ where
             current_recv_map,
             last_msg_recvd,
             shmem_provider,
+            highest_msg_id: 0,
         })
     }
 
@@ -1346,7 +1349,17 @@ where
         /* DBG("recv %p %p\n", page, last_msg); */
         let mut page = self.current_recv_map.page_mut();
         let last_msg = self.last_msg_recvd;
-        let current_msg_id = (*page).current_msg_id.load(Ordering::Relaxed);
+
+        let current_msg_id = if !last_msg.is_null() && self.highest_msg_id > (*last_msg).message_id
+        {
+            // read the msg_id from cache
+            self.highest_msg_id
+        } else {
+            // read the msg_id from shared map
+            let current_msg_id = (*page).current_msg_id.load(Ordering::Relaxed);
+            self.highest_msg_id = current_msg_id;
+            current_msg_id
+        };
 
         // Read the message from the page
         let ret = if current_msg_id == 0 {
@@ -1403,6 +1416,7 @@ where
 
                     // Set last msg we received to null (as the map may no longer exist)
                     self.last_msg_recvd = ptr::null();
+                    self.highest_msg_id = 0;
 
                     // Mark the old page save to unmap, in case we didn't so earlier.
                     (*page).safe_to_unmap.store(1, Ordering::Relaxed);
