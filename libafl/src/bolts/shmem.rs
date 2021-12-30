@@ -63,6 +63,7 @@ pub type StdShMemProvider = UnixShMemProvider;
 ))]
 pub type StdShMem = UnixShMem;
 
+/// The standard sharedmem service
 #[cfg(any(
     not(any(target_os = "android", target_vendor = "apple")),
     not(feature = "std")
