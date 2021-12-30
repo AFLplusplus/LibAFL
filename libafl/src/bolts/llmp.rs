@@ -280,7 +280,7 @@ impl Listener {
             Listener::Tcp(inner) => match inner.accept() {
                 Ok(res) => ListenerStream::Tcp(res.0, res.1),
                 Err(err) => {
-                    dbg!("Ignoring failed accept", err);
+                    println!("Ignoring failed accept: {:?}", err);
                     ListenerStream::Empty()
                 }
             },
@@ -390,11 +390,11 @@ fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
         stream.read_timeout().unwrap_or(None)
     );
 
-    let mut size_bytes = [0u8; 4];
+    let mut size_bytes = [0_u8; 4];
     stream.read_exact(&mut size_bytes)?;
     let size = u32::from_be_bytes(size_bytes);
     let mut bytes = vec![];
-    bytes.resize(size as usize, 0u8);
+    bytes.resize(size as usize, 0_u8);
 
     #[cfg(feature = "llmp_debug")]
     println!("LLMP TCP: Receiving payload of size {}", size);
@@ -421,11 +421,11 @@ fn new_map_size(max_alloc: usize) -> usize {
 /// `llmp_page->messages`
 unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit: bool) {
     #[cfg(all(feature = "llmp_debug", feature = "std"))]
-    dbg!("_llmp_page_init: shmem {}", &shmem);
+    println!("_llmp_page_init: shmem {:?}", &shmem);
     let map_size = shmem.len();
     let page = shmem2page_mut(shmem);
     #[cfg(all(feature = "llmp_debug", feature = "std"))]
-    dbg!("_llmp_page_init: page {}", &(*page));
+    println!("_llmp_page_init: page {:?}", &(*page));
 
     if !allow_reinit {
         assert!(
@@ -598,7 +598,7 @@ where
         match tcp_bind(port) {
             Ok(listener) => {
                 // We got the port. We are the broker! :)
-                dbg!("We're the broker");
+                println!("We're the broker");
 
                 let mut broker = LlmpBroker::new(shmem_provider)?;
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
@@ -1588,7 +1588,7 @@ where
         //let bt = Backtrace::new();
         //#[cfg(not(debug_assertions))]
         //let bt = "<n/a (release)>";
-        dbg!(
+        println!(
             "LLMP_DEBUG: Using existing map {} with size {}",
             existing_map.id(),
             existing_map.len(),
@@ -1606,7 +1606,7 @@ where
                 &ret.shmem
             );
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            dbg!("PAGE: {}", &(*ret.page()));
+            println!("PAGE: {:?}", &(*ret.page()));
         }
         ret
     }
@@ -2034,7 +2034,7 @@ where
             .expect("Failed to map local page in broker 2 broker thread!");
 
             #[cfg(all(feature = "llmp_debug", feature = "std"))]
-            dbg!("B2B: Starting proxy loop :)");
+            println!("B2B: Starting proxy loop :)");
 
             loop {
                 // first, forward all data we have.
@@ -2043,13 +2043,16 @@ where
                     .expect("Error reading from local page!")
                 {
                     if client_id == b2b_client_id {
-                        dbg!("Ignored message we probably sent earlier (same id)", tag);
+                        println!(
+                            "Ignored message we probably sent earlier (same id), TAG: {:x}",
+                            tag
+                        );
                         continue;
                     }
 
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                    dbg!(
-                        "Fowarding message via broker2broker connection",
+                    println!(
+                        "Fowarding message ({} bytes) via broker2broker connection",
                         payload.len()
                     );
                     // We got a new message! Forward...
@@ -2077,8 +2080,8 @@ where
                     );
 
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                    dbg!(
-                        "Fowarding incoming message from broker2broker connection",
+                    println!(
+                        "Fowarding incoming message ({} bytes) from broker2broker connection",
                         msg.payload.len()
                     );
 
@@ -2089,7 +2092,7 @@ where
                         .expect("B2B: Error forwarding message. Exiting.");
                 } else {
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
-                    dbg!("Received no input, timeout or closed. Looping back up :)");
+                    println!("Received no input, timeout or closed. Looping back up :)");
                 }
             }
         });
@@ -2099,7 +2102,7 @@ where
         });
 
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        dbg!("B2B: returning from loop. Success: {}", ret.is_ok());
+        println!("B2B: returning from loop. Success: {}", ret.is_ok());
 
         ret
     }
@@ -2210,14 +2213,18 @@ where
             loop {
                 match listener.accept() {
                     ListenerStream::Tcp(mut stream, addr) => {
-                        dbg!("New connection", addr, stream.peer_addr().unwrap());
+                        eprintln!(
+                            "New connection: {:?}/{:?}",
+                            addr,
+                            stream.peer_addr().unwrap()
+                        );
 
                         // Send initial information, without anyone asking.
                         // This makes it a tiny bit easier to map the  broker map for new Clients.
                         match send_tcp_msg(&mut stream, &broker_hello) {
                             Ok(()) => {}
                             Err(e) => {
-                                dbg!("Error sending initial hello: {:?}", e);
+                                eprintln!("Error sending initial hello: {:?}", e);
                                 continue;
                             }
                         }
@@ -2225,14 +2232,14 @@ where
                         let buf = match recv_tcp_msg(&mut stream) {
                             Ok(buf) => buf,
                             Err(e) => {
-                                dbg!("Error receving from tcp", e);
+                                eprintln!("Error receving from tcp: {:?}", e);
                                 continue;
                             }
                         };
                         let req = match (&buf).try_into() {
                             Ok(req) => req,
                             Err(e) => {
-                                dbg!("Could not deserialize tcp message", e);
+                                eprintln!("Could not deserialize tcp message: {:?}", e);
                                 continue;
                             }
                         };
@@ -2602,7 +2609,7 @@ where
                             match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
                                 Ok(stream) => break stream,
                                 Err(_) => {
-                                    dbg!("Connection Refused.. Retrying");
+                                    println!("Connection Refused.. Retrying");
                                 }
                             }
                         }
@@ -2696,7 +2703,7 @@ mod tests {
             .unwrap();
 
         let tag: Tag = 0x1337;
-        let arr: [u8; 1] = [1u8];
+        let arr: [u8; 1] = [1_u8];
         // Send stuff
         client.send_buf(tag, &arr).unwrap();
 
