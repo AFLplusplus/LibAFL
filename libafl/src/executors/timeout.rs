@@ -194,6 +194,7 @@ where
     E: Executor<EM, I, S, Z> + HasInProcessHandlers,
     I: Input,
 {
+    #[allow(clippy::cast_sign_loss)]
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -212,10 +213,11 @@ where
                 &mut data.timeout_input_ptr,
                 &mut data.current_input_ptr as *mut _ as *mut c_void,
             );
-            let tm: i64 = -1 * self.milli_sec * 10 * 1000;
-            let mut ft = FILETIME::default();
-            ft.dwLowDateTime = (tm & 0xffffffff) as u32;
-            ft.dwHighDateTime = (tm >> 32) as u32;
+            let tm: i64 = -self.milli_sec * 10 * 1000;
+            let mut ft = FILETIME {
+                dwLowDateTime: (tm & 0xffffffff) as u32,
+                dwHighDateTime: (tm >> 32) as u32,
+            };
 
             compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(&mut self.critical);
