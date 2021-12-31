@@ -185,30 +185,30 @@ impl InProcessHandlers {
     /// Call before running a target.
     pub fn pre_run_target<E, EM, I, S, Z>(
         &self,
-        executor: &E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
+        _executor: &E,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
     ) {
         #[cfg(unix)]
         unsafe {
             let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
+                _input as *const _ as *const c_void,
             );
             write_volatile(
                 &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
+                _executor as *const _ as *const c_void,
             );
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         #[cfg(all(windows, feature = "std"))]
@@ -216,19 +216,19 @@ impl InProcessHandlers {
             let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
+                _input as *const _ as *const c_void,
             );
             write_volatile(
                 &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
+                _executor as *const _ as *const c_void,
             );
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
     }
@@ -711,7 +711,7 @@ mod windows_exception_handler {
 
     impl Handler for InProcessExecutorHandlerData {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        fn handle(&mut self, code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+        fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 if !data.crash_handler.is_null() {
