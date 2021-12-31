@@ -10,10 +10,11 @@ edition = "2021"
 # memo
 # fixing mbuild in TinyInst to build it on visual studio 2022 first?
 # include xed.lib dbghelp.lib as deps?
-# find a way to stop manually generating bridge files
+# find a way to stop manually generate bridge files
 # use x64 native tools cmd prompt
 [dependencies]
 cxx = "1.0"
+libafl = { path = "../libafl", version = "0.7.0", features = ["std", "libafl_derive"] }
 
 [build-dependencies]
 cmake = { git = "https://github.com/tokatoka/cmake-rs" } # use crates.io's one when the latest one gets published.

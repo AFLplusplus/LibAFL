@@ -31,6 +31,10 @@ fn main(){
         .status()
         .unwrap();
 
+    // shim
+    std::fs::copy("./src/shim.cpp", "./tinyinst/shim.cpp").unwrap();
+    
+    std::fs::copy("./src/shim.h", "./tinyinst/shim.h").unwrap();
 
     let dst = Config::new("TinyInst")
         .generator("Visual Studio 17 2022") // make this configurable from env variable 
