@@ -83,7 +83,7 @@ pub const STATUS_ASSERTION_FAILURE: u32 = 0xC0000420;
 pub const STATUS_SXS_EARLY_DEACTIVATION: u32 = 0xC015000F;
 pub const STATUS_SXS_INVALID_DEACTIVATION: u32 = 0xC0150010;
 
-#[derive(TryFromPrimitive, Clone, Copy)]
+#[derive(Debug, TryFromPrimitive, Clone, Copy)]
 #[repr(u32)]
 pub enum ExceptionCode {
     // From https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode
