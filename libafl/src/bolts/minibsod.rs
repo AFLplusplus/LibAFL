@@ -108,14 +108,14 @@ pub fn dump_registers<W: Write>(
             writer,
             "x{:02}: 0x{:016x} ",
             reg, mcontext.__ss.__x[reg as usize]
-        );
+        )?;
         if reg % 4 == 3 {
-            writeln!(writer);
+            writeln!(writer)?;
         }
     }
-    write!(writer, "fp: 0x{:016x} ", mcontext.__ss.__fp);
-    write!(writer, "lr: 0x{:016x} ", mcontext.__ss.__lr);
-    write!(writer, "pc: 0x{:016x} ", mcontext.__ss.__pc);
+    write!(writer, "fp: 0x{:016x} ", mcontext.__ss.__fp)?;
+    write!(writer, "lr: 0x{:016x} ", mcontext.__ss.__lr)?;
+    write!(writer, "pc: 0x{:016x} ", mcontext.__ss.__pc)?;
 
     Ok(())
 }

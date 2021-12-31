@@ -25,6 +25,7 @@ pub mod pipes;
 use std::ffi::CString;
 
 #[cfg(all(windows, feature = "std"))]
+#[allow(missing_docs)]
 pub mod windows_exceptions;
 
 #[cfg(unix)]

@@ -51,6 +51,8 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>;
 
+    /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
+    /// It also keeps track of introspection stats.
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
     fn is_interesting_introspection<EM, OT>(

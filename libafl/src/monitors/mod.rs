@@ -715,7 +715,7 @@ impl ClientPerfMonitor {
         self.stages
             .iter()
             .enumerate()
-            .filter(move |(stage_index, _)| used[*stage_index as usize])
+            .filter(move |(stage_index, _)| used[*stage_index])
     }
 
     /// A map of all `feedbacks`

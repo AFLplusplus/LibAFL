@@ -97,7 +97,7 @@ type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
 
 #[cfg(unix)]
 impl<E> TimeoutExecutor<E> {
-    /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
+    /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
@@ -122,6 +122,7 @@ impl<E> TimeoutExecutor<E> {
 
 #[cfg(windows)]
 impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
+    /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout_handler: PTP_TIMER_CALLBACK =
@@ -147,6 +148,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         }
     }
 
+    /// Set the timeout for this executor
     #[cfg(unix)]
     pub fn set_timeout(&mut self, exec_tmout: Duration) {
         let milli_sec = exec_tmout.as_millis();
@@ -165,6 +167,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         self.itimerval = itimerval;
     }
 
+    /// Set the timeout for this executor
     #[cfg(windows)]
     pub fn set_timeout(&mut self, exec_tmout: Duration) {
         self.milli_sec = exec_tmout.as_millis() as i64;
@@ -175,6 +178,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         &mut self.executor
     }
 
+    /// Reset the timeout for this executor
     #[cfg(windows)]
     pub fn windows_reset_timeout(&self) -> Result<(), Error> {
         unsafe {

@@ -959,6 +959,7 @@ mod windows_exception_handler {
     }
 }
 
+/// The struct has [`InProcessHandlers`].
 #[cfg(windows)]
 pub trait HasInProcessHandlers {
     fn inprocess_handlers(&self) -> &InProcessHandlers;

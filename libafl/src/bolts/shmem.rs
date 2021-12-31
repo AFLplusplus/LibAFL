@@ -1062,6 +1062,7 @@ pub mod unix_shmem {
     }
 }
 
+/// Then `win32` implementation for shared memory.
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
