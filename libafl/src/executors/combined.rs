@@ -8,6 +8,7 @@ use crate::{
 };
 
 /// A [`CombinedExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
+#[allow(missing_debug_implementations)]
 pub struct CombinedExecutor<A, B> {
     primary: A,
     secondary: B,

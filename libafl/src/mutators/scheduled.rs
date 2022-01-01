@@ -24,7 +24,7 @@ pub use crate::mutators::mutations::*;
 pub use crate::mutators::token_mutations::*;
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct LogMutationMetadata {
     /// A list of logs
     pub list: Vec<String>,

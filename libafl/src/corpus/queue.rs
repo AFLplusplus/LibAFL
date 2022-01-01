@@ -11,6 +11,7 @@ use crate::{
 };
 
 /// Walk the corpus in a queue-like fashion
+#[derive(Debug, Clone)]
 pub struct QueueCorpusScheduler<C, I, S>
 where
     S: HasCorpus<C, I>,

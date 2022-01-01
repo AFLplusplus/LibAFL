@@ -25,6 +25,7 @@ pub mod pipes;
 use std::ffi::CString;
 
 #[cfg(all(windows, feature = "std"))]
+#[allow(missing_docs)]
 pub mod windows_exceptions;
 
 #[cfg(unix)]
@@ -32,7 +33,9 @@ use libc::pid_t;
 
 /// Child Process Handle
 #[cfg(unix)]
+#[derive(Debug)]
 pub struct ChildHandle {
+    /// The process id
     pub pid: pid_t,
 }
 
@@ -51,6 +54,7 @@ impl ChildHandle {
 
 /// The `ForkResult` (result of a fork)
 #[cfg(unix)]
+#[derive(Debug)]
 pub enum ForkResult {
     /// The fork finished, we are the parent process.
     /// The child has the handle `ChildHandle`.
@@ -103,6 +107,7 @@ pub fn dup2(fd: i32, device: i32) -> Result<(), Error> {
 /// Core ID
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CoreId {
+    /// The id of this core
     pub id: usize,
 }
 

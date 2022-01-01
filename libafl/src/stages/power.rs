@@ -16,6 +16,8 @@ use crate::{
     Error,
 };
 
+/// The power schedule to use
+#[allow(missing_docs)]
 #[derive(Clone, Debug, PartialEq)]
 pub enum PowerSchedule {
     EXPLORE,
@@ -193,6 +195,7 @@ where
     S: HasClientPerfMonitor + HasCorpus<C, I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
+    /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M, strat: PowerSchedule, map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),

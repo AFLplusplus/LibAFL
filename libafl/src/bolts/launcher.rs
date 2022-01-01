@@ -44,7 +44,7 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 /// Provides a Launcher, which can be used to launch a fuzzing run on a specified list of cores
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct Launcher<'a, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
@@ -90,7 +90,7 @@ impl<'a, CF, I, MT, OT, S, SP> Launcher<'a, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
-    OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned,

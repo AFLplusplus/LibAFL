@@ -231,6 +231,7 @@ where
 /// `restarter` will start a new process each time the child crashes or times out.
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
+#[derive(Debug, Clone)]
 pub struct SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,

@@ -1,3 +1,4 @@
+//! Gramamtron generator
 use alloc::{string::String, vec::Vec};
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
@@ -10,16 +11,23 @@ use crate::{
     Error,
 };
 
+/// A trigger
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Trigger {
+    /// the destination
     pub dest: usize,
+    /// the term
     pub term: String,
 }
 
+/// The [`Automaton`]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Automaton {
+    /// final state
     pub final_state: usize,
+    /// init state
     pub init_state: usize,
+    /// pda of [`Trigger`]s
     pub pda: Vec<Vec<Trigger>>,
 }
 
@@ -64,6 +72,7 @@ where
         }
     }
 
+    /// Append the generated terminals
     pub fn append_generated_terminals(&self, input: &mut GramatronInput, state: &mut S) -> usize {
         let mut counter = 0;
         let final_state = self.automaton.final_state;

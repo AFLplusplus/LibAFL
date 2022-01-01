@@ -107,6 +107,7 @@ where
 }
 
 /// Feed the fuzzer simpply with a random testcase on request
+#[derive(Debug, Clone)]
 pub struct RandCorpusScheduler<C, I, R, S>
 where
     S: HasCorpus<C, I> + HasRand<R>,

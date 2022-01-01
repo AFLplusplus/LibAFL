@@ -110,6 +110,8 @@ where
     }
 }
 
+/// A [`Stage`] that will call a closure
+#[derive(Debug)]
 pub struct ClosureStage<CB, E, EM, S, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
@@ -134,10 +136,12 @@ where
     }
 }
 
+/// A stage that takes a closure
 impl<CB, E, EM, S, Z> ClosureStage<CB, E, EM, S, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
 {
+    /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {
         Self {
@@ -159,6 +163,7 @@ where
 
 /// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
 #[allow(clippy::type_complexity)]
+#[derive(Debug)]
 pub struct PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
 where
     C: Corpus<I>,

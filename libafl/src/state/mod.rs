@@ -26,6 +26,9 @@ use crate::{
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
+/// The [`State`] of the fuzzer
+/// Contains all important information about the current run
+/// Will be used to restart the fuzzing process at any timme.
 pub trait State: Serialize + DeserializeOwned {}
 
 /// Trait for elements offering a corpus

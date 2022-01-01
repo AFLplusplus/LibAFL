@@ -24,15 +24,12 @@ use windows::Win32::{
     System::Threading::{
         CloseThreadpoolTimer, CreateThreadpoolTimer, EnterCriticalSection,
         InitializeCriticalSection, LeaveCriticalSection, SetThreadpoolTimer, RTL_CRITICAL_SECTION,
-        TP_CALLBACK_ENVIRON_V3, TP_TIMER,
+        TP_CALLBACK_ENVIRON_V3, TP_CALLBACK_INSTANCE, TP_TIMER,
     },
 };
 
 #[cfg(all(windows, feature = "std"))]
-use core::{
-    ffi::c_void,
-    ptr::{write, write_volatile},
-};
+use core::{ffi::c_void, ptr::write_volatile};
 
 #[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};
@@ -77,6 +74,7 @@ pub(crate) unsafe fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
 }
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
+#[allow(missing_debug_implementations)]
 pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(unix)]
@@ -92,14 +90,14 @@ pub struct TimeoutExecutor<E> {
 #[cfg(windows)]
 #[allow(non_camel_case_types)]
 type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
-    param0: *mut windows::Win32::System::Threading::TP_CALLBACK_INSTANCE,
+    param0: *mut TP_CALLBACK_INSTANCE,
     param1: *mut c_void,
-    param2: *mut windows::Win32::System::Threading::TP_TIMER,
+    param2: *mut TP_TIMER,
 );
 
 #[cfg(unix)]
 impl<E> TimeoutExecutor<E> {
-    /// Create a new `TimeoutExecutor`, wrapping the given `executor` and checking for timeouts.
+    /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
@@ -124,6 +122,7 @@ impl<E> TimeoutExecutor<E> {
 
 #[cfg(windows)]
 impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
+    /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout_handler: PTP_TIMER_CALLBACK =
@@ -149,6 +148,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         }
     }
 
+    /// Set the timeout for this executor
     #[cfg(unix)]
     pub fn set_timeout(&mut self, exec_tmout: Duration) {
         let milli_sec = exec_tmout.as_millis();
@@ -167,6 +167,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         self.itimerval = itimerval;
     }
 
+    /// Set the timeout for this executor
     #[cfg(windows)]
     pub fn set_timeout(&mut self, exec_tmout: Duration) {
         self.milli_sec = exec_tmout.as_millis() as i64;
@@ -177,6 +178,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         &mut self.executor
     }
 
+    /// Reset the timeout for this executor
     #[cfg(windows)]
     pub fn windows_reset_timeout(&self) -> Result<(), Error> {
         unsafe {
@@ -192,6 +194,7 @@ where
     E: Executor<EM, I, S, Z> + HasInProcessHandlers,
     I: Input,
 {
+    #[allow(clippy::cast_sign_loss)]
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -210,10 +213,11 @@ where
                 &mut data.timeout_input_ptr,
                 &mut data.current_input_ptr as *mut _ as *mut c_void,
             );
-            let tm: i64 = -1 * self.milli_sec * 10 * 1000;
-            let mut ft = FILETIME::default();
-            ft.dwLowDateTime = (tm & 0xffffffff) as u32;
-            ft.dwHighDateTime = (tm >> 32) as u32;
+            let tm: i64 = -self.milli_sec * 10 * 1000;
+            let ft = FILETIME {
+                dwLowDateTime: (tm & 0xffffffff) as u32,
+                dwHighDateTime: (tm >> 32) as u32,
+            };
 
             compiler_fence(Ordering::SeqCst);
             EnterCriticalSection(&mut self.critical);

@@ -72,17 +72,23 @@ pub enum BrokerEventResult {
 /// Distinguish a fuzzer by its config
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum EventConfig {
+    /// Always assume unique setups for fuzzer configs
     AlwaysUnique,
+    /// Create a fuzzer config from a name hash
     FromName {
+        /// The name hash
         name_hash: u64,
     },
+    /// Create a fuzzer config from a build-time [`Uuid`]
     #[cfg(feature = "std")]
     BuildID {
+        /// The build-time [`Uuid`]
         id: Uuid,
     },
 }
 
 impl EventConfig {
+    /// Create a new [`EventConfig`] from a name hash
     #[must_use]
     pub fn from_name(name: &str) -> Self {
         let mut hasher = AHasher::new_with_keys(0, 0);
@@ -92,6 +98,7 @@ impl EventConfig {
         }
     }
 
+    /// Create a new [`EventConfig`] from a build-time [`Uuid`]
     #[cfg(feature = "std")]
     #[must_use]
     pub fn from_build_id() -> Self {
@@ -100,6 +107,7 @@ impl EventConfig {
         }
     }
 
+    /// Match if the currenti [`EventConfig`] matches another given config
     #[must_use]
     pub fn match_with(&self, other: &EventConfig) -> bool {
         match self {
@@ -207,6 +215,7 @@ where
         /// Current performance statistics
         introspection_monitor: Box<ClientPerfMonitor>,
 
+        /// phantomm data
         phantom: PhantomData<I>,
     },
     /// A new objective was found
@@ -313,7 +322,7 @@ where
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT, S>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<I, S> + serde::Serialize,
+        OT: ObserversTuple<I, S> + Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -387,6 +396,7 @@ where
     }
 }
 
+/// Restartable trait
 pub trait EventRestarter<S> {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
@@ -413,7 +423,9 @@ pub trait EventProcessor<E, I, S, Z> {
         Ok(postcard::from_bytes(observers_buf)?)
     }
 }
-
+/// The id of this [`EventManager`].
+/// For multi processed [`EventManager`]s,
+/// each connected client sholud have a unique ids.
 pub trait HasEventManagerId {
     /// The id of this manager. For Multiprocessed [`EventManager`]s,
     /// each client sholud have a unique ids.

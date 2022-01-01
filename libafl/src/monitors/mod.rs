@@ -7,7 +7,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt, time, time::Duration};
+use core::{fmt, time::Duration};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -18,8 +18,11 @@ const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 /// User-defined stat types
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
+    /// A numerical value
     Number(u64),
+    /// A `String`
     String(String),
+    /// A ratio of two values
     Ratio(u64, u64),
 }
 
@@ -52,7 +55,7 @@ pub struct ClientStats {
     /// The last reported executions for this client
     pub last_window_executions: u64,
     /// The last time we got this information
-    pub last_window_time: time::Duration,
+    pub last_window_time: Duration,
     /// The last executions per sec
     pub last_execs_per_sec: f32,
     /// User-defined monitor
@@ -66,7 +69,7 @@ pub struct ClientStats {
 
 impl ClientStats {
     /// We got a new information about executions for this client, insert them.
-    pub fn update_executions(&mut self, executions: u64, cur_time: time::Duration) {
+    pub fn update_executions(&mut self, executions: u64, cur_time: Duration) {
         let diff = cur_time
             .checked_sub(self.last_window_time)
             .map_or(0, |d| d.as_secs());
@@ -95,7 +98,7 @@ impl ClientStats {
 
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
-    pub fn execs_per_sec(&mut self, cur_time: time::Duration) -> u64 {
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
         if self.executions == 0 {
             return 0;
         }
@@ -149,7 +152,7 @@ pub trait Monitor {
     fn client_stats(&self) -> &[ClientStats];
 
     /// creation time
-    fn start_time(&mut self) -> time::Duration;
+    fn start_time(&mut self) -> Duration;
 
     /// show the monitor to the user
     fn display(&mut self, event_msg: String, sender_id: u32);
@@ -218,6 +221,7 @@ pub trait Monitor {
 
 /// Monitor that print exactly nothing.
 /// Not good for debuging, very good for speed.
+#[derive(Debug)]
 pub struct NopMonitor {
     start_time: Duration,
     client_stats: Vec<ClientStats>,
@@ -235,7 +239,7 @@ impl Monitor for NopMonitor {
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> time::Duration {
+    fn start_time(&mut self) -> Duration {
         self.start_time
     }
 
@@ -285,7 +289,7 @@ where
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> time::Duration {
+    fn start_time(&mut self) -> Duration {
         self.start_time
     }
 
@@ -338,7 +342,7 @@ where
     }
 
     /// Creates the monitor with a given `start_time`.
-    pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
+    pub fn with_time(print_fn: F, start_time: Duration) -> Self {
         Self {
             print_fn,
             start_time,
@@ -347,6 +351,7 @@ where
     }
 }
 
+/// Start the timer
 #[macro_export]
 macro_rules! start_timer {
     ($state:expr) => {{
@@ -356,6 +361,7 @@ macro_rules! start_timer {
     }};
 }
 
+/// Mark the elapsed time for the given feature
 #[macro_export]
 macro_rules! mark_feature_time {
     ($state:expr, $feature:expr) => {{
@@ -367,6 +373,7 @@ macro_rules! mark_feature_time {
     }};
 }
 
+/// Mark the elapsed time for the given feature
 #[macro_export]
 macro_rules! mark_feedback_time {
     ($state:expr) => {{
@@ -708,7 +715,7 @@ impl ClientPerfMonitor {
         self.stages
             .iter()
             .enumerate()
-            .filter(move |(stage_index, _)| used[*stage_index as usize])
+            .filter(move |(stage_index, _)| used[*stage_index])
     }
 
     /// A map of all `feedbacks`

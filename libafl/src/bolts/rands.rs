@@ -1,3 +1,4 @@
+//! The random number generators of `LibAFL`
 use core::{debug_assert, fmt::Debug};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
@@ -83,7 +84,7 @@ macro_rules! default_rand {
         /// A default RNG will usually produce a nondeterministic stream of random numbers.
         /// As we do not have any way to get random seeds for `no_std`, they have to be reproducible there.
         /// Use [`$rand::with_seed`] to generate a reproducible RNG.
-        impl core::default::Default for $rand {
+        impl Default for $rand {
             #[cfg(feature = "std")]
             fn default() -> Self {
                 Self::new()
@@ -295,7 +296,7 @@ impl Rand for RomuTrioRand {
         let xp = self.x_state;
         let yp = self.y_state;
         let zp = self.z_state;
-        self.x_state = 15241094284759029579u64.wrapping_mul(zp);
+        self.x_state = 15241094284759029579_u64.wrapping_mul(zp);
         self.y_state = yp.wrapping_sub(xp).rotate_left(12);
         self.z_state = zp.wrapping_sub(yp).rotate_left(44);
         xp
@@ -332,7 +333,7 @@ impl Rand for RomuDuoJrRand {
     #[allow(clippy::unreadable_literal)]
     fn next(&mut self) -> u64 {
         let xp = self.x_state;
-        self.x_state = 15241094284759029579u64.wrapping_mul(self.y_state);
+        self.x_state = 15241094284759029579_u64.wrapping_mul(self.y_state);
         self.y_state = self.y_state.wrapping_sub(xp).rotate_left(27);
         xp
     }
