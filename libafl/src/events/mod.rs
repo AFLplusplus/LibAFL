@@ -423,8 +423,9 @@ pub trait EventProcessor<E, I, S, Z> {
         Ok(postcard::from_bytes(observers_buf)?)
     }
 }
-/// Has an [`EventMangerId`]. For Multiprocessed [`EventManager`]s,
-/// each client sholud have a unique ids.
+/// The id of this [`EventManager`].
+/// For multi processed [`EventManager`]s,
+/// each connected client sholud have a unique ids.
 pub trait HasEventManagerId {
     /// The id of this manager. For Multiprocessed [`EventManager`]s,
     /// each client sholud have a unique ids.

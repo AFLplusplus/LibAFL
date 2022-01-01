@@ -29,7 +29,7 @@ pub struct SyncFromDiskMetadata {
 crate::impl_serdeany!(SyncFromDiskMetadata);
 
 impl SyncFromDiskMetadata {
-    /// Create a new [`SyncFromDiskMetadata`]
+    /// Create a new [`struct@SyncFromDiskMetadata`]
     #[must_use]
     pub fn new(last_time: SystemTime) -> Self {
         Self { last_time }

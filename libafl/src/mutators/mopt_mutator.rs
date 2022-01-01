@@ -137,7 +137,7 @@ impl Debug for MOpt {
 const PERIOD_PILOT_COEF: f64 = 5000.0;
 
 impl MOpt {
-    /// Creates a new [`MOpt`] instance.
+    /// Creates a new [`struct@MOpt`] instance.
     pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
         let mut mopt = Self {
             rand: StdRand::with_seed(0),

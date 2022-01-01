@@ -15,12 +15,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
-/// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenzier`]
+/// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>
 where
     T: Tokenizer,
 {
-    /// Encode bytes to an [`EncodedInput`] using the given [`Tokenzier`]
+    /// Encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error>;
 }
 

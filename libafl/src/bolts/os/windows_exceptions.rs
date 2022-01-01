@@ -325,7 +325,7 @@ unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_PO
         .ExceptionCode;
     let exception_code = ExceptionCode::try_from(code.0).unwrap();
     // println!("Received {}", exception_code);
-    internal_handle_exception(exception_code, exception_pointers);
+    internal_handle_exception(exception_code, exception_pointers)
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);

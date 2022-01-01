@@ -231,7 +231,7 @@ pub struct PowerScheduleMetadata {
 
 /// The metadata for runs in the calibration stage.
 impl PowerScheduleMetadata {
-    /// Creates a new [`PowerScheduleMetadata`]
+    /// Creates a new [`struct@PowerScheduleMetadata`]
     #[must_use]
     pub fn new() -> Self {
         Self {

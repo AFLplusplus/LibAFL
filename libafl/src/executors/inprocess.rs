@@ -377,19 +377,19 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     timeout_input_ptr: ptr::null_mut(),
 };
 
-/// Get the inprocess [`State`]
+/// Get the inprocess [`crate::state::State`]
 #[must_use]
 pub fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
 }
 
-/// Get the [`EventManager`]
+/// Get the [`crate::events::EventManager`]
 #[must_use]
 pub fn inprocess_get_event_manager<'a, EM>() -> Option<&'a mut EM> {
     unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
 }
 
-/// Gets the inprocess [`Fuzzer`]
+/// Gets the inprocess [`crate::fuzzer::Fuzzer`]
 #[must_use]
 pub fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
     unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }

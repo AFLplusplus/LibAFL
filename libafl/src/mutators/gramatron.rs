@@ -80,7 +80,7 @@ pub struct GramatronIdxMapMetadata {
 crate::impl_serdeany!(GramatronIdxMapMetadata);
 
 impl GramatronIdxMapMetadata {
-    /// Creates a new [`GramatronIdxMapMetadata`].
+    /// Creates a new [`struct@GramatronIdxMapMetadata`].
     #[must_use]
     pub fn new(input: &GramatronInput) -> Self {
         let mut map = HashMap::default();
