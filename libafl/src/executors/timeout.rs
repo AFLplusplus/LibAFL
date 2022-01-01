@@ -214,7 +214,7 @@ where
                 &mut data.current_input_ptr as *mut _ as *mut c_void,
             );
             let tm: i64 = -self.milli_sec * 10 * 1000;
-            let mut ft = FILETIME {
+            let ft = FILETIME {
                 dwLowDateTime: (tm & 0xffffffff) as u32,
                 dwHighDateTime: (tm >> 32) as u32,
             };
