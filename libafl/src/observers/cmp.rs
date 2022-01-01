@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-
+use core::fmt::Debug;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -79,7 +79,7 @@ impl CmpValuesMetadata {
 }
 
 /// A [`CmpMap`] traces comparisons during the current execution
-pub trait CmpMap {
+pub trait CmpMap: Debug {
     /// Get the number of cmps
     fn len(&self) -> usize;
 

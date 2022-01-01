@@ -37,6 +37,7 @@ use crate::{
     Error,
 };
 
+use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
 /// How an execution finished.
@@ -69,7 +70,7 @@ where
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, I, S, Z>
+pub trait Executor<EM, I, S, Z>: Debug
 where
     I: Input,
 {
@@ -97,6 +98,7 @@ where
 
 /// A simple executor that does nothing.
 /// If intput len is 0, `run_target` will return Err
+#[derive(Debug)]
 struct NopExecutor {}
 
 impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor

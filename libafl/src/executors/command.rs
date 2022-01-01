@@ -1,5 +1,5 @@
 //! The command executor executes a sub program for each run
-use core::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(feature = "std")]
 use std::process::Child;
@@ -15,15 +15,14 @@ use std::time::Duration;
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
-#[allow(missing_debug_implementations)]
-pub struct CommandExecutor<EM, I, S, Z, T, OT> {
+pub struct CommandExecutor<EM, I, S, Z, T: Debug, OT: Debug> {
     inner: T,
     /// [`crate::observers::Observer`]s for this executor
     observers: OT,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl<EM, I, S, Z, T, OT> CommandExecutor<EM, I, S, Z, T, OT> {
+impl<EM, I, S, Z, T: Debug, OT: Debug> CommandExecutor<EM, I, S, Z, T, OT> {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
         &mut self.inner
@@ -32,7 +31,7 @@ impl<EM, I, S, Z, T, OT> CommandExecutor<EM, I, S, Z, T, OT> {
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, S, Z, T, OT> Executor<EM, I, S, Z> for CommandExecutor<EM, I, S, Z, T, OT>
+impl<EM, I, S, Z, T: Debug, OT: Debug> Executor<EM, I, S, Z> for CommandExecutor<EM, I, S, Z, T, OT>
 where
     I: Input,
     T: CommandConfigurator<EM, I, S, Z>,
@@ -72,7 +71,8 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, S, Z, T, OT> HasObservers<I, OT, S> for CommandExecutor<EM, I, S, Z, T, OT>
+impl<EM, I, S, Z, T: Debug, OT: Debug> HasObservers<I, OT, S>
+    for CommandExecutor<EM, I, S, Z, T, OT>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -122,7 +122,7 @@ where
 /// }
 /// ```
 #[cfg(all(feature = "std", unix))]
-pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized {
+pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized + Debug {
     /// Spawns a new process with the given configuration.
     fn spawn_child(
         &mut self,
@@ -133,7 +133,7 @@ pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized {
     ) -> Result<Child, Error>;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT>(self, observers: OT) -> CommandExecutor<EM, I, S, Z, Self, OT>
+    fn into_executor<OT: Debug>(self, observers: OT) -> CommandExecutor<EM, I, S, Z, Self, OT>
     where
         OT: ObserversTuple<I, S>,
     {

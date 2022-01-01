@@ -1,6 +1,6 @@
 //! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
 
-use core::{marker::PhantomData, time::Duration};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use std::{
     fs::{File, OpenOptions},
     io::{self, prelude::*, ErrorKind, SeekFrom},
@@ -150,8 +150,9 @@ impl ConfigTarget for Command {
     }
 }
 
-/// The [`OutFile`] to write to
-#[allow(missing_debug_implementations)]
+/// The [`OutFile`] to write input to.
+/// The target/forkserver will read from this file.
+#[derive(Debug)]
 pub struct OutFile {
     /// The file
     file: File,
@@ -369,7 +370,6 @@ pub trait HasForkserver {
 }
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
-#[allow(missing_debug_implementations)]
 pub struct TimeoutForkserverExecutor<E> {
     executor: E,
     timeout: TimeSpec,
@@ -482,7 +482,7 @@ where
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-#[allow(missing_debug_implementations)]
+#[derive(Debug)]
 pub struct ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,

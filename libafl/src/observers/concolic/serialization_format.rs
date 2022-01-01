@@ -43,7 +43,10 @@
 
 #![cfg(feature = "std")]
 
-use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+use std::{
+    fmt::{self, Debug, Formatter},
+    io::{self, Cursor, Read, Seek, SeekFrom, Write},
+};
 
 use bincode::{DefaultOptions, Options};
 
@@ -56,11 +59,16 @@ fn serialization_options() -> DefaultOptions {
 }
 
 /// A `MessageFileReader` reads a stream of [`SymExpr`] and their corresponding [`SymExprRef`]s from any [`Read`].
-#[allow(missing_debug_implementations)]
 pub struct MessageFileReader<R: Read> {
     reader: R,
     deserializer_config: DefaultOptions,
     current_id: usize,
+}
+
+impl<R: Read> Debug for MessageFileReader<R> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "MessageFileReader {{ current_id: {} }}", self.current_id)
+    }
 }
 
 impl<R: Read> MessageFileReader<R> {
@@ -204,12 +212,23 @@ impl<R: Read> MessageFileReader<R> {
 
 /// A `MessageFileWriter` writes a stream of [`SymExpr`] to any [`Write`]. For each written expression, it returns
 /// a [`SymExprRef`] which should be used to refer back to it.
-#[allow(missing_debug_implementations)]
 pub struct MessageFileWriter<W: Write> {
     id_counter: usize,
     writer: W,
     writer_start_position: u64,
     serialization_options: DefaultOptions,
+}
+
+impl<W> Debug for MessageFileWriter<W>
+where
+    W: Write,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MessageFileWriter")
+            .field("id_counter", &self.id_counter)
+            .field("writer_start_position", &self.writer_start_position)
+            .finish()
+    }
 }
 
 impl<W: Write + Seek> MessageFileWriter<W> {

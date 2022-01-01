@@ -3,7 +3,10 @@
 use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
 
 use alloc::boxed::Box;
-use core::any::{Any, TypeId};
+use core::{
+    any::{Any, TypeId},
+    fmt::Debug,
+};
 
 // yolo
 
@@ -30,7 +33,7 @@ pub fn unpack_type_id(id: TypeId) -> u64 {
 }
 
 /// A (de)serializable Any trait
-pub trait SerdeAny: Any + erased_serde::Serialize {
+pub trait SerdeAny: Any + erased_serde::Serialize + Debug {
     /// returns this as Any trait
     fn as_any(&self) -> &dyn Any;
     /// returns this as mutable Any trait
@@ -40,11 +43,11 @@ pub trait SerdeAny: Any + erased_serde::Serialize {
 }
 
 /// Wrap a type for serialization
-#[allow(missing_debug_implementations)]
-pub struct Wrap<'a, T: ?Sized>(pub &'a T);
+#[derive(Debug)]
+pub struct Wrap<'a, T: ?Sized + Debug>(pub &'a T);
 impl<'a, T> Serialize for Wrap<'a, T>
 where
-    T: ?Sized + erased_serde::Serialize + 'a,
+    T: ?Sized + erased_serde::Serialize + 'a + Debug,
 {
     /// Serialize the type
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -191,9 +194,9 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
-            #[derive(Serialize, Deserialize)]
             /// A (de)serializable anymap containing (de)serializable trait objects registered
             /// in the registry
+            #[derive(Debug, Serialize, Deserialize)]
             pub struct SerdeAnyMap {
                 map: HashMap<u64, Box<dyn $trait_name>>,
             }
@@ -207,13 +210,14 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
+            /*
             #[cfg(feature = "anymap_debug")]
             impl fmt::Debug for SerdeAnyMap {
                 fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                     let json = serde_json::to_string(&self);
                     write!(f, "SerdeAnyMap: [{:?}]", json)
                 }
-            }
+            }*/
 
             #[cfg(not(feature = "anymap_debug"))]
             impl fmt::Debug for SerdeAnyMap {
@@ -318,8 +322,8 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             /// A serializable [`HashMap`] wrapper for [`SerdeAny`] types, addressable by name.
-            #[allow(unused_qualifications, missing_debug_implementations)]
-            #[derive(Serialize, Deserialize)]
+            #[allow(unused_qualifications)]
+            #[derive(Debug, Serialize, Deserialize)]
             pub struct NamedSerdeAnyMap {
                 map: HashMap<u64, HashMap<u64, Box<dyn $trait_name>>>,
             }

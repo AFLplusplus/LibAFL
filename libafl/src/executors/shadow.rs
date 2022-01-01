@@ -1,6 +1,6 @@
 //! A `ShadowExecutor` wraps an executor to have shadow observer that will not be considered by the feedbacks and the manager
 
-use core::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
@@ -10,8 +10,8 @@ use crate::{
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
-#[allow(missing_debug_implementations)]
-pub struct ShadowExecutor<E, I, S, SOT> {
+#[derive(Debug)]
+pub struct ShadowExecutor<E: Debug, I: Debug, S, SOT: Debug> {
     /// The wrapped executor
     executor: E,
     /// The shadow observers
