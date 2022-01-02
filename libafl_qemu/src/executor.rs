@@ -1,3 +1,4 @@
+//! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
 use core::{ffi::c_void, mem::transmute, ptr};
 
 use libafl::{
@@ -433,6 +434,7 @@ where
     res
 }
 
+#[derive(Debug)]
 pub struct QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,

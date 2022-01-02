@@ -6,7 +6,7 @@ use std::ops::Range;
 use crate::{emu::Emulator, executor::QemuExecutor};
 
 // TODO remove 'static when specialization will be stable
-pub trait QemuHelper<I, S>: 'static
+pub trait QemuHelper<I, S>: 'static + Debug
 where
     I: Input,
 {
@@ -23,7 +23,7 @@ where
     fn post_exec(&mut self, _emulator: &Emulator, _input: &I) {}
 }
 
-pub trait QemuHelperTuple<I, S>: MatchFirstType
+pub trait QemuHelperTuple<I, S>: MatchFirstType + Debug
 where
     I: Input,
 {
@@ -82,6 +82,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub enum QemuInstrumentationFilter {
     AllowList(Vec<Range<u64>>),
     DenyList(Vec<Range<u64>>),

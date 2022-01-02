@@ -29,6 +29,7 @@ impl QemuCmpsMapMetadata {
 
 libafl::impl_serdeany!(QemuCmpsMapMetadata);
 
+#[derive(Debug)]
 pub struct QemuCmpLogHelper {
     filter: QemuInstrumentationFilter,
 }

@@ -28,6 +28,7 @@ impl QemuEdgesMapMetadata {
 
 libafl::impl_serdeany!(QemuEdgesMapMetadata);
 
+#[derive(Debug)]
 pub struct QemuEdgeCoverageHelper {
     filter: QemuInstrumentationFilter,
 }
