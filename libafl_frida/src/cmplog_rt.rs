@@ -1,8 +1,8 @@
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use libafl_targets;
 use libafl_targets::CMPLOG_MAP_W;
 use std::ffi::c_void;
 
-extern crate libafl_targets;
 extern "C" {
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
@@ -16,8 +16,13 @@ use frida_gum::{
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::helper::FridaInstrumentationHelper;
 
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+/// Speciial CmpLog Cases for `aarch64`
+#[derive(Debug)]
 pub enum SpecialCmpLogCase {
+    /// Test bit and branch if zero
     Tbz,
+    /// Test bit and branch if not zero
     Tbnz,
 }
 

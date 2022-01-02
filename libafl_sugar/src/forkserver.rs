@@ -32,9 +32,11 @@ use libafl::{
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
+/// The default coverage map size to use for forkserver targets
 pub const DEFAULT_MAP_SIZE: usize = 65536;
 
-#[derive(TypedBuilder)]
+/// Creates a Forkserver-based fuzzer.
+#[derive(Debug, TypedBuilder)]
 pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
     /// Laucher configuration (default is random)
     #[builder(default = None, setter(strip_option))]
@@ -74,6 +76,7 @@ pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
 
 #[allow(clippy::similar_names)]
 impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
+    /// Runs the fuzzer.
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = match self.configuration.as_ref() {

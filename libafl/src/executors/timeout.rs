@@ -46,7 +46,7 @@ struct Timeval {
 
 #[cfg(unix)]
 impl Debug for Timeval {
-    #[allow(clippy::cast_sign_loss, clippy::precision_loss_in_cast)]
+    #[allow(clippy::cast_sign_loss)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
