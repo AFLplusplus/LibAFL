@@ -44,6 +44,7 @@ struct Timeval {
     pub tv_usec: i64,
 }
 
+#[cfg(unix)]
 impl Debug for Timeval {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
@@ -88,7 +89,6 @@ pub(crate) unsafe fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
 }
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
-#[allow(missing_debug_implementations)]
 pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(unix)]

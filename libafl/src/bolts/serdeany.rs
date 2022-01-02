@@ -217,14 +217,14 @@ macro_rules! create_serde_registry_for_trait {
                     let json = serde_json::to_string(&self);
                     write!(f, "SerdeAnyMap: [{:?}]", json)
                 }
-            }*/
+            }
 
             #[cfg(not(feature = "anymap_debug"))]
             impl fmt::Debug for SerdeAnyMap {
                 fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                     write!(f, "SerdeAnymap with {} elements", self.len())
                 }
-            }
+            }*/
 
             #[allow(unused_qualifications)]
             impl SerdeAnyMap {

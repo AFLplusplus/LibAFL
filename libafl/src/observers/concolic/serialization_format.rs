@@ -59,7 +59,6 @@ fn serialization_options() -> DefaultOptions {
 }
 
 /// A `MessageFileReader` reads a stream of [`SymExpr`] and their corresponding [`SymExprRef`]s from any [`Read`].
-#[allow(missing_debug_implementations)]
 pub struct MessageFileReader<R: Read> {
     reader: R,
     deserializer_config: DefaultOptions,
@@ -213,7 +212,6 @@ impl<R: Read> MessageFileReader<R> {
 
 /// A `MessageFileWriter` writes a stream of [`SymExpr`] to any [`Write`]. For each written expression, it returns
 /// a [`SymExprRef`] which should be used to refer back to it.
-#[allow(missing_debug_implementations)]
 pub struct MessageFileWriter<W: Write> {
     id_counter: usize,
     writer: W,

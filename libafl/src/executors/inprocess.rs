@@ -1000,7 +1000,6 @@ where
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
-#[allow(missing_debug_implementations)]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
@@ -1014,6 +1013,7 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
@@ -1022,7 +1022,7 @@ where
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InProcessExecutor")
+        f.debug_struct("InProcessForkExecutor")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
             .finish()
