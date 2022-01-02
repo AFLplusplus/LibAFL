@@ -18,14 +18,14 @@ use std::time::Duration;
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
-pub struct CommandExecutor<EM, I, S, Z, T: Debug, OT: Debug> {
+pub struct CommandExecutor<EM, I, OT: Debug, S, T: Debug, Z> {
     inner: T,
     /// [`crate::observers::Observer`]s for this executor
     observers: OT,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl<EM, I, S, Z, T: Debug, OT: Debug> Debug for CommandExecutor<EM, I, S, Z, T, OT> {
+impl<EM, I, OT: Debug, S, T: Debug, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
             .field("inner", &self.inner)
@@ -34,7 +34,7 @@ impl<EM, I, S, Z, T: Debug, OT: Debug> Debug for CommandExecutor<EM, I, S, Z, T,
     }
 }
 
-impl<EM, I, S, Z, T: Debug, OT: Debug> CommandExecutor<EM, I, S, Z, T, OT> {
+impl<EM, I, OT: Debug, S, T: Debug, Z> CommandExecutor<EM, I, OT, S, T, Z> {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
         &mut self.inner
@@ -43,7 +43,7 @@ impl<EM, I, S, Z, T: Debug, OT: Debug> CommandExecutor<EM, I, S, Z, T, OT> {
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, S, Z, T: Debug, OT: Debug> Executor<EM, I, S, Z> for CommandExecutor<EM, I, S, Z, T, OT>
+impl<EM, I, OT: Debug, S, T: Debug, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input,
     T: CommandConfigurator<EM, I, S, Z>,
@@ -83,8 +83,8 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, S, Z, T: Debug, OT: Debug> HasObservers<I, OT, S>
-    for CommandExecutor<EM, I, S, Z, T, OT>
+impl<EM, I, OT: Debug, S, T: Debug, Z> HasObservers<I, OT, S>
+    for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -145,7 +145,7 @@ pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized + Debug {
     ) -> Result<Child, Error>;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<OT: Debug>(self, observers: OT) -> CommandExecutor<EM, I, S, Z, Self, OT>
+    fn into_executor<OT: Debug>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
         OT: ObserversTuple<I, S>,
     {
