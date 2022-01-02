@@ -74,6 +74,7 @@ impl Allocator {
         target_os = "linux",
         all(target_arch = "aarch64", target_os = "android")
     )))]
+    #[must_use]
     pub fn new(_: FridaOptions) -> Self {
         todo!("Shadow region not yet supported for this platform!");
     }

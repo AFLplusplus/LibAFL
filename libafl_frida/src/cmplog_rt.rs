@@ -1,9 +1,15 @@
+//! Functionality for [`frida`](https://frida.re)-based binary-only `CmpLog`.
+//! With it, a fuzzer can collect feedback about each compare that happenned in the target
+//! This allows the fuzzer to potentially solve the compares, if a compare value is directly
+//! related to the input.
+//! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use libafl_targets;
 use libafl_targets::CMPLOG_MAP_W;
 use std::ffi::c_void;
 
 extern "C" {
+    /// Tracks cmplog instructions
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
 }
 
@@ -32,6 +38,22 @@ use capstone::{
     Capstone, Insn,
 };
 
+/// The type of an operand loggged during `CmpLog`
+#[derive(Debug)]
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+pub enum CmplogOperandType {
+    /// A Register
+    Regid(capstone::RegId),
+    /// An immediate value
+    Imm(u64),
+    /// A constant immediate value
+    Cimm(u64),
+    /// A memory operand
+    Mem(capstone::RegId, capstone::RegId, i32, u32),
+}
+
+/// `Frida`-based binary-only innstrumentation that logs compares to the fuzzer
+/// `LibAFL` can use this knowledge for powerful mutations.
 #[derive(Debug)]
 pub struct CmpLogRuntime {
     ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
@@ -39,15 +61,8 @@ pub struct CmpLogRuntime {
     ops_handle_tbnz_masking: Option<Box<[u8]>>,
 }
 
-#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-pub enum CmplogOperandType {
-    Regid(capstone::RegId),
-    Imm(u64),
-    Cimm(u64),
-    Mem(capstone::RegId, capstone::RegId, i32, u32),
-}
-
 impl CmpLogRuntime {
+    /// Create a new [`CmpLogRuntime`]
     #[must_use]
     pub fn new() -> CmpLogRuntime {
         Self {
