@@ -76,7 +76,10 @@ where
     harness: Option<H>,
 }
 
-impl<'a, H> Debug for QemuBytesCoverageSugar<'a, H> {
+impl<'a, H> Debug for QemuBytesCoverageSugar<'a, H>
+where
+    H: FnMut(&[u8]),
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuBytesCoverageSugar")
             .field("configuration", &self.configuration)
