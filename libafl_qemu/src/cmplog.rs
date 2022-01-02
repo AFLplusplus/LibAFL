@@ -11,7 +11,7 @@ use crate::{
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
 };
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuCmpsMapMetadata {
     pub map: HashMap<u64, u64>,
     pub current_id: u64,
