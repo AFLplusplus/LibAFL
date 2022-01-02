@@ -24,8 +24,9 @@ pub mod pipes;
 #[cfg(all(unix, feature = "std"))]
 use std::ffi::CString;
 
+// Allow a few extra features we need for the whole module
 #[cfg(all(windows, feature = "std"))]
-#[allow(missing_docs)]
+#[allow(missing_docs, overflowing_literals)]
 pub mod windows_exceptions;
 
 #[cfg(unix)]
