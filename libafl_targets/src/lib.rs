@@ -44,6 +44,7 @@
     while_true
 )]
 
+#[allow(unused_imports)]
 #[macro_use]
 extern crate alloc;
 

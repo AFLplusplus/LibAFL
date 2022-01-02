@@ -46,11 +46,12 @@ struct Timeval {
 
 #[cfg(unix)]
 impl Debug for Timeval {
+    #[allow(clippy::cast_sign_loss, clippy::precision_loss_in_cast)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Timeval {{ tv: {:?} }}",
-            Duration::new(self.tv_sec as _, self.tv_usec as _)
+            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
         )
     }
 }

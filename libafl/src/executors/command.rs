@@ -106,6 +106,7 @@ where
 /// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}};
 /// use libafl::{Error, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
+/// #[derive(Debug)]
 /// struct MyExecutor;
 ///
 /// impl<EM, I: Input + HasTargetBytes, S, Z> CommandConfigurator<EM, I, S, Z> for MyExecutor {
