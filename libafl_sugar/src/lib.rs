@@ -65,6 +65,7 @@ pub const CORPUS_CACHE_SIZE: usize = 4096;
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
+/// The sugar python module
 #[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "libafl_sugar")]

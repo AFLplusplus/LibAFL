@@ -1,8 +1,7 @@
 //! An `afl`-style forkserver fuzzer.
 //! Use this if your target has complex state that needs to be reset.
-use typed_builder::TypedBuilder;
-
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
@@ -255,6 +254,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
     }
 }
 
+/// The python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::forkserver;
@@ -262,6 +262,7 @@ pub mod pybind {
     use pyo3::prelude::*;
     use std::path::PathBuf;
 
+    /// Python bindings for the `LibAFL` forkserver sugar
     #[pyclass(unsendable)]
     struct ForkserverBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
@@ -272,6 +273,7 @@ pub mod pybind {
 
     #[pymethods]
     impl ForkserverBytesCoverageSugar {
+        /// Create a new [`ForkserverBytesCoverageSugar`]
         #[new]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -287,6 +289,7 @@ pub mod pybind {
             }
         }
 
+        /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
         pub fn run(&self, program: String, arguments: Vec<String>) {
             forkserver::ForkserverBytesCoverageSugar::<{ forkserver::DEFAULT_MAP_SIZE }>::builder()
@@ -301,6 +304,7 @@ pub mod pybind {
         }
     }
 
+    /// Register the module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<ForkserverBytesCoverageSugar>()?;
         Ok(())

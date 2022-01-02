@@ -1,3 +1,4 @@
+//! In-memory fuzzer with `QEMU`-based binary-only instrumentation
 use typed_builder::TypedBuilder;
 
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
@@ -36,6 +37,8 @@ use libafl_targets::CmpLogObserver;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
+/// Sugar to create a `libfuzzer`-style fuzzer that uses
+/// `QEMU`-based binary-only instrumentation
 #[derive(TypedBuilder)]
 pub struct QemuBytesCoverageSugar<'a, H>
 where
@@ -57,6 +60,8 @@ where
     /// Flag if use CmpLog
     #[builder(default = false)]
     use_cmplog: bool,
+    /// The port the fuzzing nodes communicate over
+    /// This will spawn a server on this port, and connect to other brokers using this port.
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -74,6 +79,7 @@ impl<'a, H> QemuBytesCoverageSugar<'a, H>
 where
     H: FnMut(&[u8]),
 {
+    /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self, emulator: &Emulator) {
         let conf = match self.configuration.as_ref() {
@@ -330,6 +336,7 @@ where
     }
 }
 
+/// python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::qemu;
@@ -349,6 +356,7 @@ pub mod pybind {
 
     #[pymethods]
     impl QemuBytesCoverageSugar {
+        /// Create a new [`QemuBytesCoverageSugar`]
         #[new]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -364,6 +372,7 @@ pub mod pybind {
             }
         }
 
+        /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
         pub fn run(&self, emulator: &Emulator, harness: PyObject) {
             qemu::QemuBytesCoverageSugar::builder()
@@ -384,6 +393,7 @@ pub mod pybind {
         }
     }
 
+    /// Register this class
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<QemuBytesCoverageSugar>()?;
         Ok(())

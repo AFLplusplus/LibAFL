@@ -297,6 +297,7 @@ where
     }
 }
 
+/// Python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::inmemory;
@@ -305,6 +306,8 @@ pub mod pybind {
     use pyo3::types::PyBytes;
     use std::path::PathBuf;
 
+    /// In-Memory fuzzing made easy.
+    /// Use this sugar for scaling `libfuzzer`-style fuzzers.
     #[pyclass(unsendable)]
     struct InMemoryBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
@@ -315,6 +318,7 @@ pub mod pybind {
 
     #[pymethods]
     impl InMemoryBytesCoverageSugar {
+        /// Create a new [`InMemoryBytesCoverageSugar`]
         #[new]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -330,6 +334,7 @@ pub mod pybind {
             }
         }
 
+        /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
         pub fn run(&self, harness: PyObject) {
             inmemory::InMemoryBytesCoverageSugar::builder()
@@ -350,6 +355,7 @@ pub mod pybind {
         }
     }
 
+    /// Register the module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<InMemoryBytesCoverageSugar>()?;
         Ok(())
