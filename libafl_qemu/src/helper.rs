@@ -1,13 +1,11 @@
+use core::{fmt::Debug, ops::Range};
 use libafl::{
     bolts::tuples::MatchFirstType, executors::ExitKind, inputs::Input, observers::ObserversTuple,
-};
-use core::{
-    fmt::Debug,
-    ops::Range,
 };
 
 use crate::{emu::Emulator, executor::QemuExecutor};
 
+/// A helper for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
 pub trait QemuHelper<I, S>: 'static + Debug
 where
