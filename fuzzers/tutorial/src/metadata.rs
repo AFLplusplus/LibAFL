@@ -13,7 +13,7 @@ use crate::input::PacketData;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(SerdeAny, Serialize, Deserialize)]
+#[derive(Debug, SerdeAny, Serialize, Deserialize)]
 pub struct PacketLenMetadata {
     pub length: u64,
 }
