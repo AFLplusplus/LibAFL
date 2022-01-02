@@ -19,6 +19,7 @@ pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
 /// The size of a logged routine argument in bytes
 pub const CMPLOG_RTN_LEN: usize = 32;
 
+/// The hight of a cmplog routine map
 pub const CMPLOG_MAP_RTN_H: usize = (CMPLOG_MAP_H * core::mem::size_of::<CmpLogInstruction>())
     / core::mem::size_of::<CmpLogRoutine>();
 
@@ -29,6 +30,7 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 
 // void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
 extern "C" {
+    /// Logs an instruction for feedback during fuzzing
     pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
 }
 
@@ -51,6 +53,7 @@ pub struct CmpLogInstruction(u64, u64);
 #[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogRoutine([u8; CMPLOG_RTN_LEN], [u8; CMPLOG_RTN_LEN]);
 
+/// Union of cmplog operands and routines
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union CmpLogVals {
@@ -118,8 +121,8 @@ impl CmpMap for CmpLogMap {
                         self.vals.operands[idx][execution].1 as u32,
                     )),
                     8 => CmpValues::U64((
-                        self.vals.operands[idx][execution].0 as u64,
-                        self.vals.operands[idx][execution].1 as u64,
+                        self.vals.operands[idx][execution].0,
+                        self.vals.operands[idx][execution].1,
                     )),
                     other => panic!("Invalid CmpLog shape {}", other),
                 }
