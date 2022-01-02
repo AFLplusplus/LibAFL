@@ -1071,7 +1071,11 @@ pub mod win32_shmem {
         Error,
     };
 
-    use core::{ffi::c_void, ptr, slice};
+    use core::{
+        ffi::c_void,
+        fmt::{self, Debug, Formatter},
+        ptr, slice,
+    };
     use std::convert::TryInto;
     use uuid::Uuid;
 
@@ -1095,7 +1099,7 @@ pub mod win32_shmem {
     }
 
     impl Debug for Win32ShMem {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
             f.debug_struct("Win32ShMem")
                 .field("id", &self.id)
                 .field("handle", &self.handle.0)
