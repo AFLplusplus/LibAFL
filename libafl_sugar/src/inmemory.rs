@@ -90,7 +90,14 @@ where
             .field("broker_port", &self.broker_port)
             .field("cores", &self.cores)
             .field("remote_broker_addr", &self.remote_broker_addr)
-            .field("harness", &"Option<fn>")
+            .field(
+                "harness",
+                if self.harness.is_some() {
+                    &"<harness_fn>"
+                } else {
+                    &"None"
+                },
+            )
             .finish()
     }
 }

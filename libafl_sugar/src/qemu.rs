@@ -1,7 +1,8 @@
 //! In-memory fuzzer with `QEMU`-based binary-only instrumentation
-use typed_builder::TypedBuilder;
-
+//!
+use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
@@ -73,6 +74,30 @@ where
     /// Bytes harness
     #[builder(setter(strip_option))]
     harness: Option<H>,
+}
+
+impl<'a, H> Debug for QemuBytesCoverageSugar<'a, H> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QemuBytesCoverageSugar")
+            .field("configuration", &self.configuration)
+            .field("timeout", &self.timeout)
+            .field("input_dirs", &self.input_dirs)
+            .field("output_dir", &self.output_dir)
+            .field("tokens_file", &self.tokens_file)
+            .field("use_cmplog", &self.use_cmplog)
+            .field("broker_port", &self.broker_port)
+            .field("cores", &self.cores)
+            .field("remote_broker_addr", &self.remote_broker_addr)
+            .field(
+                "harness",
+                if self.harness.is_some() {
+                    &"<harness_fn>"
+                } else {
+                    &"None"
+                },
+            )
+            .finish()
+    }
 }
 
 impl<'a, H> QemuBytesCoverageSugar<'a, H>
