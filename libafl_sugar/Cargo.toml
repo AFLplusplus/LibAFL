@@ -23,7 +23,7 @@ arm = ["libafl_qemu/arm"] # build qemu for arm
 aarch64 = ["libafl_qemu/aarch64"] # build qemu for aarch64
 
 [build-dependencies]
-pyo3-build-config = { version = "0.14.5", optional = true }
+pyo3-build-config = { version = "0.15", optional = true }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.7.0" }
