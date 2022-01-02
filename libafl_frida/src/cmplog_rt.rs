@@ -200,6 +200,9 @@ impl CmpLogRuntime {
                 .into_boxed_slice(),
         );
     }
+
+    /// Initialize this `CmpLog` runtime.
+    /// This will generate the instrumentation blobs for the current arch.
     pub fn init(&mut self) {
         self.generate_instrumentation_blobs();
     }
@@ -225,9 +228,9 @@ impl CmpLogRuntime {
         self.ops_handle_tbnz_masking.as_ref().unwrap()
     }
 
+    /// Emit the instrumentation code which is responsible for opernads value extraction and cmplog map population
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
     #[inline]
-    /// Emit the instrumentation code which is responsible for opernads value extraction and cmplog map population
     pub fn emit_comparison_handling(
         &self,
         _address: u64,
