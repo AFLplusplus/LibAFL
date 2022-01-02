@@ -72,7 +72,7 @@ where
         f.debug_struct("InProcessExecutor")
             .field("harness_fn", &"<fn>")
             .field("observers", &self.observers)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

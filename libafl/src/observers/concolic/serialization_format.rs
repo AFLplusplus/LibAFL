@@ -227,7 +227,7 @@ where
         f.debug_struct("MessageFileWriter")
             .field("id_counter", &self.id_counter)
             .field("writer_start_position", &self.writer_start_position)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

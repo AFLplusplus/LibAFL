@@ -63,7 +63,7 @@ pub union CmpLogVals {
 
 impl Debug for CmpLogVals {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("CmpLogVals").finish()
+        f.debug_struct("CmpLogVals").finish_non_exhaustive()
     }
 }
 

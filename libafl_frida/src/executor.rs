@@ -49,7 +49,7 @@ where
             .field("base", &self.base)
             .field("helper", &self.helper)
             .field("followed", &self.followed)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

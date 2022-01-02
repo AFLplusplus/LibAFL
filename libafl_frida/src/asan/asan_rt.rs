@@ -139,7 +139,7 @@ impl Debug for AsanRuntime {
             .field("options", &self.options)
             .field("module_map", &"<ModuleMap>")
             .field("suppressed_addresses", &self.suppressed_addresses)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

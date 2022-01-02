@@ -130,7 +130,7 @@ impl Debug for MOpt {
             .field("\n\ncore_operator_cycles", &self.core_operator_cycles)
             .field("\n\ncore_operator_cycles_v2", &self.core_operator_cycles_v2)
             .field("\n\ncore_operator_cycles_v3", &self.core_operator_cycles_v3)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

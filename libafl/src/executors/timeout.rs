@@ -50,7 +50,9 @@ impl Debug for Timeval {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Timeval {{ tv: {:?} }}",
+            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
+            self.tv_sec,
+            self.tv_usec,
             Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
         )
     }
@@ -108,7 +110,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
         f.debug_struct("TimeoutExecutor")
             .field("executor", &self.executor)
             .field("milli_sec", &self.milli_sec)
-            .finish()
+            .finish_non_exhaustive()
     }
 
     #[cfg(unix)]

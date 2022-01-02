@@ -103,7 +103,7 @@ where
             .field("spawn_broker", &self.spawn_broker)
             .field("remote_broker_addr", &self.remote_broker_addr)
             .field("stdout_file", &self.stdout_file)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
