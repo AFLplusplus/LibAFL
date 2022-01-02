@@ -56,7 +56,10 @@ pub mod forkserver;
 #[cfg(target_family = "unix")]
 pub use forkserver::ForkserverBytesCoverageSugar;
 
+/// Default timeout for a run
 pub const DEFAULT_TIMEOUT_SECS: u64 = 1200;
+/// Default cache size for the corpus in memory
+/// Anything else will be on disk.
 pub const CORPUS_CACHE_SIZE: usize = 4096;
 
 #[cfg(feature = "python")]

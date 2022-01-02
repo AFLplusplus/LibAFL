@@ -1,3 +1,5 @@
+//! An `afl`-style forkserver fuzzer.
+//! Use this if your target has complex state that needs to be reset.
 use typed_builder::TypedBuilder;
 
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
