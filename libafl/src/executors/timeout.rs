@@ -1,7 +1,10 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
 #[cfg(any(windows, unix))]
-use core::time::Duration;
+use core::{
+    fmt::{self, Debug, Formatter},
+    time::Duration,
+};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
@@ -41,8 +44,23 @@ struct Timeval {
     pub tv_usec: i64,
 }
 
+#[cfg(unix)]
+impl Debug for Timeval {
+    #[allow(clippy::cast_sign_loss)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
+            self.tv_sec,
+            self.tv_usec,
+            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
+        )
+    }
+}
+
 #[repr(C)]
 #[cfg(unix)]
+#[derive(Debug)]
 struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,
@@ -74,7 +92,6 @@ pub(crate) unsafe fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
 }
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
-#[allow(missing_debug_implementations)]
 pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(unix)]
@@ -85,6 +102,24 @@ pub struct TimeoutExecutor<E> {
     tp_timer: *mut TP_TIMER,
     #[cfg(windows)]
     critical: RTL_CRITICAL_SECTION,
+}
+
+impl<E: Debug> Debug for TimeoutExecutor<E> {
+    #[cfg(windows)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimeoutExecutor")
+            .field("executor", &self.executor)
+            .field("milli_sec", &self.milli_sec)
+            .finish_non_exhaustive()
+    }
+
+    #[cfg(unix)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimeoutExecutor")
+            .field("executor", &self.executor)
+            .field("itimerval", &self.itimerval)
+            .finish()
+    }
 }
 
 #[cfg(windows)]

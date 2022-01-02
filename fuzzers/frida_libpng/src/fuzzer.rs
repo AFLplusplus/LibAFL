@@ -54,9 +54,6 @@ use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 #[cfg(unix)]
 use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
-fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
-    Ok(Duration::from_millis(time.parse()?))
-}
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -113,27 +110,6 @@ struct Opt {
     )]
     output: PathBuf,
 
-    /*
-    #[structopt(
-        parse(try_from_str = timeout_from_millis_str),
-        short,
-        long,
-        help = "Set the exeucution timeout in milliseconds, default is 1000",
-        name = "TIMEOUT",
-        default_value = "1000"
-    )]
-    timeout: Duration,
-
-    #[structopt(
-        parse(from_os_str),
-        short = "x",
-        long,
-        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
-        name = "TOKENS",
-        multiple = true
-    )]
-    tokens: Vec<PathBuf>,
-    */
     #[structopt(
         long,
         help = "The configuration this fuzzer runs with, for multiprocessing",

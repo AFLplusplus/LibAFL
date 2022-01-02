@@ -13,7 +13,9 @@ use std::{
 /// A basic block struct
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DrCovBasicBlock {
+    /// Start of this basic block
     pub start: usize,
+    /// End of this basic block
     pub end: usize,
 }
 
@@ -26,6 +28,7 @@ struct DrCovBasicBlockEntry {
 }
 
 /// A writer for `DrCov` files
+#[derive(Debug)]
 pub struct DrCovWriter<'a> {
     module_mapping: &'a RangeMap<usize, (u16, String)>,
 }

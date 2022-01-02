@@ -24,6 +24,7 @@ use crate::{
     Error,
 };
 
+use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -83,6 +84,27 @@ where
     spawn_broker: bool,
     #[builder(setter(skip), default = PhantomData)]
     phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
+}
+
+impl<'a, CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
+where
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
+    I: Input,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
+    MT: Monitor + Clone,
+    SP: ShMemProvider + 'static,
+    S: DeserializeOwned,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Launcher")
+            .field("configuration", &self.configuration)
+            .field("broker_port", &self.broker_port)
+            .field("core", &self.cores)
+            .field("spawn_broker", &self.spawn_broker)
+            .field("remote_broker_addr", &self.remote_broker_addr)
+            .field("stdout_file", &self.stdout_file)
+            .finish_non_exhaustive()
+    }
 }
 
 #[cfg(feature = "std")]

@@ -6,15 +6,16 @@ use crate::{
     observers::ObserversTuple,
     Error,
 };
+use core::fmt::Debug;
 
 /// A [`CombinedExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
-#[allow(missing_debug_implementations)]
-pub struct CombinedExecutor<A, B> {
+#[derive(Debug)]
+pub struct CombinedExecutor<A: Debug, B: Debug> {
     primary: A,
     secondary: B,
 }
 
-impl<A, B> CombinedExecutor<A, B> {
+impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
     pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
     where
@@ -56,6 +57,7 @@ where
 impl<A, B, I, OT, S> HasObservers<I, OT, S> for CombinedExecutor<A, B>
 where
     A: HasObservers<I, OT, S>,
+    B: Debug,
     OT: ObserversTuple<I, S>,
 {
     #[inline]

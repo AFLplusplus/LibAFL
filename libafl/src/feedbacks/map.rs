@@ -39,7 +39,7 @@ pub type MaxMapOneOrFilledFeedback<FT, I, O, S, T> =
     MapFeedback<FT, I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
-pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
+pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static + Debug
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -112,7 +112,7 @@ where
 }
 
 /// A `IsNovel` function is used to discriminate if a reduced value is considered novel.
-pub trait IsNovel<T>: Serialize + serde::de::DeserializeOwned + 'static
+pub trait IsNovel<T>: Serialize + serde::de::DeserializeOwned + 'static + Debug
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -270,7 +270,7 @@ where
 
 impl<T> FeedbackState for MapFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     fn reset(&mut self) -> Result<(), Error> {
         self.history_map
@@ -357,7 +357,7 @@ where
     O: MapObserver<T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasFeedbackStates<FT> + HasClientPerfMonitor,
+    S: HasFeedbackStates<FT> + HasClientPerfMonitor + Debug,
     FT: FeedbackStatesTuple,
 {
     fn is_interesting<EM, OT>(

@@ -1,3 +1,4 @@
+//! Functionality regarding binary-only coverage collection.
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use std::ffi::c_void;
 
@@ -11,6 +12,8 @@ use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
 
+/// Frida binary-only coverage
+#[derive(Debug)]
 pub struct CoverageRuntime {
     map: [u8; MAP_SIZE],
     previous_pc: u64,
@@ -25,6 +28,7 @@ impl Default for CoverageRuntime {
 }
 
 impl CoverageRuntime {
+    /// Create a new coverage runtime
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -35,13 +39,17 @@ impl CoverageRuntime {
         }
     }
 
+    /// Initialize the coverage runtime
     pub fn init(&mut self) {
         self.generate_maybe_log_blob();
     }
 
+    /// Retrieve the coverage map pointer
     pub fn map_ptr_mut(&mut self) -> *mut u8 {
         self.map.as_mut_ptr()
     }
+
+    /// Retrieve the `maybe_log` code blob, that will write coverage into the map
     #[must_use]
     pub fn blob_maybe_log(&self) -> &[u8] {
         self.blob_maybe_log.as_ref().unwrap()
@@ -116,6 +124,7 @@ impl CoverageRuntime {
         self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
+    /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
         let writer = output.writer();

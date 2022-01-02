@@ -10,12 +10,14 @@ use crate::{
 
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 
+#[derive(Debug)]
 pub struct SnapshotPageInfo {
     pub addr: u64,
     pub dirty: bool,
     pub data: [u8; SNAPSHOT_PAGE_SIZE],
 }
 
+#[derive(Debug)]
 // TODO be thread-safe maybe with https://amanieu.github.io/thread_local-rs/thread_local/index.html
 pub struct QemuSnapshotHelper {
     pub access_cache: [u64; 4],

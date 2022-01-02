@@ -28,12 +28,16 @@ use crate::{
     Error,
 };
 
-use core::{marker::PhantomData, time::Duration};
+use core::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+    time::Duration,
+};
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<I, S>: Named
+pub trait Feedback<I, S>: Named + Debug
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -103,7 +107,7 @@ where
 
 /// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
 /// of the fuzzer State
-pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned {
+pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug {
     /// Reset the internal state
     fn reset(&mut self) -> Result<(), Error> {
         Ok(())
@@ -111,7 +115,7 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned {
 }
 
 /// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwned {
+pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwned + Debug {
     /// Resets all the feedback states of the tuple
     fn reset_all(&mut self) -> Result<(), Error>;
 }
@@ -134,7 +138,7 @@ where
 }
 
 /// A cobined feedback consisting of ultiple [`Feedback`]s
-#[allow(missing_debug_implementations)]
+#[derive(Debug)]
 pub struct CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
@@ -190,7 +194,7 @@ where
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfMonitor,
+    S: HasClientPerfMonitor + Debug,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -253,7 +257,7 @@ where
 }
 
 /// Logical combination of two feedbacks
-pub trait FeedbackLogic<A, B, I, S>: 'static
+pub trait FeedbackLogic<A, B, I, S>: 'static + Debug
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -545,7 +549,7 @@ pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicEagerOr
 pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicFastOr>;
 
 /// Compose feedbacks with an `NOT` operation
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
@@ -557,6 +561,20 @@ where
     /// The name
     name: String,
     phantom: PhantomData<(I, S)>,
+}
+
+impl<A, I, S> Debug for NotFeedback<A, I, S>
+where
+    A: Feedback<I, S>,
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NotFeedback")
+            .field("name", &self.name)
+            .field("first", &self.first)
+            .finish()
+    }
 }
 
 impl<A, I, S> Feedback<I, S> for NotFeedback<A, I, S>

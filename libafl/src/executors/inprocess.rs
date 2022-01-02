@@ -3,7 +3,12 @@
 //!
 //! Needs the `fork` feature flag.
 
-use core::{ffi::c_void, marker::PhantomData, ptr};
+use core::{
+    ffi::c_void,
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+    ptr,
+};
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
@@ -42,7 +47,6 @@ use crate::{
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
-#[derive(Debug)]
 pub struct InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -56,6 +60,20 @@ where
     // Crash and timeout hah
     handlers: InProcessHandlers,
     phantom: PhantomData<(I, S)>,
+}
+
+impl<'a, H, I, OT, S> Debug for InProcessExecutor<'a, H, I, OT, S>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InProcessExecutor")
+            .field("harness_fn", &"<fn>")
+            .field("observers", &self.observers)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
@@ -982,7 +1000,6 @@ where
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
-#[allow(missing_debug_implementations)]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
@@ -994,6 +1011,22 @@ where
     shmem_provider: SP,
     observers: OT,
     phantom: PhantomData<(I, S)>,
+}
+
+#[cfg(all(feature = "std", unix))]
+impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InProcessForkExecutor")
+            .field("observers", &self.observers)
+            .field("shmem_provider", &self.shmem_provider)
+            .finish()
+    }
 }
 
 #[cfg(all(feature = "std", unix))]

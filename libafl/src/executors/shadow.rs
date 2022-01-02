@@ -1,6 +1,9 @@
 //! A `ShadowExecutor` wraps an executor to have shadow observer that will not be considered by the feedbacks and the manager
 
-use core::marker::PhantomData;
+use core::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
@@ -10,8 +13,7 @@ use crate::{
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
-#[allow(missing_debug_implementations)]
-pub struct ShadowExecutor<E, I, S, SOT> {
+pub struct ShadowExecutor<E: Debug, I: Debug, S, SOT: Debug> {
     /// The wrapped executor
     executor: E,
     /// The shadow observers
@@ -20,7 +22,16 @@ pub struct ShadowExecutor<E, I, S, SOT> {
     phantom: PhantomData<(I, S)>,
 }
 
-impl<E, I, S, SOT> ShadowExecutor<E, I, S, SOT>
+impl<E: Debug, I: Debug, S, SOT: Debug> Debug for ShadowExecutor<E, I, S, SOT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ShadowExecutor")
+            .field("executor", &self.executor)
+            .field("shadow_observers", &self.shadow_observers)
+            .finish()
+    }
+}
+
+impl<E: Debug, I: Debug, S, SOT: Debug> ShadowExecutor<E, I, S, SOT>
 where
     SOT: ObserversTuple<I, S>,
 {
@@ -65,6 +76,8 @@ where
 
 impl<E, I, OT, S, SOT> HasObservers<I, OT, S> for ShadowExecutor<E, I, S, SOT>
 where
+    I: Debug,
+    S: Debug,
     E: HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,

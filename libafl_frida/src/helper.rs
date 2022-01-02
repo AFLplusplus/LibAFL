@@ -2,53 +2,39 @@ use libafl::inputs::{HasTargetBytes, Input};
 use libafl::Error;
 use libafl_targets::drcov::DrCovBasicBlock;
 
+#[cfg(feature = "cmplog")]
+use crate::cmplog_rt::CmpLogRuntime;
+#[cfg(windows)]
+use crate::FridaOptions;
+#[cfg(unix)]
+use crate::{asan::asan_rt::AsanRuntime, FridaOptions};
+use crate::{coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
-
 #[cfg(all(target_arch = "x86_64", unix))]
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone, RegId,
 };
-
-#[cfg(target_arch = "aarch64")]
-use num_traits::cast::FromPrimitive;
-
+use core::fmt::{self, Debug, Formatter};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
-
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
-
-use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::Transformer, ModuleDetails, ModuleMap,
-};
-
 #[cfg(unix)]
 use frida_gum::CpuContext;
-
-use frida_gum::{Gum, Module, PageProtection};
-
-use rangemap::RangeMap;
-
+use frida_gum::{
+    instruction_writer::InstructionWriter, stalker::Transformer, Gum, Module, ModuleDetails,
+    ModuleMap, PageProtection,
+};
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-
-#[cfg(unix)]
-use crate::{asan::asan_rt::AsanRuntime, FridaOptions};
-
-#[cfg(windows)]
-use crate::FridaOptions;
-
-use crate::drcov_rt::DrCovRuntime;
-
-use crate::coverage_rt::CoverageRuntime;
-
-#[cfg(feature = "cmplog")]
-use crate::cmplog_rt::CmpLogRuntime;
+#[cfg(target_arch = "aarch64")]
+use num_traits::cast::FromPrimitive;
+use rangemap::RangeMap;
 
 #[cfg(any(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
@@ -56,7 +42,7 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// An helper that feeds `FridaInProcessExecutor` with user-supplied instrumentation
-pub trait FridaHelper<'a> {
+pub trait FridaHelper<'a>: Debug {
     /// Access to the stalker `Transformer`
     fn transformer(&self) -> &Transformer<'a>;
 
@@ -76,8 +62,10 @@ pub trait FridaHelper<'a> {
     /// pointer to the frida coverage map
     fn map_ptr_mut(&mut self) -> *mut u8;
 
+    /// Returns the mapped ranges of the target
     fn ranges(&self) -> &RangeMap<usize, (u16, String)>;
 
+    /// Returns the mapped ranges of the target, mutable
     fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)>;
 }
 
@@ -96,6 +84,23 @@ pub struct FridaInstrumentationHelper<'a> {
     ranges: RangeMap<usize, (u16, String)>,
     module_map: ModuleMap,
     options: &'a FridaOptions,
+}
+
+impl Debug for FridaInstrumentationHelper<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut dbg_me = f.debug_struct("FridaInstrumentationHelper");
+        dbg_me
+            .field("coverage_rt", &self.coverage_rt)
+            .field("capstone", &self.capstone)
+            .field("asan_runtime", &self.asan_runtime)
+            .field("drcov_runtime", &self.drcov_runtime)
+            .field("ranges", &self.ranges)
+            .field("module_map", &"<ModuleMap>")
+            .field("options", &self.options);
+        #[cfg(feature = "cmplog")]
+        dbg_me.field("cmplog_runtime", &self.cmplog_runtime);
+        dbg_me.finish()
+    }
 }
 
 impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
@@ -166,7 +171,7 @@ pub fn get_module_size(module_name: &str) -> usize {
     let mut code_size = 0;
     let code_size_ref = &mut code_size;
     Module::enumerate_ranges(module_name, PageProtection::ReadExecute, move |details| {
-        *code_size_ref = details.memory_range().size() as usize;
+        *code_size_ref = details.memory_range().size();
         true
     });
 
@@ -467,8 +472,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
 
-    // frida registers: https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html
-    // capstone registers: https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html
+    /// The writer registers
+    /// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>
+    /// capstone registers: <https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html>
     #[cfg(all(target_arch = "x86_64", unix))]
     #[must_use]
     #[inline]

@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
-pub trait MapObserver<T>: HasLen + Named + Serialize + serde::de::DeserializeOwned
+pub trait MapObserver<T>: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
 where
     T: PrimInt + Default + Copy + Debug,
 {

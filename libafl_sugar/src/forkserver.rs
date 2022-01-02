@@ -1,6 +1,7 @@
-use typed_builder::TypedBuilder;
-
+//! An `afl`-style forkserver fuzzer.
+//! Use this if your target has complex state that needs to be reset.
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
@@ -32,9 +33,11 @@ use libafl::{
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
+/// The default coverage map size to use for forkserver targets
 pub const DEFAULT_MAP_SIZE: usize = 65536;
 
-#[derive(TypedBuilder)]
+/// Creates a Forkserver-based fuzzer.
+#[derive(Debug, TypedBuilder)]
 pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
     /// Laucher configuration (default is random)
     #[builder(default = None, setter(strip_option))]
@@ -74,6 +77,7 @@ pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
 
 #[allow(clippy::similar_names)]
 impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
+    /// Runs the fuzzer.
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = match self.configuration.as_ref() {
@@ -250,6 +254,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
     }
 }
 
+/// The python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::forkserver;
@@ -257,6 +262,7 @@ pub mod pybind {
     use pyo3::prelude::*;
     use std::path::PathBuf;
 
+    /// Python bindings for the `LibAFL` forkserver sugar
     #[pyclass(unsendable)]
     struct ForkserverBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
@@ -267,6 +273,7 @@ pub mod pybind {
 
     #[pymethods]
     impl ForkserverBytesCoverageSugar {
+        /// Create a new [`ForkserverBytesCoverageSugar`]
         #[new]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -282,6 +289,7 @@ pub mod pybind {
             }
         }
 
+        /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
         pub fn run(&self, program: String, arguments: Vec<String>) {
             forkserver::ForkserverBytesCoverageSugar::<{ forkserver::DEFAULT_MAP_SIZE }>::builder()
@@ -296,6 +304,7 @@ pub mod pybind {
         }
     }
 
+    /// Register the module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<ForkserverBytesCoverageSugar>()?;
         Ok(())

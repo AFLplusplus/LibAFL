@@ -162,6 +162,7 @@ pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> E
     Emulator::new(args, env)
 }
 
+#[derive(Debug)]
 // TODO intrumentation filter
 pub struct QemuAsanHelper {
     enabled: bool,
