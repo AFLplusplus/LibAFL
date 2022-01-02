@@ -1,7 +1,10 @@
 use libafl::{
     bolts::tuples::MatchFirstType, executors::ExitKind, inputs::Input, observers::ObserversTuple,
 };
-use std::ops::Range;
+use core::{
+    fmt::Debug,
+    ops::Range,
+};
 
 use crate::{emu::Emulator, executor::QemuExecutor};
 
