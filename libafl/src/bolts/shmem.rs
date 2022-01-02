@@ -1071,7 +1071,11 @@ pub mod win32_shmem {
         Error,
     };
 
-    use core::{ffi::c_void, ptr, slice};
+    use core::{
+        ffi::c_void,
+        fmt::{self, Debug, Formatter},
+        ptr, slice,
+    };
     use std::convert::TryInto;
     use uuid::Uuid;
 
@@ -1086,12 +1090,23 @@ pub mod win32_shmem {
     };
 
     /// The default Sharedmap impl for windows using shmctl & shmget
-    #[derive(Clone, Debug)]
+    #[derive(Clone)]
     pub struct Win32ShMem {
         id: ShMemId,
         handle: HANDLE,
         map: *mut u8,
         map_size: usize,
+    }
+
+    impl Debug for Win32ShMem {
+        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+            f.debug_struct("Win32ShMem")
+                .field("id", &self.id)
+                .field("handle", &self.handle.0)
+                .field("map", &self.map)
+                .field("map_size", &self.map_size)
+                .finish()
+        }
     }
 
     impl Win32ShMem {
@@ -1137,7 +1152,7 @@ pub mod win32_shmem {
                 let map_str_bytes = id.id;
                 // Unlike MapViewOfFile this one needs u32
                 let handle = OpenFileMappingA(
-                    FILE_MAP_ALL_ACCESS.0,
+                    FILE_MAP_ALL_ACCESS,
                     BOOL(0),
                     PSTR(&map_str_bytes as *const u8 as *mut u8),
                 );

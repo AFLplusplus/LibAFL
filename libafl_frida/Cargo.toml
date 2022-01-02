@@ -21,16 +21,16 @@ cc = { version = "1.0", features = ["parallel"] }
 [dependencies]
 libafl = { path = "../libafl", version = "0.7.0", features = ["std", "libafl_derive"] }
 libafl_targets = { path = "../libafl_targets", version = "0.7.0", features = ["std", "sancov_cmplog"] }
-nix = "0.23.0"
+nix = "0.23"
 libc = "0.2"
 hashbrown = "0.11"
-libloading = "0.7.0"
-rangemap = "0.1.10"
+libloading = "0.7"
+rangemap = "0.1"
 frida-gum-sys = { version = "0.3", features = [ "auto-download", "event-sink", "invocation-listener"] }
 frida-gum = { version = "0.6.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs", rev = "6648a7a" }
 regex = "1.4"
-dynasmrt = "1.0.1"
+dynasmrt = "1.2"
 capstone = "0.10.0"
 color-backtrace ={ version = "0.5", features = [ "resolve-modules" ] }
 termcolor = "1.1.2"
