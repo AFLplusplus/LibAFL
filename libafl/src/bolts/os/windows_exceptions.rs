@@ -36,7 +36,6 @@ pub const SIGABRT: i32 = 22;
 pub const SIGABRT2: i32 = 22;
 
 // From https://github.com/wine-mirror/wine/blob/master/include/winnt.h#L611
-#[allow(overflowing_literals)]
 pub const STATUS_WAIT_0: i32 = 0x00000000;
 pub const STATUS_ABANDONED_WAIT_0: i32 = 0x00000080;
 pub const STATUS_USER_APC: i32 = 0x000000C0;
