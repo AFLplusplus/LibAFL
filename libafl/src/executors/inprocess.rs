@@ -1000,6 +1000,7 @@ where
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
+#[allow(missing_debug_implementations)]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
