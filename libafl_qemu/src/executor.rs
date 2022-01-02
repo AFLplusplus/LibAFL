@@ -1,5 +1,10 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
-use core::{ffi::c_void, mem::transmute, ptr};
+use core::{
+    ffi::c_void,
+    fmt::{self, Debug, Formatter},
+    mem::transmute,
+    ptr,
+};
 
 use libafl::{
     corpus::Corpus,
@@ -434,7 +439,6 @@ where
     res
 }
 
-#[derive(Debug)]
 pub struct QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -445,6 +449,22 @@ where
     helpers: QT,
     emulator: &'a Emulator,
     inner: InProcessExecutor<'a, H, I, OT, S>,
+}
+
+impl<'a, H, I, OT, QT, S> Debug for QemuExecutor<'a, H, I, OT, QT, S>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    QT: QemuHelperTuple<I, S>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QemuExecutor")
+            .field("helpers", &self.helpers)
+            .field("emulator", &self.emulator)
+            .field("inner", &self.inner)
+            .finish()
+    }
 }
 
 impl<'a, H, I, OT, QT, S> QemuExecutor<'a, H, I, OT, QT, S>
