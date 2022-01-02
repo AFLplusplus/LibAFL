@@ -15,4 +15,4 @@ debug = true
 libafl = { path = "../../libafl/" }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["x86_64"] }
 clap = { version = "3.0.0-rc.4", features = ["default"] }
-nix = "0.23.0"
+nix = "0.23"
