@@ -27,6 +27,7 @@ use capstone::{
     Capstone, Insn,
 };
 
+#[derive(Debug)]
 pub struct CmpLogRuntime {
     ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
     ops_handle_tbz_masking: Option<Box<[u8]>>,

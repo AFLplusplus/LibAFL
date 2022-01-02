@@ -7,6 +7,7 @@ this helps finding mem errors early.
 */
 
 use backtrace::Backtrace;
+use core::fmt::{self, Debug, Formatter};
 use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
 use hashbrown::HashMap;
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -69,10 +70,12 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
-// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus instrumented rip, accessed memory addr and true rip
+/// The count of registers that need to be saved by the asan runtime
+/// sixteen general purpose registers are put in this order, rax, rbx, rcx, rdx, rbp, rsp, rsi, rdi, r8-r15, plus instrumented rip, accessed memory addr and true rip
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 19;
 
+/// The registers that need to be saved by the asan runtime, as names
 #[cfg(target_arch = "x86_64")]
 pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "rax",
@@ -96,6 +99,7 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
     "actual rip",
 ];
 
+/// The count of registers that need to be saved by the asan runtime
 #[cfg(target_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 
@@ -126,6 +130,17 @@ pub struct AsanRuntime {
     module_map: Option<ModuleMap>,
     suppressed_addresses: Vec<usize>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
+}
+
+impl Debug for AsanRuntime {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AsanRuntime")
+            .field("stalked_addresses", &self.stalked_addresses)
+            .field("options", &self.options)
+            .field("module_map", &"<ModuleMap>")
+            .field("suppressed_addresses", &self.suppressed_addresses)
+            .finish()
+    }
 }
 
 impl AsanRuntime {
@@ -261,15 +276,18 @@ impl AsanRuntime {
         self.allocator.reset();
     }
 
+    /// Gets the allocator
     #[must_use]
     pub fn allocator(&self) -> &Allocator {
         &self.allocator
     }
 
+    /// Gets the allocator, mut
     pub fn allocator_mut(&mut self) -> &mut Allocator {
         &mut self.allocator
     }
 
+    /// The function that checks the shadow byte
     #[must_use]
     pub fn shadow_check_func(&self) -> &Option<extern "C" fn(*const c_void, usize) -> bool> {
         &self.shadow_check_func
@@ -332,7 +350,7 @@ impl AsanRuntime {
             .map_shadow_for_region(tls_start, tls_end, true);
         println!(
             "registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
-            stack_start as usize, stack_end as usize, tls_start as usize, tls_end as usize
+            stack_start, stack_end, tls_start, tls_end
         );
     }
 
@@ -416,6 +434,7 @@ impl AsanRuntime {
         (start, end)
     }
 
+    /// Gets the current instruction pointer
     #[cfg(target_arch = "aarch64")]
     #[must_use]
     #[inline]
@@ -423,6 +442,7 @@ impl AsanRuntime {
         Interceptor::current_invocation().cpu_context().pc() as usize
     }
 
+    /// Gets the current instruction pointer
     #[cfg(target_arch = "x86_64")]
     #[must_use]
     #[inline]
@@ -447,7 +467,7 @@ impl AsanRuntime {
                     unsafe extern "C" fn [<replacement_ $name>]($($param: $param_type),*) -> $return_type {
                         let mut invocation = Interceptor::current_invocation();
                         let this = &mut *(invocation.replacement_data().unwrap().0 as *mut AsanRuntime);
-                        let real_address = this.real_address_for_stalked(invocation.return_addr() as usize);
+                        let real_address = this.real_address_for_stalked(invocation.return_addr());
                         if !this.suppressed_addresses.contains(&real_address) && this.module_map.as_ref().unwrap().find(real_address as u64).is_some() {
                             this.[<hook_ $name>]($($param),*)
                         } else {
@@ -2118,6 +2138,7 @@ impl AsanRuntime {
         Err(())
     }
 
+    /// Checks if the current instruction is interesting for address sanitization.
     #[cfg(all(target_arch = "x86_64", unix))]
     #[inline]
     #[allow(clippy::unused_self)]
@@ -2182,6 +2203,7 @@ impl AsanRuntime {
         Err(())
     }
 
+    /// Emits a asan shadow byte check.
     #[inline]
     #[allow(clippy::too_many_lines)]
     #[allow(clippy::too_many_arguments)]

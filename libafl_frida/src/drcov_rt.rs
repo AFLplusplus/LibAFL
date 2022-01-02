@@ -9,7 +9,7 @@ use rangemap::RangeMap;
 use std::hash::Hasher;
 
 /// Generates `DrCov` traces
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct DrCovRuntime {
     /// The basic blocks of this execution
     pub drcov_basic_blocks: Vec<DrCovBasicBlock>,

@@ -1,3 +1,4 @@
+//! Errors that can be caught by the `libafl_frida` address sanitizer.
 #[cfg(target_arch = "x86_64")]
 use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use backtrace::Backtrace;
@@ -548,7 +549,7 @@ impl AsanErrors {
 pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
 /// An observer for frida address sanitizer `AsanError`s for a frida executor run
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
