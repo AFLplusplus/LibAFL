@@ -44,8 +44,19 @@ struct Timeval {
     pub tv_usec: i64,
 }
 
+impl Debug for Timeval {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Timeval {{ tv: {:?} }}",
+            Duration::new(self.tv_sec as _, self.tv_usec as _)
+        )
+    }
+}
+
 #[repr(C)]
 #[cfg(unix)]
+#[derive(Debug)]
 struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,

@@ -58,7 +58,7 @@ pub enum ExitKind {
 crate::impl_serdeany!(ExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers<I, OT, S>
+pub trait HasObservers<I, OT, S>: Debug
 where
     OT: ObserversTuple<I, S>,
 {

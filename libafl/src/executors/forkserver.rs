@@ -1,6 +1,10 @@
 //! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
 
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use core::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+    time::Duration,
+};
 use std::{
     fs::{File, OpenOptions},
     io::{self, prelude::*, ErrorKind, SeekFrom},
@@ -370,12 +374,13 @@ pub trait HasForkserver {
 }
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
-pub struct TimeoutForkserverExecutor<E> {
+#[derive(Debug)]
+pub struct TimeoutForkserverExecutor<E: Debug> {
     executor: E,
     timeout: TimeSpec,
 }
 
-impl<E> TimeoutForkserverExecutor<E> {
+impl<E: Debug> TimeoutForkserverExecutor<E> {
     /// Create a new [`TimeoutForkserverExecutor`]
     pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let milli_sec = exec_tmout.as_millis() as i64;
@@ -384,7 +389,7 @@ impl<E> TimeoutForkserverExecutor<E> {
     }
 }
 
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E>
+impl<E: Debug, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E>
 where
     I: Input + HasTargetBytes,
     E: Executor<EM, I, S, Z> + HasForkserver,
@@ -482,7 +487,6 @@ where
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-#[derive(Debug)]
 pub struct ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
@@ -495,6 +499,23 @@ where
     observers: OT,
     map: Option<StdShMem>,
     phantom: PhantomData<(I, S)>,
+}
+
+impl<I, OT, S> Debug for ForkserverExecutor<I, OT, S>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple<I, S>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ForkserverExecutor")
+            .field("target", &self.target)
+            .field("args", &self.args)
+            .field("out_file", &self.out_file)
+            .field("forkserver", &self.forkserver)
+            .field("observers", &self.observers)
+            .field("map", &self.map)
+            .finish()
+    }
 }
 
 impl<I, OT, S> ForkserverExecutor<I, OT, S>

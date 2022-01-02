@@ -1,5 +1,8 @@
 //! The command executor executes a sub program for each run
-use core::{fmt::Debug, marker::PhantomData};
+use core::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+};
 
 #[cfg(feature = "std")]
 use std::process::Child;
@@ -20,6 +23,15 @@ pub struct CommandExecutor<EM, I, S, Z, T: Debug, OT: Debug> {
     /// [`crate::observers::Observer`]s for this executor
     observers: OT,
     phantom: PhantomData<(EM, I, S, Z)>,
+}
+
+impl<EM, I, S, Z, T: Debug, OT: Debug> Debug for CommandExecutor<EM, I, S, Z, T, OT> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CommandExecutor")
+            .field("inner", &self.inner)
+            .field("observers", &self.observers)
+            .finish()
+    }
 }
 
 impl<EM, I, S, Z, T: Debug, OT: Debug> CommandExecutor<EM, I, S, Z, T, OT> {

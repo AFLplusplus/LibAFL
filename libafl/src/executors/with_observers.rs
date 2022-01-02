@@ -20,6 +20,7 @@ impl<EM, I, S, Z, E, OT> Executor<EM, I, S, Z> for WithObservers<E, OT>
 where
     I: Input,
     E: Executor<EM, I, S, Z>,
+    OT: Debug,
 {
     fn run_target(
         &mut self,
@@ -32,7 +33,7 @@ where
     }
 }
 
-impl<I, S, E, OT> HasObservers<I, OT, S> for WithObservers<E, OT>
+impl<I, S, E: Debug, OT: Debug> HasObservers<I, OT, S> for WithObservers<E, OT>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -46,7 +47,7 @@ where
     }
 }
 
-impl<E, OT> WithObservers<E, OT> {
+impl<E: Debug, OT: Debug> WithObservers<E, OT> {
     /// Wraps the given [`Executor`] with the given [`ObserversTuple`] to implement [`HasObservers`].
     ///
     /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by

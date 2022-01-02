@@ -15,7 +15,7 @@ pub struct CombinedExecutor<A: Debug, B: Debug> {
     secondary: B,
 }
 
-impl<A, B> CombinedExecutor<A, B> {
+impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
     pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
     where
@@ -57,6 +57,7 @@ where
 impl<A, B, I, OT, S> HasObservers<I, OT, S> for CombinedExecutor<A, B>
 where
     A: HasObservers<I, OT, S>,
+    B: Debug,
     OT: ObserversTuple<I, S>,
 {
     #[inline]

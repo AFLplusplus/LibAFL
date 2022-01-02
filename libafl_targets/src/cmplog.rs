@@ -1,5 +1,8 @@
 //! `CmpLog` logs and reports back values touched during fuzzing.
 //! The values will then be used in subsequent mutations.
+//!
+
+use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
@@ -55,9 +58,15 @@ pub union CmpLogVals {
     routines: [[CmpLogRoutine; CMPLOG_MAP_RTN_H]; CMPLOG_MAP_W],
 }
 
+impl Debug for CmpLogVals {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CmpLogVals").finish()
+    }
+}
+
 /// A struct containing the `CmpLog` metadata for a `LibAFL` run.
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct CmpLogMap {
     headers: [CmpLogHeader; CMPLOG_MAP_W],
     vals: CmpLogVals,
@@ -155,6 +164,7 @@ pub static mut libafl_cmplog_enabled: u8 = 0;
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
 /// A [`CmpObserver`] observer for `CmpLog`
+#[derive(Debug)]
 pub struct CmpLogObserver<'a> {
     map: OwnedRefMut<'a, CmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,
