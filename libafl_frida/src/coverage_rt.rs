@@ -162,10 +162,7 @@ impl CoverageRuntime {
         {
             writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
             writer.put_push_reg(X86Register::Rdi);
-            writer.put_mov_reg_address(
-                X86Register::Rdi,
-                h64 & (MAP_SIZE as u64 - 1),
-            );
+            writer.put_mov_reg_address(X86Register::Rdi, h64 & (MAP_SIZE as u64 - 1));
             writer.put_call_address(self.current_log_impl);
             writer.put_pop_reg(X86Register::Rdi);
             writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
@@ -179,10 +176,7 @@ impl CoverageRuntime {
                 -(16 + redzone_size),
                 IndexMode::PreAdjust,
             );
-            writer.put_ldr_reg_u64(
-                Aarch64Register::X0,
-                h64 & (MAP_SIZE as u64 - 1),
-            );
+            writer.put_ldr_reg_u64(Aarch64Register::X0, h64 & (MAP_SIZE as u64 - 1));
 
             writer.put_bl_imm(self.current_log_impl);
             writer.put_ldp_reg_reg_reg_offset(
