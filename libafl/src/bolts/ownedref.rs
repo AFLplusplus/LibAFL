@@ -234,8 +234,7 @@ where
     #[must_use]
     fn is_owned(&self) -> bool {
         match self {
-            OwnedSlice::RefRaw(_, _) => false,
-            OwnedSlice::Ref(_) => false,
+            OwnedSlice::RefRaw(_, _) | OwnedSlice::Ref(_) => false,
             OwnedSlice::Owned(_) => true,
         }
     }
@@ -336,8 +335,7 @@ where
     #[must_use]
     fn is_owned(&self) -> bool {
         match self {
-            OwnedSliceMut::RefRaw(_, _) => false,
-            OwnedSliceMut::Ref(_) => false,
+            OwnedSliceMut::RefRaw(_, _) | OwnedSliceMut::Ref(_) => false,
             OwnedSliceMut::Owned(_) => true,
         }
     }
