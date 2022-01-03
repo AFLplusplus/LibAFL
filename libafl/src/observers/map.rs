@@ -205,6 +205,7 @@ where
     ///
     /// # Safety
     /// Will dereference the owned slice with up to len elements.
+    #[must_use]
     pub fn new_from_ownedref(name: &'static str, map: OwnedSliceMut<'a, T>) -> Self {
         let map_slice = map.as_slice();
         let initial = if map_slice.is_empty() {
