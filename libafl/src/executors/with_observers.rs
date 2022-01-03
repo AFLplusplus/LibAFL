@@ -16,7 +16,7 @@ pub struct WithObservers<E: Debug, OT: Debug> {
     observers: OT,
 }
 
-impl<EM, I, S, Z, E, OT> Executor<EM, I, S, Z> for WithObservers<E, OT>
+impl<E, EM, I, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, OT>
 where
     I: Input,
     E: Executor<EM, I, S, Z>,
@@ -33,7 +33,7 @@ where
     }
 }
 
-impl<I, S, E: Debug, OT: Debug> HasObservers<I, OT, S> for WithObservers<E, OT>
+impl<I, E: Debug, OT: Debug, S> HasObservers<I, OT, S> for WithObservers<E, OT>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
