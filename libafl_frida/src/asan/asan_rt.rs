@@ -1084,7 +1084,7 @@ impl AsanRuntime {
             {
                 index_reg -= capstone::arch::arm64::Arm64Reg::ARM64_REG_S0 as u16;
             }
-            fault_address += self.regs[index_reg as usize] as usize;
+            fault_address += self.regs[index_reg as usize];
         }
 
         let backtrace = Backtrace::new();
@@ -2086,6 +2086,7 @@ impl AsanRuntime {
         self.blob_check_mem_64bytes.as_ref().unwrap()
     }
 
+    /// Determine if the instruction is 'interesting' for the purposes of ASAN
     #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn asan_is_interesting_instruction(
@@ -2359,6 +2360,7 @@ impl AsanRuntime {
         writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
     }
 
+    /// Emit a shadow memory check into the instruction stream
     #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn emit_shadow_check(

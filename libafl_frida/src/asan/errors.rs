@@ -195,12 +195,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(
-                        output,
-                        "x{:02}: 0x{:016x} ",
-                        reg, error.registers[reg as usize]
-                    )
-                    .unwrap();
+                    write!(output, "x{:02}: 0x{:016x} ", reg, error.registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -459,7 +454,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
+                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
