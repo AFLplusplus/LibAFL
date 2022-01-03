@@ -139,7 +139,7 @@ where
 
 /// A cobined feedback consisting of ultiple [`Feedback`]s
 #[derive(Debug)]
-pub struct CombinedFeedback<A, B, FL, I, S>
+pub struct CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -155,7 +155,7 @@ where
     phantom: PhantomData<(I, S, FL)>,
 }
 
-impl<A, B, FL, I, S> Named for CombinedFeedback<A, B, FL, I, S>
+impl<A, B, I, S, FL> Named for CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -168,7 +168,7 @@ where
     }
 }
 
-impl<A, B, FL, I, S> CombinedFeedback<A, B, FL, I, S>
+impl<A, B, I, S, FL> CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -188,7 +188,7 @@ where
     }
 }
 
-impl<A, B, FL, I, S> Feedback<I, S> for CombinedFeedback<A, B, FL, I, S>
+impl<A, B, I, S, FL> Feedback<I, S> for CombinedFeedback<A, B, I, S, FL>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
