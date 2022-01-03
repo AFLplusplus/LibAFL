@@ -292,13 +292,14 @@ impl Allocator {
 
         self.allocations
             .insert(metadata.address + self.page_size, metadata);
-        // println!("serving address: {:?}, size: {:x}", address, size);
+        //println!("serving address: {:?}, size: {:x}", address, size);
         address
     }
 
     /// Releases the allocation at the given address.
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
+        //println!("freeing address: {:?}", ptr);
         let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
             metadata
         } else {
@@ -379,7 +380,8 @@ impl Allocator {
         }
 
         for allocation in tmp_allocations {
-            self.allocations.insert(allocation.address, allocation);
+            self.allocations
+                .insert(allocation.address + self.page_size, allocation);
         }
 
         self.total_allocation_size = 0;

@@ -285,7 +285,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 for instruction in basic_block {
                     let instr = instruction.instr();
                     let address = instr.address();
-                    // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                    //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
 
                     //println!(
                     //"address: {:x} contains: {:?}",
@@ -297,7 +297,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                     if helper.ranges.contains_key(&(address as usize)) {
                         if first {
                             first = false;
-                            // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                            //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
                             if helper.options().coverage_enabled() {
                                 helper.coverage_rt.emit_coverage_mapping(address, &output);
                             }
@@ -399,6 +399,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         self.options
     }
 
+    /// Determine the width of the specified instruction
     #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn instruction_width(instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32 {
@@ -465,6 +466,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         8 * num_registers
     }
 
+    /// Convert from a capstone register id to a frida InstructionWriter register index
     #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
