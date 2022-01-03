@@ -127,6 +127,15 @@ impl CoverageRuntime {
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
+        let tmp = (address >> 32) + ((address & 0xffffffff) << 32);
+        let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
+        let mut h64 = tmp ^ bitflip;
+        h64 = h64.rotate_left(49) & h64.rotate_left(24);
+        h64 *= 0x9FB21C651E98DF25;
+        h64 ^= (h64 >> 35) + 8;
+        h64 *= 0x9FB21C651E98DF25;
+        h64 ^= h64 >> 28;
+
         let writer = output.writer();
         #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
         let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
@@ -155,7 +164,7 @@ impl CoverageRuntime {
             writer.put_push_reg(X86Register::Rdi);
             writer.put_mov_reg_address(
                 X86Register::Rdi,
-                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
+                h64 & (MAP_SIZE as u64 - 1),
             );
             writer.put_call_address(self.current_log_impl);
             writer.put_pop_reg(X86Register::Rdi);
@@ -167,19 +176,20 @@ impl CoverageRuntime {
                 Aarch64Register::Lr,
                 Aarch64Register::X0,
                 Aarch64Register::Sp,
-                -(16 + redzone_size) as i64,
+                -(16 + redzone_size),
                 IndexMode::PreAdjust,
             );
             writer.put_ldr_reg_u64(
                 Aarch64Register::X0,
-                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
+                h64 & (MAP_SIZE as u64 - 1),
             );
+
             writer.put_bl_imm(self.current_log_impl);
             writer.put_ldp_reg_reg_reg_offset(
                 Aarch64Register::Lr,
                 Aarch64Register::X0,
                 Aarch64Register::Sp,
-                16 + redzone_size as i64,
+                16 + redzone_size,
                 IndexMode::PostAdjust,
             );
         }
