@@ -201,6 +201,24 @@ where
         }
     }
 
+    /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map.
+    ///
+    /// # Safety
+    /// Will dereference the owned slice with up to len elements.
+    pub fn new_from_ownedref(name: &'static str, map: OwnedSliceMut<'a, T>) -> Self {
+        let map_slice = map.as_slice();
+        let initial = if map_slice.is_empty() {
+            T::default()
+        } else {
+            map_slice[0]
+        };
+        Self {
+            map,
+            name: name.to_string(),
+            initial,
+        }
+    }
+
     /// Creates a new [`MapObserver`] from a raw pointer
     ///
     /// # Safety
