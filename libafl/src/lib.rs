@@ -224,6 +224,9 @@ impl From<TryFromIntError> for Error {
     }
 }
 
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
+
 // TODO: no_std test
 #[cfg(feature = "std")]
 #[cfg(test)]
