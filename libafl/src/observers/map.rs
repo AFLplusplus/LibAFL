@@ -5,11 +5,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{
-    fmt::Debug,
-    hash::Hasher,
-    slice::{from_raw_parts, from_raw_parts_mut},
-};
+use core::{fmt::Debug, hash::Hasher, slice::from_raw_parts};
 use intervaltree::IntervalTree;
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
@@ -212,7 +208,7 @@ where
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
         let initial = if len > 0 { *map_ptr } else { T::default() };
         StdMapObserver {
-            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, len)),
+            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, len),
             name: name.to_string(),
             initial,
         }
@@ -334,7 +330,7 @@ where
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T) -> Self {
         let initial = if N > 0 { *map_ptr } else { T::default() };
         ConstMapObserver {
-            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, N)),
+            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, N),
             name: name.to_string(),
             initial,
         }
@@ -448,7 +444,7 @@ where
     ) -> Self {
         let initial = if max_len > 0 { *map_ptr } else { T::default() };
         VariableMapObserver {
-            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, max_len)),
+            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, max_len),
             size: OwnedRefMut::Ref(size),
             name: name.into(),
             initial,

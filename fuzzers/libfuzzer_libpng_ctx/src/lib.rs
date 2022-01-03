@@ -144,7 +144,7 @@ pub fn libafl_main() {
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges = edges_map_from_ptr();
+        let edges = unsafe {edges_map_from_ptr()};
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 
         // Create an observation channel to keep track of the execution time
