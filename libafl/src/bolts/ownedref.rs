@@ -175,7 +175,7 @@ enum OwnedSliceInner<'a, T: 'a + Sized> {
     Owned(Vec<T>),
 }
 
-/// The struct to simply wrap OwnedSliceInner to avoid exposing the pointer in it.
+/// Wrap a slice and convert to a Vec on serialize
 #[derive(Clone, Debug)]
 pub struct OwnedSlice<'a, T: 'a + Sized> {
     inner: OwnedSliceInner<'a, T>,
