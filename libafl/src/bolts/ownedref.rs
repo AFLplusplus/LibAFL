@@ -253,6 +253,19 @@ impl<'a, T> From<&'a [T]> for OwnedSlice<'a, T> {
     }
 }
 
+/// Create a new [`OwnedSlice`] from a [`OwnedSliceMut`]
+impl<'a, T> From<OwnedSliceMut<'a, T>> for OwnedSlice<'a, T> {
+    fn from(mut_slice: OwnedSliceMut<'a, T>) -> Self {
+        Self {
+            inner: match mut_slice.inner {
+                OwnedSliceMutInner::RefRaw(ptr, len) => OwnedSliceInner::RefRaw(ptr as _, len),
+                OwnedSliceMutInner::Ref(r) => OwnedSliceInner::Ref(r as _),
+                OwnedSliceMutInner::Owned(v) => OwnedSliceInner::Owned(v),
+            },
+        }
+    }
+}
+
 impl<'a, T: Sized> OwnedSlice<'a, T> {
     /// Get the [`OwnedSlice`] as slice.
     #[must_use]
