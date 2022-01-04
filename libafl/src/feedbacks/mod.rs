@@ -139,7 +139,7 @@ where
 
 /// A cobined feedback consisting of ultiple [`Feedback`]s
 #[derive(Debug)]
-pub struct CombinedFeedback<A, B, I, S, FL>
+pub struct CombinedFeedback<A, B, FL, I, S>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -155,7 +155,7 @@ where
     phantom: PhantomData<(I, S, FL)>,
 }
 
-impl<A, B, I, S, FL> Named for CombinedFeedback<A, B, I, S, FL>
+impl<A, B, FL, I, S> Named for CombinedFeedback<A, B, FL, I, S>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -168,7 +168,7 @@ where
     }
 }
 
-impl<A, B, I, S, FL> CombinedFeedback<A, B, I, S, FL>
+impl<A, B, FL, I, S> CombinedFeedback<A, B, FL, I, S>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -188,7 +188,7 @@ where
     }
 }
 
-impl<A, B, I, S, FL> Feedback<I, S> for CombinedFeedback<A, B, I, S, FL>
+impl<A, B, FL, I, S> Feedback<I, S> for CombinedFeedback<A, B, FL, I, S>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -532,21 +532,21 @@ where
 
 /// Combine two feedbacks with an eager AND operation,
 /// will call all feedbacks functions even if not necessery to conclude the result
-pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicEagerAnd>;
+pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerAnd, I, S>;
 
 /// Combine two feedbacks with an fast AND operation,
 /// might skip calling feedbacks functions if not necessery to conclude the result
-pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicFastAnd>;
+pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastAnd, I, S>;
 
 /// Combine two feedbacks with an eager OR operation,
 /// will call all feedbacks functions even if not necessery to conclude the result
-pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicEagerOr>;
+pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerOr, I, S>;
 
 /// Combine two feedbacks with an fast OR operation,
 /// might skip calling feedbacks functions if not necessery to conclude the result
 /// This means any feedback that is not first might be skipped, use caution when using with
 /// `TimeFeedback`
-pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicFastOr>;
+pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastOr, I, S>;
 
 /// Compose feedbacks with an `NOT` operation
 #[derive(Clone)]

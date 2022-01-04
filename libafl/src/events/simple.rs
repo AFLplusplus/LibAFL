@@ -282,7 +282,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, E, I, S, SC, SP, MT, Z> EventProcessor<E, I, S, Z>
+impl<'a, C, E, I, MT, S, SC, SP, Z> EventProcessor<E, I, S, Z>
     for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,
@@ -297,7 +297,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, C, E, I, S, SC, SP, MT, Z> EventManager<E, I, S, Z>
+impl<'a, C, E, I, MT, S, SC, SP, Z> EventManager<E, I, S, Z>
     for SimpleRestartingEventManager<'a, C, I, MT, S, SC, SP>
 where
     C: Corpus<I>,

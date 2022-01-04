@@ -11,4 +11,4 @@ regex = "1"
 postcard = "0.7"
 lazy_static = "1.4.0"
 libafl = { path = "../../../libafl" }
-structopt = "0.3.25"
+clap = { version = "3.0", features = ["derive"] }
