@@ -4,9 +4,13 @@ pub mod multi;
 pub use multi::MultiMonitor;
 
 use alloc::{
-    string::{String, ToString},
+    string::String,
     vec::Vec,
 };
+
+#[cfg(feature = "introspection")]
+use alloc::string::ToString;
+
 use core::{fmt, time::Duration};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
