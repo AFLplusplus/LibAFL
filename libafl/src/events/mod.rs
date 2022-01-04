@@ -363,7 +363,7 @@ where
             )?;
 
             if let Some(x) = state.stability() {
-                let stability = *x as f64;
+                let stability = f64::from(*x);
                 self.fire(
                     state,
                     Event::UpdateUserStats {
