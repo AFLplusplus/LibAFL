@@ -286,13 +286,19 @@ where
 
 /// Wrap a mutable slice and convert to a Vec on serialize
 #[derive(Debug)]
-pub enum OwnedSliceMut<'a, T: 'a + Sized> {
+pub enum OwnedSliceMutInner<'a, T: 'a + Sized> {
     /// A raw ptr to a memory location and a length
     RefRaw(*mut T, usize),
     /// A ptr to a mutable slice of the type
     Ref(&'a mut [T]),
     /// An owned [`Vec`] of the type
     Owned(Vec<T>),
+}
+
+/// Wrap a mutable slice and convert to a Vec on serialize
+#[derive(Debug)]
+pub struct OwnedSliceMut<'a, T: 'a + Sized> {
+    inner: OwnedSliceMutInner<'a, T>,
 }
 
 impl<'a, T: 'a + Sized> OwnedSliceMut<'a, T> {
@@ -305,9 +311,13 @@ impl<'a, T: 'a + Sized> OwnedSliceMut<'a, T> {
     #[must_use]
     pub unsafe fn from_raw_parts_mut(ptr: *mut T, len: usize) -> OwnedSliceMut<'a, T> {
         if ptr.is_null() || len == 0 {
-            OwnedSliceMut::Owned(Vec::new())
+            Self {
+                inner: OwnedSliceMutInner::Owned(Vec::new()),
+            }
         } else {
-            Self::RefRaw(ptr, len)
+            Self {
+                inner: OwnedSliceMutInner::RefRaw(ptr, len),
+            }
         }
     }
 }
@@ -317,12 +327,12 @@ impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceMut<'a, T> {
     where
         S: Serializer,
     {
-        match self {
-            OwnedSliceMut::RefRaw(rr, len) => {
-                unsafe { slice::from_raw_parts_mut(*rr, *len) }.serialize(se)
+        match self.inner {
+            OwnedSliceMutInner::RefRaw(rr, len) => {
+                unsafe { slice::from_raw_parts_mut(rr, len) }.serialize(se)
             }
-            OwnedSliceMut::Ref(r) => r.serialize(se),
-            OwnedSliceMut::Owned(b) => b.serialize(se),
+            OwnedSliceMutInner::Ref(r) => r.serialize(se),
+            OwnedSliceMutInner::Owned(b) => b.serialize(se),
         }
     }
 }
@@ -335,7 +345,8 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(deserializer).map(OwnedSliceMut::Owned)
+        let inner = Deserialize::deserialize(deserializer).map(OwnedSliceMutInner::Owned)?;
+        Ok(Self { inner })
     }
 }
 
@@ -343,20 +354,20 @@ impl<'a, T: Sized> OwnedSliceMut<'a, T> {
     /// Get the value as slice
     #[must_use]
     pub fn as_slice(&self) -> &[T] {
-        match self {
-            OwnedSliceMut::RefRaw(rr, len) => unsafe { slice::from_raw_parts(*rr, *len) },
-            OwnedSliceMut::Ref(r) => r,
-            OwnedSliceMut::Owned(v) => v.as_slice(),
+        match self.inner {
+            OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts(rr, len) },
+            OwnedSliceMutInner::Ref(r) => r,
+            OwnedSliceMutInner::Owned(v) => v.as_slice(),
         }
     }
 
     /// Get the value as mut slice
     #[must_use]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        match self {
-            OwnedSliceMut::RefRaw(rr, len) => unsafe { slice::from_raw_parts_mut(*rr, *len) },
-            OwnedSliceMut::Ref(r) => r,
-            OwnedSliceMut::Owned(v) => v.as_mut_slice(),
+        match self.inner {
+            OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts_mut(rr, len) },
+            OwnedSliceMutInner::Ref(r) => r,
+            OwnedSliceMutInner::Owned(v) => v.as_mut_slice(),
         }
     }
 }
@@ -367,20 +378,41 @@ where
 {
     #[must_use]
     fn is_owned(&self) -> bool {
-        match self {
-            OwnedSliceMut::RefRaw(_, _) | OwnedSliceMut::Ref(_) => false,
-            OwnedSliceMut::Owned(_) => true,
+        match self.inner {
+            OwnedSliceMutInner::RefRaw(_, _) | OwnedSliceMutInner::Ref(_) => false,
+            OwnedSliceMutInner::Owned(_) => true,
         }
     }
 
     #[must_use]
     fn into_owned(self) -> Self {
-        match self {
-            OwnedSliceMut::RefRaw(rr, len) => unsafe {
-                OwnedSliceMut::Owned(slice::from_raw_parts_mut(rr, len).to_vec())
+        let vec = match self.inner {
+            OwnedSliceMutInner::RefRaw(rr, len) => unsafe {
+                slice::from_raw_parts_mut(rr, len).to_vec()
             },
-            OwnedSliceMut::Ref(r) => OwnedSliceMut::Owned(r.to_vec()),
-            OwnedSliceMut::Owned(v) => OwnedSliceMut::Owned(v),
+            OwnedSliceMutInner::Ref(r) => r.to_vec(),
+            OwnedSliceMutInner::Owned(v) => v,
+        };
+        Self {
+            inner: OwnedSliceMutInner::Owned(vec),
+        }
+    }
+}
+
+/// Create a new [`OwnedSlice`] from a vector
+impl<'a, T> From<Vec<T>> for OwnedSliceMut<'a, T> {
+    fn from(vec: Vec<T>) -> Self {
+        Self {
+            inner: OwnedSliceMutInner::Owned(vec),
+        }
+    }
+}
+
+/// Create a new [`OwnedSlice`] from a reference to a slice
+impl<'a, T> From<&'a mut [T]> for OwnedSliceMut<'a, T> {
+    fn from(r: &'a mut [T]) -> Self {
+        Self {
+            inner: OwnedSliceMutInner::Ref(r),
         }
     }
 }
