@@ -4,7 +4,7 @@ pub mod multi;
 pub use multi::MultiMonitor;
 
 use alloc::{
-    string::String,
+    string::{String, ToString},
     vec::Vec,
 };
 use core::{fmt, time::Duration};
