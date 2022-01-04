@@ -476,17 +476,6 @@ impl<'a, T> From<&'a mut &'a mut [T]> for OwnedSliceMut<'a, T> {
     }
 }
 
-/*
-/// Create a new [`OwnedSliceMut`] from a reference to ref to a slice
-impl<'a, T> From<&mut &'a mut [T]> for OwnedSliceMut<'a, T> {
-    fn from(r: &'a mut [T]) -> Self {
-        Self {
-            inner: OwnedSliceMutInner::Ref(r),
-        }
-    }
-}
-*/
-
 /// Wrap a C-style pointer and convert to a Box on serialize
 #[derive(Clone, Debug)]
 pub enum OwnedPtr<T: Sized> {
