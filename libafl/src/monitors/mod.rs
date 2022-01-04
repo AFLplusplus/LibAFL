@@ -3,10 +3,7 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
-use alloc::{
-    string::String,
-    vec::Vec,
-};
+use alloc::{string::String, vec::Vec};
 
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
