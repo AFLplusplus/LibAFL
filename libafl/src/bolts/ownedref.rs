@@ -199,8 +199,8 @@ impl<'a, T> OwnedSlice<'a, T> {
 /// Create a new [`OwnedSlice`] from a vector
 impl<'a, T> From<Vec<T>> for OwnedSlice<'a, T> {
     fn from(vec: Vec<T>) -> Self {
-        Self{
-            inner: OwnedSliceInner::Owned(vec)
+        Self {
+            inner: OwnedSliceInner::Owned(vec),
         }
     }
 }
