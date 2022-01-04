@@ -2,6 +2,7 @@
 //! It achieves this by running an instrumented target program with the necessary environment variables set.
 //! When the program has finished executing, it dumps the traced constraints to a file.
 
+use clap::{self, StructOpt};
 use std::{
     ffi::OsString,
     fs::File,
@@ -10,8 +11,6 @@ use std::{
     process::{exit, Command},
     string::ToString,
 };
-
-use structopt::StructOpt;
 
 use libafl::{
     bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider},
@@ -22,44 +21,44 @@ use libafl::{
 };
 
 #[derive(Debug, StructOpt)]
-#[structopt(
+#[clap(
     name = "dump_constraints",
     about = "Dump tool for concolic constraints."
 )]
 struct Opt {
     /// Outputs plain text instead of binary
-    #[structopt(short, long)]
+    #[clap(short, long)]
     plain_text: bool,
 
     /// Outputs coverage information to the given file
-    #[structopt(short, long)]
+    #[clap(short, long)]
     coverage_file: Option<PathBuf>,
 
     /// Symbolizes only the given input file offsets.
-    #[structopt(short, long)]
+    #[clap(short, long)]
     symbolize_offsets: Option<Vec<usize>>,
 
     /// Concretize all floating point operations.
-    #[structopt(long)]
+    #[clap(long)]
     no_float: bool,
 
     /// Prune expressions from high-frequency code locations.
-    #[structopt(long)]
+    #[clap(long)]
     prune: bool,
 
     /// Trace file path, "trace" by default.
-    #[structopt(parse(from_os_str), short, long)]
+    #[clap(parse(from_os_str), short, long)]
     output: Option<PathBuf>,
 
     /// Target program and arguments
-    #[structopt(last = true)]
+    #[clap(last = true)]
     program: Vec<OsString>,
 }
 
 fn main() {
     const COVERAGE_MAP_SIZE: usize = 65536;
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let mut shmemprovider = StdShMemProvider::default();
     let concolic_shmem = shmemprovider

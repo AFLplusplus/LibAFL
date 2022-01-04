@@ -4,6 +4,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
+use clap::{self, StructOpt};
 use std::{env, path::PathBuf};
 
 use libafl::{
@@ -25,6 +26,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, Input},
+    monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
@@ -41,7 +43,6 @@ use libafl::{
         StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, StdState},
-    monitors::MultiMonitor,
     Error,
 };
 
@@ -50,12 +51,10 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
-use structopt::StructOpt;
-
 #[derive(Debug, StructOpt)]
 struct Opt {
     /// This node should do concolic tracing + solving instead of traditional fuzzing
-    #[structopt(short, long)]
+    #[clap(short, long)]
     concolic: bool,
 }
 
@@ -64,7 +63,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     println!(
         "Workdir: {:?}",

@@ -6,9 +6,9 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
+use clap::{self, StructOpt};
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
-use structopt::StructOpt;
 
 use libafl::{
     bolts::{
@@ -47,13 +47,13 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 
 /// The commandline args this fuzzer accepts
 #[derive(Debug, StructOpt)]
-#[structopt(
+#[clap(
     name = "libfuzzer_libpng_launcher",
     about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
     author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
 )]
 struct Opt {
-    #[structopt(
+    #[clap(
         short,
         long,
         parse(try_from_str = Cores::from_cmdline),
@@ -62,8 +62,8 @@ struct Opt {
     )]
     cores: Cores,
 
-    #[structopt(
-        short = "p",
+    #[clap(
+        short = 'p',
         long,
         help = "Choose the broker TCP port, default is 1337",
         name = "PORT",
@@ -71,16 +71,16 @@ struct Opt {
     )]
     broker_port: u16,
 
-    #[structopt(
+    #[clap(
         parse(try_from_str),
-        short = "a",
+        short = 'a',
         long,
         help = "Specify a remote broker",
         name = "REMOTE"
     )]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[structopt(
+    #[clap(
         parse(try_from_str),
         short,
         long,
@@ -89,7 +89,7 @@ struct Opt {
     )]
     input: Vec<PathBuf>,
 
-    #[structopt(
+    #[clap(
         short,
         long,
         parse(try_from_str),
@@ -99,7 +99,7 @@ struct Opt {
     )]
     output: PathBuf,
 
-    #[structopt(
+    #[clap(
         parse(try_from_str = timeout_from_millis_str),
         short,
         long,
@@ -110,7 +110,7 @@ struct Opt {
     timeout: Duration,
     /*
     /// This fuzzer has hard-coded tokens
-    #[structopt(
+    #[clap(
         parse(from_os_str),
         short = "x",
         long,
@@ -128,7 +128,7 @@ pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let broker_port = opt.broker_port;
     let cores = opt.cores;
