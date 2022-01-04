@@ -214,15 +214,6 @@ impl<'a, T> From<&'a [T]> for OwnedSlice<'a, T> {
     }
 }
 
-/// Create a new [`OwnedSlice`] from a reference to a slice
-impl<'a, T> From<&'a Vec<T>> for OwnedSlice<'a, T> {
-    fn from(r: &'a Vec<T>) -> Self {
-        Self {
-            inner: OwnedSliceInner::Ref(r),
-        }
-    }
-}
-
 impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSlice<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
