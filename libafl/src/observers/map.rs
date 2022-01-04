@@ -184,7 +184,7 @@ where
     pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Ref(map),
+            map: OwnedSliceMut::from(map),
             name: name.to_string(),
             initial,
         }
@@ -195,7 +195,7 @@ where
     pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Owned(map),
+            map: OwnedSliceMut::from(map),
             name: name.to_string(),
             initial,
         }
@@ -324,7 +324,7 @@ where
         assert!(map.len() >= N);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Ref(map),
+            map: OwnedSliceMut::from(map),
             name: name.to_string(),
             initial,
         }
@@ -336,7 +336,7 @@ where
         assert!(map.len() >= N);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Owned(map),
+            map: OwnedSliceMut::from(map),
             name: name.to_string(),
             initial,
         }
@@ -444,7 +444,7 @@ where
     pub fn new(name: &'static str, map: &'a mut [T], size: &'a mut usize) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Ref(map),
+            map: OwnedSliceMut::from(map),
             size: OwnedRefMut::Ref(size),
             name: name.into(),
             initial,
@@ -730,7 +730,7 @@ where
                 idx += l;
                 builder.push(r);
                 v += 1;
-                OwnedSliceMut::Ref(x)
+                OwnedSliceMut::from(x)
             })
             .collect();
         Self {
@@ -760,7 +760,7 @@ where
                 idx += l;
                 builder.push(r);
                 v += 1;
-                OwnedSliceMut::Owned(x)
+                OwnedSliceMut::from(x)
             })
             .collect();
         Self {

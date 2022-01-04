@@ -175,8 +175,37 @@ enum OwnedSliceInner<'a, T: 'a + Sized> {
     Owned(Vec<T>),
 }
 
+impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceInner<'a, T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            OwnedSliceInner::RefRaw(rr, len) => unsafe {
+                slice::from_raw_parts(*rr, *len).serialize(se)
+            },
+            OwnedSliceInner::Ref(r) => r.serialize(se),
+            OwnedSliceInner::Owned(b) => b.serialize(se),
+        }
+    }
+}
+
+impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for OwnedSliceInner<'a, T>
+where
+    Vec<T>: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Deserialize::deserialize(deserializer).map(OwnedSliceInner::Owned)
+    }
+}
+
 /// Wrap a slice and convert to a Vec on serialize
-#[derive(Clone, Debug)]
+/// We use a hidden inner enum so the public API can be safe,
+/// unless the user uses the unsafe [`OwnedSlice::from_raw_parts`]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OwnedSlice<'a, T: 'a + Sized> {
     inner: OwnedSliceInner<'a, T>,
 }
@@ -211,36 +240,6 @@ impl<'a, T> From<&'a [T]> for OwnedSlice<'a, T> {
         Self {
             inner: OwnedSliceInner::Ref(r),
         }
-    }
-}
-
-impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSlice<'a, T> {
-    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match &self.inner {
-            OwnedSliceInner::RefRaw(rr, len) => unsafe {
-                slice::from_raw_parts(*rr, *len).serialize(se)
-            },
-            OwnedSliceInner::Ref(r) => r.serialize(se),
-            OwnedSliceInner::Owned(b) => b.serialize(se),
-        }
-    }
-}
-
-impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for OwnedSlice<'a, T>
-where
-    Vec<T>: Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let vec = Deserialize::deserialize(deserializer)?;
-        Ok(Self {
-            inner: OwnedSliceInner::Owned(vec),
-        })
     }
 }
 
@@ -285,6 +284,8 @@ where
 }
 
 /// Wrap a mutable slice and convert to a Vec on serialize
+/// We use a hidden inner enum so the public API can be safe,
+/// unless the user uses the unsafe [`OwnedSliceMut::from_raw_parts_mut`]
 #[derive(Debug)]
 pub enum OwnedSliceMutInner<'a, T: 'a + Sized> {
     /// A raw ptr to a memory location and a length
@@ -295,8 +296,35 @@ pub enum OwnedSliceMutInner<'a, T: 'a + Sized> {
     Owned(Vec<T>),
 }
 
+impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceMutInner<'a, T> {
+    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            OwnedSliceMutInner::RefRaw(rr, len) => {
+                unsafe { slice::from_raw_parts_mut(*rr, *len) }.serialize(se)
+            }
+            OwnedSliceMutInner::Ref(r) => r.serialize(se),
+            OwnedSliceMutInner::Owned(b) => b.serialize(se),
+        }
+    }
+}
+
+impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for OwnedSliceMutInner<'a, T>
+where
+    Vec<T>: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Deserialize::deserialize(deserializer).map(OwnedSliceMutInner::Owned)
+    }
+}
+
 /// Wrap a mutable slice and convert to a Vec on serialize
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OwnedSliceMut<'a, T: 'a + Sized> {
     inner: OwnedSliceMutInner<'a, T>,
 }
@@ -322,40 +350,12 @@ impl<'a, T: 'a + Sized> OwnedSliceMut<'a, T> {
     }
 }
 
-impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceMut<'a, T> {
-    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self.inner {
-            OwnedSliceMutInner::RefRaw(rr, len) => {
-                unsafe { slice::from_raw_parts_mut(rr, len) }.serialize(se)
-            }
-            OwnedSliceMutInner::Ref(r) => r.serialize(se),
-            OwnedSliceMutInner::Owned(b) => b.serialize(se),
-        }
-    }
-}
-
-impl<'de, 'a, T: 'a + Sized> Deserialize<'de> for OwnedSliceMut<'a, T>
-where
-    Vec<T>: Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let inner = Deserialize::deserialize(deserializer).map(OwnedSliceMutInner::Owned)?;
-        Ok(Self { inner })
-    }
-}
-
 impl<'a, T: Sized> OwnedSliceMut<'a, T> {
     /// Get the value as slice
     #[must_use]
     pub fn as_slice(&self) -> &[T] {
-        match self.inner {
-            OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts(rr, len) },
+        match &self.inner {
+            OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts(*rr, *len) },
             OwnedSliceMutInner::Ref(r) => r,
             OwnedSliceMutInner::Owned(v) => v.as_slice(),
         }
@@ -364,8 +364,8 @@ impl<'a, T: Sized> OwnedSliceMut<'a, T> {
     /// Get the value as mut slice
     #[must_use]
     pub fn as_mut_slice(&mut self) -> &mut [T] {
-        match self.inner {
-            OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts_mut(rr, len) },
+        match &mut self.inner {
+            OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts_mut(*rr, *len) },
             OwnedSliceMutInner::Ref(r) => r,
             OwnedSliceMutInner::Owned(v) => v.as_mut_slice(),
         }
@@ -399,7 +399,7 @@ where
     }
 }
 
-/// Create a new [`OwnedSlice`] from a vector
+/// Create a new [`OwnedSliceMut`] from a vector
 impl<'a, T> From<Vec<T>> for OwnedSliceMut<'a, T> {
     fn from(vec: Vec<T>) -> Self {
         Self {
@@ -408,7 +408,7 @@ impl<'a, T> From<Vec<T>> for OwnedSliceMut<'a, T> {
     }
 }
 
-/// Create a new [`OwnedSlice`] from a reference to a slice
+/// Create a new [`OwnedSliceMut`] from a reference to ref to a slice
 impl<'a, T> From<&'a mut [T]> for OwnedSliceMut<'a, T> {
     fn from(r: &'a mut [T]) -> Self {
         Self {
@@ -416,6 +416,26 @@ impl<'a, T> From<&'a mut [T]> for OwnedSliceMut<'a, T> {
         }
     }
 }
+
+/// Create a new [`OwnedSliceMut`] from a reference to ref to a slice
+impl<'a, T> From<&'a mut &'a mut [T]> for OwnedSliceMut<'a, T> {
+    fn from(r: &'a mut &'a mut [T]) -> Self {
+        Self {
+            inner: OwnedSliceMutInner::Ref(r),
+        }
+    }
+}
+
+/*
+/// Create a new [`OwnedSliceMut`] from a reference to ref to a slice
+impl<'a, T> From<&mut &'a mut [T]> for OwnedSliceMut<'a, T> {
+    fn from(r: &'a mut [T]) -> Self {
+        Self {
+            inner: OwnedSliceMutInner::Ref(r),
+        }
+    }
+}
+*/
 
 /// Wrap a C-style pointer and convert to a Box on serialize
 #[derive(Clone, Debug)]
