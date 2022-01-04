@@ -319,6 +319,15 @@ pub enum OwnedSliceMutInner<'a, T: 'a + Sized> {
     Owned(Vec<T>),
 }
 
+impl<'a, T: 'a + Sized + Serialize + Clone> ToOwned for OwnedSliceMut<'a, T> {
+    type Owned = OwnedSliceMut<'a, T>;
+    fn to_owned(&self) -> <OwnedSliceMut<'a, T> as ToOwned>::Owned {
+        Self {
+            inner: OwnedSliceMutInner::Owned(self.as_slice().to_vec()),
+        }
+    }
+}
+
 impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceMutInner<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
