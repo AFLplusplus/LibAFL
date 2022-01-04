@@ -6,7 +6,7 @@ pub mod llmp;
 pub use llmp::*;
 
 use ahash::AHasher;
-use alloc::{string::String, vec::Vec};
+use alloc::{string::{String, ToString}, vec::Vec};
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
