@@ -166,13 +166,19 @@ where
 
 /// Wrap a slice and convert to a Vec on serialize
 #[derive(Clone, Debug)]
-pub enum OwnedSlice<'a, T: 'a + Sized> {
+pub enum OwnedSliceInner<'a, T: 'a + Sized> {
     /// A ref to a raw slice and length
     RefRaw(*const T, usize),
     /// A ref to a slice
     Ref(&'a [T]),
     /// A ref to an owned [`Vec`]
     Owned(Vec<T>),
+}
+
+/// The struct to simply wrap OwnedSliceInner to avoid exposing the pointer in it.
+#[derive(Clone, Debug)]
+pub struct OwnedSlice<'a, T: 'a + Sized> {
+    inner: OwnedSliceInner<'a, T>,
 }
 
 impl<'a, T> OwnedSlice<'a, T> {
@@ -184,7 +190,25 @@ impl<'a, T> OwnedSlice<'a, T> {
     /// The contents will be dereferenced in subsequent operations.
     #[must_use]
     pub unsafe fn from_raw_parts(ptr: *const T, len: usize) -> Self {
-        Self::RefRaw(ptr, len)
+        Self {
+            inner: OwnedSliceInner::RefRaw(ptr, len),
+        }
+    }
+
+    /// Create a new [`OwnedSlice`] from a vector
+    #[must_use]
+    pub fn vec_to_owned(vec: Vec<T>) -> Self {
+        Self {
+            inner: OwnedSliceInner::Owned(vec),
+        }
+    }
+
+    /// Create a new [`OwnedSlice`] from a reference
+    #[must_use]
+    pub fn vec_to_ref(r: &'a [T]) -> Self {
+        Self {
+            inner: OwnedSliceInner::Ref(r),
+        }
     }
 }
 
@@ -193,12 +217,12 @@ impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSlice<'a, T> {
     where
         S: Serializer,
     {
-        match self {
-            OwnedSlice::RefRaw(rr, len) => unsafe {
+        match &self.inner {
+            OwnedSliceInner::RefRaw(rr, len) => unsafe {
                 slice::from_raw_parts(*rr, *len).serialize(se)
             },
-            OwnedSlice::Ref(r) => r.serialize(se),
-            OwnedSlice::Owned(b) => b.serialize(se),
+            OwnedSliceInner::Ref(r) => r.serialize(se),
+            OwnedSliceInner::Owned(b) => b.serialize(se),
         }
     }
 }
@@ -211,7 +235,10 @@ where
     where
         D: Deserializer<'de>,
     {
-        Deserialize::deserialize(deserializer).map(OwnedSlice::Owned)
+        let vec = Deserialize::deserialize(deserializer)?;
+        Ok(Self {
+            inner: OwnedSliceInner::Owned(vec),
+        })
     }
 }
 
@@ -219,10 +246,10 @@ impl<'a, T: Sized> OwnedSlice<'a, T> {
     /// Get the [`OwnedSlice`] as slice.
     #[must_use]
     pub fn as_slice(&self) -> &[T] {
-        match self {
-            OwnedSlice::Ref(r) => r,
-            OwnedSlice::RefRaw(rr, len) => unsafe { slice::from_raw_parts(*rr, *len) },
-            OwnedSlice::Owned(v) => v.as_slice(),
+        match &self.inner {
+            OwnedSliceInner::Ref(r) => r,
+            OwnedSliceInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts(*rr, *len) },
+            OwnedSliceInner::Owned(v) => v.as_slice(),
         }
     }
 }
@@ -233,20 +260,24 @@ where
 {
     #[must_use]
     fn is_owned(&self) -> bool {
-        match self {
-            OwnedSlice::RefRaw(_, _) | OwnedSlice::Ref(_) => false,
-            OwnedSlice::Owned(_) => true,
+        match self.inner {
+            OwnedSliceInner::RefRaw(_, _) | OwnedSliceInner::Ref(_) => false,
+            OwnedSliceInner::Owned(_) => true,
         }
     }
 
     #[must_use]
     fn into_owned(self) -> Self {
-        match self {
-            OwnedSlice::RefRaw(rr, len) => {
-                OwnedSlice::Owned(unsafe { slice::from_raw_parts(rr, len).to_vec() })
-            }
-            OwnedSlice::Ref(r) => OwnedSlice::Owned(r.to_vec()),
-            OwnedSlice::Owned(v) => OwnedSlice::Owned(v),
+        match self.inner {
+            OwnedSliceInner::RefRaw(rr, len) => Self {
+                inner: OwnedSliceInner::Owned(unsafe { slice::from_raw_parts(rr, len).to_vec() }),
+            },
+            OwnedSliceInner::Ref(r) => Self {
+                inner: OwnedSliceInner::Owned(r.to_vec()),
+            },
+            OwnedSliceInner::Owned(v) => Self {
+                inner: OwnedSliceInner::Owned(v),
+            },
         }
     }
 }

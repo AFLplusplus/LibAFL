@@ -76,7 +76,7 @@ impl Input for NopInput {
 }
 impl HasTargetBytes for NopInput {
     fn target_bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::Owned(vec![0])
+        OwnedSlice::vec_to_owned(vec![0])
     }
 }
 
