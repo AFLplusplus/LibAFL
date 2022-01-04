@@ -166,7 +166,7 @@ where
 
 /// Wrap a slice and convert to a Vec on serialize
 #[derive(Clone, Debug)]
-pub enum OwnedSliceInner<'a, T: 'a + Sized> {
+enum OwnedSliceInner<'a, T: 'a + Sized> {
     /// A ref to a raw slice and length
     RefRaw(*const T, usize),
     /// A ref to a slice
@@ -194,18 +194,29 @@ impl<'a, T> OwnedSlice<'a, T> {
             inner: OwnedSliceInner::RefRaw(ptr, len),
         }
     }
+}
 
-    /// Create a new [`OwnedSlice`] from a vector
-    #[must_use]
-    pub fn vec_to_owned(vec: Vec<T>) -> Self {
-        Self {
-            inner: OwnedSliceInner::Owned(vec),
+/// Create a new [`OwnedSlice`] from a vector
+impl<'a, T> From<Vec<T>> for OwnedSlice<'a, T> {
+    fn from(vec: Vec<T>) -> Self {
+        Self{
+            inner: OwnedSliceInner::Owned(vec)
         }
     }
+}
 
-    /// Create a new [`OwnedSlice`] from a reference
-    #[must_use]
-    pub fn vec_to_ref(r: &'a [T]) -> Self {
+/// Create a new [`OwnedSlice`] from a reference to a slice
+impl<'a, T> From<&'a [T]> for OwnedSlice<'a, T> {
+    fn from(r: &'a [T]) -> Self {
+        Self {
+            inner: OwnedSliceInner::Ref(r),
+        }
+    }
+}
+
+/// Create a new [`OwnedSlice`] from a reference to a slice
+impl<'a, T> From<&'a Vec<T>> for OwnedSlice<'a, T> {
+    fn from(r: &'a Vec<T>) -> Self {
         Self {
             inner: OwnedSliceInner::Ref(r),
         }
