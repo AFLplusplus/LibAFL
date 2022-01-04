@@ -235,6 +235,15 @@ impl<'a, T> From<Vec<T>> for OwnedSlice<'a, T> {
     }
 }
 
+/// Create a new [`OwnedSlice`] from a vector reference
+impl<'a, T> From<&'a Vec<T>> for OwnedSlice<'a, T> {
+    fn from(vec: &'a Vec<T>) -> Self {
+        Self {
+            inner: OwnedSliceInner::Ref(vec),
+        }
+    }
+}
+
 /// Create a new [`OwnedSlice`] from a reference to a slice
 impl<'a, T> From<&'a [T]> for OwnedSlice<'a, T> {
     fn from(r: &'a [T]) -> Self {
@@ -406,6 +415,15 @@ impl<'a, T> From<Vec<T>> for OwnedSliceMut<'a, T> {
     fn from(vec: Vec<T>) -> Self {
         Self {
             inner: OwnedSliceMutInner::Owned(vec),
+        }
+    }
+}
+
+/// Create a new [`OwnedSliceMut`] from a vector reference
+impl<'a, T> From<&'a mut Vec<T>> for OwnedSliceMut<'a, T> {
+    fn from(vec: &'a mut Vec<T>) -> Self {
+        Self {
+            inner: OwnedSliceMutInner::Ref(vec),
         }
     }
 }
