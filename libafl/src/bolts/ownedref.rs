@@ -206,9 +206,17 @@ where
 /// We use a hidden inner enum so the public API can be safe,
 /// unless the user uses the unsafe [`OwnedSlice::from_raw_parts`]
 #[allow(clippy::unsafe_derive_deserialize)]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OwnedSlice<'a, T: 'a + Sized> {
     inner: OwnedSliceInner<'a, T>,
+}
+
+impl<'a, T: 'a + Clone> Clone for OwnedSlice<'a, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: OwnedSliceInner::Owned(self.as_slice().to_vec()),
+        }
+    }
 }
 
 impl<'a, T> OwnedSlice<'a, T> {
@@ -319,15 +327,6 @@ pub enum OwnedSliceMutInner<'a, T: 'a + Sized> {
     Owned(Vec<T>),
 }
 
-impl<'a, T: 'a + Sized + Serialize + Clone> ToOwned for OwnedSliceMut<'a, T> {
-    type Owned = OwnedSliceMut<'a, T>;
-    fn to_owned(&self) -> <OwnedSliceMut<'a, T> as ToOwned>::Owned {
-        Self {
-            inner: OwnedSliceMutInner::Owned(self.as_slice().to_vec()),
-        }
-    }
-}
-
 impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceMutInner<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
@@ -428,6 +427,14 @@ where
         };
         Self {
             inner: OwnedSliceMutInner::Owned(vec),
+        }
+    }
+}
+
+impl<'a, T: 'a + Clone> Clone for OwnedSliceMut<'a, T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: OwnedSliceMutInner::Owned(self.as_slice().to_vec()),
         }
     }
 }
