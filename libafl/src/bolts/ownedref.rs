@@ -205,6 +205,7 @@ where
 /// Wrap a slice and convert to a Vec on serialize
 /// We use a hidden inner enum so the public API can be safe,
 /// unless the user uses the unsafe [`OwnedSlice::from_raw_parts`]
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct OwnedSlice<'a, T: 'a + Sized> {
     inner: OwnedSliceInner<'a, T>,
@@ -324,6 +325,7 @@ where
 }
 
 /// Wrap a mutable slice and convert to a Vec on serialize
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OwnedSliceMut<'a, T: 'a + Sized> {
     inner: OwnedSliceMutInner<'a, T>,
@@ -418,6 +420,7 @@ impl<'a, T> From<&'a mut [T]> for OwnedSliceMut<'a, T> {
 }
 
 /// Create a new [`OwnedSliceMut`] from a reference to ref to a slice
+#[allow(clippy::mut_mut)] // This makes use in some iterators easier
 impl<'a, T> From<&'a mut &'a mut [T]> for OwnedSliceMut<'a, T> {
     fn from(r: &'a mut &'a mut [T]) -> Self {
         Self {
