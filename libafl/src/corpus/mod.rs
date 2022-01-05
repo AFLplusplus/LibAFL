@@ -30,7 +30,7 @@ pub mod powersched;
 pub use powersched::PowerQueueCorpusScheduler;
 
 use alloc::borrow::ToOwned;
-use core::{cell::RefCell, marker::PhantomData};
+use core::cell::RefCell;
 
 use crate::{
     bolts::rands::Rand,
@@ -108,22 +108,12 @@ where
 
 /// Feed the fuzzer simpply with a random testcase on request
 #[derive(Debug, Clone)]
-pub struct RandCorpusScheduler<C, I, R, S>
-where
-    S: HasCorpus<C, I> + HasRand<R>,
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-{
-    phantom: PhantomData<(C, I, R, S)>,
-}
+pub struct RandCorpusScheduler;
 
-impl<C, I, R, S> CorpusScheduler<I, S> for RandCorpusScheduler<C, I, R, S>
+impl<I, S> CorpusScheduler<I, S> for RandCorpusScheduler
 where
-    S: HasCorpus<C, I> + HasRand<R>,
-    C: Corpus<I>,
+    S: HasCorpus<I> + HasRand,
     I: Input,
-    R: Rand,
 {
     /// Gets the next entry at random
     fn next(&self, state: &mut S) -> Result<usize, Error> {
@@ -138,29 +128,15 @@ where
     }
 }
 
-impl<C, I, R, S> RandCorpusScheduler<C, I, R, S>
-where
-    S: HasCorpus<C, I> + HasRand<R>,
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-{
+impl RandCorpusScheduler {
     /// Create a new [`RandCorpusScheduler`] that just schedules randomly.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
-impl<C, I, R, S> Default for RandCorpusScheduler<C, I, R, S>
-where
-    S: HasCorpus<C, I> + HasRand<R>,
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-{
+impl Default for RandCorpusScheduler {
     fn default() -> Self {
         Self::new()
     }
@@ -168,4 +144,4 @@ where
 
 /// A [`StdCorpusScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s
 /// The current `Std` is a [`RandCorpusScheduler`], although this may change in the future, if another [`CorpusScheduler`] delivers better results.
-pub type StdCorpusScheduler<C, I, R, S> = RandCorpusScheduler<C, I, R, S>;
+pub type StdCorpusScheduler = RandCorpusScheduler;

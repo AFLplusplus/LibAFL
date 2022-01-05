@@ -9,11 +9,14 @@ use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{tuples::Named, AsSlice, HasRefCnt},
+    bolts::{
+        tuples::{MatchName, Named},
+        AsSlice, HasRefCnt,
+    },
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
+    feedbacks::{Feedback, FeedbackState},
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
@@ -22,21 +25,20 @@ use crate::{
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
-pub type AflMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, OrReducer, S, T>;
+pub type AflMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, OrReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, MinReducer, S, T>;
+pub type MinMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, MinReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapPow2Feedback<FT, I, O, S, T> =
-    MapFeedback<FT, I, NextPow2IsNovel, O, MaxReducer, S, T>;
+pub type MaxMapPow2Feedback<I, O, S, T> = MapFeedback<I, NextPow2IsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapOneOrFilledFeedback<FT, I, O, S, T> =
-    MapFeedback<FT, I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapOneOrFilledFeedback<I, O, S, T> =
+    MapFeedback<I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static + Debug
@@ -329,14 +331,13 @@ where
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<FT, I, N, O, R, S, T>
+pub struct MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
     N: IsNovel<T>,
-    S: HasFeedbackStates<FT>,
-    FT: FeedbackStatesTuple,
+    S: HasFeedbackStates,
 {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
@@ -347,18 +348,17 @@ where
     /// Name identifier of the observer
     observer_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(FT, I, N, S, R, O, T)>,
+    phantom: PhantomData<(I, N, S, R, O, T)>,
 }
 
-impl<FT, I, N, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, N, O, R, S, T>
+impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasFeedbackStates<FT> + HasClientPerfMonitor + Debug,
-    FT: FeedbackStatesTuple,
+    S: HasFeedbackStates + HasClientPerfMonitor + Debug,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -459,14 +459,13 @@ where
     }
 }
 
-impl<FT, I, N, O, R, S, T> Named for MapFeedback<FT, I, N, O, R, S, T>
+impl<I, N, O, R, S, T> Named for MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<T>,
-    S: HasFeedbackStates<FT>,
-    FT: FeedbackStatesTuple,
+    S: HasFeedbackStates,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -474,7 +473,7 @@ where
     }
 }
 
-impl<FT, I, N, O, R, S, T> MapFeedback<FT, I, N, O, R, S, T>
+impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt
         + Default
@@ -487,8 +486,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<T>,
-    S: HasFeedbackStates<FT>,
-    FT: FeedbackStatesTuple,
+    S: HasFeedbackStates,
 {
     /// Create new `MapFeedback`
     #[must_use]

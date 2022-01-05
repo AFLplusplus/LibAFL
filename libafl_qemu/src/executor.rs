@@ -7,7 +7,6 @@ use core::{
 };
 
 use libafl::{
-    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{
         inprocess::inprocess_get_state, Executor, ExitKind, HasObservers, InProcessExecutor,
@@ -474,7 +473,7 @@ where
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
 {
-    pub fn new<EM, OC, OF, Z>(
+    pub fn new<EM, OF, Z>(
         harness_fn: &'a mut H,
         emulator: &'a Emulator,
         helpers: QT,
@@ -485,9 +484,8 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I> + EventRestarter<S>,
-        OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfMonitor,
+        S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let slf = Self {
