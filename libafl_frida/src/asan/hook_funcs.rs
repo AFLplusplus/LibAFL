@@ -1,3 +1,4 @@
+//! The allocator hooks for address sanitizer.
 use crate::{
     alloc::Allocator,
     asan::{
@@ -1013,6 +1014,7 @@ impl AsanRuntime {
         unsafe { atoi(s) }
     }
 
+    /// Hooks `atol`
     #[inline]
     pub fn hook_atol(&mut self, s: *const c_char) -> i32 {
         extern "C" {
@@ -1031,6 +1033,7 @@ impl AsanRuntime {
         unsafe { atol(s) }
     }
 
+    /// Hooks `atoll`
     #[inline]
     pub fn hook_atoll(&mut self, s: *const c_char) -> i64 {
         extern "C" {
@@ -1049,6 +1052,7 @@ impl AsanRuntime {
         unsafe { atoll(s) }
     }
 
+    /// Hooks `wcslen`
     #[inline]
     pub fn hook_wcslen(&mut self, s: *const wchar_t) -> usize {
         extern "C" {
@@ -1067,6 +1071,7 @@ impl AsanRuntime {
         size
     }
 
+    /// Hooks `wcscpy`
     #[inline]
     pub fn hook_wcscpy(&mut self, dest: *mut wchar_t, src: *const wchar_t) -> *mut wchar_t {
         extern "C" {
@@ -1098,6 +1103,7 @@ impl AsanRuntime {
         unsafe { wcscpy(dest, src) }
     }
 
+    /// Hooks `wcscmp`
     #[inline]
     pub fn hook_wcscmp(&mut self, s1: *const wchar_t, s2: *const wchar_t) -> i32 {
         extern "C" {

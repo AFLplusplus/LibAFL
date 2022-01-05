@@ -1,4 +1,4 @@
-use core::marker::PhantomData;
+//! Mutators for the `Nautilus` grammmar fuzzer
 
 use crate::{
     bolts::tuples::Named,
@@ -11,15 +11,23 @@ use crate::{
     Error,
 };
 
+use core::{fmt::Debug, marker::PhantomData};
 use grammartec::mutator::Mutator as BackingMutator;
 use grammartec::{
     context::Context,
     tree::{Tree, TreeMutation},
 };
 
+/// The randomic mutator for `Nautilus` grammar.
 pub struct NautilusRandomMutator<'a> {
     ctx: &'a Context,
     mutator: BackingMutator,
+}
+
+impl Debug for NautilusRandomMutator<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NautilusRandomMutator {{}}")
+    }
 }
 
 impl<'a, S> Mutator<NautilusInput, S> for NautilusRandomMutator<'a> {
@@ -70,10 +78,17 @@ impl<'a> NautilusRandomMutator<'a> {
     }
 }
 
+/// The `Nautilus` recursion mutator
 // TODO calculate reucursions only for new items in corpus
 pub struct NautilusRecursionMutator<'a> {
     ctx: &'a Context,
     mutator: BackingMutator,
+}
+
+impl Debug for NautilusRecursionMutator<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NautilusRecursionMutator {{}}")
+    }
 }
 
 impl<'a, S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'a> {
@@ -127,10 +142,17 @@ impl<'a> NautilusRecursionMutator<'a> {
     }
 }
 
+/// The splicing mutator for `Nautilus` that can splice inputs together
 pub struct NautilusSpliceMutator<'a, C> {
     ctx: &'a Context,
     mutator: BackingMutator,
     phantom: PhantomData<C>,
+}
+
+impl Debug for NautilusSpliceMutator<'_, ()> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NautilusSpliceMutator {{}}")
+    }
 }
 
 impl<'a, S, C> Mutator<NautilusInput, S> for NautilusSpliceMutator<'a, C>

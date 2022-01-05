@@ -10,13 +10,13 @@ pub use syscall_numbers::x86::*;
 #[repr(i32)]
 pub enum Regs {
     Eax = 0,
-    Ebx = 1,
-    Ecx = 2,
-    Edx = 3,
-    Esi = 4,
-    Edi = 5,
-    Ebp = 6,
-    Esp = 7,
+    Ecx = 1,
+    Edx = 2,
+    Ebx = 3,
+    Esp = 4,
+    Ebp = 5,
+    Esi = 6,
+    Edi = 7,
     Eip = 8,
     Eflags = 9,
 }

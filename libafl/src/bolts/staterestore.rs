@@ -1,5 +1,5 @@
-/// Stores and restores state when a client needs to relaunch.
-/// Uses a [`ShMem`] up to a threshold, then write to disk.
+//! Stores and restores state when a client needs to relaunch.
+//! Uses a [`ShMem`] up to a threshold, then write to disk.
 use ahash::AHasher;
 use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
 use serde::{de::DeserializeOwned, Serialize};
@@ -204,7 +204,7 @@ where
         S: DeserializeOwned,
     {
         if !self.has_content() {
-            return Ok(Option::None);
+            return Ok(None);
         }
         let state_shmem_content = self.content();
         let bytes = unsafe {
@@ -216,7 +216,7 @@ where
         let mut state = bytes;
         let mut file_content;
         if state_shmem_content.buf_len == 0 {
-            return Ok(Option::None);
+            return Ok(None);
         } else if state_shmem_content.is_disk {
             let filename: String = postcard::from_bytes(bytes)?;
             let tmpfile = temp_dir().join(&filename);

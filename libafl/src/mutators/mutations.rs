@@ -60,10 +60,13 @@ pub fn buffer_set<T: Clone>(data: &mut [T], from: usize, len: usize, val: T) {
 /// The max value that will be added or subtracted during add mutations
 pub const ARITH_MAX: u64 = 35;
 
+/// Interesting 8-bit values from AFL
 pub const INTERESTING_8: [i8; 9] = [-128, -1, 0, 1, 16, 32, 64, 100, 127];
+/// Interesting 16-bit values from AFL
 pub const INTERESTING_16: [i16; 19] = [
     -128, -1, 0, 1, 16, 32, 64, 100, 127, -32768, -129, 128, 255, 256, 512, 1000, 1024, 4096, 32767,
 ];
+/// Interesting 32-bit values from AFL
 pub const INTERESTING_32: [i32; 27] = [
     -128,
     -1,
@@ -95,7 +98,7 @@ pub const INTERESTING_32: [i32; 27] = [
 ];
 
 /// Bitflip mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BitFlipMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -155,7 +158,7 @@ where
 }
 
 /// Byteflip mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ByteFlipMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -213,7 +216,7 @@ where
 }
 
 /// Byte increment mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ByteIncMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -272,7 +275,7 @@ where
 }
 
 /// Byte decrement mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ByteDecMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -331,7 +334,7 @@ where
 }
 
 /// Byte negate mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ByteNegMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -390,7 +393,7 @@ where
 }
 
 /// Byte random mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ByteRandMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -453,7 +456,7 @@ where
 macro_rules! add_mutator_impl {
     ($name: ident, $size: ty) => {
         /// Adds or subtracts a random value up to `ARITH_MAX` to a [`<$size>`] at a random place in the [`Vec`], in random byte order.
-        #[derive(Default)]
+        #[derive(Default, Debug)]
         pub struct $name<I, R, S>
         where
             I: Input + HasBytesVec,
@@ -463,6 +466,7 @@ macro_rules! add_mutator_impl {
             phantom: PhantomData<(I, R, S)>,
         }
 
+        #[allow(trivial_numeric_casts)]
         impl<I, R, S> Mutator<I, S> for $name<I, R, S>
         where
             I: Input + HasBytesVec,
@@ -539,7 +543,7 @@ add_mutator_impl!(QwordAddMutator, u64);
 macro_rules! interesting_mutator_impl {
     ($name: ident, $size: ty, $interesting: ident) => {
         /// Inserts an interesting value at a random place in the input vector
-        #[derive(Default)]
+        #[derive(Default, Debug)]
         pub struct $name<I, R, S>
         where
             I: Input + HasBytesVec,
@@ -612,7 +616,7 @@ interesting_mutator_impl!(WordInterestingMutator, u16, INTERESTING_16);
 interesting_mutator_impl!(DwordInterestingMutator, u32, INTERESTING_32);
 
 /// Bytes delete mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BytesDeleteMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -674,7 +678,7 @@ where
 }
 
 /// Bytes expand mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BytesExpandMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -743,7 +747,7 @@ where
 }
 
 /// Bytes insert mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BytesInsertMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -818,7 +822,7 @@ where
 }
 
 /// Bytes random insert mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BytesRandInsertMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -890,7 +894,7 @@ where
 }
 
 /// Bytes set mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BytesSetMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -954,7 +958,7 @@ where
 }
 
 /// Bytes random set mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BytesRandSetMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -1018,7 +1022,7 @@ where
 }
 
 /// Bytes copy mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct BytesCopyMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -1082,7 +1086,7 @@ where
 }
 
 /// Bytes insert and self copy mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BytesInsertCopyMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -1166,7 +1170,7 @@ where
 }
 
 /// Bytes swap mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BytesSwapMutator<I, R, S>
 where
     I: Input + HasBytesVec,
@@ -1232,7 +1236,7 @@ where
 }
 
 /// Crossover insert mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct CrossoverInsertMutator<C, I, R, S>
 where
     C: Corpus<I>,
@@ -1331,7 +1335,7 @@ where
 }
 
 /// Crossover replace mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct CrossoverReplaceMutator<C, I, R, S>
 where
     C: Corpus<I>,
@@ -1438,7 +1442,7 @@ fn locate_diffs(this: &[u8], other: &[u8]) -> (i64, i64) {
 }
 
 /// Splice mutation for inputs with a bytes vector
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct SpliceMutator<C, I, R, S>
 where
     C: Corpus<I>,

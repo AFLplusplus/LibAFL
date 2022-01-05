@@ -52,6 +52,7 @@ impl From<usize> for Location {
 /// The messages in the format are a perfect mirror of the methods that are called on the runtime during execution.
 #[cfg(feature = "std")]
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[allow(missing_docs)]
 pub enum SymExpr {
     InputByte {
         offset: usize,

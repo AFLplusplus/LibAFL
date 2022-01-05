@@ -3,7 +3,12 @@
 //!
 //! Needs the `fork` feature flag.
 
-use core::{ffi::c_void, marker::PhantomData, ptr};
+use core::{
+    ffi::c_void,
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+    ptr,
+};
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
@@ -42,7 +47,6 @@ use crate::{
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
-#[derive(Debug)]
 pub struct InProcessExecutor<'a, H, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -56,6 +60,20 @@ where
     // Crash and timeout hah
     handlers: InProcessHandlers,
     phantom: PhantomData<(I, S)>,
+}
+
+impl<'a, H, I, OT, S> Debug for InProcessExecutor<'a, H, I, OT, S>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InProcessExecutor")
+            .field("harness_fn", &"<fn>")
+            .field("observers", &self.observers)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
@@ -159,17 +177,20 @@ where
         self.harness_fn
     }
 
+    /// The inprocess handlers
     #[inline]
     pub fn handlers(&self) -> &InProcessHandlers {
         &self.handlers
     }
 
+    /// The inprocess handlers, mut
     #[inline]
     pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
         &mut self.handlers
     }
 }
 
+/// The inmem executor's handlers.
 #[derive(Debug)]
 pub struct InProcessHandlers {
     /// On crash C function pointer
@@ -179,32 +200,33 @@ pub struct InProcessHandlers {
 }
 
 impl InProcessHandlers {
+    /// Call before running a target.
     pub fn pre_run_target<E, EM, I, S, Z>(
         &self,
-        executor: &E,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
+        _executor: &E,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
+        _input: &I,
     ) {
         #[cfg(unix)]
         unsafe {
             let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
+                _input as *const _ as *const c_void,
             );
             write_volatile(
                 &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
+                _executor as *const _ as *const c_void,
             );
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
         #[cfg(all(windows, feature = "std"))]
@@ -212,23 +234,24 @@ impl InProcessHandlers {
             let data = &mut GLOBAL_STATE;
             write_volatile(
                 &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
+                _input as *const _ as *const c_void,
             );
             write_volatile(
                 &mut data.executor_ptr,
-                executor as *const _ as *const c_void,
+                _executor as *const _ as *const c_void,
             );
             data.crash_handler = self.crash_handler;
             data.timeout_handler = self.timeout_handler;
             // Direct raw pointers access /aliasing is pretty undefined behavior.
             // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, fuzzer as *mut _ as *mut c_void);
+            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
             compiler_fence(Ordering::SeqCst);
         }
     }
 
+    /// Call after running a target.
     #[allow(clippy::unused_self)]
     pub fn post_run_target(&self) {
         #[cfg(unix)]
@@ -243,6 +266,7 @@ impl InProcessHandlers {
         }
     }
 
+    /// Create new [`InProcessHandlers`].
     pub fn new<E, EM, I, OC, OF, OT, S, Z>() -> Result<Self, Error>
     where
         I: Input,
@@ -311,6 +335,7 @@ impl InProcessHandlers {
         })
     }
 
+    /// Replace the handlers with `nop` handlers, deactivating the handlers
     #[must_use]
     pub fn nop() -> Self {
         Self {
@@ -320,6 +345,9 @@ impl InProcessHandlers {
     }
 }
 
+/// The global state of the in-process harness.
+#[derive(Debug)]
+#[allow(missing_docs)]
 pub struct InProcessExecutorHandlerData {
     pub state_ptr: *mut c_void,
     pub event_mgr_ptr: *mut c_void,
@@ -367,21 +395,25 @@ pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHan
     timeout_input_ptr: ptr::null_mut(),
 };
 
+/// Get the inprocess [`crate::state::State`]
 #[must_use]
 pub fn inprocess_get_state<'a, S>() -> Option<&'a mut S> {
     unsafe { (GLOBAL_STATE.state_ptr as *mut S).as_mut() }
 }
 
+/// Get the [`crate::events::EventManager`]
 #[must_use]
 pub fn inprocess_get_event_manager<'a, EM>() -> Option<&'a mut EM> {
     unsafe { (GLOBAL_STATE.event_mgr_ptr as *mut EM).as_mut() }
 }
 
+/// Gets the inprocess [`crate::fuzzer::Fuzzer`]
 #[must_use]
 pub fn inprocess_get_fuzzer<'a, F>() -> Option<&'a mut F> {
     unsafe { (GLOBAL_STATE.fuzzer_ptr as *mut F).as_mut() }
 }
 
+/// Gets the inprocess [`Executor`]
 #[must_use]
 pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
     unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
@@ -697,7 +729,7 @@ mod windows_exception_handler {
 
     impl Handler for InProcessExecutorHandlerData {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        fn handle(&mut self, code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+        fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
             unsafe {
                 let data = &mut GLOBAL_STATE;
                 if !data.crash_handler.is_null() {
@@ -908,7 +940,7 @@ mod windows_exception_handler {
 
             let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(state, event_mgr, &input, observers, &ExitKind::Crash)
+                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
                 .expect("In crash handler objective failure.");
 
             if interesting {
@@ -945,8 +977,10 @@ mod windows_exception_handler {
     }
 }
 
+/// The struct has [`InProcessHandlers`].
 #[cfg(windows)]
 pub trait HasInProcessHandlers {
+    /// Get the in-process handlers.
     fn inprocess_handlers(&self) -> &InProcessHandlers;
 }
 
@@ -964,6 +998,7 @@ where
     }
 }
 
+/// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
@@ -979,7 +1014,23 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, EM, H, I, OT, S, Z, SP> Executor<EM, I, S, Z>
+impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InProcessForkExecutor")
+            .field("observers", &self.observers)
+            .field("shmem_provider", &self.shmem_provider)
+            .finish()
+    }
+}
+
+#[cfg(all(feature = "std", unix))]
+impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
     for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
@@ -1033,6 +1084,7 @@ where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
+    /// Creates a new [`InProcessForkExecutor`]
     pub fn new<EM, OC, OF, Z>(
         harness_fn: &'a mut H,
         observers: OT,

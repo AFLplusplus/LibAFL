@@ -1,6 +1,10 @@
 //! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
 
-use core::{marker::PhantomData, time::Duration};
+use core::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+    time::Duration,
+};
 use std::{
     fs::{File, OpenOptions},
     io::{self, prelude::*, ErrorKind, SeekFrom},
@@ -33,17 +37,21 @@ use nix::{
 
 const FORKSRV_FD: i32 = 198;
 #[allow(clippy::cast_possible_wrap)]
-const FS_OPT_ENABLED: i32 = 0x80000001u32 as i32;
+const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
-const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000u32 as i32;
+const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
 
-// Configure the target. setlimit, setsid, pipe_stdin, I borrowed the code from Angora fuzzer
+/// Configure the target, `limit`, `setsid`, `pipe_stdin`, the code was borrowed from the [`Angora`](https://github.com/AngoraFuzzer/Angora) fuzzer
 pub trait ConfigTarget {
+    /// Sets the sid
     fn setsid(&mut self) -> &mut Self;
+    /// Sets a mem limit
     fn setlimit(&mut self, memlimit: u64) -> &mut Self;
+    /// Sets the stdin
     fn setstdin(&mut self, fd: RawFd, use_stdin: bool) -> &mut Self;
+    /// Sets the AFL forkserver pipes
     fn setpipe(
         &mut self,
         st_read: RawFd,
@@ -113,6 +121,7 @@ impl ConfigTarget for Command {
         }
     }
 
+    #[allow(trivial_numeric_casts)]
     fn setlimit(&mut self, memlimit: u64) -> &mut Self {
         if memlimit == 0 {
             return self;
@@ -145,11 +154,16 @@ impl ConfigTarget for Command {
     }
 }
 
+/// The [`OutFile`] to write input to.
+/// The target/forkserver will read from this file.
+#[derive(Debug)]
 pub struct OutFile {
+    /// The file
     file: File,
 }
 
 impl OutFile {
+    /// Creates a new [`OutFile`]
     pub fn new(file_name: &str) -> Result<Self, Error> {
         let f = OpenOptions::new()
             .read(true)
@@ -159,11 +173,13 @@ impl OutFile {
         Ok(Self { file: f })
     }
 
+    /// Gets the file as raw file descriptor
     #[must_use]
     pub fn as_raw_fd(&self) -> RawFd {
         self.file.as_raw_fd()
     }
 
+    /// Writes the given buffer to the file
     pub fn write_buf(&mut self, buf: &[u8]) {
         self.rewind();
         self.file.write_all(buf).unwrap();
@@ -173,6 +189,7 @@ impl OutFile {
         self.rewind();
     }
 
+    /// Rewinds the file to the beginning
     pub fn rewind(&mut self) {
         self.file.seek(SeekFrom::Start(0)).unwrap();
     }
@@ -180,6 +197,7 @@ impl OutFile {
 
 /// The [`Forkserver`] is communication channel with a child process that forks on request of the fuzzer.
 /// The communication happens via pipe.
+#[derive(Debug)]
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
@@ -189,6 +207,7 @@ pub struct Forkserver {
 }
 
 impl Forkserver {
+    /// Create a new [`Forkserver`]
     pub fn new(
         target: String,
         args: Vec<String>,
@@ -245,35 +264,42 @@ impl Forkserver {
         })
     }
 
+    /// If the last run timed out
     #[must_use]
     pub fn last_run_timed_out(&self) -> i32 {
         self.last_run_timed_out
     }
 
+    /// Sets if the last run timed out
     pub fn set_last_run_timed_out(&mut self, last_run_timed_out: i32) {
         self.last_run_timed_out = last_run_timed_out;
     }
 
+    /// The status
     #[must_use]
     pub fn status(&self) -> i32 {
         self.status
     }
 
+    /// Sets the status
     pub fn set_status(&mut self, status: i32) {
         self.status = status;
     }
 
+    /// The child pid
     #[must_use]
     pub fn child_pid(&self) -> Pid {
         self.child_pid
     }
 
+    /// Set the child pid
     pub fn set_child_pid(&mut self, child_pid: Pid) {
         self.child_pid = child_pid;
     }
 
+    /// Read from the st pipe
     pub fn read_st(&mut self) -> Result<(usize, i32), Error> {
-        let mut buf: [u8; 4] = [0u8; 4];
+        let mut buf: [u8; 4] = [0_u8; 4];
 
         let rlen = self.st_pipe.read(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
@@ -281,14 +307,16 @@ impl Forkserver {
         Ok((rlen, val))
     }
 
+    /// Write to the ctl pipe
     pub fn write_ctl(&mut self, val: i32) -> Result<usize, Error> {
         let slen = self.ctl_pipe.write(&val.to_ne_bytes())?;
 
         Ok(slen)
     }
 
+    /// Read a message from the child process.
     pub fn read_st_timed(&mut self, timeout: &TimeSpec) -> Result<Option<i32>, Error> {
-        let mut buf: [u8; 4] = [0u8; 4];
+        let mut buf: [u8; 4] = [0_u8; 4];
         let st_read = match self.st_pipe.read_end() {
             Some(fd) => fd,
             None => {
@@ -324,27 +352,36 @@ impl Forkserver {
     }
 }
 
+/// A struct that has a forkserver
 pub trait HasForkserver {
+    /// The forkserver
     fn forkserver(&self) -> &Forkserver;
 
+    /// The forkserver, mutable
     fn forkserver_mut(&mut self) -> &mut Forkserver;
 
+    /// The file the forkserver is reading from
     fn out_file(&self) -> &OutFile;
 
+    /// The file the forkserver is reading from, mutable
     fn out_file_mut(&mut self) -> &mut OutFile;
 
+    /// The map of the fuzzer
     fn map(&self) -> &Option<StdShMem>;
 
+    /// The map of the fuzzer, mutable
     fn map_mut(&mut self) -> &mut Option<StdShMem>;
 }
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
-pub struct TimeoutForkserverExecutor<E> {
+#[derive(Debug)]
+pub struct TimeoutForkserverExecutor<E: Debug> {
     executor: E,
     timeout: TimeSpec,
 }
 
-impl<E> TimeoutForkserverExecutor<E> {
+impl<E: Debug> TimeoutForkserverExecutor<E> {
+    /// Create a new [`TimeoutForkserverExecutor`]
     pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout = TimeSpec::milliseconds(milli_sec);
@@ -352,7 +389,7 @@ impl<E> TimeoutForkserverExecutor<E> {
     }
 }
 
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E>
+impl<E: Debug, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E>
 where
     I: Input + HasTargetBytes,
     E: Executor<EM, I, S, Z> + HasForkserver,
@@ -464,11 +501,29 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
+impl<I, OT, S> Debug for ForkserverExecutor<I, OT, S>
+where
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple<I, S>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ForkserverExecutor")
+            .field("target", &self.target)
+            .field("args", &self.args)
+            .field("out_file", &self.out_file)
+            .field("forkserver", &self.forkserver)
+            .field("observers", &self.observers)
+            .field("map", &self.map)
+            .finish()
+    }
+}
+
 impl<I, OT, S> ForkserverExecutor<I, OT, S>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
 {
+    /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers.
     pub fn new(
         target: String,
         arguments: &[String],
@@ -478,6 +533,7 @@ where
         Self::with_debug(target, arguments, use_shmem_testcase, observers, false)
     }
 
+    /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers, with debug mode
     pub fn with_debug(
         target: String,
         arguments: &[String],
@@ -557,18 +613,22 @@ where
         })
     }
 
+    /// The `target` binary that's going to run.
     pub fn target(&self) -> &String {
         &self.target
     }
 
+    /// The `args` used for the binary.
     pub fn args(&self) -> &[String] {
         &self.args
     }
 
+    /// The [`Forkserver`] instance.
     pub fn forkserver(&self) -> &Forkserver {
         &self.forkserver
     }
 
+    /// The [`OutFile`] used by this [`Executor`].
     pub fn out_file(&self) -> &OutFile {
         &self.out_file
     }
@@ -737,10 +797,7 @@ mod tests {
         let bin = "echo";
         let args = vec![String::from("@@")];
 
-        let mut shmem = StdShMemProvider::new()
-            .unwrap()
-            .new_map(MAP_SIZE as usize)
-            .unwrap();
+        let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
         let shmem_map = shmem.map_mut();
 

@@ -23,6 +23,7 @@ use crate::monitors::PerfFeature;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 
+/// The default maximum number of mutations to perform per input.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 /// A Mutational push stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational push stages will usually have a range of mutations that are
@@ -75,6 +76,7 @@ where
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
     }
 
+    /// Sets the current corpus index
     pub fn set_current_corpus_idx(&mut self, current_corpus_idx: usize) {
         self.current_corpus_idx = Some(current_corpus_idx);
     }
@@ -150,7 +152,7 @@ where
 
         start_timer!(state);
         self.mutator
-            .mutate(state, &mut input, self.stage_idx as i32)
+            .mutate(state, &mut input, self.stage_idx)
             .unwrap();
         mark_feature_time!(state, PerfFeature::Mutate);
 
@@ -176,7 +178,7 @@ where
 
         start_timer!(state);
         self.mutator
-            .post_exec(state, self.stage_idx as i32, Some(self.testcases_done))?;
+            .post_exec(state, self.stage_idx, Some(self.testcases_done))?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
         self.testcases_done += 1;
 

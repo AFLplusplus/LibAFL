@@ -10,7 +10,7 @@ use crate::{
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
 };
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
     pub map: HashMap<(u64, u64), u64>,
     pub current_id: u64,
@@ -28,6 +28,7 @@ impl QemuEdgesMapMetadata {
 
 libafl::impl_serdeany!(QemuEdgesMapMetadata);
 
+#[derive(Debug)]
 pub struct QemuEdgeCoverageHelper {
     filter: QemuInstrumentationFilter,
 }

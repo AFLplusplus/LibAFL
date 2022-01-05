@@ -2,10 +2,13 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
+use clap::{self, StructOpt};
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
-use structopt::StructOpt;
 
 use libafl::{
     bolts::{
@@ -44,13 +47,13 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 }
 
 #[derive(Debug, StructOpt)]
-#[structopt(
+#[clap(
     name = "libfuzzer_libpng_ctx",
     about = "A clone of libfuzzer using LibAFL for a libpng harness",
     author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
 )]
 struct Opt {
-    #[structopt(
+    #[clap(
         short,
         long,
         parse(try_from_str = Cores::from_cmdline),
@@ -59,8 +62,8 @@ struct Opt {
     )]
     cores: Cores,
 
-    #[structopt(
-        short = "p",
+    #[clap(
+        short = 'p',
         long,
         help = "Choose the broker TCP port, default is 1337",
         name = "PORT",
@@ -68,16 +71,16 @@ struct Opt {
     )]
     broker_port: u16,
 
-    #[structopt(
+    #[clap(
         parse(try_from_str),
-        short = "a",
+        short = 'a',
         long,
         help = "Specify a remote broker",
         name = "REMOTE"
     )]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[structopt(
+    #[clap(
         parse(try_from_str),
         short,
         long,
@@ -86,7 +89,7 @@ struct Opt {
     )]
     input: Vec<PathBuf>,
 
-    #[structopt(
+    #[clap(
         short,
         long,
         parse(try_from_str),
@@ -96,7 +99,7 @@ struct Opt {
     )]
     output: PathBuf,
 
-    #[structopt(
+    #[clap(
         short,
         long,
         parse(try_from_str = timeout_from_millis_str),
@@ -107,7 +110,7 @@ struct Opt {
     timeout: Duration,
     /*
         // The tokens are hardcoded in this example.
-        #[structopt(
+        #[clap(
         parse(from_os_str),
         short = "x",
         long,
@@ -124,7 +127,7 @@ pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let broker_port = opt.broker_port;
 
@@ -141,8 +144,9 @@ pub fn libafl_main() {
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges = edges_map_from_ptr();
-        let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+        let edges = unsafe { edges_map_from_ptr() };
+        let edges_observer =
+            HitcountsMapObserver::new(StdMapObserver::new_from_ownedref("edges", edges));
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

@@ -11,6 +11,8 @@ use crate::{
     Error,
 };
 
+/// A corpus scheduler using power schedules
+#[derive(Clone, Debug)]
 pub struct PowerQueueCorpusScheduler<C, I, S>
 where
     S: HasCorpus<C, I> + HasMetadata,
@@ -96,6 +98,7 @@ where
     C: Corpus<I>,
     I: Input,
 {
+    /// Create a new [`PowerQueueCorpusScheduler`]
     #[must_use]
     pub fn new() -> Self {
         Self {

@@ -1,4 +1,7 @@
 //! A singlethreaded libfuzzer-like fuzzer that can auto-restart.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 use clap::{App, Arg};
 use core::{cell::RefCell, time::Duration};

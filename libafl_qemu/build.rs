@@ -76,13 +76,8 @@ fn main() {
     let qasan_dir = Path::new("libqasan");
     let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
     let src_dir = Path::new("src");
-    //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
-    println!("cargo:rerun-if-changed={}/libqasan.so", qasan_dir.display());
-    println!(
-        "cargo:rerun-if-changed={}/libqasan.so",
-        target_dir.display()
-    );
+    println!("cargo:rerun-if-changed=libqasan");
 
     build_dep_check(&["git", "make"]);
 

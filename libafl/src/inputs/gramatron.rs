@@ -1,3 +1,4 @@
+//! The gramatron grammar fuzzer
 use ahash::AHasher;
 use core::hash::Hasher;
 
@@ -7,14 +8,19 @@ use serde::{Deserialize, Serialize};
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
+/// A terminal for gramatron grammar fuzzing
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Terminal {
+    /// The state
     pub state: usize,
+    /// The trigger index
     pub trigger_idx: usize,
+    /// The symbol
     pub symbol: String,
 }
 
 impl Terminal {
+    /// Creates a new [`Terminal`]
     #[must_use]
     pub fn new(state: usize, trigger_idx: usize, symbol: String) -> Self {
         Self {
@@ -25,6 +31,7 @@ impl Terminal {
     }
 }
 
+/// An input for gramatron grammar fuzzing
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct GramatronInput {
     /// The input representation as list of terminals
@@ -64,16 +71,19 @@ impl GramatronInput {
         Self { terms }
     }
 
+    /// The terminals of this input
     #[must_use]
     pub fn terminals(&self) -> &[Terminal] {
         &self.terms
     }
 
+    /// The terminals of this input, mutable
     #[must_use]
     pub fn terminals_mut(&mut self) -> &mut Vec<Terminal> {
         &mut self.terms
     }
 
+    /// Create a bytes representation of this input
     pub fn unparse(&self, bytes: &mut Vec<u8>) {
         bytes.clear();
         for term in &self.terms {
@@ -81,6 +91,7 @@ impl GramatronInput {
         }
     }
 
+    /// crop the value to the given length
     pub fn crop(&self, from: usize, to: usize) -> Result<Self, Error> {
         if from < to && to <= self.terms.len() {
             let mut terms = vec![];

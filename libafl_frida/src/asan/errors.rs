@@ -1,10 +1,12 @@
+//! Errors that can be caught by the `libafl_frida` address sanitizer.
+#[cfg(target_arch = "x86_64")]
+use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use backtrace::Backtrace;
 use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
-
 use libafl::{
     bolts::{ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
@@ -19,9 +21,6 @@ use libafl::{
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
-
-#[cfg(target_arch = "x86_64")]
-use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 
 use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
 
@@ -196,12 +195,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(
-                        output,
-                        "x{:02}: 0x{:016x} ",
-                        reg, error.registers[reg as usize]
-                    )
-                    .unwrap();
+                    write!(output, "x{:02}: 0x{:016x} ", reg, error.registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -460,7 +454,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg as usize]).unwrap();
+                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -550,7 +544,7 @@ impl AsanErrors {
 pub static mut ASAN_ERRORS: Option<AsanErrors> = None;
 
 /// An observer for frida address sanitizer `AsanError`s for a frida executor run
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,

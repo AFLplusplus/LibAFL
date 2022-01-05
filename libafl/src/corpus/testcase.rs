@@ -133,6 +133,7 @@ where
         &mut self.exec_time
     }
 
+    /// Sets the execution time of the current testcase
     #[inline]
     pub fn set_exec_time(&mut self, time: Duration) {
         self.exec_time = Some(time);
@@ -260,6 +261,7 @@ pub struct PowerScheduleTestcaseMetaData {
 }
 
 impl PowerScheduleTestcaseMetaData {
+    /// Create new [`struct@PowerScheduleTestcaseMetaData`]
     #[must_use]
     pub fn new(depth: u64) -> Self {
         Self {
@@ -271,47 +273,57 @@ impl PowerScheduleTestcaseMetaData {
         }
     }
 
+    /// Get the bitmap size
     #[must_use]
     pub fn bitmap_size(&self) -> u64 {
         self.bitmap_size
     }
 
+    /// Set the bitmap size
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
     }
 
+    /// Get the fuzz level
     #[must_use]
     pub fn fuzz_level(&self) -> u64 {
         self.fuzz_level
     }
 
+    /// Set the fuzz level
     pub fn set_fuzz_level(&mut self, val: u64) {
         self.fuzz_level = val;
     }
 
+    /// Get the handicap
     #[must_use]
     pub fn handicap(&self) -> u64 {
         self.handicap
     }
 
+    /// Set the handicap
     pub fn set_handicap(&mut self, val: u64) {
         self.handicap = val;
     }
 
+    /// Get the depth
     #[must_use]
     pub fn depth(&self) -> u64 {
         self.depth
     }
 
+    /// Set the depth
     pub fn set_depth(&mut self, val: u64) {
         self.depth = val;
     }
 
+    /// Get the `n_fuzz_entry`
     #[must_use]
     pub fn n_fuzz_entry(&self) -> usize {
         self.n_fuzz_entry
     }
 
+    /// Set the `n_fuzz_entry`
     pub fn set_n_fuzz_entry(&mut self, val: usize) {
         self.n_fuzz_entry = val;
     }

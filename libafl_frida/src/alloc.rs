@@ -6,17 +6,28 @@ use nix::{
 };
 
 use backtrace::Backtrace;
-#[cfg(unix)]
+#[cfg(any(
+    target_os = "linux",
+    all(target_arch = "aarch64", target_os = "android")
+))]
 use libc::{sysconf, _SC_PAGESIZE};
 use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
-use std::{ffi::c_void, io};
+#[cfg(any(
+    target_os = "linux",
+    all(target_arch = "aarch64", target_os = "android")
+))]
+use std::io;
+use std::{collections::BTreeMap, ffi::c_void};
 
 use crate::{
     asan::errors::{AsanError, AsanErrors},
     FridaOptions,
 };
 
+/// An allocator wrapper with binary-only address sanitization
+#[derive(Debug)]
+#[allow(missing_docs)]
 pub struct Allocator {
     #[allow(dead_code)]
     options: FridaOptions,
@@ -26,7 +37,7 @@ pub struct Allocator {
     pre_allocated_shadow: bool,
     allocations: HashMap<usize, AllocationMetadata>,
     shadow_pages: RangeSet<usize>,
-    allocation_queue: HashMap<usize, Vec<AllocationMetadata>>,
+    allocation_queue: BTreeMap<usize, Vec<AllocationMetadata>>,
     largest_allocation: usize,
     total_allocation_size: usize,
     base_mapping_addr: usize,
@@ -44,7 +55,9 @@ macro_rules! map_to_shadow {
     };
 }
 
+/// Metadata for an allocation
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct AllocationMetadata {
     pub address: usize,
     pub size: usize,
@@ -56,6 +69,21 @@ pub struct AllocationMetadata {
 }
 
 impl Allocator {
+    /// Creates a new [`Allocator`] (not supported on this platform!)
+    #[cfg(not(any(
+        target_os = "linux",
+        all(target_arch = "aarch64", target_os = "android")
+    )))]
+    #[must_use]
+    pub fn new(_: FridaOptions) -> Self {
+        todo!("Shadow region not yet supported for this platform!");
+    }
+
+    /// Creates a new [`Allocator`]
+    #[cfg(any(
+        target_os = "linux",
+        all(target_arch = "aarch64", target_os = "android")
+    ))]
     #[must_use]
     pub fn new(options: FridaOptions) -> Self {
         let ret = unsafe { sysconf(_SC_PAGESIZE) };
@@ -118,8 +146,8 @@ impl Allocator {
                 shadow_bit = try_shadow_bit;
             }
         }
-        assert!(shadow_bit != 0);
 
+        assert!(shadow_bit != 0);
         // attempt to pre-map the entire shadow-memory space
 
         let addr: usize = 1 << shadow_bit;
@@ -146,7 +174,7 @@ impl Allocator {
             shadow_bit,
             allocations: HashMap::new(),
             shadow_pages: RangeSet::new(),
-            allocation_queue: HashMap::new(),
+            allocation_queue: BTreeMap::new(),
             largest_allocation: 0,
             total_allocation_size: 0,
             base_mapping_addr: addr + addr + addr,
@@ -173,19 +201,17 @@ impl Allocator {
     }
 
     fn find_smallest_fit(&mut self, size: usize) -> Option<AllocationMetadata> {
-        let mut current_size = size;
-        while current_size <= self.largest_allocation {
-            if self.allocation_queue.contains_key(&current_size) {
-                if let Some(metadata) = self.allocation_queue.entry(current_size).or_default().pop()
-                {
+        for (current_size, list) in &mut self.allocation_queue {
+            if *current_size >= size {
+                if let Some(metadata) = list.pop() {
                     return Some(metadata);
                 }
             }
-            current_size *= 2;
         }
         None
     }
 
+    /// Allocate a new allocation of the given size.
     #[must_use]
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn alloc(&mut self, size: usize, _alignment: usize) -> *mut c_void {
@@ -266,12 +292,14 @@ impl Allocator {
 
         self.allocations
             .insert(metadata.address + self.page_size, metadata);
-        // println!("serving address: {:?}, size: {:x}", address, size);
+        //println!("serving address: {:?}, size: {:x}", address, size);
         address
     }
 
+    /// Releases the allocation at the given address.
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
+        //println!("freeing address: {:?}", ptr);
         let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
             metadata
         } else {
@@ -300,6 +328,7 @@ impl Allocator {
         Self::poison(shadow_mapping_start, metadata.size);
     }
 
+    /// Finds the metadata for the allocation at the given address.
     pub fn find_metadata(
         &mut self,
         ptr: usize,
@@ -326,6 +355,7 @@ impl Allocator {
         closest
     }
 
+    /// Resets the allocator contents
     pub fn reset(&mut self) {
         let mut tmp_allocations = Vec::new();
         for (address, mut allocation) in self.allocations.drain() {
@@ -350,12 +380,14 @@ impl Allocator {
         }
 
         for allocation in tmp_allocations {
-            self.allocations.insert(allocation.address, allocation);
+            self.allocations
+                .insert(allocation.address + self.page_size, allocation);
         }
 
         self.total_allocation_size = 0;
     }
 
+    /// Gets the usable size of the allocation, by allocated pointer
     pub fn get_usable_size(&self, ptr: *mut c_void) -> usize {
         match self.allocations.get(&(ptr as usize)) {
             Some(metadata) => metadata.size,
@@ -386,6 +418,7 @@ impl Allocator {
         }
     }
 
+    /// Poisonn an area in memory
     pub fn poison(start: usize, size: usize) {
         // println!("poisoning {:x} for {:x}", start, size / 8 + 1);
         unsafe {
@@ -446,17 +479,21 @@ impl Allocator {
         (shadow_mapping_start, (end - start) / 8)
     }
 
+    /// Maps the address to a shadow address
+    #[inline]
     #[must_use]
     pub fn map_to_shadow(&self, start: usize) -> usize {
         map_to_shadow!(self, start)
     }
 
+    /// Checks if the currennt address is one of ours
     #[inline]
     pub fn is_managed(&self, ptr: *mut c_void) -> bool {
         //self.allocations.contains_key(&(ptr as usize))
         self.base_mapping_addr <= ptr as usize && (ptr as usize) < self.current_mapping_addr
     }
 
+    /// Checks if any of the allocations has not been freed
     pub fn check_for_leaks(&self) {
         for metadata in self.allocations.values() {
             if !metadata.freed {
