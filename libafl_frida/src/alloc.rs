@@ -98,6 +98,32 @@ impl Allocator {
         // probe to find a usable shadow bit:
         let mut shadow_bit = 0;
 
+        let mut occupied_ranges: Vec<(usize, usize)> = vec![];
+        // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
+        let mut userspace_max: usize = 0;
+        // List up all occupied memory ranges
+        RangeDetails::enumerate_with_prot(PageProtection::Read, &mut |details| {
+            let start = details.memory_range().base_address().0 as usize;
+            let end = start + details.memory_range().size();
+            occupied_ranges.push((start, end));
+            // println!("{:x} {:x}", start, end);
+            if end > userspace_max {
+                userspace_max = end;
+            }
+            true
+        });
+
+        let mut maxbit = 0;
+        for power in 1..64 {
+            let base: usize = 2;
+            if base.pow(power) > userspace_max {
+                maxbit = power;
+                break;
+            }
+        }
+        println!("{:x}", maxbit);
+
+
         #[cfg(all(target_arch = "aarch64", target_os = "android"))]
         for try_shadow_bit in &[44usize, 36usize] {
             let addr: usize = 1 << try_shadow_bit;
@@ -126,27 +152,42 @@ impl Allocator {
         // This memory map is for amd64 linux.
         #[cfg(target_os = "linux")]
         {
-            let try_shadow_bit: usize = 44;
-            let addr: usize = 1 << try_shadow_bit;
-            if unsafe {
-                mmap(
-                    addr as *mut c_void,
-                    page_size,
-                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_PRIVATE
-                        | ANONYMOUS_FLAG
-                        | MapFlags::MAP_FIXED
-                        | MapFlags::MAP_NORESERVE,
-                    -1,
-                    0,
-                )
-            }
-            .is_ok()
-            {
-                shadow_bit = try_shadow_bit;
+            for try_shadow_bit in &[maxbit - 4, maxbit - 3, maxbit - 2]{
+                let addr: usize = 1 << try_shadow_bit;
+                let shadow_start = addr;
+                let shadow_end = addr + addr + addr;
+
+                // check if the proposed shadow bit overlaps with occupied ranges.
+                for (start, end) in &occupied_ranges {
+                    if (shadow_start <= *end) && (*start <= shadow_end){
+                        // println!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
+                        println!("shadow_bit {:x} is not suitable", try_shadow_bit);
+                        break;
+                    }
+                } 
+
+                if unsafe {
+                    mmap(
+                        addr as *mut c_void,
+                        page_size,
+                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                        MapFlags::MAP_PRIVATE
+                            | ANONYMOUS_FLAG
+                            | MapFlags::MAP_FIXED
+                            | MapFlags::MAP_NORESERVE,
+                        -1,
+                        0,
+                    )
+                }
+                .is_ok()
+                {
+                    shadow_bit = (*try_shadow_bit).try_into().unwrap();
+                    break;
+                }
             }
         }
 
+        println!("shadow_bit {:x} is suitable", shadow_bit);
         assert!(shadow_bit != 0);
         // attempt to pre-map the entire shadow-memory space
 
