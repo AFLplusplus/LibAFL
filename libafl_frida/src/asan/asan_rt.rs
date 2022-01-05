@@ -506,6 +506,7 @@ impl AsanRuntime {
             }
         }
 
+        /*
         // Hook the memory allocator functions
         hook_func!(None, malloc, (size: usize), *mut c_void);
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
@@ -521,6 +522,8 @@ impl AsanRuntime {
         );
         #[cfg(not(target_vendor = "apple"))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
+        */
+
 
         for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
             for export in Module::enumerate_exports(libname) {
