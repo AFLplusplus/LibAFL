@@ -5,11 +5,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{
-    fmt::Debug,
-    hash::Hasher,
-    slice::{from_raw_parts, from_raw_parts_mut},
-};
+use core::{fmt::Debug, hash::Hasher, slice::from_raw_parts};
 use intervaltree::IntervalTree;
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
@@ -188,7 +184,7 @@ where
     pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Ref(map),
+            map: OwnedSliceMut::from(map),
             name: name.to_string(),
             initial,
         }
@@ -199,7 +195,26 @@ where
     pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Owned(map),
+            map: OwnedSliceMut::from(map),
+            name: name.to_string(),
+            initial,
+        }
+    }
+
+    /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map.
+    ///
+    /// # Safety
+    /// Will dereference the owned slice with up to len elements.
+    #[must_use]
+    pub fn new_from_ownedref(name: &'static str, map: OwnedSliceMut<'a, T>) -> Self {
+        let map_slice = map.as_slice();
+        let initial = if map_slice.is_empty() {
+            T::default()
+        } else {
+            map_slice[0]
+        };
+        Self {
+            map,
             name: name.to_string(),
             initial,
         }
@@ -212,7 +227,7 @@ where
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
         let initial = if len > 0 { *map_ptr } else { T::default() };
         StdMapObserver {
-            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, len)),
+            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, len),
             name: name.to_string(),
             initial,
         }
@@ -309,7 +324,7 @@ where
         assert!(map.len() >= N);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Ref(map),
+            map: OwnedSliceMut::from(map),
             name: name.to_string(),
             initial,
         }
@@ -321,7 +336,7 @@ where
         assert!(map.len() >= N);
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Owned(map),
+            map: OwnedSliceMut::from(map),
             name: name.to_string(),
             initial,
         }
@@ -334,7 +349,7 @@ where
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T) -> Self {
         let initial = if N > 0 { *map_ptr } else { T::default() };
         ConstMapObserver {
-            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, N)),
+            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, N),
             name: name.to_string(),
             initial,
         }
@@ -429,7 +444,7 @@ where
     pub fn new(name: &'static str, map: &'a mut [T], size: &'a mut usize) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: OwnedSliceMut::Ref(map),
+            map: OwnedSliceMut::from(map),
             size: OwnedRefMut::Ref(size),
             name: name.into(),
             initial,
@@ -448,7 +463,7 @@ where
     ) -> Self {
         let initial = if max_len > 0 { *map_ptr } else { T::default() };
         VariableMapObserver {
-            map: OwnedSliceMut::Ref(from_raw_parts_mut(map_ptr, max_len)),
+            map: OwnedSliceMut::from_raw_parts_mut(map_ptr, max_len),
             size: OwnedRefMut::Ref(size),
             name: name.into(),
             initial,
@@ -715,7 +730,7 @@ where
                 idx += l;
                 builder.push(r);
                 v += 1;
-                OwnedSliceMut::Ref(x)
+                OwnedSliceMut::from(x)
             })
             .collect();
         Self {
@@ -745,7 +760,7 @@ where
                 idx += l;
                 builder.push(r);
                 v += 1;
-                OwnedSliceMut::Owned(x)
+                OwnedSliceMut::from(x)
             })
             .collect();
         Self {
