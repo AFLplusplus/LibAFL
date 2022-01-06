@@ -10,23 +10,13 @@ use libafl::{
 
 use crate::input::PacketData;
 
-use core::marker::PhantomData;
 use lain::traits::Mutatable;
 
-pub struct LainMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+pub struct LainMutator {
     inner: lain::mutator::Mutator<StdRand>,
-    phantom: PhantomData<*const (R, S)>,
 }
 
-impl<R, S> Mutator<PacketData, S> for LainMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl<S: HasRand> Mutator<PacketData, S> for LainMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -40,35 +30,22 @@ where
     }
 }
 
-impl<R, S> Named for LainMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl Named for LainMutator {
     fn name(&self) -> &str {
         "LainMutator"
     }
 }
 
-impl<R, S> LainMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl LainMutator {
     #[must_use]
     pub fn new() -> Self {
         Self {
             inner: lain::mutator::Mutator::new(StdRand::with_seed(0)),
-            phantom: PhantomData,
         }
     }
 }
 
-impl<R, S> Default for LainMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl Default for LainMutator {
     #[must_use]
     fn default() -> Self {
         Self::new()

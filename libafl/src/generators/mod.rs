@@ -35,19 +35,17 @@ where
 
 #[derive(Clone, Debug)]
 /// Generates random bytes
-pub struct RandBytesGenerator<R, S>
+pub struct RandBytesGenerator<S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     max_size: usize,
-    phantom: PhantomData<(R, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<R, S> Generator<BytesInput, S> for RandBytesGenerator<R, S>
+impl<S> Generator<BytesInput, S> for RandBytesGenerator<S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
         let mut size = state.rand_mut().below(self.max_size as u64);
@@ -67,10 +65,9 @@ where
     }
 }
 
-impl<R, S> RandBytesGenerator<R, S>
+impl<S> RandBytesGenerator<S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
@@ -84,19 +81,17 @@ where
 
 #[derive(Clone, Debug)]
 /// Generates random printable characters
-pub struct RandPrintablesGenerator<R, S>
+pub struct RandPrintablesGenerator<S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     max_size: usize,
-    phantom: PhantomData<(R, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<R, S> Generator<BytesInput, S> for RandPrintablesGenerator<R, S>
+impl<S> Generator<BytesInput, S> for RandPrintablesGenerator<S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
         let mut size = state.rand_mut().below(self.max_size as u64);
@@ -117,10 +112,9 @@ where
     }
 }
 
-impl<R, S> RandPrintablesGenerator<R, S>
+impl<S> RandPrintablesGenerator<S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     /// Creates a new [`RandPrintablesGenerator`], generating up to `max_size` random printable characters.
     #[must_use]

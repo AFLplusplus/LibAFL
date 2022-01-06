@@ -2,10 +2,11 @@
 
 use crate::{
     bolts::current_time,
+    bolts::tuples::MatchName,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{FeedbackStatesTuple, MapFeedbackState},
+    feedbacks::MapFeedbackState,
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
@@ -23,40 +24,31 @@ use serde::{Deserialize, Serialize};
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+pub struct CalibrationStage<I, O, OT, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasMetadata,
 {
     map_observer_name: String,
     stage_max: usize,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, FT, I, O, OT, S, T, Z)>,
+    phantom: PhantomData<(I, O, OT, S, T)>,
 }
 
 const CAL_STAGE_START: usize = 4;
 const CAL_STAGE_MAX: usize = 16;
 
-impl<C, E, EM, FT, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
-    for CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+impl<E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata + HasFeedbackStates<FT> + HasClientPerfMonitor,
+    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -314,18 +306,13 @@ impl PowerScheduleMetadata {
 
 crate::impl_serdeany!(PowerScheduleMetadata);
 
-impl<C, E, EM, FT, I, O, OT, S, T, Z> CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+impl<I, O, OT, S, T> CalibrationStage<I, O, OT, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasMetadata,
 {
     /// Create a new [`CalibrationStage`].
     pub fn new(state: &mut S, map_observer_name: &O) -> Self {
