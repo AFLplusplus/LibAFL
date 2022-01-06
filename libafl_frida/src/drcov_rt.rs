@@ -30,6 +30,8 @@ impl DrCovRuntime {
     /// initializes this runtime wiith the given `ranges`
     pub fn init(&mut self, ranges: &RangeMap<usize, (u16, String)>) {
         self.ranges = ranges.clone();
+        std::fs::create_dir_all("./coverage")
+            .expect("failed to create directory for coverage files");
     }
 
     /// Called before execution, does nothing

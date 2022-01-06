@@ -1,5 +1,4 @@
-use libafl::inputs::{HasTargetBytes, Input};
-use libafl::Error;
+use libafl::{bolts::tuples::MatchFirstType, inputs::{HasTargetBytes, Input}, Error};
 use libafl_targets::drcov::DrCovBasicBlock;
 
 #[cfg(feature = "cmplog")]
@@ -40,6 +39,55 @@ use rangemap::RangeMap;
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
+
+pub trait FridaRuntime: 'static + Debug {
+    fn init(&self);
+
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+
+}
+
+pub trait FridaRuntimeTuple: MatchFirstType + Debug
+{
+    fn init_all(&self);
+
+    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+
+    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+}
+
+impl FridaRuntimeTuple for (){
+    fn init_all(&self) {}
+    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<Head, Tail> FridaRuntimeTuple for (Head, Tail)
+where
+    Head: FridaRuntime,
+    Tail: FridaRuntimeTuple,
+{
+    fn init_all(&self) {
+        self.0.init();
+        self.1.init_all();
+    }
+
+    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+        self.0.pre_exec(input)?;
+        self.1.pre_exec_all(input)
+    }
+
+    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+        self.0.post_exec(input)?;
+        self.1.post_exec_all(input)
+    }
+}
 
 /// An helper that feeds `FridaInProcessExecutor` with user-supplied instrumentation
 pub trait FridaHelper<'a>: Debug {
@@ -198,6 +246,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         options: &'a FridaOptions,
         _harness_module_name: &str,
         modules_to_instrument: &'a [&str],
+        runtimes: FridaRuntimeTuple,
     ) -> Self {
         // workaround frida's frida-gum-allocate-near bug:
         #[cfg(unix)]
