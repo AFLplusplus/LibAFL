@@ -1,5 +1,5 @@
 # from the maturin venv, after running 'maturin develop' in the pylibafl directory
-
+#!/usr/bin/python3
 from pylibafl import sugar, qemu
 import lief
 
