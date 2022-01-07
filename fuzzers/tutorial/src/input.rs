@@ -61,7 +61,7 @@ impl HasTargetBytes for PacketData {
     fn target_bytes(&self) -> OwnedSlice<u8> {
         let mut serialized_data = Vec::with_capacity(self.serialized_size());
         self.binary_serialize::<_, LittleEndian>(&mut serialized_data);
-        OwnedSlice::Owned(serialized_data)
+        OwnedSlice::from(serialized_data)
     }
 }
 

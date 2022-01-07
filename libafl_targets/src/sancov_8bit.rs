@@ -2,6 +2,8 @@
 use alloc::vec::Vec;
 use core::slice::from_raw_parts_mut;
 
+/// A [`Vec`] of `8-bit-counters` maps for multiple modules.
+/// They are initialized by calling [`__sanitizer_cov_8bit_counters_init`](
 pub static mut COUNTERS_MAPS: Vec<&'static mut [u8]> = Vec::new();
 
 /// Initialize the sancov `8-bit-counters` - usually called by `llvm`.

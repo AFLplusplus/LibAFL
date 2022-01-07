@@ -27,7 +27,7 @@ clippy = [] # Ignore compiler warnings during clippy
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-rangemap = "0.1.10"
+rangemap = "0.1"
 libafl = { path = "../libafl", version = "0.7.0", features = [] }
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 # serde-big-array = "0.3.2"

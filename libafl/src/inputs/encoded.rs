@@ -15,25 +15,35 @@ use serde::{Deserialize, Serialize};
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
+/// Trait to encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
 pub trait InputEncoder<T>
 where
     T: Tokenizer,
 {
+    /// Encode bytes to an [`EncodedInput`] using the given [`Tokenizer`]
     fn encode(&mut self, bytes: &[u8], tokenizer: &mut T) -> Result<EncodedInput, Error>;
 }
 
+/// Trait to decode encoded input to bytes
 pub trait InputDecoder {
+    /// Decode encoded input to bytes
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
+/// Tokenizer is a trait that can tokenize bytes into a ][`Vec`] of tokens
 pub trait Tokenizer {
+    /// Tokanize the given bytes
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error>;
 }
 
+/// A token input encoder/decoder
 #[derive(Clone, Debug)]
 pub struct TokenInputEncoderDecoder {
+    /// The table of tokens
     token_table: HashMap<String, u32>,
+    /// The table of ids
     id_table: HashMap<u32, String>,
+    /// The next id
     next_id: u32,
 }
 
@@ -72,6 +82,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
 }
 
 impl TokenInputEncoderDecoder {
+    /// Creates a new [`TokenInputEncoderDecoder`]
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -88,15 +99,21 @@ impl Default for TokenInputEncoderDecoder {
     }
 }
 
+/// A native tokenizer struct
 #[cfg(feature = "std")]
+#[derive(Clone, Debug)]
 pub struct NaiveTokenizer {
+    /// Ident regex
     ident_re: Regex,
+    /// Comement regex
     comment_re: Regex,
+    /// String regex
     string_re: Regex,
 }
 
 #[cfg(feature = "std")]
 impl NaiveTokenizer {
+    /// Creates a new [`NaiveTokenizer`]
     #[must_use]
     pub fn new(ident_re: Regex, comment_re: Regex, string_re: Regex) -> Self {
         Self {
@@ -221,11 +238,13 @@ impl EncodedInput {
         Self { codes }
     }
 
+    /// The codes of this encoded input
     #[must_use]
     pub fn codes(&self) -> &[u32] {
         &self.codes
     }
 
+    /// The codes of this encoded input, mutable
     #[must_use]
     pub fn codes_mut(&mut self) -> &mut Vec<u32> {
         &mut self.codes

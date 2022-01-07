@@ -1,17 +1,26 @@
-use crate::{inputs::Input, observers::ObserversTuple, Error};
+//! A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 
-use super::{Executor, ExitKind, HasObservers};
+use core::fmt::Debug;
+
+use crate::{
+    executors::{Executor, ExitKind, HasObservers},
+    inputs::Input,
+    observers::ObserversTuple,
+    Error,
+};
 
 /// A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
-pub struct WithObservers<E, OT> {
+#[derive(Debug)]
+pub struct WithObservers<E: Debug, OT: Debug> {
     executor: E,
     observers: OT,
 }
 
-impl<EM, I, S, Z, E, OT> Executor<EM, I, S, Z> for WithObservers<E, OT>
+impl<E, EM, I, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, OT>
 where
     I: Input,
     E: Executor<EM, I, S, Z>,
+    OT: Debug,
 {
     fn run_target(
         &mut self,
@@ -24,7 +33,7 @@ where
     }
 }
 
-impl<I, S, E, OT> HasObservers<I, OT, S> for WithObservers<E, OT>
+impl<I, E: Debug, OT: Debug, S> HasObservers<I, OT, S> for WithObservers<E, OT>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -38,7 +47,7 @@ where
     }
 }
 
-impl<E, OT> WithObservers<E, OT> {
+impl<E: Debug, OT: Debug> WithObservers<E, OT> {
     /// Wraps the given [`Executor`] with the given [`ObserversTuple`] to implement [`HasObservers`].
     ///
     /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by

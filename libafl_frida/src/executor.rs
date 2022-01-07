@@ -1,13 +1,11 @@
 use crate::helper::FridaHelper;
 
-use std::{ffi::c_void, marker::PhantomData};
-
+use core::fmt::{self, Debug, Formatter};
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
-    Gum, NativePointer,
+    Gum, MemoryRange, NativePointer,
 };
-
-use frida_gum::MemoryRange;
+use std::{ffi::c_void, marker::PhantomData};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -22,6 +20,7 @@ use crate::asan::errors::ASAN_ERRORS;
 #[cfg(windows)]
 use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 
+/// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
 pub struct FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
@@ -36,6 +35,22 @@ where
     helper: &'c mut FH,
     followed: bool,
     _phantom: PhantomData<&'b u8>,
+}
+
+impl<'a, 'b, 'c, FH, H, I, OT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
+where
+    FH: FridaHelper<'b>,
+    H: FnMut(&I) -> ExitKind,
+    I: Input + HasTargetBytes,
+    OT: ObserversTuple<I, S>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FridaInProcessExecutor")
+            .field("base", &self.base)
+            .field("helper", &self.helper)
+            .field("followed", &self.followed)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a, 'b, 'c, EM, FH, H, I, OT, S, Z> Executor<EM, I, S, Z>
@@ -55,7 +70,7 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.helper.pre_exec(input);
+        self.helper.pre_exec(input)?;
         if self.helper.stalker_enabled() {
             if self.followed {
                 self.stalker.activate(NativePointer(core::ptr::null_mut()));
@@ -76,7 +91,7 @@ where
                 libc::raise(libc::SIGABRT);
             }
         }
-        self.helper.post_exec(input);
+        self.helper.post_exec(input)?;
         res
     }
 }
@@ -107,6 +122,7 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
 {
+    /// Creates a new [`FridaInProcessExecutor`]
     pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
         let mut stalker = Stalker::new(gum);
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that

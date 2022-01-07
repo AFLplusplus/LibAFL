@@ -1,3 +1,4 @@
+//! Gramamtron generator
 use alloc::{string::String, vec::Vec};
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
@@ -10,34 +11,39 @@ use crate::{
     Error,
 };
 
+/// A trigger
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Trigger {
+    /// the destination
     pub dest: usize,
+    /// the term
     pub term: String,
 }
 
+/// The [`Automaton`]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Automaton {
+    /// final state
     pub final_state: usize,
+    /// init state
     pub init_state: usize,
+    /// pda of [`Trigger`]s
     pub pda: Vec<Vec<Trigger>>,
 }
 
 #[derive(Clone, Debug)]
 /// Generates random inputs from a grammar automatron
-pub struct GramatronGenerator<'a, R, S>
+pub struct GramatronGenerator<'a, S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     automaton: &'a Automaton,
-    phantom: PhantomData<(R, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<'a, R, S> Generator<GramatronInput, S> for GramatronGenerator<'a, R, S>
+impl<'a, S> Generator<GramatronInput, S> for GramatronGenerator<'a, S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<GramatronInput, Error> {
         let mut input = GramatronInput::new(vec![]);
@@ -50,10 +56,9 @@ where
     }
 }
 
-impl<'a, R, S> GramatronGenerator<'a, R, S>
+impl<'a, S> GramatronGenerator<'a, S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     /// Returns a new [`GramatronGenerator`]
     #[must_use]
@@ -64,6 +69,7 @@ where
         }
     }
 
+    /// Append the generated terminals
     pub fn append_generated_terminals(&self, input: &mut GramatronInput, state: &mut S) -> usize {
         let mut counter = 0;
         let final_state = self.automaton.final_state;

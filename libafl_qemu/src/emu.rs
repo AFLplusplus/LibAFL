@@ -293,6 +293,7 @@ impl Drop for GuestMaps {
 
 static mut EMULATOR_IS_INITIALIZED: bool = false;
 
+#[derive(Debug)]
 pub struct Emulator {
     _private: (),
 }

@@ -47,7 +47,7 @@ fn main() {
     } else if cfg!(feature = "aarch64") {
         "aarch64".to_string()
     } else if cfg!(feature = "i386") {
-        "i368".to_string()
+        "i386".to_string()
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             println!(
@@ -57,7 +57,7 @@ fn main() {
         })
     };
 
-    let jobs = env::var("CARGO_BUILD_JOBS");
+    let jobs = env::var("NUM_JOBS");
 
     let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
         println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({}) is not the host arch ({}))", cpu_target, env::consts::ARCH);
@@ -76,13 +76,8 @@ fn main() {
     let qasan_dir = Path::new("libqasan");
     let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
     let src_dir = Path::new("src");
-    //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
-    println!("cargo:rerun-if-changed={}/libqasan.so", qasan_dir.display());
-    println!(
-        "cargo:rerun-if-changed={}/libqasan.so",
-        target_dir.display()
-    );
+    println!("cargo:rerun-if-changed=libqasan");
 
     build_dep_check(&["git", "make"]);
 

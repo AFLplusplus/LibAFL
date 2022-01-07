@@ -9,11 +9,14 @@ use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{tuples::Named, AsSlice, HasRefCnt},
+    bolts::{
+        tuples::{MatchName, Named},
+        AsSlice, HasRefCnt,
+    },
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::{Feedback, FeedbackState, FeedbackStatesTuple},
+    feedbacks::{Feedback, FeedbackState},
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
@@ -22,26 +25,25 @@ use crate::{
 };
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
-pub type AflMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, OrReducer, S, T>;
+pub type AflMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, OrReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<FT, I, O, S, T> = MapFeedback<FT, I, DifferentIsNovel, O, MinReducer, S, T>;
+pub type MinMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, MinReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapPow2Feedback<FT, I, O, S, T> =
-    MapFeedback<FT, I, NextPow2IsNovel, O, MaxReducer, S, T>;
+pub type MaxMapPow2Feedback<I, O, S, T> = MapFeedback<I, NextPow2IsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapOneOrFilledFeedback<FT, I, O, S, T> =
-    MapFeedback<FT, I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapOneOrFilledFeedback<I, O, S, T> =
+    MapFeedback<I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
-pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static
+pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static + Debug
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Reduce two values to one value, with the current [`Reducer`].
     fn reduce(first: T, second: T) -> T;
@@ -53,13 +55,7 @@ pub struct OrReducer {}
 
 impl<T> Reducer<T> for OrReducer
 where
-    T: PrimInt
-        + Default
-        + Copy
-        + 'static
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + PartialOrd,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialOrd,
 {
     #[inline]
     fn reduce(history: T, new: T) -> T {
@@ -73,13 +69,7 @@ pub struct AndReducer {}
 
 impl<T> Reducer<T> for AndReducer
 where
-    T: PrimInt
-        + Default
-        + Copy
-        + 'static
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + PartialOrd,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialOrd,
 {
     #[inline]
     fn reduce(history: T, new: T) -> T {
@@ -93,13 +83,7 @@ pub struct MaxReducer {}
 
 impl<T> Reducer<T> for MaxReducer
 where
-    T: PrimInt
-        + Default
-        + Copy
-        + 'static
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + PartialOrd,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialOrd,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -117,13 +101,7 @@ pub struct MinReducer {}
 
 impl<T> Reducer<T> for MinReducer
 where
-    T: PrimInt
-        + Default
-        + Copy
-        + 'static
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + PartialOrd,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialOrd,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -136,9 +114,9 @@ where
 }
 
 /// A `IsNovel` function is used to discriminate if a reduced value is considered novel.
-pub trait IsNovel<T>: Serialize + serde::de::DeserializeOwned + 'static
+pub trait IsNovel<T>: Serialize + serde::de::DeserializeOwned + 'static + Debug
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// If a new value in the [`MapFeedback`] was found,
     /// this filter can decide if the result is considered novel or not.
@@ -151,7 +129,7 @@ pub struct AllIsNovel {}
 
 impl<T> IsNovel<T> for AllIsNovel
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn is_novel(_old: T, _new: T) -> bool {
@@ -178,7 +156,7 @@ fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
 pub struct DifferentIsNovel {}
 impl<T> IsNovel<T> for DifferentIsNovel
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn is_novel(old: T, new: T) -> bool {
@@ -191,7 +169,7 @@ where
 pub struct NextPow2IsNovel {}
 impl<T> IsNovel<T> for NextPow2IsNovel
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn is_novel(old: T, new: T) -> bool {
@@ -211,7 +189,7 @@ where
 pub struct OneOrFilledIsNovel {}
 impl<T> IsNovel<T> for OneOrFilledIsNovel
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn is_novel(old: T, new: T) -> bool {
@@ -220,7 +198,7 @@ where
 }
 
 /// A testcase metadata holding a list of indexes of a map
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MapIndexesMetadata {
     /// The list of indexes.
     pub list: Vec<usize>,
@@ -256,7 +234,7 @@ impl MapIndexesMetadata {
 }
 
 /// A testcase metadata holding a list of indexes of a map
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MapNoveltiesMetadata {
     /// A `list` of novelties.
     pub list: Vec<usize>,
@@ -284,7 +262,7 @@ impl MapNoveltiesMetadata {
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct MapFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,
@@ -294,7 +272,7 @@ where
 
 impl<T> FeedbackState for MapFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     fn reset(&mut self) -> Result<(), Error> {
         self.history_map
@@ -306,7 +284,7 @@ where
 
 impl<T> Named for MapFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -316,7 +294,7 @@ where
 
 impl<T> MapFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Create new `MapFeedbackState`
     #[must_use]
@@ -353,14 +331,13 @@ where
 /// The most common AFL-like feedback type
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct MapFeedback<FT, I, N, O, R, S, T>
+pub struct MapFeedback<I, N, O, R, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
     N: IsNovel<T>,
-    S: HasFeedbackStates<FT>,
-    FT: FeedbackStatesTuple,
+    S: HasFeedbackStates,
 {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
@@ -371,18 +348,17 @@ where
     /// Name identifier of the observer
     observer_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(FT, I, N, S, R, O, T)>,
+    phantom: PhantomData<(I, N, S, R, O, T)>,
 }
 
-impl<FT, I, N, O, R, S, T> Feedback<I, S> for MapFeedback<FT, I, N, O, R, S, T>
+impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasFeedbackStates<FT> + HasClientPerfMonitor,
-    FT: FeedbackStatesTuple,
+    S: HasFeedbackStates + HasClientPerfMonitor + Debug,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -483,14 +459,13 @@ where
     }
 }
 
-impl<FT, I, N, O, R, S, T> Named for MapFeedback<FT, I, N, O, R, S, T>
+impl<I, N, O, R, S, T> Named for MapFeedback<I, N, O, R, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<T>,
-    S: HasFeedbackStates<FT>,
-    FT: FeedbackStatesTuple,
+    S: HasFeedbackStates,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -498,21 +473,20 @@ where
     }
 }
 
-impl<FT, I, N, O, R, S, T> MapFeedback<FT, I, N, O, R, S, T>
+impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt
         + Default
         + Copy
         + 'static
-        + serde::Serialize
+        + Serialize
         + serde::de::DeserializeOwned
         + PartialOrd
         + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<T>,
-    S: HasFeedbackStates<FT>,
-    FT: FeedbackStatesTuple,
+    S: HasFeedbackStates,
 {
     /// Create new `MapFeedback`
     #[must_use]
