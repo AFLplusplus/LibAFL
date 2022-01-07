@@ -16,7 +16,7 @@ use pyo3::{prelude::*, PyIterProtocol};
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq)]
 #[repr(i32)]
 pub enum MmapPerms {
     None = 0,
@@ -189,6 +189,9 @@ extern "C" {
     /// abi_long target_mmap(abi_ulong start, abi_ulong len, int target_prot, int flags, int fd, abi_ulong offset)
     fn target_mmap(start: u64, len: u64, target_prot: i32, flags: i32, fd: i32, offset: u64)
         -> u64;
+
+    /// int target_mprotect(abi_ulong start, abi_ulong len, int prot)
+    fn target_mprotect(start: u64, len: u64, target_prot: i32) -> i32;
 
     /// int target_munmap(abi_ulong start, abi_ulong len)
     fn target_munmap(start: u64, len: u64) -> i32;
@@ -463,6 +466,11 @@ impl Emulator {
         } else {
             Ok(res)
         }
+    }
+
+    pub fn change_prot(&self, addr: u64, size: usize, perms: MmapPerms) -> bool {
+        let res = unsafe { target_mprotect(addr, size as u64, perms.into()) };
+        return res > 0;
     }
 
     pub fn unmap(&self, addr: u64, size: usize) -> Result<(), String> {
