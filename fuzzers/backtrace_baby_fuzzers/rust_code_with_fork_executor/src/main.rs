@@ -13,13 +13,16 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessForkExecutor},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedback_and,
+    feedbacks::{
+        CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
+    },
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::StdMapObserver,
+    observers::{StacktraceObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -64,16 +67,27 @@ pub fn main() {
 
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", signals_clone.map_mut());
-    // Create a stacktrace observer to add the observers tuple
+    // Create a stacktrace observer
+    let st_observer = StacktraceObserver::new(
+        "StacktraceObserver".to_string(),
+        libafl::observers::HarnessType::RUST,
+    );
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
+    let st_feedback_state = NewHashFeedbackState::<u64>::with_observer(&st_observer);
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let feedback = MaxMapFeedback::new(&feedback_state, &observer);
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let objective = feedback_and!(
+        CrashFeedback::new(),
+        NewHashFeedback::new(
+            "StacktraceObserver".to_string(),
+            "StacktraceObserver".to_string()
+        )
+    );
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -86,7 +100,7 @@ pub fn main() {
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
         // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
+        tuple_list!(feedback_state, st_feedback_state),
     );
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
@@ -105,7 +119,7 @@ pub fn main() {
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessForkExecutor::new(
         &mut harness,
-        tuple_list!(observer),
+        tuple_list!(observer, st_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,

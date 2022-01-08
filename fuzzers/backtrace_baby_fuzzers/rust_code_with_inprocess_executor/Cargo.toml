@@ -1,7 +1,6 @@
 [package]
-name = "baby_fuzzer_stacktrace"
-version = "0.6.1"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+name = "rust_code_with_inprocess_executor"
+version = "0.0.1"
 edition = "2021"
 
 [features]
@@ -19,4 +18,4 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../libafl/" }
+libafl = { path = "../../../libafl/" }

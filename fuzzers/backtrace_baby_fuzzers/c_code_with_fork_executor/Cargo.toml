@@ -1,5 +1,5 @@
 [package]
-name = "baby_fuzzer_ffi_stacktrace_with_forkexecutor"
+name = "c_code_with_fork_executor"
 version = "0.0.1"
 edition = "2021"
 
@@ -15,7 +15,7 @@ opt-level = 3
 debug = true
 
 [dependencies]
-libafl = { path = "../../libafl/" }
+libafl = { path = "../../../libafl/" }
 libc = "0.2"
 
 [build-dependencies]
