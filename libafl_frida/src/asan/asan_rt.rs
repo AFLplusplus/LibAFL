@@ -11,8 +11,7 @@ use core::fmt::{self, Debug, Formatter};
 use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
 use hashbrown::HashMap;
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-
-use crate::helper::FridaInstrumentationHelper;
+use rangemap::RangeMap;
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
@@ -54,8 +53,12 @@ use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::FridaRuntime,
+    utils::writer_register,
     FridaOptions,
 };
+
+#[cfg(target_arch = "aarch64")]
+use crate::utils::instruction_width;
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -110,6 +113,7 @@ pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 /// even if the target would not have crashed under normal conditions.
 /// this helps finding mem errors early.
 pub struct AsanRuntime {
+    check_for_leaks_enabled: bool,
     current_report_impl: u64,
     allocator: Allocator,
     regs: [usize; ASAN_SAVE_REGISTER_COUNT],
@@ -148,7 +152,12 @@ impl FridaRuntime for AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    fn init(&mut self, gum: &Gum, _helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {
+    fn init(
+        &mut self,
+        gum: &Gum,
+        ranges: &RangeMap<usize, (u16, String)>,
+        modules_to_instrument: &[&str],
+    ) {
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
@@ -243,7 +252,10 @@ impl FridaRuntime for AsanRuntime {
         }
         */
     }
-    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, input: &I, _helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
+    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+        &mut self,
+        input: &I,
+    ) -> Result<(), libafl::Error> {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
 
@@ -251,8 +263,11 @@ impl FridaRuntime for AsanRuntime {
         Ok(())
     }
 
-    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
-        if helper.options().asan_detect_leaks() {
+    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+        &mut self,
+        input: &I,
+    ) -> Result<(), libafl::Error> {
+        if self.check_for_leaks_enabled {
             self.check_for_leaks();
         }
 
@@ -263,7 +278,6 @@ impl FridaRuntime for AsanRuntime {
 
         Ok(())
     }
-
 }
 
 impl AsanRuntime {
@@ -271,6 +285,7 @@ impl AsanRuntime {
     #[must_use]
     pub fn new(options: FridaOptions) -> AsanRuntime {
         Self {
+            check_for_leaks_enabled: options.asan_detect_leaks(),
             current_report_impl: 0,
             allocator: Allocator::new(options.clone()),
             regs: [0; ASAN_SAVE_REGISTER_COUNT],
@@ -294,7 +309,6 @@ impl AsanRuntime {
             shadow_check_func: None,
         }
     }
-
 
     /// Reset all allocations so that they can be reused for new allocation requests.
     #[allow(clippy::unused_self)]
@@ -2155,7 +2169,7 @@ impl AsanRuntime {
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
-                    FridaInstrumentationHelper::instruction_width(instr, &operands),
+                    instruction_width(instr, &operands),
                     arm64operand.shift,
                     arm64operand.ext,
                 ));
@@ -2253,14 +2267,14 @@ impl AsanRuntime {
         let basereg = if basereg.0 == 0 {
             None
         } else {
-            let reg = FridaInstrumentationHelper::writer_register(basereg);
+            let reg = writer_register(basereg);
             Some(reg)
         };
 
         let indexreg = if indexreg.0 == 0 {
             None
         } else {
-            let reg = FridaInstrumentationHelper::writer_register(indexreg);
+            let reg = writer_register(indexreg);
             Some(reg)
         };
 
@@ -2403,9 +2417,9 @@ impl AsanRuntime {
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
-        let basereg = FridaInstrumentationHelper::writer_register(basereg);
+        let basereg = writer_register(basereg);
         let indexreg = if indexreg.0 != 0 {
-            Some(FridaInstrumentationHelper::writer_register(indexreg))
+            Some(writer_register(indexreg))
         } else {
             None
         };
