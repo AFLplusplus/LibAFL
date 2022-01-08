@@ -111,16 +111,10 @@ where
 
 /// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a, RT> {
-    coverage_rt: CoverageRuntime,
     /// Transformer that has to be passed to FridaInProcessExecutor
     transformer: Option<Transformer<'a>>,
     #[cfg(unix)]
     capstone: Capstone,
-    #[cfg(unix)]
-    asan_runtime: AsanRuntime,
-    #[cfg(feature = "cmplog")]
-    cmplog_runtime: CmpLogRuntime,
-    drcov_runtime: DrCovRuntime,
     ranges: RangeMap<usize, (u16, String)>,
     module_map: ModuleMap,
     options: &'a FridaOptions,
@@ -131,15 +125,10 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_me = f.debug_struct("FridaInstrumentationHelper");
         dbg_me
-            .field("coverage_rt", &self.coverage_rt)
             .field("capstone", &self.capstone)
-            .field("asan_runtime", &self.asan_runtime)
-            .field("drcov_runtime", &self.drcov_runtime)
             .field("ranges", &self.ranges)
             .field("module_map", &"<ModuleMap>")
             .field("options", &self.options);
-        #[cfg(feature = "cmplog")]
-        dbg_me.field("cmplog_runtime", &self.cmplog_runtime);
         dbg_me.finish()
     }
 }
@@ -208,7 +197,6 @@ where
         }
 
         let mut helper = Self {
-            coverage_rt: CoverageRuntime::new(),
             transformer: None,
             #[cfg(target_arch = "aarch64")]
             capstone: Capstone::new()
@@ -224,11 +212,6 @@ where
                 .detail(true)
                 .build()
                 .expect("Failed to create Capstone object"),
-            #[cfg(not(windows))]
-            asan_runtime: AsanRuntime::new(options.clone()),
-            #[cfg(feature = "cmplog")]
-            cmplog_runtime: CmpLogRuntime::new(),
-            drcov_runtime: DrCovRuntime::new(),
             ranges: RangeMap::new(),
             module_map: ModuleMap::new_from_names(modules_to_instrument),
             options,
@@ -273,8 +256,8 @@ where
                         if first {
                             first = false;
                             //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                            if helper.options().coverage_enabled() {
-                                helper.coverage_rt.emit_coverage_mapping(address, &output);
+                            if let Some(rt) = helper.coverage_runtime() {
+                                rt.emit_coverage_mapping(address, &output);
                             }
                             #[cfg(unix)]
                             if helper.options().drcov_enabled() {
@@ -356,6 +339,42 @@ where
             helper.transformer = Some(transformer);
         }
         helper
+    }
+
+    pub fn coverage_runtime(&self) -> Option<&CoverageRuntime> {
+        self.runtimes.match_first_type::<CoverageRuntime>()
+    }
+
+    pub fn coverage_runtime_mut(&mut self) -> Option<&mut CoverageRuntime> {
+        self.runtimes.match_first_type_mut::<CoverageRuntime>()
+    }
+
+    #[cfg(unix)]
+    pub fn asan_runtime(&self) -> Option<&AsanRuntime> {
+        self.runtimes.match_first_type::<AsanRuntime>()
+    }
+
+    #[cfg(unix)]
+    pub fn asan_runtime_mut(&mut self) -> Option<&mut AsanRuntime> {
+        self.runtimes.match_first_type_mut::<AsanRuntime>()
+    }
+
+    pub fn drcov_runtime(&self) -> Option<&DrCovRuntime> {
+        self.runtimes.match_first_type::<DrCovRuntime>()
+    }
+
+    pub fn drcov_runtime_mut(&mut self) -> Option<&mut DrCovRuntime> {
+        self.runtimes.match_first_type_mut::<DrCovRuntime>()
+    }
+
+    #[cfg(feature = "cmplog")]
+    pub fn cmplog_runtime(&self) -> Option<&CmpLogRuntime> {
+        self.runtimes.match_first_type::<CmpLogRuntime>()
+    }
+
+    #[cfg(feature = "cmplog")]
+    pub fn cmplog_runtime_mut(&mut self) -> Option<&mut CmpLogRuntime> {
+        self.runtime.match_first_type_mut::<CmpLogRuntime>()
     }
 
     /// Returns ref to the Transformer
