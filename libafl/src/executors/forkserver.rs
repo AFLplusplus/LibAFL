@@ -378,14 +378,16 @@ pub trait HasForkserver {
 pub struct TimeoutForkserverExecutor<E: Debug> {
     executor: E,
     timeout: TimeSpec,
+    signal: Signal,
 }
 
 impl<E: Debug> TimeoutForkserverExecutor<E> {
     /// Create a new [`TimeoutForkserverExecutor`]
-    pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
+    pub fn new(executor: E, exec_tmout: Duration, kill_signal: Option<Signal>) -> Result<Self, Error> {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout = TimeSpec::milliseconds(milli_sec);
-        Ok(Self { executor, timeout })
+        let signal = kill_signal.unwrap_or(Signal::SIGKILL);
+        Ok(Self { executor, timeout, signal })
     }
 }
 
@@ -466,7 +468,7 @@ where
             self.executor.forkserver_mut().set_last_run_timed_out(1);
 
             // We need to kill the child in case he has timed out, or we can't get the correct pid in the next call to self.executor.forkserver_mut().read_st()?
-            let _ = kill(self.executor.forkserver().child_pid(), Signal::SIGKILL);
+            let _ = kill(self.executor.forkserver().child_pid(), self.signal);
             let (recv_status_len, _) = self.executor.forkserver_mut().read_st()?;
             if recv_status_len != 4 {
                 return Err(Error::Forkserver(

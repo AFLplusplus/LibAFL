@@ -137,7 +137,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             );
 
             // A feedback to choose if an input is a solution or not
-            let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+            let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new(), None);
 
             // If not restarting, create a State from scratch
             let mut state = state.unwrap_or_else(|| {
