@@ -1,15 +1,105 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use crate::{bolts::tuples::Named, observers::Observer, Error};
+use crate::{
+    bolts::{
+        shmem::{
+            unix_shmem::ashmem::AshmemShMem, GenericShMem, MmapShMem, ShMem, ShMemId,
+            ShMemProvider, ShMemType, StdShMem, UnixShMem,
+        },
+        tuples::Named,
+    },
+    observers::Observer,
+    Error,
+};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
+/// An observer looking at the stacktrace if a run crashes (For rust code)
+
+pub struct BacktraceSharedMemoryWrapper {
+    shmem_id: Option<ShMemId>,
+    shmem_size: Option<usize>,
+    shmem_type: Option<ShMemType>,
+}
+
+impl BacktraceSharedMemoryWrapper {
+    fn update_shmem_info(&mut self, shmem_id: ShMemId, shmem_size: usize, shmem_type: ShMemType) {
+        self.shmem_id = Some(shmem_id);
+        self.shmem_size = Some(shmem_size);
+        self.shmem_type = Some(shmem_type);
+    }
+
+    fn is_ready(&self) -> bool {
+        match (self.shmem_id, self.shmem_size, self.shmem_type.as_ref()) {
+            (None, _, _) => false,
+            (_, None, _) => false,
+            (_, _, None) => false,
+            _ => true,
+        }
+    }
+
+    fn get_generic_shmem(&self) -> GenericShMem {
+        if self.is_ready() {
+            let id = self.shmem_id.unwrap();
+            let size = self.shmem_size.unwrap();
+            let g_shmem: GenericShMem;
+            match self.shmem_type.as_ref().unwrap() {
+                ShMemType::AshmemShMem => {
+                    g_shmem =
+                        GenericShMem::AshmemShMem(AshmemShMem::from_id_and_size(id, size).unwrap());
+                }
+                ShMemType::MmapShMem => {
+                    g_shmem =
+                        GenericShMem::MmapShMem(MmapShMem::from_id_and_size(id, size).unwrap());
+                }
+                ShMemType::StdShMem => {
+                    g_shmem = GenericShMem::StdShMem(StdShMem::from_id_and_size(id, size).unwrap());
+                }
+                ShMemType::UnixShMem => {
+                    g_shmem =
+                        GenericShMem::UnixShMem(UnixShMem::from_id_and_size(id, size).unwrap());
+                } // _ => panic!("Unknown ShMemType"),
+            }
+
+            g_shmem
+        } else {
+            panic!("Cannot get generic shmem from uninitialized item");
+        }
+    }
+
+    fn store_stacktrace_hash(&self, hash: u64) {
+        let mut g_shmem = self.get_generic_shmem();
+        let map = g_shmem.map_mut();
+        let hash_bytes = hash.to_be_bytes();
+        for i in 0..hash_bytes.len() {
+            map[i] = hash_bytes[i]
+        }
+    }
+
+    fn get_stacktrace_hash(&self) -> u64 {
+        let g_shmem = self.get_generic_shmem();
+        let map = g_shmem.map();
+        let mut bytes: [u8; 8] = [0; 8];
+        for i in 0..8 {
+            bytes[i] = map[i];
+        }
+        u64::from_be_bytes(bytes)
+    }
+}
+
+// Used for fuzzers not running in the same process
+pub static mut BACKTRACE_SHMEM_DATA: BacktraceSharedMemoryWrapper = BacktraceSharedMemoryWrapper {
+    shmem_id: None,
+    shmem_size: None,
+    shmem_type: None,
+};
+
+// Used for in process fuzzing (InProccessExecutor)
+// This could be later wrapped in a shared memory struct implementing ShMem
 pub static mut LOCAL_HASH: u64 = 0;
 
-/// An observer looking at the stacktrace if a run crashes (For rust code)
 pub mod stacktrace_hooks {
     use crate::bolts::os::unix_signals::Signal;
-    use crate::executors::inprocess::BACKTRACE_SHMEM_DATA;
     use crate::observers::LOCAL_HASH;
     use ahash::AHasher;
     use backtrace::Backtrace;
@@ -30,11 +120,12 @@ pub mod stacktrace_hooks {
         println!("backtrace collected with hash={}", hash);
         unsafe {
             // If run with InProcessForkExecutor
-            if BACKTRACE_SHMEM_DATA.is_ready() {
-                BACKTRACE_SHMEM_DATA.store_stacktrace_hash(hash);
+            if crate::observers::BACKTRACE_SHMEM_DATA.is_ready() {
+                crate::observers::BACKTRACE_SHMEM_DATA.store_stacktrace_hash(hash);
+            } else {
+                // if run with InProcessExecutor
+                LOCAL_HASH = hash;
             }
-            // if run with InProcessExecutor
-            LOCAL_HASH = hash;
         }
     }
 
@@ -89,7 +180,6 @@ impl StacktraceObserver {
     /// Creates a new [`StacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: String, harness_type: HarnessType) -> Self {
-        println!("panic hook is being set");
         match harness_type {
             HarnessType::RUST => stacktrace_hooks::setup_rust_panic_hook(),
             HarnessType::FFI => unsafe { stacktrace_hooks::setup_signal_handler() },
@@ -115,6 +205,18 @@ impl StacktraceObserver {
     pub fn clear_hash(&mut self) {
         self.hash = None;
     }
+
+    pub fn setup_shmem<SP: ShMemProvider>(&self, shmem_provider: SP) {
+        println!("panic hook is being set");
+        let shmem_map = shmem_provider.to_owned().new_map(5000).unwrap();
+        let shmem_id = shmem_map.id();
+        let shmem_size = shmem_map.len();
+        let shmem_type = shmem_map.get_type();
+
+        unsafe {
+            BACKTRACE_SHMEM_DATA.update_shmem_info(shmem_id, shmem_size, shmem_type);
+        }
+    }
 }
 
 impl Default for StacktraceObserver {
@@ -133,10 +235,16 @@ where
 
     fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         unsafe {
-            // Makes sense only when run with an InProcessExecutor
-            if LOCAL_HASH > 0 {
-                self.update_hash(LOCAL_HASH);
-                LOCAL_HASH = 0;
+            if BACKTRACE_SHMEM_DATA.is_ready() {
+                let hash = BACKTRACE_SHMEM_DATA.get_stacktrace_hash();
+                println!("hash from parent process is {}", hash);
+                self.update_hash(hash);
+            } else {
+                // Makes sense only when run with an InProcessExecutor
+                if LOCAL_HASH > 0 {
+                    self.update_hash(LOCAL_HASH);
+                    LOCAL_HASH = 0;
+                }
             }
         }
         Ok(())

@@ -62,7 +62,10 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
     // Create a stacktrace observer to add the observers tuple
-    let another_observer = StacktraceObserver::new("StacktraceObserver".to_string());
+    let another_observer = StacktraceObserver::new(
+        "StacktraceObserver".to_string(),
+        libafl::observers::HarnessType::RUST,
+    );
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);

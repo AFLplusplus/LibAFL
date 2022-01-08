@@ -7,7 +7,7 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{unix_shmem, unix_shmem::UnixShMemProvider, ShMem, ShMemProvider},
+        shmem::{unix_shmem, ShMem, ShMemProvider},
         tuples::tuple_list,
     },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
