@@ -41,29 +41,29 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 pub trait FridaRuntime: 'static + Debug {
-    fn init(&self);
+    fn init(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]);
 
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error>;
 
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error>;
 
 }
 
 pub trait FridaRuntimeTuple: MatchFirstType + Debug
 {
-    fn init_all(&self);
+    fn init_all(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]);
 
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error>;
 
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error>;
 }
 
-impl FridaRuntimeTuple for (){
-    fn init_all(&self) {}
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+impl FridaRuntimeTuple for () {
+    fn init_all(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {}
+    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error> {
         Ok(())
     }
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -73,48 +73,20 @@ where
     Head: FridaRuntime,
     Tail: FridaRuntimeTuple,
 {
-    fn init_all(&self) {
-        self.0.init();
-        self.1.init_all();
+    fn init_all(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {
+        self.0.init(gum, helper, modules_to_instrument);
+        self.1.init_all(gum, helper, modules_to_instrument);
     }
 
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        self.0.pre_exec(input)?;
-        self.1.pre_exec_all(input)
+    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error> {
+        self.0.pre_exec(input, helper)?;
+        self.1.pre_exec_all(input, helper)
     }
 
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        self.0.post_exec(input)?;
-        self.1.post_exec_all(input)
+    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error> {
+        self.0.post_exec(input, helper)?;
+        self.1.post_exec_all(input, helper)
     }
-}
-
-/// An helper that feeds `FridaInProcessExecutor` with user-supplied instrumentation
-pub trait FridaHelper<'a>: Debug {
-    /// Access to the stalker `Transformer`
-    fn transformer(&self) -> &Transformer<'a>;
-
-    /// Register a new thread with this `FridaHelper`
-    #[cfg(unix)]
-    fn register_thread(&mut self);
-
-    /// Called prior to execution of an input
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
-
-    /// Called after execution of an input
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
-
-    /// Returns `true` if stalker is enabled
-    fn stalker_enabled(&self) -> bool;
-
-    /// pointer to the frida coverage map
-    fn map_ptr_mut(&mut self) -> *mut u8;
-
-    /// Returns the mapped ranges of the target
-    fn ranges(&self) -> &RangeMap<usize, (u16, String)>;
-
-    /// Returns the mapped ranges of the target, mutable
-    fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)>;
 }
 
 /// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
@@ -151,68 +123,6 @@ impl Debug for FridaInstrumentationHelper<'_> {
     }
 }
 
-impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
-    fn transformer(&self) -> &Transformer<'a> {
-        self.transformer.as_ref().unwrap()
-    }
-
-    /// Register the current thread with the [`FridaInstrumentationHelper`]
-    #[cfg(unix)]
-    fn register_thread(&mut self) {
-        self.asan_runtime.register_thread();
-    }
-
-    #[cfg(not(unix))]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
-
-    #[cfg(unix)]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        let target_bytes = input.target_bytes();
-        let slice = target_bytes.as_slice();
-        //println!("target_bytes: {:#x}: {:02x?}", slice.as_ptr() as usize, slice);
-        if self.options.asan_enabled() {
-            self.asan_runtime
-                .unpoison(slice.as_ptr() as usize, slice.len());
-        }
-        Ok(())
-    }
-
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        if self.options().enable_drcov {
-            self.drcov_runtime.post_exec(input)?;
-        }
-        #[cfg(unix)]
-        if self.options.asan_enabled() {
-            if self.options.asan_detect_leaks() {
-                self.asan_runtime.check_for_leaks();
-            }
-
-            let target_bytes = input.target_bytes();
-            let slice = target_bytes.as_slice();
-            self.asan_runtime
-                .poison(slice.as_ptr() as usize, slice.len());
-            self.asan_runtime.reset_allocations();
-        }
-        Ok(())
-    }
-
-    fn stalker_enabled(&self) -> bool {
-        self.options.stalker_enabled()
-    }
-
-    fn map_ptr_mut(&mut self) -> *mut u8 {
-        self.coverage_rt.map_ptr_mut()
-    }
-
-    fn ranges(&self) -> &RangeMap<usize, (u16, String)> {
-        &self.ranges
-    }
-
-    fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)> {
-        &mut self.ranges
-    }
-}
-
 /// Helper function to get the size of a module's CODE section from frida
 #[must_use]
 pub fn get_module_size(module_name: &str) -> usize {
@@ -246,7 +156,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
         options: &'a FridaOptions,
         _harness_module_name: &str,
         modules_to_instrument: &'a [&str],
-        runtimes: FridaRuntimeTuple,
     ) -> Self {
         // workaround frida's frida-gum-allocate-near bug:
         #[cfg(unix)]
@@ -431,7 +340,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
 
             #[cfg(unix)]
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
-                helper.asan_runtime.init(gum, modules_to_instrument);
+                helper.asan_runtime.init(gum, &helper, modules_to_instrument);
             }
 
             helper.drcov_runtime.init(&helper.ranges);
@@ -443,8 +352,58 @@ impl<'a> FridaInstrumentationHelper<'a> {
         helper
     }
 
+    pub fn transformer(&self) -> &Transformer<'a> {
+        self.transformer.as_ref().unwrap()
+    }
+
+    /// Register the current thread with the [`FridaInstrumentationHelper`]
+    #[cfg(unix)]
+    pub fn register_thread(&mut self) {
+        self.asan_runtime.register_thread();
+    }
+
+    #[cfg(unix)]
+    pub fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+        todo!("run pre_exec for every runtime");
+    }
+
+    pub fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+        if self.options().enable_drcov {
+            self.drcov_runtime.post_exec(input)?;
+        }
+        #[cfg(unix)]
+        if self.options.asan_enabled() {
+            if self.options.asan_detect_leaks() {
+                self.asan_runtime.check_for_leaks();
+            }
+
+            let target_bytes = input.target_bytes();
+            let slice = target_bytes.as_slice();
+            self.asan_runtime
+                .poison(slice.as_ptr() as usize, slice.len());
+            self.asan_runtime.reset_allocations();
+        }
+        Ok(())
+    }
+
+    pub fn stalker_enabled(&self) -> bool {
+        self.options.stalker_enabled()
+    }
+
+    pub fn map_ptr_mut(&mut self) -> *mut u8 {
+        self.coverage_rt.map_ptr_mut()
+    }
+
+    pub fn ranges(&self) -> &RangeMap<usize, (u16, String)> {
+        &self.ranges
+    }
+
+    pub fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)> {
+        &mut self.ranges
+    }
+
     #[inline]
-    fn options(&self) -> &FridaOptions {
+    pub fn options(&self) -> &FridaOptions {
         self.options
     }
 

@@ -53,6 +53,7 @@ use std::{ffi::c_void, ptr::write_volatile};
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    helper::FridaRuntime,
     FridaOptions,
 };
 
@@ -143,38 +144,11 @@ impl Debug for AsanRuntime {
     }
 }
 
-impl AsanRuntime {
-    /// Create a new `AsanRuntime`
-    #[must_use]
-    pub fn new(options: FridaOptions) -> AsanRuntime {
-        Self {
-            current_report_impl: 0,
-            allocator: Allocator::new(options.clone()),
-            regs: [0; ASAN_SAVE_REGISTER_COUNT],
-            blob_report: None,
-            blob_check_mem_byte: None,
-            blob_check_mem_halfword: None,
-            blob_check_mem_dword: None,
-            blob_check_mem_qword: None,
-            blob_check_mem_16bytes: None,
-            blob_check_mem_3bytes: None,
-            blob_check_mem_6bytes: None,
-            blob_check_mem_12bytes: None,
-            blob_check_mem_24bytes: None,
-            blob_check_mem_32bytes: None,
-            blob_check_mem_48bytes: None,
-            blob_check_mem_64bytes: None,
-            stalked_addresses: HashMap::new(),
-            options,
-            module_map: None,
-            suppressed_addresses: Vec::new(),
-            shadow_check_func: None,
-        }
-    }
+impl FridaRuntime for AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, _gum: &Gum, modules_to_instrument: &[&str]) {
+    fn init(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
@@ -193,7 +167,7 @@ impl AsanRuntime {
             }
         }
 
-        self.hook_functions(_gum);
+        self.hook_functions(gum);
         /*
         unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
@@ -269,6 +243,59 @@ impl AsanRuntime {
         }
         */
     }
+    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
+        let target_bytes = input.target_bytes();
+        let slice = target_bytes.as_slice();
+
+        self.unpoison(slice.as_ptr() as usize, slice.len());
+        Ok(())
+    }
+
+    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
+        if helper.options.asan_detect_leaks() {
+            self.asan_runtime.check_for_leaks();
+        }
+
+        let target_bytes = input.target_bytes();
+        let slice = target_bytes.as_slice();
+        self.asan_runtime
+            .poison(slice.as_ptr() as usize, slice.len());
+        self.asan_runtime.reset_allocations();
+
+        Ok(())
+    }
+
+}
+
+impl AsanRuntime {
+    /// Create a new `AsanRuntime`
+    #[must_use]
+    pub fn new(options: FridaOptions) -> AsanRuntime {
+        Self {
+            current_report_impl: 0,
+            allocator: Allocator::new(options.clone()),
+            regs: [0; ASAN_SAVE_REGISTER_COUNT],
+            blob_report: None,
+            blob_check_mem_byte: None,
+            blob_check_mem_halfword: None,
+            blob_check_mem_dword: None,
+            blob_check_mem_qword: None,
+            blob_check_mem_16bytes: None,
+            blob_check_mem_3bytes: None,
+            blob_check_mem_6bytes: None,
+            blob_check_mem_12bytes: None,
+            blob_check_mem_24bytes: None,
+            blob_check_mem_32bytes: None,
+            blob_check_mem_48bytes: None,
+            blob_check_mem_64bytes: None,
+            stalked_addresses: HashMap::new(),
+            options,
+            module_map: None,
+            suppressed_addresses: Vec::new(),
+            shadow_check_func: None,
+        }
+    }
+
 
     /// Reset all allocations so that they can be reused for new allocation requests.
     #[allow(clippy::unused_self)]
