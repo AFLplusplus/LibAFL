@@ -194,7 +194,7 @@ impl AsanRuntime {
         }
 
         self.hook_functions(_gum);
-        /* 
+        /*
         unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
             mprotect(
@@ -523,7 +523,6 @@ impl AsanRuntime {
         );
         #[cfg(not(target_vendor = "apple"))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
-
 
         for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
             for export in Module::enumerate_exports(libname) {

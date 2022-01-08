@@ -150,19 +150,19 @@ impl Allocator {
         // This memory map is for amd64 linux.
         #[cfg(target_os = "linux")]
         {
-            for try_shadow_bit in &[maxbit - 4, maxbit - 3, maxbit - 2]{
+            for try_shadow_bit in &[maxbit - 4, maxbit - 3, maxbit - 2] {
                 let addr: usize = 1 << try_shadow_bit;
                 let shadow_start = addr;
                 let shadow_end = addr + addr + addr;
 
                 // check if the proposed shadow bit overlaps with occupied ranges.
                 for (start, end) in &occupied_ranges {
-                    if (shadow_start <= *end) && (*start <= shadow_end){
+                    if (shadow_start <= *end) && (*start <= shadow_end) {
                         // println!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
                         println!("shadow_bit {:x} is not suitable", try_shadow_bit);
                         break;
                     }
-                } 
+                }
 
                 if unsafe {
                     mmap(
