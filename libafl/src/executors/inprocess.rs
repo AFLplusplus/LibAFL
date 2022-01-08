@@ -4,26 +4,39 @@
 //! Needs the `fork` feature flag.
 
 use core::{ffi::c_void, marker::PhantomData, ptr};
-
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+use std::hash::Hasher;
+use std::panic;
 
+use ahash::AHasher;
+use backtrace::Backtrace;
+use libc::{siginfo_t, ucontext_t};
 #[cfg(all(feature = "std", unix))]
 use nix::{
     sys::wait::{waitpid, WaitStatus},
     unistd::{fork, ForkResult},
 };
 
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::shmem::ShMemProvider;
-
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::shmem::ShMemProvider;
+use crate::{
+    bolts::{
+        os::unix_signals::{Handler, Signal},
+        shmem::{
+            unix_shmem::{ashmem::AshmemShMem, UnixShMem},
+            GenericShMem, MmapShMem, ShMem, ShMemId, ShMemType, StdShMem,
+        },
+    },
+    observers::StacktraceObserver,
+};
 
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
@@ -961,6 +974,86 @@ where
     }
 }
 
+pub struct BacktraceSharedMemoryWrapper {
+    shmem_id: Option<ShMemId>,
+    shmem_size: Option<usize>,
+    shmem_type: Option<ShMemType>,
+}
+
+unsafe impl Send for BacktraceSharedMemoryWrapper {}
+unsafe impl Sync for BacktraceSharedMemoryWrapper {}
+
+impl BacktraceSharedMemoryWrapper {
+    fn update_shmem_info(&mut self, shmem_id: ShMemId, shmem_size: usize, shmem_type: ShMemType) {
+        self.shmem_id = Some(shmem_id);
+        self.shmem_size = Some(shmem_size);
+        self.shmem_type = Some(shmem_type);
+    }
+
+    pub fn is_ready(&self) -> bool {
+        match (self.shmem_id, self.shmem_size, self.shmem_type.as_ref()) {
+            (None, _, _) => false,
+            (_, None, _) => false,
+            (_, _, None) => false,
+            _ => true,
+        }
+    }
+
+    fn get_generic_shmem(&self) -> GenericShMem {
+        if self.is_ready() {
+            let id = self.shmem_id.unwrap();
+            let size = self.shmem_size.unwrap();
+            let g_shmem: GenericShMem;
+            match self.shmem_type.as_ref().unwrap() {
+                ShMemType::AshmemShMem => {
+                    g_shmem =
+                        GenericShMem::AshmemShMem(AshmemShMem::from_id_and_size(id, size).unwrap());
+                }
+                ShMemType::MmapShMem => {
+                    g_shmem =
+                        GenericShMem::MmapShMem(MmapShMem::from_id_and_size(id, size).unwrap());
+                }
+                ShMemType::StdShMem => {
+                    g_shmem = GenericShMem::StdShMem(StdShMem::from_id_and_size(id, size).unwrap());
+                }
+                ShMemType::UnixShMem => {
+                    g_shmem =
+                        GenericShMem::UnixShMem(UnixShMem::from_id_and_size(id, size).unwrap());
+                } // _ => panic!("Unknown ShMemType"),
+            }
+
+            g_shmem
+        } else {
+            panic!("Cannot get generic shmem from uninitialized item");
+        }
+    }
+
+    pub fn store_stacktrace_hash(&self, hash: u64) {
+        let mut g_shmem = self.get_generic_shmem();
+        let map = g_shmem.map_mut();
+        let hash_bytes = hash.to_be_bytes();
+        for i in 0..hash_bytes.len() {
+            map[i] = hash_bytes[i]
+        }
+    }
+
+    fn get_stacktrace_hash(&self) -> u64 {
+        let g_shmem = self.get_generic_shmem();
+        let map = g_shmem.map();
+        let mut bytes: [u8; 8] = [0; 8];
+        for i in 0..8 {
+            bytes[i] = map[i];
+        }
+        u64::from_be_bytes(bytes)
+    }
+}
+
+pub static mut BACKTRACE_SHMEM_DATA: BacktraceSharedMemoryWrapper = BacktraceSharedMemoryWrapper {
+    shmem_id: None,
+    shmem_size: None,
+    shmem_type: None,
+};
+
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
@@ -997,7 +1090,6 @@ where
             self.shmem_provider.pre_fork()?;
             match fork() {
                 Ok(ForkResult::Child) => {
-                    // Child
                     self.shmem_provider.post_fork(true)?;
 
                     (self.harness_fn)(input);
@@ -1011,6 +1103,17 @@ where
                     self.shmem_provider.post_fork(false)?;
 
                     let res = waitpid(child, None)?;
+
+                    let hash = BACKTRACE_SHMEM_DATA.get_stacktrace_hash();
+                    println!("hash from parent process is {}", hash);
+                    let st_observer = self
+                        .observers
+                        .match_name_mut::<StacktraceObserver>("StacktraceObserver");
+                    match st_observer {
+                        Some(obs) => obs.update_hash(hash),
+                        None => panic!("Can't find a stacktrace observer"), // TODO NO PANIC,
+                    }
+
                     match res {
                         WaitStatus::Signaled(_, _, _) => Ok(ExitKind::Crash),
                         _ => Ok(ExitKind::Ok),
@@ -1045,6 +1148,15 @@ where
         S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
+        let shmem_map = shmem_provider.to_owned().new_map(5000).unwrap();
+        let shmem_id = shmem_map.id();
+        let shmem_size = shmem_map.len();
+        let shmem_type = shmem_map.get_type();
+
+        unsafe {
+            BACKTRACE_SHMEM_DATA.update_shmem_info(shmem_id, shmem_size, shmem_type);
+        }
+
         Ok(Self {
             harness_fn,
             shmem_provider,

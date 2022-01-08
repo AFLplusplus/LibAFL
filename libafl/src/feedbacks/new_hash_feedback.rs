@@ -101,7 +101,7 @@ where
 
     fn update_hash_set(&mut self, value: T) -> Result<bool, Error> {
         let r = self.hash_set.insert(value);
-        // print!("{:?}", &self.hash_set);
+        println!("Got r={}, the hashset is {:?}", r, &self.hash_set);
         Ok(r)
     }
 }
@@ -149,8 +149,7 @@ where
                 Ok(res)
             }
             None => {
-                // Something's wrong if we get here
-                print!("Unexpected error");
+                // We get here if the hash was not updated, ie no crash happened
                 Ok(false)
             }
         }

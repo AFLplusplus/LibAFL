@@ -70,6 +70,8 @@ use crate::bolts::os::pipes::Pipe;
 #[cfg(all(unix, feature = "std"))]
 use std::io::{Read, Write};
 
+use self::unix_shmem::ashmem::AshmemShMem;
+
 /// Description of a shared map.
 /// May be used to restore the map by id.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -152,6 +154,39 @@ impl Display for ShMemId {
     }
 }
 
+pub enum ShMemType {
+    MmapShMem,
+    AshmemShMem,
+    UnixShMem,
+    StdShMem,
+}
+
+pub enum GenericShMem {
+    MmapShMem(MmapShMem),
+    AshmemShMem(AshmemShMem),
+    UnixShMem(UnixShMem),
+    StdShMem(StdShMem),
+}
+
+impl GenericShMem {
+    pub fn map(&self) -> &[u8] {
+        match self {
+            GenericShMem::StdShMem(sh) => sh.map(),
+            GenericShMem::MmapShMem(sh) => sh.map(),
+            GenericShMem::UnixShMem(sh) => sh.map(),
+            GenericShMem::AshmemShMem(sh) => sh.map(),
+        }
+    }
+
+    pub fn map_mut(&mut self) -> &mut [u8] {
+        match self {
+            GenericShMem::StdShMem(sh) => sh.map_mut(),
+            GenericShMem::MmapShMem(sh) => sh.map_mut(),
+            GenericShMem::UnixShMem(sh) => sh.map_mut(),
+            GenericShMem::AshmemShMem(sh) => sh.map_mut(),
+        }
+    }
+}
 /// A [`ShMem`] is an interface to shared maps.
 /// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
@@ -190,6 +225,8 @@ pub trait ShMem: Sized + Debug + Clone {
         env::set_var(map_size_env, format!("{}", map_size));
         Ok(())
     }
+
+    fn get_type(&self) -> ShMemType;
 }
 
 /// A [`ShMemProvider`] provides access to shared maps.
@@ -278,6 +315,10 @@ where
 
     fn map_mut(&mut self) -> &mut [u8] {
         self.internal.map_mut()
+    }
+
+    fn get_type(&self) -> ShMemType {
+        ShMemType::AshmemShMem
     }
 }
 
@@ -492,7 +533,7 @@ pub mod unix_shmem {
         use std::{io::Write, process, ptr::null_mut};
 
         use crate::{
-            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            bolts::shmem::{ShMem, ShMemId, ShMemProvider, ShMemType},
             Error,
         };
         #[cfg(unix)]
@@ -612,7 +653,7 @@ pub mod unix_shmem {
                 }
             }
 
-            fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let shm_fd: i32 = id.to_string().parse().unwrap();
 
@@ -694,6 +735,10 @@ pub mod unix_shmem {
 
             fn map_mut(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+            }
+
+            fn get_type(&self) -> ShMemType {
+                ShMemType::MmapShMem
             }
         }
 
@@ -794,6 +839,10 @@ pub mod unix_shmem {
             fn map_mut(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
+
+            fn get_type(&self) -> ShMemType {
+                ShMemType::UnixShMem
+            }
         }
 
         /// [`Drop`] implementation for [`UnixShMem`], which cleans up the mapping.
@@ -850,7 +899,7 @@ pub mod unix_shmem {
         use std::ffi::CString;
 
         use crate::{
-            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            bolts::shmem::{ShMem, ShMemId, ShMemProvider, ShMemType},
             Error,
         };
 
@@ -990,6 +1039,10 @@ pub mod unix_shmem {
 
             fn map_mut(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
+            }
+
+            fn get_type(&self) -> crate::bolts::shmem::ShMemType {
+                ShMemType::AshmemShMem
             }
         }
 
