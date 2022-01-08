@@ -85,6 +85,7 @@ impl Allocator {
         all(target_arch = "aarch64", target_os = "android")
     ))]
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn new(options: FridaOptions) -> Self {
         let ret = unsafe { sysconf(_SC_PAGESIZE) };
         assert!(
