@@ -8,12 +8,17 @@ pub static mut LOCAL_HASH: u64 = 0;
 
 /// An observer looking at the stacktrace if a run crashes (For rust code)
 pub mod stacktrace_hooks {
+    use crate::bolts::os::unix_signals::Signal;
     use crate::executors::inprocess::BACKTRACE_SHMEM_DATA;
     use crate::observers::LOCAL_HASH;
     use ahash::AHasher;
     use backtrace::Backtrace;
+    use libc::{
+        c_int, c_void, sigaction, sigaddset, sigemptyset, siginfo_t, SA_NODEFER, SA_SIGINFO,
+        SIGALRM,
+    };
     use std::hash::Hasher;
-    use std::panic;
+    use std::{mem, panic, ptr};
 
     pub fn collect_backtrace() {
         let b = Backtrace::new();
@@ -39,8 +44,31 @@ pub mod stacktrace_hooks {
         }));
     }
 
-    pub unsafe fn register_bt_collection_in_signal_handler() {
-        crate::executors::inprocess::COLLECT_BACKTRACE = true;
+    pub unsafe fn setup_signal_handler() {
+        println!("setting up stacktrace signal handler");
+        fn signal_handler(sig: c_int, _info: siginfo_t, _con: *mut c_void) {
+            println!("Received signal sig={}", sig);
+            collect_backtrace();
+        }
+        let signals = vec![
+            Signal::SigAlarm,
+            Signal::SigUser2,
+            Signal::SigAbort,
+            Signal::SigBus,
+            Signal::SigPipe,
+            Signal::SigFloatingPointException,
+            Signal::SigIllegalInstruction,
+            Signal::SigSegmentationFault,
+            Signal::SigTrap,
+        ];
+        let mut sa: sigaction = mem::zeroed();
+        sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
+        sigaddset(&mut sa.sa_mask as *mut libc::sigset_t, SIGALRM);
+        sa.sa_sigaction = signal_handler as usize;
+        sa.sa_flags = SA_NODEFER | SA_SIGINFO;
+        for sig in signals {
+            sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut());
+        }
     }
 }
 
@@ -64,9 +92,7 @@ impl StacktraceObserver {
         println!("panic hook is being set");
         match harness_type {
             HarnessType::RUST => stacktrace_hooks::setup_rust_panic_hook(),
-            HarnessType::FFI => unsafe {
-                stacktrace_hooks::register_bt_collection_in_signal_handler()
-            },
+            HarnessType::FFI => unsafe { stacktrace_hooks::setup_signal_handler() },
         }
         Self {
             observer_name,

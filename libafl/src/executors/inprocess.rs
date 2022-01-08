@@ -46,8 +46,9 @@ use crate::{
     Error,
 };
 
-/// Tells the executor whether to collect the backtrace or not
-pub static mut COLLECT_BACKTRACE: bool = false;
+use self::unix_signal_handler::{
+    inproc_crash_handler, inproc_crash_handler_with_backtrace_collection,
+};
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
@@ -132,7 +133,13 @@ where
         S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, I, OC, OF, OT, S, Z>()?;
+        let should_collect_backtrace =
+            match observers.match_name::<StacktraceObserver>("StacktraceObserver") {
+                Some(_) => true,
+                None => false,
+            };
+        let handlers =
+            InProcessHandlers::new::<Self, EM, I, OC, OF, OT, S, Z>(should_collect_backtrace)?;
         #[cfg(windows)]
         unsafe {
             /*
@@ -252,7 +259,7 @@ impl InProcessHandlers {
         }
     }
 
-    pub fn new<E, EM, I, OC, OF, OT, S, Z>() -> Result<Self, Error>
+    pub fn new<E, EM, I, OC, OF, OT, S, Z>(should_collect_backtrace: bool) -> Result<Self, Error>
     where
         I: Input,
         E: HasObservers<I, OT, S>,
@@ -268,10 +275,23 @@ impl InProcessHandlers {
             let data = &mut GLOBAL_STATE;
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
-
+            let crash_handler_ptr = if should_collect_backtrace {
+                unix_signal_handler::inproc_crash_handler_with_backtrace_collection::<
+                    E,
+                    EM,
+                    I,
+                    OC,
+                    OF,
+                    OT,
+                    S,
+                    Z,
+                > as *const c_void
+            } else {
+                unix_signal_handler::inproc_crash_handler::<E, EM, I, OC, OF, OT, S, Z>
+                    as *const c_void
+            };
             Ok(Self {
-                crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, I, OC, OF, OT, S, Z>
-                    as *const _,
+                crash_handler: crash_handler_ptr,
                 timeout_handler: unix_signal_handler::inproc_timeout_handler::<
                     E,
                     EM,
@@ -416,7 +436,7 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::Input,
-        observers::{stacktrace_hooks, ObserversTuple, StacktraceObserver},
+        observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
@@ -605,10 +625,6 @@ mod unix_signal_handler {
 
             // TODO tell the parent to not restart
         } else {
-            if (crate::executors::inprocess::COLLECT_BACKTRACE) {
-                stacktrace_hooks::collect_backtrace()
-            }
-
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
@@ -674,6 +690,25 @@ mod unix_signal_handler {
         }
 
         libc::_exit(128 + (signal as i32));
+    }
+
+    pub unsafe fn inproc_crash_handler_with_backtrace_collection<E, EM, I, OC, OF, OT, S, Z>(
+        signal: Signal,
+        info: siginfo_t,
+        context: &mut ucontext_t,
+        data: &mut InProcessExecutorHandlerData,
+    ) where
+        E: HasObservers<I, OT, S>,
+        EM: EventFirer<I> + EventRestarter<S>,
+        OT: ObserversTuple<I, S>,
+        OC: Corpus<I>,
+        OF: Feedback<I, S>,
+        S: HasSolutions<OC, I> + HasClientPerfMonitor,
+        I: Input,
+        Z: HasObjective<I, OF, S>,
+    {
+        crate::observers::stacktrace_hooks::collect_backtrace();
+        inproc_crash_handler::<E, EM, I, OC, OF, OT, S, Z>(signal, info, context, data);
     }
 }
 
