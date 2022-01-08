@@ -9,12 +9,8 @@ use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
-use std::hash::Hasher;
 use std::panic;
 
-use ahash::AHasher;
-use backtrace::Backtrace;
-use libc::{siginfo_t, ucontext_t};
 #[cfg(all(feature = "std", unix))]
 use nix::{
     sys::wait::{waitpid, WaitStatus},
@@ -28,12 +24,9 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
 use crate::{
-    bolts::{
-        os::unix_signals::{Handler, Signal},
-        shmem::{
-            unix_shmem::{ashmem::AshmemShMem, UnixShMem},
-            GenericShMem, MmapShMem, ShMem, ShMemId, ShMemType, StdShMem,
-        },
+    bolts::shmem::{
+        unix_shmem::{ashmem::AshmemShMem, UnixShMem},
+        GenericShMem, MmapShMem, ShMem, ShMemId, ShMemType, StdShMem,
     },
     observers::StacktraceObserver,
 };
@@ -52,6 +45,9 @@ use crate::{
     state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
+
+/// Tells the executor whether to collect the backtrace or not
+pub static mut COLLECT_BACKTRACE: bool = false;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
@@ -420,7 +416,7 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::Input,
-        observers::ObserversTuple,
+        observers::{stacktrace_hooks, ObserversTuple, StacktraceObserver},
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
@@ -609,6 +605,10 @@ mod unix_signal_handler {
 
             // TODO tell the parent to not restart
         } else {
+            if (crate::executors::inprocess::COLLECT_BACKTRACE) {
+                stacktrace_hooks::collect_backtrace()
+            }
+
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();

@@ -7,20 +7,15 @@ use std::fmt::Debug;
 pub static mut LOCAL_HASH: u64 = 0;
 
 /// An observer looking at the stacktrace if a run crashes (For rust code)
-mod stacktrace_hooks {
-    use crate::bolts::os::unix_signals::Signal;
+pub mod stacktrace_hooks {
     use crate::executors::inprocess::BACKTRACE_SHMEM_DATA;
     use crate::observers::LOCAL_HASH;
     use ahash::AHasher;
     use backtrace::Backtrace;
-    use libc::{
-        c_int, c_void, sigaction, sigaddset, sigemptyset, siginfo_t, SA_NODEFER, SA_SIGINFO,
-        SIGALRM,
-    };
     use std::hash::Hasher;
-    use std::{mem, panic, ptr};
+    use std::panic;
 
-    fn collect_backtrace() {
+    pub fn collect_backtrace() {
         let b = Backtrace::new();
         let trace = format!("{:?}", b);
         eprintln!("{}", trace);
@@ -44,30 +39,8 @@ mod stacktrace_hooks {
         }));
     }
 
-    pub unsafe fn setup_signal_handler() {
-        fn signal_handler(sig: c_int, _info: siginfo_t, _con: *mut c_void) {
-            println!("Received signal sig={}", sig);
-            collect_backtrace();
-        }
-        let signals = vec![
-            Signal::SigAlarm,
-            Signal::SigUser2,
-            Signal::SigAbort,
-            Signal::SigBus,
-            Signal::SigPipe,
-            Signal::SigFloatingPointException,
-            Signal::SigIllegalInstruction,
-            Signal::SigSegmentationFault,
-            Signal::SigTrap,
-        ];
-        let mut sa: sigaction = mem::zeroed();
-        sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
-        sigaddset(&mut sa.sa_mask as *mut libc::sigset_t, SIGALRM);
-        sa.sa_sigaction = signal_handler as usize;
-        sa.sa_flags = SA_NODEFER | SA_SIGINFO;
-        for sig in signals {
-            sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut());
-        }
+    pub unsafe fn register_bt_collection_in_signal_handler() {
+        crate::executors::inprocess::COLLECT_BACKTRACE = true;
     }
 }
 
@@ -88,6 +61,13 @@ impl StacktraceObserver {
     /// Creates a new [`StacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: String, harness_type: HarnessType) -> Self {
+        println!("panic hook is being set");
+        match harness_type {
+            HarnessType::RUST => stacktrace_hooks::setup_rust_panic_hook(),
+            HarnessType::FFI => unsafe {
+                stacktrace_hooks::register_bt_collection_in_signal_handler()
+            },
+        }
         Self {
             observer_name,
             harness_type,
@@ -122,11 +102,6 @@ where
     I: Debug,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        println!("panic hook is being set");
-        match self.harness_type {
-            HarnessType::RUST => stacktrace_hooks::setup_rust_panic_hook(),
-            HarnessType::FFI => unsafe { stacktrace_hooks::setup_signal_handler() },
-        }
         Ok(())
     }
 

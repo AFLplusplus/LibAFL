@@ -200,6 +200,7 @@ unsafe fn handle_signal(sig: c_int, info: siginfo_t, void: *mut c_void) {
 /// The signal handlers will be called on any signal. They should (tm) be async safe.
 /// A lot can go south in signal handling. Be sure you know what you are doing.
 pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Result<(), Error> {
+    println!("Setting up original signal handler");
     // First, set up our own stack to be used during segfault handling. (and specify `SA_ONSTACK` in `sigaction`)
     if SIGNAL_STACK_PTR.is_null() {
         SIGNAL_STACK_PTR = malloc(SIGNAL_STACK_SIZE);
