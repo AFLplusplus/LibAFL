@@ -10,7 +10,7 @@ use backtrace::Backtrace;
 use core::fmt::{self, Debug, Formatter};
 use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
 use hashbrown::HashMap;
-use nix::sys::mman::{mmap, MapFlags, ProtFlags, mprotect};
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 
 use crate::helper::FridaInstrumentationHelper;
 
@@ -194,6 +194,7 @@ impl AsanRuntime {
         }
 
         self.hook_functions(_gum);
+        /* 
         unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
             mprotect(
@@ -266,6 +267,7 @@ impl AsanRuntime {
             }
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
+        */
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -506,7 +508,6 @@ impl AsanRuntime {
             }
         }
 
-        /*
         // Hook the memory allocator functions
         hook_func!(None, malloc, (size: usize), *mut c_void);
         hook_func!(None, calloc, (nmemb: usize, size: usize), *mut c_void);
@@ -522,7 +523,6 @@ impl AsanRuntime {
         );
         #[cfg(not(target_vendor = "apple"))]
         hook_func!(None, malloc_usable_size, (ptr: *mut c_void), usize);
-        */
 
 
         for libname in ["libc++.so", "libc++.so.1", "libc++_shared.so"] {
@@ -2151,8 +2151,6 @@ impl AsanRuntime {
         _address: u64,
         instr: &Insn,
     ) -> Result<(RegId, u8, RegId, RegId, i32, i64), ()> {
-        return Err(());
-
         let operands = capstone
             .insn_detail(instr)
             .unwrap()

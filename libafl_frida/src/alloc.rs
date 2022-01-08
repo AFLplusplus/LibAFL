@@ -121,8 +121,6 @@ impl Allocator {
                 break;
             }
         }
-        println!("{:x}", maxbit);
-
 
         #[cfg(all(target_arch = "aarch64", target_os = "android"))]
         for try_shadow_bit in &[44usize, 36usize] {
