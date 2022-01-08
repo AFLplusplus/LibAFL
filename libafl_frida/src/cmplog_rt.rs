@@ -61,6 +61,22 @@ pub struct CmpLogRuntime {
     ops_handle_tbnz_masking: Option<Box<[u8]>>,
 }
 
+impl FridaRuntime for CmpLogRuntime {
+    /// Initialize this `CmpLog` runtime.
+    /// This will generate the instrumentation blobs for the current arch.
+    fn init(&mut self, gum: &frida_gum::Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {
+        self.generate_instrumentation_blobs();
+    }
+
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
 impl CmpLogRuntime {
     /// Create a new [`CmpLogRuntime`]
     #[must_use]
@@ -199,12 +215,6 @@ impl CmpLogRuntime {
                 .unwrap()
                 .into_boxed_slice(),
         );
-    }
-
-    /// Initialize this `CmpLog` runtime.
-    /// This will generate the instrumentation blobs for the current arch.
-    pub fn init(&mut self) {
-        self.generate_instrumentation_blobs();
     }
 
     /// Get the blob which saves the context, jumps to the populate function and restores the context

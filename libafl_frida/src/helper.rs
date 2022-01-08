@@ -41,7 +41,7 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 pub trait FridaRuntime: 'static + Debug {
-    fn init(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]);
+    fn init(&mut self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]);
 
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error>;
 
@@ -51,7 +51,7 @@ pub trait FridaRuntime: 'static + Debug {
 
 pub trait FridaRuntimeTuple: MatchFirstType + Debug
 {
-    fn init_all(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]);
+    fn init_all(&mut self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]);
 
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error>;
 
@@ -59,7 +59,7 @@ pub trait FridaRuntimeTuple: MatchFirstType + Debug
 }
 
 impl FridaRuntimeTuple for () {
-    fn init_all(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {}
+    fn init_all(&mut self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {}
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), Error> {
         Ok(())
     }
@@ -73,7 +73,7 @@ where
     Head: FridaRuntime,
     Tail: FridaRuntimeTuple,
 {
-    fn init_all(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {
+    fn init_all(&mut self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {
         self.0.init(gum, helper, modules_to_instrument);
         self.1.init_all(gum, helper, modules_to_instrument);
     }
@@ -229,15 +229,6 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 }
             }
 
-            if helper.options().drcov_enabled() {
-                std::fs::create_dir_all("./coverage")
-                    .expect("failed to create directory for coverage files");
-            }
-
-            if helper.options().coverage_enabled() {
-                helper.coverage_rt.init();
-            }
-
             let transformer = Transformer::from_callback(gum, |basic_block, output| {
                 let mut first = true;
                 for instruction in basic_block {
@@ -337,21 +328,11 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 }
             });
             helper.transformer = Some(transformer);
-
-            #[cfg(unix)]
-            if helper.options().asan_enabled() || helper.options().drcov_enabled() {
-                helper.asan_runtime.init(gum, &helper, modules_to_instrument);
-            }
-
-            helper.drcov_runtime.init(&helper.ranges);
-            #[cfg(feature = "cmplog")]
-            if helper.options.cmplog_enabled() {
-                helper.cmplog_runtime.init();
-            }
         }
         helper
     }
 
+    /// Returns ref to the Transformer
     pub fn transformer(&self) -> &Transformer<'a> {
         self.transformer.as_ref().unwrap()
     }
@@ -362,46 +343,42 @@ impl<'a> FridaInstrumentationHelper<'a> {
         self.asan_runtime.register_thread();
     }
 
-    #[cfg(unix)]
+    /// Initializa all
+    pub fn init(&mut self, gum: &'a Gum, modules_to_instrument: &'a [&str]) {
+        todo!("run init for every runtime");
+    }
+
+    /// Pre_exec all
     pub fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
         todo!("run pre_exec for every runtime");
     }
 
+    /// Post_exec all
     pub fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
-        if self.options().enable_drcov {
-            self.drcov_runtime.post_exec(input)?;
-        }
-        #[cfg(unix)]
-        if self.options.asan_enabled() {
-            if self.options.asan_detect_leaks() {
-                self.asan_runtime.check_for_leaks();
-            }
-
-            let target_bytes = input.target_bytes();
-            let slice = target_bytes.as_slice();
-            self.asan_runtime
-                .poison(slice.as_ptr() as usize, slice.len());
-            self.asan_runtime.reset_allocations();
-        }
-        Ok(())
+        todo!("run pre_exec for every runtime");
     }
 
+    /// If stalker is enabled
     pub fn stalker_enabled(&self) -> bool {
         self.options.stalker_enabled()
     }
 
+    /// Pointer to coverage map
     pub fn map_ptr_mut(&mut self) -> *mut u8 {
         self.coverage_rt.map_ptr_mut()
     }
 
+    /// Ranges
     pub fn ranges(&self) -> &RangeMap<usize, (u16, String)> {
         &self.ranges
     }
 
+    /// Mutable ranges
     pub fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)> {
         &mut self.ranges
     }
 
+    /// Return the ref to options
     #[inline]
     pub fn options(&self) -> &FridaOptions {
         self.options

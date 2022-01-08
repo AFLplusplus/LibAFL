@@ -9,6 +9,8 @@ use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
 
+use crate::helper::{FridaRuntime, FridaInstrumentationHelper};
+
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
 
@@ -27,6 +29,21 @@ impl Default for CoverageRuntime {
     }
 }
 
+impl FridaRuntime for CoverageRuntime {
+    /// Initialize the coverage runtime
+    fn init(&mut self, _gum: &frida_gum::Gum, _helper: &FridaInstrumentationHelper, _modules_to_instrument: &[&str]) {
+        self.generate_maybe_log_blob();
+    }
+
+    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, _input: &I, _helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
+        Ok(())
+    }
+
+    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, _input: &I, _helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
+        Ok(())
+    }
+}
+
 impl CoverageRuntime {
     /// Create a new coverage runtime
     #[must_use]
@@ -37,11 +54,6 @@ impl CoverageRuntime {
             current_log_impl: 0,
             blob_maybe_log: None,
         }
-    }
-
-    /// Initialize the coverage runtime
-    pub fn init(&mut self) {
-        self.generate_maybe_log_blob();
     }
 
     /// Retrieve the coverage map pointer

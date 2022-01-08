@@ -148,7 +148,7 @@ impl FridaRuntime for AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    fn init(&self, gum: &Gum, helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {
+    fn init(&mut self, gum: &Gum, _helper: &FridaInstrumentationHelper, modules_to_instrument: &[&str]) {
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
@@ -243,7 +243,7 @@ impl FridaRuntime for AsanRuntime {
         }
         */
     }
-    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
+    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, input: &I, _helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
 
@@ -252,15 +252,14 @@ impl FridaRuntime for AsanRuntime {
     }
 
     fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(&mut self, input: &I, helper: &FridaInstrumentationHelper) -> Result<(), libafl::Error> {
-        if helper.options.asan_detect_leaks() {
-            self.asan_runtime.check_for_leaks();
+        if helper.options().asan_detect_leaks() {
+            self.check_for_leaks();
         }
 
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
-        self.asan_runtime
-            .poison(slice.as_ptr() as usize, slice.len());
-        self.asan_runtime.reset_allocations();
+        self.poison(slice.as_ptr() as usize, slice.len());
+        self.reset_allocations();
 
         Ok(())
     }
