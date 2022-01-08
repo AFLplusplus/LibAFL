@@ -2306,10 +2306,14 @@ impl AsanRuntime {
             Some(reg) => match reg {
                 X86Register::Rip => {
                     writer.put_mov_reg_address(X86Register::Rsi, true_rip);
-                }
+                },
+                X86Register::Rdi => {
+                // In this case rdi is already clobbered, so we want it from the stack (we pushed rdi onto stack before!)
+                    writer.put_mov_reg_reg_offset_ptr(X86Register::Rsi, X86Register::Rsp, -0x28);
+                },
                 _ => {
                     writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
-                }
+                },
             },
             None => {
                 writer.put_xor_reg_reg(X86Register::Rsi, X86Register::Rsi);
