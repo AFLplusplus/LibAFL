@@ -180,7 +180,6 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
                 )
                 .expect("Failed to create the executor."),
                 timeout,
-                None,
             )
             .expect("Failed to create the executor.");
 
