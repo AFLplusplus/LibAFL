@@ -509,7 +509,7 @@ impl AsanErrors {
 
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
-                let start_pc = pc - 4 * 5;
+                let start_pc = pc;
                 for insn in cs
                     .disasm_count(
                         unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
