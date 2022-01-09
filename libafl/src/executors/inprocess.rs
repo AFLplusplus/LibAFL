@@ -123,6 +123,7 @@ where
         Z: HasObjective<I, OF, S>,
     {
         let should_collect_backtrace =
+            // should match on type when it's available
             match observers.match_name::<StacktraceObserver>("StacktraceObserver") {
                 Some(_) => true,
                 None => false,
@@ -1082,6 +1083,7 @@ where
         S: HasSolutions<OC, I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
+        // should match on type when it's available
         match observers.match_name::<StacktraceObserver>("StacktraceObserver") {
             Some(st_observer) => st_observer.setup_shmem(shmem_provider.clone()),
             None => (),
