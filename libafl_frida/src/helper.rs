@@ -31,10 +31,7 @@ use frida_gum::CpuContext;
 
 #[cfg(unix)]
 use frida_gum::instruction_writer::InstructionWriter;
-use frida_gum::{
-    stalker::Transformer, Gum, Module, ModuleDetails,
-    ModuleMap, PageProtection,
-};
+use frida_gum::{stalker::Transformer, Gum, Module, ModuleDetails, ModuleMap, PageProtection};
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 #[cfg(target_arch = "aarch64")]
@@ -122,7 +119,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     }
 
     #[cfg(not(unix))]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error>{
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
