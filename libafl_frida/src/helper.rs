@@ -1,5 +1,7 @@
 use libafl::inputs::{HasTargetBytes, Input};
 use libafl::Error;
+
+#[cfg(unix)]
 use libafl_targets::drcov::DrCovBasicBlock;
 
 #[cfg(feature = "cmplog")]
@@ -22,12 +24,15 @@ use capstone::{
 use core::fmt::{self, Debug, Formatter};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", unix))]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(unix)]
 use frida_gum::CpuContext;
+
+#[cfg(unix)]
+use frida_gum::instruction_writer::InstructionWriter;
 use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::Transformer, Gum, Module, ModuleDetails,
+    stalker::Transformer, Gum, Module, ModuleDetails,
     ModuleMap, PageProtection,
 };
 #[cfg(unix)]
@@ -91,14 +96,16 @@ impl Debug for FridaInstrumentationHelper<'_> {
         let mut dbg_me = f.debug_struct("FridaInstrumentationHelper");
         dbg_me
             .field("coverage_rt", &self.coverage_rt)
-            .field("capstone", &self.capstone)
-            .field("asan_runtime", &self.asan_runtime)
             .field("drcov_runtime", &self.drcov_runtime)
             .field("ranges", &self.ranges)
             .field("module_map", &"<ModuleMap>")
             .field("options", &self.options);
         #[cfg(feature = "cmplog")]
         dbg_me.field("cmplog_runtime", &self.cmplog_runtime);
+        #[cfg(unix)]
+        dbg_me.field("capstone", &self.capstone);
+        #[cfg(unix)]
+        dbg_me.field("asan_runtime", &self.asan_runtime);
         dbg_me.finish()
     }
 }
@@ -115,7 +122,9 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     }
 
     #[cfg(not(unix))]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error>{
+        Ok(())
+    }
 
     #[cfg(unix)]
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
