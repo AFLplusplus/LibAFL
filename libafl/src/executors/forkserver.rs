@@ -384,25 +384,14 @@ pub struct TimeoutForkserverExecutor<E: Debug> {
 impl<E: Debug> TimeoutForkserverExecutor<E> {
     /// Create a new [`TimeoutForkserverExecutor`]
     pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
-        let milli_sec = exec_tmout.as_millis() as i64;
-        let timeout = TimeSpec::milliseconds(milli_sec);
         let signal = Signal::SIGKILL;
-        Ok(Self {
-            executor,
-            timeout,
-            signal,
-        })
+        Self::with_signal(executor, exec_tmout, signal)
     }
 
     /// Create a new [`TimeoutForkserverExecutor`] that sends a user-defined signal to the timed-out process
-    pub fn with_signal(
-        executor: E,
-        exec_tmout: Duration,
-        kill_signal: Option<Signal>,
-    ) -> Result<Self, Error> {
+    pub fn with_signal(executor: E, exec_tmout: Duration, signal: Signal) -> Result<Self, Error> {
         let milli_sec = exec_tmout.as_millis() as i64;
         let timeout = TimeSpec::milliseconds(milli_sec);
-        let signal = kill_signal.unwrap_or(Signal::SIGKILL);
         Ok(Self {
             executor,
             timeout,
