@@ -148,7 +148,7 @@ jobs:
       with:
         command: clippy
     - name: Build frida
-      run: cd fuzzers/frida_libpng/ && cargo build --release
+      run: cd libafl_frida && cargo build --release
   macos:
     runs-on: macOS-latest
     steps:
