@@ -3,8 +3,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::{env, fs, ptr};
 
 use crate::{
-    emu,
-    emu::SyscallHookResult,
+    emu::{Emulator, SyscallHookResult},
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     Regs,
@@ -114,7 +113,7 @@ unsafe extern "C" fn asan_giovese_populate_context(ctx: *mut CallContext, _pc: u
 
 static mut ASAN_INITED: bool = false;
 
-pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> i32 {
+pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> Emulator {
     assert!(!args.is_empty());
     let current = env::current_exe().unwrap();
     let asan_lib = fs::canonicalize(&current)
@@ -160,9 +159,10 @@ pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> i
         asan_giovese_init();
         ASAN_INITED = true;
     }
-    emu::init(args, env)
+    Emulator::new(args, env)
 }
 
+#[derive(Debug)]
 // TODO intrumentation filter
 pub struct QemuAsanHelper {
     enabled: bool,
@@ -172,7 +172,7 @@ pub struct QemuAsanHelper {
 impl QemuAsanHelper {
     #[must_use]
     pub fn new() -> Self {
-        assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just init(...)");
+        assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
         Self {
             enabled: true,
             filter: QemuInstrumentationFilter::None,
@@ -202,7 +202,7 @@ impl QemuAsanHelper {
     }
 
     #[allow(clippy::unused_self)]
-    pub fn alloc(&mut self, start: u64, end: u64) {
+    pub fn alloc(&mut self, _emulator: &Emulator, start: u64, end: u64) {
         unsafe {
             let ctx: *const CallContext =
                 libc::calloc(core::mem::size_of::<CallContext>(), 1) as *const _;
@@ -211,188 +211,188 @@ impl QemuAsanHelper {
     }
 
     #[allow(clippy::unused_self)]
-    pub fn dealloc(&mut self, addr: u64) {
+    pub fn dealloc(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
             let ckinfo = asan_giovese_alloc_search(addr);
             if let Some(ck) = ckinfo.as_mut() {
                 if ck.start != addr {
                     // Free not the start of the chunk
-                    asan_giovese_badfree(addr, emu::read_reg(Regs::Pc).unwrap_or(u64::MAX));
+                    asan_giovese_badfree(addr, emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX));
                 }
                 let ctx: *const CallContext =
                     libc::calloc(core::mem::size_of::<CallContext>(), 1) as *const _;
                 ck.free_ctx = ctx;
             } else {
                 // Free of wild ptr
-                asan_giovese_badfree(addr, emu::read_reg(Regs::Pc).unwrap_or(u64::MAX));
+                asan_giovese_badfree(addr, emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX));
             }
         }
     }
 
     #[allow(clippy::unused_self)]
     #[must_use]
-    pub fn is_poisoned(&self, addr: u64, size: usize) -> bool {
-        unsafe { asan_giovese_loadN(emu::g2h(addr), size) != 0 }
+    pub fn is_poisoned(&self, emulator: &Emulator, addr: u64, size: usize) -> bool {
+        unsafe { asan_giovese_loadN(emulator.g2h(addr), size) != 0 }
     }
 
-    pub fn read_1(&mut self, addr: u64) {
+    pub fn read_1(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
-            if self.enabled() && asan_giovese_load1(emu::g2h(addr)) != 0 {
+            if self.enabled() && asan_giovese_load1(emulator.g2h(addr)) != 0 {
                 asan_giovese_report_and_crash(
                     0,
                     addr,
                     1,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn read_2(&mut self, addr: u64) {
+    pub fn read_2(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
-            if self.enabled() && asan_giovese_load2(emu::g2h(addr)) != 0 {
+            if self.enabled() && asan_giovese_load2(emulator.g2h(addr)) != 0 {
                 asan_giovese_report_and_crash(
                     0,
                     addr,
                     2,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn read_4(&mut self, addr: u64) {
+    pub fn read_4(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
-            if self.enabled() && asan_giovese_load4(emu::g2h(addr)) != 0 {
+            if self.enabled() && asan_giovese_load4(emulator.g2h(addr)) != 0 {
                 asan_giovese_report_and_crash(
                     0,
                     addr,
                     4,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn read_8(&mut self, addr: u64) {
+    pub fn read_8(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
-            if self.enabled() && asan_giovese_load8(emu::g2h(addr)) != 0 {
+            if self.enabled() && asan_giovese_load8(emulator.g2h(addr)) != 0 {
                 asan_giovese_report_and_crash(
                     0,
                     addr,
                     8,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn read_n(&mut self, addr: u64, size: usize) {
+    pub fn read_n(&mut self, emulator: &Emulator, addr: u64, size: usize) {
         unsafe {
-            if self.enabled() && asan_giovese_loadN(emu::g2h(addr), size) != 0 {
+            if self.enabled() && asan_giovese_loadN(emulator.g2h(addr), size) != 0 {
                 asan_giovese_report_and_crash(
                     0,
                     addr,
                     size,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn write_1(&mut self, addr: u64) {
+    pub fn write_1(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
-            if self.enabled() && asan_giovese_store1(emu::g2h(addr)) != 0 {
+            if self.enabled() && asan_giovese_store1(emulator.g2h(addr)) != 0 {
                 asan_giovese_report_and_crash(
                     1,
                     addr,
                     1,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn write_2(&mut self, addr: u64) {
+    pub fn write_2(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
-            if self.enabled() && asan_giovese_store2(emu::g2h(addr)) != 0 {
+            if self.enabled() && asan_giovese_store2(emulator.g2h(addr)) != 0 {
                 asan_giovese_report_and_crash(
                     1,
                     addr,
                     2,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn write_4(&mut self, addr: u64) {
+    pub fn write_4(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
-            if self.enabled() && asan_giovese_store4(emu::g2h(addr)) != 0 {
+            if self.enabled() && asan_giovese_store4(emulator.g2h(addr)) != 0 {
                 asan_giovese_report_and_crash(
                     1,
                     addr,
                     4,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn write_8(&mut self, addr: u64) {
+    pub fn write_8(&mut self, emulator: &Emulator, addr: u64) {
         unsafe {
-            if self.enabled() && asan_giovese_store8(emu::g2h(addr)) != 0 {
+            if self.enabled() && asan_giovese_store8(emulator.g2h(addr)) != 0 {
                 asan_giovese_report_and_crash(
                     1,
                     addr,
                     8,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
-    pub fn write_n(&mut self, addr: u64, size: usize) {
+    pub fn write_n(&mut self, emulator: &Emulator, addr: u64, size: usize) {
         unsafe {
-            if self.enabled() && asan_giovese_storeN(emu::g2h(addr), size) != 0 {
+            if self.enabled() && asan_giovese_storeN(emulator.g2h(addr), size) != 0 {
                 asan_giovese_report_and_crash(
                     1,
                     addr,
                     size,
-                    emu::read_reg(Regs::Pc).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Pc).unwrap_or(u64::MAX),
                     0,
-                    emu::read_reg(Regs::Sp).unwrap_or(u64::MAX),
+                    emulator.read_reg(Regs::Sp).unwrap_or(u64::MAX),
                 );
             }
         }
     }
 
     #[allow(clippy::unused_self)]
-    pub fn poison(&mut self, addr: u64, size: usize, poison: PoisonKind) {
-        unsafe { asan_giovese_poison_region(emu::g2h(addr), size, poison.into()) };
+    pub fn poison(&mut self, emulator: &Emulator, addr: u64, size: usize, poison: PoisonKind) {
+        unsafe { asan_giovese_poison_region(emulator.g2h(addr), size, poison.into()) };
     }
 
     #[allow(clippy::unused_self)]
-    pub fn unpoison(&mut self, addr: u64, size: usize) {
-        unsafe { asan_giovese_unpoison_region(emu::g2h(addr), size) };
+    pub fn unpoison(&mut self, emulator: &Emulator, addr: u64, size: usize) {
+        unsafe { asan_giovese_unpoison_region(emulator.g2h(addr), size) };
     }
 
     #[allow(clippy::unused_self)]
@@ -435,13 +435,14 @@ where
         executor.hook_syscalls(qasan_fake_syscall::<I, QT, S>);
     }
 
-    fn post_exec(&mut self, _input: &I) {
+    fn post_exec(&mut self, _emulator: &Emulator, _input: &I) {
         self.reset();
     }
 }
 
 // TODO add pc to generation hooks
 pub fn gen_readwrite_asan<I, QT, S>(
+    _emulator: &Emulator,
     helpers: &mut QT,
     _state: &mut S,
     pc: u64,
@@ -459,43 +460,64 @@ where
     }
 }
 
-pub fn trace_read1_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_read1_asan<I, QT, S>(
+    emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_1(addr);
+    h.read_1(emulator, addr);
 }
 
-pub fn trace_read2_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_read2_asan<I, QT, S>(
+    emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_2(addr);
+    h.read_2(emulator, addr);
 }
 
-pub fn trace_read4_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_read4_asan<I, QT, S>(
+    emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_4(addr);
+    h.read_4(emulator, addr);
 }
 
-pub fn trace_read8_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_read8_asan<I, QT, S>(
+    emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_8(addr);
+    h.read_8(emulator, addr);
 }
 
 pub fn trace_read_n_asan<I, QT, S>(
+    emulator: &Emulator,
     helpers: &mut QT,
     _state: &mut S,
     _id: u64,
@@ -506,46 +528,67 @@ pub fn trace_read_n_asan<I, QT, S>(
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(addr, size);
+    h.read_n(emulator, addr, size);
 }
 
-pub fn trace_write1_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_write1_asan<I, QT, S>(
+    emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_1(addr);
+    h.write_1(emulator, addr);
 }
 
-pub fn trace_write2_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_write2_asan<I, QT, S>(
+    emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_2(addr);
+    h.write_2(emulator, addr);
 }
 
-pub fn trace_write4_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_write4_asan<I, QT, S>(
+    emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_4(addr);
+    h.write_4(emulator, addr);
 }
 
-pub fn trace_write8_asan<I, QT, S>(helpers: &mut QT, _state: &mut S, _id: u64, addr: u64)
-where
+pub fn trace_write8_asan<I, QT, S>(
+    emulator: &Emulator,
+    helpers: &mut QT,
+    _state: &mut S,
+    _id: u64,
+    addr: u64,
+) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_8(addr);
+    h.write_8(emulator, addr);
 }
 
 pub fn trace_write_n_asan<I, QT, S>(
+    emulator: &Emulator,
     helpers: &mut QT,
     _state: &mut S,
     _id: u64,
@@ -556,11 +599,12 @@ pub fn trace_write_n_asan<I, QT, S>(
     QT: QemuHelperTuple<I, S>,
 {
     let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(addr, size);
+    h.read_n(emulator, addr, size);
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn qasan_fake_syscall<I, QT, S>(
+    emulator: &Emulator,
     helpers: &mut QT,
     _state: &mut S,
     sys_num: i32,
@@ -582,30 +626,35 @@ where
         let mut r = 0;
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
-                h.read_n(a1, a2 as usize);
+                h.read_n(emulator, a1, a2 as usize);
             }
             QasanAction::CheckStore => {
-                h.write_n(a1, a2 as usize);
+                h.write_n(emulator, a1, a2 as usize);
             }
             QasanAction::Poison => {
-                h.poison(a1, a2 as usize, PoisonKind::try_from(a3 as u8).unwrap());
+                h.poison(
+                    emulator,
+                    a1,
+                    a2 as usize,
+                    PoisonKind::try_from(a3 as u8).unwrap(),
+                );
             }
             QasanAction::UserPoison => {
-                h.poison(a1, a2 as usize, PoisonKind::User);
+                h.poison(emulator, a1, a2 as usize, PoisonKind::User);
             }
             QasanAction::UnPoison => {
-                h.unpoison(a1, a2 as usize);
+                h.unpoison(emulator, a1, a2 as usize);
             }
             QasanAction::IsPoison => {
-                if h.is_poisoned(a1, a2 as usize) {
+                if h.is_poisoned(emulator, a1, a2 as usize) {
                     r = 1;
                 }
             }
             QasanAction::Alloc => {
-                h.alloc(a1, a2);
+                h.alloc(emulator, a1, a2);
             }
             QasanAction::Dealloc => {
-                h.dealloc(a1);
+                h.dealloc(emulator, a1);
             }
             QasanAction::Enable => {
                 h.set_enabled(true);

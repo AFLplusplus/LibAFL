@@ -28,12 +28,16 @@ use crate::{
     Error,
 };
 
-use core::{marker::PhantomData, time::Duration};
+use core::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+    time::Duration,
+};
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<I, S>: Named
+pub trait Feedback<I, S>: Named + Debug
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -51,6 +55,8 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>;
 
+    /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
+    /// It also keeps track of introspection stats.
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
     fn is_interesting_introspection<EM, OT>(
@@ -101,7 +107,7 @@ where
 
 /// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
 /// of the fuzzer State
-pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned {
+pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug {
     /// Reset the internal state
     fn reset(&mut self) -> Result<(), Error> {
         Ok(())
@@ -109,7 +115,8 @@ pub trait FeedbackState: Named + serde::Serialize + serde::de::DeserializeOwned 
 }
 
 /// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + serde::Serialize + serde::de::DeserializeOwned {
+pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwned + Debug {
+    /// Resets all the feedback states of the tuple
     fn reset_all(&mut self) -> Result<(), Error>;
 }
 
@@ -130,7 +137,9 @@ where
     }
 }
 
-pub struct CombinedFeedback<A, B, I, S, FL>
+/// A cobined feedback consisting of ultiple [`Feedback`]s
+#[derive(Debug)]
+pub struct CombinedFeedback<A, B, FL, I, S>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -138,13 +147,15 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// First [`Feedback`]
     pub first: A,
+    /// Second [`Feedback`]
     pub second: B,
     name: String,
     phantom: PhantomData<(I, S, FL)>,
 }
 
-impl<A, B, I, S, FL> Named for CombinedFeedback<A, B, I, S, FL>
+impl<A, B, FL, I, S> Named for CombinedFeedback<A, B, FL, I, S>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -157,7 +168,7 @@ where
     }
 }
 
-impl<A, B, I, S, FL> CombinedFeedback<A, B, I, S, FL>
+impl<A, B, FL, I, S> CombinedFeedback<A, B, FL, I, S>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
@@ -165,6 +176,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// Create a new combined feedback
     pub fn new(first: A, second: B) -> Self {
         let name = format!("{} ({},{})", FL::name(), first.name(), second.name());
         Self {
@@ -176,13 +188,13 @@ where
     }
 }
 
-impl<A, B, I, S, FL> Feedback<I, S> for CombinedFeedback<A, B, I, S, FL>
+impl<A, B, FL, I, S> Feedback<I, S> for CombinedFeedback<A, B, FL, I, S>
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     FL: FeedbackLogic<A, B, I, S>,
     I: Input,
-    S: HasClientPerfMonitor,
+    S: HasClientPerfMonitor + Debug,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -244,15 +256,18 @@ where
     }
 }
 
-pub trait FeedbackLogic<A, B, I, S>: 'static
+/// Logical combination of two feedbacks
+pub trait FeedbackLogic<A, B, I, S>: 'static + Debug
 where
     A: Feedback<I, S>,
     B: Feedback<I, S>,
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// The name of this cobination
     fn name() -> &'static str;
 
+    /// If the feedback pair is interesting
     fn is_pair_interesting<EM, OT>(
         first: &mut A,
         second: &mut B,
@@ -266,6 +281,7 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>;
 
+    /// If this pair is interesting (with introspection features enabled)
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
     fn is_pair_interesting_introspection<EM, OT>(
@@ -282,9 +298,20 @@ where
         OT: ObserversTuple<I, S>;
 }
 
+/// Eager `OR` combination of two feedbacks
+#[derive(Debug, Clone)]
 pub struct LogicEagerOr {}
+
+/// Fast `OR` combination of two feedbacks
+#[derive(Debug, Clone)]
 pub struct LogicFastOr {}
+
+/// Eager `AND` combination of two feedbacks
+#[derive(Debug, Clone)]
 pub struct LogicEagerAnd {}
+
+/// Fast `AND` combination of two feedbacks
+#[derive(Debug, Clone)]
 pub struct LogicFastAnd {}
 
 impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicEagerOr
@@ -505,23 +532,24 @@ where
 
 /// Combine two feedbacks with an eager AND operation,
 /// will call all feedbacks functions even if not necessery to conclude the result
-pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicEagerAnd>;
+pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerAnd, I, S>;
 
 /// Combine two feedbacks with an fast AND operation,
 /// might skip calling feedbacks functions if not necessery to conclude the result
-pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicFastAnd>;
+pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastAnd, I, S>;
 
 /// Combine two feedbacks with an eager OR operation,
 /// will call all feedbacks functions even if not necessery to conclude the result
-pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicEagerOr>;
+pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerOr, I, S>;
 
 /// Combine two feedbacks with an fast OR operation,
 /// might skip calling feedbacks functions if not necessery to conclude the result
 /// This means any feedback that is not first might be skipped, use caution when using with
 /// `TimeFeedback`
-pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, I, S, LogicFastOr>;
+pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastOr, I, S>;
 
-/// Compose feedbacks with an OR operation
+/// Compose feedbacks with an `NOT` operation
+#[derive(Clone)]
 pub struct NotFeedback<A, I, S>
 where
     A: Feedback<I, S>,
@@ -533,6 +561,20 @@ where
     /// The name
     name: String,
     phantom: PhantomData<(I, S)>,
+}
+
+impl<A, I, S> Debug for NotFeedback<A, I, S>
+where
+    A: Feedback<I, S>,
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NotFeedback")
+            .field("name", &self.name)
+            .field("first", &self.first)
+            .finish()
+    }
 }
 
 impl<A, I, S> Feedback<I, S> for NotFeedback<A, I, S>
@@ -631,6 +673,7 @@ macro_rules! feedback_or {
     };
 }
 
+/// Combines multiple feedbacks with an `OR` operation, not executing feedbacks after the first positive result
 #[macro_export]
 macro_rules! feedback_or_fast {
     ( $last:expr ) => { $last };

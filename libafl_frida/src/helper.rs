@@ -1,55 +1,42 @@
-use ahash::AHasher;
-use std::hash::Hasher;
-
 use libafl::inputs::{HasTargetBytes, Input};
+use libafl::Error;
 
-use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
+#[cfg(unix)]
+use libafl_targets::drcov::DrCovBasicBlock;
 
+#[cfg(feature = "cmplog")]
+use crate::cmplog_rt::CmpLogRuntime;
+#[cfg(windows)]
+use crate::FridaOptions;
+#[cfg(unix)]
+use crate::{asan::asan_rt::AsanRuntime, FridaOptions};
+use crate::{coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
     Capstone, Insn,
 };
-
 #[cfg(all(target_arch = "x86_64", unix))]
 use capstone::{
     arch::{self, BuildsCapstone},
     Capstone, RegId,
 };
-
-#[cfg(target_arch = "aarch64")]
-use num_traits::cast::FromPrimitive;
-
+use core::fmt::{self, Debug, Formatter};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::Aarch64Register;
-
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", unix))]
 use frida_gum::instruction_writer::X86Register;
-
-use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::Transformer, ModuleDetails, ModuleMap,
-};
-
 #[cfg(unix)]
 use frida_gum::CpuContext;
 
-use frida_gum::{Gum, Module, PageProtection};
-
-use rangemap::RangeMap;
-
+#[cfg(unix)]
+use frida_gum::instruction_writer::InstructionWriter;
+use frida_gum::{stalker::Transformer, Gum, Module, ModuleDetails, ModuleMap, PageProtection};
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-
-#[cfg(unix)]
-use crate::{asan::asan_rt::AsanRuntime, FridaOptions};
-
-#[cfg(windows)]
-use crate::FridaOptions;
-
-use crate::coverage_rt::CoverageRuntime;
-
-#[cfg(feature = "cmplog")]
-use crate::cmplog_rt::CmpLogRuntime;
+#[cfg(target_arch = "aarch64")]
+use num_traits::cast::FromPrimitive;
+use rangemap::RangeMap;
 
 #[cfg(any(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
@@ -57,7 +44,7 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
 /// An helper that feeds `FridaInProcessExecutor` with user-supplied instrumentation
-pub trait FridaHelper<'a> {
+pub trait FridaHelper<'a>: Debug {
     /// Access to the stalker `Transformer`
     fn transformer(&self) -> &Transformer<'a>;
 
@@ -66,10 +53,10 @@ pub trait FridaHelper<'a> {
     fn register_thread(&mut self);
 
     /// Called prior to execution of an input
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 
     /// Called after execution of an input
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I);
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 
     /// Returns `true` if stalker is enabled
     fn stalker_enabled(&self) -> bool;
@@ -77,7 +64,11 @@ pub trait FridaHelper<'a> {
     /// pointer to the frida coverage map
     fn map_ptr_mut(&mut self) -> *mut u8;
 
+    /// Returns the mapped ranges of the target
     fn ranges(&self) -> &RangeMap<usize, (u16, String)>;
+
+    /// Returns the mapped ranges of the target, mutable
+    fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)>;
 }
 
 /// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
@@ -91,10 +82,29 @@ pub struct FridaInstrumentationHelper<'a> {
     asan_runtime: AsanRuntime,
     #[cfg(feature = "cmplog")]
     cmplog_runtime: CmpLogRuntime,
+    drcov_runtime: DrCovRuntime,
     ranges: RangeMap<usize, (u16, String)>,
     module_map: ModuleMap,
     options: &'a FridaOptions,
-    drcov_basic_blocks: Vec<DrCovBasicBlock>,
+}
+
+impl Debug for FridaInstrumentationHelper<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let mut dbg_me = f.debug_struct("FridaInstrumentationHelper");
+        dbg_me
+            .field("coverage_rt", &self.coverage_rt)
+            .field("drcov_runtime", &self.drcov_runtime)
+            .field("ranges", &self.ranges)
+            .field("module_map", &"<ModuleMap>")
+            .field("options", &self.options);
+        #[cfg(feature = "cmplog")]
+        dbg_me.field("cmplog_runtime", &self.cmplog_runtime);
+        #[cfg(unix)]
+        dbg_me.field("capstone", &self.capstone);
+        #[cfg(unix)]
+        dbg_me.field("asan_runtime", &self.asan_runtime);
+        dbg_me.finish()
+    }
 }
 
 impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
@@ -109,10 +119,12 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     }
 
     #[cfg(not(unix))]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) {}
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
 
     #[cfg(unix)]
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
         //println!("target_bytes: {:#x}: {:02x?}", slice.as_ptr() as usize, slice);
@@ -120,17 +132,13 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
             self.asan_runtime
                 .unpoison(slice.as_ptr() as usize, slice.len());
         }
+        Ok(())
     }
 
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) {
-        if self.options.drcov_enabled() {
-            let mut hasher = AHasher::new_with_keys(0, 0);
-            hasher.write(input.target_bytes().as_slice());
-
-            let filename = format!("./coverage/{:016x}.drcov", hasher.finish(),);
-            DrCovWriter::new(&filename, &self.ranges, &mut self.drcov_basic_blocks).write();
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+        if self.options().enable_drcov {
+            self.drcov_runtime.post_exec(input)?;
         }
-
         #[cfg(unix)]
         if self.options.asan_enabled() {
             if self.options.asan_detect_leaks() {
@@ -143,6 +151,7 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
                 .poison(slice.as_ptr() as usize, slice.len());
             self.asan_runtime.reset_allocations();
         }
+        Ok(())
     }
 
     fn stalker_enabled(&self) -> bool {
@@ -156,6 +165,10 @@ impl<'a> FridaHelper<'a> for FridaInstrumentationHelper<'a> {
     fn ranges(&self) -> &RangeMap<usize, (u16, String)> {
         &self.ranges
     }
+
+    fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)> {
+        &mut self.ranges
+    }
 }
 
 /// Helper function to get the size of a module's CODE section from frida
@@ -164,7 +177,7 @@ pub fn get_module_size(module_name: &str) -> usize {
     let mut code_size = 0;
     let code_size_ref = &mut code_size;
     Module::enumerate_ranges(module_name, PageProtection::ReadExecute, move |details| {
-        *code_size_ref = details.memory_range().size() as usize;
+        *code_size_ref = details.memory_range().size();
         true
     });
 
@@ -238,10 +251,10 @@ impl<'a> FridaInstrumentationHelper<'a> {
             asan_runtime: AsanRuntime::new(options.clone()),
             #[cfg(feature = "cmplog")]
             cmplog_runtime: CmpLogRuntime::new(),
+            drcov_runtime: DrCovRuntime::new(),
             ranges: RangeMap::new(),
             module_map: ModuleMap::new_from_names(modules_to_instrument),
             options,
-            drcov_basic_blocks: vec![],
         };
 
         if helper.options().stalker_enabled() {
@@ -278,19 +291,19 @@ impl<'a> FridaInstrumentationHelper<'a> {
                 for instruction in basic_block {
                     let instr = instruction.instr();
                     let address = instr.address();
-                    // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                    /*
-                    println!(
-                        "address: {:x} contains: {:?}",
-                        address,
-                        helper.ranges.contains_key(&(address as usize))
-                    );
-                    */
+                    //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+
+                    //println!(
+                    //"address: {:x} contains: {:?}",
+                    //address,
+                    //helper.ranges.contains_key(&(address as usize))
+                    //);
+
                     // println!("Ranges: {:#?}", helper.ranges);
                     if helper.ranges.contains_key(&(address as usize)) {
                         if first {
                             first = false;
-                            // println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                            //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
                             if helper.options().coverage_enabled() {
                                 helper.coverage_rt.emit_coverage_mapping(address, &output);
                             }
@@ -302,6 +315,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
                                     helper
+                                        .drcov_runtime
                                         .drcov_basic_blocks
                                         .push(DrCovBasicBlock::new(real_address, real_address + 4));
                                 });
@@ -376,6 +390,8 @@ impl<'a> FridaInstrumentationHelper<'a> {
             if helper.options().asan_enabled() || helper.options().drcov_enabled() {
                 helper.asan_runtime.init(gum, modules_to_instrument);
             }
+
+            helper.drcov_runtime.init(&helper.ranges);
             #[cfg(feature = "cmplog")]
             if helper.options.cmplog_enabled() {
                 helper.cmplog_runtime.init();
@@ -389,6 +405,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         self.options
     }
 
+    /// Determine the width of the specified instruction
     #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn instruction_width(instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32 {
@@ -455,6 +472,7 @@ impl<'a> FridaInstrumentationHelper<'a> {
         8 * num_registers
     }
 
+    /// Convert from a capstone register id to a frida InstructionWriter register index
     #[cfg(target_arch = "aarch64")]
     #[inline]
     pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
@@ -462,8 +480,9 @@ impl<'a> FridaInstrumentationHelper<'a> {
         Aarch64Register::from_u32(regint as u32).unwrap()
     }
 
-    // frida registers: https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html
-    // capstone registers: https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html
+    /// The writer registers
+    /// frida registers: <https://docs.rs/frida-gum/0.4.0/frida_gum/instruction_writer/enum.X86Register.html>
+    /// capstone registers: <https://docs.rs/capstone-sys/0.14.0/capstone_sys/x86_reg/index.html>
     #[cfg(all(target_arch = "x86_64", unix))]
     #[must_use]
     #[inline]

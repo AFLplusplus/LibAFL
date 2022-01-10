@@ -1,5 +1,7 @@
+//! Gramatron is the rewritten gramatron fuzzer in rust.
+//! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
 use alloc::vec::Vec;
-use core::{cmp::max, marker::PhantomData};
+use core::cmp::max;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -13,18 +15,18 @@ use crate::{
     Error,
 };
 
-pub struct GramatronRandomMutator<'a, R, S>
+/// A random mutator for grammar fuzzing
+#[derive(Debug)]
+pub struct GramatronRandomMutator<'a, S>
 where
-    S: HasRand<R> + HasMetadata,
-    R: Rand,
+    S: HasRand + HasMetadata,
 {
-    generator: &'a GramatronGenerator<'a, R, S>,
+    generator: &'a GramatronGenerator<'a, S>,
 }
 
-impl<'a, R, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, R, S>
+impl<'a, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, S>
 where
-    S: HasRand<R> + HasMetadata,
-    R: Rand,
+    S: HasRand + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -44,29 +46,29 @@ where
     }
 }
 
-impl<'a, R, S> Named for GramatronRandomMutator<'a, R, S>
+impl<'a, S> Named for GramatronRandomMutator<'a, S>
 where
-    S: HasRand<R> + HasMetadata,
-    R: Rand,
+    S: HasRand + HasMetadata,
 {
     fn name(&self) -> &str {
         "GramatronRandomMutator"
     }
 }
 
-impl<'a, R, S> GramatronRandomMutator<'a, R, S>
+impl<'a, S> GramatronRandomMutator<'a, S>
 where
-    S: HasRand<R> + HasMetadata,
-    R: Rand,
+    S: HasRand + HasMetadata,
 {
     /// Creates a new [`GramatronRandomMutator`].
     #[must_use]
-    pub fn new(generator: &'a GramatronGenerator<'a, R, S>) -> Self {
+    pub fn new(generator: &'a GramatronGenerator<'a, S>) -> Self {
         Self { generator }
     }
 }
 
-#[derive(Serialize, Deserialize)]
+/// The metadata used for `gramatron`
+#[derive(Debug, Serialize, Deserialize)]
+#[allow(missing_docs)]
 pub struct GramatronIdxMapMetadata {
     pub map: HashMap<usize, Vec<usize>>,
 }
@@ -74,6 +76,7 @@ pub struct GramatronIdxMapMetadata {
 crate::impl_serdeany!(GramatronIdxMapMetadata);
 
 impl GramatronIdxMapMetadata {
+    /// Creates a new [`struct@GramatronIdxMapMetadata`].
     #[must_use]
     pub fn new(input: &GramatronInput) -> Self {
         let mut map = HashMap::default();
@@ -85,21 +88,13 @@ impl GramatronIdxMapMetadata {
     }
 }
 
-#[derive(Default)]
-pub struct GramatronSpliceMutator<C, R, S>
-where
-    C: Corpus<GramatronInput>,
-    S: HasRand<R> + HasCorpus<C, GramatronInput> + HasMetadata,
-    R: Rand,
-{
-    phantom: PhantomData<(C, R, S)>,
-}
+/// A [`Mutator`] that mutates a [`GramatronInput`] by splicing inputs together.
+#[derive(Default, Debug)]
+pub struct GramatronSpliceMutator;
 
-impl<C, R, S> Mutator<GramatronInput, S> for GramatronSpliceMutator<C, R, S>
+impl<S> Mutator<GramatronInput, S> for GramatronSpliceMutator
 where
-    C: Corpus<GramatronInput>,
-    S: HasRand<R> + HasCorpus<C, GramatronInput> + HasMetadata,
-    R: Rand,
+    S: HasRand + HasCorpus<GramatronInput> + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -147,48 +142,31 @@ where
     }
 }
 
-impl<C, R, S> Named for GramatronSpliceMutator<C, R, S>
-where
-    C: Corpus<GramatronInput>,
-    S: HasRand<R> + HasCorpus<C, GramatronInput> + HasMetadata,
-    R: Rand,
-{
+impl Named for GramatronSpliceMutator {
     fn name(&self) -> &str {
         "GramatronSpliceMutator"
     }
 }
 
-impl<'a, C, R, S> GramatronSpliceMutator<C, R, S>
-where
-    C: Corpus<GramatronInput>,
-    S: HasRand<R> + HasCorpus<C, GramatronInput> + HasMetadata,
-    R: Rand,
-{
+impl GramatronSpliceMutator {
     /// Creates a new [`GramatronSpliceMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
-#[derive(Default)]
-pub struct GramatronRecursionMutator<R, S>
-where
-    S: HasRand<R> + HasMetadata,
-    R: Rand,
-{
+/// A mutator that uses Gramatron for grammar fuzzing and mutation.
+#[derive(Default, Debug)]
+pub struct GramatronRecursionMutator {
     counters: HashMap<usize, (usize, usize, usize)>,
     states: Vec<usize>,
     temp: Vec<Terminal>,
-    phantom: PhantomData<(R, S)>,
 }
 
-impl<R, S> Mutator<GramatronInput, S> for GramatronRecursionMutator<R, S>
+impl<S> Mutator<GramatronInput, S> for GramatronRecursionMutator
 where
-    S: HasRand<R> + HasMetadata,
-    R: Rand,
+    S: HasRand + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -257,29 +235,16 @@ where
     }
 }
 
-impl<R, S> Named for GramatronRecursionMutator<R, S>
-where
-    S: HasRand<R> + HasMetadata,
-    R: Rand,
-{
+impl Named for GramatronRecursionMutator {
     fn name(&self) -> &str {
         "GramatronRecursionMutator"
     }
 }
 
-impl<R, S> GramatronRecursionMutator<R, S>
-where
-    S: HasRand<R> + HasMetadata,
-    R: Rand,
-{
+impl GramatronRecursionMutator {
     /// Creates a new [`GramatronRecursionMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            counters: HashMap::default(),
-            states: vec![],
-            temp: vec![],
-            phantom: PhantomData,
-        }
+        Self::default()
     }
 }

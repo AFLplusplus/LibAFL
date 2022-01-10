@@ -1,13 +1,22 @@
+//! Generators for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer
+use crate::{generators::Generator, inputs::nautilus::NautilusInput, Error};
 use alloc::{string::String, vec::Vec};
+use core::fmt::Debug;
+use grammartec::context::Context;
 use std::{fs, io::BufReader, path::Path};
 
-use crate::{generators::Generator, inputs::nautilus::NautilusInput, Error};
-
-use grammartec::context::Context;
 pub use grammartec::newtypes::NTermID;
 
+/// The nautilus context for a generator
 pub struct NautilusContext {
+    /// The nautilus context for a generator
     pub ctx: Context,
+}
+
+impl Debug for NautilusContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NautilusContext {{}}",)
+    }
 }
 
 impl NautilusContext {
@@ -26,6 +35,7 @@ impl NautilusContext {
         Self { ctx }
     }
 
+    /// Create a new [`NautilusContext`] from a file
     #[must_use]
     pub fn from_file<P: AsRef<Path>>(tree_depth: usize, grammar_file: P) -> Self {
         let file = fs::File::open(grammar_file).expect("Cannot open grammar file");
@@ -39,7 +49,14 @@ impl NautilusContext {
 #[derive(Clone)]
 /// Generates random inputs from a grammar
 pub struct NautilusGenerator<'a> {
+    /// The nautilus context of the grammar
     pub ctx: &'a Context,
+}
+
+impl Debug for NautilusGenerator<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NautilusGenerator {{}}",)
+    }
 }
 
 impl<'a, S> Generator<NautilusInput, S> for NautilusGenerator<'a> {
@@ -63,12 +80,14 @@ impl<'a> NautilusGenerator<'a> {
         Self { ctx: &context.ctx }
     }
 
+    /// Gets the nonterminal from this input
     // TODO create from a python grammar
     #[must_use]
     pub fn nonterminal(&self, name: &str) -> NTermID {
         self.ctx.nt_id(name)
     }
 
+    /// Generates a [`NautilusInput`] from a nonterminal
     pub fn generate_from_nonterminal(&self, input: &mut NautilusInput, start: NTermID, len: usize) {
         input.tree_mut().generate_from_nt(start, len, self.ctx);
     }

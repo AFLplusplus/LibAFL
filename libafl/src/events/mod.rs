@@ -6,7 +6,10 @@ pub mod llmp;
 pub use llmp::*;
 
 use ahash::AHasher;
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
@@ -72,17 +75,23 @@ pub enum BrokerEventResult {
 /// Distinguish a fuzzer by its config
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum EventConfig {
+    /// Always assume unique setups for fuzzer configs
     AlwaysUnique,
+    /// Create a fuzzer config from a name hash
     FromName {
+        /// The name hash
         name_hash: u64,
     },
+    /// Create a fuzzer config from a build-time [`Uuid`]
     #[cfg(feature = "std")]
     BuildID {
+        /// The build-time [`Uuid`]
         id: Uuid,
     },
 }
 
 impl EventConfig {
+    /// Create a new [`EventConfig`] from a name hash
     #[must_use]
     pub fn from_name(name: &str) -> Self {
         let mut hasher = AHasher::new_with_keys(0, 0);
@@ -92,6 +101,7 @@ impl EventConfig {
         }
     }
 
+    /// Create a new [`EventConfig`] from a build-time [`Uuid`]
     #[cfg(feature = "std")]
     #[must_use]
     pub fn from_build_id() -> Self {
@@ -100,6 +110,7 @@ impl EventConfig {
         }
     }
 
+    /// Match if the currenti [`EventConfig`] matches another given config
     #[must_use]
     pub fn match_with(&self, other: &EventConfig) -> bool {
         match self {
@@ -179,8 +190,6 @@ where
     UpdateExecStats {
         /// The time of generation of the [`Event`]
         time: Duration,
-        /// The stability of this fuzzer node, if known
-        stability: Option<f32>,
         /// The executions of this client
         executions: usize,
         /// [`PhantomData`]
@@ -202,11 +211,10 @@ where
         time: Duration,
         /// The executions of this client
         executions: usize,
-        /// The stability of this fuzzer node, if known
-        stability: Option<f32>,
         /// Current performance statistics
         introspection_monitor: Box<ClientPerfMonitor>,
 
+        /// phantomm data
         phantom: PhantomData<I>,
     },
     /// A new objective was found
@@ -247,7 +255,6 @@ where
             } => "Testcase",
             Event::UpdateExecStats {
                 time: _,
-                stability: _,
                 executions: _,
                 phantom: _,
             }
@@ -260,7 +267,6 @@ where
             Event::UpdatePerfMonitor {
                 time: _,
                 executions: _,
-                stability: _,
                 introspection_monitor: _,
                 phantom: _,
             } => "PerfMonitor",
@@ -313,7 +319,7 @@ where
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT, S>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<I, S> + serde::Serialize,
+        OT: ObserversTuple<I, S> + Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -342,7 +348,6 @@ where
         S: HasExecutions + HasClientPerfMonitor,
     {
         let executions = *state.executions();
-        let stability = *state.stability();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
@@ -352,11 +357,22 @@ where
                 state,
                 Event::UpdateExecStats {
                     executions,
-                    stability,
                     time: cur,
                     phantom: PhantomData,
                 },
             )?;
+
+            if let Some(x) = state.stability() {
+                let stability = f64::from(*x);
+                self.fire(
+                    state,
+                    Event::UpdateUserStats {
+                        name: "stability".to_string(),
+                        value: UserStats::Float(stability),
+                        phantom: PhantomData,
+                    },
+                )?;
+            }
 
             // If performance monitor are requested, fire the `UpdatePerfMonitor` event
             #[cfg(feature = "introspection")]
@@ -372,7 +388,6 @@ where
                     Event::UpdatePerfMonitor {
                         executions,
                         time: cur,
-                        stability,
                         introspection_monitor: Box::new(state.introspection_monitor().clone()),
                         phantom: PhantomData,
                     },
@@ -387,6 +402,7 @@ where
     }
 }
 
+/// Restartable trait
 pub trait EventRestarter<S> {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
@@ -413,7 +429,9 @@ pub trait EventProcessor<E, I, S, Z> {
         Ok(postcard::from_bytes(observers_buf)?)
     }
 }
-
+/// The id of this [`EventManager`].
+/// For multi processed [`EventManager`]s,
+/// each connected client sholud have a unique ids.
 pub trait HasEventManagerId {
     /// The id of this manager. For Multiprocessed [`EventManager`]s,
     /// each client sholud have a unique ids.

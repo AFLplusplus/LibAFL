@@ -22,14 +22,19 @@ fn dll_extension<'a>() -> &'a str {
 
 include!(concat!(env!("OUT_DIR"), "/clang_constants.rs"));
 
+/// The supported LLVM passes
 #[allow(clippy::upper_case_acronyms)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LLVMPasses {
     //CmpLogIns,
+    /// The CmpLog pass
     CmpLogRtn,
+    /// The AFL coverage pass
     AFLCoverage,
 }
 
 impl LLVMPasses {
+    /// Gets the path of the LLVM pass
     #[must_use]
     pub fn path(&self) -> PathBuf {
         match self {
@@ -43,6 +48,7 @@ impl LLVMPasses {
 
 /// Wrap Clang
 #[allow(clippy::struct_excessive_bools)]
+#[derive(Debug)]
 pub struct ClangWrapper {
     is_silent: bool,
     optimize: bool,
@@ -269,11 +275,13 @@ impl ClangWrapper {
         }
     }
 
+    /// Sets the wrapped `cc` compiler
     pub fn wrapped_cc(&mut self, cc: String) -> &'_ mut Self {
         self.wrapped_cc = cc;
         self
     }
 
+    /// Sets the wrapped `cxx` compiler
     pub fn wrapped_cxx(&mut self, cxx: String) -> &'_ mut Self {
         self.wrapped_cxx = cxx;
         self
@@ -291,7 +299,7 @@ impl ClangWrapper {
         self
     }
 
-    // Add LLVM pass
+    /// Add LLVM pass
     pub fn add_pass(&mut self, pass: LLVMPasses) -> &'_ mut Self {
         self.passes.push(pass);
         self

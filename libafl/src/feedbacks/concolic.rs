@@ -1,3 +1,8 @@
+//! Concoliic feedback for comcolic fuzzing.
+//! It is used to attach concolic tracing metadata to the testcase.
+//! This feedback should be used in combination with another feedback as this feedback always considers testcases
+//! to be not interesting.
+//! Requires a [`ConcolicObserver`] to observe the concolic trace.
 use crate::{
     bolts::tuples::Named,
     corpus::Testcase,
@@ -17,12 +22,14 @@ use crate::{
 /// This feedback should be used in combination with another feedback as this feedback always considers testcases
 /// to be not interesting.
 /// Requires a [`ConcolicObserver`] to observe the concolic trace.
+#[derive(Debug)]
 pub struct ConcolicFeedback {
     name: String,
     metadata: Option<ConcolicMetadata>,
 }
 
 impl ConcolicFeedback {
+    /// Creates a concolic feedback from an observer
     #[allow(unused)]
     #[must_use]
     pub fn from_observer(observer: &ConcolicObserver) -> Self {

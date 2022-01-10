@@ -5,12 +5,12 @@ use serde::{Deserialize, Serialize};
 use std::{cell::UnsafeCell, cmp::max};
 
 use crate::{
-    emu,
+    emu::Emulator,
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
 };
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
     pub map: HashMap<(u64, u64), u64>,
     pub current_id: u64,
@@ -28,6 +28,7 @@ impl QemuEdgesMapMetadata {
 
 libafl::impl_serdeany!(QemuEdgesMapMetadata);
 
+#[derive(Debug)]
 pub struct QemuEdgeCoverageHelper {
     filter: QemuInstrumentationFilter,
 }
@@ -69,7 +70,7 @@ where
         QT: QemuHelperTuple<I, S>,
     {
         executor.hook_edge_generation(gen_unique_edge_ids::<I, QT, S>);
-        emu::set_exec_edge_hook(trace_edge_hitcount);
+        executor.emulator().set_exec_edge_hook(trace_edge_hitcount);
     }
 }
 
@@ -83,6 +84,7 @@ fn hash_me(mut x: u64) -> u64 {
 }
 
 pub fn gen_unique_edge_ids<I, QT, S>(
+    _emulator: &Emulator,
     helpers: &mut QT,
     state: &mut S,
     src: u64,
@@ -128,6 +130,7 @@ where
 }
 
 pub fn gen_hashed_edge_ids<I, QT, S>(
+    _emulator: &Emulator,
     helpers: &mut QT,
     _state: &mut S,
     src: u64,
@@ -157,11 +160,21 @@ pub extern "C" fn trace_edge_single(id: u64) {
     }
 }
 
-pub fn gen_addr_block_ids<I, QT, S>(_helpers: &mut QT, _state: &mut S, pc: u64) -> Option<u64> {
+pub fn gen_addr_block_ids<I, QT, S>(
+    _emulator: &Emulator,
+    _helpers: &mut QT,
+    _state: &mut S,
+    pc: u64,
+) -> Option<u64> {
     Some(pc)
 }
 
-pub fn gen_hashed_block_ids<I, QT, S>(_helpers: &mut QT, _state: &mut S, pc: u64) -> Option<u64> {
+pub fn gen_hashed_block_ids<I, QT, S>(
+    _emulator: &Emulator,
+    _helpers: &mut QT,
+    _state: &mut S,
+    pc: u64,
+) -> Option<u64> {
     Some(hash_me(pc))
 }
 

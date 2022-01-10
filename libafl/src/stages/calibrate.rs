@@ -2,10 +2,11 @@
 
 use crate::{
     bolts::current_time,
+    bolts::tuples::MatchName,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{FeedbackStatesTuple, MapFeedbackState},
+    feedbacks::MapFeedbackState,
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
@@ -21,41 +22,33 @@ use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
+/// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+pub struct CalibrationStage<I, O, OT, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasMetadata,
 {
     map_observer_name: String,
     stage_max: usize,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, FT, I, O, OT, S, T, Z)>,
+    phantom: PhantomData<(I, O, OT, S, T)>,
 }
 
 const CAL_STAGE_START: usize = 4;
 const CAL_STAGE_MAX: usize = 16;
 
-impl<C, E, EM, FT, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
-    for CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+impl<E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata + HasFeedbackStates<FT> + HasClientPerfMonitor,
+    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -110,7 +103,7 @@ where
         let mut i = 1;
         let mut has_errors = false;
         let mut unstable_entries: usize = 0;
-        let map_len: usize = map_first.len() as usize;
+        let map_len: usize = map_first.len();
         while i < iter {
             let input = state
                 .corpus()
@@ -208,8 +201,10 @@ where
     }
 }
 
+/// The n fuzz size
 pub const N_FUZZ_SIZE: usize = 1 << 21;
 
+/// The metadata used for power schedules
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PowerScheduleMetadata {
     /// Measured exec time during calibration
@@ -228,6 +223,7 @@ pub struct PowerScheduleMetadata {
 
 /// The metadata for runs in the calibration stage.
 impl PowerScheduleMetadata {
+    /// Creates a new [`struct@PowerScheduleMetadata`]
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -240,56 +236,68 @@ impl PowerScheduleMetadata {
         }
     }
 
+    /// The measured exec time during calibration
     #[must_use]
     pub fn exec_time(&self) -> Duration {
         self.exec_time
     }
 
+    /// Set the measured exec
     pub fn set_exec_time(&mut self, time: Duration) {
         self.exec_time = time;
     }
 
+    /// The cycles
     #[must_use]
     pub fn cycles(&self) -> u64 {
         self.cycles
     }
 
+    /// Sets the cycles
     pub fn set_cycles(&mut self, val: u64) {
         self.cycles = val;
     }
 
+    /// The bitmap size
     #[must_use]
     pub fn bitmap_size(&self) -> u64 {
         self.bitmap_size
     }
 
+    /// Sets the bitmap size
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
     }
 
+    /// The number of filled map entries
     #[must_use]
     pub fn bitmap_entries(&self) -> u64 {
         self.bitmap_entries
     }
 
+    /// Sets the number of filled map entries
     pub fn set_bitmap_entries(&mut self, val: u64) {
         self.bitmap_entries = val;
     }
 
+    /// The amount of queue cycles
     #[must_use]
     pub fn queue_cycles(&self) -> u64 {
         self.queue_cycles
     }
 
+    /// Sets the amount of queue cycles
     pub fn set_queue_cycles(&mut self, val: u64) {
         self.queue_cycles = val;
     }
 
+    /// Gets the `n_fuzz`.
     #[must_use]
     pub fn n_fuzz(&self) -> &[u32] {
         &self.n_fuzz
     }
 
+    /// Sets the `n_fuzz`.
     #[must_use]
     pub fn n_fuzz_mut(&mut self) -> &mut [u32] {
         &mut self.n_fuzz
@@ -298,19 +306,15 @@ impl PowerScheduleMetadata {
 
 crate::impl_serdeany!(PowerScheduleMetadata);
 
-impl<C, E, EM, FT, I, O, OT, S, T, Z> CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+impl<I, O, OT, S, T> CalibrationStage<I, O, OT, S, T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     I: Input,
     O: MapObserver<T>,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasMetadata,
 {
+    /// Create a new [`CalibrationStage`].
     pub fn new(state: &mut S, map_observer_name: &O) -> Self {
         state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new());
         Self {

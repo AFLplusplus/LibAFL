@@ -3,11 +3,12 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
-use core::{fmt, time, time::Duration};
+use alloc::{string::String, vec::Vec};
+
+#[cfg(feature = "introspection")]
+use alloc::string::ToString;
+
+use core::{fmt, time::Duration};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -18,8 +19,13 @@ const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 /// User-defined stat types
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
+    /// A numerical value
     Number(u64),
+    /// A Float value
+    Float(f64),
+    /// A `String`
     String(String),
+    /// A ratio of two values
     Ratio(u64, u64),
 }
 
@@ -27,6 +33,7 @@ impl fmt::Display for UserStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UserStats::Number(n) => write!(f, "{}", n),
+            UserStats::Float(n) => write!(f, "{}", n),
             UserStats::String(s) => write!(f, "{}", s),
             UserStats::Ratio(a, b) => {
                 if *b == 0 {
@@ -52,13 +59,11 @@ pub struct ClientStats {
     /// The last reported executions for this client
     pub last_window_executions: u64,
     /// The last time we got this information
-    pub last_window_time: time::Duration,
+    pub last_window_time: Duration,
     /// The last executions per sec
     pub last_execs_per_sec: f32,
     /// User-defined monitor
     pub user_monitor: HashMap<String, UserStats>,
-    /// Stability, and if we ever received a stability value
-    pub stability: Option<f32>,
     /// Client performance statistics
     #[cfg(feature = "introspection")]
     pub introspection_monitor: ClientPerfMonitor,
@@ -66,7 +71,7 @@ pub struct ClientStats {
 
 impl ClientStats {
     /// We got a new information about executions for this client, insert them.
-    pub fn update_executions(&mut self, executions: u64, cur_time: time::Duration) {
+    pub fn update_executions(&mut self, executions: u64, cur_time: Duration) {
         let diff = cur_time
             .checked_sub(self.last_window_time)
             .map_or(0, |d| d.as_secs());
@@ -88,14 +93,9 @@ impl ClientStats {
         self.objective_size = objective_size;
     }
 
-    /// we got a new information about stability for this client, insert it.
-    pub fn update_stability(&mut self, stability: f32) {
-        self.stability = Some(stability);
-    }
-
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
-    pub fn execs_per_sec(&mut self, cur_time: time::Duration) -> u64 {
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
         if self.executions == 0 {
             return 0;
         }
@@ -149,28 +149,10 @@ pub trait Monitor {
     fn client_stats(&self) -> &[ClientStats];
 
     /// creation time
-    fn start_time(&mut self) -> time::Duration;
+    fn start_time(&mut self) -> Duration;
 
     /// show the monitor to the user
     fn display(&mut self, event_msg: String, sender_id: u32);
-
-    /// Show the Stabiliity
-    fn stability(&self) -> Option<f32> {
-        let mut stability_total = 0_f32;
-        let mut num = 0_usize;
-        for stat in self.client_stats() {
-            if let Some(stability) = stat.stability {
-                stability_total += stability;
-                num += 1;
-            }
-        }
-        if num == 0 {
-            None
-        } else {
-            #[allow(clippy::cast_precision_loss)]
-            Some(stability_total / num as f32)
-        }
-    }
 
     /// Amount of elements in the corpus (combined for all children)
     fn corpus_size(&self) -> u64 {
@@ -218,6 +200,7 @@ pub trait Monitor {
 
 /// Monitor that print exactly nothing.
 /// Not good for debuging, very good for speed.
+#[derive(Debug)]
 pub struct NopMonitor {
     start_time: Duration,
     client_stats: Vec<ClientStats>,
@@ -235,7 +218,7 @@ impl Monitor for NopMonitor {
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> time::Duration {
+    fn start_time(&mut self) -> Duration {
         self.start_time
     }
 
@@ -285,13 +268,13 @@ where
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> time::Duration {
+    fn start_time(&mut self) -> Duration {
         self.start_time
     }
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}{}, exec/sec: {}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),
@@ -299,11 +282,6 @@ where
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            if let Some(stability) = self.stability() {
-                format!(", stability: {:.2}", stability)
-            } else {
-                "".to_string()
-            },
             self.execs_per_sec()
         );
         (self.print_fn)(fmt);
@@ -338,7 +316,7 @@ where
     }
 
     /// Creates the monitor with a given `start_time`.
-    pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
+    pub fn with_time(print_fn: F, start_time: Duration) -> Self {
         Self {
             print_fn,
             start_time,
@@ -347,6 +325,7 @@ where
     }
 }
 
+/// Start the timer
 #[macro_export]
 macro_rules! start_timer {
     ($state:expr) => {{
@@ -356,6 +335,7 @@ macro_rules! start_timer {
     }};
 }
 
+/// Mark the elapsed time for the given feature
 #[macro_export]
 macro_rules! mark_feature_time {
     ($state:expr, $feature:expr) => {{
@@ -367,6 +347,7 @@ macro_rules! mark_feature_time {
     }};
 }
 
+/// Mark the elapsed time for the given feature
 #[macro_export]
 macro_rules! mark_feedback_time {
     ($state:expr) => {{
@@ -708,7 +689,7 @@ impl ClientPerfMonitor {
         self.stages
             .iter()
             .enumerate()
-            .filter(move |(stage_index, _)| used[*stage_index as usize])
+            .filter(move |(stage_index, _)| used[*stage_index])
     }
 
     /// A map of all `feedbacks`

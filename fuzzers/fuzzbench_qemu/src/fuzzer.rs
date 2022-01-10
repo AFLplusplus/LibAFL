@@ -22,33 +22,42 @@ use libafl::{
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
     },
-    corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{
+        Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
+    },
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
-    feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedback_or,
+    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
-        tokens_mutations, I2SRandReplace, Tokens,
+        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    stages::{
+        calibrate::CalibrationStage,
+        power::{PowerMutationalStage, PowerSchedule},
+        ShadowTracingStage, StdMutationalStage,
+    },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
 use libafl_qemu::{
-    asan::QemuAsanHelper,
+    //asan::QemuAsanHelper,
     cmplog,
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
     edges,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    emu, filter_qemu_args, init_with_asan,
-    snapshot::QemuSnapshotHelper,
-    MmapPerms, QemuExecutor, Regs,
+    emu::Emulator,
+    filter_qemu_args,
+    //snapshot::QemuSnapshotHelper,
+    MmapPerms,
+    QemuExecutor,
+    Regs,
 };
 
 /// The fuzzer main
@@ -56,10 +65,6 @@ pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-
-    let mut args: Vec<String> = env::args().collect();
-    let mut env: Vec<(String, String)> = env::vars().collect();
-    init_with_asan(&mut args, &mut env);
 
     let res = match App::new("libafl_qemu_fuzzbench")
         .version("0.4.0")
@@ -161,34 +166,37 @@ fn fuzz(
     logfile: PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
+    env::remove_var("LD_LIBRARY_PATH");
+
+    let args: Vec<String> = env::args().collect();
+    let env: Vec<(String, String)> = env::vars().collect();
+    let emu = Emulator::new(&args, &env);
+
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu::binary_path(), &mut elf_buffer)?;
+    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu::load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
 
-    emu::set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu::run();
+    emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    unsafe { emu.run() };
 
-    println!(
-        "Break at {:#x}",
-        emu::read_reg::<_, u64>(Regs::Rip).unwrap()
-    );
+    println!("Break at {:#x}", emu.read_reg::<_, u64>(Regs::Rip).unwrap());
 
-    let stack_ptr: u64 = emu::read_reg(Regs::Rsp).unwrap();
+    let stack_ptr: u64 = emu.read_reg(Regs::Rsp).unwrap();
     let mut ret_addr = [0u64];
-    emu::read_mem(stack_ptr, &mut ret_addr);
+    unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
     let ret_addr = ret_addr[0];
 
     println!("Stack pointer = {:#x}", stack_ptr);
     println!("Return address = {:#x}", ret_addr);
 
-    emu::remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu::set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
+    emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu::map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
     println!("Placing input at {:#x}", input_addr);
 
     let log = RefCell::new(
@@ -256,7 +264,7 @@ fn fuzz(
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+    let objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -274,8 +282,18 @@ fn fuzz(
         )
     });
 
+    let calibration = CalibrationStage::new(&mut state, &edges_observer);
+
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
+    // Setup a MOPT mutator
+    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
+
+    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -290,24 +308,27 @@ fn fuzz(
             len = 4096;
         }
 
-        emu::write_mem(input_addr, buf);
+        unsafe {
+            emu.write_mem(input_addr, buf);
 
-        emu::write_reg(Regs::Rdi, input_addr).unwrap();
-        emu::write_reg(Regs::Rsi, len).unwrap();
-        emu::write_reg(Regs::Rip, test_one_input_ptr).unwrap();
-        emu::write_reg(Regs::Rsp, stack_ptr).unwrap();
+            emu.write_reg(Regs::Rdi, input_addr).unwrap();
+            emu.write_reg(Regs::Rsi, len).unwrap();
+            emu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
+            emu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-        emu::run();
+            emu.run();
+        }
 
         ExitKind::Ok
     };
 
     let executor = QemuExecutor::new(
         &mut harness,
+        &emu,
         tuple_list!(
             QemuEdgeCoverageHelper::new(),
             QemuCmpLogHelper::new(),
-            QemuAsanHelper::new(),
+            //QemuAsanHelper::new(),
             //QemuSnapshotHelper::new()
         ),
         tuple_list!(edges_observer, time_observer),
@@ -340,13 +361,8 @@ fn fuzz(
 
     let tracing = ShadowTracingStage::new(&mut executor);
 
-    // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(I2SRandReplace::new());
-
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-
-    let mut stages = tuple_list!(tracing, i2s, StdMutationalStage::new(mutator));
+    // The order of the stages matter!
+    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Remove target ouput (logs still survive)
     #[cfg(unix)]

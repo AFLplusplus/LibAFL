@@ -8,4 +8,4 @@ authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>"]
 
 [dependencies]
 libafl = {path = "../../../libafl"}
-structopt = "0.3.21"
+clap = { version = "3.0", features = ["derive"] }

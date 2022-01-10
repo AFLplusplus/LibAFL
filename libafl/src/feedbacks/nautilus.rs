@@ -1,5 +1,8 @@
+//! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
+use core::fmt::Debug;
 use grammartec::{chunkstore::ChunkStore, context::Context};
 use serde::{Deserialize, Serialize};
+use serde_json;
 use std::fs::create_dir_all;
 
 use crate::{
@@ -15,14 +18,27 @@ use crate::{
     Error,
 };
 
+/// Metadata for Nautilus grammar mutator chunks
 #[derive(Serialize, Deserialize)]
 pub struct NautilusChunksMetadata {
+    /// the chunk store
     pub cks: ChunkStore,
+}
+
+impl Debug for NautilusChunksMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "NautilusChunksMetadata {{ {} }}",
+            serde_json::to_string_pretty(self).unwrap(),
+        )
+    }
 }
 
 crate::impl_serdeany!(NautilusChunksMetadata);
 
 impl NautilusChunksMetadata {
+    /// Creates a new [`NautilusChunksMetadata`]
     #[must_use]
     pub fn new(work_dir: String) -> Self {
         create_dir_all(format!("{}/outputs/chunks", &work_dir))
@@ -33,11 +49,19 @@ impl NautilusChunksMetadata {
     }
 }
 
+/// A nautilus feedback for grammar fuzzing
 pub struct NautilusFeedback<'a> {
     ctx: &'a Context,
 }
 
+impl Debug for NautilusFeedback<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "NautilusFeedback {{}}")
+    }
+}
+
 impl<'a> NautilusFeedback<'a> {
+    /// Create a new [`NautilusFeedback`]
     #[must_use]
     pub fn new(context: &'a NautilusContext) -> Self {
         Self { ctx: &context.ctx }

@@ -220,16 +220,20 @@ where
     }
 }
 
+/// The corpus this input should be added to
 #[derive(Debug, PartialEq)]
 pub enum ExecuteInputResult {
+    /// No special input
     None,
+    /// This input should be stored ini the corpus
     Corpus,
+    /// This input leads to a solution
     Solution,
 }
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+pub struct StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     F: Feedback<I, S>,
@@ -240,11 +244,10 @@ where
     scheduler: CS,
     feedback: F,
     objective: OF,
-    phantom: PhantomData<(C, I, OT, S, SC)>,
+    phantom: PhantomData<(I, OT, S)>,
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> HasCorpusScheduler<CS, I, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     F: Feedback<I, S>,
@@ -261,7 +264,7 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> HasFeedback<F, I, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> HasFeedback<F, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     F: Feedback<I, S>,
@@ -278,7 +281,7 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> HasObjective<I, OF, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> HasObjective<I, OF, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     F: Feedback<I, S>,
@@ -295,17 +298,14 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> ExecutionProcessor<I, OT, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> ExecutionProcessor<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    C: Corpus<I>,
-    SC: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -412,17 +412,14 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> EvaluatorObservers<I, OT, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> EvaluatorObservers<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
-    SC: Corpus<I>,
+    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -444,10 +441,8 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, E, EM, F, I, OF, OT, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
@@ -455,8 +450,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
-    SC: Corpus<I>,
+    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -513,8 +507,7 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, I, OF, OT, S, ST, SC> Fuzzer<E, EM, I, S, ST>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     EM: EventManager<E, I, S, Self>,
@@ -564,7 +557,7 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     F: Feedback<I, S>,
@@ -612,6 +605,7 @@ where
     }
 }
 
+/// Structs with this trait will execute an [`Input`]
 pub trait ExecutesInput<I, OT, S, Z>
 where
     I: Input,
@@ -630,8 +624,7 @@ where
         OT: ObserversTuple<I, S>;
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> ExecutesInput<I, OT, S, Self>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> ExecutesInput<I, OT, S, Self> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: CorpusScheduler<I, S>,
     F: Feedback<I, S>,
