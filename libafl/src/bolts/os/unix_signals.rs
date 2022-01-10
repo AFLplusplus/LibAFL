@@ -74,7 +74,7 @@ extern "C" {
 }
 
 /// All signals on this system, as `enum`.
-#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
+#[derive(Debug, IntoPrimitive, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
 pub enum Signal {
     /// `SIGABRT` signal id

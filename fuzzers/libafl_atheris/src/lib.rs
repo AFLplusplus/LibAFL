@@ -216,8 +216,13 @@ pub fn LLVMFuzzerRunDriver(
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
-        let edges = unsafe { slice::from_raw_parts_mut(EDGES_MAP_PTR, MAX_EDGES_NUM) };
-        let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+        let edges_observer = unsafe {
+            HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                "edges",
+                EDGES_MAP_PTR,
+                MAX_EDGES_NUM,
+            ))
+        };
 
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");

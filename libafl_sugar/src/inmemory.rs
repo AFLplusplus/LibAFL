@@ -1,6 +1,9 @@
-use typed_builder::TypedBuilder;
+//! In-Memory fuzzing made easy.
+//! Use this sugar for scaling `libfuzzer`-style fuzzers.
 
+use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
+use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
@@ -35,6 +38,8 @@ use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP, MAX_EDGES_NUM};
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
+/// In-Memory fuzzing made easy.
+/// Use this sugar for scaling `libfuzzer`-style fuzzers.
 #[derive(TypedBuilder)]
 pub struct InMemoryBytesCoverageSugar<'a, H>
 where
@@ -56,6 +61,7 @@ where
     /// Flag if use CmpLog
     #[builder(default = false)]
     use_cmplog: bool,
+    /// The port used for communication between this fuzzer node and other fuzzer nodes
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -69,11 +75,39 @@ where
     harness: Option<H>,
 }
 
+impl<H> Debug for InMemoryBytesCoverageSugar<'_, H>
+where
+    H: FnMut(&[u8]),
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InMemoryBytesCoverageSugar")
+            .field("configuration", &self.configuration)
+            .field("timeout", &self.timeout)
+            .field("input_dirs", &self.input_dirs)
+            .field("output_dir", &self.output_dir)
+            .field("tokens_file", &self.tokens_file)
+            .field("use_cmplog", &self.use_cmplog)
+            .field("broker_port", &self.broker_port)
+            .field("cores", &self.cores)
+            .field("remote_broker_addr", &self.remote_broker_addr)
+            .field(
+                "harness",
+                if self.harness.is_some() {
+                    &"<harness_fn>"
+                } else {
+                    &"None"
+                },
+            )
+            .finish()
+    }
+}
+
 #[allow(clippy::similar_names)]
 impl<'a, H> InMemoryBytesCoverageSugar<'a, H>
 where
     H: FnMut(&[u8]),
 {
+    /// Run the fuzzer
     #[allow(clippy::too_many_lines, clippy::similar_names)]
     pub fn run(&mut self) {
         let conf = match self.configuration.as_ref() {
@@ -270,6 +304,7 @@ where
     }
 }
 
+/// Python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::inmemory;
@@ -278,6 +313,8 @@ pub mod pybind {
     use pyo3::types::PyBytes;
     use std::path::PathBuf;
 
+    /// In-Memory fuzzing made easy.
+    /// Use this sugar for scaling `libfuzzer`-style fuzzers.
     #[pyclass(unsendable)]
     struct InMemoryBytesCoverageSugar {
         input_dirs: Vec<PathBuf>,
@@ -288,6 +325,7 @@ pub mod pybind {
 
     #[pymethods]
     impl InMemoryBytesCoverageSugar {
+        /// Create a new [`InMemoryBytesCoverageSugar`]
         #[new]
         fn new(
             input_dirs: Vec<PathBuf>,
@@ -303,6 +341,7 @@ pub mod pybind {
             }
         }
 
+        /// Run the fuzzer
         #[allow(clippy::needless_pass_by_value)]
         pub fn run(&self, harness: PyObject) {
             inmemory::InMemoryBytesCoverageSugar::builder()
@@ -323,6 +362,7 @@ pub mod pybind {
         }
     }
 
+    /// Register the module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<InMemoryBytesCoverageSugar>()?;
         Ok(())

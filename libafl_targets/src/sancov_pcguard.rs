@@ -39,7 +39,7 @@ pub unsafe extern "C" fn __sanitizer_cov_trace_pc_guard(guard: *mut u32) {
         }
         #[cfg(feature = "sancov_pcguard_hitcounts")]
         {
-            let val = (*EDGES_MAP.get_unchecked(pos) as u8).wrapping_add(1);
+            let val = (*EDGES_MAP.get_unchecked(pos)).wrapping_add(1);
             *EDGES_MAP.get_unchecked_mut(pos) = val;
         }
     }

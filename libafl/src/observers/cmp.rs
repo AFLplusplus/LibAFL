@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-
+use core::fmt::Debug;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
@@ -14,16 +14,23 @@ use crate::{
     Error,
 };
 
+/// Compare values collected during a run
 #[derive(Debug, Serialize, Deserialize)]
 pub enum CmpValues {
+    /// Two u8 values
     U8((u8, u8)),
+    /// Two u16 values
     U16((u16, u16)),
+    /// Two u32 values
     U32((u32, u32)),
+    /// Two u64 values
     U64((u64, u64)),
+    /// Two vecs of u8 values/byte
     Bytes((Vec<u8>, Vec<u8>)),
 }
 
 impl CmpValues {
+    /// Returns if the values are numericals
     #[must_use]
     pub fn is_numeric(&self) -> bool {
         matches!(
@@ -32,6 +39,7 @@ impl CmpValues {
         )
     }
 
+    /// Converts the value to a u64 tuple
     #[must_use]
     pub fn to_u64_tuple(&self) -> Option<(u64, u64)> {
         match self {
@@ -45,7 +53,7 @@ impl CmpValues {
 }
 
 /// A state metadata holding a list of values logged from comparisons
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct CmpValuesMetadata {
     /// A `list` of values.
     #[serde(skip)]
@@ -71,7 +79,7 @@ impl CmpValuesMetadata {
 }
 
 /// A [`CmpMap`] traces comparisons during the current execution
-pub trait CmpMap {
+pub trait CmpMap: Debug {
     /// Get the number of cmps
     fn len(&self) -> usize;
 
@@ -81,13 +89,13 @@ pub trait CmpMap {
         self.len() == 0
     }
 
-    // Get the number of executions for a cmp
+    /// Get the number of executions for a cmp
     fn executions_for(&self, idx: usize) -> usize;
 
-    // Get the number of logged executions for a cmp
+    /// Get the number of logged executions for a cmp
     fn usable_executions_for(&self, idx: usize) -> usize;
 
-    // Get the logged values for a cmp
+    /// Get the logged values for a cmp
     fn values_of(&self, idx: usize, execution: usize) -> CmpValues;
 
     /// Reset the state

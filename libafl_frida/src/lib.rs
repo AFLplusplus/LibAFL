@@ -3,6 +3,62 @@ The frida executor is a binary-only mode for `LibAFL`.
 It can report coverage and, on supported architecutres, even reports memory access errors.
 */
 
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::pedantic)]
+#![allow(
+    clippy::unreadable_literal,
+    clippy::type_repetition_in_bounds,
+    clippy::missing_errors_doc,
+    clippy::cast_possible_truncation,
+    clippy::used_underscore_binding,
+    clippy::ptr_as_ptr,
+    clippy::missing_panics_doc,
+    clippy::missing_docs_in_private_items,
+    clippy::module_name_repetitions,
+    clippy::unreadable_literal
+)]
+#![cfg_attr(debug_assertions, warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(not(debug_assertions), deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(
+    not(debug_assertions),
+    deny(
+        bad_style,
+        const_err,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        private_in_public,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+
 /// The frida-asan allocator
 #[cfg(unix)]
 pub mod alloc;
@@ -18,6 +74,8 @@ pub mod cmplog_rt;
 
 /// The `LibAFL` firda helper
 pub mod helper;
+
+pub mod drcov_rt;
 
 /// The frida executor
 pub mod executor;
@@ -37,6 +95,7 @@ pub struct FridaOptions {
     enable_asan_continue_after_error: bool,
     enable_asan_allocation_backtraces: bool,
     asan_max_allocation: usize,
+    asan_max_total_allocation: usize,
     asan_max_allocation_panics: bool,
     enable_coverage: bool,
     enable_drcov: bool,
@@ -78,6 +137,9 @@ impl FridaOptions {
                     }
                     "asan-max-allocation" => {
                         options.asan_max_allocation = value.parse().unwrap();
+                    }
+                    "asan-max-total-allocation" => {
+                        options.asan_max_total_allocation = value.parse().unwrap();
                     }
                     "asan-max-allocation-panics" => {
                         options.asan_max_allocation_panics = value.parse().unwrap();
@@ -208,6 +270,13 @@ impl FridaOptions {
         self.asan_max_allocation
     }
 
+    /// The maximum total allocation size that the ASAN allocator should allocate
+    #[must_use]
+    #[inline]
+    pub fn asan_max_total_allocation(&self) -> usize {
+        self.asan_max_total_allocation
+    }
+
     /// Should we panic if the max ASAN allocation size is exceeded
     #[must_use]
     #[inline]
@@ -252,6 +321,7 @@ impl Default for FridaOptions {
             enable_asan_continue_after_error: false,
             enable_asan_allocation_backtraces: true,
             asan_max_allocation: 1 << 30,
+            asan_max_total_allocation: 1 << 32,
             asan_max_allocation_panics: false,
             enable_coverage: true,
             enable_drcov: false,

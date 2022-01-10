@@ -28,7 +28,7 @@ use crate::bolts::fs::write_file_atomic;
 use crate::{bolts::ownedref::OwnedSlice, Error};
 
 /// An input for the target
-pub trait Input: Clone + serde::Serialize + serde::de::DeserializeOwned + Debug {
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     #[cfg(feature = "std")]
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
@@ -76,7 +76,7 @@ impl Input for NopInput {
 }
 impl HasTargetBytes for NopInput {
     fn target_bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::Owned(vec![0])
+        OwnedSlice::from(vec![0])
     }
 }
 
