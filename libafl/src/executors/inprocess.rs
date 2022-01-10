@@ -531,6 +531,12 @@ mod unix_signal_handler {
 
         let input = (data.current_input_ptr as *const I).as_ref().unwrap();
         data.current_input_ptr = ptr::null();
+        let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+        let observers = executor.observers_mut();
+
+        observers
+            .post_exec_all(state, input)
+            .expect("Observers post_exec_all failed");
 
         let interesting = fuzzer
             .objective_mut()
@@ -642,7 +648,6 @@ mod unix_signal_handler {
             #[cfg(feature = "std")]
             eprintln!("Triggering post_exec_all from crash_handler");
 
-            // We can also filter the stacktrace observers exclusively and run their post_exec
             observers
                 .post_exec_all(state, input)
                 .expect("Observers post_exec_all failed");
