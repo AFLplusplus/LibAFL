@@ -1,8 +1,7 @@
+//! Mutations for [`EncodedInput`]s
+//!
 use alloc::vec::Vec;
-use core::{
-    cmp::{max, min},
-    marker::PhantomData,
-};
+use core::cmp::{max, min};
 
 use crate::{
     bolts::{
@@ -20,20 +19,10 @@ use crate::{
 };
 
 /// Set a code in the input as a random value
-#[derive(Default)]
-pub struct EncodedRandMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
-    phantom: PhantomData<(R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct EncodedRandMutator;
 
-impl<R, S> Mutator<EncodedInput, S> for EncodedRandMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -50,45 +39,25 @@ where
     }
 }
 
-impl<R, S> Named for EncodedRandMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl Named for EncodedRandMutator {
     fn name(&self) -> &str {
         "EncodedRandMutator"
     }
 }
 
-impl<R, S> EncodedRandMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl EncodedRandMutator {
     /// Creates a new [`EncodedRandMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// Increment a random code in the input
-#[derive(Default)]
-pub struct EncodedIncMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
-    phantom: PhantomData<(R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct EncodedIncMutator;
 
-impl<R, S> Mutator<EncodedInput, S> for EncodedIncMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -105,45 +74,25 @@ where
     }
 }
 
-impl<R, S> Named for EncodedIncMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl Named for EncodedIncMutator {
     fn name(&self) -> &str {
         "EncodedIncMutator"
     }
 }
 
-impl<R, S> EncodedIncMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
-    /// Creates a new [`EncodedRandMutator`].
+impl EncodedIncMutator {
+    /// Creates a new [`EncodedIncMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// Decrement a random code in the input
-#[derive(Default)]
-pub struct EncodedDecMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
-    phantom: PhantomData<(R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct EncodedDecMutator;
 
-impl<R, S> Mutator<EncodedInput, S> for EncodedDecMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -160,45 +109,25 @@ where
     }
 }
 
-impl<R, S> Named for EncodedDecMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl Named for EncodedDecMutator {
     fn name(&self) -> &str {
         "EncodedDecMutator"
     }
 }
 
-impl<R, S> EncodedDecMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
-    /// Creates a new [`EncodedRandMutator`].
+impl EncodedDecMutator {
+    /// Creates a new [`EncodedDecMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// Adds or subtracts a random value up to `ARITH_MAX` to a random place in the codes [`Vec`].
-#[derive(Default)]
-pub struct EncodedAddMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
-    phantom: PhantomData<(R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct EncodedAddMutator;
 
-impl<R, S> Mutator<EncodedInput, S> for EncodedAddMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -219,45 +148,25 @@ where
     }
 }
 
-impl<R, S> Named for EncodedAddMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl Named for EncodedAddMutator {
     fn name(&self) -> &str {
         "EncodedAddMutator"
     }
 }
 
-impl<R, S> EncodedAddMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl EncodedAddMutator {
     /// Creates a new [`EncodedAddMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// Codes delete mutation for encoded inputs
-#[derive(Default)]
-pub struct EncodedDeleteMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
-    phantom: PhantomData<(R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct EncodedDeleteMutator;
 
-impl<R, S> Mutator<EncodedInput, S> for EncodedDeleteMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -277,45 +186,29 @@ where
     }
 }
 
-impl<R, S> Named for EncodedDeleteMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl Named for EncodedDeleteMutator {
     fn name(&self) -> &str {
         "EncodedDeleteMutator"
     }
 }
 
-impl<R, S> EncodedDeleteMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl EncodedDeleteMutator {
     /// Creates a new [`EncodedDeleteMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// Insert mutation for encoded inputs
-#[derive(Default)]
-pub struct EncodedInsertCopyMutator<R, S>
-where
-    S: HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+#[derive(Debug, Default)]
+pub struct EncodedInsertCopyMutator {
     tmp_buf: Vec<u32>,
-    phantom: PhantomData<(R, S)>,
 }
 
-impl<R, S> Mutator<EncodedInput, S> for EncodedInsertCopyMutator<R, S>
+impl<S> Mutator<EncodedInput, S> for EncodedInsertCopyMutator
 where
-    S: HasRand<R> + HasMaxSize,
-    R: Rand,
+    S: HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -356,46 +249,25 @@ where
     }
 }
 
-impl<R, S> Named for EncodedInsertCopyMutator<R, S>
-where
-    S: HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl Named for EncodedInsertCopyMutator {
     fn name(&self) -> &str {
         "EncodedInsertCopyMutator"
     }
 }
 
-impl<R, S> EncodedInsertCopyMutator<R, S>
-where
-    S: HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl EncodedInsertCopyMutator {
     /// Creates a new [`EncodedInsertCopyMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            tmp_buf: vec![],
-            phantom: PhantomData,
-        }
+        Self::default()
     }
 }
 
 /// Codes copy mutation for encoded inputs
-#[derive(Default)]
-pub struct EncodedCopyMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
-    phantom: PhantomData<(R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct EncodedCopyMutator;
 
-impl<R, S> Mutator<EncodedInput, S> for EncodedCopyMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -417,46 +289,27 @@ where
     }
 }
 
-impl<R, S> Named for EncodedCopyMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl Named for EncodedCopyMutator {
     fn name(&self) -> &str {
         "EncodedCopyMutator"
     }
 }
 
-impl<R, S> EncodedCopyMutator<R, S>
-where
-    S: HasRand<R>,
-    R: Rand,
-{
+impl EncodedCopyMutator {
     /// Creates a new [`EncodedCopyMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// Crossover insert mutation for encoded inputs
-#[derive(Default)]
-pub struct EncodedCrossoverInsertMutator<C, R, S>
-where
-    C: Corpus<EncodedInput>,
-    R: Rand,
-    S: HasRand<R> + HasCorpus<C, EncodedInput> + HasMaxSize,
-{
-    phantom: PhantomData<(C, R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct EncodedCrossoverInsertMutator;
 
-impl<C, R, S> Mutator<EncodedInput, S> for EncodedCrossoverInsertMutator<C, R, S>
+impl<S> Mutator<EncodedInput, S> for EncodedCrossoverInsertMutator
 where
-    C: Corpus<EncodedInput>,
-    R: Rand,
-    S: HasRand<R> + HasCorpus<C, EncodedInput> + HasMaxSize,
+    S: HasRand + HasCorpus<EncodedInput> + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -510,48 +363,27 @@ where
     }
 }
 
-impl<C, R, S> Named for EncodedCrossoverInsertMutator<C, R, S>
-where
-    C: Corpus<EncodedInput>,
-    R: Rand,
-    S: HasRand<R> + HasCorpus<C, EncodedInput> + HasMaxSize,
-{
+impl Named for EncodedCrossoverInsertMutator {
     fn name(&self) -> &str {
         "EncodedCrossoverInsertMutator"
     }
 }
 
-impl<C, R, S> EncodedCrossoverInsertMutator<C, R, S>
-where
-    C: Corpus<EncodedInput>,
-    R: Rand,
-    S: HasRand<R> + HasCorpus<C, EncodedInput> + HasMaxSize,
-{
+impl EncodedCrossoverInsertMutator {
     /// Creates a new [`EncodedCrossoverInsertMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// Crossover replace mutation for encoded inputs
-#[derive(Default)]
-pub struct EncodedCrossoverReplaceMutator<C, R, S>
-where
-    C: Corpus<EncodedInput>,
-    R: Rand,
-    S: HasRand<R> + HasCorpus<C, EncodedInput>,
-{
-    phantom: PhantomData<(C, R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct EncodedCrossoverReplaceMutator;
 
-impl<C, R, S> Mutator<EncodedInput, S> for EncodedCrossoverReplaceMutator<C, R, S>
+impl<S> Mutator<EncodedInput, S> for EncodedCrossoverReplaceMutator
 where
-    C: Corpus<EncodedInput>,
-    R: Rand,
-    S: HasRand<R> + HasCorpus<C, EncodedInput>,
+    S: HasRand + HasCorpus<EncodedInput>,
 {
     fn mutate(
         &mut self,
@@ -597,50 +429,33 @@ where
     }
 }
 
-impl<C, R, S> Named for EncodedCrossoverReplaceMutator<C, R, S>
-where
-    C: Corpus<EncodedInput>,
-    R: Rand,
-    S: HasRand<R> + HasCorpus<C, EncodedInput>,
-{
+impl Named for EncodedCrossoverReplaceMutator {
     fn name(&self) -> &str {
         "EncodedCrossoverReplaceMutator"
     }
 }
 
-impl<C, R, S> EncodedCrossoverReplaceMutator<C, R, S>
-where
-    C: Corpus<EncodedInput>,
-    R: Rand,
-    S: HasRand<R> + HasCorpus<C, EncodedInput>,
-{
+impl EncodedCrossoverReplaceMutator {
     /// Creates a new [`EncodedCrossoverReplaceMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// Get the mutations that compose the encoded mutator
 #[must_use]
-pub fn encoded_mutations<C, R, S>() -> tuple_list_type!(
-       EncodedRandMutator<R, S>,
-       EncodedIncMutator<R, S>,
-       EncodedDecMutator<R, S>,
-       EncodedAddMutator<R, S>,
-       EncodedDeleteMutator<R, S>,
-       EncodedInsertCopyMutator<R, S>,
-       EncodedCopyMutator<R, S>,
-       EncodedCrossoverInsertMutator<C, R, S>,
-       EncodedCrossoverReplaceMutator<C, R, S>,
-   )
-where
-    S: HasRand<R> + HasCorpus<C, EncodedInput> + HasMaxSize,
-    C: Corpus<EncodedInput>,
-    R: Rand,
-{
+pub fn encoded_mutations() -> tuple_list_type!(
+    EncodedRandMutator,
+    EncodedIncMutator,
+    EncodedDecMutator,
+    EncodedAddMutator,
+    EncodedDeleteMutator,
+    EncodedInsertCopyMutator,
+    EncodedCopyMutator,
+    EncodedCrossoverInsertMutator,
+    EncodedCrossoverReplaceMutator,
+) {
     tuple_list!(
         EncodedRandMutator::new(),
         EncodedIncMutator::new(),

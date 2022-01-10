@@ -65,12 +65,12 @@ pub fn main() {
     let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let mut shmem_map = shmem.map_mut();
+    let shmem_map = shmem.map_mut();
 
     // Create an observation channel using the signals map
     let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
         "shared_mem",
-        &mut shmem_map,
+        shmem_map,
     ));
 
     // Create an observation channel to keep track of the execution time

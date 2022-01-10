@@ -6,12 +6,12 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu,
+    emu::Emulator,
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
 };
 
-#[derive(Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuCmpsMapMetadata {
     pub map: HashMap<u64, u64>,
     pub current_id: u64,
@@ -29,6 +29,7 @@ impl QemuCmpsMapMetadata {
 
 libafl::impl_serdeany!(QemuCmpsMapMetadata);
 
+#[derive(Debug)]
 pub struct QemuCmpLogHelper {
     filter: QemuInstrumentationFilter,
 }
@@ -70,14 +71,15 @@ where
         QT: QemuHelperTuple<I, S>,
     {
         executor.hook_cmp_generation(gen_unique_cmp_ids::<I, QT, S>);
-        emu::set_exec_cmp8_hook(trace_cmp8_cmplog);
-        emu::set_exec_cmp4_hook(trace_cmp4_cmplog);
-        emu::set_exec_cmp2_hook(trace_cmp2_cmplog);
-        emu::set_exec_cmp1_hook(trace_cmp1_cmplog);
+        executor.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
+        executor.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
+        executor.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
+        executor.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
     }
 }
 
 pub fn gen_unique_cmp_ids<I, QT, S>(
+    _emulator: &Emulator,
     helpers: &mut QT,
     state: &mut S,
     pc: u64,

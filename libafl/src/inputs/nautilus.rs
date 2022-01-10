@@ -1,3 +1,9 @@
+//! Input for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer methods
+//!
+
+//use ahash::AHasher;
+//use core::hash::Hasher;
+
 use alloc::{rc::Rc, string::String};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
@@ -10,6 +16,7 @@ use grammartec::{
     tree::{Tree, TreeLike},
 };
 
+/// An [`Input`] implementation for `Nautilus` grammar.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NautilusInput {
     /// The input representation as Tree
@@ -19,8 +26,14 @@ pub struct NautilusInput {
 impl Input for NautilusInput {
     /// Generate a name for this input
     #[must_use]
-    fn generate_name(&self, _idx: usize) -> String {
-        format!("{}", Uuid::new_v4().to_simple())
+    fn generate_name(&self, idx: usize) -> String {
+        // format!("{}", Uuid::new_v4().to_simple())
+        /*let mut hasher = AHasher::new_with_keys(0, 0);
+        for term in &self.terms {
+            hasher.write(term.symbol.as_bytes());
+        }
+        format!("{:016x}", hasher.finish())*/
+        format!("id:{}", idx)
     }
 }
 
@@ -45,6 +58,7 @@ impl NautilusInput {
         Self { tree }
     }
 
+    /// Create an empty [`Input`]
     #[must_use]
     pub fn empty() -> Self {
         Self {
@@ -56,16 +70,19 @@ impl NautilusInput {
         }
     }
 
+    /// Generate a `Nautilus` input from the given bytes
     pub fn unparse(&self, context: &NautilusContext, bytes: &mut Vec<u8>) {
         bytes.clear();
         self.tree.unparse(NodeID::from(0), &context.ctx, bytes);
     }
 
+    /// Get the tree representation of this input
     #[must_use]
     pub fn tree(&self) -> &Tree {
         &self.tree
     }
 
+    /// Get the tree representation of this input, as a mutable reference
     #[must_use]
     pub fn tree_mut(&mut self) -> &mut Tree {
         &mut self.tree
