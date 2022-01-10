@@ -515,8 +515,8 @@ mod unix_signal_handler {
         let state = (data.state_ptr as *mut S).as_mut().unwrap();
         let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
         let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-        let executor = (data.executor_ptr as *const E).as_ref().unwrap();
-        let observers = executor.observers();
+        let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+        let observers = executor.observers_mut();
 
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
@@ -531,8 +531,6 @@ mod unix_signal_handler {
 
         let input = (data.current_input_ptr as *const I).as_ref().unwrap();
         data.current_input_ptr = ptr::null();
-        let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
-        let observers = executor.observers_mut();
 
         observers
             .post_exec_all(state, input)
