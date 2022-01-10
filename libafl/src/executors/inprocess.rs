@@ -1082,6 +1082,7 @@ where
             self.shmem_provider.pre_fork()?;
             match fork() {
                 Ok(ForkResult::Child) => {
+                    // Child
                     self.shmem_provider.post_fork(true)?;
 
                     (self.harness_fn)(input);
