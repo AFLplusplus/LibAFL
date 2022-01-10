@@ -66,6 +66,10 @@ fn main() {
 
     println!("cargo:rustc-cfg=cpu_target=\"{}\"", cpu_target);
 
+    if std::env::var("DOCS_RS").is_ok() {
+        return; // only build when we're not generating docs
+    }
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
