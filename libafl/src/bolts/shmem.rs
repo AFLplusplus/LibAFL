@@ -29,6 +29,8 @@ pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService}
 
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
+
+use self::unix_shmem::ashmem::AshmemShMem;
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMemProvider = Win32ShMemProvider;
@@ -161,21 +163,34 @@ impl Display for ShMemId {
     }
 }
 
+/// Types enum used in GenericShMem
+#[derive(Debug)]
 pub enum ShMemType {
+    /// Type of MmapShMem shared memory
     MmapShMem,
+    /// Type of AshmemShMem shared memory
     AshmemShMem,
+    /// Type of UnixShMem shared memory
     UnixShMem,
+    /// Type of StdShMem shared memory
     StdShMem,
 }
 
+/// A wrapper around common types implementing ShMem
+#[derive(Debug)]
 pub enum GenericShMem {
+    /// create a GenericShMem from a MmapShMem
     MmapShMem(MmapShMem),
+    /// create a GenericShMem from a AshmemShMem
     AshmemShMem(AshmemShMem),
+    /// create a GenericShMem from a UnixShMem
     UnixShMem(UnixShMem),
+    /// create a GenericShMem from a StdShMem
     StdShMem(StdShMem),
 }
 
 impl GenericShMem {
+    /// invokes .map() on the the wrapped ShMem type
     pub fn map(&self) -> &[u8] {
         match self {
             GenericShMem::StdShMem(sh) => sh.map(),
@@ -185,6 +200,7 @@ impl GenericShMem {
         }
     }
 
+    /// invokes .map_mut() on the the wrapped ShMem type
     pub fn map_mut(&mut self) -> &mut [u8] {
         match self {
             GenericShMem::StdShMem(sh) => sh.map_mut(),
@@ -233,6 +249,7 @@ pub trait ShMem: Sized + Debug + Clone {
         Ok(())
     }
 
+    /// Returns a ShMemType corresponding to the type. Used to wrap a type implementing ShMem in GenericShMem
     fn get_type(&self) -> ShMemType;
 }
 
@@ -1050,7 +1067,7 @@ pub mod unix_shmem {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
 
-            fn get_type(&self) -> crate::bolts::shmem::ShMemType {
+            fn get_type(&self) -> ShMemType {
                 ShMemType::AshmemShMem
             }
         }

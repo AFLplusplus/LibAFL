@@ -14,11 +14,14 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-/// An observer looking at the stacktrace if a run crashes (For rust code)
-
+/// A struct that stores needed information to persist the backtrace across prcesses/runs
+#[derive(Debug)]
 pub struct BacktraceSharedMemoryWrapper {
+    /// ID of the shared memory
     shmem_id: Option<ShMemId>,
+    /// Size of the shared memory
     shmem_size: Option<usize>,
+    /// Type of the shared memory
     shmem_type: Option<ShMemType>,
 }
 
@@ -88,16 +91,18 @@ impl BacktraceSharedMemoryWrapper {
 }
 
 // Used for fuzzers not running in the same process
+/// Static variable storing shared memory information
 pub static mut BACKTRACE_SHMEM_DATA: BacktraceSharedMemoryWrapper = BacktraceSharedMemoryWrapper {
     shmem_id: None,
     shmem_size: None,
     shmem_type: None,
 };
 
-// Used for in process fuzzing (InProccessExecutor)
-// This could be later wrapped in a shared memory struct implementing ShMem
+/// Used for in process fuzzing (InProccessExecutor)
+/// This could be later wrapped in a shared memory struct implementing ShMem
 pub static mut LOCAL_HASH: u64 = 0;
 
+/// Utilities for setting up the signal handler and panic handler to collect the backtrace
 pub mod stacktrace_hooks {
     use crate::bolts::os::unix_signals::Signal;
     use crate::observers::LOCAL_HASH;
@@ -110,8 +115,11 @@ pub mod stacktrace_hooks {
     use std::hash::Hasher;
     use std::{mem, panic, ptr};
 
+    /// Collects the backtrace via Backtrace and Debug
+    /// Debug used for dev purposes, will hash symbols later
     pub fn collect_backtrace() {
         let b = Backtrace::new();
+        /// will use symbols later
         let trace = format!("{:?}", b);
         eprintln!("{}", trace);
         let mut hasher = AHasher::new_with_keys(0, 0);
@@ -176,6 +184,7 @@ pub struct StacktraceObserver {
     hash: Option<u64>,
 }
 
+/// An observer looking at the stacktrace if a run crashes (For rust code)
 impl StacktraceObserver {
     /// Creates a new [`StacktraceObserver`] with the given name.
     #[must_use]

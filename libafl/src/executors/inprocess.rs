@@ -292,15 +292,13 @@ impl InProcessHandlers {
                     E,
                     EM,
                     I,
-                    OC,
                     OF,
                     OT,
                     S,
                     Z,
                 > as *const c_void
             } else {
-                unix_signal_handler::inproc_crash_handler::<E, EM, I, OC, OF, OT, S, Z>
-                    as *const c_void
+                unix_signal_handler::inproc_crash_handler::<E, EM, I, OF, OT, S, Z> as *const c_void
             };
             Ok(Self {
                 crash_handler: crash_handler_ptr,
@@ -700,7 +698,7 @@ mod unix_signal_handler {
         libc::_exit(128 + (signal as i32));
     }
 
-    pub unsafe fn inproc_crash_handler_with_backtrace_collection<E, EM, I, OC, OF, OT, S, Z>(
+    pub unsafe fn inproc_crash_handler_with_backtrace_collection<E, EM, I, OF, OT, S, Z>(
         signal: Signal,
         info: siginfo_t,
         context: &mut ucontext_t,
@@ -709,14 +707,13 @@ mod unix_signal_handler {
         E: HasObservers<I, OT, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
-        OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfMonitor,
+        S: HasSolutions<I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
         crate::observers::stacktrace_hooks::collect_backtrace();
-        inproc_crash_handler::<E, EM, I, OC, OF, OT, S, Z>(signal, info, context, data);
+        inproc_crash_handler::<E, EM, I, OF, OT, S, Z>(signal, info, context, data);
     }
 }
 
