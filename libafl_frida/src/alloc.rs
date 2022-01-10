@@ -103,7 +103,11 @@ impl Allocator {
         // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
         let mut userspace_max: usize = 0;
 
-        for prot in [PageProtection::Read, PageProtection::Write, PageProtection::Execute] {
+        for prot in [
+            PageProtection::Read,
+            PageProtection::Write,
+            PageProtection::Execute,
+        ] {
             RangeDetails::enumerate_with_prot(prot, &mut |details| {
                 let start = details.memory_range().base_address().0 as usize;
                 let end = start + details.memory_range().size();
