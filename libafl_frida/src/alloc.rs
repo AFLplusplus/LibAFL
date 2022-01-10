@@ -102,39 +102,19 @@ impl Allocator {
         let mut occupied_ranges: Vec<(usize, usize)> = vec![];
         // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
         let mut userspace_max: usize = 0;
-        // List up all occupied memory ranges that is at least readable
-        RangeDetails::enumerate_with_prot(PageProtection::Read, &mut |details| {
-            let start = details.memory_range().base_address().0 as usize;
-            let end = start + details.memory_range().size();
-            occupied_ranges.push((start, end));
-            // println!("{:x} {:x}", start, end);
-            if end > userspace_max {
-                userspace_max = end;
-            }
-            true
-        });
-        // List up all occupied memory ranges that is at least writable
-        RangeDetails::enumerate_with_prot(PageProtection::Write, &mut |details| {
-            let start = details.memory_range().base_address().0 as usize;
-            let end = start + details.memory_range().size();
-            occupied_ranges.push((start, end));
-            // println!("{:x} {:x}", start, end);
-            if end > userspace_max {
-                userspace_max = end;
-            }
-            true
-        });
-        // List up all occupied memory ranges that is at least executable
-        RangeDetails::enumerate_with_prot(PageProtection::Execute, &mut |details| {
-            let start = details.memory_range().base_address().0 as usize;
-            let end = start + details.memory_range().size();
-            occupied_ranges.push((start, end));
-            // println!("{:x} {:x}", start, end);
-            if end > userspace_max {
-                userspace_max = end;
-            }
-            true
-        });
+
+        for prot in [PageProtection::Read, PageProtection::Write, PageProtection::Execute] {
+            RangeDetails::enumerate_with_prot(prot, &mut |details| {
+                let start = details.memory_range().base_address().0 as usize;
+                let end = start + details.memory_range().size();
+                occupied_ranges.push((start, end));
+                // println!("{:x} {:x}", start, end);
+                if end > userspace_max {
+                    userspace_max = end;
+                }
+                true
+            });
+        }
 
         let mut maxbit = 0;
         for power in 1..64 {
