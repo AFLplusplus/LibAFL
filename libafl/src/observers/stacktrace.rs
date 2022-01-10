@@ -119,7 +119,7 @@ pub mod stacktrace_hooks {
     /// Debug used for dev purposes, will hash symbols later
     pub fn collect_backtrace() {
         let b = Backtrace::new();
-        /// will use symbols later
+        // will use symbols later
         let trace = format!("{:?}", b);
         eprintln!("{}", trace);
         let mut hasher = AHasher::new_with_keys(0, 0);
@@ -137,12 +137,14 @@ pub mod stacktrace_hooks {
         }
     }
 
+    /// setup backtrace collection in a rust panic hook when the harness is rust code
     pub fn setup_rust_panic_hook() {
         panic::set_hook(Box::new(|_panic_info| {
             collect_backtrace();
         }));
     }
 
+    /// setup backtrace collection in a signal handler when the harness is linked via FFI
     pub unsafe fn setup_signal_handler() {
         println!("setting up stacktrace signal handler");
         fn signal_handler(sig: c_int, _info: siginfo_t, _con: *mut c_void) {
@@ -171,12 +173,16 @@ pub mod stacktrace_hooks {
     }
 }
 
+/// An enum encoding the types of harnesses
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum HarnessType {
+    /// Harness type when the harness is rust code
     RUST,
+    /// Harness type when the harness is linked via FFI (e.g C code)
     FFI,
 }
 
+/// An observer looking at the stacktrace if a run crashes (For rust code)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StacktraceObserver {
     observer_name: String,
@@ -184,7 +190,6 @@ pub struct StacktraceObserver {
     hash: Option<u64>,
 }
 
-/// An observer looking at the stacktrace if a run crashes (For rust code)
 impl StacktraceObserver {
     /// Creates a new [`StacktraceObserver`] with the given name.
     #[must_use]
@@ -211,10 +216,12 @@ impl StacktraceObserver {
         self.hash = Some(hash);
     }
 
+    /// Clears the current hash value
     pub fn clear_hash(&mut self) {
         self.hash = None;
     }
 
+    /// Sets up the shared memory information in the static object BACKTRACE_SHMEM_DATA
     pub fn setup_shmem<SP: ShMemProvider>(&self, shmem_provider: SP) {
         println!("panic hook is being set");
         let shmem_map = shmem_provider.to_owned().new_map(5000).unwrap();

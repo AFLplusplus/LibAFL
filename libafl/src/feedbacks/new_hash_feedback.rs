@@ -1,6 +1,6 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash};
 
 use hashbrown::HashSet;
 use num_traits::PrimInt;
@@ -17,7 +17,6 @@ use crate::{
     Error,
 };
 
-use super::FeedbackStatesTuple;
 /// A state that implements this trait has a hash set
 pub trait HashSetState<T> {
     /// creates a new instance with a specific hashset
