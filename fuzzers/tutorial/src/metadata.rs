@@ -13,7 +13,7 @@ use crate::input::PacketData;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(SerdeAny, Serialize, Deserialize)]
+#[derive(Debug, SerdeAny, Serialize, Deserialize)]
 pub struct PacketLenMetadata {
     pub length: u64,
 }
@@ -29,8 +29,8 @@ impl FavFactor<PacketData> for PacketLenFavFactor {
     }
 }
 
-pub type PacketLenMinimizerCorpusScheduler<C, CS, R, S> =
-    MinimizerCorpusScheduler<C, CS, PacketLenFavFactor, PacketData, MapIndexesMetadata, R, S>;
+pub type PacketLenMinimizerCorpusScheduler<CS, S> =
+    MinimizerCorpusScheduler<CS, PacketLenFavFactor, PacketData, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {

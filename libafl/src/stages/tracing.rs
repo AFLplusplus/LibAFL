@@ -1,6 +1,6 @@
 //! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
 
-use core::marker::PhantomData;
+use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     corpus::Corpus,
@@ -19,26 +19,24 @@ use crate::monitors::PerfFeature;
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct TracingStage<C, EM, I, OT, S, TE, Z>
+pub struct TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
     tracer_executor: TE,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, EM, I, OT, S, TE, Z)>,
+    phantom: PhantomData<(EM, I, OT, S, TE, Z)>,
 }
 
-impl<E, C, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for TracingStage<C, EM, I, OT, S, TE, Z>
+impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
     #[inline]
     fn perform(
@@ -82,13 +80,12 @@ where
     }
 }
 
-impl<C, EM, I, OT, S, TE, Z> TracingStage<C, EM, I, OT, S, TE, Z>
+impl<EM, I, OT, S, TE, Z> TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
@@ -98,6 +95,7 @@ where
         }
     }
 
+    /// Gets the underlying tracer executor
     pub fn executor(&self) -> &TE {
         &self.tracer_executor
     }
@@ -105,20 +103,19 @@ where
 
 /// A stage that runs the shadow executor using also the shadow observers
 #[derive(Clone, Debug)]
-pub struct ShadowTracingStage<C, E, EM, I, OT, S, SOT, Z> {
+pub struct ShadowTracingStage<E, EM, I, OT, S, SOT, Z> {
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, OT, S, SOT, Z)>,
+    phantom: PhantomData<(E, EM, I, OT, S, SOT, Z)>,
 }
 
-impl<C, E, EM, I, OT, S, SOT, Z> Stage<ShadowExecutor<E, I, S, SOT>, EM, S, Z>
-    for ShadowTracingStage<C, E, EM, I, OT, S, SOT, Z>
+impl<E, EM, I, OT, S, SOT, Z> Stage<ShadowExecutor<E, I, S, SOT>, EM, S, Z>
+    for ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
 where
     I: Input,
-    C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I> + Debug,
 {
     #[inline]
     fn perform(
@@ -162,14 +159,13 @@ where
     }
 }
 
-impl<C, E, EM, I, OT, S, SOT, Z> ShadowTracingStage<C, E, EM, I, OT, S, SOT, Z>
+impl<E, EM, I, OT, S, SOT, Z> ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
 where
     I: Input,
-    C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {

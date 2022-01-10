@@ -9,7 +9,7 @@ pub use cmp::*;
 pub mod concolic;
 
 use alloc::string::{String, ToString};
-use core::time::Duration;
+use core::{fmt::Debug, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer<I, S>: Named {
+pub trait Observer<I, S>: Named + Debug {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
     #[inline]
@@ -44,7 +44,7 @@ pub trait Observer<I, S>: Named {
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple<I, S>: MatchName {
+pub trait ObserversTuple<I, S>: MatchName + Debug {
     /// This is called right before the next execution.
     fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 

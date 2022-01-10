@@ -1,3 +1,4 @@
+//! Functionality regarding binary-only coverage collection.
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use std::ffi::c_void;
 
@@ -11,6 +12,8 @@ use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
 
+/// Frida binary-only coverage
+#[derive(Debug)]
 pub struct CoverageRuntime {
     map: [u8; MAP_SIZE],
     previous_pc: u64,
@@ -25,6 +28,7 @@ impl Default for CoverageRuntime {
 }
 
 impl CoverageRuntime {
+    /// Create a new coverage runtime
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -35,13 +39,17 @@ impl CoverageRuntime {
         }
     }
 
+    /// Initialize the coverage runtime
     pub fn init(&mut self) {
         self.generate_maybe_log_blob();
     }
 
+    /// Retrieve the coverage map pointer
     pub fn map_ptr_mut(&mut self) -> *mut u8 {
         self.map.as_mut_ptr()
     }
+
+    /// Retrieve the `maybe_log` code blob, that will write coverage into the map
     #[must_use]
     pub fn blob_maybe_log(&self) -> &[u8] {
         self.blob_maybe_log.as_ref().unwrap()
@@ -116,8 +124,18 @@ impl CoverageRuntime {
         self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
+    /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
+        let tmp = (address >> 32) + ((address & 0xffffffff) << 32);
+        let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
+        let mut h64 = tmp ^ bitflip;
+        h64 = h64.rotate_left(49) & h64.rotate_left(24);
+        h64 *= 0x9FB21C651E98DF25;
+        h64 ^= (h64 >> 35) + 8;
+        h64 *= 0x9FB21C651E98DF25;
+        h64 ^= h64 >> 28;
+
         let writer = output.writer();
         #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
         let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
@@ -144,10 +162,7 @@ impl CoverageRuntime {
         {
             writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
             writer.put_push_reg(X86Register::Rdi);
-            writer.put_mov_reg_address(
-                X86Register::Rdi,
-                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
-            );
+            writer.put_mov_reg_address(X86Register::Rdi, h64 & (MAP_SIZE as u64 - 1));
             writer.put_call_address(self.current_log_impl);
             writer.put_pop_reg(X86Register::Rdi);
             writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
@@ -158,19 +173,17 @@ impl CoverageRuntime {
                 Aarch64Register::Lr,
                 Aarch64Register::X0,
                 Aarch64Register::Sp,
-                -(16 + redzone_size) as i64,
+                -(16 + redzone_size),
                 IndexMode::PreAdjust,
             );
-            writer.put_ldr_reg_u64(
-                Aarch64Register::X0,
-                ((address >> 4) ^ (address << 8)) & (MAP_SIZE - 1) as u64,
-            );
+            writer.put_ldr_reg_u64(Aarch64Register::X0, h64 & (MAP_SIZE as u64 - 1));
+
             writer.put_bl_imm(self.current_log_impl);
             writer.put_ldp_reg_reg_reg_offset(
                 Aarch64Register::Lr,
                 Aarch64Register::X0,
                 Aarch64Register::Sp,
-                16 + redzone_size as i64,
+                16 + redzone_size,
                 IndexMode::PostAdjust,
             );
         }

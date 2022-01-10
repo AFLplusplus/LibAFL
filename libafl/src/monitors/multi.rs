@@ -1,7 +1,7 @@
 //! Monitor to disply both cumulative and per-client monitor
 
 use alloc::{string::String, vec::Vec};
-use core::{time, time::Duration};
+use core::time::Duration;
 
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
@@ -37,7 +37,7 @@ where
     }
 
     /// Time this fuzzing run stated
-    fn start_time(&mut self) -> time::Duration {
+    fn start_time(&mut self) -> Duration {
         self.start_time
     }
 
@@ -104,7 +104,7 @@ where
     }
 
     /// Creates the monitor with a given `start_time`.
-    pub fn with_time(print_fn: F, start_time: time::Duration) -> Self {
+    pub fn with_time(print_fn: F, start_time: Duration) -> Self {
         Self {
             print_fn,
             start_time,

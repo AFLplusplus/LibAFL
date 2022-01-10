@@ -23,6 +23,7 @@ use crate::monitors::PerfFeature;
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 
+/// The default maximum number of mutations to perform per input.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 /// A Mutational push stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational push stages will usually have a range of mutations that are
@@ -34,16 +35,14 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 ///
 /// The default mutational push stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalPushStage<C, CS, EM, I, M, OT, R, S, Z>
+pub struct StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     current_corpus_idx: Option<usize>,
@@ -54,19 +53,17 @@ where
 
     mutator: M,
 
-    psh: PushStageHelper<C, CS, EM, I, OT, R, S, Z>,
+    psh: PushStageHelper<CS, EM, I, OT, S, Z>,
 }
 
-impl<C, CS, EM, I, M, OT, R, S, Z> StdMutationalPushStage<C, CS, EM, I, M, OT, R, S, Z>
+impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Gets the number of iterations as a random number
@@ -75,22 +72,21 @@ where
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
     }
 
+    /// Sets the current corpus index
     pub fn set_current_corpus_idx(&mut self, current_corpus_idx: usize) {
         self.current_corpus_idx = Some(current_corpus_idx);
     }
 }
 
-impl<C, CS, EM, I, M, OT, R, S, Z> PushStage<C, CS, EM, I, OT, R, S, Z>
-    for StdMutationalPushStage<C, CS, EM, I, M, OT, R, S, Z>
+impl<CS, EM, I, M, OT, S, Z> PushStage<CS, EM, I, OT, S, Z>
+    for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
@@ -150,7 +146,7 @@ where
 
         start_timer!(state);
         self.mutator
-            .mutate(state, &mut input, self.stage_idx as i32)
+            .mutate(state, &mut input, self.stage_idx)
             .unwrap();
         mark_feature_time!(state, PerfFeature::Mutate);
 
@@ -176,7 +172,7 @@ where
 
         start_timer!(state);
         self.mutator
-            .post_exec(state, self.stage_idx as i32, Some(self.testcases_done))?;
+            .post_exec(state, self.stage_idx, Some(self.testcases_done))?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
         self.testcases_done += 1;
 
@@ -184,26 +180,24 @@ where
     }
 
     #[inline]
-    fn push_stage_helper(&self) -> &PushStageHelper<C, CS, EM, I, OT, R, S, Z> {
+    fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, I, OT, S, Z> {
         &self.psh
     }
 
     #[inline]
-    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<C, CS, EM, I, OT, R, S, Z> {
+    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, I, OT, S, Z> {
         &mut self.psh
     }
 }
 
-impl<C, CS, EM, I, M, OT, R, S, Z> Iterator for StdMutationalPushStage<C, CS, EM, I, M, OT, R, S, Z>
+impl<CS, EM, I, M, OT, S, Z> Iterator for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     type Item = Result<I, Error>;
@@ -213,16 +207,14 @@ where
     }
 }
 
-impl<C, CS, EM, I, M, OT, R, S, Z> StdMutationalPushStage<C, CS, EM, I, M, OT, R, S, Z>
+impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
@@ -230,7 +222,7 @@ where
     #[allow(clippy::type_complexity)]
     pub fn new(
         mutator: M,
-        shared_state: Rc<RefCell<Option<PushStageSharedState<C, CS, EM, I, OT, R, S, Z>>>>,
+        shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, I, OT, S, Z>>>>,
         exit_kind: Rc<Cell<Option<ExitKind>>>,
         stage_idx: i32,
     ) -> Self {

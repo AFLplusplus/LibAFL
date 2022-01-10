@@ -1,14 +1,16 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
+use clap::{self, StructOpt};
 use frida_gum::Gum;
 use std::{
     env,
     net::SocketAddr,
     path::{Path, PathBuf},
-    time::Duration,
 };
-use structopt::StructOpt;
 
 use libafl::{
     bolts::{
@@ -51,12 +53,9 @@ use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 #[cfg(unix)]
 use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
-fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
-    Ok(Duration::from_millis(time.parse()?))
-}
 
 #[derive(Debug, StructOpt)]
-#[structopt(
+#[clap(
     name = "libafl_frida",
     version = "0.1.0",
     about = "A frida-based binary-only libfuzzer-style fuzzer for with llmp-multithreading support",
@@ -64,7 +63,7 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Dongjia Zhang <toka@aflplus.plus>, Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
 )]
 struct Opt {
-    #[structopt(
+    #[clap(
         short,
         long,
         parse(try_from_str = Cores::from_cmdline),
@@ -73,8 +72,8 @@ struct Opt {
     )]
     cores: Cores,
 
-    #[structopt(
-        short = "p",
+    #[clap(
+        short = 'p',
         long,
         help = "Choose the broker TCP port, default is 1337",
         name = "PORT",
@@ -82,16 +81,16 @@ struct Opt {
     )]
     broker_port: u16,
 
-    #[structopt(
+    #[clap(
         parse(try_from_str),
-        short = "a",
+        short = 'a',
         long,
         help = "Specify a remote broker",
         name = "REMOTE"
     )]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[structopt(
+    #[clap(
         parse(try_from_str),
         short,
         long,
@@ -100,7 +99,7 @@ struct Opt {
     )]
     input: Vec<PathBuf>,
 
-    #[structopt(
+    #[clap(
         short,
         long,
         parse(try_from_str),
@@ -110,27 +109,7 @@ struct Opt {
     )]
     output: PathBuf,
 
-    #[structopt(
-        parse(try_from_str = timeout_from_millis_str),
-        short,
-        long,
-        help = "Set the exeucution timeout in milliseconds, default is 1000",
-        name = "TIMEOUT",
-        default_value = "1000"
-    )]
-    timeout: Duration,
-
-    #[structopt(
-        parse(from_os_str),
-        short = "x",
-        long,
-        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
-        name = "TOKENS",
-        multiple = true
-    )]
-    tokens: Vec<PathBuf>,
-
-    #[structopt(
+    #[clap(
         long,
         help = "The configuration this fuzzer runs with, for multiprocessing",
         name = "CONF",
@@ -138,19 +117,19 @@ struct Opt {
     )]
     configuration: String,
 
-    #[structopt(
+    #[clap(
         long,
         help = "The file to redirect stdout input to (/dev/null if unset)"
     )]
     stdout_file: Option<String>,
 
-    #[structopt(help = "The harness")]
+    #[clap(help = "The harness")]
     harness: String,
 
-    #[structopt(help = "The symbol name to look up and hook")]
+    #[clap(help = "The symbol name to look up and hook")]
     symbol: String,
 
-    #[structopt(help = "The modules to instrument, separated by colons")]
+    #[clap(help = "The modules to instrument, separated by colons")]
     modules_to_instrument: String,
 }
 
@@ -160,7 +139,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     color_backtrace::install();
 
     println!(

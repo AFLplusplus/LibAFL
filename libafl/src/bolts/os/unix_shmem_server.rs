@@ -118,7 +118,7 @@ where
             .write_all(&message)
             .expect("Failed to send message");
 
-        let mut shm_slice = [0u8; 20];
+        let mut shm_slice = [0_u8; 20];
         let mut fd_buf = [-1; 1];
         self.stream
             .recv_fds(&mut shm_slice, &mut fd_buf)
@@ -172,7 +172,7 @@ where
         res.id = id;
         Ok(res)
     }
-    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, crate::Error> {
+    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
         Ok(ServedShMem {
@@ -302,12 +302,18 @@ pub enum ShMemService<SP>
 where
     SP: ShMemProvider,
 {
+    /// A started service
     Started {
+        /// The background thread
         bg_thread: Arc<Mutex<ShMemServiceThread>>,
+        /// The pantom data
         phantom: PhantomData<SP>,
     },
+    /// A failed service
     Failed {
+        /// The error message
         err_msg: String,
+        /// The pantom data
         phantom: PhantomData<SP>,
     },
 }
@@ -541,7 +547,7 @@ where
                 let client = self.clients.get_mut(&client_id).unwrap();
                 let maps = client.maps.entry(map_id).or_default();
                 if maps.is_empty() {
-                    Ok(ServedShMemResponse::RefCount(0u32))
+                    Ok(ServedShMemResponse::RefCount(0_u32))
                 } else {
                     Ok(ServedShMemResponse::RefCount(
                         Rc::strong_count(&maps.pop().unwrap()) as u32,
@@ -563,11 +569,11 @@ where
         let client = self.clients.get_mut(&client_id).unwrap();
 
         // Always receive one be u32 of size, then the command.
-        let mut size_bytes = [0u8; 4];
+        let mut size_bytes = [0_u8; 4];
         client.stream.read_exact(&mut size_bytes)?;
         let size = u32::from_be_bytes(size_bytes);
         let mut bytes = vec![];
-        bytes.resize(size as usize, 0u8);
+        bytes.resize(size as usize, 0_u8);
         client
             .stream
             .read_exact(&mut bytes)

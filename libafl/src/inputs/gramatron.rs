@@ -1,3 +1,7 @@
+//! The gramatron grammar fuzzer
+use ahash::AHasher;
+use core::hash::Hasher;
+
 use alloc::{rc::Rc, string::String, vec::Vec};
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
@@ -5,14 +9,19 @@ use uuid::Uuid;
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
+/// A terminal for gramatron grammar fuzzing
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Terminal {
+    /// The state
     pub state: usize,
+    /// The trigger index
     pub trigger_idx: usize,
+    /// The symbol
     pub symbol: String,
 }
 
 impl Terminal {
+    /// Creates a new [`Terminal`]
     #[must_use]
     pub fn new(state: usize, trigger_idx: usize, symbol: String) -> Self {
         Self {
@@ -23,6 +32,7 @@ impl Terminal {
     }
 }
 
+/// An input for gramatron grammar fuzzing
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct GramatronInput {
     /// The input representation as list of terminals
@@ -33,7 +43,12 @@ impl Input for GramatronInput {
     /// Generate a name for this input
     #[must_use]
     fn generate_name(&self, _idx: usize) -> String {
-        format!("{}", Uuid::new_v4().to_simple())
+        // format!("{}", Uuid::new_v4().to_simple()) todo
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        for term in &self.terms {
+            hasher.write(term.symbol.as_bytes());
+        }
+        format!("{:016x}", hasher.finish())
     }
 }
 
@@ -58,16 +73,19 @@ impl GramatronInput {
         Self { terms }
     }
 
+    /// The terminals of this input
     #[must_use]
     pub fn terminals(&self) -> &[Terminal] {
         &self.terms
     }
 
+    /// The terminals of this input, mutable
     #[must_use]
     pub fn terminals_mut(&mut self) -> &mut Vec<Terminal> {
         &mut self.terms
     }
 
+    /// Create a bytes representation of this input
     pub fn unparse(&self, bytes: &mut Vec<u8>) {
         bytes.clear();
         for term in &self.terms {
@@ -75,6 +93,7 @@ impl GramatronInput {
         }
     }
 
+    /// crop the value to the given length
     pub fn crop(&self, from: usize, to: usize) -> Result<Self, Error> {
         if from < to && to <= self.terms.len() {
             let mut terms = vec![];
