@@ -1,6 +1,11 @@
 use bio::data_structures::interval_tree::IntervalTree;
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
-use std::collections::HashMap;
+use std::{
+    cell::UnsafeCell,
+    collections::{HashMap, HashSet},
+    sync::Mutex,
+};
+use thread_local::ThreadLocal;
 
 use crate::{
     emu::{Emulator, MmapPerms},
@@ -16,20 +21,30 @@ pub struct SnapshotPageInfo {
     pub addr: u64,
     pub perms: MmapPerms,
     pub private: bool,
-    pub dirty: bool,
     pub data: Option<Box<[u8; SNAPSHOT_PAGE_SIZE]>>,
 }
 
-#[derive(Debug)]
-// TODO be thread-safe maybe with https://amanieu.github.io/thread_local-rs/thread_local/index.html
-pub struct QemuSnapshotHelper {
+#[derive(Default, Debug)]
+pub struct SnapshotAccessInfo {
     pub access_cache: [u64; 4],
     pub access_cache_idx: usize,
+    pub dirty: HashSet<u64>,
+}
+
+impl SnapshotAccessInfo {
+    pub fn clear(&mut self) {
+        self.access_cache_idx = 0;
+        self.access_cache = [u64::MAX; 4];
+        self.dirty.clear();
+    }
+}
+
+#[derive(Debug)]
+pub struct QemuSnapshotHelper {
+    pub accesses: ThreadLocal<UnsafeCell<SnapshotAccessInfo>>,
+    pub new_maps: Mutex<IntervalTree<u64, Option<MmapPerms>>>,
     pub pages: HashMap<u64, SnapshotPageInfo>,
-    pub dirty: Vec<u64>,
     pub brk: u64,
-    //pub new_maps: Vec<(u64, usize, Option<MmapPerms>)>,
-    pub new_maps: IntervalTree<u64, Option<MmapPerms>>,
     pub empty: bool,
 }
 
@@ -37,12 +52,10 @@ impl QemuSnapshotHelper {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            access_cache: [u64::MAX; 4],
-            access_cache_idx: 0,
+            accesses: ThreadLocal::new(),
+            new_maps: Mutex::new(IntervalTree::new()),
             pages: HashMap::default(),
-            dirty: vec![],
             brk: 0,
-            new_maps: IntervalTree::new(),
             empty: true,
         }
     }
@@ -51,14 +64,12 @@ impl QemuSnapshotHelper {
         self.brk = emulator.get_brk();
         self.pages.clear();
         for map in emulator.mappings() {
-            // TODO track all the pages OR track mproctect
             let mut addr = map.start();
             while addr < map.end() {
                 let mut info = SnapshotPageInfo {
                     addr,
                     perms: map.flags(),
                     private: map.is_priv(),
-                    dirty: false,
                     data: None,
                 };
                 if map.flags().is_w() {
@@ -75,22 +86,20 @@ impl QemuSnapshotHelper {
     }
 
     pub fn page_access(&mut self, page: u64) {
-        if self.access_cache[0] == page
-            || self.access_cache[1] == page
-            || self.access_cache[2] == page
-            || self.access_cache[3] == page
-        {
-            return;
-        }
-        self.access_cache[self.access_cache_idx] = page;
-        self.access_cache_idx = (self.access_cache_idx + 1) & 3;
-        if let Some(info) = self.pages.get_mut(&page) {
-            if info.dirty {
+        unsafe {
+            let acc = self.accesses.get_or_default().get();
+            if (*acc).access_cache[0] == page
+                || (*acc).access_cache[1] == page
+                || (*acc).access_cache[2] == page
+                || (*acc).access_cache[3] == page
+            {
                 return;
             }
-            info.dirty = true;
+            let idx = (*acc).access_cache_idx;
+            (*acc).access_cache[idx] = page;
+            (*acc).access_cache_idx = (idx + 1) & 3;
+            (*acc).dirty.insert(page);
         }
-        self.dirty.push(page);
     }
 
     pub fn access(&mut self, addr: u64, size: usize) {
@@ -105,56 +114,63 @@ impl QemuSnapshotHelper {
 
     pub fn reset(&mut self, emulator: &Emulator) {
         self.reset_maps(emulator);
-        self.access_cache = [u64::MAX; 4];
-        self.access_cache_idx = 0;
-        while let Some(page) = self.dirty.pop() {
-            if let Some(info) = self.pages.get_mut(&page) {
-                if let Some(data) = info.data.as_ref() {
-                    unsafe { emulator.write_mem(page, &data[..]) };
+        for acc in self.accesses.iter_mut() {
+            for page in unsafe { &(*acc.get()).dirty } {
+                if let Some(info) = self.pages.get_mut(&page) {
+                    // TODO avoid duplicated memcpy
+                    if let Some(data) = info.data.as_ref() {
+                        unsafe { emulator.write_mem(*page, &data[..]) };
+                    }
                 }
-                info.dirty = false;
             }
+            unsafe { (*acc.get()).clear() };
         }
         emulator.set_brk(self.brk);
     }
 
-    pub fn add_mapped(&mut self, start: u64, size: usize, perms: Option<MmapPerms>) {
-        self.new_maps.insert(start..start + (size as u64), perms);
+    pub fn add_mapped(&mut self, start: u64, mut size: usize, perms: Option<MmapPerms>) {
+        if size % SNAPSHOT_PAGE_SIZE != 0 {
+            size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
+        }
+        self.new_maps
+            .lock()
+            .unwrap()
+            .insert(start..start + (size as u64), perms);
     }
 
     pub fn reset_maps(&mut self, emulator: &Emulator) {
-        for r in self.new_maps.find(0..u64::MAX) {
+        let new_maps = self.new_maps.get_mut().unwrap();
+        for r in new_maps.find(0..u64::MAX) {
             let addr = r.interval().start;
             let end = r.interval().end;
             let perms = r.data();
             let mut page = addr & (SNAPSHOT_PAGE_SIZE as u64 - 1);
-            let mut to_unmap = vec![];
-            let mut prev = false;
+            let mut prev = None;
             while page < end {
                 if let Some(info) = self.pages.get(&page) {
-                    prev = false;
+                    if let Some((addr, size)) = prev {
+                        drop(emulator.unmap(addr, size));
+                    }
+                    prev = None;
                     if let Some(p) = perms {
                         if info.perms != *p {
                             emulator.change_prot(page, SNAPSHOT_PAGE_SIZE, info.perms);
                         }
                     }
                 } else {
-                    if !prev {
-                        to_unmap.push((page, SNAPSHOT_PAGE_SIZE));
-                    } else if let Some(last) = to_unmap.last_mut() {
-                        last.1 += SNAPSHOT_PAGE_SIZE;
+                    if let Some((_, size)) = &mut prev {
+                        *size += SNAPSHOT_PAGE_SIZE;
+                    } else {
+                        prev = Some((page, SNAPSHOT_PAGE_SIZE));
                     }
-                    prev = true;
                 }
                 page += SNAPSHOT_PAGE_SIZE as u64;
             }
-            for (addr, size) in to_unmap {
-                //drop(emulator.unmap(addr, size));
+            if let Some((addr, size)) = prev {
+                drop(emulator.unmap(addr, size));
             }
-            //drop(emulator.unmap(*addr, *size));
         }
-        //self.new_maps.clear();
-        self.new_maps = IntervalTree::new();
+        *new_maps = IntervalTree::new();
     }
 }
 
@@ -310,7 +326,7 @@ where
         let h = helpers
             .match_first_type_mut::<QemuSnapshotHelper>()
             .unwrap();
-        h.add_mapped(a0, a2 as usize, None);
+        h.add_mapped(result, a2 as usize, None);
     } else if i64::from(sys_num) == SYS_mprotect {
         if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
             let h = helpers

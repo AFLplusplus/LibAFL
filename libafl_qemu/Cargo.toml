@@ -35,6 +35,7 @@ strum = "0.21"
 strum_macros = "0.21"
 syscall-numbers = "2.0"
 bio = "0.39"
+thread_local = "1.1.3"
 #pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
 pyo3 = { version = "0.15", optional = true }
 
