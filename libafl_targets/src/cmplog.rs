@@ -1,5 +1,8 @@
 //! `CmpLog` logs and reports back values touched during fuzzing.
 //! The values will then be used in subsequent mutations.
+//!
+
+use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
@@ -16,6 +19,7 @@ pub const CMPLOG_MAP_SIZE: usize = CMPLOG_MAP_W * CMPLOG_MAP_H;
 /// The size of a logged routine argument in bytes
 pub const CMPLOG_RTN_LEN: usize = 32;
 
+/// The hight of a cmplog routine map
 pub const CMPLOG_MAP_RTN_H: usize = (CMPLOG_MAP_H * core::mem::size_of::<CmpLogInstruction>())
     / core::mem::size_of::<CmpLogRoutine>();
 
@@ -26,6 +30,7 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 
 // void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2)
 extern "C" {
+    /// Logs an instruction for feedback during fuzzing
     pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
 }
 
@@ -48,6 +53,7 @@ pub struct CmpLogInstruction(u64, u64);
 #[derive(Default, Debug, Clone, Copy)]
 pub struct CmpLogRoutine([u8; CMPLOG_RTN_LEN], [u8; CMPLOG_RTN_LEN]);
 
+/// Union of cmplog operands and routines
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub union CmpLogVals {
@@ -55,9 +61,15 @@ pub union CmpLogVals {
     routines: [[CmpLogRoutine; CMPLOG_MAP_RTN_H]; CMPLOG_MAP_W],
 }
 
+impl Debug for CmpLogVals {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CmpLogVals").finish_non_exhaustive()
+    }
+}
+
 /// A struct containing the `CmpLog` metadata for a `LibAFL` run.
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct CmpLogMap {
     headers: [CmpLogHeader; CMPLOG_MAP_W],
     vals: CmpLogVals,
@@ -109,8 +121,8 @@ impl CmpMap for CmpLogMap {
                         self.vals.operands[idx][execution].1 as u32,
                     )),
                     8 => CmpValues::U64((
-                        self.vals.operands[idx][execution].0 as u64,
-                        self.vals.operands[idx][execution].1 as u64,
+                        self.vals.operands[idx][execution].0,
+                        self.vals.operands[idx][execution].1,
                     )),
                     other => panic!("Invalid CmpLog shape {}", other),
                 }
@@ -155,6 +167,7 @@ pub static mut libafl_cmplog_enabled: u8 = 0;
 pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 
 /// A [`CmpObserver`] observer for `CmpLog`
+#[derive(Debug)]
 pub struct CmpLogObserver<'a> {
     map: OwnedRefMut<'a, CmpLogMap>,
     size: Option<OwnedRefMut<'a, usize>>,

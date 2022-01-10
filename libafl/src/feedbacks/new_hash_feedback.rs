@@ -1,13 +1,13 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, hash::Hash};
 
 use hashbrown::HashSet;
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::Named,
+    bolts::tuples::{MatchName, Named},
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackState},
@@ -17,10 +17,11 @@ use crate::{
     Error,
 };
 
-use super::FeedbackStatesTuple;
-
+/// A state that implements this trait has a hash set
 pub trait HashSetState<T> {
+    /// creates a new instance with a specific hashset
     fn with_hash_set(name: &'static str, hash_set: HashSet<T>) -> Self;
+    /// updates the hash_set with the given value
     fn update_hash_set(&mut self, value: T) -> Result<bool, Error>;
 }
 
@@ -29,7 +30,7 @@ pub trait HashSetState<T> {
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct NewHashFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Hash,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
     /// Contains information about untouched entries
     pub hash_set: HashSet<T>,
@@ -39,7 +40,7 @@ where
 
 impl<T> FeedbackState for NewHashFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Hash,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
     fn reset(&mut self) -> Result<(), Error> {
         self.hash_set.clear();
@@ -49,7 +50,7 @@ where
 
 impl<T> Named for NewHashFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Hash,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -59,7 +60,7 @@ where
 
 impl<T> NewHashFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Hash,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
     /// Create new `NewHashFeedbackState`
     #[must_use]
@@ -80,14 +81,7 @@ where
 }
 impl<T> HashSetState<T> for NewHashFeedbackState<T>
 where
-    T: PrimInt
-        + Default
-        + Copy
-        + 'static
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + Hash
-        + Debug,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
     /// Create new `NewHashFeedbackState` using a name and a hash set.
     /// The map can be shared.
@@ -108,17 +102,15 @@ where
 
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewHashFeedback<FT> {
-    phantom_val: PhantomData<FT>,
+pub struct NewHashFeedback {
     feedback_name: String,
     observer_name: String,
 }
 
-impl<FT, I, S> Feedback<I, S> for NewHashFeedback<FT>
+impl<I, S> Feedback<I, S> for NewHashFeedback
 where
     I: Input,
-    FT: FeedbackStatesTuple,
-    S: HasClientPerfMonitor + HasFeedbackStates<FT>,
+    S: HasClientPerfMonitor + HasFeedbackStates,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -156,26 +148,25 @@ where
     }
 }
 
-impl<FT> Named for NewHashFeedback<FT> {
+impl Named for NewHashFeedback {
     #[inline]
     fn name(&self) -> &str {
         &self.feedback_name
     }
 }
 
-impl<FT> NewHashFeedback<FT> {
+impl NewHashFeedback {
     /// Returns a new [`NewHashFeedback`].
     #[must_use]
     pub fn new(feedback_name: String, observer_name: String) -> Self {
         Self {
-            phantom_val: PhantomData,
             feedback_name,
             observer_name,
         }
     }
 }
 
-impl<FT> Default for NewHashFeedback<FT> {
+impl Default for NewHashFeedback {
     fn default() -> Self {
         Self::new(
             "NewHashFeedback".to_string(),

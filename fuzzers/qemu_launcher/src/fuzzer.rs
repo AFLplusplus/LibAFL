@@ -30,7 +30,18 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu, MmapPerms, QemuExecutor, Regs,
+    //asan::QemuAsanHelper,
+    cmplog,
+    cmplog::{CmpLogObserver, QemuCmpLogHelper},
+    edges,
+    edges::QemuEdgeCoverageHelper,
+    elf::EasyElf,
+    emu::Emulator,
+    filter_qemu_args,
+    //snapshot::QemuSnapshotHelper,
+    MmapPerms,
+    QemuExecutor,
+    Regs,
 };
 
 pub fn fuzz() {
@@ -42,39 +53,37 @@ pub fn fuzz() {
     let objective_dir = PathBuf::from("./crashes");
 
     // Initialize QEMU
+    env::remove_var("LD_LIBRARY_PATH");
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
-    emu::init(&args, &env);
+    let emu = Emulator::new(&args, &env);
 
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu::binary_path(), &mut elf_buffer).unwrap();
+    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer).unwrap();
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu::load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
 
-    emu::set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu::run();
+    emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    unsafe { emu.run() };
 
-    println!(
-        "Break at {:#x}",
-        emu::read_reg::<_, u64>(Regs::Rip).unwrap()
-    );
+    println!("Break at {:#x}", emu.read_reg::<_, u64>(Regs::Rip).unwrap());
 
     // Get the return address
-    let stack_ptr: u64 = emu::read_reg(Regs::Rsp).unwrap();
+    let stack_ptr: u64 = emu.read_reg(Regs::Rsp).unwrap();
     let mut ret_addr = [0u64];
-    emu::read_mem(stack_ptr, &mut ret_addr);
+    unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
     let ret_addr = ret_addr[0];
 
     println!("Stack pointer = {:#x}", stack_ptr);
     println!("Return address = {:#x}", ret_addr);
 
-    emu::remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu::set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
+    emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu::map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
     println!("Placing input at {:#x}", input_addr);
 
     // The wrapped harness function, calling out to the LLVM-style harness
@@ -87,14 +96,16 @@ pub fn fuzz() {
             len = 4096;
         }
 
-        emu::write_mem(input_addr, buf);
+        unsafe {
+            emu.write_mem(input_addr, buf);
 
-        emu::write_reg(Regs::Rdi, input_addr).unwrap();
-        emu::write_reg(Regs::Rsi, len).unwrap();
-        emu::write_reg(Regs::Rip, test_one_input_ptr).unwrap();
-        emu::write_reg(Regs::Rsp, stack_ptr).unwrap();
+            emu.write_reg(Regs::Rdi, input_addr).unwrap();
+            emu.write_reg(Regs::Rsi, len).unwrap();
+            emu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
+            emu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-        emu::run();
+            emu.run();
+        }
 
         ExitKind::Ok
     };
@@ -149,6 +160,7 @@ pub fn fuzz() {
         // Create a QEMU in-process executor
         let executor = QemuExecutor::new(
             &mut harness,
+            &emu,
             // The QEMU helpers define common hooks like coverage tracking hooks
             tuple_list!(QemuEdgeCoverageHelper::new()),
             tuple_list!(edges_observer, time_observer),

@@ -11,7 +11,7 @@ extern crate serde;
 use libafl::SerdeAny;
 use serde::{Serialize, Deserialize};
 
-#[derive(Serialize, Deserialize, SerdeAny)]
+#[derive(Debug, Serialize, Deserialize, SerdeAny)]
 pub struct MyMetadata {
     //...
 }

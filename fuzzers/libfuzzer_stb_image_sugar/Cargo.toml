@@ -19,6 +19,7 @@ debug = true
 libafl = { path = "../../libafl/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
 libafl_sugar = { path = "../../libafl_sugar/" }
+mimalloc = { version = "*", default-features = false }
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }

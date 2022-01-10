@@ -18,13 +18,13 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
 
 /// A testcase metadata saying if a testcase is favored
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct IsFavoredMetadata {}
 
 crate::impl_serdeany!(IsFavoredMetadata);
 
 /// A state metadata holding a map of favoreds testcases for each map entry
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TopRatedsMetadata {
     /// map index -> corpus index
     pub map: HashMap<usize, usize>,
@@ -59,6 +59,7 @@ where
 
 /// Multiply the testcase size with the execution time.
 /// This favors small and quick testcases.
+#[derive(Debug, Clone)]
 pub struct LenTimeMulFavFactor<I>
 where
     I: Input + HasLen,
@@ -79,29 +80,27 @@ where
 /// The [`MinimizerCorpusScheduler`] employs a genetic algorithm to compute a subset of the
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
 /// prioritizing [`Testcase`]`s` using [`FavFactor`]
-pub struct MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
+#[derive(Debug, Clone)]
+pub struct MinimizerCorpusScheduler<CS, F, I, M, S>
 where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<C, I> + HasMetadata,
-    C: Corpus<I>,
+    S: HasCorpus<I> + HasMetadata,
 {
     base: CS,
     skip_non_favored_prob: u64,
-    phantom: PhantomData<(C, F, I, M, R, S)>,
+    phantom: PhantomData<(F, I, M, S)>,
 }
 
-impl<C, CS, F, I, M, R, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
+impl<CS, F, I, M, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<CS, F, I, M, S>
 where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<C, I> + HasMetadata + HasRand<R>,
-    C: Corpus<I>,
-    R: Rand,
+    S: HasCorpus<I> + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
@@ -143,15 +142,13 @@ where
     }
 }
 
-impl<C, CS, F, I, M, R, S> MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
+impl<CS, F, I, M, S> MinimizerCorpusScheduler<CS, F, I, M, S>
 where
     CS: CorpusScheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<C, I> + HasMetadata + HasRand<R>,
-    C: Corpus<I>,
-    R: Rand,
+    S: HasCorpus<I> + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score using the `MinimizerCorpusScheduler`
     #[allow(clippy::unused_self)]
@@ -282,10 +279,10 @@ where
 }
 
 /// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`.
-pub type LenTimeMinimizerCorpusScheduler<C, CS, I, M, R, S> =
-    MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, M, R, S>;
+pub type LenTimeMinimizerCorpusScheduler<CS, I, M, S> =
+    MinimizerCorpusScheduler<CS, LenTimeMulFavFactor<I>, I, M, S>;
 
 /// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
-pub type IndexesLenTimeMinimizerCorpusScheduler<C, CS, I, R, S> =
-    MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, R, S>;
+pub type IndexesLenTimeMinimizerCorpusScheduler<CS, I, S> =
+    MinimizerCorpusScheduler<CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, S>;

@@ -24,12 +24,11 @@ use crate::monitors::PerfFeature;
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<C, E, EM, I, M, S, Z>: Stage<E, EM, S, Z>
+pub trait MutationalStage<E, EM, I, M, S, Z>: Stage<E, EM, S, Z>
 where
-    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasCorpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator registered for this stage
@@ -84,28 +83,23 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<C, E, EM, I, M, R, S, Z>
+pub struct StdMutationalStage<E, EM, I, M, S, Z>
 where
-    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, R, S, Z)>,
+    phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<C, E, EM, I, M, R, S, Z> MutationalStage<C, E, EM, I, M, S, Z>
-    for StdMutationalStage<C, E, EM, I, M, R, S, Z>
+impl<E, EM, I, M, S, Z> MutationalStage<E, EM, I, M, S, Z> for StdMutationalStage<E, EM, I, M, S, Z>
 where
-    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -126,13 +120,11 @@ where
     }
 }
 
-impl<C, E, EM, I, M, R, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<C, E, EM, I, M, R, S, Z>
+impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I, M, S, Z>
 where
-    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -154,13 +146,11 @@ where
     }
 }
 
-impl<C, E, EM, I, M, R, S, Z> StdMutationalStage<C, E, EM, I, M, R, S, Z>
+impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
 where
-    C: Corpus<I>,
     M: Mutator<I, S>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage

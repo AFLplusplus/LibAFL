@@ -32,8 +32,7 @@ pub mod sync;
 pub use sync::*;
 
 use crate::{
-    bolts::rands::Rand,
-    corpus::{Corpus, CorpusScheduler},
+    corpus::CorpusScheduler,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::Input,
@@ -110,6 +109,8 @@ where
     }
 }
 
+/// A [`Stage`] that will call a closure
+#[derive(Debug)]
 pub struct ClosureStage<CB, E, EM, S, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
@@ -134,10 +135,12 @@ where
     }
 }
 
+/// A stage that takes a closure
 impl<CB, E, EM, S, Z> ClosureStage<CB, E, EM, S, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
 {
+    /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {
         Self {
@@ -159,32 +162,29 @@ where
 
 /// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
 #[allow(clippy::type_complexity)]
-pub struct PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+#[derive(Debug)]
+pub struct PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    PS: PushStage<CS, EM, I, OT, S, Z>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     push_stage: PS,
-    phantom: PhantomData<(C, CS, EM, I, OT, R, S, Z)>,
+    phantom: PhantomData<(CS, EM, I, OT, S, Z)>,
 }
 
-impl<C, CS, EM, I, OT, PS, R, S, Z> PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+impl<CS, EM, I, OT, PS, S, Z> PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    PS: PushStage<CS, EM, I, OT, S, Z>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageAdapter`], warpping the given [`PushStage`]
@@ -198,18 +198,15 @@ where
     }
 }
 
-impl<C, CS, E, EM, I, OT, PS, R, S, Z> Stage<E, EM, S, Z>
-    for PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    C: Corpus<I>,
     CS: CorpusScheduler<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    PS: PushStage<CS, EM, I, OT, S, Z>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
     Z: ExecutesInput<I, OT, S, Z>
         + ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>

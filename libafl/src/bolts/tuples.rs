@@ -6,8 +6,8 @@ use core::any::TypeId;
 
 use xxhash_rust::xxh3::xxh3_64;
 
-#[cfg(feature = "RUSTC_IS_NIGHTLY")]
-/// From https://stackoverflow.com/a/60138532/7658998
+#[rustversion::nightly]
+/// From <https://stackoverflow.com/a/60138532/7658998>
 const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // Helper trait. `VALUE` is false, except for the specialization of the
     // case where `T == U`.
@@ -28,7 +28,7 @@ const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     <T as TypeEq<U>>::VALUE
 }
 
-#[cfg(not(feature = "RUSTC_IS_NIGHTLY"))]
+#[rustversion::not(nightly)]
 const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // BEWARE! This is not unsafe, it is SUPER UNSAFE
     true

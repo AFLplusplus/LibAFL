@@ -41,8 +41,11 @@ pub trait HasLen {
     }
 }
 
+/// Has a ref count
 pub trait HasRefCnt {
+    /// The ref count
     fn refcnt(&self) -> isize;
+    /// The ref count, mutable
     fn refcnt_mut(&mut self) -> &mut isize;
 }
 

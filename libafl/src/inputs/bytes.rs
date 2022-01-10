@@ -75,7 +75,7 @@ impl HasBytesVec for BytesInput {
 impl HasTargetBytes for BytesInput {
     #[inline]
     fn target_bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::Ref(&self.bytes)
+        OwnedSlice::from(&self.bytes)
     }
 }
 

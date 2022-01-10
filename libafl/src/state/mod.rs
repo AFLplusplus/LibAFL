@@ -26,18 +26,19 @@ use crate::{
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
+/// The [`State`] of the fuzzer
+/// Contains all important information about the current run
+/// Will be used to restart the fuzzing process at any timme.
 pub trait State: Serialize + DeserializeOwned {}
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus<C, I>
-where
-    C: Corpus<I>,
-    I: Input,
-{
+pub trait HasCorpus<I: Input> {
+    /// The associated type implementing [`Corpus`].
+    type Corpus: Corpus<I>;
     /// The testcase corpus
-    fn corpus(&self) -> &C;
+    fn corpus(&self) -> &Self::Corpus;
     /// The testcase corpus (mut)
-    fn corpus_mut(&mut self) -> &mut C;
+    fn corpus_mut(&mut self) -> &mut Self::Corpus;
 }
 
 /// Interact with the maximum size
@@ -49,26 +50,23 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions<C, I>
-where
-    C: Corpus<I>,
-    I: Input,
-{
+pub trait HasSolutions<I: Input> {
+    /// The associated type implementing [`Corpus`] for solutions
+    type Solutions: Corpus<I>;
     /// The solutions corpus
-    fn solutions(&self) -> &C;
+    fn solutions(&self) -> &Self::Solutions;
     /// The solutions corpus (mut)
-    fn solutions_mut(&mut self) -> &mut C;
+    fn solutions_mut(&mut self) -> &mut Self::Solutions;
 }
 
 /// Trait for elements offering a rand
-pub trait HasRand<R>
-where
-    R: Rand,
-{
+pub trait HasRand {
+    /// The associated type implementing [`Rand`]
+    type Rand: Rand;
     /// The rand instance
-    fn rand(&self) -> &R;
+    fn rand(&self) -> &Self::Rand;
     /// The rand instance (mut)
-    fn rand_mut(&mut self) -> &mut R;
+    fn rand_mut(&mut self) -> &mut Self::Rand;
 }
 
 /// Trait for offering a [`ClientPerfMonitor`]
@@ -113,15 +111,14 @@ pub trait HasMetadata {
 }
 
 /// Trait for elements offering a feedback
-pub trait HasFeedbackStates<FT>
-where
-    FT: FeedbackStatesTuple,
-{
+pub trait HasFeedbackStates {
+    /// The associated feedback type implementing [`FeedbackStatesTuple`].
+    type FeedbackStates: FeedbackStatesTuple;
     /// The feedback states
-    fn feedback_states(&self) -> &FT;
+    fn feedback_states(&self) -> &Self::FeedbackStates;
 
     /// The feedback states (mut)
-    fn feedback_states_mut(&mut self) -> &mut FT;
+    fn feedback_states_mut(&mut self) -> &mut Self::FeedbackStates;
 }
 
 /// Trait for the execution counter
@@ -189,7 +186,7 @@ where
 {
 }
 
-impl<C, FT, I, R, SC> HasRand<R> for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasRand for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -197,20 +194,22 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
+    type Rand = R;
+
     /// The rand instance
     #[inline]
-    fn rand(&self) -> &R {
+    fn rand(&self) -> &Self::Rand {
         &self.rand
     }
 
     /// The rand instance (mut)
     #[inline]
-    fn rand_mut(&mut self) -> &mut R {
+    fn rand_mut(&mut self) -> &mut Self::Rand {
         &mut self.rand
     }
 }
 
-impl<C, FT, I, R, SC> HasCorpus<C, I> for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasCorpus<I> for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -218,6 +217,8 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
+    type Corpus = C;
+
     /// Returns the corpus
     #[inline]
     fn corpus(&self) -> &C {
@@ -231,7 +232,7 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasSolutions<SC, I> for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasSolutions<I> for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -239,6 +240,8 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
+    type Solutions = SC;
+
     /// Returns the solutions corpus
     #[inline]
     fn solutions(&self) -> &SC {
@@ -273,7 +276,7 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasFeedbackStates<FT> for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasFeedbackStates for StdState<C, FT, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -281,6 +284,8 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
+    type FeedbackStates = FT;
+
     /// The feedback states
     #[inline]
     fn feedback_states(&self) -> &FT {
@@ -505,7 +510,6 @@ where
                 added += 1;
             } else {
                 let (res, _) = fuzzer.evaluate_input(self, executor, manager, input)?;
-                println!("{:?}", res);
                 if res != ExecuteInputResult::None {
                     added += 1;
                 }

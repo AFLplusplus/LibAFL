@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "e97deaae59c1825823037c2d549f8697a05d157c";
+const QEMU_REVISION: &str = "fa2b9c4a25f548f15b3d1b1afcfdb75cc7165f9a";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -36,37 +36,28 @@ fn main() {
         return;
     }
 
-    // Make sure we have at least and at most one architecutre feature set
+    // Make sure we have at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
     assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
-    #[cfg(not(any(
-        feature = "arm",
-        feature = "aarch64",
-        feature = "i386",
-        feature = "x86_64"
-    )))]
-    println!(
-        "cargo:warning=No architecture feature enabled for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
-    );
 
-    let cpu_target = if cfg!(feature = "clippy") {
-        // assume x86_64 for clippy
-        "x86_64"
+    let cpu_target = if cfg!(feature = "x86_64") {
+        "x86_64".to_string()
     } else if cfg!(feature = "arm") {
-        "arm"
+        "arm".to_string()
     } else if cfg!(feature = "aarch64") {
-        "aarch64"
+        "aarch64".to_string()
     } else if cfg!(feature = "i386") {
-        "368"
+        "i386".to_string()
     } else {
-        // if cfg!(feature = "x86_64") {
-        "x86_64"
-        /*} else {
-        panic!("No architecture feture enabled for libafl_qemu");
-        */
+        env::var("CPU_TARGET").unwrap_or_else(|_| {
+            println!(
+                "cargo:warning=No architecture feature enabled or CPU_TARGET env specified for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
+            );
+            "x86_64".to_string()
+        })
     };
 
-    let jobs = env::var("CARGO_BUILD_JOBS");
+    let jobs = env::var("NUM_JOBS");
 
     let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
         println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({}) is not the host arch ({}))", cpu_target, env::consts::ARCH);
@@ -74,6 +65,10 @@ fn main() {
     });
 
     println!("cargo:rustc-cfg=cpu_target=\"{}\"", cpu_target);
+
+    if std::env::var("DOCS_RS").is_ok() {
+        return; // only build when we're not generating docs
+    }
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
@@ -85,13 +80,8 @@ fn main() {
     let qasan_dir = Path::new("libqasan");
     let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
     let src_dir = Path::new("src");
-    //let cwd = env::current_dir().unwrap().to_string_lossy().to_string();
 
-    println!("cargo:rerun-if-changed={}/libqasan.so", qasan_dir.display());
-    println!(
-        "cargo:rerun-if-changed={}/libqasan.so",
-        target_dir.display()
-    );
+    println!("cargo:rerun-if-changed=libqasan");
 
     build_dep_check(&["git", "make"]);
 
@@ -109,7 +99,36 @@ fn main() {
             "cargo:warning=Qemu not found, cloning with git ({})...",
             QEMU_REVISION
         );
+        fs::create_dir_all(&qemu_path).unwrap();
         Command::new("git")
+            .current_dir(&qemu_path)
+            .arg("init")
+            .status()
+            .unwrap();
+        Command::new("git")
+            .current_dir(&qemu_path)
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg(QEMU_URL)
+            .status()
+            .unwrap();
+        Command::new("git")
+            .current_dir(&qemu_path)
+            .arg("fetch")
+            .arg("--depth")
+            .arg("1")
+            .arg("origin")
+            .arg(QEMU_REVISION)
+            .status()
+            .unwrap();
+        Command::new("git")
+            .current_dir(&qemu_path)
+            .arg("checkout")
+            .arg("FETCH_HEAD")
+            .status()
+            .unwrap();
+        /*Command::new("git")
             .current_dir(&out_dir_path)
             .arg("clone")
             .arg(QEMU_URL)
@@ -120,7 +139,7 @@ fn main() {
             .arg("checkout")
             .arg(QEMU_REVISION)
             .status()
-            .unwrap();
+            .unwrap();*/
         fs::write(&qemu_rev, QEMU_REVISION).unwrap();
     }
 
@@ -229,6 +248,7 @@ fn main() {
         for dir in &[
             build_dir.join("libcommon.fa.p"),
             build_dir.join(&format!("libqemu-{}-linux-user.fa.p", cpu_target)),
+            build_dir.join("libcommon-user.fa.p"),
             //build_dir.join("libqemuutil.a.p"),
             //build_dir.join("libqom.fa.p"),
             //build_dir.join("libhwcore.fa.p"),

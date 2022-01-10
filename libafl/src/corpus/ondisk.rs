@@ -30,7 +30,7 @@ pub enum OnDiskMetadataFormat {
 
 /// A corpus able to store testcases to disk, and load them from disk, when they are being used.
 #[cfg(feature = "std")]
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct OnDiskMetadata<'a> {
     metadata: &'a SerdeAnyMap,
     exec_time: &'a Option<Duration>,

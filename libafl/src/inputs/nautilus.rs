@@ -1,3 +1,6 @@
+//! Input for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer methods
+//!
+
 //use ahash::AHasher;
 //use core::hash::Hasher;
 
@@ -12,6 +15,7 @@ use grammartec::{
     tree::{Tree, TreeLike},
 };
 
+/// An [`Input`] implementation for `Nautilus` grammar.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NautilusInput {
     /// The input representation as Tree
@@ -52,6 +56,7 @@ impl NautilusInput {
         Self { tree }
     }
 
+    /// Create an empty [`Input`]
     #[must_use]
     pub fn empty() -> Self {
         Self {
@@ -63,16 +68,19 @@ impl NautilusInput {
         }
     }
 
+    /// Generate a `Nautilus` input from the given bytes
     pub fn unparse(&self, context: &NautilusContext, bytes: &mut Vec<u8>) {
         bytes.clear();
         self.tree.unparse(NodeID::from(0), &context.ctx, bytes);
     }
 
+    /// Get the tree representation of this input
     #[must_use]
     pub fn tree(&self) -> &Tree {
         &self.tree
     }
 
+    /// Get the tree representation of this input, as a mutable reference
     #[must_use]
     pub fn tree_mut(&mut self) -> &mut Tree {
         &mut self.tree

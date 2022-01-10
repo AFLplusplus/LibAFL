@@ -41,7 +41,7 @@ pub fn main() {
     let feedback_state = MapFeedbackState::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input
-    let feedback = MaxMapFeedback::<_, BytesInput, _, _, _>::new(&feedback_state, &observer);
+    let feedback = MaxMapFeedback::<BytesInput, _, _, _>::new(&feedback_state, &observer);
 
     // A feedback to choose if an input is a solution or not
     let objective = CrashFeedback::new();

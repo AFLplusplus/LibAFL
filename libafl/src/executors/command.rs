@@ -1,4 +1,8 @@
-use core::marker::PhantomData;
+//! The command executor executes a sub program for each run
+use core::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+};
 
 #[cfg(feature = "std")]
 use std::process::Child;
@@ -18,13 +22,24 @@ use std::time::Duration;
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
-pub struct CommandExecutor<EM, I, S, Z, T, OT> {
+pub struct CommandExecutor<EM, I, OT: Debug, S, T: Debug, Z> {
     inner: T,
+    /// [`crate::observers::Observer`]s for this executor
     observers: OT,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl<EM, I, S, Z, T, OT> CommandExecutor<EM, I, S, Z, T, OT> {
+impl<EM, I, OT: Debug, S, T: Debug, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("CommandExecutor")
+            .field("inner", &self.inner)
+            .field("observers", &self.observers)
+            .finish()
+    }
+}
+
+impl<EM, I, OT: Debug, S, T: Debug, Z> CommandExecutor<EM, I, OT, S, T, Z> {
+    /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
         &mut self.inner
     }
@@ -32,7 +47,7 @@ impl<EM, I, S, Z, T, OT> CommandExecutor<EM, I, S, Z, T, OT> {
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, S, Z, T, OT> Executor<EM, I, S, Z> for CommandExecutor<EM, I, S, Z, T, OT>
+impl<EM, I, OT: Debug, S, T: Debug, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input,
     T: CommandConfigurator<EM, I, S, Z>,
@@ -90,7 +105,8 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, S, Z, T, OT> HasObservers<I, OT, S> for CommandExecutor<EM, I, S, Z, T, OT>
+impl<EM, I, OT: Debug, S, T: Debug, Z> HasObservers<I, OT, S>
+    for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -112,6 +128,7 @@ where
 /// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}};
 /// use libafl::{Error, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
+/// #[derive(Debug)]
 /// struct MyExecutor;
 ///
 /// impl<EM, I: Input + HasTargetBytes, S, Z> CommandConfigurator<EM, I, S, Z> for MyExecutor {
@@ -140,7 +157,8 @@ where
 /// }
 /// ```
 #[cfg(all(feature = "std", unix))]
-pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized {
+pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized + Debug {
+    /// Spawns a new process with the given configuration.
     fn spawn_child(
         &mut self,
         fuzzer: &mut Z,
@@ -149,7 +167,8 @@ pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized {
         input: &I,
     ) -> Result<Child, Error>;
 
-    fn into_executor<OT>(self, observers: OT) -> CommandExecutor<EM, I, S, Z, Self, OT>
+    /// Create an `Executor` from this `CommandConfigurator`.
+    fn into_executor<OT: Debug>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
         OT: ObserversTuple<I, S>,
     {

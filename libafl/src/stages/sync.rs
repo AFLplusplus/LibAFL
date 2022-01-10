@@ -10,8 +10,6 @@ use std::{
 };
 
 use crate::{
-    bolts::rands::Rand,
-    corpus::Corpus,
     fuzzer::Evaluator,
     inputs::Input,
     stages::Stage,
@@ -19,14 +17,17 @@ use crate::{
     Error,
 };
 
-#[derive(Serialize, Deserialize)]
+/// Metadata used to store information about disk sync time
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SyncFromDiskMetadata {
+    /// The last time the sync was done
     pub last_time: SystemTime,
 }
 
 crate::impl_serdeany!(SyncFromDiskMetadata);
 
 impl SyncFromDiskMetadata {
+    /// Create a new [`struct@SyncFromDiskMetadata`]
     #[must_use]
     pub fn new(last_time: SystemTime) -> Self {
         Self { last_time }
@@ -34,28 +35,25 @@ impl SyncFromDiskMetadata {
 }
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
-pub struct SyncFromDiskStage<C, CB, E, EM, I, R, S, Z>
+#[derive(Debug)]
+pub struct SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    C: Corpus<I>,
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     sync_dir: PathBuf,
     load_callback: CB,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, R, S, Z)>,
+    phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<C, CB, E, EM, I, R, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<C, CB, E, EM, I, R, S, Z>
+impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    C: Corpus<I>,
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -95,13 +93,11 @@ where
     }
 }
 
-impl<C, CB, E, EM, I, R, S, Z> SyncFromDiskStage<C, CB, E, EM, I, R, S, Z>
+impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    C: Corpus<I>,
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`]
@@ -159,13 +155,11 @@ where
     }
 }
 
-impl<C, E, EM, I, R, S, Z>
-    SyncFromDiskStage<C, fn(&mut Z, &mut S, &Path) -> Result<I, Error>, E, EM, I, R, S, Z>
+impl<E, EM, I, S, Z>
+    SyncFromDiskStage<fn(&mut Z, &mut S, &Path) -> Result<I, Error>, E, EM, I, S, Z>
 where
-    C: Corpus<I>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
