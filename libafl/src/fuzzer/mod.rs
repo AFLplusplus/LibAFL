@@ -692,14 +692,8 @@ pub mod pybind {
     #[pyclass(unsendable, name = "StdFuzzerI32")]
     pub struct PythonStdFuzzerI32 {
         pub std_fuzzer: StdFuzzer<
-            InMemoryCorpus<BytesInput>,
-            QueueCorpusScheduler<
-                InMemoryCorpus<BytesInput>,
-                BytesInput, 
-                MyState,
-            >,
+            QueueCorpusScheduler,
             MaxMapFeedback<
-                (MapFeedbackState<i32>, ()),
                 BytesInput,
                 OwnedMapObserver<i32>,
                 MyState,
@@ -709,7 +703,6 @@ pub mod pybind {
             CrashFeedback,
             (OwnedMapObserver<i32>, ()),
             MyState,
-            OnDiskCorpus<BytesInput>
         >
     }
 

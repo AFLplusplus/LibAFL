@@ -696,7 +696,6 @@ pub mod pybind {
     #[derive(Clone)]
     pub struct PythonMaxMapFeedbackI32 {
         pub max_map_feedback: MaxMapFeedback<
-            (MapFeedbackState<i32>, ()),
             BytesInput,
             OwnedMapObserver<i32>,
             StdState<

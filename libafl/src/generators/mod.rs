@@ -139,7 +139,6 @@ pub mod pybind {
     #[pyclass(unsendable, name = "RandPrintablesGenerator")]
     pub struct  PythonRandPrintablesGeneratorI32{ 
         pub rand_printable_generator: RandPrintablesGenerator<
-            StdRand,
             StdState<
                 InMemoryCorpus<BytesInput>, 
                 (MapFeedbackState<i32>, ()), 

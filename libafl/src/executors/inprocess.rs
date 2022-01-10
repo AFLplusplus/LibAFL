@@ -332,8 +332,220 @@ impl InProcessHandlers {
     }
 }
 
-<<<<<<< HEAD
-// #[derive(Debug)] TODO: put back
+// // #[derive(Debug)] TODO: put back
+// pub struct OwnedInProcessExecutor<I, OT, S>
+// where
+//     I: Input,
+//     OT: ObserversTuple<I, S>,
+// {
+//     /// The harness function, being executed for each fuzzing loop execution
+//     harness_fn: Box<dyn FnMut(&I) -> ExitKind>,
+//     /// The observers, observing each run
+//     observers: OT,
+//     /// On crash C function pointer
+//     crash_handler: *const c_void,
+//     /// On timeout C function pointer
+//     timeout_handler: *const c_void,
+//     phantom: PhantomData<(I, S)>,
+// }
+
+// impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for OwnedInProcessExecutor<I, OT, S>
+// where
+//     I: Input,
+//     OT: ObserversTuple<I, S>,
+// {
+//     #[inline]
+//     fn run_target(
+//         &mut self,
+//         _fuzzer: &mut Z,
+//         _state: &mut S,
+//         _mgr: &mut EM,
+//         input: &I,
+//     ) -> Result<ExitKind, Error> {
+//         #[cfg(unix)]
+//         unsafe {
+//             let data = &mut GLOBAL_STATE;
+//             write_volatile(
+//                 &mut data.current_input_ptr,
+//                 input as *const _ as *const c_void,
+//             );
+//             write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+//             // println!("{:p}", data.crash_handler);
+//             data.crash_handler = self.crash_handler;
+//             data.timeout_handler = self.timeout_handler;
+//             // Direct raw pointers access /aliasing is pretty undefined behavior.
+//             // Since the state and event may have moved in memory, refresh them right before the signal may happen
+//             write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+//             write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+//             write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+//             compiler_fence(Ordering::SeqCst);
+//         }
+//         #[cfg(all(windows, feature = "std"))]
+//         unsafe {
+//             let data = &mut GLOBAL_STATE;
+//             write_volatile(
+//                 &mut data.current_input_ptr,
+//                 input as *const _ as *const c_void,
+//             );
+//             write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
+//             data.crash_handler = self.crash_handler;
+//             data.timeout_handler = self.timeout_handler;
+//             // Direct raw pointers access /aliasing is pretty undefined behavior.
+//             // Since the state and event may have moved in memory, refresh them right before the signal may happen
+//             write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
+//             write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
+//             write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
+//             compiler_fence(Ordering::SeqCst);
+//         }
+
+//         let ret = (self.harness_fn)(input);
+
+//         #[cfg(unix)]
+//         unsafe {
+//             write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
+//             compiler_fence(Ordering::SeqCst);
+//         }
+//         #[cfg(all(windows, feature = "std"))]
+//         unsafe {
+//             write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
+//             compiler_fence(Ordering::SeqCst);
+//         }
+
+//         Ok(ret)
+//     }
+// }
+
+// impl<I, OT, S> HasObservers<I, OT, S> for OwnedInProcessExecutor<I, OT, S>
+// where
+//     I: Input,
+//     OT: ObserversTuple<I, S>,
+// {
+//     #[inline]
+//     fn observers(&self) -> &OT {
+//         &self.observers
+//     }
+
+//     #[inline]
+//     fn observers_mut(&mut self) -> &mut OT {
+//         &mut self.observers
+//     }
+// }
+
+// impl<I, OT, S> OwnedInProcessExecutor<I, OT, S>
+// where
+//     I: Input,
+//     OT: ObserversTuple<I, S>,
+// {
+//     /// Create a new in mem executor.
+//     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
+//     /// depending on different corpus or state.
+//     /// * `harness_fn` - the harness, executiong the function
+//     /// * `observers` - the observers observing the target during execution
+//     /// This may return an error on unix, if signal handler setup fails
+//     pub fn new<EM, OC, OF, Z>(
+//         harness_fn: Box<dyn FnMut(&I) -> ExitKind>,
+//         observers: OT,
+//         _fuzzer: &mut Z,
+//         _state: &mut S,
+//         _event_mgr: &mut EM,
+//     ) -> Result<Self, Error>
+//     where
+//         EM: EventFirer<I> + EventRestarter<S>,
+//         OC: Corpus<I>,
+//         OF: Feedback<I, S>,
+//         S: HasSolutions<OC, I> + HasClientPerfMonitor,
+//         Z: HasObjective<I, OF, S>,
+//     {
+//         #[cfg(unix)]
+//         unsafe {
+//             let data = &mut GLOBAL_STATE;
+//             setup_signal_handler(data)?;
+//             compiler_fence(Ordering::SeqCst);
+
+//             Ok(Self {
+//                 harness_fn,
+//                 observers,
+//                 crash_handler: unix_signal_handler::inproc_crash_handler::<
+//                     Self,
+//                     EM,
+//                     I,
+//                     OC,
+//                     OF,
+//                     OT,
+//                     S,
+//                     Z,
+//                 > as *const _,
+//                 timeout_handler: unix_signal_handler::inproc_timeout_handler::<
+//                     Self,
+//                     EM,
+//                     I,
+//                     OC,
+//                     OF,
+//                     OT,
+//                     S,
+//                     Z,
+//                 > as *const _,
+//                 phantom: PhantomData,
+//             })
+//         }
+//         #[cfg(all(windows, feature = "std"))]
+//         unsafe {
+//             let data = &mut GLOBAL_STATE;
+//             setup_exception_handler(data)?;
+//             compiler_fence(Ordering::SeqCst);
+
+//             Ok(Self {
+//                 harness_fn,
+//                 observers,
+//                 crash_handler: windows_exception_handler::inproc_crash_handler::<
+//                     Self,
+//                     EM,
+//                     I,
+//                     OC,
+//                     OF,
+//                     OT,
+//                     S,
+//                     Z,
+//                 > as *const _,
+//                 timeout_handler: windows_exception_handler::inproc_timeout_handler::<
+//                     Self,
+//                     EM,
+//                     I,
+//                     OC,
+//                     OF,
+//                     OT,
+//                     S,
+//                     Z,
+//                 > as *const c_void,
+//                 // timeout_handler: ptr::null(),
+//                 phantom: PhantomData,
+//             })
+//         }
+//         #[cfg(not(any(unix, all(windows, feature = "std"))))]
+//         Ok(Self {
+//             harness_fn,
+//             observers,
+//             crash_handler: ptr::null(),
+//             timeout_handler: ptr::null(),
+//             phantom: PhantomData,
+//         })
+//     }
+
+//     /// Retrieve the harness function.
+//     #[inline]
+//     pub fn harness(&self) -> &impl FnMut(&I) -> ExitKind {
+//         &self.harness_fn
+//     }
+
+//     /// Retrieve the harness function for a mutable reference.
+//     #[inline]
+//     pub fn harness_mut(&mut self) -> &mut impl FnMut(&I) -> ExitKind {
+//         &mut self.harness_fn
+//     }
+// }
+
+/// The inmem executor simply calls a target function, then returns afterwards.
+#[allow(dead_code)]
 pub struct OwnedInProcessExecutor<I, OT, S>
 where
     I: Input,
@@ -343,11 +555,22 @@ where
     harness_fn: Box<dyn FnMut(&I) -> ExitKind>,
     /// The observers, observing each run
     observers: OT,
-    /// On crash C function pointer
-    crash_handler: *const c_void,
-    /// On timeout C function pointer
-    timeout_handler: *const c_void,
+    // Crash and timeout hah
+    handlers: InProcessHandlers,
     phantom: PhantomData<(I, S)>,
+}
+
+impl<I, OT, S> Debug for OwnedInProcessExecutor<I, OT, S>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("InProcessExecutor")
+            .field("harness_fn", &"<fn>")
+            .field("observers", &self.observers)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for OwnedInProcessExecutor<I, OT, S>
@@ -358,60 +581,15 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        #[cfg(unix)]
-        unsafe {
-            let data = &mut GLOBAL_STATE;
-            write_volatile(
-                &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
-            );
-            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
-            // println!("{:p}", data.crash_handler);
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
-            // Direct raw pointers access /aliasing is pretty undefined behavior.
-            // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
-            compiler_fence(Ordering::SeqCst);
-        }
-        #[cfg(all(windows, feature = "std"))]
-        unsafe {
-            let data = &mut GLOBAL_STATE;
-            write_volatile(
-                &mut data.current_input_ptr,
-                input as *const _ as *const c_void,
-            );
-            write_volatile(&mut data.executor_ptr, self as *const _ as *const c_void);
-            data.crash_handler = self.crash_handler;
-            data.timeout_handler = self.timeout_handler;
-            // Direct raw pointers access /aliasing is pretty undefined behavior.
-            // Since the state and event may have moved in memory, refresh them right before the signal may happen
-            write_volatile(&mut data.state_ptr, _state as *mut _ as *mut c_void);
-            write_volatile(&mut data.event_mgr_ptr, _mgr as *mut _ as *mut c_void);
-            write_volatile(&mut data.fuzzer_ptr, _fuzzer as *mut _ as *mut c_void);
-            compiler_fence(Ordering::SeqCst);
-        }
-
+        self.handlers
+            .pre_run_target(self, fuzzer, state, mgr, input);
         let ret = (self.harness_fn)(input);
-
-        #[cfg(unix)]
-        unsafe {
-            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
-            compiler_fence(Ordering::SeqCst);
-        }
-        #[cfg(all(windows, feature = "std"))]
-        unsafe {
-            write_volatile(&mut GLOBAL_STATE.current_input_ptr, ptr::null());
-            compiler_fence(Ordering::SeqCst);
-        }
-
+        self.handlers.post_run_target();
         Ok(ret)
     }
 }
@@ -443,7 +621,7 @@ where
     /// * `harness_fn` - the harness, executiong the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
-    pub fn new<EM, OC, OF, Z>(
+    pub fn new<EM, OF, Z>(
         harness_fn: Box<dyn FnMut(&I) -> ExitKind>,
         observers: OT,
         _fuzzer: &mut Z,
@@ -452,82 +630,30 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I> + EventRestarter<S>,
-        OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfMonitor,
+        S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
-        #[cfg(unix)]
+        let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z>()?;
+        #[cfg(windows)]
         unsafe {
-            let data = &mut GLOBAL_STATE;
-            setup_signal_handler(data)?;
-            compiler_fence(Ordering::SeqCst);
-
-            Ok(Self {
-                harness_fn,
-                observers,
-                crash_handler: unix_signal_handler::inproc_crash_handler::<
-                    Self,
-                    EM,
-                    I,
-                    OC,
-                    OF,
-                    OT,
-                    S,
-                    Z,
-                > as *const _,
-                timeout_handler: unix_signal_handler::inproc_timeout_handler::<
-                    Self,
-                    EM,
-                    I,
-                    OC,
-                    OF,
-                    OT,
-                    S,
-                    Z,
-                > as *const _,
-                phantom: PhantomData,
-            })
+            /*
+                See https://github.com/AFLplusplus/LibAFL/pull/403
+                This one reserves certain amount of memory for the stack.
+                If stack overflow happens during fuzzing on windows, the program is transferred to our exception handler for windows.
+                However, if we run out of the stack memory again in this exception handler, we'll crash with STATUS_ACCESS_VIOLATION.
+                We need this API call because with the llmp_compression
+                feature enabled, the exception handler uses a lot of stack memory (in the compression lib code) on release build.
+                As far as I have observed, the compression uses around 0x10000 bytes, but for safety let's just reserve 0x20000 bytes for our exception handlers.
+                This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
+            */
+            let mut stack_reserved = 0x20000;
+            SetThreadStackGuarantee(&mut stack_reserved);
         }
-        #[cfg(all(windows, feature = "std"))]
-        unsafe {
-            let data = &mut GLOBAL_STATE;
-            setup_exception_handler(data)?;
-            compiler_fence(Ordering::SeqCst);
-
-            Ok(Self {
-                harness_fn,
-                observers,
-                crash_handler: windows_exception_handler::inproc_crash_handler::<
-                    Self,
-                    EM,
-                    I,
-                    OC,
-                    OF,
-                    OT,
-                    S,
-                    Z,
-                > as *const _,
-                timeout_handler: windows_exception_handler::inproc_timeout_handler::<
-                    Self,
-                    EM,
-                    I,
-                    OC,
-                    OF,
-                    OT,
-                    S,
-                    Z,
-                > as *const c_void,
-                // timeout_handler: ptr::null(),
-                phantom: PhantomData,
-            })
-        }
-        #[cfg(not(any(unix, all(windows, feature = "std"))))]
         Ok(Self {
             harness_fn,
             observers,
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
+            handlers,
             phantom: PhantomData,
         })
     }
@@ -543,13 +669,23 @@ where
     pub fn harness_mut(&mut self) -> &mut impl FnMut(&I) -> ExitKind {
         &mut self.harness_fn
     }
+
+    /// The inprocess handlers
+    #[inline]
+    pub fn handlers(&self) -> &InProcessHandlers {
+        &self.handlers
+    }
+
+    /// The inprocess handlers, mut
+    #[inline]
+    pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
+        &mut self.handlers
+    }
 }
 
-=======
 /// The global state of the in-process harness.
 #[derive(Debug)]
 #[allow(missing_docs)]
->>>>>>> upstream/main
 pub struct InProcessExecutorHandlerData {
     pub state_ptr: *mut c_void,
     pub event_mgr_ptr: *mut c_void,
