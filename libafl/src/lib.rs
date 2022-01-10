@@ -3,7 +3,7 @@ Welcome to `LibAFL`
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(feature = "RUSTC_IS_NIGHTLY", feature(min_specialization))]
+#![cfg_attr(unstable_feature, feature(specialization))]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::pedantic)]
 #![allow(
