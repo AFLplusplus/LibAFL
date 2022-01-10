@@ -2,7 +2,11 @@ use core::marker::PhantomData;
 
 #[cfg(feature = "std")]
 use std::process::Child;
+use std::{hash::Hasher, io::Read};
 
+use ahash::AHasher;
+
+use crate::observers::StacktraceObserver;
 #[cfg(feature = "std")]
 use crate::{executors::HasObservers, inputs::Input, observers::ObserversTuple, Error};
 
@@ -46,7 +50,7 @@ where
 
         let mut child = self.inner.spawn_child(_fuzzer, _state, _mgr, input)?;
 
-        match child
+        let res = match child
             .wait_timeout(Duration::from_secs(5))
             .expect("waiting on child failed")
             .map(|status| status.signal())
@@ -63,7 +67,25 @@ where
                 drop(child.wait());
                 Ok(ExitKind::Timeout)
             }
+        };
+
+        let stderr = child.stderr.as_mut().unwrap();
+        let mut buf = String::new();
+        let read = stderr.read_to_string(&mut buf)?;
+        println!("Read {} bytes : {}", read, buf);
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        // hasher.write(buf.as_slice());
+        let hash = hasher.finish();
+
+        match self
+            .observers
+            .match_name_mut::<StacktraceObserver>("StacktraceObserver")
+        {
+            Some(obs) => obs.update_hash(hash),
+            None => (),
         }
+
+        res
     }
 }
 
