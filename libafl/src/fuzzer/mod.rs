@@ -674,7 +674,7 @@ pub mod pybind {
     use crate::fuzzer::{StdFuzzer, Fuzzer};
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler};
     use crate::inputs::BytesInput;
-    use crate::observers::map::OwnedMapObserver;
+    use crate::observers::map::{OwnedMapObserver, pybind::PythonMapObserverI32};
     use crate::state::{StdState, pybind::PythonStdState};
     use crate::events::simple::pybind::PythonSimpleEventManager;
     use crate::executors::inprocess::pybind::PythonOwnedInProcessExecutorI32;
@@ -695,13 +695,13 @@ pub mod pybind {
             QueueCorpusScheduler,
             MaxMapFeedback<
                 BytesInput,
-                OwnedMapObserver<i32>,
+                PythonMapObserverI32,
                 MyState,
                 i32,
             >,
             BytesInput,
             CrashFeedback,
-            (OwnedMapObserver<i32>, ()),
+            (OwnedMapObserver<i32>, ()), // TODO: Not use OwnedMapObserver and PythonMapObserverI32
             MyState,
         >
     }

@@ -683,7 +683,7 @@ pub mod pybind {
     #[pymethods]
     impl PythonMapFeedbackStateI32 {
         #[staticmethod]
-        fn with_observer(py_observer: &mut PythonMapObserverI32) -> Self {
+        fn with_observer(py_observer: &PythonMapObserverI32) -> Self {
             Self {
                 map_feedback_state: MapFeedbackState::with_observer(
                     py_observer.get_map_observer(),
@@ -697,7 +697,7 @@ pub mod pybind {
     pub struct PythonMaxMapFeedbackI32 {
         pub max_map_feedback: MaxMapFeedback<
             BytesInput,
-            OwnedMapObserver<i32>,
+            PythonMapObserverI32,
             StdState<
                 InMemoryCorpus<BytesInput>, 
                 (MapFeedbackState<i32>, ()), 
@@ -714,12 +714,12 @@ pub mod pybind {
         #[new]
         fn new(
             py_feedback_state: &PythonMapFeedbackStateI32,
-            py_observer: &PythonOwnedMapObserverI32,
+            py_observer: &PythonMapObserverI32,
         ) -> Self {
             Self {
                 max_map_feedback: MaxMapFeedback::new(
                     &py_feedback_state.map_feedback_state,
-                    &py_observer.owned_map_observer,
+                    py_observer,
                 ),
             }
         }
