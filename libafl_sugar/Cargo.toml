@@ -1,6 +1,6 @@
 [package]
 name = "libafl_sugar"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Sugar builders to create common fuzzers with LibAFL"
 documentation = "https://docs.rs/libafl_sugar"
