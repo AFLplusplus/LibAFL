@@ -23,8 +23,9 @@ aarch64 = [] # build qemu for aarch64
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.7.0" }
-libafl_targets = { path = "../libafl_targets", version = "0.7.0" }
+libafl = { path = "../libafl", version = "0.7.1" }
+libafl_targets = { path = "../libafl_targets", version = "0.7.1" }
+
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.11", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
 num-traits = "0.2"
