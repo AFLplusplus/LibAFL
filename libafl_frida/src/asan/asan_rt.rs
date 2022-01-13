@@ -2155,7 +2155,6 @@ impl AsanRuntime {
             .unwrap()
             .arch_detail()
             .operands();
-
         // Ignore lea instruction
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.
