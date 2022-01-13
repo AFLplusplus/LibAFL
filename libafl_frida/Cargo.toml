@@ -1,6 +1,6 @@
 [package]
 name = "libafl_frida"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["s1341 <github@shmarya.net>"]
 description = "Frida backend library for LibAFL"
 documentation = "https://docs.rs/libafl_frida"
