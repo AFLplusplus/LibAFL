@@ -110,6 +110,10 @@ impl CompilerWrapper for ClangWrapper {
 
         for arg in &args[1..] {
             match arg.as_ref() {
+                "--libafl-no-link" => {
+                    linking = false;
+                    continue;
+                }
                 "-x" => self.x_set = true,
                 "-m32" => self.bit_mode = 32,
                 "-m64" => self.bit_mode = 64,
