@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
