@@ -34,7 +34,16 @@
 #include "llvm/Config/llvm-config.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
+
+#ifdef USE_NEW_PM
+#include "llvm/Passes/PassPlugin.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/IR/PassManager.h"
+#else
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#endif
+
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DebugInfo.h"
@@ -132,19 +141,53 @@ bool isIgnoreFunction(const llvm::Function *F) {
 
 }
 
-
+#ifdef USE_NEW_PM
+class AFLdict2filePass: public PassInfoMixin<AFLdict2filePass>{
+  public:
+    AFLdict2filePass(){
+#else
 class AFLdict2filePass : public ModulePass {
 
  public:
   static char ID;
 
-  AFLdict2filePass() : ModulePass(ID) {}
+  AFLdict2filePass() : ModulePass(ID) {
 
+#endif
+  
+  }
+
+#ifdef USE_NEW_PM
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
+#else
   bool runOnModule(Module &M) override;
+#endif
+
+  protected:
 
 };
 
 }  // namespace
+
+
+#ifdef USE_NEW_PM
+extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
+llvmGetPassPluginInfo() {
+  return {
+    LLVM_PLUGIN_API_VERSION, "AFLdict2filePass", "v0.1",
+    [](PassBuilder &PB){
+      using OptimizationLevel = typename PassBuilder::OptimizationLevel;
+      PB.registerOptimizerLastEPCallback(
+        [](ModulePassManager &MPM, OptimizationLevel OL){
+          MPM.addPass(AFLdict2filePass());
+        }
+      );
+    }
+  };
+}
+#else
+char AFLdict2filePass::ID = 0;
+#endif
 
 void dict2file(int fd, uint8_t *mem, uint32_t len) {
 
@@ -184,7 +227,15 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
 
 }
 
+#ifdef USE_NEW_PM
+PreservedAnalyses AFLdict2filePass::run(Module &M, ModuleAnalysisManager &MAM) {
+#else
 bool AFLdict2filePass::runOnModule(Module &M) {
+#endif
+
+  #ifdef USE_NEW_PM
+    auto PA = PreservedAnalyses::all();
+  #endif
 
   DenseMap<Value *, std::string *> valueMap;
   char *                           ptr;
@@ -626,12 +677,15 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
   close(fd);
 
+  #ifdef USE_NEW_PM
+    return PA;
+  #else
   return true;
-
+  #endif
 }
 
-char AFLdict2filePass::ID = 0;
 
+#ifndef USE_NEW_PM
 static void registerAFLdict2filePass(const PassManagerBuilder &,
                                      legacy::PassManagerBase &PM) {
 
@@ -649,3 +703,4 @@ static RegisterStandardPasses RegisterAFLdict2filePass(
 static RegisterStandardPasses RegisterAFLdict2filePass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerAFLdict2filePass);
 
+#endif

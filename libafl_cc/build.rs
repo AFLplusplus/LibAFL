@@ -142,6 +142,7 @@ fn main() {
 
         println!("cargo:rerun-if-changed=src/cmplog-routines-pass.cc");
         println!("cargo:rerun-if-changed=src/afl-coverage-pass.cc");
+        println!("cargo:rerun-if-changed=src/dict2file-pass.cc");
 
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
@@ -162,6 +163,19 @@ fn main() {
             .arg(out_dir.join(format!("afl-coverage-pass.{}", dll_extension())))
             .status()
             .expect("Failed to compile afl-coverage-pass.cc");
+        
+        println!("cargo:warning=dict2file!");
+        let _ = Command::new(llvm_bindir.join("clang++"))
+            .args(&cxxflags)
+            .args(&custom_flags)
+            .arg("-D USE_NEW_PM")
+            .arg(src_dir.join("dict2file-pass.cc"))
+            .args(&ldflags)
+            .args(&["-fPIC", "-shared", "-o"])
+            .arg(out_dir.join(format!("dict2file-pass.{}", dll_extension())))
+            .status()
+            .expect("Failed to compile dict2file-pass.cc");
+
     } else {
         write!(
             &mut clang_constants_file,
