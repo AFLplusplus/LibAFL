@@ -12,7 +12,7 @@ target/release/libafl_cxx: src/* src/bin/*
 target/release/libafl_cc: target/release/libafl_cxx
 
 fuzz.o: fuzz.c target/release/libafl_cc
-	target/release/libafl_cc -O3 -c $^ -o $@
+	target/release/libafl_cc --libafl-no-link -O3 -c $^ -o $@
 
 fuzzer: target/release/libafl_cxx fuzz.o
 	# Build the fuzzer compiler
@@ -20,6 +20,7 @@ fuzzer: target/release/libafl_cxx fuzz.o
 
 	# Build the harness	
 	target/release/libafl_cxx \
+	  --libafl \
 		fuzz.o \
 		-o $(FUZZER_NAME) \
 		-lm -lz
