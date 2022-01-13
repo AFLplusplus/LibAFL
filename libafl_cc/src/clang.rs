@@ -60,6 +60,8 @@ pub struct ClangWrapper {
     linking: bool,
     x_set: bool,
     bit_mode: u32,
+    need_libafl_arg: bool,
+    has_libafl_arg: bool,
 
     from_args_called: bool,
     base_args: Vec<String>,
@@ -112,6 +114,11 @@ impl CompilerWrapper for ClangWrapper {
             match arg.as_ref() {
                 "--libafl-no-link" => {
                     linking = false;
+                    self.has_libafl_arg = true;
+                    continue;
+                }
+                "--libafl" => {
+                    self.has_libafl_arg = true;
                     continue;
                 }
                 "-x" => self.x_set = true,
@@ -207,6 +214,10 @@ impl CompilerWrapper for ClangWrapper {
             args.push(self.wrapped_cc.clone());
         }
         args.extend_from_slice(self.base_args.as_slice());
+        if self.need_libafl_arg && !self.has_libafl_arg {
+            return Ok(args);
+        }
+
         if !self.passes.is_empty() {
             args.push("-fno-experimental-new-pass-manager".into());
         }
@@ -270,6 +281,8 @@ impl ClangWrapper {
             linking: false,
             x_set: false,
             bit_mode: 0,
+            need_libafl_arg: false,
+            has_libafl_arg: false,
             from_args_called: false,
             base_args: vec![],
             cc_args: vec![],
@@ -306,6 +319,18 @@ impl ClangWrapper {
     /// Add LLVM pass
     pub fn add_pass(&mut self, pass: LLVMPasses) -> &'_ mut Self {
         self.passes.push(pass);
+        self
+    }
+
+    /// Set if linking
+    pub fn linking(&mut self, value: bool) -> &'_ mut Self {
+        self.linking = value;
+        self
+    }
+
+    /// Set if it needs the --libafl arg to add the custom arguments to clang
+    pub fn need_libafl_arg(&mut self, value: bool) -> &'_ mut Self {
+        self.need_libafl_arg = value;
         self
     }
 }
