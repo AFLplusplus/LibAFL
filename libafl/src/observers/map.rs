@@ -955,11 +955,13 @@ where
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use serde::{Deserialize, Serialize};
     use crate::bolts::{tuples::Named, HasLen};
-    use crate::observers::{map::OwnedMapObserver, MapObserver};
+    use crate::inputs::Input;
+    use crate::observers::{map::OwnedMapObserver, MapObserver, Observer};
+    use crate::state::pybind::MyStdState;
+    use crate::Error;
     use pyo3::prelude::*;
-
+    use serde::{Deserialize, Serialize};
 
     #[pyclass(unsendable, name = "OwnedMapObserverI32")]
     #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1015,16 +1017,11 @@ pub mod pybind {
 
     #[pymethods]
     impl PythonMapObserverI32 {
-        #[new]
-        fn new(map_observer: PyObject, type_name: &str) -> Self {
-            Python::with_gil(|py| match type_name {
-                "OwnedMapObserverI32" => Self {
-                    map_observer: PythonMapObserverWrapperI32::Owned(
-                        map_observer.extract(py).unwrap(),
-                    ),
-                },
-                _ => panic!("MapObserver not supported: {}", type_name),
-            })
+        #[staticmethod]
+        fn new_from_owned(owned_map_observer: PythonOwnedMapObserverI32) -> Self {
+            Self {
+                map_observer: PythonMapObserverWrapperI32::Owned(owned_map_observer),
+            }
         }
     }
 
@@ -1066,6 +1063,18 @@ pub mod pybind {
         #[inline]
         fn len(&self) -> usize {
             self.get_map_observer().len()
+        }
+    }
+
+    // Hardcode types ?
+    impl<I, S> Observer<I, S> for PythonMapObserverI32
+    where
+        Self: MapObserver<i32>,
+        // I: Input,
+    {
+        #[inline]
+        fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+            self.get_mut_map_observer().reset_map()
         }
     }
 

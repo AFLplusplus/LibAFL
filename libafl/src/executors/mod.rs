@@ -138,3 +138,111 @@ mod test {
             .is_ok());
     }
 }
+
+#[cfg(feature = "python")]
+pub mod pybind {
+    use std::rc::Rc;
+
+    use crate::bolts::{rands::StdRand, tuples::tuple_list};
+    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
+    use crate::events::simple::pybind::PythonSimpleEventManager;
+    use crate::events::SimpleEventManager;
+    use crate::executors::HasObservers;
+    use crate::executors::{
+        inprocess::{pybind::PythonOwnedInProcessExecutorI32, OwnedInProcessExecutor},
+        Executor,
+    };
+    use crate::feedbacks::MapFeedbackState;
+    use crate::fuzzer::pybind::{MyStdFuzzer, PythonStdFuzzerI32};
+    use crate::inputs::{BytesInput, HasBytesVec, HasTargetBytes, Input};
+    use crate::monitors::SimpleMonitor;
+    use crate::observers::{map::pybind::PythonMapObserverI32, ObserversTuple};
+    use crate::state::{
+        pybind::{MyStdState, PythonStdState},
+        StdState,
+    };
+
+    use pyo3::prelude::*;
+
+    #[derive(Debug)]
+    pub enum PythonExecutorWrapperI32 {
+        OwnedInProcess(*mut PythonOwnedInProcessExecutorI32),
+    }
+
+    // Not Exposed to user
+    #[pyclass(unsendable, name = "ExecutorI32")]
+    #[derive(Debug)]
+    pub struct PythonExecutorI32 {
+        pub executor: PythonExecutorWrapperI32,
+    }
+
+    impl PythonExecutorI32 {
+        pub fn get_executor(
+            &self,
+        ) -> &(impl Executor<
+            SimpleEventManager<BytesInput, SimpleMonitor<fn(String)>>,
+            BytesInput,
+            MyStdState,
+            MyStdFuzzer,
+        > + HasObservers<BytesInput, (), MyStdState>)
+        {
+            unsafe {
+                match &self.executor {
+                    PythonExecutorWrapperI32::OwnedInProcess(owned_inprocess_executor) => {
+                        &(*(*owned_inprocess_executor)).owned_in_process_executor
+                    }
+                    _ => panic!("Executor not supported"),
+                }
+            }
+        }
+
+        pub fn get_mut_executor(
+            &self,
+        ) -> &mut (impl Executor<
+            SimpleEventManager<BytesInput, SimpleMonitor<fn(String)>>,
+            BytesInput,
+            MyStdState,
+            MyStdFuzzer,
+        > + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
+            unsafe {
+                match &self.executor {
+                    PythonExecutorWrapperI32::OwnedInProcess(owned_inprocess_executor) => {
+                        &mut (*(*owned_inprocess_executor)).owned_in_process_executor
+                    }
+                    _ => panic!("Executor not supported"),
+                }
+            }
+        }
+    }
+
+    #[pymethods]
+    impl PythonExecutorI32 {
+        #[staticmethod]
+        fn new(owned_inprocess_executor: &mut PythonOwnedInProcessExecutorI32) -> Self {
+            Self {
+                executor: PythonExecutorWrapperI32::OwnedInProcess(owned_inprocess_executor),
+            }
+        }
+    }
+
+    impl<I, OT, S> HasObservers<I, OT, S> for PythonExecutorI32
+    where
+        I: Input,
+        OT: ObserversTuple<I, S>,
+    {
+        #[inline]
+        fn observers(&self) -> &OT {
+            self.get_executor().observers()
+        }
+
+        #[inline]
+        fn observers_mut(&mut self) -> &mut OT {
+            self.get_mut_executor().observers_mut()
+        }
+    }
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonExecutorI32>()?;
+        Ok(())
+    }
+}

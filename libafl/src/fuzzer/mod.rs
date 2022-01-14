@@ -675,35 +675,29 @@ pub mod pybind {
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler};
     use crate::inputs::BytesInput;
     use crate::observers::map::{OwnedMapObserver, pybind::PythonMapObserverI32};
-    use crate::state::{StdState, pybind::PythonStdState};
+    use crate::state::{StdState, pybind::{PythonStdState, MyStdState}};
     use crate::events::simple::pybind::PythonSimpleEventManager;
     use crate::executors::inprocess::pybind::PythonOwnedInProcessExecutorI32;
     use crate::mutators::scheduled::{havoc_mutations, StdScheduledMutator};
     use crate::stages::StdMutationalStage;
 
-    type MyState = StdState<
-        InMemoryCorpus<BytesInput>,
-        (MapFeedbackState<i32>, ()),
+    pub type MyStdFuzzer = StdFuzzer<
+        QueueCorpusScheduler,
+        MaxMapFeedback<
+            BytesInput,
+            PythonMapObserverI32,
+            MyStdState,
+            i32,
+        >,
         BytesInput,
-        StdRand, 
-        OnDiskCorpus<BytesInput>
+        CrashFeedback,
+        (PythonMapObserverI32, ()),
+        MyStdState,
     >;
 
     #[pyclass(unsendable, name = "StdFuzzerI32")]
     pub struct PythonStdFuzzerI32 {
-        pub std_fuzzer: StdFuzzer<
-            QueueCorpusScheduler,
-            MaxMapFeedback<
-                BytesInput,
-                PythonMapObserverI32,
-                MyState,
-                i32,
-            >,
-            BytesInput,
-            CrashFeedback,
-            (OwnedMapObserver<i32>, ()), // TODO: Not use OwnedMapObserver and PythonMapObserverI32
-            MyState,
-        >
+        pub std_fuzzer: MyStdFuzzer
     }
 
     #[pymethods]

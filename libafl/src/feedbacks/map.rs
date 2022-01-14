@@ -686,7 +686,7 @@ pub mod pybind {
         fn with_observer(py_observer: &PythonMapObserverI32) -> Self {
             Self {
                 map_feedback_state: MapFeedbackState::with_observer(
-                    py_observer.get_map_observer(),
+                    py_observer,
                 ),
             }
         }

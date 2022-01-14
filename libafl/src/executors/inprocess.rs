@@ -332,6 +332,7 @@ impl InProcessHandlers {
     }
 }
 
+// InProcessExecutor for python use
 #[allow(dead_code)]
 pub struct OwnedInProcessExecutor<I, OT, S>
 where
@@ -1321,14 +1322,15 @@ pub mod pybind {
     use crate::events::simple::pybind::PythonSimpleEventManager;
     use crate::fuzzer::pybind::PythonStdFuzzerI32;
     use crate::executors::{ExitKind, inprocess::OwnedInProcessExecutor};
-    use crate::observers::pybind::{PythonOwnedMapObserverI32};
+    use crate::observers::pybind::{PythonMapObserverI32};
     use crate::observers::map::OwnedMapObserver;
 
     #[pyclass(unsendable, name = "OwnedInProcessExecutorI32")]
-    pub struct  PythonOwnedInProcessExecutorI32{
+    #[derive(Debug)]
+    pub struct PythonOwnedInProcessExecutorI32{
         pub owned_in_process_executor: OwnedInProcessExecutor<
             BytesInput, 
-            (OwnedMapObserver<i32>, ()),
+            (PythonMapObserverI32, ()),
             StdState<
                 InMemoryCorpus<BytesInput>, 
                 (MapFeedbackState<i32>, ()), 
@@ -1344,7 +1346,7 @@ pub mod pybind {
         #[new]
         fn new(
             // harness: PyObject,
-            py_observer: PythonOwnedMapObserverI32,
+            py_observer: PythonMapObserverI32,
             py_fuzzer: &mut PythonStdFuzzerI32,
             py_state: &mut PythonStdState,
             py_event_manager: &mut PythonSimpleEventManager
@@ -1374,7 +1376,7 @@ pub mod pybind {
                         }
                         ExitKind::Ok
                     }), 
-                    tuple_list!(py_observer.owned_map_observer), 
+                    tuple_list!(py_observer), 
                     &mut py_fuzzer.std_fuzzer, 
                     &mut py_state.std_state, 
                     &mut py_event_manager.simple_event_manager).expect("Failed to create the Executor".into())

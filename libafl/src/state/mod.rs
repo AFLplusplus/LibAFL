@@ -641,28 +641,31 @@ where
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use pyo3::prelude::*;
-    use std::path::PathBuf;
     use crate::bolts::{rands::StdRand, tuples::tuple_list};
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
-    use crate::inputs::BytesInput;
-    use crate::feedbacks::map::{MapFeedbackState, pybind::PythonMapFeedbackStateI32};
-    use crate::state::StdState;
     use crate::events::simple::pybind::PythonSimpleEventManager;
+    use crate::executors::{inprocess::pybind::PythonOwnedInProcessExecutorI32, pybind::PythonExecutorI32};
+    use crate::feedbacks::map::{pybind::PythonMapFeedbackStateI32, MapFeedbackState};
     use crate::fuzzer::pybind::PythonStdFuzzerI32;
-    use crate::executors::inprocess::pybind::PythonOwnedInProcessExecutorI32;
     use crate::generators::pybind::PythonRandPrintablesGeneratorI32;
+    use crate::inputs::BytesInput;
+    use crate::state::StdState;
+    use pyo3::prelude::*;
+    use std::path::PathBuf;
+
+    // Temporary fixed generics state
+    pub type MyStdState = StdState<
+        InMemoryCorpus<BytesInput>,
+        (MapFeedbackState<i32>, ()),
+        BytesInput,
+        StdRand,
+        OnDiskCorpus<BytesInput>,
+    >;
 
     #[pyclass(unsendable, name = "StdState")]
-    pub struct PythonStdState { // I32 ??
-        pub std_state: StdState<
-            InMemoryCorpus<BytesInput>,
-            (MapFeedbackState<i32>, ()),
-            BytesInput,
-            StdRand, 
-            OnDiskCorpus<BytesInput>
-        >
-
+    pub struct PythonStdState {
+        // I32 ??
+        pub std_state: MyStdState,
     }
 
     #[pymethods]
@@ -671,33 +674,35 @@ pub mod pybind {
         fn new(
             seed: u64,
             dir_path_name: String,
-            py_map_feedback_state: PythonMapFeedbackStateI32
+            py_map_feedback_state: PythonMapFeedbackStateI32,
         ) -> Self {
-            Self{
+            Self {
                 std_state: StdState::new(
                     StdRand::with_seed(seed),
                     InMemoryCorpus::new(),
                     OnDiskCorpus::new(PathBuf::from(dir_path_name)).unwrap(),
                     tuple_list!(py_map_feedback_state.map_feedback_state),
-                )
+                ),
             }
         }
 
         fn generate_initial_inputs(
             &mut self,
             py_fuzzer: &mut PythonStdFuzzerI32,
-            py_executor: &mut PythonOwnedInProcessExecutorI32,
+            py_executor: &mut PythonExecutorI32,
             py_generator: &mut PythonRandPrintablesGeneratorI32,
             py_mgr: &mut PythonSimpleEventManager,
-            num: usize
+            num: usize,
         ) {
-            self.std_state.generate_initial_inputs(
-                &mut py_fuzzer.std_fuzzer, 
-                &mut py_executor.owned_in_process_executor, 
-                &mut py_generator.rand_printable_generator,
-                &mut py_mgr.simple_event_manager,
-                num
-            ).expect("Failed to generate the initial corpus".into());
+            self.std_state
+                .generate_initial_inputs(
+                    &mut py_fuzzer.std_fuzzer,
+                    py_executor.get_mut_executor(),
+                    &mut py_generator.rand_printable_generator,
+                    &mut py_mgr.simple_event_manager,
+                    num,
+                )
+                .expect("Failed to generate the initial corpus".into());
         }
     }
 

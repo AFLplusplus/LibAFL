@@ -341,6 +341,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     monitors::pybind::register(py, m)?;
     events::simple::pybind::register(py, m)?;
     fuzzer::pybind::register(py, m)?;
+    executors::pybind::register(py, m)?;
     executors::inprocess::pybind::register(py, m)?;
     generators::pybind::register(py, m)?;
     Ok(())
