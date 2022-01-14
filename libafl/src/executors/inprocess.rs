@@ -1131,7 +1131,7 @@ where
     {
         // should match on type when it's available
         match observers.match_name::<StacktraceObserver>("StacktraceObserver") {
-            Some(st_observer) => st_observer.setup_shmem(shmem_provider.clone()),
+            Some(st_observer) => st_observer.setup_shmem(),
             None => (),
         }
         Ok(Self {

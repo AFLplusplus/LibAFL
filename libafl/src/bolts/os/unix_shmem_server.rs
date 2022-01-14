@@ -6,7 +6,7 @@ and forwards them over unix domain sockets.
 */
 
 use crate::{
-    bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider, ShMemType},
+    bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
 use core::mem::ManuallyDrop;
@@ -95,10 +95,6 @@ where
 
     fn map_mut(&mut self) -> &mut [u8] {
         self.inner.map_mut()
-    }
-
-    fn get_type(&self) -> ShMemType {
-        ShMemType::AshmemShMem
     }
 }
 

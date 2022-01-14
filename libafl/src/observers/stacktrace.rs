@@ -2,10 +2,7 @@
 
 use crate::{
     bolts::{
-        shmem::{
-            unix_shmem::ashmem::AshmemShMem, GenericShMem, MmapShMem, ShMem, ShMemId,
-            ShMemProvider, ShMemType, StdShMem, UnixShMem,
-        },
+        shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
         tuples::Named,
     },
     observers::Observer,
@@ -17,62 +14,41 @@ use std::fmt::Debug;
 /// A struct that stores needed information to persist the backtrace across prcesses/runs
 #[derive(Debug)]
 pub struct BacktraceSharedMemoryWrapper {
-    /// ID of the shared memory
-    shmem_id: Option<ShMemId>,
-    /// Size of the shared memory
-    shmem_size: Option<usize>,
-    /// Type of the shared memory
-    shmem_type: Option<ShMemType>,
+    /// shared memory
+    shmem: Option<StdShMem>,
 }
 
 impl BacktraceSharedMemoryWrapper {
-    fn update_shmem_info(&mut self, shmem_id: ShMemId, shmem_size: usize, shmem_type: ShMemType) {
-        self.shmem_id = Some(shmem_id);
-        self.shmem_size = Some(shmem_size);
-        self.shmem_type = Some(shmem_type);
+    fn set_shmem(&mut self, shmem: StdShMem) {
+        self.shmem = Some(shmem);
     }
 
     fn is_ready(&self) -> bool {
-        match (self.shmem_id, self.shmem_size, self.shmem_type.as_ref()) {
-            (None, _, _) => false,
-            (_, None, _) => false,
-            (_, _, None) => false,
-            _ => true,
+        match &self.shmem {
+            Some(_) => true,
+            None => false,
         }
     }
 
-    fn get_generic_shmem(&self) -> GenericShMem {
+    fn get_shmem(&self) -> &StdShMem {
         if self.is_ready() {
-            let id = self.shmem_id.unwrap();
-            let size = self.shmem_size.unwrap();
-            let g_shmem: GenericShMem;
-            match self.shmem_type.as_ref().unwrap() {
-                ShMemType::AshmemShMem => {
-                    g_shmem =
-                        GenericShMem::AshmemShMem(AshmemShMem::from_id_and_size(id, size).unwrap());
-                }
-                ShMemType::MmapShMem => {
-                    g_shmem =
-                        GenericShMem::MmapShMem(MmapShMem::from_id_and_size(id, size).unwrap());
-                }
-                ShMemType::StdShMem => {
-                    g_shmem = GenericShMem::StdShMem(StdShMem::from_id_and_size(id, size).unwrap());
-                }
-                ShMemType::UnixShMem => {
-                    g_shmem =
-                        GenericShMem::UnixShMem(UnixShMem::from_id_and_size(id, size).unwrap());
-                } // _ => panic!("Unknown ShMemType"),
-            }
-
-            g_shmem
+            self.shmem.as_ref().unwrap()
         } else {
             panic!("Cannot get generic shmem from uninitialized item");
         }
     }
 
-    fn store_stacktrace_hash(&self, hash: u64) {
-        let mut g_shmem = self.get_generic_shmem();
-        let map = g_shmem.map_mut();
+    fn get_shmem_mut(&mut self) -> &mut StdShMem {
+        if self.is_ready() {
+            self.shmem.as_mut().unwrap()
+        } else {
+            panic!("Cannot get generic shmem from uninitialized item");
+        }
+    }
+
+    fn store_stacktrace_hash(&mut self, hash: u64) {
+        let shmem = self.get_shmem_mut();
+        let map = shmem.map_mut();
         let hash_bytes = hash.to_be_bytes();
         for i in 0..hash_bytes.len() {
             map[i] = hash_bytes[i]
@@ -80,8 +56,8 @@ impl BacktraceSharedMemoryWrapper {
     }
 
     fn get_stacktrace_hash(&self) -> u64 {
-        let g_shmem = self.get_generic_shmem();
-        let map = g_shmem.map();
+        let shmem = self.get_shmem();
+        let map = shmem.map();
         let mut bytes: [u8; 8] = [0; 8];
         for i in 0..8 {
             bytes[i] = map[i];
@@ -92,11 +68,8 @@ impl BacktraceSharedMemoryWrapper {
 
 // Used for fuzzers not running in the same process
 /// Static variable storing shared memory information
-pub static mut BACKTRACE_SHMEM_DATA: BacktraceSharedMemoryWrapper = BacktraceSharedMemoryWrapper {
-    shmem_id: None,
-    shmem_size: None,
-    shmem_type: None,
-};
+pub static mut BACKTRACE_SHMEM_DATA: BacktraceSharedMemoryWrapper =
+    BacktraceSharedMemoryWrapper { shmem: None };
 
 /// Used for in process fuzzing (InProccessExecutor)
 /// This could be later wrapped in a shared memory struct implementing ShMem
@@ -222,15 +195,12 @@ impl StacktraceObserver {
     }
 
     /// Sets up the shared memory information in the static object BACKTRACE_SHMEM_DATA
-    pub fn setup_shmem<SP: ShMemProvider>(&self, shmem_provider: SP) {
+    pub fn setup_shmem(&self) {
+        let shmem_provider = StdShMemProvider::new();
         println!("panic hook is being set");
-        let shmem_map = shmem_provider.to_owned().new_map(5000).unwrap();
-        let shmem_id = shmem_map.id();
-        let shmem_size = shmem_map.len();
-        let shmem_type = shmem_map.get_type();
-
+        let shmem = shmem_provider.unwrap().new_map(5000).unwrap();
         unsafe {
-            BACKTRACE_SHMEM_DATA.update_shmem_info(shmem_id, shmem_size, shmem_type);
+            BACKTRACE_SHMEM_DATA.set_shmem(shmem);
         }
     }
 }
