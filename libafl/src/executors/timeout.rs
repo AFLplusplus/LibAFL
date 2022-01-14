@@ -18,8 +18,6 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
-#[cfg(unix)]
-use libc::c_int;
 
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
@@ -36,6 +34,8 @@ use core::{ffi::c_void, ptr::write_volatile};
 
 #[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};
+
+use super::HasOnCrashReset;
 
 #[repr(C)]
 #[cfg(unix)]
@@ -66,36 +66,13 @@ struct Itimerval {
     pub it_value: Timeval,
 }
 
-#[cfg(unix)]
-extern "C" {
-    fn setitimer(which: c_int, new_value: *mut Itimerval, old_value: *mut Itimerval) -> c_int;
-}
-
-#[cfg(unix)]
-const ITIMER_REAL: c_int = 0;
-
-/// Reset and remove the timeout
-#[cfg(unix)]
-pub(crate) fn unix_remove_timeout() {
-    unsafe {
-        let mut itimerval_zero: Itimerval = zeroed();
-        setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
-    }
-}
-
-/// Deletes this timer queue
-/// # Safety
-/// Will dereference the given `tp_timer` pointer, unchecked.
-#[cfg(all(windows, feature = "std"))]
-pub(crate) unsafe fn windows_delete_timer_queue(tp_timer: *mut TP_TIMER) {
-    CloseThreadpoolTimer(tp_timer);
-}
-
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(unix)]
-    itimerval: Itimerval,
+    itimerspec: libc::itimerspec,
+    #[cfg(unix)]
+    timerid: libc::timer_t,
     #[cfg(windows)]
     milli_sec: i64,
     #[cfg(windows)]
@@ -117,7 +94,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
             .field("executor", &self.executor)
-            .field("itimerval", &self.itimerval)
+            .field("itimerval", &self.itimerspec)
             .finish()
     }
 }
@@ -136,22 +113,46 @@ impl<E> TimeoutExecutor<E> {
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis();
-        let it_value = Timeval {
-            tv_sec: (milli_sec / 1000) as i64,
-            tv_usec: (milli_sec % 1000) as i64,
+        let it_value = libc::timespec {
+            tv_sec: (milli_sec / 1000) as _,
+            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
         };
-        let it_interval = Timeval {
+        let it_interval = libc::timespec {
             tv_sec: 0,
-            tv_usec: 0,
+            tv_nsec: 0,
         };
-        let itimerval = Itimerval {
+        let itimerspec = libc::itimerspec {
             it_interval,
             it_value,
         };
+        let mut timerid: libc::timer_t = null_mut();
+        unsafe {
+            // creates a new per-process interval timer
+            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), &mut timerid as *mut _);
+        }
         Self {
             executor,
-            itimerval,
+            itimerspec,
+            timerid,
         }
+    }
+
+    /// Set the timeout for this executor
+    pub fn set_timeout(&mut self, exec_tmout: Duration) {
+        let milli_sec = exec_tmout.as_millis();
+        let it_value = libc::timespec {
+            tv_sec: (milli_sec / 1000) as _,
+            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
+        };
+        let it_interval = libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        let itimerspec = libc::itimerspec {
+            it_interval,
+            it_value,
+        };
+        self.itimerspec = itimerspec;
     }
 }
 
@@ -184,25 +185,6 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     }
 
     /// Set the timeout for this executor
-    #[cfg(unix)]
-    pub fn set_timeout(&mut self, exec_tmout: Duration) {
-        let milli_sec = exec_tmout.as_millis();
-        let it_value = Timeval {
-            tv_sec: (milli_sec / 1000) as i64,
-            tv_usec: (milli_sec % 1000) as i64,
-        };
-        let it_interval = Timeval {
-            tv_sec: 0,
-            tv_usec: 0,
-        };
-        let itimerval = Itimerval {
-            it_interval,
-            it_value,
-        };
-        self.itimerval = itimerval;
-    }
-
-    /// Set the timeout for this executor
     #[cfg(windows)]
     pub fn set_timeout(&mut self, exec_tmout: Duration) {
         self.milli_sec = exec_tmout.as_millis() as i64;
@@ -211,15 +193,6 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     /// Retrieve the inner `Executor` that is wrapped by this `TimeoutExecutor`.
     pub fn inner(&mut self) -> &mut E {
         &mut self.executor
-    }
-
-    /// Reset the timeout for this executor
-    #[cfg(windows)]
-    pub fn windows_reset_timeout(&self) -> Result<(), Error> {
-        unsafe {
-            SetThreadpoolTimer(self.tp_timer, core::ptr::null(), 0, 0);
-        }
-        Ok(())
     }
 }
 
@@ -277,7 +250,7 @@ where
 
             write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());
 
-            self.windows_reset_timeout()?;
+            self.reset();
             ret
         }
     }
@@ -298,9 +271,10 @@ where
     ) -> Result<ExitKind, Error> {
         #[cfg(unix)]
         unsafe {
-            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+            libc::timer_settime(self.timerid, 0, &self.itimerspec as *const _, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            unix_remove_timeout();
+            // reset timer
+            self.reset();
             ret
         }
     }
@@ -322,11 +296,32 @@ where
     }
 }
 
+#[cfg(unix)]
+impl<E> HasOnCrashReset for TimeoutExecutor<E> {
+    /// Disarm currently running timer
+    fn reset(&self) {
+        unsafe {
+            let disarmed: libc::itimerspec = zeroed();
+            libc::timer_settime(self.timerid, 0, &disarmed as *const _, null_mut());
+        }
+    }
+}
+
+#[cfg(all(windows, feature = "std"))]
+impl<E> HasOnCrashReset for TimeoutExecutor<E> {
+    /// Deletes this timer queue
+    /// # Safety
+    /// Will dereference the given `tp_timer` pointer, unchecked.
+    fn reset(&self) {
+        CloseThreadpoolTimer(self.tp_timer);
+    }
+}
+
 #[cfg(windows)]
 impl<E> Drop for TimeoutExecutor<E> {
     fn drop(&mut self) {
         unsafe {
-            windows_delete_timer_queue(self.tp_timer);
+            self.reset();
         }
     }
 }

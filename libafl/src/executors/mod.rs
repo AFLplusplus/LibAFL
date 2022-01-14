@@ -69,6 +69,12 @@ where
     fn observers_mut(&mut self) -> &mut OT;
 }
 
+/// Allows access to custom Reset Handler
+pub trait HasOnCrashReset {
+    /// Reset the state, e.g., disable timers
+    fn reset(&self);
+}
+
 /// An executor takes the given inputs, and runs the harness/target.
 pub trait Executor<EM, I, S, Z>: Debug
 where
@@ -94,6 +100,11 @@ where
     {
         WithObservers::new(self, observers)
     }
+}
+
+impl<EM, I, S, Z> HasOnCrashReset for dyn Executor<EM, I, S, Z> {
+    #[inline]
+    fn reset(&self) {}
 }
 
 /// A simple executor that does nothing.

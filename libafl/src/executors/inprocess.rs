@@ -35,7 +35,7 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, HasOnCrashReset},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
@@ -112,6 +112,16 @@ where
     fn observers_mut(&mut self) -> &mut OT {
         &mut self.observers
     }
+}
+
+impl<'a, H, I, OT, S> HasOnCrashReset for InProcessExecutor<'a, H, I, OT, S>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    #[inline]
+    fn reset(&self) {}
 }
 
 impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
@@ -268,7 +278,7 @@ impl InProcessHandlers {
     pub fn new<E, EM, I, OF, OT, S, Z>() -> Result<Self, Error>
     where
         I: Input,
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, OT, S> + HasOnCrashReset,
         OT: ObserversTuple<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OF: Feedback<I, S>,
@@ -420,8 +430,7 @@ mod unix_signal_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            timeout::unix_remove_timeout,
-            ExitKind, HasObservers,
+            ExitKind, HasObservers, HasOnCrashReset,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -563,7 +572,7 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, OT, S> + HasOnCrashReset,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -571,8 +580,6 @@ mod unix_signal_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
-        unix_remove_timeout();
-
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
             as *mut libc::c_void as *mut ucontext_t);
@@ -613,10 +620,12 @@ mod unix_signal_handler {
 
             // TODO tell the parent to not restart
         } else {
+            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+            // disarms timeout in case of TimeoutExecutor
+            executor.reset();
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
             let observers = executor.observers();
 
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
@@ -860,7 +869,7 @@ mod windows_exception_handler {
             LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
 
-            windows_delete_timer_queue(x);
+            data.reset();
             data.tp_timer = ptr::null_mut();
         }
 
