@@ -29,8 +29,6 @@ pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService}
 
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
-
-use self::unix_shmem::ashmem::AshmemShMem;
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMemProvider = Win32ShMemProvider;
@@ -624,7 +622,7 @@ pub mod unix_shmem {
                 }
             }
 
-            pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let shm_fd: i32 = id.to_string().parse().unwrap();
 
