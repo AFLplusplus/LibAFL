@@ -49,17 +49,17 @@ void c_harness(char *array) {
       set_value(2);
       if (array[2] == 'a') {
         // abort 1
-        printf("Will abort\n");
+        // fprintf(stderr, "Will abort1\n");
         abort();
       }
       if (array[2] == 'b') {
         // abort 2
-        printf("Will abort\n");
+        // fprintf(stderr, "Will abort2\n");
         abort();
       }
       if (array[2] == 'c') {
         // abort 3
-        printf("Will abort\n");
+        // fprintf(stderr, "Will abort3\n");
         abort();
       }
     }

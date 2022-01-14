@@ -17,9 +17,9 @@ use crate::{executors::HasObservers, inputs::Input, observers::ObserversTuple, E
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
 
+use regex::Regex;
 #[cfg(all(feature = "std", unix))]
 use std::time::Duration;
-
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 pub struct CommandExecutor<EM, I, OT: Debug, S, T: Debug, Z> {
@@ -64,7 +64,6 @@ where
         use wait_timeout::ChildExt;
 
         let mut child = self.inner.spawn_child(_fuzzer, _state, _mgr, input)?;
-
         let res = match child
             .wait_timeout(Duration::from_secs(5))
             .expect("waiting on child failed")
@@ -89,9 +88,12 @@ where
         let read = stderr.read_to_string(&mut buf)?;
         println!("Read {} bytes : {}", read, buf);
         let mut hasher = AHasher::new_with_keys(0, 0);
-        // hasher.write(buf.as_slice());
+        let matcher = Regex::new("\\s*#[0-9]*\\s0x[0-9a-f]*\\sin\\s(.*)").unwrap();
+        matcher.captures_iter(&buf).for_each(|m| {
+            let g = m.get(1).unwrap();
+            hasher.write(g.as_str().as_bytes());
+        });
         let hash = hasher.finish();
-
         match self
             .observers
             .match_name_mut::<StacktraceObserver>("StacktraceObserver")
@@ -99,7 +101,6 @@ where
             Some(obs) => obs.update_hash(hash),
             None => (),
         }
-
         res
     }
 }

@@ -1,5 +1,4 @@
-use ahash::AHasher;
-use std::{hash::Hasher, io::Read, path::PathBuf};
+use std::path::PathBuf;
 
 #[cfg(windows)]
 use std::ptr::write_volatile;
@@ -9,7 +8,7 @@ use libafl::{
         current_nanos,
         rands::StdRand,
         shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
-        tuples::{tuple_list, MatchName},
+        tuples::tuple_list,
     },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
@@ -22,13 +21,12 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{self, StacktraceObserver, StdMapObserver},
+    observers::{StacktraceObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use spawn_ptrace::CommandPtraceSpawn;
-
 use libafl::{executors::command::CommandConfigurator, Error};
+use std::env;
 use std::{
     io::Write,
     process::{Child, Command, Stdio},
@@ -45,7 +43,7 @@ pub fn main() {
     // Create a stacktrace observer
     let st_observer = StacktraceObserver::new(
         "StacktraceObserver".to_string(),
-        libafl::observers::HarnessType::FFI,
+        libafl::observers::HarnessType::COMMAND,
     );
 
     // The state of the edges feedback.
@@ -93,6 +91,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with just one observer
+    #[derive(Debug)]
     struct MyExecutor {
         shmem_id: ShMemId,
     }
@@ -106,13 +105,17 @@ pub fn main() {
             input: &I,
         ) -> Result<Child, Error> {
             let mut command = Command::new("./test_command");
-            let command = command.args(&[self.shmem_id.as_str()]);
+
+            let command = command
+                .args(&[self.shmem_id.as_str()])
+                .env("ASAN_OPTIONS", "handle_abort=1");
+
             command
                 .stdin(Stdio::piped())
-                .stdout(Stdio::null())
+                .stdout(Stdio::inherit())
                 .stderr(Stdio::piped());
 
-            let child = command.spawn_ptrace().expect("failed to start process");
+            let child = command.spawn().expect("failed to start process");
             let mut stdin = child.stdin.as_ref().unwrap();
             stdin.write_all(input.target_bytes().as_slice())?;
             Ok(child)
