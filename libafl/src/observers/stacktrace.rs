@@ -153,6 +153,8 @@ pub enum HarnessType {
     RUST,
     /// Harness type when the harness is linked via FFI (e.g C code)
     FFI,
+    /// Harness is a shell command
+    COMMAND,
 }
 
 /// An observer looking at the stacktrace if a run crashes (For rust code)
@@ -170,6 +172,7 @@ impl StacktraceObserver {
         match harness_type {
             HarnessType::RUST => stacktrace_hooks::setup_rust_panic_hook(),
             HarnessType::FFI => unsafe { stacktrace_hooks::setup_signal_handler() },
+            HarnessType::COMMAND => (),
         }
         Self {
             observer_name,
