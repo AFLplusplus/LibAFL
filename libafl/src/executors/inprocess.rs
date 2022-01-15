@@ -141,7 +141,7 @@ where
     {
         let should_collect_backtrace =
             // should match on type when it's available
-            match observers.match_name::<BacktraceObserver>("StacktraceObserver") {
+            match observers.match_name::<BacktraceObserver>("BacktraceObserver") {
                 Some(_) => true,
                 None => false,
             };
@@ -1130,7 +1130,7 @@ where
         Z: HasObjective<I, OF, S>,
     {
         // should match on type when it's available
-        match observers.match_name::<BacktraceObserver>("StacktraceObserver") {
+        match observers.match_name::<BacktraceObserver>("BacktraceObserver") {
             Some(st_observer) => st_observer.setup_shmem(),
             None => (),
         }

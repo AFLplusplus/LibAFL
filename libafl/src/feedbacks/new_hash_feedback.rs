@@ -1,6 +1,6 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use std::{fmt::Debug, hash::Hash};
+use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
 use hashbrown::HashSet;
 use num_traits::PrimInt;
@@ -12,7 +12,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackState},
     inputs::Input,
-    observers::{BacktraceObserver, ObserverWithHashField, ObserversTuple},
+    observers::{ObserverWithHashField, ObserversTuple},
     state::{HasClientPerfMonitor, HasFeedbackStates},
     Error,
 };
@@ -62,7 +62,7 @@ impl<T> NewHashFeedbackState<T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
-    /// Create new `NewHashFeedbackState`
+    /// Create a new [`NewHashFeedbackState`]
     #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
@@ -71,11 +71,11 @@ where
         }
     }
 
-    /// Create new `NewHashFeedbackState` for the observer type.
-    pub fn with_observer(stacktrace_observer: &BacktraceObserver) -> Self {
+    /// Create a new [`NewHashFeedbackState`] for an observer that implements [`ObserverWithHashField`]
+    pub fn with_observer(backtrace_observer: &(impl ObserverWithHashField + Named)) -> Self {
         Self {
             hash_set: HashSet::<T>::new(),
-            name: stacktrace_observer.name().to_string(),
+            name: backtrace_observer.name().to_string(),
         }
     }
 }
@@ -83,8 +83,7 @@ impl<T> HashSetState<T> for NewHashFeedbackState<T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
-    /// Create new `NewHashFeedbackState` using a name and a hash set.
-    /// The map can be shared.
+    /// Create new [`NewHashFeedbackState`] using a name and a hash set.
     #[must_use]
     fn with_hash_set(name: &'static str, hash_set: HashSet<T>) -> Self {
         Self {
@@ -102,15 +101,17 @@ where
 
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewHashFeedback {
+pub struct NewHashFeedback<O> {
     feedback_name: String,
     observer_name: String,
+    o_type: PhantomData<O>,
 }
 
-impl<I, S> Feedback<I, S> for NewHashFeedback
+impl<I, S, O> Feedback<I, S> for NewHashFeedback<O>
 where
     I: Input,
     S: HasClientPerfMonitor + HasFeedbackStates,
+    O: ObserverWithHashField + Named + Debug,
 {
     fn is_interesting<EM, OT>(
         &mut self,
@@ -125,52 +126,58 @@ where
         OT: ObserversTuple<I, S>,
     {
         let observer = observers
-            .match_name::<BacktraceObserver>(&self.observer_name)
+            .match_name::<O>(&self.observer_name)
             .expect("A NewHashFeedback needs a StacktraceObserver");
 
-        let stacktrace_state = _state
+        let backtrace_state = _state
             .feedback_states_mut()
             .match_name_mut::<NewHashFeedbackState<u64>>(&self.observer_name.to_string())
             .unwrap();
 
         match observer.hash() {
             Some(hash) => {
-                let res = stacktrace_state
+                let res = backtrace_state
                     .update_hash_set(*hash)
                     .expect("Failed to update the hash state");
                 Ok(res)
             }
             None => {
-                // We get here if the hash was not updated, ie no crash happened
+                // We get here if the hash was not updated, i.e the first run or if no crash happens
                 Ok(false)
             }
         }
     }
 }
 
-impl Named for NewHashFeedback {
+impl<O> Named for NewHashFeedback<O> {
     #[inline]
     fn name(&self) -> &str {
         &self.feedback_name
     }
 }
 
-impl NewHashFeedback {
-    /// Returns a new [`NewHashFeedback`].
+impl<O> NewHashFeedback<O>
+where
+    O: ObserverWithHashField + Named + Debug,
+{
+    /// Returns a new [`NewHashFeedback`]. Carefull, it's recommended to use 'new_with_observer'
+    /// Setting an observer name that doesn't exist would eventually trigger a panic.
     #[must_use]
-    pub fn new(feedback_name: String, observer_name: String) -> Self {
+    pub fn new(feedback_name: &str, observer_name: &str) -> Self {
         Self {
-            feedback_name,
-            observer_name,
+            feedback_name: feedback_name.to_string(),
+            observer_name: observer_name.to_string(),
+            o_type: PhantomData,
         }
     }
-}
 
-impl Default for NewHashFeedback {
-    fn default() -> Self {
-        Self::new(
-            "NewHashFeedback".to_string(),
-            "StacktraceObserver".to_string(),
-        )
+    /// Returns a new [`NewHashFeedback`].
+    #[must_use]
+    pub fn new_with_observer(feedback_name: &str, observer: &O) -> Self {
+        Self {
+            feedback_name: feedback_name.to_string(),
+            observer_name: observer.name().to_string(),
+            o_type: PhantomData,
+        }
     }
 }
