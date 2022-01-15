@@ -1318,7 +1318,7 @@ pub mod pybind {
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
     use crate::feedbacks::MapFeedbackState;
     use crate::inputs::{BytesInput, HasBytesVec, HasTargetBytes};
-    use crate::state::{StdState, pybind::PythonStdState};
+    use crate::state::{StdState, pybind::{PythonStdState, MyStdState}};
     use crate::events::simple::pybind::PythonSimpleEventManager;
     use crate::fuzzer::pybind::PythonStdFuzzerI32;
     use crate::executors::{ExitKind, inprocess::OwnedInProcessExecutor};
@@ -1331,14 +1331,7 @@ pub mod pybind {
         pub owned_in_process_executor: OwnedInProcessExecutor<
             BytesInput, 
             (PythonMapObserverI32, ()),
-            StdState<
-                InMemoryCorpus<BytesInput>, 
-                (MapFeedbackState<i32>, ()), 
-                BytesInput, 
-                StdRand, 
-                OnDiskCorpus<BytesInput>
-                >,
-            >
+            MyStdState>
     }
 
     #[pymethods]

@@ -1070,7 +1070,6 @@ pub mod pybind {
     impl<I, S> Observer<I, S> for PythonMapObserverI32
     where
         Self: MapObserver<i32>,
-        // I: Input,
     {
         #[inline]
         fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {

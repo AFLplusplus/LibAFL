@@ -141,8 +141,6 @@ mod test {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use std::rc::Rc;
-
     use crate::bolts::{rands::StdRand, tuples::tuple_list};
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
     use crate::events::simple::pybind::PythonSimpleEventManager;
@@ -184,7 +182,7 @@ pub mod pybind {
             BytesInput,
             MyStdState,
             MyStdFuzzer,
-        > + HasObservers<BytesInput, (), MyStdState>)
+        > + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>)
         {
             unsafe {
                 match &self.executor {
@@ -218,25 +216,22 @@ pub mod pybind {
     #[pymethods]
     impl PythonExecutorI32 {
         #[staticmethod]
-        fn new(owned_inprocess_executor: &mut PythonOwnedInProcessExecutorI32) -> Self {
+        fn new_from_inprocess(owned_inprocess_executor: &mut PythonOwnedInProcessExecutorI32) -> Self {
             Self {
                 executor: PythonExecutorWrapperI32::OwnedInProcess(owned_inprocess_executor),
             }
         }
     }
 
-    impl<I, OT, S> HasObservers<I, OT, S> for PythonExecutorI32
-    where
-        I: Input,
-        OT: ObserversTuple<I, S>,
+    impl<I, S> HasObservers<I, (PythonMapObserverI32, ()), S> for PythonExecutorI32
     {
-        #[inline]
-        fn observers(&self) -> &OT {
+        // #[inline]
+        fn observers(&self) -> &(PythonMapObserverI32, ()) {
             self.get_executor().observers()
         }
 
         #[inline]
-        fn observers_mut(&mut self) -> &mut OT {
+        fn observers_mut(&mut self) -> &mut (PythonMapObserverI32, ()) {
             self.get_mut_executor().observers_mut()
         }
     }
