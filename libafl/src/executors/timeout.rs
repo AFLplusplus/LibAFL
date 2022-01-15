@@ -64,6 +64,14 @@ struct Itimerval {
     pub it_value: Timeval,
 }
 
+#[cfg(all(unix, target_vendor = "apple"))]
+extern "C" {
+    fn setitimer(which: c_int, new_value: *mut Itimerval, old_value: *mut Itimerval) -> c_int;
+}
+
+#[cfg(all(unix, target_vendor = "apple"))]
+const ITIMER_REAL: c_int = 0;
+
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
@@ -305,7 +313,7 @@ where
 
             write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());
 
-            self.reset();
+            self.reset_on_crash();
             ret
         }
     }
