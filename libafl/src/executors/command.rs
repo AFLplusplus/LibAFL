@@ -10,7 +10,7 @@ use std::{hash::Hasher, io::Read};
 
 use ahash::AHasher;
 
-use crate::observers::StacktraceObserver;
+use crate::observers::{BacktraceObserver, ObserverWithHashField};
 #[cfg(feature = "std")]
 use crate::{executors::HasObservers, inputs::Input, observers::ObserversTuple, Error};
 
@@ -96,7 +96,7 @@ where
         let hash = hasher.finish();
         match self
             .observers
-            .match_name_mut::<StacktraceObserver>("StacktraceObserver")
+            .match_name_mut::<BacktraceObserver>("StacktraceObserver")
         {
             Some(obs) => obs.update_hash(hash),
             None => (),

@@ -28,7 +28,7 @@ use crate::bolts::os::unix_signals::setup_signal_handler;
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
-use crate::observers::StacktraceObserver;
+use crate::observers::BacktraceObserver;
 
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
@@ -141,7 +141,7 @@ where
     {
         let should_collect_backtrace =
             // should match on type when it's available
-            match observers.match_name::<StacktraceObserver>("StacktraceObserver") {
+            match observers.match_name::<BacktraceObserver>("StacktraceObserver") {
                 Some(_) => true,
                 None => false,
             };
@@ -1130,7 +1130,7 @@ where
         Z: HasObjective<I, OF, S>,
     {
         // should match on type when it's available
-        match observers.match_name::<StacktraceObserver>("StacktraceObserver") {
+        match observers.match_name::<BacktraceObserver>("StacktraceObserver") {
             Some(st_observer) => st_observer.setup_shmem(),
             None => (),
         }

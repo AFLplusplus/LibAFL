@@ -12,7 +12,7 @@ use crate::{
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackState},
     inputs::Input,
-    observers::{ObserversTuple, StacktraceObserver},
+    observers::{BacktraceObserver, ObserverWithHashField, ObserversTuple},
     state::{HasClientPerfMonitor, HasFeedbackStates},
     Error,
 };
@@ -72,7 +72,7 @@ where
     }
 
     /// Create new `NewHashFeedbackState` for the observer type.
-    pub fn with_observer(stacktrace_observer: &StacktraceObserver) -> Self {
+    pub fn with_observer(stacktrace_observer: &BacktraceObserver) -> Self {
         Self {
             hash_set: HashSet::<T>::new(),
             name: stacktrace_observer.name().to_string(),
@@ -125,7 +125,7 @@ where
         OT: ObserversTuple<I, S>,
     {
         let observer = observers
-            .match_name::<StacktraceObserver>(&self.observer_name)
+            .match_name::<BacktraceObserver>(&self.observer_name)
             .expect("A NewHashFeedback needs a StacktraceObserver");
 
         let stacktrace_state = _state

@@ -83,6 +83,15 @@ where
     }
 }
 
+/// A trait for obervers with a hash field that can be used with 'NewHashFeedback'
+pub trait ObserverWithHashField {
+    /// get the value of the hash field
+    fn hash(&self) -> &Option<u64>;
+    /// update the hash field with the given value
+    fn update_hash(&mut self, hash: u64);
+    /// clears the current value of the hash and sets it to None
+    fn clear_hash(&mut self);
+}
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {

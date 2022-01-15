@@ -11,6 +11,8 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
+use super::ObserverWithHashField;
+
 /// A struct that stores needed information to persist the backtrace across prcesses/runs
 #[derive(Debug)]
 pub struct BacktraceSharedMemoryWrapper {
@@ -157,15 +159,15 @@ pub enum HarnessType {
     COMMAND,
 }
 
-/// An observer looking at the stacktrace if a run crashes (For rust code)
+/// An observer looking at the backtrace of rust code harness
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct StacktraceObserver {
+pub struct BacktraceObserver {
     observer_name: String,
     harness_type: HarnessType,
     hash: Option<u64>,
 }
 
-impl StacktraceObserver {
+impl BacktraceObserver {
     /// Creates a new [`StacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: String, harness_type: HarnessType) -> Self {
@@ -181,22 +183,6 @@ impl StacktraceObserver {
         }
     }
 
-    /// Gets the hash value of this observer.
-    #[must_use]
-    pub fn hash(&self) -> &Option<u64> {
-        &self.hash
-    }
-
-    /// Updates the hash value of this observer.
-    pub fn update_hash(&mut self, hash: u64) {
-        self.hash = Some(hash);
-    }
-
-    /// Clears the current hash value
-    pub fn clear_hash(&mut self) {
-        self.hash = None;
-    }
-
     /// Sets up the shared memory information in the static object BACKTRACE_SHMEM_DATA
     pub fn setup_shmem(&self) {
         let shmem_provider = StdShMemProvider::new();
@@ -208,13 +194,31 @@ impl StacktraceObserver {
     }
 }
 
-impl Default for StacktraceObserver {
+impl ObserverWithHashField for BacktraceObserver {
+    /// Gets the hash value of this observer.
+    #[must_use]
+    fn hash(&self) -> &Option<u64> {
+        &self.hash
+    }
+
+    /// Updates the hash value of this observer.
+    fn update_hash(&mut self, hash: u64) {
+        self.hash = Some(hash);
+    }
+
+    /// Clears the current hash value
+    fn clear_hash(&mut self) {
+        self.hash = None;
+    }
+}
+
+impl Default for BacktraceObserver {
     fn default() -> Self {
         Self::new("StacktraceObserver".to_string(), HarnessType::RUST)
     }
 }
 
-impl<I, S> Observer<I, S> for StacktraceObserver
+impl<I, S> Observer<I, S> for BacktraceObserver
 where
     I: Debug,
 {
@@ -240,7 +244,7 @@ where
     }
 }
 
-impl Named for StacktraceObserver {
+impl Named for BacktraceObserver {
     fn name(&self) -> &str {
         &self.observer_name
     }
