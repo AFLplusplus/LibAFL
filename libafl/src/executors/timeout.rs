@@ -35,13 +35,44 @@ use core::{ffi::c_void, ptr::write_volatile};
 #[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};
 
+#[repr(C)]
+#[cfg(all(unix, target_vendor = "apple"))]
+struct Timeval {
+    pub tv_sec: i64,
+    pub tv_usec: i64,
+}
+
+#[cfg(all(unix, target_vendor = "apple"))]
+impl Debug for Timeval {
+    #[allow(clippy::cast_sign_loss)]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
+            self.tv_sec,
+            self.tv_usec,
+            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
+        )
+    }
+}
+
+#[repr(C)]
+#[cfg(all(unix, target_vendor = "apple"))]
+#[derive(Debug)]
+struct Itimerval {
+    pub it_interval: Timeval,
+    pub it_value: Timeval,
+}
+
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_vendor = "apple")))]
     itimerspec: libc::itimerspec,
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_vendor = "apple")))]
     timerid: libc::timer_t,
+    #[cfg(all(unix, target_vendor = "apple"))]
+    itimerval: Itimerval,
     #[cfg(windows)]
     milli_sec: i64,
     #[cfg(windows)]
@@ -59,7 +90,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
             .finish_non_exhaustive()
     }
 
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_vendor = "apple")))]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
             .field("executor", &self.executor)
@@ -68,6 +99,14 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
                 &(&self.itimerspec.it_value.tv_sec * 1000
                     + &self.itimerspec.it_value.tv_nsec / 1000 / 1000),
             )
+            .finish()
+    }
+
+    #[cfg(all(unix, target_vendor = "apple"))]
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimeoutExecutor")
+            .field("executor", &self.executor)
+            .field("itimerval", &self.itimerval)
             .finish()
     }
 }
@@ -80,7 +119,7 @@ type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
     param2: *mut TP_TIMER,
 );
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_vendor = "apple")))]
 impl<E> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
@@ -126,6 +165,49 @@ impl<E> TimeoutExecutor<E> {
             it_value,
         };
         self.itimerspec = itimerspec;
+    }
+}
+
+#[cfg(all(unix, target_vendor = "apple"))]
+impl<E> TimeoutExecutor<E> {
+    /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
+    /// This should usually be used for `InProcess` fuzzing.
+    pub fn new(executor: E, exec_tmout: Duration) -> Self {
+        let milli_sec = exec_tmout.as_millis();
+        let it_value = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_interval = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_interval,
+            it_value,
+        };
+        Self {
+            executor,
+            itimerval,
+        }
+    }
+
+    /// Set the timeout for this executor
+    pub fn set_timeout(&mut self, exec_tmout: Duration) {
+        let milli_sec = exec_tmout.as_millis();
+        let it_value = Timeval {
+            tv_sec: (milli_sec / 1000) as i64,
+            tv_usec: (milli_sec % 1000) as i64,
+        };
+        let it_interval = Timeval {
+            tv_sec: 0,
+            tv_usec: 0,
+        };
+        let itimerval = Itimerval {
+            it_interval,
+            it_value,
+        };
+        self.itimerval = itimerval;
     }
 }
 
@@ -229,7 +311,7 @@ where
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_vendor = "apple")))]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z>,
@@ -242,11 +324,32 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        #[cfg(unix)]
         unsafe {
             libc::timer_settime(self.timerid, 0, &self.itimerspec as *const _, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
             // reset timer
+            self.reset_on_crash();
+            ret
+        }
+    }
+}
+
+#[cfg(all(unix, target_vendor = "apple"))]
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+where
+    E: Executor<EM, I, S, Z>,
+    I: Input,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        unsafe {
+            setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
+            let ret = self.executor.run_target(fuzzer, state, mgr, input);
             self.reset_on_crash();
             ret
         }
@@ -269,13 +372,25 @@ where
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_vendor = "apple")))]
 impl<E> HasOnCrashReset for TimeoutExecutor<E> {
     /// Disarm currently running timer
     fn reset_on_crash(&self) {
         unsafe {
             let disarmed: libc::itimerspec = zeroed();
             libc::timer_settime(self.timerid, 0, &disarmed as *const _, null_mut());
+        }
+    }
+}
+
+#[cfg(all(unix, target_vendor = "apple"))]
+impl<E> HasOnCrashReset for TimeoutExecutor<E> {
+    /// Disarm currently running timer
+    fn reset_on_crash(&self) {
+        unsafe {
+            let mut itimerval_zero: libc::itimerval = zeroed();
+            println!("zeroed");
+            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
         }
     }
 }
