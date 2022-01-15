@@ -431,14 +431,14 @@ pub mod pybind {
     use pyo3::prelude::*;
     use crate::inputs::BytesInput;
     use crate::monitors::SimpleMonitor;
-    use crate::monitors::pybind::PythonSimpleMonitor;
+    use crate::monitors::pybind::{PythonMonitor, PythonSimpleMonitor};
     use crate::events::SimpleEventManager;
     
     #[pyclass(unsendable, name = "SimpleEventManager")]
     pub struct PythonSimpleEventManager {
         pub simple_event_manager: SimpleEventManager<
-                BytesInput /* ?? */, 
-                SimpleMonitor<fn(String)>
+                BytesInput, 
+                PythonMonitor
             >
     }
 
@@ -446,10 +446,10 @@ pub mod pybind {
     impl PythonSimpleEventManager {
         #[new]
         fn new(
-            py_simple_monitor: PythonSimpleMonitor
+            py_monitor: PythonMonitor
         ) -> Self {
             Self{
-                simple_event_manager: SimpleEventManager::new(py_simple_monitor.simple_monitor)
+                simple_event_manager: SimpleEventManager::new(py_monitor)
             }
         }
     }

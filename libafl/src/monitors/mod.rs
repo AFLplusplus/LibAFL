@@ -782,8 +782,12 @@ impl Default for ClientPerfMonitor {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::monitors::SimpleMonitor;
+    use crate::monitors::{Monitor, SimpleMonitor};
     use pyo3::prelude::*;
+
+    use super::ClientStats;
+    use core::time::Duration;
+
 
     #[pyclass(unsendable, name = "SimpleMonitor")]
     #[derive(Clone)]
@@ -808,8 +812,68 @@ pub mod pybind {
         }
     }
 
+    #[derive(Clone)]
+    pub enum PythonMonitorWrapper {
+        Simple(PythonSimpleMonitor),
+    }
+
+    // Should not be exposed to user
+    #[pyclass(unsendable, name = "Monitor")]
+    #[derive(Clone)]
+    pub struct PythonMonitor {
+        pub monitor: PythonMonitorWrapper,
+    }
+
+    impl PythonMonitor {
+        pub fn get_monitor(&self) -> &impl Monitor {
+            match &self.monitor {
+                PythonMonitorWrapper::Simple(monitor) => {
+                    &monitor.simple_monitor
+                }
+            }
+        }
+
+        pub fn get_mut_monitor(&mut self) -> &mut impl Monitor {
+            match &mut self.monitor {
+                PythonMonitorWrapper::Simple(monitor) => {
+                    &mut monitor.simple_monitor
+                }
+            }
+        }
+    }
+
+    #[pymethods]
+    impl PythonMonitor {
+        #[staticmethod]
+        fn new_from_simple(simple_monitor: PythonSimpleMonitor) -> Self {
+            Self {
+                monitor: PythonMonitorWrapper::Simple(simple_monitor),
+            }
+        }
+    }
+
+    impl Monitor for PythonMonitor {
+        fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+            self.get_mut_monitor().client_stats_mut()
+        }
+
+        fn client_stats(&self) -> &[ClientStats] {
+            self.get_monitor().client_stats()
+        }
+
+        /// Time this fuzzing run stated
+        fn start_time(&mut self) -> Duration {
+            self.get_mut_monitor().start_time()
+        }
+
+        fn display(&mut self, event_msg: String, sender_id: u32) {
+            self.get_mut_monitor().display(event_msg, sender_id)
+        }
+    }
+
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonSimpleMonitor>()?;
+        m.add_class::<PythonMonitor>()?;
         Ok(())
     }
 }

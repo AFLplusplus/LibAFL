@@ -153,7 +153,7 @@ pub mod pybind {
     use crate::feedbacks::MapFeedbackState;
     use crate::fuzzer::pybind::{MyStdFuzzer, PythonStdFuzzerI32};
     use crate::inputs::{BytesInput, HasBytesVec, HasTargetBytes, Input};
-    use crate::monitors::SimpleMonitor;
+    use crate::monitors::pybind::PythonMonitor;
     use crate::observers::{map::pybind::PythonMapObserverI32, ObserversTuple};
     use crate::state::{
         pybind::{MyStdState, PythonStdState},
@@ -178,7 +178,7 @@ pub mod pybind {
         pub fn get_executor(
             &self,
         ) -> &(impl Executor<
-            SimpleEventManager<BytesInput, SimpleMonitor<fn(String)>>,
+            SimpleEventManager<BytesInput, PythonMonitor>,
             BytesInput,
             MyStdState,
             MyStdFuzzer,
@@ -197,7 +197,7 @@ pub mod pybind {
         pub fn get_mut_executor(
             &self,
         ) -> &mut (impl Executor<
-            SimpleEventManager<BytesInput, SimpleMonitor<fn(String)>>,
+            SimpleEventManager<BytesInput, PythonMonitor>,
             BytesInput,
             MyStdState,
             MyStdFuzzer,
