@@ -56,10 +56,12 @@ pub fn libafl_main() {
     )
     .expect("An error occurred while fuzzing");
 }
+
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{}", s));
+
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
         match setup_restarting_mgr_std(monitor, broker_port, EventConfig::AlwaysUnique) {
@@ -126,6 +128,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Setup a basic mutator with a mutational stage
+
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
     let calibration = CalibrationStage::new(&mut state, &edges_observer);

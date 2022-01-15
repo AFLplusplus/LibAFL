@@ -164,7 +164,6 @@ fn main() {
             .status()
             .expect("Failed to compile afl-coverage-pass.cc");
 
-        println!("cargo:warning=dict2file!");
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
             .args(&custom_flags)

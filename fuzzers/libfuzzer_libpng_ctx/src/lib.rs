@@ -40,7 +40,9 @@ use libafl::{
     Error,
 };
 
-use libafl_targets::{edges_map_from_ptr, libfuzzer_initialize, libfuzzer_test_one_input};
+use libafl_targets::{
+    edges_map_from_ptr, libfuzzer_initialize, libfuzzer_test_one_input, DICT_START, DICT_STOP,
+};
 
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(time.parse()?))
@@ -182,7 +184,7 @@ pub fn libafl_main() {
             )
         });
 
-        println!("We're a client, let's fuzz :)");
+        let autodict_tokens = unsafe { Tokens::from_autodict(DICT_START, DICT_STOP)? };
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
@@ -193,6 +195,7 @@ pub fn libafl_main() {
                 "PLTE".as_bytes().to_vec(),
                 "IEND".as_bytes().to_vec(),
             ]));
+            state.add_metadata(autodict_tokens);
         }
 
         // Setup a basic mutator with a mutational stage
@@ -253,7 +256,7 @@ pub fn libafl_main() {
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
+        // .stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {

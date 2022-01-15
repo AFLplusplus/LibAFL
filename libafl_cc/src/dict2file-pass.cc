@@ -215,8 +215,8 @@ bool AFLdict2filePass::runOnModule(Module &M) {
   ptr = getenv("AFL_LLVM_DICT2FILE");
 
   if (!ptr || *ptr != '/') {
-    fprintf("AFL_LLVM_DICT2FILE is not set to an absolute path: %s", ptr);
-    fprintf(stderr, "Writing tokens into libafl_dict section");
+    fprintf(stderr, "AFL_LLVM_DICT2FILE is not set to an absolute path: %s\n", ptr);
+    fprintf(stderr, "Writing tokens into libafl_dict section\n");
 
     use_file = false;
   }
@@ -341,7 +341,7 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
               }
 
-              if use_file {
+              if(use_file) {
                 dict2file(fd, (uint8_t *)&val, len);
               }
               else{

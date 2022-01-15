@@ -1,4 +1,4 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
+use libafl_cc::{ClangWrapper, CompilerWrapper};
 use std::env;
 
 pub fn main() {
@@ -23,7 +23,6 @@ pub fn main() {
             .from_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "libfuzzer_libpng")
-            .add_pass(LLVMPasses::Dict2File)
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             .run()
             .expect("Failed to run the wrapped compiler")
