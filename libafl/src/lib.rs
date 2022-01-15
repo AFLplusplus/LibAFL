@@ -339,6 +339,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     feedbacks::map::pybind::register(py, m)?;
     state::pybind::register(py, m)?;
     monitors::pybind::register(py, m)?;
+    events::pybind::register(py, m)?;
     events::simple::pybind::register(py, m)?;
     fuzzer::pybind::register(py, m)?;
     executors::pybind::register(py, m)?;

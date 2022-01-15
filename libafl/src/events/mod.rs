@@ -543,3 +543,98 @@ mod tests {
         };
     }
 }
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::events::simple::pybind::PythonSimpleEventManager;
+    use crate::events::{
+        Event, EventFirer, EventManager, EventProcessor, EventRestarter, HasEventManagerId,
+        ProgressReporter, EventManagerId
+    };
+    use crate::executors::pybind::PythonExecutorI32;
+    use crate::inputs::{BytesInput, Input};
+    use crate::pybind::MyStdFuzzer;
+    use crate::state::pybind::MyStdState;
+    use crate::Error;
+    use pyo3::prelude::*;
+
+    pub enum PythonEventManagerWrapper {
+        Simple(*mut PythonSimpleEventManager),
+    }
+
+    // Should not be exposed to user
+    #[pyclass(unsendable, name = "EventManager")]
+    pub struct PythonEventManager {
+        pub event_manager: PythonEventManagerWrapper,
+    }
+
+    impl PythonEventManager {
+        pub fn get_event_manager(
+            &self,
+        ) -> &impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer> {
+            unsafe {
+                match &self.event_manager {
+                    PythonEventManagerWrapper::Simple(py_simple_event_manager) => {
+                        &(*(*py_simple_event_manager)).simple_event_manager
+                    }
+                }
+            }
+        }
+
+        pub fn get_mut_event_manager(
+            &mut self,
+        ) -> &mut impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer> {
+            unsafe {
+                match &mut self.event_manager {
+                    PythonEventManagerWrapper::Simple(py_simple_event_manager) => {
+                        &mut (*(*py_simple_event_manager)).simple_event_manager
+                    }
+                }
+            }
+        }
+    }
+
+    #[pymethods]
+    impl PythonEventManager {
+        #[staticmethod]
+        fn new_from_simple(py_simple_event_manager: &mut PythonSimpleEventManager) -> Self {
+            Self {
+                event_manager: PythonEventManagerWrapper::Simple(py_simple_event_manager),
+            }
+        }
+    }
+
+    impl EventFirer<BytesInput> for PythonEventManager {
+        fn fire<S>(&mut self, _state: &mut S, event: Event<BytesInput>) -> Result<(), Error> {
+            self.get_mut_event_manager().fire(_state, event)
+        }
+    }
+
+    impl<S> EventRestarter<S> for PythonEventManager {}
+
+    impl EventProcessor<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer> for PythonEventManager {
+        fn process(
+            &mut self,
+            _fuzzer: &mut MyStdFuzzer,
+            state: &mut MyStdState,
+            _executor: &mut PythonExecutorI32,
+        ) -> Result<usize, Error> {
+            self.get_mut_event_manager()
+                .process(_fuzzer, state, _executor)
+        }
+    }
+
+    impl ProgressReporter<BytesInput> for PythonEventManager {}
+
+    impl HasEventManagerId for PythonEventManager {
+        fn mgr_id(&self) -> EventManagerId {
+            self.get_event_manager().mgr_id()
+        }
+    }
+
+    impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer> for PythonEventManager {}
+
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonEventManager>()?;
+        Ok(())
+    }
+}

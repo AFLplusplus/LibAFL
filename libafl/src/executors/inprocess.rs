@@ -1319,7 +1319,7 @@ pub mod pybind {
     use crate::feedbacks::MapFeedbackState;
     use crate::inputs::{BytesInput, HasBytesVec, HasTargetBytes};
     use crate::state::{StdState, pybind::{PythonStdState, MyStdState}};
-    use crate::events::simple::pybind::PythonSimpleEventManager;
+    use crate::events::pybind::PythonEventManager;
     use crate::fuzzer::pybind::PythonStdFuzzerI32;
     use crate::executors::{ExitKind, inprocess::OwnedInProcessExecutor};
     use crate::observers::pybind::{PythonMapObserverI32};
@@ -1342,7 +1342,7 @@ pub mod pybind {
             py_observer: PythonMapObserverI32,
             py_fuzzer: &mut PythonStdFuzzerI32,
             py_state: &mut PythonStdState,
-            py_event_manager: &mut PythonSimpleEventManager
+            py_event_manager: &mut PythonEventManager
         ) -> Self{
             Self{
                 owned_in_process_executor: OwnedInProcessExecutor::new(
@@ -1372,7 +1372,7 @@ pub mod pybind {
                     tuple_list!(py_observer), 
                     &mut py_fuzzer.std_fuzzer, 
                     &mut py_state.std_state, 
-                    &mut py_event_manager.simple_event_manager).expect("Failed to create the Executor".into())
+          py_event_manager).expect("Failed to create the Executor".into())
             }
         }
     }

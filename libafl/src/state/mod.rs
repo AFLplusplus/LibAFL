@@ -643,7 +643,7 @@ where
 pub mod pybind {
     use crate::bolts::{rands::StdRand, tuples::tuple_list};
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
-    use crate::events::simple::pybind::PythonSimpleEventManager;
+    use crate::events::pybind::PythonEventManager;
     use crate::executors::{inprocess::pybind::PythonOwnedInProcessExecutorI32, pybind::PythonExecutorI32};
     use crate::feedbacks::map::{pybind::PythonMapFeedbackStateI32, MapFeedbackState};
     use crate::fuzzer::pybind::PythonStdFuzzerI32;
@@ -691,15 +691,15 @@ pub mod pybind {
             py_fuzzer: &mut PythonStdFuzzerI32,
             py_executor: &mut PythonExecutorI32,
             py_generator: &mut PythonRandPrintablesGeneratorI32,
-            py_mgr: &mut PythonSimpleEventManager,
+            py_mgr: &mut PythonEventManager,
             num: usize,
         ) {
             self.std_state
                 .generate_initial_inputs(
                     &mut py_fuzzer.std_fuzzer,
-                    py_executor.get_mut_executor(),
+                    py_executor,
                     &mut py_generator.rand_printable_generator,
-                    &mut py_mgr.simple_event_manager,
+                    py_mgr,
                     num,
                 )
                 .expect("Failed to generate the initial corpus".into());

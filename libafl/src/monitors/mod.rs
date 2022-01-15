@@ -827,16 +827,16 @@ pub mod pybind {
     impl PythonMonitor {
         pub fn get_monitor(&self) -> &impl Monitor {
             match &self.monitor {
-                PythonMonitorWrapper::Simple(monitor) => {
-                    &monitor.simple_monitor
+                PythonMonitorWrapper::Simple(py_simple_monitor) => {
+                    &py_simple_monitor.simple_monitor
                 }
             }
         }
 
         pub fn get_mut_monitor(&mut self) -> &mut impl Monitor {
             match &mut self.monitor {
-                PythonMonitorWrapper::Simple(monitor) => {
-                    &mut monitor.simple_monitor
+                PythonMonitorWrapper::Simple(py_simple_monitor) => {
+                    &mut py_simple_monitor.simple_monitor
                 }
             }
         }

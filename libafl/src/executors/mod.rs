@@ -143,12 +143,10 @@ mod test {
 pub mod pybind {
     use crate::bolts::{rands::StdRand, tuples::tuple_list};
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
-    use crate::events::simple::pybind::PythonSimpleEventManager;
-    use crate::events::SimpleEventManager;
-    use crate::executors::HasObservers;
+    use crate::events::pybind::PythonEventManager;
     use crate::executors::{
         inprocess::{pybind::PythonOwnedInProcessExecutorI32, OwnedInProcessExecutor},
-        Executor,
+        Executor, ExitKind, HasObservers,
     };
     use crate::feedbacks::MapFeedbackState;
     use crate::fuzzer::pybind::{MyStdFuzzer, PythonStdFuzzerI32};
@@ -160,6 +158,7 @@ pub mod pybind {
         StdState,
     };
 
+    use crate::Error;
     use pyo3::prelude::*;
 
     #[derive(Debug)]
@@ -177,17 +176,12 @@ pub mod pybind {
     impl PythonExecutorI32 {
         pub fn get_executor(
             &self,
-        ) -> &(impl Executor<
-            SimpleEventManager<BytesInput, PythonMonitor>,
-            BytesInput,
-            MyStdState,
-            MyStdFuzzer,
-        > + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>)
-        {
+        ) -> &(impl Executor<PythonEventManager, BytesInput, MyStdState, MyStdFuzzer>
+                 + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
             unsafe {
                 match &self.executor {
-                    PythonExecutorWrapperI32::OwnedInProcess(owned_inprocess_executor) => {
-                        &(*(*owned_inprocess_executor)).owned_in_process_executor
+                    PythonExecutorWrapperI32::OwnedInProcess(py_owned_inprocess_executor) => {
+                        &(*(*py_owned_inprocess_executor)).owned_in_process_executor
                     }
                     _ => panic!("Executor not supported"),
                 }
@@ -196,16 +190,12 @@ pub mod pybind {
 
         pub fn get_mut_executor(
             &self,
-        ) -> &mut (impl Executor<
-            SimpleEventManager<BytesInput, PythonMonitor>,
-            BytesInput,
-            MyStdState,
-            MyStdFuzzer,
-        > + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
+        ) -> &mut (impl Executor<PythonEventManager, BytesInput, MyStdState, MyStdFuzzer>
+                     + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
             unsafe {
                 match &self.executor {
-                    PythonExecutorWrapperI32::OwnedInProcess(owned_inprocess_executor) => {
-                        &mut (*(*owned_inprocess_executor)).owned_in_process_executor
+                    PythonExecutorWrapperI32::OwnedInProcess(py_owned_inprocess_executor) => {
+                        &mut (*(*py_owned_inprocess_executor)).owned_in_process_executor
                     }
                     _ => panic!("Executor not supported"),
                 }
@@ -216,15 +206,16 @@ pub mod pybind {
     #[pymethods]
     impl PythonExecutorI32 {
         #[staticmethod]
-        fn new_from_inprocess(owned_inprocess_executor: &mut PythonOwnedInProcessExecutorI32) -> Self {
+        fn new_from_inprocess(
+            owned_inprocess_executor: &mut PythonOwnedInProcessExecutorI32,
+        ) -> Self {
             Self {
                 executor: PythonExecutorWrapperI32::OwnedInProcess(owned_inprocess_executor),
             }
         }
     }
 
-    impl<I, S> HasObservers<I, (PythonMapObserverI32, ()), S> for PythonExecutorI32
-    {
+    impl<I, S> HasObservers<I, (PythonMapObserverI32, ()), S> for PythonExecutorI32 {
         // #[inline]
         fn observers(&self) -> &(PythonMapObserverI32, ()) {
             self.get_executor().observers()
@@ -233,6 +224,20 @@ pub mod pybind {
         #[inline]
         fn observers_mut(&mut self) -> &mut (PythonMapObserverI32, ()) {
             self.get_mut_executor().observers_mut()
+        }
+    }
+
+    impl Executor<PythonEventManager, BytesInput, MyStdState, MyStdFuzzer> for PythonExecutorI32 {
+        #[inline]
+        fn run_target(
+            &mut self,
+            fuzzer: &mut MyStdFuzzer,
+            state: &mut MyStdState,
+            mgr: &mut PythonEventManager,
+            input: &BytesInput,
+        ) -> Result<ExitKind, Error> {
+            self.get_mut_executor()
+                .run_target(fuzzer, state, mgr, input)
         }
     }
 
