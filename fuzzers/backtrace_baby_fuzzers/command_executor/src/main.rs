@@ -21,12 +21,11 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{StacktraceObserver, StdMapObserver},
+    observers::{get_asan_runtime_flags, CommandBacktraceObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
 use libafl::{executors::command::CommandConfigurator, Error};
-use std::env;
 use std::{
     io::Write,
     process::{Child, Command, Stdio},
@@ -41,14 +40,11 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", signals.map_mut());
     // Create a stacktrace observer
-    let st_observer = StacktraceObserver::new(
-        "StacktraceObserver".to_string(),
-        libafl::observers::HarnessType::COMMAND,
-    );
+    let bt_observer = CommandBacktraceObserver::new("CommandBacktraceObserver");
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
-    let st_feedback_state = NewHashFeedbackState::<u64>::with_observer(&st_observer);
+    let bt_feedback_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let feedback = MaxMapFeedback::new(&feedback_state, &observer);
@@ -56,9 +52,9 @@ pub fn main() {
     // A feedback to choose if an input is a solution or not
     let objective = feedback_and!(
         CrashFeedback::new(),
-        NewHashFeedback::new(
-            "StacktraceObserver".to_string(),
-            "StacktraceObserver".to_string()
+        NewHashFeedback::<CommandBacktraceObserver>::new_with_observer(
+            "CommandBacktraceObserver",
+            &bt_observer
         )
     );
     // let objective = CrashFeedback::new();
@@ -74,7 +70,7 @@ pub fn main() {
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
         // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state, st_feedback_state),
+        tuple_list!(feedback_state, bt_feedback_state),
     );
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
@@ -108,11 +104,11 @@ pub fn main() {
 
             let command = command
                 .args(&[self.shmem_id.as_str()])
-                .env("ASAN_OPTIONS", "handle_abort=1");
+                .env("ASAN_OPTIONS", get_asan_runtime_flags());
 
             command
                 .stdin(Stdio::piped())
-                .stdout(Stdio::inherit())
+                .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
 
             let child = command.spawn().expect("failed to start process");
@@ -122,7 +118,7 @@ pub fn main() {
         }
     }
 
-    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, st_observer));
+    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);

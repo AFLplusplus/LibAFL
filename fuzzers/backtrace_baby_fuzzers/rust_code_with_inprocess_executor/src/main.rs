@@ -17,7 +17,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{StacktraceObserver, StdMapObserver},
+    observers::{BacktraceObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -62,14 +62,12 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
     // Create a stacktrace observer to add the observers tuple
-    let another_observer = StacktraceObserver::new(
-        "StacktraceObserver".to_string(),
-        libafl::observers::HarnessType::RUST,
-    );
+    let bt_observer =
+        BacktraceObserver::new("BacktraceObserver", libafl::observers::HarnessType::RUST);
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
-    let hash_state = NewHashFeedbackState::<u64>::with_observer(&another_observer);
+    let hash_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let feedback = MaxMapFeedback::new(&feedback_state, &observer);
@@ -77,10 +75,7 @@ pub fn main() {
     // A feedback to choose if an input is a solution or not
     let objective = feedback_and!(
         CrashFeedback::new(),
-        NewHashFeedback::new(
-            "NewHashFeedback".to_string(),
-            "StacktraceObserver".to_string()
-        )
+        NewHashFeedback::<BacktraceObserver>::new_with_observer("NewHashFeedback", &bt_observer)
     );
 
     // create a State from scratch
@@ -113,7 +108,7 @@ pub fn main() {
     // Create the executor for an in-process function with just one observer
     let mut executor = InProcessExecutor::new(
         &mut harness,
-        tuple_list!(observer, another_observer),
+        tuple_list!(observer, bt_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
