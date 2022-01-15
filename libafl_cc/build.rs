@@ -168,7 +168,6 @@ fn main() {
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
             .args(&custom_flags)
-            .arg("-D USE_NEW_PM")
             .arg(src_dir.join("dict2file-pass.cc"))
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])

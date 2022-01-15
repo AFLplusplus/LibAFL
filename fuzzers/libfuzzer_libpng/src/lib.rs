@@ -35,7 +35,7 @@ use libafl::{
     Error,
 };
 
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM, DICT_START, DICT_STOP};
 
 /// The main fn, `no_mangle` as it is a C main
 #[cfg(not(test))]
@@ -56,12 +56,11 @@ pub fn libafl_main() {
     )
     .expect("An error occurred while fuzzing");
 }
-
 /// The actual fuzzer
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{}", s));
-
+    let autodict = unsafe { Tokens::from_autodict(DICT_START, DICT_STOP) };
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
         match setup_restarting_mgr_std(monitor, broker_port, EventConfig::AlwaysUnique) {
@@ -128,7 +127,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     }
 
     // Setup a basic mutator with a mutational stage
-
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
     let calibration = CalibrationStage::new(&mut state, &edges_observer);

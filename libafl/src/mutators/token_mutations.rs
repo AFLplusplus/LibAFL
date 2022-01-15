@@ -38,6 +38,39 @@ impl Tokens {
         Self { token_vec }
     }
 
+    /// Creates a new token from autodict
+    #[cfg(feature = "std")]
+    pub unsafe fn from_autodict(dict_start: *const u8, dict_stop: *const u8) -> Result<Self, Error>
+    {
+
+        let mut ret = Self::new(vec![]);
+
+        let section_size: usize = dict_stop.offset_from(dict_start).try_into().unwrap();
+        println!("size: {}", section_size);
+        let slice = std::slice::from_raw_parts(dict_start, section_size);
+
+        let mut head = 0;
+
+        loop {
+            let size = slice[head] as usize;
+            head += 1;
+            if size > 0 {
+                ret.add_token(&slice[head..head + size].to_vec());
+                println!("token read! size: {:x} content: {:#?}", size, &slice[head..head + size].to_vec());
+                head += size;
+            }
+            if head >= section_size {
+                // Sanity Check
+                assert!(head == section_size);
+                break;
+            }
+        }
+
+        // Now we know the beginning and the end of the dictionary section.. let's parse them into tokens
+
+        Ok(ret)
+    }
+
     /// Creates a new instance from a file
     #[cfg(feature = "std")]
     pub fn from_tokens_file<P>(file: P) -> Result<Self, Error>

@@ -35,14 +35,8 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
 
-#ifdef USE_NEW_PM
-#include "llvm/Passes/PassPlugin.h"
-#include "llvm/Passes/PassBuilder.h"
-#include "llvm/IR/PassManager.h"
-#else
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#endif
 
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
@@ -62,7 +56,13 @@
   #define O_DSYNC O_SYNC
 #endif
 
+// The max length of a token
 #define MAX_AUTO_EXTRA 32
+
+#define USE_AUTO_EXTRAS 4096
+#define MAX_AUTO_EXTRAS (USE_AUTO_EXTRAS * 8)
+
+#include <iostream>
 
 #define FATAL(x...)                                                      \
   do {                                                                   \
@@ -141,11 +141,6 @@ bool isIgnoreFunction(const llvm::Function *F) {
 
 }
 
-#ifdef USE_NEW_PM
-class AFLdict2filePass: public PassInfoMixin<AFLdict2filePass>{
-  public:
-    AFLdict2filePass(){
-#else
 class AFLdict2filePass : public ModulePass {
 
  public:
@@ -153,44 +148,24 @@ class AFLdict2filePass : public ModulePass {
 
   AFLdict2filePass() : ModulePass(ID) {
 
-#endif
   
   }
 
-#ifdef USE_NEW_PM
-  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
-#else
   bool runOnModule(Module &M) override;
-#endif
 
   protected:
+
+  private:
+    std::vector<std::string>  dictionary;
 
 };
 
 }  // namespace
 
-
-#ifdef USE_NEW_PM
-extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
-llvmGetPassPluginInfo() {
-  return {
-    LLVM_PLUGIN_API_VERSION, "AFLdict2filePass", "v0.1",
-    [](PassBuilder &PB){
-      using OptimizationLevel = typename PassBuilder::OptimizationLevel;
-      PB.registerOptimizerLastEPCallback(
-        [](ModulePassManager &MPM, OptimizationLevel OL){
-          MPM.addPass(AFLdict2filePass());
-        }
-      );
-    }
-  };
-}
-#else
 char AFLdict2filePass::ID = 0;
-#endif
+
 
 void dict2file(int fd, uint8_t *mem, uint32_t len) {
-
   uint32_t  i, j, binary = 0;
   char line[MAX_AUTO_EXTRA * 8], tmp[8];
 
@@ -227,15 +202,7 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
 
 }
 
-#ifdef USE_NEW_PM
-PreservedAnalyses AFLdict2filePass::run(Module &M, ModuleAnalysisManager &MAM) {
-#else
 bool AFLdict2filePass::runOnModule(Module &M) {
-#endif
-
-  #ifdef USE_NEW_PM
-    auto PA = PreservedAnalyses::all();
-  #endif
 
   DenseMap<Value *, std::string *> valueMap;
   char *                           ptr;
@@ -366,10 +333,12 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
               }
 
+              dictionary.push_back(std::string((char *)&val, len));
               dict2file(fd, (uint8_t *)&val, len);
               found++;
               if (val2) {
 
+                dictionary.push_back(std::string((char *)&val2, len));
                 dict2file(fd, (uint8_t *)&val2, len);
                 found++;
 
@@ -664,6 +633,7 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
           ptr = (char *)thestring.c_str();
 
+          dictionary.push_back(thestring.substr(0, optLen));
           dict2file(fd, (uint8_t *)ptr, optLen);
           found++;
 
@@ -677,15 +647,91 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
   close(fd);
 
-  #ifdef USE_NEW_PM
-    return PA;
-  #else
+  LLVMContext &Ctx = M.getContext();
+  Type *Int8Tyi = IntegerType::getInt8Ty(Ctx);
+  Type *Int32Tyi = IntegerType::getInt32Ty(Ctx);
+  Type *Int32PtrTy = PointerType::getInt32Ty(Ctx);
+
+  if (dictionary.size()) {
+
+    size_t memlen = 0, count = 0, offset = 0;
+
+    // sort and unique the dictionary
+    std::sort(dictionary.begin(), dictionary.end());
+    auto last = std::unique(dictionary.begin(), dictionary.end());
+    dictionary.erase(last, dictionary.end());
+
+    for (auto token : dictionary) {
+
+      memlen += token.length();
+      count++;
+
+    }
+    if (count) {
+
+      auto ptrhld = std::unique_ptr<char[]>(new char[memlen + count]);
+
+      count = 0;
+
+      for (auto token : dictionary) {
+
+        if (offset + token.length() < 0xfffff0 && count < MAX_AUTO_EXTRAS) {
+          
+          // This lenght is guranteed to be < MAX_AUTO_EXTRA
+          ptrhld.get()[offset++] = (uint8_t)token.length();
+          memcpy(ptrhld.get() + offset, token.c_str(), token.length());
+          offset += token.length();
+          count++;
+        }
+      }
+      
+      // Type
+      ArrayType* arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
+      
+      // The actual dict
+      GlobalVariable *dict = new GlobalVariable(M, arrayTy, true, GlobalVariable::ExternalLinkage, ConstantDataArray::get(Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))), "libafl_dictionary_" + M.getName());
+      dict->setSection("libafl_dict");
+
+
+
+      /*
+      GlobalVariable *AFLDictionaryLen =
+          new GlobalVariable(M, Int32Tyi, false, GlobalValue::ExternalLinkage,
+                             0, "__afl_dictionary_len");
+      ConstantInt *const_len = ConstantInt::get(Int32Tyi, offset);
+      StoreInst *StoreDictLen = IRB.CreateStore(const_len, AFLDictionaryLen);
+      ModuleSanitizerCoverage::SetNoSanitizeMetadata(StoreDictLen);
+
+      ArrayType *ArrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
+      GlobalVariable *AFLInternalDictionary = new GlobalVariable(
+          M, ArrayTy, true, GlobalValue::ExternalLinkage,
+          ConstantDataArray::get(Ctx,
+                                 *(new ArrayRef<char>(ptrhld.get(), offset))),
+          "__afl_internal_dictionary");
+      AFLInternalDictionary->setInitializer(ConstantDataArray::get(
+          Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))));
+      AFLInternalDictionary->setConstant(true);
+
+      GlobalVariable *AFLDictionary = new GlobalVariable(
+          M, PointerType::get(Int8Tyi, 0), false,
+          GlobalValue::ExternalLinkage, 0, "__afl_dictionary");
+
+      Value *AFLDictOff = IRB.CreateGEP(Int8Ty, AFLInternalDictionary, Zero);
+      Value *AFLDictPtr =
+          IRB.CreatePointerCast(AFLDictOff, PointerType::get(Int8Tyi, 0));
+      StoreInst *StoreDict = IRB.CreateStore(AFLDictPtr, AFLDictionary);
+      ModuleSanitizerCoverage::SetNoSanitizeMetadata(StoreDict);
+      */
+    }
+
+  }
+
+
+
   return true;
-  #endif
 }
 
 
-#ifndef USE_NEW_PM
 static void registerAFLdict2filePass(const PassManagerBuilder &,
                                      legacy::PassManagerBase &PM) {
 
@@ -702,5 +748,3 @@ static RegisterStandardPasses RegisterAFLdict2filePass(
 
 static RegisterStandardPasses RegisterAFLdict2filePass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerAFLdict2filePass);
-
-#endif
