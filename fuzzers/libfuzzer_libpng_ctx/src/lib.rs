@@ -184,6 +184,7 @@ pub fn libafl_main() {
             )
         });
 
+        println!("We're a client, let's fuzz :)");
         let autodict_tokens = unsafe { Tokens::from_autodict(DICT_START, DICT_STOP)? };
 
         // Create a PNG dictionary if not existing
