@@ -8,8 +8,10 @@ use crate::{
     observers::Observer,
     Error,
 };
+use ahash::AHasher;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, hash::Hasher, io::Read, process::ChildStderr};
 
 use super::ObserverWithHashField;
 
@@ -155,11 +157,9 @@ pub enum HarnessType {
     RUST,
     /// Harness type when the harness is linked via FFI (e.g C code)
     FFI,
-    /// Harness is a shell command
-    COMMAND,
 }
 
-/// An observer looking at the backtrace of rust code harness
+/// An observer looking at the backtrace after the harness crashes
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BacktraceObserver {
     observer_name: String,
@@ -170,14 +170,13 @@ pub struct BacktraceObserver {
 impl BacktraceObserver {
     /// Creates a new [`StacktraceObserver`] with the given name.
     #[must_use]
-    pub fn new(observer_name: String, harness_type: HarnessType) -> Self {
+    pub fn new(observer_name: &str, harness_type: HarnessType) -> Self {
         match harness_type {
             HarnessType::RUST => stacktrace_hooks::setup_rust_panic_hook(),
             HarnessType::FFI => unsafe { stacktrace_hooks::setup_signal_handler() },
-            HarnessType::COMMAND => (),
         }
         Self {
-            observer_name,
+            observer_name: observer_name.to_string(),
             harness_type,
             hash: None,
         }
@@ -214,7 +213,7 @@ impl ObserverWithHashField for BacktraceObserver {
 
 impl Default for BacktraceObserver {
     fn default() -> Self {
-        Self::new("StacktraceObserver".to_string(), HarnessType::RUST)
+        Self::new("BacktraceObserver", HarnessType::RUST)
     }
 }
 
@@ -245,6 +244,99 @@ where
 }
 
 impl Named for BacktraceObserver {
+    fn name(&self) -> &str {
+        &self.observer_name
+    }
+}
+
+/// returns the recommended ASAN runtime flags to capture the backtrace correctly
+pub fn get_asan_runtime_flags() -> String {
+    let flags = vec![
+        "exitcode=0",
+        "abort_on_error=1",
+        "handle_abort=1",
+        "handle_segv=1",
+        "handle_sigbus=1",
+        "handle_sigill=1",
+        "handle_sigfpe=1",
+    ];
+
+    flags.join(":")
+}
+
+/// An observer looking at the backtrace of target command using ASAN output
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CommandBacktraceObserver {
+    observer_name: String,
+    hash: Option<u64>,
+}
+
+impl CommandBacktraceObserver {
+    /// Creates a new [`StacktraceObserver`] with the given name.
+    #[must_use]
+    pub fn new(observer_name: &str) -> Self {
+        Self {
+            observer_name: observer_name.to_string(),
+            hash: None,
+        }
+    }
+
+    /// parse ASAN error output emited by the target command and compute the hash
+    pub fn parse_asan_output(&mut self, stderr: &mut ChildStderr) {
+        let mut buf = String::new();
+        let read = stderr
+            .read_to_string(&mut buf)
+            .expect("Failed to read the child process stderr");
+        println!("Read {} bytes : {}", read, buf);
+        let mut hasher = AHasher::new_with_keys(0, 0);
+        let matcher = Regex::new("\\s*#[0-9]*\\s0x[0-9a-f]*\\sin\\s(.*)").unwrap();
+        matcher.captures_iter(&buf).for_each(|m| {
+            let g = m.get(1).unwrap();
+            hasher.write(g.as_str().as_bytes());
+        });
+        let hash = hasher.finish();
+        self.update_hash(hash);
+    }
+}
+
+impl ObserverWithHashField for CommandBacktraceObserver {
+    /// Gets the hash value of this observer.
+    #[must_use]
+    fn hash(&self) -> &Option<u64> {
+        &self.hash
+    }
+
+    /// Updates the hash value of this observer.
+    fn update_hash(&mut self, hash: u64) {
+        self.hash = Some(hash);
+    }
+
+    /// Clears the current hash value
+    fn clear_hash(&mut self) {
+        self.hash = None;
+    }
+}
+
+impl Default for CommandBacktraceObserver {
+    fn default() -> Self {
+        Self::new("CommandBacktraceObserver")
+    }
+}
+
+impl<I, S> Observer<I, S> for CommandBacktraceObserver
+where
+    I: Debug,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl Named for CommandBacktraceObserver {
     fn name(&self) -> &str {
         &self.observer_name
     }
