@@ -23,8 +23,8 @@ extern "C" {
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
 // Better & rusty(?) name
-pub use __dict_start as DICT_START;
 pub use __dict_end as DICT_STOP;
+pub use __dict_start as DICT_START;
 
 /// The size of the map for edges.
 #[no_mangle]

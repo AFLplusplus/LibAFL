@@ -174,7 +174,6 @@ fn main() {
             .arg(out_dir.join(format!("dict2file-pass.{}", dll_extension())))
             .status()
             .expect("Failed to compile dict2file-pass.cc");
-
     } else {
         write!(
             &mut clang_constants_file,

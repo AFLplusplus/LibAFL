@@ -40,9 +40,10 @@ impl Tokens {
 
     /// Creates a new token from autodict
     #[cfg(feature = "std")]
-    pub unsafe fn from_autodict(dict_start: *const u8, dict_stop: *const u8) -> Result<Self, Error>
-    {
-
+    pub unsafe fn from_autodict(
+        dict_start: *const u8,
+        dict_stop: *const u8,
+    ) -> Result<Self, Error> {
         let mut ret = Self::new(vec![]);
 
         let section_size: usize = dict_stop.offset_from(dict_start).try_into().unwrap();
@@ -57,7 +58,11 @@ impl Tokens {
             head += 1;
             if size > 0 {
                 ret.add_token(&slice[head..head + size].to_vec());
-                println!("token read! size: {:x} content: {:#?}", size, &slice[head..head + size].to_vec());
+                println!(
+                    "token read! size: {:x} content: {:#?}",
+                    size,
+                    &slice[head..head + size].to_vec()
+                );
                 head += size;
             }
             if head >= section_size {
@@ -66,7 +71,6 @@ impl Tokens {
                 break;
             }
         }
-
 
         Ok(ret)
     }
