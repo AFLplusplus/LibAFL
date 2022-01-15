@@ -19,6 +19,9 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
 
+#[cfg(all(unix, target_vendor = "apple"))]
+use libc::c_int;
+
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,
@@ -396,8 +399,7 @@ impl<E> HasOnCrashReset for TimeoutExecutor<E> {
     /// Disarm currently running timer
     fn reset_on_crash(&self) {
         unsafe {
-            let mut itimerval_zero: libc::itimerval = zeroed();
-            println!("zeroed");
+            let mut itimerval_zero: Itimerval = zeroed();
             setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
         }
     }
@@ -409,7 +411,9 @@ impl<E> HasOnCrashReset for TimeoutExecutor<E> {
     /// # Safety
     /// Will dereference the given `tp_timer` pointer, unchecked.
     fn reset_on_crash(&self) {
-        CloseThreadpoolTimer(self.tp_timer);
+        unsafe {
+            CloseThreadpoolTimer(self.tp_timer);
+        }
     }
 }
 

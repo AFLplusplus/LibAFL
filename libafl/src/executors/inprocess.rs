@@ -852,7 +852,7 @@ mod windows_exception_handler {
         Z: HasObjective<I, OF, S>,
     {
         // Have we set a timer_before?
-        if let Some(x) =
+        if let Some(_) =
             (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
         {
             /*
