@@ -148,7 +148,7 @@ class AFLdict2filePass : public ModulePass {
 
   AFLdict2filePass() : ModulePass(ID) {
 
-  
+
   }
 
   bool runOnModule(Module &M) override;
@@ -207,17 +207,25 @@ bool AFLdict2filePass::runOnModule(Module &M) {
   DenseMap<Value *, std::string *> valueMap;
   char *                           ptr;
   int                              fd, found = 0;
+  bool use_file = true;
 
   /* Show a banner */
   setvbuf(stdout, NULL, _IONBF, 0);
 
   ptr = getenv("AFL_LLVM_DICT2FILE");
 
-  if (!ptr || *ptr != '/')
-    FATAL("AFL_LLVM_DICT2FILE is not set to an absolute path: %s", ptr);
+  if (!ptr || *ptr != '/') {
+    fprintf("AFL_LLVM_DICT2FILE is not set to an absolute path: %s", ptr);
+    fprintf(stderr, "Writing tokens into libafl_dict section");
 
-  if ((fd = open(ptr, O_WRONLY | O_APPEND | O_CREAT | O_DSYNC, 0644)) < 0)
-    FATAL("Could not open/create %s.", ptr);
+    use_file = false;
+  }
+
+  if(use_file) {
+    if ((fd = open(ptr, O_WRONLY | O_APPEND | O_CREAT | O_DSYNC, 0644)) < 0)
+      FATAL("Could not open/create %s.", ptr);
+  }
+
 
   /* Instrument all the things! */
 
@@ -333,13 +341,22 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
               }
 
-              dictionary.push_back(std::string((char *)&val, len));
-              dict2file(fd, (uint8_t *)&val, len);
+              if use_file {
+                dict2file(fd, (uint8_t *)&val, len);
+              }
+              else{
+                dictionary.push_back(std::string((char *)&val, len));
+              }
+
               found++;
               if (val2) {
 
-                dictionary.push_back(std::string((char *)&val2, len));
-                dict2file(fd, (uint8_t *)&val2, len);
+                if(use_file) {
+                  dict2file(fd, (uint8_t *)&val2, len);
+                }
+                else{
+                  dictionary.push_back(std::string((char *)&val2, len));
+                }
                 found++;
 
               }
@@ -633,8 +650,12 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
           ptr = (char *)thestring.c_str();
 
-          dictionary.push_back(thestring.substr(0, optLen));
-          dict2file(fd, (uint8_t *)ptr, optLen);
+          if(use_file){
+            dict2file(fd, (uint8_t *)ptr, optLen);
+          }
+          else{
+            dictionary.push_back(thestring.substr(0, optLen));
+          }
           found++;
 
         }
@@ -645,12 +666,11 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
   }
 
-  close(fd);
+  if(use_file){
+    close(fd);
+  }
 
   LLVMContext &Ctx = M.getContext();
-  Type *Int8Tyi = IntegerType::getInt8Ty(Ctx);
-  Type *Int32Tyi = IntegerType::getInt32Ty(Ctx);
-  Type *Int32PtrTy = PointerType::getInt32Ty(Ctx);
 
   if (dictionary.size()) {
 
@@ -676,7 +696,7 @@ bool AFLdict2filePass::runOnModule(Module &M) {
       for (auto token : dictionary) {
 
         if (offset + token.length() < 0xfffff0 && count < MAX_AUTO_EXTRAS) {
-          
+
           // This lenght is guranteed to be < MAX_AUTO_EXTRA
           ptrhld.get()[offset++] = (uint8_t)token.length();
           memcpy(ptrhld.get() + offset, token.c_str(), token.length());
@@ -684,44 +704,13 @@ bool AFLdict2filePass::runOnModule(Module &M) {
           count++;
         }
       }
-      
+
       // Type
       ArrayType* arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
-      
+
       // The actual dict
       GlobalVariable *dict = new GlobalVariable(M, arrayTy, true, GlobalVariable::ExternalLinkage, ConstantDataArray::get(Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))), "libafl_dictionary_" + M.getName());
       dict->setSection("libafl_dict");
-
-
-
-      /*
-      GlobalVariable *AFLDictionaryLen =
-          new GlobalVariable(M, Int32Tyi, false, GlobalValue::ExternalLinkage,
-                             0, "__afl_dictionary_len");
-      ConstantInt *const_len = ConstantInt::get(Int32Tyi, offset);
-      StoreInst *StoreDictLen = IRB.CreateStore(const_len, AFLDictionaryLen);
-      ModuleSanitizerCoverage::SetNoSanitizeMetadata(StoreDictLen);
-
-      ArrayType *ArrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
-      GlobalVariable *AFLInternalDictionary = new GlobalVariable(
-          M, ArrayTy, true, GlobalValue::ExternalLinkage,
-          ConstantDataArray::get(Ctx,
-                                 *(new ArrayRef<char>(ptrhld.get(), offset))),
-          "__afl_internal_dictionary");
-      AFLInternalDictionary->setInitializer(ConstantDataArray::get(
-          Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))));
-      AFLInternalDictionary->setConstant(true);
-
-      GlobalVariable *AFLDictionary = new GlobalVariable(
-          M, PointerType::get(Int8Tyi, 0), false,
-          GlobalValue::ExternalLinkage, 0, "__afl_dictionary");
-
-      Value *AFLDictOff = IRB.CreateGEP(Int8Ty, AFLInternalDictionary, Zero);
-      Value *AFLDictPtr =
-          IRB.CreatePointerCast(AFLDictOff, PointerType::get(Int8Tyi, 0));
-      StoreInst *StoreDict = IRB.CreateStore(AFLDictPtr, AFLDictionary);
-      ModuleSanitizerCoverage::SetNoSanitizeMetadata(StoreDict);
-      */
     }
 
   }

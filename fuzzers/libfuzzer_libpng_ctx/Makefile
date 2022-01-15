@@ -36,10 +36,8 @@ fuzzer: libpng-1.6.37/.libs/libpng16.a libafl_cxx
 		-lm -lz
 
 clean:
-	# rm ./$(FUZZER_NAME)
-	# $(MAKE) -C libpng-1.6.37 clean
-	cargo clean
-	rm -rf libpng-1.6.37*
+	rm ./$(FUZZER_NAME)
+	$(MAKE) -C libpng-1.6.37 clean
 
 run: all
 	./$(FUZZER_NAME) --cores 0 &

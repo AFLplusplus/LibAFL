@@ -51,6 +51,7 @@ impl Tokens {
 
         let mut head = 0;
 
+        // Now we know the beginning and the end of the dictionary section.. let's parse them into tokens
         loop {
             let size = slice[head] as usize;
             head += 1;
@@ -66,7 +67,6 @@ impl Tokens {
             }
         }
 
-        // Now we know the beginning and the end of the dictionary section.. let's parse them into tokens
 
         Ok(ret)
     }
