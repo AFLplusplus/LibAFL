@@ -121,7 +121,7 @@ where
     OT: ObserversTuple<I, S>,
 {
     #[inline]
-    fn reset(&self) {}
+    fn reset_on_crash(&self) {}
 }
 
 impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
@@ -622,7 +622,7 @@ mod unix_signal_handler {
         } else {
             let executor = (data.executor_ptr as *const E).as_ref().unwrap();
             // disarms timeout in case of TimeoutExecutor
-            executor.reset();
+            executor.reset_on_crash();
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
@@ -699,8 +699,7 @@ mod windows_exception_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            timeout::windows_delete_timer_queue,
-            ExitKind, HasObservers,
+            ExitKind, HasObservers, HasOnCrashReset,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -869,7 +868,8 @@ mod windows_exception_handler {
             LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
 
-            data.reset();
+            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+            executor.reset_on_crash();
             data.tp_timer = ptr::null_mut();
         }
 

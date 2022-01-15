@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{Executor, ExitKind, HasObservers, HasOnCrashReset},
     inputs::Input,
     observers::ObserversTuple,
     Error,
@@ -34,37 +34,6 @@ use core::{ffi::c_void, ptr::write_volatile};
 
 #[cfg(windows)]
 use core::sync::atomic::{compiler_fence, Ordering};
-
-use super::HasOnCrashReset;
-
-#[repr(C)]
-#[cfg(unix)]
-struct Timeval {
-    pub tv_sec: i64,
-    pub tv_usec: i64,
-}
-
-#[cfg(unix)]
-impl Debug for Timeval {
-    #[allow(clippy::cast_sign_loss)]
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Timeval {{ tv_sec: {:?}, tv_usec: {:?} (tv: {:?}) }}",
-            self.tv_sec,
-            self.tv_usec,
-            Duration::new(self.tv_sec as _, (self.tv_usec * 1000) as _)
-        )
-    }
-}
-
-#[repr(C)]
-#[cfg(unix)]
-#[derive(Debug)]
-struct Itimerval {
-    pub it_interval: Timeval,
-    pub it_value: Timeval,
-}
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
@@ -94,7 +63,11 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
             .field("executor", &self.executor)
-            .field("itimerval", &self.itimerspec)
+            .field(
+                "milli_sec",
+                &(&self.itimerspec.it_value.tv_sec * 1000
+                    + &self.itimerspec.it_value.tv_nsec / 1000 / 1000),
+            )
             .finish()
     }
 }
@@ -274,7 +247,7 @@ where
             libc::timer_settime(self.timerid, 0, &self.itimerspec as *const _, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
             // reset timer
-            self.reset();
+            self.reset_on_crash();
             ret
         }
     }
@@ -299,7 +272,7 @@ where
 #[cfg(unix)]
 impl<E> HasOnCrashReset for TimeoutExecutor<E> {
     /// Disarm currently running timer
-    fn reset(&self) {
+    fn reset_on_crash(&self) {
         unsafe {
             let disarmed: libc::itimerspec = zeroed();
             libc::timer_settime(self.timerid, 0, &disarmed as *const _, null_mut());
@@ -312,7 +285,7 @@ impl<E> HasOnCrashReset for TimeoutExecutor<E> {
     /// Deletes this timer queue
     /// # Safety
     /// Will dereference the given `tp_timer` pointer, unchecked.
-    fn reset(&self) {
+    fn reset_on_crash(&self) {
         CloseThreadpoolTimer(self.tp_timer);
     }
 }
@@ -321,7 +294,7 @@ impl<E> HasOnCrashReset for TimeoutExecutor<E> {
 impl<E> Drop for TimeoutExecutor<E> {
     fn drop(&mut self) {
         unsafe {
-            self.reset();
+            CloseThreadpoolTimer(self.tp_timer);
         }
     }
 }

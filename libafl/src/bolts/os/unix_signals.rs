@@ -13,12 +13,12 @@ use nix::errno::{errno, Errno};
 #[cfg(feature = "std")]
 use std::ffi::CString;
 
-#[cfg(target_arch = "arm")]
 /// armv7 `libc` does not feature a `uncontext_t` implementation
+#[cfg(target_arch = "arm")]
 pub use libc::c_ulong;
 
-#[cfg(target_arch = "arm")]
 /// ARMv7-specific representation of a saved context
+#[cfg(target_arch = "arm")]
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 #[repr(C)]
@@ -67,8 +67,8 @@ pub struct mcontext_t {
     pub fault_address: c_ulong,
 }
 
-#[cfg(target_arch = "arm")]
 /// User Context Struct
+#[cfg(target_arch = "arm")]
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 #[repr(C)]
