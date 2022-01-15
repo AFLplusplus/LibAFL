@@ -9,6 +9,8 @@ pub use cmp::*;
 #[cfg(feature = "std")]
 pub mod stacktrace;
 #[cfg(feature = "std")]
+pub use stacktrace::CommandBacktraceObserver;
+#[cfg(feature = "std")]
 pub use stacktrace::*;
 
 pub mod concolic;
