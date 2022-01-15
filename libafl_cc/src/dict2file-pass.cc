@@ -668,6 +668,7 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 
   if(use_file){
     close(fd);
+    return true;
   }
 
   LLVMContext &Ctx = M.getContext();
@@ -712,10 +713,7 @@ bool AFLdict2filePass::runOnModule(Module &M) {
       GlobalVariable *dict = new GlobalVariable(M, arrayTy, true, GlobalVariable::ExternalLinkage, ConstantDataArray::get(Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))), "libafl_dictionary_" + M.getName());
       dict->setSection("libafl_dict");
     }
-
   }
-
-
 
   return true;
 }
