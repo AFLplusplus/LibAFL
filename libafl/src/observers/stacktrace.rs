@@ -17,7 +17,7 @@ use super::ObserverWithHashField;
 
 /// A struct that stores needed information to persist the backtrace across prcesses/runs
 #[derive(Debug)]
-pub enum BacktraceSharedMemoryWrapper {
+pub enum BacktraceHashValueWrapper {
     /// shared memory instance
     Shmem(StdShMem),
     /// static variable
@@ -26,7 +26,7 @@ pub enum BacktraceSharedMemoryWrapper {
     None,
 }
 
-impl BacktraceSharedMemoryWrapper {
+impl BacktraceHashValueWrapper {
     fn store_stacktrace_hash(&mut self, hash: u64) {
         match self {
             Self::Shmem(shmem) => {
@@ -39,7 +39,7 @@ impl BacktraceSharedMemoryWrapper {
             Self::StaticVariable(_) => {
                 *self = Self::StaticVariable(hash);
             }
-            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet!"),
+            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet22!"),
         }
     }
 
@@ -54,15 +54,14 @@ impl BacktraceSharedMemoryWrapper {
                 u64::from_be_bytes(bytes)
             }
             Self::StaticVariable(var) => *var,
-            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet!"),
+            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet11!"),
         }
     }
 }
 
 // Used for fuzzers not running in the same process
 /// Static variable storing shared memory information
-pub static mut BACKTRACE_SHMEM_DATA: BacktraceSharedMemoryWrapper =
-    BacktraceSharedMemoryWrapper::None;
+pub static mut BACKTRACE_HASH_VALUE: BacktraceHashValueWrapper = BacktraceHashValueWrapper::None;
 
 /// Utilities for setting up the signal handler and panic handler to collect the backtrace
 pub mod stacktrace_hooks {
@@ -88,7 +87,7 @@ pub mod stacktrace_hooks {
         let hash = hasher.finish();
         println!("backtrace collected with hash={}", hash);
         unsafe {
-            crate::observers::BACKTRACE_SHMEM_DATA.store_stacktrace_hash(hash);
+            crate::observers::BACKTRACE_HASH_VALUE.store_stacktrace_hash(hash);
         }
     }
 
@@ -160,13 +159,20 @@ impl BacktraceObserver {
         }
     }
 
-    /// Sets up the shared memory information in the static object BACKTRACE_SHMEM_DATA
-    pub fn setup_shmem(&self) {
+    /// Setup the shared memory and store it in [`BACKTRACE_HASH_VALUE`]
+    pub fn setup_shmem() {
         let shmem_provider = StdShMemProvider::new();
         println!("panic hook is being set");
         let shmem = shmem_provider.unwrap().new_map(5000).unwrap();
         unsafe {
-            BACKTRACE_SHMEM_DATA = BacktraceSharedMemoryWrapper::Shmem(shmem);
+            BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::Shmem(shmem);
+        }
+    }
+
+    /// Init the [`BACKTRACE_HASH_VALUE`] to BacktraceHashValueWrapper::StaticVariable(0)
+    pub fn setup_static_variable() {
+        unsafe {
+            BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::StaticVariable(0);
         }
     }
 }
@@ -205,7 +211,7 @@ where
 
     fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         unsafe {
-            let hash = BACKTRACE_SHMEM_DATA.get_stacktrace_hash();
+            let hash = BACKTRACE_HASH_VALUE.get_stacktrace_hash();
             println!("hash from parent process is {}", hash);
             self.update_hash(hash);
         }

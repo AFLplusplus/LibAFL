@@ -142,7 +142,10 @@ where
         let should_collect_backtrace =
             // should match on type when it's available
             match observers.match_name::<BacktraceObserver>("BacktraceObserver") {
-                Some(_) => true,
+                Some(_) => {
+                    BacktraceObserver::setup_static_variable();
+                    true
+                },
                 None => false,
             };
         let handlers =
@@ -1131,7 +1134,7 @@ where
     {
         // should match on type when it's available
         match observers.match_name::<BacktraceObserver>("BacktraceObserver") {
-            Some(st_observer) => st_observer.setup_shmem(),
+            Some(_) => BacktraceObserver::setup_shmem(),
             None => (),
         }
         Ok(Self {
