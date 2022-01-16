@@ -17,72 +17,56 @@ use super::ObserverWithHashField;
 
 /// A struct that stores needed information to persist the backtrace across prcesses/runs
 #[derive(Debug)]
-pub struct BacktraceSharedMemoryWrapper {
-    /// shared memory
-    shmem: Option<StdShMem>,
+pub enum BacktraceSharedMemoryWrapper {
+    /// shared memory instance
+    Shmem(StdShMem),
+    /// static variable
+    StaticVariable(u64),
+    /// Neither is set
+    None,
 }
 
 impl BacktraceSharedMemoryWrapper {
-    fn set_shmem(&mut self, shmem: StdShMem) {
-        self.shmem = Some(shmem);
-    }
-
-    fn is_ready(&self) -> bool {
-        match &self.shmem {
-            Some(_) => true,
-            None => false,
-        }
-    }
-
-    fn get_shmem(&self) -> &StdShMem {
-        if self.is_ready() {
-            self.shmem.as_ref().unwrap()
-        } else {
-            panic!("Cannot get generic shmem from uninitialized item");
-        }
-    }
-
-    fn get_shmem_mut(&mut self) -> &mut StdShMem {
-        if self.is_ready() {
-            self.shmem.as_mut().unwrap()
-        } else {
-            panic!("Cannot get generic shmem from uninitialized item");
-        }
-    }
-
     fn store_stacktrace_hash(&mut self, hash: u64) {
-        let shmem = self.get_shmem_mut();
-        let map = shmem.map_mut();
-        let hash_bytes = hash.to_be_bytes();
-        for i in 0..hash_bytes.len() {
-            map[i] = hash_bytes[i]
+        match self {
+            Self::Shmem(shmem) => {
+                let map = shmem.map_mut();
+                let hash_bytes = hash.to_be_bytes();
+                for i in 0..hash_bytes.len() {
+                    map[i] = hash_bytes[i];
+                }
+            }
+            Self::StaticVariable(_) => {
+                *self = Self::StaticVariable(hash);
+            }
+            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet!"),
         }
     }
 
     fn get_stacktrace_hash(&self) -> u64 {
-        let shmem = self.get_shmem();
-        let map = shmem.map();
-        let mut bytes: [u8; 8] = [0; 8];
-        for i in 0..8 {
-            bytes[i] = map[i];
+        match &self {
+            Self::Shmem(shmem) => {
+                let map = shmem.map();
+                let mut bytes: [u8; 8] = [0; 8];
+                for i in 0..8 {
+                    bytes[i] = map[i];
+                }
+                u64::from_be_bytes(bytes)
+            }
+            Self::StaticVariable(var) => *var,
+            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet!"),
         }
-        u64::from_be_bytes(bytes)
     }
 }
 
 // Used for fuzzers not running in the same process
 /// Static variable storing shared memory information
 pub static mut BACKTRACE_SHMEM_DATA: BacktraceSharedMemoryWrapper =
-    BacktraceSharedMemoryWrapper { shmem: None };
-
-/// Used for in process fuzzing (InProccessExecutor)
-/// This could be later wrapped in a shared memory struct implementing ShMem
-pub static mut LOCAL_HASH: u64 = 0;
+    BacktraceSharedMemoryWrapper::None;
 
 /// Utilities for setting up the signal handler and panic handler to collect the backtrace
 pub mod stacktrace_hooks {
     use crate::bolts::os::unix_signals::Signal;
-    use crate::observers::LOCAL_HASH;
     use ahash::AHasher;
     use backtrace::Backtrace;
     use libc::{
@@ -104,13 +88,7 @@ pub mod stacktrace_hooks {
         let hash = hasher.finish();
         println!("backtrace collected with hash={}", hash);
         unsafe {
-            // If run with InProcessForkExecutor
-            if crate::observers::BACKTRACE_SHMEM_DATA.is_ready() {
-                crate::observers::BACKTRACE_SHMEM_DATA.store_stacktrace_hash(hash);
-            } else {
-                // if run with InProcessExecutor
-                LOCAL_HASH = hash;
-            }
+            crate::observers::BACKTRACE_SHMEM_DATA.store_stacktrace_hash(hash);
         }
     }
 
@@ -188,7 +166,7 @@ impl BacktraceObserver {
         println!("panic hook is being set");
         let shmem = shmem_provider.unwrap().new_map(5000).unwrap();
         unsafe {
-            BACKTRACE_SHMEM_DATA.set_shmem(shmem);
+            BACKTRACE_SHMEM_DATA = BacktraceSharedMemoryWrapper::Shmem(shmem);
         }
     }
 }
@@ -227,17 +205,9 @@ where
 
     fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         unsafe {
-            if BACKTRACE_SHMEM_DATA.is_ready() {
-                let hash = BACKTRACE_SHMEM_DATA.get_stacktrace_hash();
-                println!("hash from parent process is {}", hash);
-                self.update_hash(hash);
-            } else {
-                // Makes sense only when run with an InProcessExecutor
-                if LOCAL_HASH > 0 {
-                    self.update_hash(LOCAL_HASH);
-                    LOCAL_HASH = 0;
-                }
-            }
+            let hash = BACKTRACE_SHMEM_DATA.get_stacktrace_hash();
+            println!("hash from parent process is {}", hash);
+            self.update_hash(hash);
         }
         Ok(())
     }
