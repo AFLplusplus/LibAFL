@@ -169,11 +169,16 @@ impl BacktraceObserver {
         }
     }
 
-    /// Init the [`BACKTRACE_HASH_VALUE`] to BacktraceHashValueWrapper::StaticVariable(0)
+    /// Init the [`BACKTRACE_HASH_VALUE`] to `BacktraceHashValueWrapper::StaticVariable(0)`
     pub fn setup_static_variable() {
         unsafe {
             BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::StaticVariable(0);
         }
+    }
+
+    /// returns harness_type for this [`BacktraceObserver`] instance
+    pub fn get_harness_type(&self) -> &HarnessType {
+        &self.harness_type
     }
 }
 

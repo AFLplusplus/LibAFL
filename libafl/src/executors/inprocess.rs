@@ -28,6 +28,7 @@ use crate::bolts::os::unix_signals::setup_signal_handler;
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
+#[cfg(feature = "std")]
 use crate::observers::BacktraceObserver;
 
 #[cfg(windows)]
@@ -39,7 +40,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
-    observers::ObserversTuple,
+    observers::{HarnessType, ObserversTuple},
     state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
@@ -139,15 +140,22 @@ where
         S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
-        let should_collect_backtrace =
+        let mut should_collect_backtrace = false;
+        #[cfg(feature = "std")]
+        {
+            should_collect_backtrace =
             // should match on type when it's available
             match observers.match_name::<BacktraceObserver>("BacktraceObserver") {
-                Some(_) => {
+                Some(obs) => {
                     BacktraceObserver::setup_static_variable();
-                    true
+                    match obs.get_harness_type() {
+                        HarnessType::RUST => false,
+                        HarnessType::FFI => true,
+                    }
                 },
                 None => false,
             };
+        }
         let handlers =
             InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z>(should_collect_backtrace)?;
         #[cfg(windows)]
@@ -718,6 +726,7 @@ mod unix_signal_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
+        #[cfg(feature = "std")]
         crate::observers::stacktrace_hooks::collect_backtrace();
         inproc_crash_handler::<E, EM, I, OF, OT, S, Z>(signal, info, context, data);
     }
