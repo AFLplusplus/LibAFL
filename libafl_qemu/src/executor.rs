@@ -3,7 +3,7 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     mem::transmute,
-    ptr,
+    ptr::{self, addr_of},
 };
 
 use libafl::{
@@ -799,7 +799,7 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        unsafe { QEMU_HELPERS_PTR = &self.helpers as *const _ as *const c_void };
+        unsafe { QEMU_HELPERS_PTR = addr_of!(self.helpers) as *const c_void };
         self.helpers.pre_exec_all(self.emulator, input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
         self.helpers.post_exec_all(self.emulator, input);
