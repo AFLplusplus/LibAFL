@@ -835,7 +835,7 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             let staterestorer: StateRestorer<SP> =
-                StateRestorer::new(self.shmem_provider.new_map(256 * 1024 * 1024)?);
+                StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
@@ -976,7 +976,7 @@ mod tests {
 
         let mut llmp_client = LlmpClient::new(
             shmem_provider.clone(),
-            LlmpSharedMap::new(0, shmem_provider.new_map(1024).unwrap()),
+            LlmpSharedMap::new(0, shmem_provider.new_shmem(1024).unwrap()),
         )
         .unwrap();
 
@@ -1007,7 +1007,7 @@ mod tests {
 
         // First, create a channel from the current fuzzer to the next to store state between restarts.
         let mut staterestorer = StateRestorer::<StdShMemProvider>::new(
-            shmem_provider.new_map(256 * 1024 * 1024).unwrap(),
+            shmem_provider.new_shmem(256 * 1024 * 1024).unwrap(),
         );
 
         staterestorer.reset();

@@ -62,7 +62,7 @@ fn main() {
 
     let mut shmemprovider = StdShMemProvider::default();
     let concolic_shmem = shmemprovider
-        .new_map(1024 * 1024 * 1024)
+        .new_shmem(1024 * 1024 * 1024)
         .expect("unable to create shared mapping");
     concolic_shmem
         .write_to_env(DEFAULT_ENV_NAME)
@@ -70,7 +70,7 @@ fn main() {
 
     let coverage_map = StdShMemProvider::new()
         .unwrap()
-        .new_map(COVERAGE_MAP_SIZE)
+        .new_shmem(COVERAGE_MAP_SIZE)
         .unwrap();
     //let the forkserver know the shmid
     coverage_map.write_to_env(HITMAP_ENV_NAME).unwrap();
@@ -104,7 +104,7 @@ fn main() {
                 File::create(coverage_file_path).expect("unable to open coverage file"),
             );
             for (index, count) in coverage_map
-                .map()
+                .as_slice()
                 .iter()
                 .enumerate()
                 .filter(|(_, &v)| v != 0)
@@ -117,7 +117,7 @@ fn main() {
         let output_file_path = opt.output.unwrap_or_else(|| "trace".into());
         let mut output_file =
             BufWriter::new(File::create(output_file_path).expect("unable to open output file"));
-        let mut reader = MessageFileReader::from_length_prefixed_buffer(concolic_shmem.map())
+        let mut reader = MessageFileReader::from_length_prefixed_buffer(concolic_shmem.as_slice())
             .expect("unable to create trace reader");
         if opt.plain_text {
             while let Some(message) = reader.next_message() {
