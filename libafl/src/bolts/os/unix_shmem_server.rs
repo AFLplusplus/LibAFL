@@ -9,7 +9,7 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
-use core::mem::ManuallyDrop;
+use core::{mem::ManuallyDrop, ptr::addr_of};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -177,14 +177,16 @@ where
 
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
-                self.inner
-                    .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), map_size)?,
+                self.inner.map_from_id_and_size(
+                    ShMemId::from_string(&format!("{}", client_fd)),
+                    map_size,
+                )?,
             ),
             server_fd,
         })
     }
 
-    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+    fn map_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
         let parts = id.as_str().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.get(0).unwrap();
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::ExistingMap(
@@ -193,7 +195,7 @@ where
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
                 self.inner
-                    .from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?,
+                    .map_from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?,
             ),
             server_fd,
         })
@@ -649,8 +651,7 @@ where
             let copied_poll_fds: Vec<PollFd> = poll_fds.clone();
             for poll_fd in copied_poll_fds {
                 let revents = poll_fd.revents().expect("revents should not be None");
-                let raw_polled_fd =
-                    unsafe { *((&poll_fd as *const PollFd) as *const libc::pollfd) }.fd;
+                let raw_polled_fd = unsafe { *((addr_of!(poll_fd)) as *const libc::pollfd) }.fd;
                 if revents.contains(PollFlags::POLLHUP) {
                     poll_fds.remove(poll_fds.iter().position(|item| *item == poll_fd).unwrap());
                     self.clients.remove(&raw_polled_fd);

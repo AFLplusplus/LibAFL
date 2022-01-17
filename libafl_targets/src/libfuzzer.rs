@@ -24,8 +24,8 @@ pub fn libfuzzer_initialize(args: &[String]) -> i32 {
     let argc = argv.len() as i32;
     unsafe {
         libafl_targets_libfuzzer_init(
-            &argc as *const i32,
-            &argv.as_ptr() as *const *const *const u8,
+            core::ptr::addr_of!(argc),
+            core::ptr::addr_of!(argv.as_ptr()),
         )
     }
 }

@@ -215,16 +215,16 @@ pub trait ShMemProvider: Clone + Default + Debug {
     fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error>;
 
     /// Get a mapping given its id and size
-    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error>;
+    fn map_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error>;
 
     /// Get a mapping given a description
-    fn from_description(&mut self, description: ShMemDescription) -> Result<Self::Mem, Error> {
-        self.from_id_and_size(description.id, description.size)
+    fn map_from_decription(&mut self, description: ShMemDescription) -> Result<Self::Mem, Error> {
+        self.map_from_id_and_size(description.id, description.size)
     }
 
     /// Create a new sharedmap reference from an existing `id` and `len`
     fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
-        self.from_id_and_size(mapping.id(), mapping.len())
+        self.map_from_id_and_size(mapping.id(), mapping.len())
     }
 
     /// Reads an existing map config from env vars, then maps it
@@ -232,7 +232,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
     fn existing_from_env(&mut self, env_name: &str) -> Result<Self::Mem, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
-        self.from_description(ShMemDescription::from_string_and_size(
+        self.map_from_decription(ShMemDescription::from_string_and_size(
             &map_shm_str,
             map_size,
         ))
@@ -342,9 +342,9 @@ where
         })
     }
 
-    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+    fn map_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
         Ok(Self::Mem {
-            internal: ManuallyDrop::new(self.internal.borrow_mut().from_id_and_size(id, size)?),
+            internal: ManuallyDrop::new(self.internal.borrow_mut().map_from_id_and_size(id, size)?),
             provider: self.internal.clone(),
         })
     }
@@ -622,7 +622,7 @@ pub mod unix_shmem {
                 }
             }
 
-            fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            fn map_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let shm_fd: i32 = id.to_string().parse().unwrap();
 
@@ -684,8 +684,12 @@ pub mod unix_shmem {
                 MmapShMem::new(map_size, self.current_map_id)
             }
 
-            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-                MmapShMem::from_id_and_size(id, size)
+            fn map_from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::Mem, Error> {
+                MmapShMem::map_from_id_and_size(id, size)
             }
         }
 
@@ -771,7 +775,7 @@ pub mod unix_shmem {
             }
 
             /// Get a [`UnixShMem`] of the existing shared memory mapping identified by id
-            pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            pub fn map_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let id_int: i32 = id.into();
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
@@ -843,8 +847,12 @@ pub mod unix_shmem {
                 CommonUnixShMem::new(map_size)
             }
 
-            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-                CommonUnixShMem::from_id_and_size(id, size)
+            fn map_from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::Mem, Error> {
+                CommonUnixShMem::map_from_id_and_size(id, size)
             }
         }
     }
@@ -951,7 +959,7 @@ pub mod unix_shmem {
             }
 
             /// Get a [`crate::bolts::shmem::unix_shmem::UnixShMem`] of the existing [`ShMem`] mapping identified by id.
-            pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            pub fn map_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
                     #[allow(trivial_numeric_casts, clippy::cast_sign_loss)]
@@ -1055,8 +1063,12 @@ pub mod unix_shmem {
                 Ok(mapping)
             }
 
-            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-                AshmemShMem::from_id_and_size(id, size)
+            fn map_from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::Mem, Error> {
+                AshmemShMem::map_from_id_and_size(id, size)
             }
         }
     }
@@ -1147,7 +1159,7 @@ pub mod win32_shmem {
             }
         }
 
-        fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+        fn map_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let map_str_bytes = id.id;
                 // Unlike MapViewOfFile this one needs u32
@@ -1228,8 +1240,8 @@ pub mod win32_shmem {
             Win32ShMem::new_map(map_size)
         }
 
-        fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-            Win32ShMem::from_id_and_size(id, size)
+        fn map_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+            Win32ShMem::map_from_id_and_size(id, size)
         }
     }
 }
