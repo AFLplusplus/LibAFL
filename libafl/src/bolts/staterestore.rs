@@ -58,7 +58,7 @@ pub struct StateRestorer<SP>
 where
     SP: ShMemProvider,
 {
-    shmem: SP::Mem,
+    shmem: SP::ShMem,
     phantom: PhantomData<*const SP>,
 }
 
@@ -85,7 +85,7 @@ where
     }
 
     /// Create a new [`StateRestorer`].
-    pub fn new(shmem: SP::Mem) -> Self {
+    pub fn new(shmem: SP::ShMem) -> Self {
         let mut ret = Self {
             shmem,
             phantom: PhantomData,

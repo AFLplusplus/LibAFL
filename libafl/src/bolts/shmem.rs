@@ -187,33 +187,33 @@ pub trait ShMem: Sized + Debug + Clone {
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
 pub trait ShMemProvider: Clone + Default + Debug {
     /// The actual shared map handed out by this [`ShMemProvider`].
-    type Mem: ShMem;
+    type ShMem: ShMem;
 
     /// Create a new instance of the provider
     fn new() -> Result<Self, Error>;
 
     /// Create a new shared memory mapping
-    fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error>;
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error>;
 
     /// Get a mapping given its id and size
-    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error>;
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error>;
 
     /// Get a mapping given a description
     fn shmem_from_description(
         &mut self,
         description: ShMemDescription,
-    ) -> Result<Self::Mem, Error> {
+    ) -> Result<Self::ShMem, Error> {
         self.shmem_from_id_and_size(description.id, description.size)
     }
 
     /// Create a new sharedmap reference from an existing `id` and `len`
-    fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
+    fn clone_ref(&mut self, mapping: &Self::ShMem) -> Result<Self::ShMem, Error> {
         self.shmem_from_id_and_size(mapping.id(), mapping.len())
     }
 
     /// Reads an existing map config from env vars, then maps it
     #[cfg(feature = "std")]
-    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::Mem, Error> {
+    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::ShMem, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
         self.shmem_from_description(ShMemDescription::from_string_and_size(
@@ -239,7 +239,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
     }
 
     /// Release the resources associated with the given [`ShMem`]
-    fn release_shem(&mut self, _shem: &mut Self::Mem) {
+    fn release_shmem(&mut self, _shmem: &mut Self::ShMem) {
         // do nothing
     }
 }
@@ -249,7 +249,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 pub struct RcShMem<T: ShMemProvider> {
-    internal: ManuallyDrop<T::Mem>,
+    internal: ManuallyDrop<T::ShMem>,
     provider: Rc<RefCell<T>>,
 }
 
@@ -276,7 +276,7 @@ where
 
 impl<T: ShMemProvider> Drop for RcShMem<T> {
     fn drop(&mut self) {
-        self.provider.borrow_mut().release_shem(&mut self.internal);
+        self.provider.borrow_mut().release_shmem(&mut self.internal);
     }
 }
 
@@ -309,7 +309,7 @@ impl<SP> ShMemProvider for RcShMemProvider<SP>
 where
     SP: ShMemProvider + Debug,
 {
-    type Mem = RcShMem<SP>;
+    type ShMem = RcShMem<SP>;
 
     fn new() -> Result<Self, Error> {
         Ok(Self {
@@ -319,15 +319,15 @@ where
         })
     }
 
-    fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
-        Ok(Self::Mem {
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
             internal: ManuallyDrop::new(self.internal.borrow_mut().new_shmem(map_size)?),
             provider: self.internal.clone(),
         })
     }
 
-    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-        Ok(Self::Mem {
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
             internal: ManuallyDrop::new(
                 self.internal
                     .borrow_mut()
@@ -337,12 +337,12 @@ where
         })
     }
 
-    fn release_shem(&mut self, map: &mut Self::Mem) {
-        self.internal.borrow_mut().release_shem(&mut map.internal);
+    fn release_shmem(&mut self, map: &mut Self::ShMem) {
+        self.internal.borrow_mut().release_shmem(&mut map.internal);
     }
 
-    fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
-        Ok(Self::Mem {
+    fn clone_ref(&mut self, mapping: &Self::ShMem) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
             internal: ManuallyDrop::new(self.internal.borrow_mut().clone_ref(&mapping.internal)?),
             provider: self.internal.clone(),
         })
@@ -647,7 +647,7 @@ pub mod unix_shmem {
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct MmapShMemProvider {
-            current_shem_id: usize,
+            current_shmem_id: usize,
         }
 
         unsafe impl Send for MmapShMemProvider {}
@@ -662,21 +662,23 @@ pub mod unix_shmem {
         /// Implement [`ShMemProvider`] for [`MmapShMemProvider`].
         #[cfg(unix)]
         impl ShMemProvider for MmapShMemProvider {
-            type Mem = MmapShMem;
+            type ShMem = MmapShMem;
 
             fn new() -> Result<Self, Error> {
-                Ok(Self { current_shem_id: 0 })
+                Ok(Self {
+                    current_shmem_id: 0,
+                })
             }
-            fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
-                self.current_shem_id += 1;
-                MmapShMem::new(map_size, self.current_shem_id)
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+                self.current_shmem_id += 1;
+                MmapShMem::new(map_size, self.current_shmem_id)
             }
 
             fn shmem_from_id_and_size(
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<Self::Mem, Error> {
+            ) -> Result<Self::ShMem, Error> {
                 MmapShMem::shmem_from_id_and_size(id, size)
             }
         }
@@ -826,12 +828,12 @@ pub mod unix_shmem {
         /// Implement [`ShMemProvider`] for [`UnixShMemProvider`].
         #[cfg(unix)]
         impl ShMemProvider for CommonUnixShMemProvider {
-            type Mem = CommonUnixShMem;
+            type ShMem = CommonUnixShMem;
 
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
-            fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 CommonUnixShMem::new(map_size)
             }
 
@@ -839,7 +841,7 @@ pub mod unix_shmem {
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<Self::Mem, Error> {
+            ) -> Result<Self::ShMem, Error> {
                 CommonUnixShMem::shmem_from_id_and_size(id, size)
             }
         }
@@ -1040,13 +1042,13 @@ pub mod unix_shmem {
         /// Implement [`ShMemProvider`] for [`AshmemShMemProvider`], for the Android `ShMem`.
         #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
-            type Mem = AshmemShMem;
+            type ShMem = AshmemShMem;
 
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
 
-            fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 let mapping = AshmemShMem::new(map_size)?;
                 Ok(mapping)
             }
@@ -1055,7 +1057,7 @@ pub mod unix_shmem {
                 &mut self,
                 id: ShMemId,
                 size: usize,
-            ) -> Result<Self::Mem, Error> {
+            ) -> Result<Self::ShMem, Error> {
                 AshmemShMem::shmem_from_id_and_size(id, size)
             }
         }
@@ -1083,7 +1085,7 @@ pub mod win32_shmem {
 
     use windows::{
         Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
-        Win32::System::Memory::{
+        Win32::System::ShMemory::{
             CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
             FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
         },
@@ -1219,16 +1221,20 @@ pub mod win32_shmem {
 
     /// Implement [`ShMemProvider`] for [`Win32ShMemProvider`]
     impl ShMemProvider for Win32ShMemProvider {
-        type Mem = Win32ShMem;
+        type ShMem = Win32ShMem;
 
         fn new() -> Result<Self, Error> {
             Ok(Self {})
         }
-        fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+        fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
             Win32ShMem::new_shmem(map_size)
         }
 
-        fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+        fn shmem_from_id_and_size(
+            &mut self,
+            id: ShMemId,
+            size: usize,
+        ) -> Result<Self::ShMem, Error> {
             Win32ShMem::shmem_from_id_and_size(id, size)
         }
     }

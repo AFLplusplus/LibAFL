@@ -370,10 +370,10 @@ pub trait HasForkserver {
     fn out_file_mut(&mut self) -> &mut OutFile;
 
     /// The map of the fuzzer
-    fn shmem(&self) -> &Option<<<Self as HasForkserver>::SP as ShMemProvider>::Mem>;
+    fn shmem(&self) -> &Option<<<Self as HasForkserver>::SP as ShMemProvider>::ShMem>;
 
     /// The map of the fuzzer, mutable
-    fn shmem_mut(&mut self) -> &mut Option<<<Self as HasForkserver>::SP as ShMemProvider>::Mem>;
+    fn shmem_mut(&mut self) -> &mut Option<<<Self as HasForkserver>::SP as ShMemProvider>::ShMem>;
 }
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
@@ -512,7 +512,7 @@ where
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
-    map: Option<SP::Mem>,
+    map: Option<SP::ShMem>,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -798,12 +798,12 @@ where
     }
 
     #[inline]
-    fn shmem(&self) -> &Option<SP::Mem> {
+    fn shmem(&self) -> &Option<SP::ShMem> {
         &self.map
     }
 
     #[inline]
-    fn shmem_mut(&mut self) -> &mut Option<SP::Mem> {
+    fn shmem_mut(&mut self) -> &mut Option<SP::ShMem> {
         &mut self.map
     }
 }

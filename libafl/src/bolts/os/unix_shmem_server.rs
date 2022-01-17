@@ -154,7 +154,7 @@ impl<SP> ShMemProvider for ServedShMemProvider<SP>
 where
     SP: ShMemProvider,
 {
-    type Mem = ServedShMem<SP::Mem>;
+    type ShMem = ServedShMem<SP::ShMem>;
 
     /// Connect to the server and return a new [`ServedShMemProvider`]
     /// Will try to spawn a [`ShMemService`]. This will only work for the first try.
@@ -172,7 +172,7 @@ where
         res.id = id;
         Ok(res)
     }
-    fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
         Ok(ServedShMem {
@@ -184,7 +184,7 @@ where
         })
     }
 
-    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
         let parts = id.as_str().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.get(0).unwrap();
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::ExistingMap(
@@ -224,7 +224,7 @@ where
         Ok(())
     }
 
-    fn release_shem(&mut self, map: &mut Self::Mem) {
+    fn release_shmem(&mut self, map: &mut Self::ShMem) {
         let (refcount, _) = self
             .send_receive(ServedShMemRequest::Deregister(map.server_fd))
             .expect("Could not communicate with ServedShMem server!");
@@ -284,7 +284,7 @@ enum ServedShMemResponse<SP>
 where
     SP: ShMemProvider,
 {
-    Mapping(Rc<RefCell<SP::Mem>>),
+    Mapping(Rc<RefCell<SP::ShMem>>),
     Id(i32),
     RefCount(u32),
 }
@@ -446,10 +446,10 @@ where
     SP: ShMemProvider,
 {
     provider: SP,
-    clients: HashMap<RawFd, SharedShMemClient<SP::Mem>>,
+    clients: HashMap<RawFd, SharedShMemClient<SP::ShMem>>,
     /// Maps from a pre-fork (parent) client id to its cloned maps.
-    forking_clients: HashMap<RawFd, HashMap<i32, Vec<Rc<RefCell<SP::Mem>>>>>,
-    all_shems: HashMap<i32, Weak<RefCell<SP::Mem>>>,
+    forking_clients: HashMap<RawFd, HashMap<i32, Vec<Rc<RefCell<SP::ShMem>>>>>,
+    all_shmems: HashMap<i32, Weak<RefCell<SP::ShMem>>>,
 }
 
 impl<SP> ServedShMemServiceWorker<SP>
@@ -461,13 +461,13 @@ where
         Ok(Self {
             provider: SP::new()?,
             clients: HashMap::new(),
-            all_shems: HashMap::new(),
+            all_shmems: HashMap::new(),
             forking_clients: HashMap::new(),
         })
     }
 
-    fn upgrade_shem_with_id(&mut self, description_id: i32) -> Rc<RefCell<SP::Mem>> {
-        self.all_shems
+    fn upgrade_shmem_with_id(&mut self, description_id: i32) -> Rc<RefCell<SP::ShMem>> {
+        self.all_shmems
             .get_mut(&description_id)
             .unwrap()
             .clone()
@@ -496,11 +496,11 @@ where
                 /*
                 // remove temporarily
                 let client = self.clients.remove(&client_id);
-                let mut forking_shems = HashMap::new();
+                let mut forking_shmems = HashMap::new();
                 for (id, map) in client.as_ref().unwrap().maps.iter() {
-                    forking_shems.insert(*id, map.clone());
+                    forking_shmems.insert(*id, map.clone());
                 }
-                self.forking_clients.insert(client_id, forking_shems);
+                self.forking_clients.insert(client_id, forking_shmems);
                 self.clients.insert(client_id, client.unwrap());
                 */
 
@@ -512,10 +512,10 @@ where
                 Ok(ServedShMemResponse::Id(client_id))
             }
             ServedShMemRequest::NewMap(map_size) => {
-                let new_shem = self.provider.new_shmem(map_size)?;
-                let description = new_shem.description();
-                let new_rc = Rc::new(RefCell::new(new_shem));
-                self.all_shems
+                let new_shmem = self.provider.new_shmem(map_size)?;
+                let description = new_shmem.description();
+                let new_rc = Rc::new(RefCell::new(new_shmem));
+                self.all_shmems
                     .insert(description.id.into(), Rc::downgrade(&new_rc));
                 Ok(ServedShMemResponse::Mapping(new_rc))
             }
@@ -536,12 +536,12 @@ where
                         {
                             map.clone()
                         } else {
-                            self.upgrade_shem_with_id(description_id)
+                            self.upgrade_shmem_with_id(description_id)
                         },
                     ))
                 } else {
                     Ok(ServedShMemResponse::Mapping(
-                        self.upgrade_shem_with_id(description_id),
+                        self.upgrade_shmem_with_id(description_id),
                     ))
                 }
             }

@@ -21,7 +21,7 @@ After the broker received a new message for clientN, (`clientN_out->current_id
 != last_message->message_id`) the broker will copy the message content to its
 own, centralized page.
 
-The clients periodically check (`current_broadcast_shem->current_id !=
+The clients periodically check (`current_broadcast_shmem->current_id !=
 last_message->message_id`) for new incoming messages. If the page is filled up,
 the broker instead creates a new page and places an end of page (`EOP`)
 message in its queue. The `EOP` buf contains the new description to
@@ -31,7 +31,7 @@ current map.
 ```text
 [broker]
   |
-[current_broadcast_shem]
+[current_broadcast_shmem]
   |
   |___________________________________
   |_________________                  \
@@ -41,8 +41,8 @@ current map.
 [client0]        [client1]    ...    [clientN]
 ```
 
-In the future, if we would need zero copy, the `current_broadcast_shem` could instead
-list the `client_out_shem` ID an offset for each message. In that case, the clients
+In the future, if we would need zero copy, the `current_broadcast_shmem` could instead
+list the `client_out_shmem` ID an offset for each message. In that case, the clients
 also need to create a new [`ShMem`] each time their bufs are filled up.
 
 
@@ -721,7 +721,7 @@ where
     /// If null, a new page (just) started.
     pub last_msg_sent: *const LlmpMsg,
     /// A vec of page wrappers, each containing an intialized AfShmem
-    pub out_shmems: Vec<LlmpSharedMap<SP::Mem>>,
+    pub out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
     /// If true, pages will never be pruned.
     /// The broker uses this feature.
     /// By keeping the message history around,
@@ -859,7 +859,7 @@ where
     /// else reattach will get a new, empty page, from the OS, or fail.
     pub fn on_existing_shmem(
         shmem_provider: SP,
-        current_out_shmem: SP::Mem,
+        current_out_shmem: SP::ShMem,
         last_msg_sent_offset: Option<u64>,
     ) -> Result<Self, Error> {
         let mut out_shmem = LlmpSharedMap::existing(current_out_shmem);
@@ -1298,7 +1298,7 @@ where
     /// The shmem provider
     pub shmem_provider: SP,
     /// current page. After EOP, this gets replaced with the new one
-    pub current_recv_shem: LlmpSharedMap<SP::Mem>,
+    pub current_recv_shmem: LlmpSharedMap<SP::ShMem>,
     /// Caches the highest msg id we've seen so far
     highest_msg_id: u64,
 }
@@ -1308,10 +1308,10 @@ impl<SP> LlmpReceiver<SP>
 where
     SP: ShMemProvider,
 {
-    /// Reattach to a vacant `recv_shem`, to with a previous sender stored the information in an env before.
+    /// Reattach to a vacant `recv_shmem`, to with a previous sender stored the information in an env before.
     #[cfg(feature = "std")]
     pub fn on_existing_from_env(mut shmem_provider: SP, env_name: &str) -> Result<Self, Error> {
-        Self::on_existing_shem(
+        Self::on_existing_shmem(
             shmem_provider.clone(),
             shmem_provider.existing_from_env(env_name)?,
             msg_offset_from_env(env_name)?,
@@ -1322,28 +1322,28 @@ where
     /// A new client can reattach to it using [`LlmpReceiver::on_existing_from_env()`]
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        let current_out_shem = &self.current_recv_shem;
-        current_out_shem.shmem.write_to_env(env_name)?;
-        unsafe { current_out_shem.msg_to_env(self.last_msg_recvd, env_name) }
+        let current_out_shmem = &self.current_recv_shmem;
+        current_out_shmem.shmem.write_to_env(env_name)?;
+        unsafe { current_out_shmem.msg_to_env(self.last_msg_recvd, env_name) }
     }
 
     /// Create a Receiver, reattaching to an existing sender map.
-    /// It is essential, that the sender (or someone else) keeps a pointer to the `sender_shem`
+    /// It is essential, that the sender (or someone else) keeps a pointer to the `sender_shmem`
     /// else reattach will get a new, empty page, from the OS, or fail.
-    pub fn on_existing_shem(
+    pub fn on_existing_shmem(
         shmem_provider: SP,
-        current_sender_shem: SP::Mem,
+        current_sender_shmem: SP::ShMem,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
-        let mut current_recv_shem = LlmpSharedMap::existing(current_sender_shem);
+        let mut current_recv_shmem = LlmpSharedMap::existing(current_sender_shmem);
         let last_msg_recvd = match last_msg_recvd_offset {
-            Some(offset) => current_recv_shem.msg_from_offset(offset)?,
+            Some(offset) => current_recv_shmem.msg_from_offset(offset)?,
             None => ptr::null_mut(),
         };
 
         Ok(Self {
             id: 0,
-            current_recv_shem,
+            current_recv_shmem,
             last_msg_recvd,
             shmem_provider,
             highest_msg_id: 0,
@@ -1355,7 +1355,7 @@ where
     #[inline(never)]
     unsafe fn recv(&mut self) -> Result<Option<*mut LlmpMsg>, Error> {
         /* DBG("recv %p %p\n", page, last_msg); */
-        let mut page = self.current_recv_shem.page_mut();
+        let mut page = self.current_recv_shmem.page_mut();
         let last_msg = self.last_msg_recvd;
 
         let (current_msg_id, loaded) =
@@ -1387,7 +1387,7 @@ where
             }
             // We don't know how big the msg wants to be, assert at least the header has space.
             Some(llmp_next_msg_ptr_checked(
-                &mut self.current_recv_shem,
+                &mut self.current_recv_shmem,
                 last_msg,
                 size_of::<LlmpMsg>(),
             )?)
@@ -1395,7 +1395,7 @@ where
 
         // Let's see what we got.
         if let Some(msg) = ret {
-            if !(*msg).in_shmem(&mut self.current_recv_shem) {
+            if !(*msg).in_shmem(&mut self.current_recv_shmem) {
                 return Err(Error::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
             }
             // Handle special, LLMP internal, messages.
@@ -1437,20 +1437,20 @@ where
                     (*page).safe_to_unmap.store(1, Ordering::Relaxed);
 
                     // Map the new page. The old one should be unmapped by Drop
-                    self.current_recv_shem =
+                    self.current_recv_shmem =
                         LlmpSharedMap::existing(self.shmem_provider.shmem_from_id_and_size(
                             ShMemId::from_slice(&pageinfo_cpy.shm_str),
                             pageinfo_cpy.map_size,
                         )?);
-                    page = self.current_recv_shem.page_mut();
+                    page = self.current_recv_shmem.page_mut();
                     // Mark the new page save to unmap also (it's mapped by us, the broker now)
                     (*page).safe_to_unmap.store(1, Ordering::Relaxed);
 
                     #[cfg(all(feature = "llmp_debug", feature = "std"))]
                     println!(
                         "LLMP_DEBUG: Got a new recv map {} with len {:?}",
-                        self.current_recv_shem.shmem.id(),
-                        self.current_recv_shem.shmem.len()
+                        self.current_recv_shmem.shmem.id(),
+                        self.current_recv_shmem.shmem.len()
                     );
                     // After we mapped the new page, return the next message, if available
                     return self.recv();
@@ -1470,7 +1470,7 @@ where
     /// Returns a raw ptr, on the recv map. Should be safe in general
     pub unsafe fn recv_blocking(&mut self) -> Result<*mut LlmpMsg, Error> {
         let mut current_msg_id = 0;
-        let page = self.current_recv_shem.page_mut();
+        let page = self.current_recv_shmem.page_mut();
         let last_msg = self.last_msg_recvd;
         if !last_msg.is_null() {
             assert!(
@@ -1512,7 +1512,7 @@ where
                     (*msg).sender,
                     (*msg).tag,
                     (*msg).flags,
-                    (*msg).as_slice(&mut self.current_recv_shem)?,
+                    (*msg).as_slice(&mut self.current_recv_shmem)?,
                 )),
                 None => None,
             })
@@ -1527,14 +1527,14 @@ where
             Ok((
                 (*msg).sender,
                 (*msg).tag,
-                (*msg).as_slice(&mut self.current_recv_shem)?,
+                (*msg).as_slice(&mut self.current_recv_shmem)?,
             ))
         }
     }
 
     /// Describe this client in a way, that it can be restored later with [`Self::on_existing_from_description`]
     pub fn describe(&self) -> Result<LlmpDescription, Error> {
-        let map = &self.current_recv_shem;
+        let map = &self.current_recv_shmem;
         let last_message_offset = if self.last_msg_recvd.is_null() {
             None
         } else {
@@ -1551,7 +1551,7 @@ where
         mut shmem_provider: SP,
         description: &LlmpDescription,
     ) -> Result<Self, Error> {
-        Self::on_existing_shem(
+        Self::on_existing_shmem(
             shmem_provider.clone(),
             shmem_provider.shmem_from_description(description.shmem)?,
             description.last_message_offset,
@@ -1578,22 +1578,22 @@ where
     SHM: ShMem,
 {
     /// Creates a new page, initializing the passed shared mem struct
-    pub fn new(sender: ClientId, mut new_shem: SHM) -> Self {
+    pub fn new(sender: ClientId, mut new_shmem: SHM) -> Self {
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         println!(
             "LLMP_DEBUG: Initializing map on {} with size {}",
-            new_shem.id(),
-            new_shem.len()
+            new_shmem.id(),
+            new_shmem.len()
         );
 
         unsafe {
-            _llmp_page_init(&mut new_shem, sender, false);
+            _llmp_page_init(&mut new_shmem, sender, false);
         }
-        Self { shmem: new_shem }
+        Self { shmem: new_shmem }
     }
 
     /// Maps and wraps an existing
-    pub fn existing(existing_shem: SHM) -> Self {
+    pub fn existing(existing_shmem: SHM) -> Self {
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
         //{
         //#[cfg(debug_assertions)]
@@ -1602,14 +1602,14 @@ where
         //let bt = "<n/a (release)>";
         println!(
             "LLMP_DEBUG: Using existing map {} with size {}",
-            existing_shem.id(),
-            existing_shem.len(),
+            existing_shmem.id(),
+            existing_shmem.len(),
             //bt
         );
         //}
 
         let ret = Self {
-            shmem: existing_shem,
+            shmem: existing_shmem,
         };
         unsafe {
             assert!(
@@ -1794,15 +1794,15 @@ where
     }
 
     /// Registers a new client for the given sharedmap str and size.
-    /// Returns the id of the new client in [`broker.client_shem`]
-    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::Mem>) {
+    /// Returns the id of the new client in [`broker.client_shmem`]
+    pub fn register_client(&mut self, mut client_page: LlmpSharedMap<SP::ShMem>) {
         // Tell the client it may unmap this page now.
         client_page.mark_safe_to_unmap();
 
         let id = self.llmp_clients.len() as u32;
         self.llmp_clients.push(LlmpReceiver {
             id,
-            current_recv_shem: client_page,
+            current_recv_shmem: client_page,
             last_msg_recvd: ptr::null_mut(),
             shmem_provider: self.shmem_provider.clone(),
             highest_msg_id: 0,
@@ -1867,13 +1867,13 @@ where
                 .description(),
         )?;
 
-        let new_shem = LlmpSharedMap::existing(
+        let new_shmem = LlmpSharedMap::existing(
             self.shmem_provider
                 .shmem_from_description(map_description)?,
         );
 
         {
-            self.register_client(new_shem);
+            self.register_client(new_shmem);
         }
 
         Ok(())
@@ -2013,9 +2013,9 @@ where
     fn b2b_thread_on(
         mut stream: TcpStream,
         b2b_client_id: ClientId,
-        broker_shem_description: &ShMemDescription,
+        broker_shmem_description: &ShMemDescription,
     ) -> Result<ShMemDescription, Error> {
-        let broker_shem_description = *broker_shem_description;
+        let broker_shmem_description = *broker_shmem_description;
 
         // A channel to get the new "client's" sharedmap id from
         let (send, recv) = channel();
@@ -2049,7 +2049,7 @@ where
                 shmem_provider_bg,
                 &LlmpDescription {
                     last_message_offset: None,
-                    shmem: broker_shem_description,
+                    shmem: broker_shmem_description,
                 },
             )
             .expect("Failed to map local page in broker 2 broker thread!");
@@ -2135,7 +2135,7 @@ where
         request: &TcpRequest,
         current_client_id: &mut u32,
         sender: &mut LlmpSender<SP>,
-        broker_shem_description: &ShMemDescription,
+        broker_shmem_description: &ShMemDescription,
     ) {
         match request {
             TcpRequest::LocalClientHello { shmem_description } => {
@@ -2171,7 +2171,7 @@ where
                 }
 
                 if let Ok(shmem_description) =
-                    Self::b2b_thread_on(stream, *current_client_id, broker_shem_description)
+                    Self::b2b_thread_on(stream, *current_client_id, broker_shmem_description)
                 {
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
                         println!("B2B: Error announcing client {:?}", shmem_description);
@@ -2190,26 +2190,26 @@ where
         // However, the original map is (as of now) never freed, new clients will start
         // to read from the initial map id.
 
-        let client_out_shem_mem = &self.llmp_out.out_shmems.first().unwrap().shmem;
-        let broker_shem_description = client_out_shem_mem.description();
+        let client_out_shmem_mem = &self.llmp_out.out_shmems.first().unwrap().shmem;
+        let broker_shmem_description = client_out_shmem_mem.description();
         let hostname = hostname::get()
             .unwrap_or_else(|_| "<unknown>".into())
             .to_string_lossy()
             .into();
         let broker_hello = TcpResponse::BrokerConnectHello {
-            broker_shmem_description: broker_shem_description,
+            broker_shmem_description: broker_shmem_description,
             hostname,
         };
 
         let llmp_tcp_id = self.llmp_clients.len() as ClientId;
 
         // Tcp out map sends messages from background thread tcp server to foreground client
-        let tcp_out_shem = LlmpSharedMap::new(
+        let tcp_out_shmem = LlmpSharedMap::new(
             llmp_tcp_id,
             self.shmem_provider.new_shmem(LLMP_CFG_INITIAL_MAP_SIZE)?,
         );
-        let tcp_out_shem_description = tcp_out_shem.shmem.description();
-        self.register_client(tcp_out_shem);
+        let tcp_out_shmem_description = tcp_out_shmem.shmem.description();
+        self.register_client(tcp_out_shmem);
 
         let ret = thread::spawn(move || {
             // Create a new ShMemProvider for this background thread.
@@ -2222,7 +2222,7 @@ where
                 last_msg_sent: ptr::null_mut(),
                 out_shmems: vec![LlmpSharedMap::existing(
                     shmem_provider_bg
-                        .shmem_from_description(tcp_out_shem_description)
+                        .shmem_from_description(tcp_out_shmem_description)
                         .unwrap(),
                 )],
                 // drop pages to the broker, if it already read them.
@@ -2270,7 +2270,7 @@ where
                             &req,
                             &mut current_client_id,
                             &mut tcp_incoming_sender,
-                            &broker_shem_description,
+                            &broker_shmem_description,
                         );
                     }
                     ListenerStream::Empty() => {
@@ -2332,14 +2332,14 @@ where
                             ShMemId::from_slice(&(*pageinfo).shm_str),
                             (*pageinfo).map_size,
                         ) {
-                            Ok(new_shem) => {
-                                let mut new_page = LlmpSharedMap::existing(new_shem);
+                            Ok(new_shmem) => {
+                                let mut new_page = LlmpSharedMap::existing(new_shmem);
                                 let id = next_id;
                                 next_id += 1;
                                 new_page.mark_safe_to_unmap();
                                 self.llmp_clients.push(LlmpReceiver {
                                     id,
-                                    current_recv_shem: new_page,
+                                    current_recv_shmem: new_page,
                                     last_msg_recvd: ptr::null_mut(),
                                     shmem_provider: self.shmem_provider.clone(),
                                     highest_msg_id: 0,
@@ -2362,7 +2362,7 @@ where
                     // The message is not specifically for use. Let the user handle it, then forward it to the clients, if necessary.
                     let mut should_forward_msg = true;
 
-                    let map = &mut self.llmp_clients[client_id as usize].current_recv_shem;
+                    let map = &mut self.llmp_clients[client_id as usize].current_recv_shmem;
                     let msg_buf = (*msg).as_slice(map)?;
                     if let LlmpMsgHookResult::Handled =
                         (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
@@ -2406,25 +2406,25 @@ where
     SP: ShMemProvider,
 {
     /// Reattach to a vacant client map.
-    /// It is essential, that the broker (or someone else) kept a pointer to the `out_shem`
+    /// It is essential, that the broker (or someone else) kept a pointer to the `out_shmem`
     /// else reattach will get a new, empty page, from the OS, or fail
     #[allow(clippy::needless_pass_by_value)]
-    pub fn on_existing_shem(
+    pub fn on_existing_shmem(
         shmem_provider: SP,
-        _current_out_shem: SP::Mem,
+        _current_out_shmem: SP::ShMem,
         _last_msg_sent_offset: Option<u64>,
-        current_broker_shem: SP::Mem,
+        current_broker_shmem: SP::ShMem,
         last_msg_recvd_offset: Option<u64>,
     ) -> Result<Self, Error> {
         Ok(Self {
-            receiver: LlmpReceiver::on_existing_shem(
+            receiver: LlmpReceiver::on_existing_shmem(
                 shmem_provider.clone(),
-                current_broker_shem.clone(),
+                current_broker_shmem.clone(),
                 last_msg_recvd_offset,
             )?,
             sender: LlmpSender::on_existing_shmem(
                 shmem_provider,
-                current_broker_shem,
+                current_broker_shmem,
                 last_msg_recvd_offset,
             )?,
         })
@@ -2446,7 +2446,7 @@ where
     }
 
     /// Write the current state to env.
-    /// A new client can attach to exactly the same state by calling [`LlmpClient::on_existing_shem()`].
+    /// A new client can attach to exactly the same state by calling [`LlmpClient::on_existing_shmem()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
         self.sender.to_env(&format!("{}_SENDER", env_name))?;
@@ -2502,7 +2502,7 @@ where
     /// Creates a new [`LlmpClient`]
     pub fn new(
         mut shmem_provider: SP,
-        initial_broker_shem: LlmpSharedMap<SP::Mem>,
+        initial_broker_shmem: LlmpSharedMap<SP::ShMem>,
     ) -> Result<Self, Error> {
         Ok(Self {
             sender: LlmpSender {
@@ -2519,7 +2519,7 @@ where
 
             receiver: LlmpReceiver {
                 id: 0,
-                current_recv_shem: initial_broker_shem,
+                current_recv_shmem: initial_broker_shmem,
                 last_msg_recvd: ptr::null_mut(),
                 shmem_provider,
                 highest_msg_id: 0,
@@ -2641,12 +2641,12 @@ where
         };
         println!("Connected to port {}", port);
 
-        let broker_shem_description = if let TcpResponse::BrokerConnectHello {
-            broker_shmem_description: broker_shem_description,
+        let broker_shmem_description = if let TcpResponse::BrokerConnectHello {
+            broker_shmem_description: broker_shmem_description,
             hostname: _,
         } = (&recv_tcp_msg(&mut stream)?).try_into()?
         {
-            broker_shem_description
+            broker_shmem_description
         } else {
             return Err(Error::IllegalState(
                 "Received unexpected Broker Hello".to_string(),
@@ -2654,7 +2654,7 @@ where
         };
 
         let map = LlmpSharedMap::existing(
-            shmem_provider.shmem_from_description(broker_shem_description)?,
+            shmem_provider.shmem_from_description(broker_shmem_description)?,
         );
         let mut ret = Self::new(shmem_provider, map)?;
 
