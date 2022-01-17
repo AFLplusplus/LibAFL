@@ -1085,7 +1085,7 @@ pub mod win32_shmem {
 
     use windows::{
         Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
-        Win32::System::ShMemory::{
+        Win32::System::Memory::{
             CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
             FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
         },
