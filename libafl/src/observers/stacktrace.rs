@@ -70,7 +70,7 @@ pub mod stacktrace_hooks {
     use std::{mem, panic, ptr};
 
     /// Collects the backtrace via Backtrace and Debug
-    /// Debug used for dev purposes, will hash symbols later
+    /// (Debug is currently used for dev purposes, symbols hash will be used eventually)
     pub fn collect_backtrace() {
         let b = Backtrace::new();
         // will use symbols later
@@ -94,7 +94,6 @@ pub mod stacktrace_hooks {
 
     /// setup backtrace collection in a signal handler when the harness is linked via FFI
     pub unsafe fn setup_signal_handler() {
-        println!("setting up stacktrace signal handler");
         fn signal_handler(sig: c_int, _info: siginfo_t, _con: *mut c_void) {
             println!("Received signal sig={}", sig);
             collect_backtrace();
@@ -226,6 +225,7 @@ impl Named for BacktraceObserver {
 }
 
 /// returns the recommended ASAN runtime flags to capture the backtrace correctly
+#[must_use]
 pub fn get_asan_runtime_flags() -> String {
     let flags = vec![
         "exitcode=0",
