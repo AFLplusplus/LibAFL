@@ -2642,7 +2642,7 @@ where
         println!("Connected to port {}", port);
 
         let broker_shmem_description = if let TcpResponse::BrokerConnectHello {
-            broker_shmem_description: broker_shmem_description,
+            broker_shmem_description,
             hostname: _,
         } = (&recv_tcp_msg(&mut stream)?).try_into()?
         {
