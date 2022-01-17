@@ -32,9 +32,7 @@ impl BacktraceHashValueWrapper {
             Self::Shmem(shmem) => {
                 let map = shmem.map_mut();
                 let hash_bytes = hash.to_be_bytes();
-                for i in 0..hash_bytes.len() {
-                    map[i] = hash_bytes[i];
-                }
+                map.copy_from_slice(&hash_bytes);
             }
             Self::StaticVariable(_) => {
                 *self = Self::StaticVariable(hash);
@@ -47,11 +45,7 @@ impl BacktraceHashValueWrapper {
         match &self {
             Self::Shmem(shmem) => {
                 let map = shmem.map();
-                let mut bytes: [u8; 8] = [0; 8];
-                for i in 0..8 {
-                    bytes[i] = map[i];
-                }
-                u64::from_be_bytes(bytes)
+                u64::from_be_bytes(map[0..8].try_into().expect("Incorrectly sized"))
             }
             Self::StaticVariable(var) => *var,
             Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet11!"),
@@ -163,7 +157,7 @@ impl BacktraceObserver {
     pub fn setup_shmem() {
         let shmem_provider = StdShMemProvider::new();
         println!("panic hook is being set");
-        let shmem = shmem_provider.unwrap().new_map(5000).unwrap();
+        let shmem = shmem_provider.unwrap().new_map(8).unwrap();
         let boxed_shmem = Box::<StdShMem>::new(shmem);
         unsafe {
             BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::Shmem(boxed_shmem);
