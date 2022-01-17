@@ -24,6 +24,7 @@ use crate::{
         current_time,
         tuples::{MatchName, Named},
     },
+    executors::ExitKind,
     Error,
 };
 
@@ -45,7 +46,12 @@ pub trait Observer<I, S>: Named + Debug {
 
     /// Called right after execution finish.
     #[inline]
-    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -56,7 +62,12 @@ pub trait ObserversTuple<I, S>: MatchName + Debug {
     fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 
     /// This is called right after the last execution
-    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error>;
 }
 
 impl<I, S> ObserversTuple<I, S> for () {
@@ -64,7 +75,12 @@ impl<I, S> ObserversTuple<I, S> for () {
         Ok(())
     }
 
-    fn post_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec_all(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -79,9 +95,14 @@ where
         self.1.pre_exec_all(state, input)
     }
 
-    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.0.post_exec(state, input)?;
-        self.1.post_exec_all(state, input)
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.0.post_exec(state, input, exit_kind)?;
+        self.1.post_exec_all(state, input, exit_kind)
     }
 }
 
@@ -127,7 +148,12 @@ impl<I, S> Observer<I, S> for TimeObserver {
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
         Ok(())
     }

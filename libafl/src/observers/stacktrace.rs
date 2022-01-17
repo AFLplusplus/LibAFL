@@ -5,6 +5,7 @@ use crate::{
         shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
         tuples::Named,
     },
+    executors::ExitKind,
     observers::Observer,
     Error,
 };
@@ -208,7 +209,7 @@ where
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         unsafe {
             let hash = BACKTRACE_HASH_VALUE.get_stacktrace_hash();
             println!("hash from parent process is {}", hash);
@@ -307,7 +308,12 @@ where
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

@@ -548,7 +548,7 @@ mod unix_signal_handler {
         data.current_input_ptr = ptr::null();
 
         observers
-            .post_exec_all(state, input)
+            .post_exec_all(state, input, &ExitKind::Timeout)
             .expect("Observers post_exec_all failed");
 
         let interesting = fuzzer
@@ -662,7 +662,7 @@ mod unix_signal_handler {
             eprintln!("Triggering post_exec_all from crash_handler");
 
             observers
-                .post_exec_all(state, input)
+                .post_exec_all(state, input, &ExitKind::Crash)
                 .expect("Observers post_exec_all failed");
 
             #[cfg(feature = "std")]
