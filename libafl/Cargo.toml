@@ -1,6 +1,6 @@
 [package]
 name = "libafl"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
@@ -43,6 +43,8 @@ num_cpus = "1.0" # cpu count, for llmp example
 serial_test = "0.5"
 
 [dependencies]
+libafl_derive = { version = "0.7.1", optional = true, path = "../libafl_derive" }
+
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }
 hashbrown =  { version = "0.11", features = ["serde", "ahash-compile-time-rng"], default-features=false } # A faster hashmap, nostd compatible
@@ -59,7 +61,6 @@ typed-builder = "0.9.1" # Implement the builder pattern at compiletime
 ahash = { version = "0.7", default-features=false, features=["compile-time-rng"] } # The hash function already used in hashbrown
 intervaltree = { version = "0.2.7", default-features = false, features = ["serde"] }
 
-libafl_derive = { version = "0.7.0", optional = true, path = "../libafl_derive" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] }
 miniz_oxide = { version = "0.5", optional = true}
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs", rev = "6648a7a", optional = true }

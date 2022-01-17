@@ -21,7 +21,7 @@ pub fn main() {
             .cpp(is_cpp)
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(true)
-            .from_args(&args)
+            .parse_args(&args)
             .expect("Failed to parse the command line")
             .add_link_arg(weak)
             .link_staticlib(&dir, "libfuzzer_libpng")

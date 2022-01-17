@@ -333,7 +333,7 @@ where
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a place to store state in, for restarts.
             let staterestorer: StateRestorer<SP> =
-                StateRestorer::new(shmem_provider.new_map(256 * 1024 * 1024)?);
+                StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
@@ -366,9 +366,9 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
+                #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
-                    #[allow(clippy::manual_assert)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.

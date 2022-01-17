@@ -26,10 +26,10 @@ Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc
 As you can see from the forkserver example,
 ```rust,ignore
 //Coverage map shared between observer and executor
-let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
+let mut shmem = StdShMemProvider::new().unwrap().new_shmem(MAP_SIZE).unwrap();
 //let the forkserver know the shmid
 shmem.write_to_env("__AFL_SHM_ID").unwrap();
-let mut shmem_map = shmem.map_mut();
+let mut shmem_buf = shmem.as_mut_slice();
 ```
 Here we make a shared memory region; `shmem`, and write this to environmental variable `__AFL_SHM_ID`. Then the instrumented binary, or the forkserver, finds this shared memory region (from the aforementioned env var) to record its coverage. On your fuzzer side, you can pass this shmem map to your `Observer` to obtain coverage feedbacks combined with any `Feedback`.
 
@@ -47,11 +47,11 @@ On your fuzzer side, you can allocate a shared memory region and make the `EDGES
 ```rust,ignore
 let mut shmem;
 unsafe{
-    shmem = StdShMemProvider::new().unwrap().new_map(MAX_EDGES_NUM).unwrap();
+    shmem = StdShMemProvider::new().unwrap().new_shmem(MAX_EDGES_NUM).unwrap();
 }
-let shmem_map = shmem.map_mut();
+let shmem_buf = shmem.as_mut_slice();
 unsafe{
-    EDGES_PTR = shmem_map.as_ptr();
+    EDGES_PTR = shmem_buf.as_ptr();
 }
 ```
 Again, you can pass this shmem map to your `Observer` and `Feedback` to obtain coverage feedbacks.

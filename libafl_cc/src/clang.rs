@@ -60,8 +60,10 @@ pub struct ClangWrapper {
     linking: bool,
     x_set: bool,
     bit_mode: u32,
+    need_libafl_arg: bool,
+    has_libafl_arg: bool,
 
-    from_args_called: bool,
+    parse_args_called: bool,
     base_args: Vec<String>,
     cc_args: Vec<String>,
     link_args: Vec<String>,
@@ -70,7 +72,7 @@ pub struct ClangWrapper {
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
 impl CompilerWrapper for ClangWrapper {
-    fn from_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
+    fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>,
     {
@@ -81,13 +83,13 @@ impl CompilerWrapper for ClangWrapper {
             ));
         }
 
-        if self.from_args_called {
+        if self.parse_args_called {
             return Err(Error::Unknown(
-                "CompilerWrapper::from_args cannot be called twice on the same instance"
+                "CompilerWrapper::parse_args cannot be called twice on the same instance"
                     .to_string(),
             ));
         }
-        self.from_args_called = true;
+        self.parse_args_called = true;
 
         if args.len() == 1 {
             return Err(Error::InvalidArguments(
@@ -110,6 +112,15 @@ impl CompilerWrapper for ClangWrapper {
 
         for arg in &args[1..] {
             match arg.as_ref() {
+                "--libafl-no-link" => {
+                    linking = false;
+                    self.has_libafl_arg = true;
+                    continue;
+                }
+                "--libafl" => {
+                    self.has_libafl_arg = true;
+                    continue;
+                }
                 "-x" => self.x_set = true,
                 "-m32" => self.bit_mode = 32,
                 "-m64" => self.bit_mode = 64,
@@ -203,6 +214,10 @@ impl CompilerWrapper for ClangWrapper {
             args.push(self.wrapped_cc.clone());
         }
         args.extend_from_slice(self.base_args.as_slice());
+        if self.need_libafl_arg && !self.has_libafl_arg {
+            return Ok(args);
+        }
+
         if !self.passes.is_empty() {
             args.push("-fno-experimental-new-pass-manager".into());
         }
@@ -266,7 +281,9 @@ impl ClangWrapper {
             linking: false,
             x_set: false,
             bit_mode: 0,
-            from_args_called: false,
+            need_libafl_arg: false,
+            has_libafl_arg: false,
+            parse_args_called: false,
             base_args: vec![],
             cc_args: vec![],
             link_args: vec![],
@@ -304,6 +321,18 @@ impl ClangWrapper {
         self.passes.push(pass);
         self
     }
+
+    /// Set if linking
+    pub fn linking(&mut self, value: bool) -> &'_ mut Self {
+        self.linking = value;
+        self
+    }
+
+    /// Set if it needs the --libafl arg to add the custom arguments to clang
+    pub fn need_libafl_arg(&mut self, value: bool) -> &'_ mut Self {
+        self.need_libafl_arg = value;
+        self
+    }
 }
 
 #[cfg(test)]
@@ -313,7 +342,7 @@ mod tests {
     #[test]
     fn test_clang_version() {
         if let Err(res) = ClangWrapper::new()
-            .from_args(&["my-clang", "-v"])
+            .parse_args(&["my-clang", "-v"])
             .unwrap()
             .run()
         {

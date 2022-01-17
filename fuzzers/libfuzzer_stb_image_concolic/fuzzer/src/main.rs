@@ -206,13 +206,13 @@ fn fuzz(
         // The shared memory for the concolic runtime to write its trace to
         let mut concolic_shmem = StdShMemProvider::new()
             .unwrap()
-            .new_map(DEFAULT_SIZE)
+            .new_shmem(DEFAULT_SIZE)
             .unwrap();
         concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer =
-            ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
+            ConcolicObserver::new("concolic".to_string(), concolic_shmem.as_slice_mut());
 
         let concolic_observer_name = concolic_observer.name().to_string();
 
