@@ -29,7 +29,7 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
 #[cfg(feature = "std")]
-use crate::observers::BacktraceObserver;
+use crate::observers::{BacktraceObserver, HarnessType};
 
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
@@ -40,7 +40,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
-    observers::{HarnessType, ObserversTuple},
+    observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
