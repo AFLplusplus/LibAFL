@@ -140,11 +140,15 @@ where
         S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
-        let mut should_collect_backtrace = false;
+        let should_collect_backtrace;
+        #[cfg(not(feature = "std"))]
+        {
+            should_collect_backtrace = false;
+        }
         #[cfg(feature = "std")]
         {
             should_collect_backtrace =
-            // should match on type when it's available
+            // should eventually use match_type when it's working
             match observers.match_name::<BacktraceObserver>("BacktraceObserver") {
                 Some(obs) => {
                     BacktraceObserver::setup_static_variable();
