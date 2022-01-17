@@ -378,7 +378,7 @@ impl AsanRuntime {
             rlim_cur: 0,
             rlim_max: 0,
         };
-        assert!(unsafe { getrlimit64(RLIMIT_STACK, &mut stack_rlimit as *mut rlimit64) } == 0);
+        assert!(unsafe { getrlimit64(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
 
         stack_rlimit.rlim_cur as usize
     }
