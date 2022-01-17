@@ -12,7 +12,7 @@ use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
     env,
     fs::{self, File, OpenOptions},
-    io::{self, Write},
+    io::{self, Read, Write},
     path::PathBuf,
     process,
 };
@@ -61,21 +61,21 @@ pub fn libafl_main() {
     //RegistryBuilder::register::<Tokens>();
 
     let res = match App::new("libafl_fuzzbench")
-        .version("0.4.0")
+        .version("0.7.1")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
             Arg::new("out")
+                .short('o')
+                .long("output")
                 .help("The directory to place finds in ('corpus')")
-                .required(true)
-                .index(1)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
+                .short('i')
+                .long("input")
                 .help("The directory to read initial inputs from ('seeds')")
-                .required(true)
-                .index(2)
                 .takes_value(true),
         )
         .arg(
@@ -99,12 +99,13 @@ pub fn libafl_main() {
                 .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
         )
+        .arg(Arg::new("remaining").multiple_values(true))
         .try_get_matches()
     {
         Ok(res) => res,
         Err(err) => {
             println!(
-                "Syntax: {}, [-x dictionary] corpus_dir seed_dir\n{:?}",
+                "Syntax: {}, [-x dictionary] -o corpus_dir -i seed_dir\n{:?}",
                 env::current_exe()
                     .unwrap_or_else(|_| "fuzzer".into())
                     .to_string_lossy(),
@@ -119,8 +120,20 @@ pub fn libafl_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
+    if let Some(filenames) = res.values_of("remaining") {
+        let filenames: Vec<&str> = filenames.collect();
+        if !filenames.is_empty() {
+            run_testcases(&filenames);
+            return;
+        }
+    }
+
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
-    let mut out_dir = PathBuf::from(res.value_of("out").unwrap().to_string());
+    let mut out_dir = PathBuf::from(
+        res.value_of("out")
+            .expect("The --output parameter is missing")
+            .to_string(),
+    );
     if fs::create_dir(&out_dir).is_err() {
         println!("Out dir at {:?} already exists.", &out_dir);
         if !out_dir.is_dir() {
@@ -132,7 +145,11 @@ pub fn libafl_main() {
     crashes.push("crashes");
     out_dir.push("queue");
 
-    let in_dir = PathBuf::from(res.value_of("in").unwrap().to_string());
+    let in_dir = PathBuf::from(
+        res.value_of("in")
+            .expect("The --input parameter is missing")
+            .to_string(),
+    );
     if !in_dir.is_dir() {
         println!("In dir at {:?} is not a valid directory!", &in_dir);
         return;
@@ -152,6 +169,29 @@ pub fn libafl_main() {
 
     fuzz(out_dir, crashes, in_dir, tokens, logfile, timeout)
         .expect("An error occurred while fuzzing");
+}
+
+fn run_testcases(filenames: &[&str]) {
+    // The actual target run starts here.
+    // Call LLVMFUzzerInitialize() if present.
+    let args: Vec<String> = env::args().collect();
+    if libfuzzer_initialize(&args) == -1 {
+        println!("Warning: LLVMFuzzerInitialize failed with -1")
+    }
+
+    println!(
+        "You are not fuzzing, just executing {} testcases",
+        filenames.len()
+    );
+    for fname in filenames {
+        println!("Executing {}", fname);
+
+        let mut file = File::open(fname).expect("No file found");
+        let mut buffer = vec![];
+        file.read_to_end(&mut buffer).expect("Buffer overflow");
+
+        libfuzzer_test_one_input(&buffer);
+    }
 }
 
 /// The actual fuzzer
