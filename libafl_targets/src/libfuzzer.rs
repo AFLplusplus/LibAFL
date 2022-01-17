@@ -23,10 +23,8 @@ pub fn libfuzzer_initialize(args: &[String]) -> i32 {
     #[allow(clippy::cast_possible_wrap)]
     let argc = argv.len() as i32;
     unsafe {
-        libafl_targets_libfuzzer_init(
-            core::ptr::addr_of!(argc),
-            core::ptr::addr_of!(argv.as_ptr()),
-        )
+        let argv_ptr = argv.as_ptr();
+        libafl_targets_libfuzzer_init(core::ptr::addr_of!(argc), core::ptr::addr_of!(argv_ptr))
     }
 }
 

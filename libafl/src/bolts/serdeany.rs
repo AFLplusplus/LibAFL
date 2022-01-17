@@ -6,7 +6,7 @@ use alloc::boxed::Box;
 use core::{
     any::{Any, TypeId},
     fmt::Debug,
-    ptr,
+    ptr::addr_of,
 };
 
 // yolo
@@ -19,7 +19,7 @@ use core::{
 #[must_use]
 pub fn pack_type_id(id: u64) -> TypeId {
     assert_eq_size!(TypeId, u64);
-    unsafe { *(ptr::addr_of!(id) as *const TypeId) }
+    unsafe { *(addr_of!(id) as *const TypeId) }
 }
 
 /// Unpack a `type_id` to an `u64`
@@ -30,7 +30,7 @@ pub fn pack_type_id(id: u64) -> TypeId {
 #[must_use]
 pub fn unpack_type_id(id: TypeId) -> u64 {
     assert_eq_size!(TypeId, u64);
-    unsafe { *(ptr::addr_of!(id) as *const u64) }
+    unsafe { *(addr_of!(id) as *const u64) }
 }
 
 /// A (de)serializable Any trait
