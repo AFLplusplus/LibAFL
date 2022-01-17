@@ -94,8 +94,6 @@ where
             .observers()
             .match_name::<O>(&self.map_observer_name)
             .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-            .map()
-            .unwrap()
             .to_vec();
 
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
@@ -137,8 +135,6 @@ where
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
                 .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-                .map()
-                .unwrap()
                 .to_vec();
 
             let history_map = &mut state

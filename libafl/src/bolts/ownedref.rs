@@ -1,7 +1,11 @@
 //! Wrappers that abstracts references (or pointers) and owned data accesses.
 // The serialization is towards owned, allowing to serialize pointers without troubles.
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{
+    boxed::Box,
+    slice::{Iter, IterMut},
+    vec::Vec,
+};
 use core::{clone::Clone, fmt::Debug, slice};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -359,6 +363,34 @@ where
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OwnedSliceMut<'a, T: 'a + Sized> {
     inner: OwnedSliceMutInner<'a, T>,
+}
+
+impl<'a, 'it, T> IntoIterator for &'it mut OwnedSliceMut<'a, T> {
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = IterMut<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let slice = match &mut self.inner {
+            OwnedSliceMutInner::RefRaw(rr, len) => &unsafe { slice::from_raw_parts_mut(*rr, *len) },
+            OwnedSliceMutInner::Ref(r) => r,
+            OwnedSliceMutInner::Owned(v) => &v.as_mut_slice(),
+        };
+        slice.into_iter()
+    }
+}
+
+impl<'a, 'it, T> IntoIterator for &'it OwnedSliceMut<'a, T> {
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = IterMut<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let slice = match self.inner {
+            OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts_mut(rr, len) },
+            OwnedSliceMutInner::Ref(r) => r,
+            OwnedSliceMutInner::Owned(v) => v.as_mut_slice(),
+        };
+        slice.into_iter()
+    }
 }
 
 impl<'a, T: 'a + Sized> OwnedSliceMut<'a, T> {
