@@ -20,7 +20,7 @@ pub fn main() {
             .cpp(is_cpp)
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(true)
-            .from_args(&args)
+            .parse_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "libfuzzer_libmozjpeg")
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
