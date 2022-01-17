@@ -19,7 +19,7 @@ use super::ObserverWithHashField;
 #[derive(Debug)]
 pub enum BacktraceHashValueWrapper {
     /// shared memory instance
-    Shmem(StdShMem),
+    Shmem(Box<StdShMem>),
     /// static variable
     StaticVariable(u64),
     /// Neither is set
@@ -164,8 +164,9 @@ impl BacktraceObserver {
         let shmem_provider = StdShMemProvider::new();
         println!("panic hook is being set");
         let shmem = shmem_provider.unwrap().new_map(5000).unwrap();
+        let boxed_shmem = Box::<StdShMem>::new(shmem);
         unsafe {
-            BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::Shmem(shmem);
+            BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::Shmem(boxed_shmem);
         }
     }
 
