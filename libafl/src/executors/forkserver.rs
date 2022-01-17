@@ -813,11 +813,11 @@ mod tests {
             .new_shmem(MAP_SIZE)
             .unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
-        let shmem_map = shmem.as_mut_slice();
+        let shmem_buf = shmem.as_mut_slice();
 
         let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
             "shared_mem",
-            shmem_map,
+            shmem_buf,
         ));
 
         let executor = ForkserverExecutor::<NopInput, _, ()>::new(

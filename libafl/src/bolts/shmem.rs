@@ -258,7 +258,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
     }
 
     /// Release the resources associated with the given [`ShMem`]
-    fn release_map(&mut self, _map: &mut Self::Mem) {
+    fn release_shem(&mut self, _shem: &mut Self::Mem) {
         // do nothing
     }
 }
@@ -295,7 +295,7 @@ where
 
 impl<T: ShMemProvider> Drop for RcShMem<T> {
     fn drop(&mut self) {
-        self.provider.borrow_mut().release_map(&mut self.internal);
+        self.provider.borrow_mut().release_shem(&mut self.internal);
     }
 }
 
@@ -356,8 +356,8 @@ where
         })
     }
 
-    fn release_map(&mut self, map: &mut Self::Mem) {
-        self.internal.borrow_mut().release_map(&mut map.internal);
+    fn release_shem(&mut self, map: &mut Self::Mem) {
+        self.internal.borrow_mut().release_shem(&mut map.internal);
     }
 
     fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
@@ -666,7 +666,7 @@ pub mod unix_shmem {
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct MmapShMemProvider {
-            current_map_id: usize,
+            current_shem_id: usize,
         }
 
         unsafe impl Send for MmapShMemProvider {}
@@ -684,11 +684,11 @@ pub mod unix_shmem {
             type Mem = MmapShMem;
 
             fn new() -> Result<Self, Error> {
-                Ok(Self { current_map_id: 0 })
+                Ok(Self { current_shem_id: 0 })
             }
             fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
-                self.current_map_id += 1;
-                MmapShMem::new(map_size, self.current_map_id)
+                self.current_shem_id += 1;
+                MmapShMem::new(map_size, self.current_shem_id)
             }
 
             fn shmem_from_id_and_size(
