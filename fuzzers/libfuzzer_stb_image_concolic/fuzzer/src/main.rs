@@ -212,7 +212,7 @@ fn fuzz(
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer =
-            ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
+            ConcolicObserver::new("concolic".to_string(), concolic_shmem.as_slice_mut());
 
         let concolic_observer_name = concolic_observer.name().to_string();
 
