@@ -178,7 +178,7 @@ where
     }
 
     fn content_mut(&mut self) -> &mut StateShMemContent {
-        let ptr = self.shmem.map().as_ptr();
+        let ptr = self.shmem.as_slice().as_ptr();
         #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
         unsafe {
             &mut *(ptr as *mut StateShMemContent)
@@ -188,7 +188,7 @@ where
     /// The content is either the name of the tmpfile, or the serialized bytes directly, if they fit on a single page.
     fn content(&self) -> &StateShMemContent {
         #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
-        let ptr = self.shmem.map().as_ptr() as *const StateShMemContent;
+        let ptr = self.shmem.as_slice().as_ptr() as *const StateShMemContent;
         unsafe { &*(ptr) }
     }
 
@@ -251,7 +251,7 @@ mod tests {
         const TESTMAP_SIZE: usize = 1024;
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
-        let shmem = shmem_provider.new_map(TESTMAP_SIZE).unwrap();
+        let shmem = shmem_provider.new_shmem(TESTMAP_SIZE).unwrap();
         let mut state_restorer = StateRestorer::<StdShMemProvider>::new(shmem);
 
         let state = "hello world".to_string();

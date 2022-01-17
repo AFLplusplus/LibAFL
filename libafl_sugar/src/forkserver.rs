@@ -108,10 +108,10 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             // Coverage map shared between target and fuzzer
             let mut shmem = StdShMemProvider::new()
                 .expect("Failed to init shared memory")
-                .new_map(MAP_SIZE)
+                .new_shmem(MAP_SIZE)
                 .unwrap();
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
-            let shmem_map = shmem.map_mut();
+            let shmem_map = shmem.as_mut_slice();
 
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {

@@ -89,12 +89,12 @@ where
         self.inner.len()
     }
 
-    fn map(&self) -> &[u8] {
-        self.inner.map()
+    fn as_slice(&self) -> &[u8] {
+        self.inner.as_slice()
     }
 
-    fn map_mut(&mut self) -> &mut [u8] {
-        self.inner.map_mut()
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        self.inner.as_mut_slice()
     }
 }
 
@@ -172,21 +172,19 @@ where
         res.id = id;
         Ok(res)
     }
-    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
         Ok(ServedShMem {
-            inner: ManuallyDrop::new(
-                self.inner.map_from_id_and_size(
-                    ShMemId::from_string(&format!("{}", client_fd)),
-                    map_size,
-                )?,
-            ),
+            inner: ManuallyDrop::new(self.inner.shmem_from_id_and_size(
+                ShMemId::from_string(&format!("{}", client_fd)),
+                map_size,
+            )?),
             server_fd,
         })
     }
 
-    fn map_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
         let parts = id.as_str().split(':').collect::<Vec<&str>>();
         let server_id_str = parts.get(0).unwrap();
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::ExistingMap(
@@ -194,8 +192,10 @@ where
         ))?;
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
-                self.inner
-                    .map_from_id_and_size(ShMemId::from_string(&format!("{}", client_fd)), size)?,
+                self.inner.shmem_from_id_and_size(
+                    ShMemId::from_string(&format!("{}", client_fd)),
+                    size,
+                )?,
             ),
             server_fd,
         })
@@ -512,7 +512,7 @@ where
                 Ok(ServedShMemResponse::Id(client_id))
             }
             ServedShMemRequest::NewMap(map_size) => {
-                let new_map = self.provider.new_map(map_size)?;
+                let new_map = self.provider.new_shmem(map_size)?;
                 let description = new_map.description();
                 let new_rc = Rc::new(RefCell::new(new_map));
                 self.all_maps

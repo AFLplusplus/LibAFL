@@ -294,14 +294,14 @@ impl Listener {
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page_mut<SHM: ShMem>(afl_shmem: &mut SHM) -> *mut LlmpPage {
-    afl_shmem.map_mut().as_mut_ptr() as *mut LlmpPage
+    afl_shmem.as_mut_slice().as_mut_ptr() as *mut LlmpPage
 }
 
 /// Get sharedmem from a page
 #[inline]
 #[allow(clippy::cast_ptr_alignment)]
 unsafe fn shmem2page<SHM: ShMem>(afl_shmem: &SHM) -> *const LlmpPage {
-    afl_shmem.map().as_ptr() as *const LlmpPage
+    afl_shmem.as_slice().as_ptr() as *const LlmpPage
 }
 
 /// Return, if a msg is contained in the current page
@@ -460,7 +460,7 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     alloc_size: usize,
 ) -> Result<*mut LlmpMsg, Error> {
     let page = map.page_mut();
-    let map_size = map.shmem.map().len();
+    let map_size = map.shmem.as_slice().len();
     let msg_begin_min = (page as *const u8).add(size_of::<LlmpPage>());
     // We still need space for this msg (alloc_size).
     let msg_begin_max = (page as *const u8).add(map_size - alloc_size);
@@ -556,7 +556,7 @@ impl LlmpMsg {
     #[inline]
     pub fn in_map<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
         unsafe {
-            let map_size = map.shmem.map().len();
+            let map_size = map.shmem.as_slice().len();
             let buf_ptr = self.buf.as_ptr();
             if buf_ptr > (map.page_mut() as *const u8).add(size_of::<LlmpPage>())
                 && buf_ptr <= (map.page_mut() as *const u8).add(map_size - size_of::<LlmpMsg>())
@@ -747,7 +747,7 @@ where
             last_msg_sent: ptr::null_mut(),
             out_maps: vec![LlmpSharedMap::new(
                 0,
-                shmem_provider.new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
+                shmem_provider.new_shmem(LLMP_CFG_INITIAL_MAP_SIZE)?,
             )],
             // drop pages to the broker if it already read them
             keep_pages_forever,
@@ -1078,7 +1078,7 @@ where
         let mut new_map_shmem = LlmpSharedMap::new(
             (*old_map).sender,
             self.shmem_provider
-                .new_map(new_map_size((*old_map).max_alloc_size))?,
+                .new_shmem(new_map_size((*old_map).max_alloc_size))?,
         );
         let mut new_map = new_map_shmem.page_mut();
 
@@ -1272,7 +1272,7 @@ where
     ) -> Result<Self, Error> {
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.map_from_decription(description.shmem)?,
+            shmem_provider.shmem_from_description(description.shmem)?,
             description.last_message_offset,
         )
     }
@@ -1431,7 +1431,7 @@ where
 
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_map =
-                        LlmpSharedMap::existing(self.shmem_provider.map_from_id_and_size(
+                        LlmpSharedMap::existing(self.shmem_provider.shmem_from_id_and_size(
                             ShMemId::from_slice(&pageinfo_cpy.shm_str),
                             pageinfo_cpy.map_size,
                         )?);
@@ -1546,7 +1546,7 @@ where
     ) -> Result<Self, Error> {
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.map_from_decription(description.shmem)?,
+            shmem_provider.shmem_from_description(description.shmem)?,
             description.last_message_offset,
         )
     }
@@ -1692,7 +1692,7 @@ where
         let offset = offset as usize;
         unsafe {
             let page = self.page_mut();
-            let page_size = self.shmem.map().len() - size_of::<LlmpPage>();
+            let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
             if offset > page_size {
                 Err(Error::IllegalArgument(format!(
                     "Msg offset out of bounds (size: {}, requested offset: {})",
@@ -1755,7 +1755,7 @@ where
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::new(
                     0,
-                    shmem_provider.new_map(new_map_size(0))?,
+                    shmem_provider.new_shmem(new_map_size(0))?,
                 )],
                 // Broker never cleans up the pages so that new
                 // clients may join at any time
@@ -1854,8 +1854,10 @@ where
             &self.llmp_out.out_maps.first().unwrap().shmem.description(),
         )?;
 
-        let new_map =
-            LlmpSharedMap::existing(self.shmem_provider.map_from_decription(map_description)?);
+        let new_map = LlmpSharedMap::existing(
+            self.shmem_provider
+                .shmem_from_description(map_description)?,
+        );
 
         {
             self.register_client(new_map);
@@ -2191,7 +2193,7 @@ where
         // Tcp out map sends messages from background thread tcp server to foreground client
         let tcp_out_map = LlmpSharedMap::new(
             llmp_tcp_id,
-            self.shmem_provider.new_map(LLMP_CFG_INITIAL_MAP_SIZE)?,
+            self.shmem_provider.new_shmem(LLMP_CFG_INITIAL_MAP_SIZE)?,
         );
         let tcp_out_map_description = tcp_out_map.shmem.description();
         self.register_client(tcp_out_map);
@@ -2207,7 +2209,7 @@ where
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::existing(
                     shmem_provider_bg
-                        .map_from_decription(tcp_out_map_description)
+                        .shmem_from_description(tcp_out_map_description)
                         .unwrap(),
                 )],
                 // drop pages to the broker, if it already read them.
@@ -2313,7 +2315,7 @@ where
                     } else {
                         let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
-                        match self.shmem_provider.map_from_id_and_size(
+                        match self.shmem_provider.shmem_from_id_and_size(
                             ShMemId::from_slice(&(*pageinfo).shm_str),
                             (*pageinfo).map_size,
                         ) {
@@ -2494,7 +2496,7 @@ where
                 id: 0,
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::new(0, {
-                    shmem_provider.new_map(LLMP_CFG_INITIAL_MAP_SIZE)?
+                    shmem_provider.new_shmem(LLMP_CFG_INITIAL_MAP_SIZE)?
                 })],
                 // drop pages to the broker if it already read them
                 keep_pages_forever: false,
@@ -2639,7 +2641,7 @@ where
         };
 
         let map =
-            LlmpSharedMap::existing(shmem_provider.map_from_decription(broker_map_description)?);
+            LlmpSharedMap::existing(shmem_provider.shmem_from_description(broker_map_description)?);
         let mut ret = Self::new(shmem_provider, map)?;
 
         let client_hello_req = TcpRequest::LocalClientHello {

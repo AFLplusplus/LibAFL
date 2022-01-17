@@ -206,7 +206,7 @@ fn fuzz(
         // The shared memory for the concolic runtime to write its trace to
         let mut concolic_shmem = StdShMemProvider::new()
             .unwrap()
-            .new_map(DEFAULT_SIZE)
+            .new_shmem(DEFAULT_SIZE)
             .unwrap();
         concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
 

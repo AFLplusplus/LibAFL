@@ -367,10 +367,10 @@ pub trait HasForkserver {
     fn out_file_mut(&mut self) -> &mut OutFile;
 
     /// The map of the fuzzer
-    fn map(&self) -> &Option<StdShMem>;
+    fn shmem(&self) -> &Option<StdShMem>;
 
     /// The map of the fuzzer, mutable
-    fn map_mut(&mut self) -> &mut Option<StdShMem>;
+    fn as_mut_slice(&mut self) -> &mut Option<StdShMem>;
 }
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
@@ -417,14 +417,14 @@ where
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
 
-        match &mut self.executor.map_mut() {
+        match &mut self.executor.as_mut_slice() {
             Some(map) => {
                 let target_bytes = input.target_bytes();
                 let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
-                map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
-                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                map.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
+                map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                     .copy_from_slice(target_bytes.as_slice());
             }
             None => {
@@ -571,11 +571,11 @@ where
         if use_shmem_testcase {
             // setup shared memory
             let mut provider = StdShMemProvider::new()?;
-            let mut shmem = provider.new_map(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+            let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
             shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
 
             let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-            shmem.map_mut()[..4].clone_from_slice(&size_in_bytes[..4]);
+            shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
             map = Some(shmem);
         }
 
@@ -667,8 +667,8 @@ where
                 let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
-                map.map_mut()[..4].copy_from_slice(&size_in_bytes[..4]);
-                map.map_mut()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                map.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
+                map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                     .copy_from_slice(target_bytes.as_slice());
             }
             None => {
@@ -761,12 +761,12 @@ where
     }
 
     #[inline]
-    fn map(&self) -> &Option<StdShMem> {
+    fn shmem(&self) -> &Option<StdShMem> {
         &self.map
     }
 
     #[inline]
-    fn map_mut(&mut self) -> &mut Option<StdShMem> {
+    fn as_mut_slice(&mut self) -> &mut Option<StdShMem> {
         &mut self.map
     }
 }
@@ -808,9 +808,12 @@ mod tests {
         let bin = "echo";
         let args = vec![String::from("@@")];
 
-        let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
+        let mut shmem = StdShMemProvider::new()
+            .unwrap()
+            .new_shmem(MAP_SIZE)
+            .unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
-        let shmem_map = shmem.map_mut();
+        let shmem_map = shmem.as_mut_slice();
 
         let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
             "shared_mem",
