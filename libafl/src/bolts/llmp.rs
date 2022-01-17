@@ -1272,7 +1272,7 @@ where
     ) -> Result<Self, Error> {
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.from_description(description.shmem)?,
+            shmem_provider.map_from_decription(description.shmem)?,
             description.last_message_offset,
         )
     }
@@ -1431,7 +1431,7 @@ where
 
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_map =
-                        LlmpSharedMap::existing(self.shmem_provider.from_id_and_size(
+                        LlmpSharedMap::existing(self.shmem_provider.map_from_id_and_size(
                             ShMemId::from_slice(&pageinfo_cpy.shm_str),
                             pageinfo_cpy.map_size,
                         )?);
@@ -1546,7 +1546,7 @@ where
     ) -> Result<Self, Error> {
         Self::on_existing_map(
             shmem_provider.clone(),
-            shmem_provider.from_description(description.shmem)?,
+            shmem_provider.map_from_decription(description.shmem)?,
             description.last_message_offset,
         )
     }
@@ -1855,7 +1855,7 @@ where
         )?;
 
         let new_map =
-            LlmpSharedMap::existing(self.shmem_provider.from_description(map_description)?);
+            LlmpSharedMap::existing(self.shmem_provider.map_from_decription(map_description)?);
 
         {
             self.register_client(new_map);
@@ -2207,7 +2207,7 @@ where
                 last_msg_sent: ptr::null_mut(),
                 out_maps: vec![LlmpSharedMap::existing(
                     shmem_provider_bg
-                        .from_description(tcp_out_map_description)
+                        .map_from_decription(tcp_out_map_description)
                         .unwrap(),
                 )],
                 // drop pages to the broker, if it already read them.
@@ -2313,7 +2313,7 @@ where
                     } else {
                         let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
-                        match self.shmem_provider.from_id_and_size(
+                        match self.shmem_provider.map_from_id_and_size(
                             ShMemId::from_slice(&(*pageinfo).shm_str),
                             (*pageinfo).map_size,
                         ) {
@@ -2638,7 +2638,8 @@ where
             ));
         };
 
-        let map = LlmpSharedMap::existing(shmem_provider.from_description(broker_map_description)?);
+        let map =
+            LlmpSharedMap::existing(shmem_provider.map_from_decription(broker_map_description)?);
         let mut ret = Self::new(shmem_provider, map)?;
 
         let client_hello_req = TcpRequest::LocalClientHello {
