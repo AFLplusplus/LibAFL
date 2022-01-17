@@ -50,6 +50,12 @@ pub fn main() {
                 .default_value("1200"),
         )
         .arg(
+            Arg::new("debug_child")
+                .help("If not set, the child's stdout and stderror will be redirected to /dev/null")
+                .short('d')
+                .long("debug-child"),
+        )
+        .arg(
             Arg::new("arguments")
                 .help("Arguments passed to the target")
                 .setting(clap::ArgSettings::MultipleValues)
@@ -61,9 +67,11 @@ pub fn main() {
 
     const MAP_SIZE: usize = 65536;
 
-    //Coverage map shared between observer and executor
-    let mut shmem = StdShMemProvider::new().unwrap().new_shmem(MAP_SIZE).unwrap();
-    //let the forkserver know the shmid
+    // The default, OS-specific privider for shared memory
+    let mut shmem_provider = StdShMemProvider::new().unwrap();
+    // The coverage map shared between observer and executor
+    let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
+    // let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
     let shmem_buf = shmem.as_mut_slice();
 
@@ -127,6 +135,9 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+    // If we should debug the child
+    let debug_child = res.value_of("debug_child").is_some();
+
     // Create the executor for the forkserver
     let args = match res.values_of("arguments") {
         Some(vec) => vec.map(|s| s.to_string()).collect::<Vec<String>>().to_vec(),
@@ -134,11 +145,12 @@ pub fn main() {
     };
 
     let mut executor = TimeoutForkserverExecutor::new(
-        ForkserverExecutor::new(
+        ForkserverExecutor::with_shmem_inputs(
             res.value_of("executable").unwrap().to_string(),
             &args,
-            true,
             tuple_list!(edges_observer, time_observer),
+            debug_child,
+            &mut shmem_provider,
         )
         .unwrap(),
         Duration::from_millis(

@@ -24,39 +24,28 @@ pub use unix_shmem::{MmapShMem, MmapShMemProvider};
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
 
+#[cfg(all(windows, feature = "std"))]
+pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
+
 #[cfg(all(feature = "std", unix))]
 pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
 
-#[cfg(all(windows, feature = "std"))]
-pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMemProvider = Win32ShMemProvider;
-/// The standard sharedmem type
-#[cfg(all(windows, feature = "std"))]
-pub type StdShMem = Win32ShMem;
-
 /// The standard sharedmem provider
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemProvider =
     RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
-/// The standard sharedmem type
-#[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMem = RcShMem<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
 /// The standard sharedmem service
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemService = ShMemService<unix_shmem::ashmem::AshmemShMemProvider>;
-
 /// The standard sharedmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
-/// The standard sharedmem type
-#[cfg(all(feature = "std", target_vendor = "apple"))]
-pub type StdShMem = RcShMem<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 /// The standard sharedmem service
 pub type StdShMemService = ShMemService<MmapShMemProvider>;
-
 /// The default [`ShMemProvider`] for this os.
 #[cfg(all(
     feature = "std",
@@ -64,14 +53,6 @@ pub type StdShMemService = ShMemService<MmapShMemProvider>;
     not(any(target_os = "android", target_vendor = "apple"))
 ))]
 pub type StdShMemProvider = UnixShMemProvider;
-/// The default [`ShMemProvider`] for this os.
-#[cfg(all(
-    feature = "std",
-    unix,
-    not(any(target_os = "android", target_vendor = "apple"))
-))]
-pub type StdShMem = UnixShMem;
-
 /// The standard sharedmem service
 #[cfg(any(
     not(any(target_os = "android", target_vendor = "apple")),
