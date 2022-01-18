@@ -6,13 +6,13 @@ use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
-        AsSlice,
         current_nanos,
         launcher::Launcher,
         os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
     corpus::{
         CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
