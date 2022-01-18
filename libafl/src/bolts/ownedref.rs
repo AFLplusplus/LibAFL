@@ -238,6 +238,15 @@ impl<'a, T> OwnedSlice<'a, T> {
     }
 }
 
+impl<'a, 'it, T> IntoIterator for &'it OwnedSlice<'a, T> {
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Iter<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
 /// Create a new [`OwnedSlice`] from a vector
 impl<'a, T> From<Vec<T>> for OwnedSlice<'a, T> {
     fn from(vec: Vec<T>) -> Self {
@@ -370,26 +379,16 @@ impl<'a, 'it, T> IntoIterator for &'it mut OwnedSliceMut<'a, T> {
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let slice = match &mut self.inner {
-            OwnedSliceMutInner::RefRaw(rr, len) => &unsafe { slice::from_raw_parts_mut(*rr, *len) },
-            OwnedSliceMutInner::Ref(r) => r,
-            OwnedSliceMutInner::Owned(v) => &v.as_mut_slice(),
-        };
-        slice.into_iter()
+        self.as_mut_slice().iter_mut()
     }
 }
 
 impl<'a, 'it, T> IntoIterator for &'it OwnedSliceMut<'a, T> {
-    type Item = <IterMut<'it, T> as Iterator>::Item;
-    type IntoIter = IterMut<'it, T>;
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let slice = match self.inner {
-            OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts_mut(rr, len) },
-            OwnedSliceMutInner::Ref(r) => r,
-            OwnedSliceMutInner::Owned(v) => v.as_mut_slice(),
-        };
-        slice.into_iter()
+        self.as_slice().iter()
     }
 }
 

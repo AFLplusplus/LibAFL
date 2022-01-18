@@ -5,15 +5,15 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt::Debug, hash::Hasher, slice::from_raw_parts};
+use core::{
+    fmt::Debug,
+    hash::Hasher,
+    iter::Flatten,
+    slice::{from_raw_parts, Iter, IterMut},
+};
 use intervaltree::IntervalTree;
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
-use std::{
-    iter::{FlatMap, Flatten},
-    marker::PhantomData,
-    slice::{Iter, IterMut},
-};
 
 use crate::{
     bolts::{
@@ -36,6 +36,7 @@ fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
     hasher.finish()
 }
 
+/// Returns the element as a [`core::slice::Slice`]
 pub trait AsSlice<T> {
     /// Get the slice that's underlying this map
     fn as_slice(&self) -> &[T];
@@ -160,7 +161,7 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().into_iter()
+        self.as_slice().iter()
     }
 }
 
@@ -172,7 +173,7 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().into_iter()
+        self.as_mut_slice().iter_mut()
     }
 }
 
@@ -196,7 +197,7 @@ where
     }
 
     fn hash(&self) -> u64 {
-        hash_slice(&self.as_slice())
+        hash_slice(self.as_slice())
     }
 
     #[inline]
@@ -225,12 +226,12 @@ where
 {
     #[inline]
     fn as_slice(&self) -> &[T] {
-        &self.map.as_slice()
+        self.map.as_slice()
     }
 
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
-        &mut self.map.as_mut_slice()
+        self.map.as_mut_slice()
     }
 }
 
@@ -346,7 +347,7 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().into_iter()
+        self.as_slice().iter()
     }
 }
 
@@ -358,7 +359,7 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().into_iter()
+        self.as_mut_slice().iter_mut()
     }
 }
 
@@ -514,7 +515,7 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().into_iter()
+        self.as_slice().iter()
     }
 }
 
@@ -526,7 +527,7 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().into_iter()
+        self.as_mut_slice().iter_mut()
     }
 }
 
@@ -949,8 +950,18 @@ where
     type IntoIter = Flatten<IterMut<'it, OwnedSliceMut<'a, T>>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let test = self.maps.iter_mut().flatten();
-        println!("{:?}", &test);
-        test
+        self.maps.iter_mut().flatten()
+    }
+}
+
+impl<'a, 'it, T> IntoIterator for &'it MultiMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Flatten<Iter<'it, OwnedSliceMut<'a, T>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.maps.iter().flatten()
     }
 }
