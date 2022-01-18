@@ -19,34 +19,33 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use num_traits::PrimInt;
+use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<I, O, OT, S, T>
+pub struct CalibrationStage<I, O, OT, S>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     I: Input,
-    O: MapObserver<Entry = T>,
+    O: MapObserver,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I> + HasMetadata,
 {
     map_observer_name: String,
     stage_max: usize,
-    phantom: PhantomData<(I, O, OT, S, T)>,
+    phantom: PhantomData<(I, O, OT, S)>,
 }
 
 const CAL_STAGE_START: usize = 4;
 const CAL_STAGE_MAX: usize = 16;
 
-impl<E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S, T>
+impl<E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     EM: EventFirer<I>,
     I: Input,
-    O: MapObserver<Entry = T>,
+    O: MapObserver,
+    for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
@@ -139,13 +138,13 @@ where
 
             let history_map = &mut state
                 .feedback_states_mut()
-                .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
+                .match_name_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name)
                 .unwrap()
                 .history_map;
 
             for j in 0..map_len {
-                if map_first[j] != map[j] && history_map[j] != T::max_value() {
-                    history_map[j] = T::max_value();
+                if map_first[j] != map[j] && history_map[j] != O::Entry::max_value() {
+                    history_map[j] = O::Entry::max_value();
                     unstable_entries += 1;
                 };
             }
@@ -302,11 +301,10 @@ impl PowerScheduleMetadata {
 
 crate::impl_serdeany!(PowerScheduleMetadata);
 
-impl<I, O, OT, S, T> CalibrationStage<I, O, OT, S, T>
+impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     I: Input,
-    O: MapObserver<Entry = T>,
+    O: MapObserver,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I> + HasMetadata,
 {
