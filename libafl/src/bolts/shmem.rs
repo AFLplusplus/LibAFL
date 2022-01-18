@@ -3,7 +3,10 @@
 
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::pipes::Pipe;
-use crate::Error;
+use crate::{
+    bolts::{AsMutSlice, AsSlice},
+    Error,
+};
 use alloc::{rc::Rc, string::ToString};
 use core::{
     cell::RefCell,
@@ -89,10 +92,17 @@ pub struct ShMemId {
 }
 
 impl ShMemId {
-    /// Create a new id from a fixed-size string
+    /// Create a new id from a fixed-size string/bytes array
+    /// It should contain a valid cstring.
     #[must_use]
-    pub fn from_slice(slice: &[u8; 20]) -> Self {
-        Self { id: *slice }
+    pub fn from_array(array: &[u8; 20]) -> Self {
+        Self { id: *array }
+    }
+
+    /// Try to create a new id from a bytes string.
+    /// The slice must have a length of at least 20 bytes and contain a valid cstring.
+    pub fn try_from_slice(slice: &[u8]) -> Result<Self, Error> {
+        Ok(Self::from_array(&slice[0..20].try_into()?))
     }
 
     /// Create a new id from an int
@@ -113,7 +123,7 @@ impl ShMemId {
 
     /// Get the id as a fixed-length slice
     #[must_use]
-    pub fn as_slice(&self) -> &[u8; 20] {
+    pub fn as_array(&self) -> &[u8; 20] {
         &self.id
     }
 
@@ -127,6 +137,11 @@ impl ShMemId {
     #[must_use]
     pub fn as_str(&self) -> &str {
         alloc::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
+    }
+}
+impl AsSlice<u8> for ShMemId {
+    fn as_slice(&self) -> &[u8] {
+        &self.id
     }
 }
 
@@ -145,7 +160,7 @@ impl Display for ShMemId {
 /// A [`ShMem`] is an interface to shared maps.
 /// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
-pub trait ShMem: Sized + Debug + Clone {
+pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -164,12 +179,6 @@ pub trait ShMem: Sized + Debug + Clone {
             id: self.id(),
         }
     }
-
-    /// The actual shared map, in memory
-    fn as_slice(&self) -> &[u8];
-
-    /// The actual shared map, mutable
-    fn as_mut_slice(&mut self) -> &mut [u8];
 
     /// Write this map's config to env
     #[cfg(feature = "std")]
@@ -264,11 +273,21 @@ where
     fn len(&self) -> usize {
         self.internal.len()
     }
+}
 
+impl<T> AsSlice<u8> for RcShMem<T>
+where
+    T: ShMemProvider + Debug,
+{
     fn as_slice(&self) -> &[u8] {
         self.internal.as_slice()
     }
+}
 
+impl<T> AsMutSlice<u8> for RcShMem<T>
+where
+    T: ShMemProvider + Debug,
+{
     fn as_mut_slice(&mut self) -> &mut [u8] {
         self.internal.as_mut_slice()
     }
@@ -489,7 +508,10 @@ pub mod unix_shmem {
         use std::{io::Write, process};
 
         use crate::{
-            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            bolts::{
+                shmem::{ShMem, ShMemId, ShMemProvider},
+                AsMutSlice, AsSlice,
+            },
             Error,
         };
         #[cfg(unix)]
@@ -691,11 +713,15 @@ pub mod unix_shmem {
             fn len(&self) -> usize {
                 self.map_size
             }
+        }
 
+        impl AsSlice<u8> for MmapShMem {
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
+        }
 
+        impl AsMutSlice<u8> for MmapShMem {
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -790,11 +816,15 @@ pub mod unix_shmem {
             fn len(&self) -> usize {
                 self.map_size
             }
+        }
 
+        impl AsSlice<u8> for CommonUnixShMem {
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
+        }
 
+        impl AsMutSlice<u8> for CommonUnixShMem {
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -858,7 +888,10 @@ pub mod unix_shmem {
         use std::ffi::CString;
 
         use crate::{
-            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            bolts::{
+                shmem::{ShMem, ShMemId, ShMemProvider},
+                AsMutSlice, AsSlice,
+            },
             Error,
         };
 
@@ -992,11 +1025,15 @@ pub mod unix_shmem {
             fn len(&self) -> usize {
                 self.map_size
             }
+        }
 
+        impl AsSlice<u8> for AshmemShMem {
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
+        }
 
+        impl AsMutSlice<u8> for AshmemShMem {
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -1069,7 +1106,10 @@ pub mod unix_shmem {
 pub mod win32_shmem {
 
     use crate::{
-        bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+        bolts::{
+            shmem::{ShMem, ShMemId, ShMemProvider},
+            AsMutSlice, AsSlice,
+        },
         Error,
     };
 
@@ -1141,7 +1181,7 @@ pub mod win32_shmem {
                 }
 
                 Ok(Self {
-                    id: ShMemId::from_slice(&map_str_bytes[0..20].try_into().unwrap()),
+                    id: ShMemId::try_from_slice(&map_str_bytes).unwrap(),
                     handle,
                     map,
                     map_size,
@@ -1189,11 +1229,14 @@ pub mod win32_shmem {
         fn len(&self) -> usize {
             self.map_size
         }
+    }
 
+    impl AsSlice<u8> for Win32ShMem {
         fn as_slice(&self) -> &[u8] {
             unsafe { slice::from_raw_parts(self.map, self.map_size) }
         }
-
+    }
+    impl AsMutSlice<u8> for Win32ShMem {
         fn as_mut_slice(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
         }
@@ -1348,7 +1391,10 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 mod tests {
     use serial_test::serial;
 
-    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
+    use crate::bolts::{
+        shmem::{ShMemProvider, StdShMemProvider},
+        AsMutSlice, AsSlice,
+    };
 
     #[test]
     #[serial]

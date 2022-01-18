@@ -6,7 +6,10 @@ and forwards them over unix domain sockets.
 */
 
 use crate::{
-    bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+    bolts::{
+        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+        AsMutSlice, AsSlice,
+    },
     Error,
 };
 use core::{mem::ManuallyDrop, ptr::addr_of};
@@ -88,11 +91,20 @@ where
     fn len(&self) -> usize {
         self.inner.len()
     }
+}
 
+impl<SH> AsSlice<u8> for ServedShMem<SH>
+where
+    SH: ShMem,
+{
     fn as_slice(&self) -> &[u8] {
         self.inner.as_slice()
     }
-
+}
+impl<SH> AsMutSlice<u8> for ServedShMem<SH>
+where
+    SH: ShMem,
+{
     fn as_mut_slice(&mut self) -> &mut [u8] {
         self.inner.as_mut_slice()
     }
@@ -124,7 +136,7 @@ where
             .recv_fds(&mut shm_slice, &mut fd_buf)
             .expect("Did not receive a response");
 
-        let server_id = ShMemId::from_slice(&shm_slice);
+        let server_id = ShMemId::from_array(&shm_slice);
         let server_fd: i32 = server_id.into();
         Ok((server_fd, fd_buf[0]))
     }
