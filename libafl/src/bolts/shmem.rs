@@ -93,9 +93,16 @@ pub struct ShMemId {
 
 impl ShMemId {
     /// Create a new id from a fixed-size string/bytes array
+    /// It should contain a valid cstring.
     #[must_use]
-    pub fn from_array(slice: &[u8; 20]) -> Self {
-        Self { id: *slice }
+    pub fn from_array(array: &[u8; 20]) -> Self {
+        Self { id: *array }
+    }
+
+    /// Try to create a new id from a bytes string.
+    /// The slice must have a length of at least 20 bytes and contain a valid cstring.
+    pub fn try_from_slice(slice: &[u8]) -> Result<Self, Error> {
+        Ok(Self::from_array(&slice[0..20].try_into()?))
     }
 
     /// Create a new id from an int
@@ -1101,7 +1108,7 @@ pub mod win32_shmem {
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemId, ShMemProvider},
-            AsSlice, AsMutSlice,
+            AsMutSlice, AsSlice,
         },
         Error,
     };
@@ -1174,7 +1181,7 @@ pub mod win32_shmem {
                 }
 
                 Ok(Self {
-                    id: ShMemId::from_slice(&map_str_bytes[0..20].try_into().unwrap()),
+                    id: ShMemId::try_from_slice(&map_str_bytes).unwrap(),
                     handle,
                     map,
                     map_size,
