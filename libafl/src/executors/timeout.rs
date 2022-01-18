@@ -416,12 +416,3 @@ impl<E> HasPostRunReset for TimeoutExecutor<E> {
         }
     }
 }
-
-#[cfg(windows)]
-impl<E> Drop for TimeoutExecutor<E> {
-    fn drop(&mut self) {
-        unsafe {
-            CloseThreadpoolTimer(self.tp_timer);
-        }
-    }
-}
