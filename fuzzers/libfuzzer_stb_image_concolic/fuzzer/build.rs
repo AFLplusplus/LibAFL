@@ -4,7 +4,7 @@ use std::{
     env,
     io::{stdout, Write},
     path::{Path, PathBuf},
-    process::{exit, Command},
+    process::exit,
 };
 
 use which::which;

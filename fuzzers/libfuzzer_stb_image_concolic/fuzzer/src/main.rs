@@ -13,7 +13,7 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Named},
-        AsSlice, AsSliceMut,
+        AsMutSlice, AsSlice,
     },
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,

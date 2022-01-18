@@ -1101,7 +1101,7 @@ pub mod win32_shmem {
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemId, ShMemProvider},
-            AsSlice, AsSliceMut,
+            AsSlice, AsMutSlice,
         },
         Error,
     };
