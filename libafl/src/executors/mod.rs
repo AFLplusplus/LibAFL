@@ -70,9 +70,9 @@ where
 }
 
 /// Allows access to custom Reset Handler
-pub trait HasOnCrashReset {
+pub trait HasPostRunReset {
     /// Reset the state, e.g., disable timers
-    fn reset_on_crash(&self);
+    fn post_run_reset(&self);
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
@@ -102,9 +102,9 @@ where
     }
 }
 
-impl<EM, I, S, Z> HasOnCrashReset for dyn Executor<EM, I, S, Z> {
+impl<EM, I, S, Z> HasPostRunReset for dyn Executor<EM, I, S, Z> {
     #[inline]
-    fn reset_on_crash(&self) {}
+    fn post_run_reset(&self) {}
 }
 
 /// A simple executor that does nothing.

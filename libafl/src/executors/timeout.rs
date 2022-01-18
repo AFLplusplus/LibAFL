@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    executors::{Executor, ExitKind, HasObservers, HasOnCrashReset},
+    executors::{Executor, ExitKind, HasObservers, HasPostRunReset},
     inputs::Input,
     observers::ObserversTuple,
     Error,
@@ -19,7 +19,7 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
 
-#[cfg(all(unix, target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 use libc::c_int;
 
 #[cfg(all(windows, feature = "std"))]
@@ -39,13 +39,13 @@ use core::{ffi::c_void, ptr::write_volatile};
 use core::sync::atomic::{compiler_fence, Ordering};
 
 #[repr(C)]
-#[cfg(all(unix, target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 struct Timeval {
     pub tv_sec: i64,
     pub tv_usec: i64,
 }
 
-#[cfg(all(unix, target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 impl Debug for Timeval {
     #[allow(clippy::cast_sign_loss)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -60,19 +60,19 @@ impl Debug for Timeval {
 }
 
 #[repr(C)]
-#[cfg(all(unix, target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 #[derive(Debug)]
 struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,
 }
 
-#[cfg(all(unix, target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 extern "C" {
     fn setitimer(which: c_int, new_value: *mut Itimerval, old_value: *mut Itimerval) -> c_int;
 }
 
-#[cfg(all(unix, target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
@@ -82,7 +82,7 @@ pub struct TimeoutExecutor<E> {
     itimerspec: libc::itimerspec,
     #[cfg(all(unix, not(target_vendor = "apple")))]
     timerid: libc::timer_t,
-    #[cfg(all(unix, target_vendor = "apple"))]
+    #[cfg(target_vendor = "apple")]
     itimerval: Itimerval,
     #[cfg(windows)]
     milli_sec: i64,
@@ -113,7 +113,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
             .finish()
     }
 
-    #[cfg(all(unix, target_vendor = "apple"))]
+    #[cfg(target_vendor = "apple")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
             .field("executor", &self.executor)
@@ -179,7 +179,7 @@ impl<E> TimeoutExecutor<E> {
     }
 }
 
-#[cfg(all(unix, target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 impl<E> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
@@ -316,7 +316,7 @@ where
 
             write_volatile(&mut data.timeout_input_ptr, core::ptr::null_mut());
 
-            self.reset_on_crash();
+            self.post_run_reset();
             ret
         }
     }
@@ -339,13 +339,13 @@ where
             libc::timer_settime(self.timerid, 0, &self.itimerspec as *const _, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
             // reset timer
-            self.reset_on_crash();
+            self.post_run_reset();
             ret
         }
     }
 }
 
-#[cfg(all(unix, target_vendor = "apple"))]
+#[cfg(target_vendor = "apple")]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z>,
@@ -361,7 +361,7 @@ where
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
-            self.reset_on_crash();
+            self.post_run_reset();
             ret
         }
     }
@@ -384,9 +384,9 @@ where
 }
 
 #[cfg(all(unix, not(target_vendor = "apple")))]
-impl<E> HasOnCrashReset for TimeoutExecutor<E> {
+impl<E> HasPostRunReset for TimeoutExecutor<E> {
     /// Disarm currently running timer
-    fn reset_on_crash(&self) {
+    fn post_run_reset(&self) {
         unsafe {
             let disarmed: libc::itimerspec = zeroed();
             libc::timer_settime(self.timerid, 0, &disarmed as *const _, null_mut());
@@ -394,10 +394,10 @@ impl<E> HasOnCrashReset for TimeoutExecutor<E> {
     }
 }
 
-#[cfg(all(unix, target_vendor = "apple"))]
-impl<E> HasOnCrashReset for TimeoutExecutor<E> {
+#[cfg(target_vendor = "apple")]
+impl<E> HasPostRunReset for TimeoutExecutor<E> {
     /// Disarm currently running timer
-    fn reset_on_crash(&self) {
+    fn post_run_reset(&self) {
         unsafe {
             let mut itimerval_zero: Itimerval = zeroed();
             setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
@@ -406,11 +406,11 @@ impl<E> HasOnCrashReset for TimeoutExecutor<E> {
 }
 
 #[cfg(all(windows, feature = "std"))]
-impl<E> HasOnCrashReset for TimeoutExecutor<E> {
+impl<E> HasPostRunReset for TimeoutExecutor<E> {
     /// Deletes this timer queue
     /// # Safety
     /// Will dereference the given `tp_timer` pointer, unchecked.
-    fn reset_on_crash(&self) {
+    fn post_run_reset(&self) {
         unsafe {
             CloseThreadpoolTimer(self.tp_timer);
         }
