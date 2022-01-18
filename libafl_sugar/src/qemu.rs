@@ -6,6 +6,7 @@ use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
+        AsSlice,
         current_nanos,
         launcher::Launcher,
         os::Cores,
