@@ -2,7 +2,7 @@ use super::*;
 
 use tui::{
     backend::Backend,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     symbols,
     text::{Span, Spans},
@@ -46,74 +46,149 @@ pub fn previous<T>(state: &mut ListState, items: &[T]) {
 
 #[derive(Default)]
 pub struct TuiUI {
+    title: String,
+    enhanced_graphics: bool,
+    show_logs: bool,
+    clients_idx: usize,
+    clients: usize,
+    charts_tab_idx: usize,
+
+    pub should_quit: bool,
     pub graphs: ListState,
     pub client_logs: ListState,
 }
 
 impl TuiUI {
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<B>, app: &Arc<RwLock<TuiContext>>) {
-        let chunks = Layout::default()
-            .constraints([Constraint::Min(0)].as_ref())
-            .split(f.size());
-        self.draw_general_tab(f, app, chunks[0]);
+    pub fn new(title: String, enhanced_graphics: bool) -> Self {
+        Self {
+            title,
+            enhanced_graphics,
+            show_logs: true,
+            clients_idx: 1,
+            ..Default::default()
+        }
     }
 
-    fn draw_general_tab<B>(&mut self, f: &mut Frame<B>, app: &Arc<RwLock<TuiContext>>, area: Rect)
+    pub fn on_key(&mut self, c: char) {
+        match c {
+            'q' => {
+                self.should_quit = true;
+            }
+            'n' => {
+                // never 0
+                self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
+            }
+            't' => {
+                self.show_logs = !self.show_logs;
+            }
+            _ => {}
+        }
+    }
+
+    pub fn on_up(&mut self) {}
+
+    pub fn on_down(&mut self) {}
+
+    pub fn on_right(&mut self) {
+        self.charts_tab_idx = (self.charts_tab_idx + 1) % 3;
+    }
+
+    pub fn on_left(&mut self) {
+        if self.charts_tab_idx > 0 {
+            self.charts_tab_idx -= 1;
+        } else {
+            self.charts_tab_idx = 2;
+        }
+    }
+
+    pub fn draw<B>(&mut self, f: &mut Frame<B>, app: &Arc<RwLock<TuiContext>>)
     where
         B: Backend,
     {
-        let chunks = Layout::default()
-            .constraints(
-                [
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(50),
-                ]
-                .as_ref(),
-            )
-            .split(area);
-        let top_chunks = Layout::default()
+        self.clients = app.read().unwrap().clients_num;
+
+        let body = Layout::default()
+            .constraints(if self.show_logs {
+                [Constraint::Percentage(50), Constraint::Percentage(50)].as_ref()
+            } else {
+                [Constraint::Percentage(100)].as_ref()
+            })
+            .split(f.size());
+
+        let top_layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-            .split(chunks[0]);
-        let enhanced_graphics = app.read().unwrap().enhanced_graphics; // TODO move this value in self
+            .split(body[0]);
 
-        self.draw_text(f, app, top_chunks[0]);
-        
-        let tab_chunks = Layout::default()
+        let left_layout = Layout::default()
             .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
-            .split(top_chunks[1]);
+            .split(top_layout[0]);
+
+        let text = vec![Spans::from(Span::styled(
+            &self.title,
+            Style::default()
+                .fg(Color::LightMagenta)
+                .add_modifier(Modifier::BOLD),
+        ))];
+        let block = Block::default().borders(Borders::ALL);
+        let paragraph = Paragraph::new(text)
+            .block(block)
+            .alignment(Alignment::Center); //.wrap(Wrap { trim: true });
+        f.render_widget(paragraph, left_layout[0]);
+
+        self.draw_text(f, app, left_layout[1]);
+
+        let right_layout = Layout::default()
+            .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
+            .split(top_layout[1]);
         let titles = vec![
-            Spans::from(Span::styled("speed", Style::default().fg(Color::Green))),
-            Spans::from(Span::styled("corpus", Style::default().fg(Color::Green))),
-            Spans::from(Span::styled("objectives", Style::default().fg(Color::Green))),
+            Spans::from(Span::styled(
+                "speed",
+                Style::default().fg(Color::LightGreen),
+            )),
+            Spans::from(Span::styled(
+                "corpus",
+                Style::default().fg(Color::LightGreen),
+            )),
+            Spans::from(Span::styled(
+                "objectives",
+                Style::default().fg(Color::LightGreen),
+            )),
         ];
-        let idx = app.read().unwrap().charts_tab_idx;
         let tabs = Tabs::new(titles)
-            .block(Block::default().borders(Borders::ALL).title("charts"))
-            .highlight_style(Style::default().fg(Color::Yellow))
-            .select(idx);
-        f.render_widget(tabs, tab_chunks[0]);
-        match idx {
+            .block(
+                Block::default()
+                    .title(Span::styled(
+                        "charts (l/r arrows to switch)",
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))
+                    .borders(Borders::ALL),
+            )
+            .highlight_style(Style::default().fg(Color::LightYellow))
+            .select(self.charts_tab_idx);
+        f.render_widget(tabs, right_layout[0]);
+
+        match self.charts_tab_idx {
             0 => {
-                  let ctx = app.read().unwrap();
-                  self.draw_time_chart(
-                      "speed chart",
-                      "exec/sec",
-                      f,
-                      tab_chunks[1],
-                      enhanced_graphics,
-                      &ctx.execs_per_sec_timed,
-                      ctx.start_time,
-                  );
-              }
+                let ctx = app.read().unwrap();
+                self.draw_time_chart(
+                    "speed chart",
+                    "exec/sec",
+                    f,
+                    right_layout[1],
+                    &ctx.execs_per_sec_timed,
+                    ctx.start_time,
+                );
+            }
             1 => {
                 let ctx = app.read().unwrap();
                 self.draw_time_chart(
                     "corpus chart",
                     "corpus size",
                     f,
-                    tab_chunks[1],
-                    enhanced_graphics,
+                    right_layout[1],
                     &ctx.corpus_size_timed,
                     ctx.start_time,
                 );
@@ -124,8 +199,7 @@ impl TuiUI {
                     "corpus chart",
                     "objectives",
                     f,
-                    tab_chunks[1],
-                    enhanced_graphics,
+                    right_layout[1],
                     &ctx.objective_size_timed,
                     ctx.start_time,
                 );
@@ -133,7 +207,9 @@ impl TuiUI {
             _ => {}
         }
 
-        self.draw_logs(f, app, chunks[1]);
+        if self.show_logs {
+            self.draw_logs(f, app, body[1]);
+        }
     }
 
     fn draw_time_chart<B>(
@@ -142,7 +218,6 @@ impl TuiUI {
         y_name: &str,
         f: &mut Frame<B>,
         area: Rect,
-        enhanced_graphics: bool,
         stats: &TimedStats,
         start_time: Duration,
     ) where
@@ -191,15 +266,15 @@ impl TuiUI {
         }
 
         let datasets = vec![Dataset::default()
-            .name("data")
-            .marker(if enhanced_graphics {
+            //.name("data")
+            .marker(if self.enhanced_graphics {
                 symbols::Marker::Braille
             } else {
                 symbols::Marker::Dot
             })
             .style(
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(Color::LightYellow)
                     .add_modifier(Modifier::BOLD),
             )
             .data(&data)];
@@ -208,8 +283,9 @@ impl TuiUI {
                 Block::default()
                     .title(Span::styled(
                         title,
-                        Style::default(), //.fg(Color::Cyan)
-                                          //.add_modifier(Modifier::BOLD)
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
                     ))
                     .borders(Borders::ALL),
             )
@@ -253,7 +329,7 @@ impl TuiUI {
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("clients")),
-                Cell::from(Span::raw(format!("{}", app.read().unwrap().clients))),
+                Cell::from(Span::raw(format!("{}", self.clients))),
             ]),
             Row::new(vec![
                 Cell::from(Span::raw("executions")),
@@ -274,77 +350,143 @@ impl TuiUI {
             ]),
         ];
 
-        #[cfg(feature = "introspection")]
         let chunks = Layout::default()
             .constraints(
                 [
-                    Constraint::Length(2 * items.len() as u16),
+                    Constraint::Length(2 + items.len() as u16),
                     Constraint::Min(8),
                 ]
                 .as_ref(),
             )
             .split(area);
-        #[cfg(not(feature = "introspection"))]
-        let chunks = Layout::default()
-            .constraints([Constraint::Percentage(100)].as_ref())
-            .split(area);
 
-        /*let items: Vec<Row> = colors
-        .iter()
-        .map(|c| {
-            let cells = vec![
-                Cell::from(Span::raw(format!("{:?}: ", c))),
-                Cell::from(Span::styled("Foreground", Style::default().fg(*c))),
-                Cell::from(Span::styled("Background", Style::default().bg(*c))),
-            ];
-            Row::new(cells)
-        })
-        .collect();*/
         let table = Table::new(items)
-            .block(Block::default().title("generic").borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .title(Span::styled(
+                        "generic",
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))
+                    .borders(Borders::ALL),
+            )
             .widths(&[Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
         f.render_widget(table, chunks[0]);
 
+        let client_block = Block::default()
+            .title(Span::styled(
+                format!("client #{} (`n` to switch)", self.clients_idx),
+                Style::default()
+                    .fg(Color::LightCyan)
+                    .add_modifier(Modifier::BOLD),
+            ))
+            .borders(Borders::ALL);
+        let client_area = client_block.inner(chunks[1]);
+        f.render_widget(client_block, chunks[1]);
+
+        let mut client_items = vec![];
+        {
+            let ctx = app.read().unwrap();
+            if let Some(client) = ctx.clients.get(&self.clients_idx) {
+                client_items.push(Row::new(vec![
+                    Cell::from(Span::raw("executions")),
+                    Cell::from(Span::raw(format!("{}", client.executions))),
+                ]));
+                client_items.push(Row::new(vec![
+                    Cell::from(Span::raw("exec/sec")),
+                    Cell::from(Span::raw(format!("{}", client.exec_sec))),
+                ]));
+                client_items.push(Row::new(vec![
+                    Cell::from(Span::raw("corpus")),
+                    Cell::from(Span::raw(format!("{}", client.corpus))),
+                ]));
+                client_items.push(Row::new(vec![
+                    Cell::from(Span::raw("objectives")),
+                    Cell::from(Span::raw(format!("{}", client.objectives))),
+                ]));
+                for (key, val) in &client.user_stats {
+                    client_items.push(Row::new(vec![
+                        Cell::from(Span::raw(key.clone())),
+                        Cell::from(Span::raw(format!("{}", val.clone()))),
+                    ]));
+                }
+            };
+        }
+
+        #[cfg(feature = "introspection")]
+        let client_chunks = Layout::default()
+            .constraints(
+                [
+                    Constraint::Length(client_items.len() as u16),
+                    Constraint::Min(4),
+                ]
+                .as_ref(),
+            )
+            .split(client_area);
+        #[cfg(not(feature = "introspection"))]
+        let client_chunks = Layout::default()
+            .constraints([Constraint::Percentage(100)].as_ref())
+            .split(client_area);
+
+        let table = Table::new(client_items)
+            .block(Block::default())
+            .widths(&[Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
+        f.render_widget(table, client_chunks[0]);
+
         #[cfg(feature = "introspection")]
         {
-            let items = vec![
-                Row::new(vec![
-                    Cell::from(Span::raw("run time")),
-                    Cell::from(Span::raw(format_duration_hms(
-                        &(current_time() - app.read().unwrap().start_time),
-                    ))),
-                ]),
-                Row::new(vec![
-                    Cell::from(Span::raw("clients")),
-                    Cell::from(Span::raw(format!("{}", app.read().unwrap().clients))),
-                ]),
-                Row::new(vec![
-                    Cell::from(Span::raw("executions")),
-                    Cell::from(Span::raw(format!("{}", app.read().unwrap().total_execs))),
-                ]),
-                Row::new(vec![
-                    Cell::from(Span::raw("exec/sec")),
-                    Cell::from(Span::raw(format!(
-                        "{}",
-                        app.read()
-                            .unwrap()
-                            .execs_per_sec_timed
-                            .series
-                            .last()
-                            .map(|x| x.item)
-                            .unwrap_or(0)
-                    ))),
-                ]),
-            ];
+            let mut items = vec![];
+            {
+                let ctx = app.read().unwrap();
+                if let Some(client) = ctx.introspection.get(&self.clients_idx) {
+                    items.push(Row::new(vec![
+                        Cell::from(Span::raw("scheduler")),
+                        Cell::from(Span::raw(format!("{:.2}%", client.scheduler * 100.0))),
+                    ]));
+                    items.push(Row::new(vec![
+                        Cell::from(Span::raw("manager")),
+                        Cell::from(Span::raw(format!("{:.2}%", client.manager * 100.0))),
+                    ]));
+                    for i in 0..client.stages.len() {
+                        items.push(Row::new(vec![
+                            Cell::from(Span::raw(format!("stage {}", i))),
+                            Cell::from(Span::raw("")),
+                        ]));
+
+                        for (key, val) in &client.stages[i] {
+                            items.push(Row::new(vec![
+                                Cell::from(Span::raw(key.clone())),
+                                Cell::from(Span::raw(format!("{:.2}%", val * 100.0))),
+                            ]));
+                        }
+                    }
+                    for (key, val) in &client.feedbacks {
+                        items.push(Row::new(vec![
+                            Cell::from(Span::raw(key.clone())),
+                            Cell::from(Span::raw(format!("{:.2}%", val * 100.0))),
+                        ]));
+                    }
+                    items.push(Row::new(vec![
+                        Cell::from(Span::raw("not measured")),
+                        Cell::from(Span::raw(format!("{:.2}%", client.unmeasured * 100.0))),
+                    ]));
+                };
+            }
 
             let table = Table::new(items)
                 .block(
                     Block::default()
-                        .title("introspection")
+                        .title(Span::styled(
+                            "introspection",
+                            Style::default()
+                                .fg(Color::LightCyan)
+                                .add_modifier(Modifier::BOLD),
+                        ))
                         .borders(Borders::ALL),
                 )
                 .widths(&[Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
-            f.render_widget(table, chunks[1]);
+            f.render_widget(table, client_chunks[1]);
         }
     }
 
@@ -352,10 +494,10 @@ impl TuiUI {
     where
         B: Backend,
     {
-        let info_style = Style::default().fg(Color::Blue);
-        let warning_style = Style::default().fg(Color::Yellow);
+        /*let info_style = Style::default().fg(Color::Blue);
+        let warning_style = Style::default().fg(Color::LightYellow);
         let error_style = Style::default().fg(Color::Magenta);
-        let critical_style = Style::default().fg(Color::Red);
+        let critical_style = Style::default().fg(Color::Red);*/
         let app = app.read().unwrap();
         let logs: Vec<ListItem> = app
             .client_logs
@@ -379,8 +521,14 @@ impl TuiUI {
         } else {
             Some(logs.len() - 1)
         };
-        let logs =
-            List::new(logs).block(Block::default().borders(Borders::ALL).title("clients logs"));
+        let logs = List::new(logs).block(
+            Block::default().borders(Borders::ALL).title(Span::styled(
+                "clients logs (`t` to show/hide)",
+                Style::default()
+                    .fg(Color::LightCyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
+        );
         f.render_stateful_widget(logs, area, &mut self.client_logs);
         self.client_logs.select(sel);
     }

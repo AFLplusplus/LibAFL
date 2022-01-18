@@ -5,6 +5,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use hashbrown::HashMap;
 use num_traits::PrimInt;
 use std::{error::Error, io, io::BufRead, marker::Sync, time::Instant};
 use tui::{
@@ -24,11 +25,11 @@ use std::{
 };
 
 #[cfg(feature = "introspection")]
-use alloc::string::ToString;
+use super::{ClientPerfMonitor, PerfFeature};
 
 use crate::{
     bolts::{current_time, format_duration_hms},
-    monitors::{ClientStats, Monitor},
+    monitors::{ClientStats, Monitor, UserStats},
 };
 
 mod ui;
@@ -82,78 +83,142 @@ impl TimedStats {
     }
 }
 
+#[cfg(feature = "introspection")]
+#[derive(Default, Clone)]
+pub struct PerfTuiContext {
+    pub scheduler: f64,
+    pub manager: f64,
+    pub unmeasured: f64,
+    pub stages: Vec<Vec<(String, f64)>>,
+    pub feedbacks: Vec<(String, f64)>,
+}
+
+#[cfg(feature = "introspection")]
+impl PerfTuiContext {
+    pub fn grab_data(&mut self, m: &ClientPerfMonitor) {
+        // Calculate the elapsed time from the monitor
+        let elapsed: f64 = m.elapsed_cycles() as f64;
+
+        // Calculate the percentages for each benchmark
+        self.scheduler = m.scheduler_cycles() as f64 / elapsed;
+        self.manager = m.manager_cycles() as f64 / elapsed;
+
+        // Calculate the remaining percentage that has not been benchmarked
+        let mut other_percent = 1.0;
+        other_percent -= self.scheduler;
+        other_percent -= self.manager;
+
+        self.stages.clear();
+
+        // Calculate each stage
+        // Make sure we only iterate over used stages
+        for (stage_index, features) in m.used_stages() {
+            let mut features_percentages = vec![];
+
+            for (feature_index, feature) in features.iter().enumerate() {
+                // Calculate this current stage's percentage
+                let feature_percent = *feature as f64 / elapsed;
+
+                // Ignore this feature if it isn't used
+                if feature_percent == 0.0 {
+                    continue;
+                }
+
+                // Update the other percent by removing this current percent
+                other_percent -= feature_percent;
+
+                // Get the actual feature from the feature index for printing its name
+                let feature: PerfFeature = feature_index.into();
+                features_percentages.push((format!("{:?}", feature), feature_percent));
+            }
+
+            self.stages.push(features_percentages);
+        }
+
+        self.feedbacks.clear();
+
+        for (feedback_name, feedback_time) in m.feedbacks() {
+            // Calculate this current stage's percentage
+            let feedback_percent = *feedback_time as f64 / elapsed;
+
+            // Ignore this feedback if it isn't used
+            if feedback_percent == 0.0 {
+                continue;
+            }
+
+            // Update the other percent by removing this current percent
+            other_percent -= feedback_percent;
+
+            self.feedbacks
+                .push((feedback_name.clone(), feedback_percent));
+        }
+
+        self.unmeasured = other_percent;
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct ClientTuiContext {
+    pub corpus: u64,
+    pub objectives: u64,
+    pub executions: u64,
+    pub exec_sec: u64,
+
+    pub user_stats: HashMap<String, UserStats>,
+}
+
+impl ClientTuiContext {
+    pub fn grab_data(&mut self, client: &ClientStats, exec_sec: u64) {
+        self.corpus = client.corpus_size;
+        self.objectives = client.objective_size;
+        self.executions = client.executions;
+        self.exec_sec = exec_sec;
+
+        for (key, val) in &client.user_monitor {
+            self.user_stats.insert(key.clone(), val.clone());
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct TuiContext {
-    pub title: String,
-    pub enhanced_graphics: bool,
-    pub charts_tab_idx: usize,
-    pub show_logs: bool,
-    pub should_quit: bool,
-
     pub graphs: Vec<String>,
 
     pub corpus_size_timed: TimedStats,
     pub objective_size_timed: TimedStats,
     pub execs_per_sec_timed: TimedStats,
 
-    pub client_logs: Vec<String>,
+    #[cfg(feature = "introspection")]
+    pub introspection: HashMap<usize, PerfTuiContext>,
 
-    pub clients: usize, // TODO remove when implementing tabs
+    pub clients: HashMap<usize, ClientTuiContext>,
+
+    pub client_logs: Vec<String>, // TODO set max size
+
+    pub clients_num: usize,
     pub total_execs: u64,
     pub start_time: Duration,
 }
 
 impl TuiContext {
-    pub fn new(title: String, enhanced_graphics: bool, start_time: Duration) -> Self {
+    pub fn new(start_time: Duration) -> Self {
         Self {
-            title,
-            enhanced_graphics,
-            charts_tab_idx: 0,
-            show_logs: true,
-            should_quit: false,
-
             graphs: vec!["corpus".into(), "objectives".into(), "exec/sec".into()],
             corpus_size_timed: TimedStats::new(),
             objective_size_timed: TimedStats::new(),
             execs_per_sec_timed: TimedStats::new(),
+
+            #[cfg(feature = "introspection")]
+            introspection: HashMap::default(),
+            clients: HashMap::default(),
+
             client_logs: vec![],
 
-            clients: 0,
+            clients_num: 0,
             total_execs: 0,
             start_time,
         }
     }
-
-    pub fn on_key(&mut self, c: char) {
-        match c {
-            'q' => {
-                self.should_quit = true;
-            }
-            't' => {
-                //self.show_chart = !self.show_chart;
-            }
-            _ => {}
-        }
-    }
-    
-    pub fn on_up(&mut self) {
-    }
-
-    pub fn on_down(&mut self) {
-    }
-
-    pub fn on_right(&mut self) {
-        self.charts_tab_idx = (self.charts_tab_idx + 1) % 3;
-    }
-
-    pub fn on_left(&mut self) {
-        if self.charts_tab_idx > 0 {
-            self.charts_tab_idx -= 1;
-        } else {
-            self.charts_tab_idx = 2;
-        }
-    }
-
 }
 
 /// Tracking monitor during fuzzing and display with tui-rs.
@@ -195,7 +260,7 @@ impl Monitor for TuiMonitor {
                 .add(run_time, self.objective_size());
             ctx.execs_per_sec_timed.add(run_time, execsec);
             ctx.total_execs = totalexec;
-            ctx.clients = self.client_stats.len();
+            ctx.clients_num = self.client_stats.len();
         }
 
         let client = self.client_stats_mut_for(sender_id);
@@ -216,18 +281,29 @@ impl Monitor for TuiMonitor {
             fmt += &format!(", {}: {}", key, val);
         }
 
-        /*
-        // Only print perf monitor if the feature is enabled
+        {
+            let client = &self.client_stats()[sender_id as usize];
+            let mut ctx = self.context.write().unwrap();
+            ctx.clients
+                .entry(sender_id as usize)
+                .or_default()
+                .grab_data(client, exec_sec);
+            ctx.client_logs.push(fmt);
+        }
+
         #[cfg(feature = "introspection")]
         {
-            fmt += "\n";
             // Print the client performance monitor. Skip the Client 0 which is the broker
             for (i, client) in self.client_stats.iter().skip(1).enumerate() {
-                fmt += &format!("Client {:03}:\n{}", i + 1, client.introspection_monitor);
+                self.context
+                    .write()
+                    .unwrap()
+                    .introspection
+                    .entry(i)
+                    .or_default()
+                    .grab_data(&client.introspection_monitor);
             }
-        }*/
-
-        self.context.write().unwrap().client_logs.push(fmt);
+        }
     }
 }
 
@@ -239,12 +315,13 @@ impl TuiMonitor {
 
     /// Creates the monitor with a given `start_time`.
     pub fn with_time(title: String, enhanced_graphics: bool, start_time: Duration) -> Self {
-        let context = Arc::new(RwLock::new(TuiContext::new(
+        let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
+        run_tui_thread(
+            context.clone(),
+            Duration::from_millis(250),
             title,
             enhanced_graphics,
-            start_time,
-        )));
-        run_tui_thread(context.clone(), Duration::from_millis(250));
+        );
         Self {
             context,
             start_time,
@@ -253,7 +330,12 @@ impl TuiMonitor {
     }
 }
 
-fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration) {
+fn run_tui_thread(
+    context: Arc<RwLock<TuiContext>>,
+    tick_rate: Duration,
+    title: String,
+    enhanced_graphics: bool,
+) {
     thread::spawn(move || -> io::Result<()> {
         // setup terminal
         let mut stdout = io::stdout();
@@ -262,7 +344,7 @@ fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration) {
 
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-        let mut ui = TuiUI::default();
+        let mut ui = TuiUI::new(title, enhanced_graphics);
 
         let mut last_tick = Instant::now();
         loop {
@@ -274,11 +356,11 @@ fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration) {
             if crossterm::event::poll(timeout)? {
                 if let Event::Key(key) = event::read()? {
                     match key.code {
-                        KeyCode::Char(c) => context.write().unwrap().on_key(c),
-                        KeyCode::Left => context.write().unwrap().on_left(),
-                        //KeyCode::Up => context.write().unwrap().on_up(),
-                        KeyCode::Right => context.write().unwrap().on_right(),
-                        //KeyCode::Down => context.write().unwrap().on_down(),
+                        KeyCode::Char(c) => ui.on_key(c),
+                        KeyCode::Left => ui.on_left(),
+                        //KeyCode::Up => ui.on_up(),
+                        KeyCode::Right => ui.on_right(),
+                        //KeyCode::Down => ui.on_down(),
                         _ => {}
                     }
                 }
@@ -287,7 +369,7 @@ fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration) {
                 //context.on_tick();
                 last_tick = Instant::now();
             }
-            if context.read().unwrap().should_quit {
+            if ui.should_quit {
                 // restore terminal
                 disable_raw_mode()?;
                 execute!(
@@ -297,7 +379,7 @@ fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration) {
                 )?;
                 terminal.show_cursor()?;
 
-                println!("\nType Control-C to stop the fuzzers, otherwise press Enter to resume the visualization\n");
+                println!("\nPress Control-C to stop the fuzzers, otherwise press Enter to resume the visualization\n");
 
                 let mut line = String::new();
                 io::stdin().lock().read_line(&mut line)?;
@@ -307,7 +389,7 @@ fn run_tui_thread(context: Arc<RwLock<TuiContext>>, tick_rate: Duration) {
                 enable_raw_mode()?;
                 execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
-                context.write().unwrap().should_quit = false;
+                ui.should_quit = false;
             }
         }
 
