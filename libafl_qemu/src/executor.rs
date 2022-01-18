@@ -442,19 +442,19 @@ pub struct QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     QT: QemuHelperTuple<I, S>,
 {
     helpers: QT,
     emulator: &'a Emulator,
-    inner: InProcessExecutor<'a, H, I, OT, S>,
+    inner: InProcessExecutor<'a, H, OT, S>,
 }
 
 impl<'a, H, I, OT, QT, S> Debug for QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     QT: QemuHelperTuple<I, S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -470,7 +470,7 @@ impl<'a, H, I, OT, QT, S> QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     QT: QemuHelperTuple<I, S>,
 {
     pub fn new<EM, OF, Z>(
@@ -485,7 +485,7 @@ where
     where
         EM: EventFirer<I> + EventRestarter<S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let slf = Self {
@@ -497,11 +497,11 @@ where
         Ok(slf)
     }
 
-    pub fn inner(&self) -> &InProcessExecutor<'a, H, I, OT, S> {
+    pub fn inner(&self) -> &InProcessExecutor<'a, H, OT, S> {
         &self.inner
     }
 
-    pub fn inner_mut(&mut self) -> &mut InProcessExecutor<'a, H, I, OT, S> {
+    pub fn inner_mut(&mut self) -> &mut InProcessExecutor<'a, H, OT, S> {
         &mut self.inner
     }
 
@@ -789,7 +789,7 @@ impl<'a, EM, H, I, OT, QT, S, Z> Executor<EM, I, S, Z> for QemuExecutor<'a, H, I
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     QT: QemuHelperTuple<I, S>,
 {
     fn run_target(
@@ -808,11 +808,11 @@ where
     }
 }
 
-impl<'a, H, I, OT, QT, S> HasObservers<I, OT, S> for QemuExecutor<'a, H, I, OT, QT, S>
+impl<'a, H, I, OT, QT, S> HasObservers<OT, S> for QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     QT: QemuHelperTuple<I, S>,
 {
     #[inline]

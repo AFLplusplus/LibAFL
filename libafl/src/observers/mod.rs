@@ -17,12 +17,16 @@ use crate::{
         current_time,
         tuples::{MatchName, Named},
     },
+    state::{HasCorpus, HasInputType},
     Error,
 };
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer<I, S>: Named + Debug {
+pub trait Observer<S>: Named + Debug
+where
+    S: HasInputType,
+{
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
     #[inline]
@@ -32,47 +36,86 @@ pub trait Observer<I, S>: Named + Debug {
 
     /// Called right before execution starts.
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Called right after execution finish.
     #[inline]
-    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple<I, S>: MatchName + Debug {
+pub trait ObserversTuple<S>: MatchName + Debug
+where
+    S: HasCorpus,
+{
     /// This is called right before the next execution.
-    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+    fn pre_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error>;
 
     /// This is called right after the last execution
-    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error>;
 }
 
-impl<I, S> ObserversTuple<I, S> for () {
-    fn pre_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
-
-    fn post_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-impl<Head, Tail, I, S> ObserversTuple<I, S> for (Head, Tail)
+impl<S> ObserversTuple<S> for ()
 where
-    Head: Observer<I, S>,
-    Tail: ObserversTuple<I, S>,
+    S: HasCorpus,
 {
-    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec_all(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_exec_all(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
+where
+    S: HasInputType,
+    Head: Observer<S>,
+    Tail: ObserversTuple<S>,
+{
+    fn pre_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error> {
         self.0.pre_exec(state, input)?;
         self.1.pre_exec_all(state, input)
     }
 
-    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error> {
         self.0.post_exec(state, input)?;
         self.1.post_exec_all(state, input)
     }
@@ -104,14 +147,25 @@ impl TimeObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for TimeObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl<S> Observer<S> for TimeObserver
+where
+    S: HasInputType,
+{
+    fn pre_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as HasInputType>::Input,
+    ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
         Ok(())
     }

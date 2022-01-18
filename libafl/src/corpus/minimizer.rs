@@ -83,25 +83,29 @@ where
 #[derive(Debug, Clone)]
 pub struct MinimizerCorpusScheduler<CS, F, I, M, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata,
+    S: HasCorpus + HasMetadata,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     base: CS,
     skip_non_favored_prob: u64,
     phantom: PhantomData<(F, I, M, S)>,
 }
 
-impl<CS, F, I, M, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<CS, F, I, M, S>
+impl<CS, F, I, M, S> CorpusScheduler for MinimizerCorpusScheduler<CS, F, I, M, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
+    type State = S;
+
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         self.update_score(state, idx)?;
@@ -144,11 +148,12 @@ where
 
 impl<CS, F, I, M, S> MinimizerCorpusScheduler<CS, F, I, M, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     /// Update the `Corpus` score using the `MinimizerCorpusScheduler`
     #[allow(clippy::unused_self)]

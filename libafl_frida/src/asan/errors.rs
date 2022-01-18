@@ -550,7 +550,7 @@ pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl<I, S> Observer<I, S> for AsanErrorsObserver {
+impl<I, S> Observer<S> for AsanErrorsObserver {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
@@ -625,7 +625,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
     {
         let observer = observers
             .match_name::<AsanErrorsObserver>("AsanErrors")

@@ -17,6 +17,7 @@ use crate::{
         HasLen,
     },
     observers::Observer,
+    state::HasCorpus,
     Error,
 };
 
@@ -114,7 +115,7 @@ where
     name: String,
 }
 
-impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
+impl<'a, S, T> Observer<S> for StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver<T>,
@@ -248,10 +249,11 @@ where
     name: String,
 }
 
-impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
+impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver<T>,
+    S: HasCorpus,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -370,8 +372,9 @@ where
     name: String,
 }
 
-impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
+impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
 where
+    S: HasCorpus,
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver<T>,
 {
@@ -496,9 +499,10 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
 ];
 
-impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
+impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8> + Observer<I, S>,
+    S: HasCorpus,
+    M: MapObserver<u8> + Observer<S>,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -595,8 +599,9 @@ where
     name: String,
 }
 
-impl<'a, I, S, T> Observer<I, S> for MultiMapObserver<'a, T>
+impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T>
 where
+    S: HasCorpus,
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver<T>,
 {

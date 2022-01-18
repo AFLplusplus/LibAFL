@@ -51,10 +51,11 @@ where
     meta_format: Option<OnDiskMetadataFormat>,
 }
 
-impl<I> Corpus<I> for OnDiskCorpus<I>
+impl<I> Corpus for OnDiskCorpus<I>
 where
     I: Input,
 {
+    type Input = I;
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {

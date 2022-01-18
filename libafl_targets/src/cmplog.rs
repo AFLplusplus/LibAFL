@@ -196,7 +196,7 @@ where
     }
 }
 
-impl<'a, I, S> Observer<I, S> for CmpLogObserver<'a>
+impl<'a, I, S> Observer<S> for CmpLogObserver<'a>
 where
     S: HasMetadata,
     Self: CmpObserver<CmpLogMap, I, S>,

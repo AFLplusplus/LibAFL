@@ -327,7 +327,7 @@ where
     #[allow(clippy::similar_names)]
     pub fn launch<S>(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
-        S: DeserializeOwned + Serialize + HasCorpus<I> + HasSolutions<I>,
+        S: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
     {
         // We start ourself as child process to actually fuzz
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {

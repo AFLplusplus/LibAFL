@@ -34,11 +34,11 @@ const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 #[derive(Clone, Debug)]
 pub struct PushStageSharedState<CS, EM, I, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// The [`crate::state::State`]
@@ -54,11 +54,11 @@ where
 
 impl<CS, EM, I, OT, S, Z> PushStageSharedState<CS, EM, I, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
@@ -78,11 +78,11 @@ where
 #[derive(Clone, Debug)]
 pub struct PushStageHelper<CS, EM, I, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// If this stage has already been initalized.
@@ -109,11 +109,11 @@ where
 
 impl<CS, EM, I, OT, S, Z> PushStageHelper<CS, EM, I, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageHelper`]
@@ -182,11 +182,11 @@ where
 /// After it has finished once, we will call it agan for the next fuzzer round.
 pub trait PushStage<CS, EM, I, OT, S, Z>: Iterator
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Gets the [`PushStageHelper`]

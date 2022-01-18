@@ -504,7 +504,7 @@ where
 pub struct ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
     target: String,
@@ -519,7 +519,7 @@ where
 impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -537,7 +537,7 @@ where
 impl<I, OT, S> ForkserverExecutor<I, OT, S, StdShMemProvider>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This Forserver won't attempt to provide inputs over shared mem but write them to an iput file
@@ -555,7 +555,7 @@ where
 impl<I, OT, S, SP> ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
     /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers.
@@ -680,7 +680,7 @@ where
 impl<EM, I, OT, S, SP, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
     #[inline]
@@ -752,10 +752,10 @@ where
     }
 }
 
-impl<I, OT, S, SP> HasObservers<I, OT, S> for ForkserverExecutor<I, OT, S, SP>
+impl<I, OT, S, SP> HasObservers<OT, S> for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
     #[inline]
@@ -772,7 +772,7 @@ where
 impl<I, OT, S, SP> HasForkserver for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
     type SP = SP;
@@ -808,10 +808,10 @@ where
     }
 }
 
-impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutForkserverExecutor<E>
+impl<E, OT, S> HasObservers<OT, S> for TimeoutForkserverExecutor<E>
 where
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    E: HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
 {
     #[inline]
     fn observers(&self) -> &OT {

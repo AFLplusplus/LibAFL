@@ -26,9 +26,9 @@ where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
-    base: InProcessExecutor<'a, H, I, OT, S>,
+    base: InProcessExecutor<'a, H, OT, S>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -42,7 +42,7 @@ where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")
@@ -59,7 +59,7 @@ where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
     /// Instruct the target about the input and run
     #[inline]
@@ -96,13 +96,13 @@ where
     }
 }
 
-impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<I, OT, S>
+impl<'a, 'b, 'c, FH, H, I, OT, S> HasObservers<OT, S>
     for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
 where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -120,10 +120,10 @@ where
     FH: FridaHelper<'b>,
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
     /// Creates a new [`FridaInProcessExecutor`]
-    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, I, OT, S>, helper: &'c mut FH) -> Self {
+    pub fn new(gum: &'a Gum, base: InProcessExecutor<'a, H, OT, S>, helper: &'c mut FH) -> Self {
         let mut stalker = Stalker::new(gum);
         // Include the current module (the fuzzer) in stalked ranges. We clone the ranges so that
         // we don't add it to the INSTRUMENTED ranges.
@@ -163,7 +163,7 @@ impl<'a, 'b, 'c, FH, H, I, OT, S> HasInProcessHandlers
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     FH: FridaHelper<'b>,
 {
     /// the timeout handler

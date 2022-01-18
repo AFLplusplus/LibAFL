@@ -28,8 +28,9 @@ pub trait MutationalStage<E, EM, I, M, S, Z>: Stage<E, EM, S, Z>
 where
     M: Mutator<I, S>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasCorpus,
     Z: Evaluator<E, EM, I, S>,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -87,7 +88,7 @@ pub struct StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     mutator: M,
@@ -99,8 +100,9 @@ impl<E, EM, I, M, S, Z> MutationalStage<E, EM, I, M, S, Z> for StdMutationalStag
 where
     M: Mutator<I, S>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: Evaluator<E, EM, I, S>,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -124,7 +126,7 @@ impl<E, EM, I, M, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<E, EM, I, M, S
 where
     M: Mutator<I, S>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -150,7 +152,7 @@ impl<E, EM, I, M, S, Z> StdMutationalStage<E, EM, I, M, S, Z>
 where
     M: Mutator<I, S>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new default mutational stage

@@ -165,12 +165,12 @@ where
 #[derive(Debug)]
 pub struct PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     push_stage: PS,
@@ -179,12 +179,12 @@ where
 
 impl<CS, EM, I, OT, PS, S, Z> PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageAdapter`], warpping the given [`PushStage`]
@@ -200,13 +200,13 @@ where
 
 impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    CS: CorpusScheduler<State = S>,
+    E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
     Z: ExecutesInput<I, OT, S, Z>
         + ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>

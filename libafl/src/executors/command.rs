@@ -47,7 +47,7 @@ impl<EM, I, OT: Debug, S, T: Debug, Z> Executor<EM, I, S, Z> for CommandExecutor
 where
     I: Input,
     T: CommandConfigurator<EM, I, S, Z>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
     fn run_target(
         &mut self,
@@ -83,11 +83,10 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, OT: Debug, S, T: Debug, Z> HasObservers<I, OT, S>
-    for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, I, OT: Debug, S, T: Debug, Z> HasObservers<OT, S> for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     T: CommandConfigurator<EM, I, S, Z>,
 {
     #[inline]
@@ -148,7 +147,7 @@ pub trait CommandConfigurator<EM, I: Input, S, Z>: Sized + Debug {
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<OT: Debug>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
     {
         CommandExecutor {
             inner: self,

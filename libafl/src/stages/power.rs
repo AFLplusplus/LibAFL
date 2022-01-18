@@ -37,12 +37,12 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 pub struct PowerMutationalStage<E, EM, I, M, O, OT, S, T, Z>
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     map_observer_name: String,
@@ -57,13 +57,14 @@ impl<E, EM, I, M, O, OT, S, T, Z> MutationalStage<E, EM, I, M, S, Z>
     for PowerMutationalStage<E, EM, I, M, O, OT, S, T, Z>
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -157,13 +158,14 @@ impl<E, EM, I, M, O, OT, S, T, Z> Stage<E, EM, S, Z>
     for PowerMutationalStage<E, EM, I, M, O, OT, S, T, Z>
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -183,12 +185,12 @@ where
 impl<E, EM, I, M, O, OT, S, T, Z> PowerMutationalStage<E, EM, I, M, O, OT, S, T, Z>
 where
     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]

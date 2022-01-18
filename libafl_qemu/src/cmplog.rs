@@ -67,7 +67,7 @@ where
     fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
     where
         H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
         QT: QemuHelperTuple<I, S>,
     {
         executor.hook_cmp_generation(gen_unique_cmp_ids::<I, QT, S>);

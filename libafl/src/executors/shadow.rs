@@ -33,7 +33,7 @@ impl<E: Debug, I: Debug, S, SOT: Debug> Debug for ShadowExecutor<E, I, S, SOT> {
 
 impl<E: Debug, I: Debug, S, SOT: Debug> ShadowExecutor<E, I, S, SOT>
 where
-    SOT: ObserversTuple<I, S>,
+    SOT: ObserversTuple<S>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {
@@ -61,7 +61,7 @@ impl<E, EM, I, S, SOT, Z> Executor<EM, I, S, Z> for ShadowExecutor<E, I, S, SOT>
 where
     E: Executor<EM, I, S, Z>,
     I: Input,
-    SOT: ObserversTuple<I, S>,
+    SOT: ObserversTuple<S>,
 {
     fn run_target(
         &mut self,
@@ -74,13 +74,13 @@ where
     }
 }
 
-impl<E, I, OT, S, SOT> HasObservers<I, OT, S> for ShadowExecutor<E, I, S, SOT>
+impl<E, I, OT, S, SOT> HasObservers<OT, S> for ShadowExecutor<E, I, S, SOT>
 where
     I: Debug,
     S: Debug,
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    SOT: ObserversTuple<I, S>,
+    E: HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    SOT: ObserversTuple<S>,
 {
     #[inline]
     fn observers(&self) -> &OT {

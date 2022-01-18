@@ -14,6 +14,7 @@
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::bolts::os::{dup2, fork, ForkResult};
+use crate::state::HasCorpus;
 #[cfg(feature = "std")]
 use crate::{
     bolts::{os::Cores, shmem::ShMemProvider},
@@ -52,8 +53,8 @@ where
     I: Input + 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    OT: ObserversTuple<I, S> + 'a,
-    S: DeserializeOwned + 'a,
+    OT: ObserversTuple<S> + 'a,
+    S: DeserializeOwned + HasCorpus + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -90,7 +91,7 @@ impl<'a, CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
-    OT: ObserversTuple<I, S> + DeserializeOwned,
+    OT: ObserversTuple<S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned,
@@ -112,7 +113,7 @@ impl<'a, CF, I, MT, OT, S, SP> Launcher<'a, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
-    OT: ObserversTuple<I, S> + DeserializeOwned,
+    OT: ObserversTuple<S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned,

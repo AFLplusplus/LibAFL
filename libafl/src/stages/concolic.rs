@@ -20,9 +20,9 @@ use super::{Stage, TracingStage};
 pub struct ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     inner: TracingStage<EM, I, OT, S, TE, Z>,
     observer_name: String,
@@ -31,9 +31,9 @@ where
 impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
     fn perform(
@@ -68,9 +68,9 @@ where
 impl<EM, I, OT, S, TE, Z> ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
     pub fn new(inner: TracingStage<EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
@@ -342,7 +342,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 pub struct SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     _phantom: PhantomData<(EM, I, S, Z)>,
 }
@@ -351,7 +351,7 @@ where
 impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input + HasBytesVec,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -394,7 +394,7 @@ where
 impl<EM, I, S, Z> Default for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     fn default() -> Self {
         Self {

@@ -27,7 +27,7 @@ const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 /// Holds a scheduler
 pub trait HasCorpusScheduler<CS, I, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     I: Input,
 {
     /// The scheduler
@@ -68,7 +68,8 @@ where
 /// Evaluate if an input is interesting using the feedback
 pub trait ExecutionProcessor<I, OT, S>
 where
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
+    S: HasCorpus,
     I: Input,
 {
     /// Evaluate if a set of observation channels has an interesting state
@@ -89,7 +90,8 @@ where
 pub trait EvaluatorObservers<I, OT, S>: Sized
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
+    S: HasCorpus,
 {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new testcase in the corpus
@@ -102,7 +104,7 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
+        E: Executor<EM, I, S, Self> + HasObservers<OT, S>,
         EM: EventManager<E, I, S, Self>;
 }
 
@@ -235,7 +237,7 @@ pub enum ExecuteInputResult {
 #[derive(Debug)]
 pub struct StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -249,7 +251,7 @@ where
 
 impl<CS, F, I, OF, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -266,7 +268,7 @@ where
 
 impl<CS, F, I, OF, OT, S> HasFeedback<F, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -283,7 +285,7 @@ where
 
 impl<CS, F, I, OF, OT, S> HasObjective<I, OF, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -300,12 +302,13 @@ where
 
 impl<CS, F, I, OF, OT, S> ExecutionProcessor<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    OT: ObserversTuple<S> + serde::Serialize + serde::de::DeserializeOwned,
+    S: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -414,12 +417,13 @@ where
 
 impl<CS, F, I, OF, OT, S> EvaluatorObservers<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
-    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
+    CS: CorpusScheduler<State = S>,
+    OT: ObserversTuple<S> + serde::Serialize + serde::de::DeserializeOwned,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -432,7 +436,7 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
+        E: Executor<EM, I, S, Self> + HasObservers<OT, S>,
         EM: EventManager<E, I, S, Self>,
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
@@ -443,14 +447,15 @@ where
 
 impl<CS, E, EM, F, I, OF, OT, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
-    E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
+    CS: CorpusScheduler<State = S>,
+    E: Executor<EM, I, S, Self> + HasObservers<OT, S>,
+    OT: ObserversTuple<S> + serde::Serialize + serde::de::DeserializeOwned,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -509,7 +514,7 @@ where
 
 impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
@@ -559,7 +564,7 @@ where
 
 impl<CS, F, I, OF, OT, S> StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -584,8 +589,9 @@ where
         input: &I,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>,
+        E: Executor<EM, I, S, Self> + HasObservers<OT, S>,
+        S: HasCorpus,
+        OT: ObserversTuple<S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -609,7 +615,8 @@ where
 pub trait ExecutesInput<I, OT, S, Z>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
+    S: HasCorpus,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input<E, EM>(
@@ -620,18 +627,18 @@ where
         input: &I,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>;
+        E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+        OT: ObserversTuple<S>;
 }
 
 impl<CS, F, I, OF, OT, S> ExecutesInput<I, OT, S, Self> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     F: Feedback<I, S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     OF: Feedback<I, S>,
-    S: HasExecutions + HasClientPerfMonitor,
+    S: HasExecutions + HasClientPerfMonitor + HasCorpus,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input<E, EM>(
@@ -642,8 +649,8 @@ where
         input: &I,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>,
+        E: Executor<EM, I, S, Self> + HasObservers<OT, S>,
+        OT: ObserversTuple<S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;

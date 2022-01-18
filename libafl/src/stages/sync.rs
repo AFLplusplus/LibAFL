@@ -40,7 +40,7 @@ pub struct SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     sync_dir: PathBuf,
@@ -53,7 +53,7 @@ impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, 
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -97,7 +97,7 @@ impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`]
@@ -159,7 +159,7 @@ impl<E, EM, I, S, Z>
     SyncFromDiskStage<fn(&mut Z, &mut S, &Path) -> Result<I, Error>, E, EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs

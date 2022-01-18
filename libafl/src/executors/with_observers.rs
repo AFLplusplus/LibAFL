@@ -33,10 +33,9 @@ where
     }
 }
 
-impl<I, E: Debug, OT: Debug, S> HasObservers<I, OT, S> for WithObservers<E, OT>
+impl<E: Debug, OT: Debug, S> HasObservers<OT, S> for WithObservers<E, OT>
 where
-    I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
     fn observers(&self) -> &OT {
         &self.observers

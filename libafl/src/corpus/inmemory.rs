@@ -17,7 +17,7 @@ where
     current: Option<usize>,
 }
 
-impl<I> Corpus<I> for InMemoryCorpus<I>
+impl<I> Corpus for InMemoryCorpus<I>
 where
     I: Input,
 {

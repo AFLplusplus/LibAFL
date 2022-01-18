@@ -29,8 +29,8 @@ where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     I: Input,
     O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata,
+    OT: ObserversTuple<S>,
+    S: HasCorpus + HasMetadata,
 {
     map_observer_name: String,
     stage_max: usize,
@@ -43,13 +43,14 @@ const CAL_STAGE_MAX: usize = 16;
 impl<E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
     EM: EventFirer<I>,
     I: Input,
     O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
+    OT: ObserversTuple<S>,
+    S: HasCorpus + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     #[inline]
     #[allow(clippy::let_and_return, clippy::too_many_lines)]
@@ -311,8 +312,8 @@ where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     I: Input,
     O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata,
+    OT: ObserversTuple<S>,
+    S: HasCorpus + HasMetadata,
 {
     /// Create a new [`CalibrationStage`].
     pub fn new(state: &mut S, map_observer_name: &O) -> Self {

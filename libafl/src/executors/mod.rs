@@ -34,6 +34,7 @@ pub use command::CommandExecutor;
 use crate::{
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
+    state::HasCorpus,
     Error,
 };
 
@@ -58,9 +59,10 @@ pub enum ExitKind {
 crate::impl_serdeany!(ExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers<I, OT, S>: Debug
+pub trait HasObservers<OT, S>: Debug
 where
-    OT: ObserversTuple<I, S>,
+    S: HasCorpus,
+    OT: ObserversTuple<S>,
 {
     /// Get the linked observers
     fn observers(&self) -> &OT;
@@ -90,7 +92,7 @@ where
     fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
     where
         Self: Sized,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
     {
         WithObservers::new(self, observers)
     }

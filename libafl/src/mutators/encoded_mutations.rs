@@ -309,7 +309,8 @@ pub struct EncodedCrossoverInsertMutator;
 
 impl<S> Mutator<EncodedInput, S> for EncodedCrossoverInsertMutator
 where
-    S: HasRand + HasCorpus<EncodedInput> + HasMaxSize,
+    S: HasRand + HasCorpus + HasMaxSize,
+    <S as HasCorpus>::Corpus: Corpus<Input = EncodedInput>,
 {
     fn mutate(
         &mut self,
@@ -383,7 +384,8 @@ pub struct EncodedCrossoverReplaceMutator;
 
 impl<S> Mutator<EncodedInput, S> for EncodedCrossoverReplaceMutator
 where
-    S: HasRand + HasCorpus<EncodedInput>,
+    S: HasRand + HasCorpus,
+    <S as HasCorpus>::Corpus: Corpus<Input = EncodedInput>,
 {
     fn mutate(
         &mut self,

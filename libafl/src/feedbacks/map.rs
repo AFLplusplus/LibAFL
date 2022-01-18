@@ -370,7 +370,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -596,7 +596,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();

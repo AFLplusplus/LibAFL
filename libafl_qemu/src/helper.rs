@@ -14,7 +14,7 @@ where
     fn init<'a, H, OT, QT>(&self, _executor: &QemuExecutor<'a, H, I, OT, QT, S>)
     where
         H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
         QT: QemuHelperTuple<I, S>,
     {
     }
@@ -31,7 +31,7 @@ where
     fn init_all<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
     where
         H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
         QT: QemuHelperTuple<I, S>;
 
     fn pre_exec_all(&mut self, _emulator: &Emulator, input: &I);
@@ -46,7 +46,7 @@ where
     fn init_all<'a, H, OT, QT>(&self, _executor: &QemuExecutor<'a, H, I, OT, QT, S>)
     where
         H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
         QT: QemuHelperTuple<I, S>,
     {
     }
@@ -65,7 +65,7 @@ where
     fn init_all<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
     where
         H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
         QT: QemuHelperTuple<I, S>,
     {
         self.0.init(executor);

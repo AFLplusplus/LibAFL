@@ -306,10 +306,10 @@ where
     }
 }
 
-impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutExecutor<E>
+impl<E, OT, S> HasObservers<OT, S> for TimeoutExecutor<E>
 where
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    E: HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
 {
     #[inline]
     fn observers(&self) -> &OT {

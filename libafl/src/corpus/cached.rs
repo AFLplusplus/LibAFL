@@ -27,10 +27,11 @@ where
     cache_max_len: usize,
 }
 
-impl<I> Corpus<I> for CachedOnDiskCorpus<I>
+impl<I> Corpus for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
+    type Input = I;
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {

@@ -54,11 +54,11 @@ where
     }
 }
 
-impl<A, B, I, OT, S> HasObservers<I, OT, S> for CombinedExecutor<A, B>
+impl<A, B, OT, S> HasObservers<OT, S> for CombinedExecutor<A, B>
 where
-    A: HasObservers<I, OT, S>,
+    A: HasObservers<OT, S>,
     B: Debug,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
 {
     #[inline]
     fn observers(&self) -> &OT {

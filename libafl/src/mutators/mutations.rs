@@ -855,7 +855,7 @@ pub struct BytesSwapMutator;
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I> + HasMaxSize,
+    S: HasRand + HasCorpus + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -901,7 +901,8 @@ pub struct CrossoverInsertMutator;
 impl<I, S> Mutator<I, S> for CrossoverInsertMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I> + HasMaxSize,
+    S: HasRand + HasCorpus + HasMaxSize,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     fn mutate(
         &mut self,
@@ -976,7 +977,8 @@ pub struct CrossoverReplaceMutator;
 impl<I, S> Mutator<I, S> for CrossoverReplaceMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     fn mutate(
         &mut self,
@@ -1059,7 +1061,8 @@ pub struct SpliceMutator;
 impl<I, S> Mutator<I, S> for SpliceMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     #[allow(clippy::cast_sign_loss)]
     fn mutate(
@@ -1181,7 +1184,7 @@ mod tests {
     fn test_mutations<I, S>() -> impl MutatorsTuple<I, S>
     where
         I: Input + HasBytesVec,
-        S: HasRand + HasCorpus<I> + HasMetadata + HasMaxSize,
+        S: HasRand + HasCorpus + HasMetadata + HasMaxSize,
     {
         tuple_list!(
             BitFlipMutator::new(),

@@ -1,10 +1,10 @@
 //! The queue corpus scheduler for power schedules.
 
 use alloc::string::{String, ToString};
+use core::marker::PhantomData;
 
 use crate::{
     corpus::{Corpus, CorpusScheduler, PowerScheduleTestcaseMetaData},
-    inputs::Input,
     stages::PowerScheduleMetadata,
     state::{HasCorpus, HasMetadata},
     Error,
@@ -12,19 +12,28 @@ use crate::{
 
 /// A corpus scheduler using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerQueueCorpusScheduler;
+pub struct PowerQueueCorpusScheduler<S>
+where
+    S: HasCorpus + HasMetadata,
+{
+    phantom: PhantomData<S>,
+}
 
-impl Default for PowerQueueCorpusScheduler {
+impl<S> Default for PowerQueueCorpusScheduler<S>
+where
+    S: HasCorpus + HasMetadata,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<I, S> CorpusScheduler<I, S> for PowerQueueCorpusScheduler
+impl<S> CorpusScheduler for PowerQueueCorpusScheduler<S>
 where
-    S: HasCorpus<I> + HasMetadata,
-    I: Input,
+    S: HasCorpus + HasMetadata,
 {
+    type State = S;
+
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         let current_idx = *state.corpus().current();
@@ -78,10 +87,15 @@ where
     }
 }
 
-impl PowerQueueCorpusScheduler {
+impl<S> PowerQueueCorpusScheduler<S>
+where
+    S: HasCorpus + HasMetadata,
+{
     /// Create a new [`PowerQueueCorpusScheduler`]
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self {
+            phantom: PhantomData,
+        }
     }
 }

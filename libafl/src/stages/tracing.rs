@@ -22,9 +22,9 @@ use crate::monitors::PerfFeature;
 pub struct TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     tracer_executor: TE,
     #[allow(clippy::type_complexity)]
@@ -34,9 +34,10 @@ where
 impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     #[inline]
     fn perform(
@@ -83,9 +84,9 @@ where
 impl<EM, I, OT, S, TE, Z> TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    TE: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
@@ -112,10 +113,11 @@ impl<E, EM, I, OT, S, SOT, Z> Stage<ShadowExecutor<E, I, S, SOT>, EM, S, Z>
     for ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
 where
     I: Input,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    SOT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I> + Debug,
+    E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    SOT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus + Debug,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     #[inline]
     fn perform(
@@ -162,10 +164,10 @@ where
 impl<E, EM, I, OT, S, SOT, Z> ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
 where
     I: Input,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    SOT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    E: Executor<EM, I, S, Z> + HasObservers<OT, S>,
+    OT: ObserversTuple<S>,
+    SOT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {

@@ -37,12 +37,12 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 #[derive(Clone, Debug)]
 pub struct StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     current_corpus_idx: Option<usize>,
@@ -58,12 +58,12 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Gets the number of iterations as a random number
@@ -81,13 +81,14 @@ where
 impl<CS, EM, I, M, OT, S, Z> PushStage<CS, EM, I, OT, S, Z>
     for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    <S as HasCorpus>::Corpus: Corpus<Input = I>,
 {
     /// Creates a new default mutational stage
     fn init(
@@ -192,12 +193,12 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> Iterator for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     type Item = Result<I, Error>;
@@ -209,12 +210,12 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: CorpusScheduler<State = S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage

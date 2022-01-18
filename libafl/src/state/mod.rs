@@ -29,12 +29,23 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer
 /// Contains all important information about the current run
 /// Will be used to restart the fuzzing process at any timme.
-pub trait State: Serialize + DeserializeOwned {}
+pub trait State: Serialize + DeserializeOwned {
+    type Input: Input;
+    type Corpus: Corpus<Input = Self::Input>;
+    type Rand: Rand;
+    type FeedbackStatesTuple: FeedbackStatesTuple;
+    type Solutions: Corpus<Input = Self::Input>;
+}
+
+pub trait HasInputType {
+    /// An associated input type
+    type Input: Input;
+}
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus<I: Input> {
+pub trait HasCorpus {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus<I>;
+    type Corpus: Corpus;
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
     /// The testcase corpus (mut)
@@ -50,9 +61,9 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions<I: Input> {
+pub trait HasSolutions {
     /// The associated type implementing [`Corpus`] for solutions
-    type Solutions: Corpus<I>;
+    type Solutions: Corpus;
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
     /// The solutions corpus (mut)
@@ -144,11 +155,11 @@ pub trait HasStartTime {
 #[serde(bound = "FT: serde::de::DeserializeOwned")]
 pub struct StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus + Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus + Corpus<Input = I>,
 {
     /// RNG instance
     rand: R,
@@ -176,23 +187,43 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<C, FT, I, R, SC> State for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasInputType for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
+    type Input = I;
+}
+
+impl<C, FT, I, R, SC> State for StdState<C, FT, I, R, SC>
+where
+    C: Corpus<Input = I>,
+    I: Input,
+    R: Rand,
+    FT: FeedbackStatesTuple,
+    SC: Corpus<Input = I>,
+{
+    type Input = I;
+
+    type Corpus = C;
+
+    type Rand = R;
+
+    type FeedbackStatesTuple = FT;
+
+    type Solutions = SC;
 }
 
 impl<C, FT, I, R, SC> HasRand for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     type Rand = R;
 
@@ -209,13 +240,13 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasCorpus<I> for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasCorpus for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     type Corpus = C;
 
@@ -232,13 +263,13 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasSolutions<I> for StdState<C, FT, I, R, SC>
+impl<C, FT, I, R, SC> HasSolutions for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     type Solutions = SC;
 
@@ -257,11 +288,11 @@ where
 
 impl<C, FT, I, R, SC> HasMetadata for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
@@ -278,11 +309,11 @@ where
 
 impl<C, FT, I, R, SC> HasFeedbackStates for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     type FeedbackStates = FT;
 
@@ -301,11 +332,11 @@ where
 
 impl<C, FT, I, R, SC> HasExecutions for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     /// The executions counter
     #[inline]
@@ -322,11 +353,11 @@ where
 
 impl<C, FT, I, R, SC> HasMaxSize for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     fn max_size(&self) -> usize {
         self.max_size
@@ -339,11 +370,11 @@ where
 
 impl<C, FT, I, R, SC> HasStartTime for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     /// The starting time
     #[inline]
@@ -361,11 +392,11 @@ where
 #[cfg(feature = "std")]
 impl<C, FT, I, R, SC> StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     /// loads inputs from a directory
     /// If `forced` is `true`, the value will be loaded,
@@ -482,11 +513,11 @@ where
 
 impl<C, FT, I, R, SC> StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     fn generate_initial_internal<G, E, EM, Z>(
         &mut self,
@@ -582,11 +613,11 @@ where
 #[cfg(feature = "introspection")]
 impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         &self.introspection_monitor
@@ -612,11 +643,11 @@ where
 #[cfg(not(feature = "introspection"))]
 impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
     FT: FeedbackStatesTuple,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         unimplemented!()
