@@ -19,7 +19,7 @@ use crate::{
     bolts::{
         ownedref::{OwnedRefMut, OwnedSliceMut},
         tuples::Named,
-        HasLen,
+        AsMutSlice, AsSlice, HasLen,
     },
     observers::Observer,
     Error,
@@ -34,15 +34,6 @@ fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
         hasher.write(from_raw_parts(ptr, map_size));
     }
     hasher.finish()
-}
-
-/// Returns the element as a [`core::slice::Slice`]
-pub trait AsSlice<T> {
-    /// Get the slice that's underlying this map
-    fn as_slice(&self) -> &[T];
-
-    /// Get the slice (mutable) backing this map
-    fn as_mut_slice(&mut self) -> &mut [T];
 }
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
@@ -224,11 +215,17 @@ impl<'a, T> AsSlice<T> for StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    #[must_use]
     #[inline]
     fn as_slice(&self) -> &[T] {
         self.map.as_slice()
     }
-
+}
+impl<'a, T> AsMutSlice<T> for StdMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[must_use]
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
         self.map.as_mut_slice()
@@ -413,7 +410,11 @@ where
     fn as_slice(&self) -> &[T] {
         self.map.as_slice()
     }
-
+}
+impl<'a, T, const N: usize> AsMutSlice<T> for ConstMapObserver<'a, T, N>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
         self.map.as_mut_slice()
@@ -579,7 +580,11 @@ where
     fn as_slice(&self) -> &[T] {
         self.map.as_slice()
     }
-
+}
+impl<'a, T> AsMutSlice<T> for VariableMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
         self.map.as_mut_slice()
@@ -735,7 +740,11 @@ where
     fn as_slice(&self) -> &[u8] {
         self.base.as_slice()
     }
-
+}
+impl<M> AsMutSlice<u8> for HitcountsMapObserver<M>
+where
+    M: MapObserver<u8> + AsMutSlice<u8>,
+{
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [u8] {
         self.base.as_mut_slice()

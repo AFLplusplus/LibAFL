@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{
         tuples::{MatchName, Named},
-        AsSlice, HasRefCnt,
+        AsMutSlice, AsSlice, HasRefCnt,
     },
     corpus::Testcase,
     events::{Event, EventFirer},
@@ -214,6 +214,12 @@ impl AsSlice<usize> for MapIndexesMetadata {
         self.list.as_slice()
     }
 }
+impl AsMutSlice<usize> for MapIndexesMetadata {
+    /// Convert to a slice
+    fn as_mut_slice(&mut self) -> &mut [usize] {
+        self.list.as_mut_slice()
+    }
+}
 
 impl HasRefCnt for MapIndexesMetadata {
     fn refcnt(&self) -> isize {
@@ -247,6 +253,13 @@ impl AsSlice<usize> for MapNoveltiesMetadata {
     #[must_use]
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
+    }
+}
+impl AsMutSlice<usize> for MapNoveltiesMetadata {
+    /// Convert to a slice
+    #[must_use]
+    fn as_mut_slice(&mut self) -> &mut [usize] {
+        self.list.as_mut_slice()
     }
 }
 impl MapNoveltiesMetadata {

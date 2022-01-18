@@ -12,7 +12,10 @@ use std::{
 };
 
 use crate::{
-    bolts::shmem::{ShMem, ShMemProvider},
+    bolts::{
+        shmem::{ShMem, ShMemProvider},
+        AsSlice,
+    },
     Error,
 };
 

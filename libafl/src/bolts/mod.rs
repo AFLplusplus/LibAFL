@@ -24,10 +24,16 @@ use core::time;
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Can be converted to a slice
+/// Can be converted to a [`core::slice::Slice`]
 pub trait AsSlice<T> {
     /// Convert to a slice
     fn as_slice(&self) -> &[T];
+}
+
+/// Can be converted to a [`core::slice::MutSlice`]
+pub trait AsMutSlice<T> {
+    /// Convert to a slice
+    fn as_mut_slice(&mut self) -> &mut [T];
 }
 
 /// Has a length field

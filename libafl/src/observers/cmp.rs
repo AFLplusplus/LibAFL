@@ -8,7 +8,7 @@ use core::fmt::Debug;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named, AsSlice},
+    bolts::{ownedref::OwnedRefMut, tuples::Named, AsMutSlice, AsSlice},
     observers::Observer,
     state::HasMetadata,
     Error,
@@ -67,6 +67,13 @@ impl AsSlice<CmpValues> for CmpValuesMetadata {
     #[must_use]
     fn as_slice(&self) -> &[CmpValues] {
         self.list.as_slice()
+    }
+}
+impl AsMutSlice<CmpValues> for CmpValuesMetadata {
+    /// Convert to a slice
+    #[must_use]
+    fn as_mut_slice(&mut self) -> &mut [CmpValues] {
+        self.list.as_mut_slice()
     }
 }
 

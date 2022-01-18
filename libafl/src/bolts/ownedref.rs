@@ -1,6 +1,7 @@
 //! Wrappers that abstracts references (or pointers) and owned data accesses.
 // The serialization is towards owned, allowing to serialize pointers without troubles.
 
+use crate::bolts::{AsMutSlice, AsSlice};
 use alloc::{
     boxed::Box,
     slice::{Iter, IterMut},
@@ -287,10 +288,10 @@ impl<'a, T> From<OwnedSliceMut<'a, T>> for OwnedSlice<'a, T> {
     }
 }
 
-impl<'a, T: Sized> OwnedSlice<'a, T> {
+impl<'a, T: Sized> AsSlice<T> for OwnedSlice<'a, T> {
     /// Get the [`OwnedSlice`] as slice.
     #[must_use]
-    pub fn as_slice(&self) -> &[T] {
+    fn as_slice(&self) -> &[T] {
         match &self.inner {
             OwnedSliceInner::Ref(r) => r,
             OwnedSliceInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts(*rr, *len) },
@@ -413,20 +414,21 @@ impl<'a, T: 'a + Sized> OwnedSliceMut<'a, T> {
     }
 }
 
-impl<'a, T: Sized> OwnedSliceMut<'a, T> {
+impl<'a, T: Sized> AsSlice<T> for OwnedSliceMut<'a, T> {
     /// Get the value as slice
     #[must_use]
-    pub fn as_slice(&self) -> &[T] {
+    fn as_slice(&self) -> &[T] {
         match &self.inner {
             OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts(*rr, *len) },
             OwnedSliceMutInner::Ref(r) => r,
             OwnedSliceMutInner::Owned(v) => v.as_slice(),
         }
     }
-
+}
+impl<'a, T: Sized> AsMutSlice<T> for OwnedSliceMut<'a, T> {
     /// Get the value as mut slice
     #[must_use]
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
+    fn as_mut_slice(&mut self) -> &mut [T] {
         match &mut self.inner {
             OwnedSliceMutInner::RefRaw(rr, len) => unsafe { slice::from_raw_parts_mut(*rr, *len) },
             OwnedSliceMutInner::Ref(r) => r,
@@ -636,143 +638,6 @@ where
                 OwnedPtrMut::Owned(Box::new(p.as_ref().unwrap().clone()))
             },
             OwnedPtrMut::Owned(v) => OwnedPtrMut::Owned(v),
-        }
-    }
-}
-
-/// Wrap a C-style pointer to an array (with size) and convert to a Vec on serialize
-#[derive(Clone, Debug)]
-pub enum OwnedArrayPtr<T: Sized> {
-    /// Ptr to a slice
-    ArrayPtr((*const T, usize)),
-    /// A owned [`Vec`].
-    Owned(Vec<T>),
-}
-
-impl<T: Sized + Serialize> Serialize for OwnedArrayPtr<T> {
-    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.as_slice().serialize(se)
-    }
-}
-
-impl<'de, T: Sized + Serialize> Deserialize<'de> for OwnedArrayPtr<T>
-where
-    Vec<T>: Deserialize<'de>,
-{
-    fn deserialize<D>(de: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Deserialize::deserialize(de).map(OwnedArrayPtr::Owned)
-    }
-}
-
-impl<T: Sized> OwnedArrayPtr<T> {
-    /// Get a slice from this array.
-    #[must_use]
-    pub fn as_slice(&self) -> &[T] {
-        match self {
-            OwnedArrayPtr::ArrayPtr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
-            OwnedArrayPtr::Owned(v) => v.as_slice(),
-        }
-    }
-}
-
-impl<T> IntoOwned for OwnedArrayPtr<T>
-where
-    T: Sized + Clone,
-{
-    #[must_use]
-    fn is_owned(&self) -> bool {
-        match self {
-            OwnedArrayPtr::ArrayPtr(_) => false,
-            OwnedArrayPtr::Owned(_) => true,
-        }
-    }
-
-    #[must_use]
-    fn into_owned(self) -> Self {
-        match self {
-            OwnedArrayPtr::ArrayPtr(p) => unsafe {
-                OwnedArrayPtr::Owned(core::slice::from_raw_parts(p.0, p.1).to_vec())
-            },
-            OwnedArrayPtr::Owned(v) => OwnedArrayPtr::Owned(v),
-        }
-    }
-}
-
-/// Wrap a C-style mutable pointer to an array (with size) and convert to a Vec on serialize
-#[derive(Clone, Debug)]
-pub enum OwnedArrayPtrMut<T: Sized> {
-    /// A ptr to the array (or slice).
-    ArrayPtr((*mut T, usize)),
-    /// An owned [`Vec`].
-    Owned(Vec<T>),
-}
-
-impl<T: Sized + Serialize> Serialize for OwnedArrayPtrMut<T> {
-    fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.as_slice().serialize(se)
-    }
-}
-
-impl<'de, T: Sized + Serialize> Deserialize<'de> for OwnedArrayPtrMut<T>
-where
-    Vec<T>: Deserialize<'de>,
-{
-    fn deserialize<D>(de: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Deserialize::deserialize(de).map(OwnedArrayPtrMut::Owned)
-    }
-}
-
-impl<T: Sized> OwnedArrayPtrMut<T> {
-    /// Return this array as slice
-    #[must_use]
-    pub fn as_slice(&self) -> &[T] {
-        match self {
-            OwnedArrayPtrMut::ArrayPtr(p) => unsafe { core::slice::from_raw_parts(p.0, p.1) },
-            OwnedArrayPtrMut::Owned(v) => v.as_slice(),
-        }
-    }
-
-    /// Return this array as mut slice
-    #[must_use]
-    pub fn as_mut_slice(&mut self) -> &mut [T] {
-        match self {
-            OwnedArrayPtrMut::ArrayPtr(p) => unsafe { core::slice::from_raw_parts_mut(p.0, p.1) },
-            OwnedArrayPtrMut::Owned(v) => v.as_mut_slice(),
-        }
-    }
-}
-
-impl<T> IntoOwned for OwnedArrayPtrMut<T>
-where
-    T: Sized + Clone,
-{
-    #[must_use]
-    fn is_owned(&self) -> bool {
-        match self {
-            OwnedArrayPtrMut::ArrayPtr(_) => false,
-            OwnedArrayPtrMut::Owned(_) => true,
-        }
-    }
-
-    #[must_use]
-    fn into_owned(self) -> Self {
-        match self {
-            OwnedArrayPtrMut::ArrayPtr(p) => unsafe {
-                OwnedArrayPtrMut::Owned(core::slice::from_raw_parts(p.0, p.1).to_vec())
-            },
-            OwnedArrayPtrMut::Owned(v) => OwnedArrayPtrMut::Owned(v),
         }
     }
 }
