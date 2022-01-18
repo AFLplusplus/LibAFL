@@ -6,16 +6,16 @@ use tui::{
     style::{Color, Modifier, Style},
     symbols,
     text::{Span, Spans},
-    widgets::canvas::{Canvas, Line, Map, MapResolution, Rectangle},
     widgets::{
-        Axis, BarChart, Block, Borders, Cell, Chart, Dataset, Gauge, LineGauge, List, ListItem,
-        ListState, Paragraph, Row, Sparkline, Table, Tabs, Wrap,
+        Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, ListState, Paragraph, Row,
+        Table, Tabs,
     },
     Frame,
 };
 
 use std::sync::{Arc, RwLock};
 
+/*
 pub fn next<T>(state: &mut ListState, items: &[T]) {
     let i = match state.selected() {
         Some(i) => {
@@ -43,6 +43,7 @@ pub fn previous<T>(state: &mut ListState, items: &[T]) {
     };
     state.select(Some(i));
 }
+*/
 
 #[derive(Default)]
 pub struct TuiUI {
@@ -54,7 +55,6 @@ pub struct TuiUI {
     charts_tab_idx: usize,
 
     pub should_quit: bool,
-    pub graphs: ListState,
     pub client_logs: ListState,
 }
 
@@ -85,9 +85,9 @@ impl TuiUI {
         }
     }
 
-    pub fn on_up(&mut self) {}
+    //pub fn on_up(&mut self) {}
 
-    pub fn on_down(&mut self) {}
+    //pub fn on_down(&mut self) {}
 
     pub fn on_right(&mut self) {
         self.charts_tab_idx = (self.charts_tab_idx + 1) % 3;
@@ -179,7 +179,6 @@ impl TuiUI {
                     f,
                     right_layout[1],
                     &ctx.execs_per_sec_timed,
-                    ctx.start_time,
                 );
             }
             1 => {
@@ -190,7 +189,6 @@ impl TuiUI {
                     f,
                     right_layout[1],
                     &ctx.corpus_size_timed,
-                    ctx.start_time,
                 );
             }
             2 => {
@@ -201,7 +199,6 @@ impl TuiUI {
                     f,
                     right_layout[1],
                     &ctx.objective_size_timed,
-                    ctx.start_time,
                 );
             }
             _ => {}
@@ -219,7 +216,6 @@ impl TuiUI {
         f: &mut Frame<B>,
         area: Rect,
         stats: &TimedStats,
-        start_time: Duration,
     ) where
         B: Backend,
     {
@@ -230,7 +226,6 @@ impl TuiUI {
                 let end = stats.series[stats.series.len() - 1].time;
                 let start = end.saturating_sub(Duration::from_secs(5 * 60));
                 (
-                    // stats.series[0].time.as_secs(),
                     start.as_secs(),
                     end.as_secs(),
                     stats.min,
@@ -494,27 +489,11 @@ impl TuiUI {
     where
         B: Backend,
     {
-        /*let info_style = Style::default().fg(Color::Blue);
-        let warning_style = Style::default().fg(Color::LightYellow);
-        let error_style = Style::default().fg(Color::Magenta);
-        let critical_style = Style::default().fg(Color::Red);*/
         let app = app.read().unwrap();
         let logs: Vec<ListItem> = app
             .client_logs
             .iter()
-            .map(|msg| {
-                /*let s = match level {
-                    "ERROR" => error_style,
-                    "CRITICAL" => critical_style,
-                    "WARNING" => warning_style,
-                    _ => info_style,
-                };
-                let content = vec![Spans::from(vec![
-                    Span::styled(format!("{:<9}", info_style), s),
-                    Span::raw(msg),
-                ])];*/
-                ListItem::new(Span::raw(msg))
-            })
+            .map(|msg| ListItem::new(Span::raw(msg)))
             .collect();
         let sel = if logs.is_empty() {
             None

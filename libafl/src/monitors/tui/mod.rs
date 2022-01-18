@@ -6,21 +6,15 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use hashbrown::HashMap;
-use num_traits::PrimInt;
-use std::{error::Error, io, io::BufRead, marker::Sync, time::Instant};
-use tui::{
-    backend::{Backend, CrosstermBackend},
-    Terminal,
-};
+use tui::{backend::CrosstermBackend, Terminal};
 
 use std::{
-    cell::RefCell,
     cmp::{max, min},
-    io::Stdout,
+    io::{self, BufRead},
     string::String,
     sync::{Arc, RwLock},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
     vec::Vec,
 };
 
@@ -201,6 +195,7 @@ pub struct TuiContext {
 }
 
 impl TuiContext {
+    /// Create a new TUI context
     pub fn new(start_time: Duration) -> Self {
         Self {
             graphs: vec!["corpus".into(), "objectives".into(), "exec/sec".into()],
@@ -224,7 +219,7 @@ impl TuiContext {
 /// Tracking monitor during fuzzing and display with tui-rs.
 #[derive(Clone)]
 pub struct TuiMonitor {
-    pub context: Arc<RwLock<TuiContext>>,
+    pub(crate) context: Arc<RwLock<TuiContext>>,
 
     start_time: Duration,
     client_stats: Vec<ClientStats>,
@@ -392,7 +387,5 @@ fn run_tui_thread(
                 ui.should_quit = false;
             }
         }
-
-        Ok(())
     });
 }
