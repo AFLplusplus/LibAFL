@@ -37,15 +37,14 @@ fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
 }
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
-pub trait MapObserver<T>: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
-where
-    T: PrimInt + Default + Copy + Debug,
-{
+pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug {
+    type Entry: PrimInt + Default + Copy + Debug;
+
     /// Get the value at `idx`
-    fn get(&self, idx: usize) -> &T;
+    fn get(&self, idx: usize) -> &Self::Entry;
 
     /// Get the value at `idx` (mutable)
-    fn get_mut(&mut self, idx: usize) -> &mut T;
+    fn get_mut(&mut self, idx: usize) -> &mut Self::Entry;
 
     /// Get the number of usable entries in the map (all by default)
     fn usable_count(&self) -> usize;
@@ -67,13 +66,13 @@ where
     fn hash(&self) -> u64;
 
     /// Get the initial value for reset()
-    fn initial(&self) -> T;
+    fn initial(&self) -> Self::Entry;
 
     /// Get the initial value for reset()
-    fn initial_mut(&mut self) -> &mut T;
+    fn initial_mut(&mut self) -> &mut Self::Entry;
 
     /// Set the initial value for reset()
-    fn set_initial(&mut self, initial: T);
+    fn set_initial(&mut self, initial: Self::Entry);
 
     /// Reset the map
     #[inline]
@@ -88,7 +87,7 @@ where
     }
 
     /// Get these observer's contents as [`Vec`]
-    fn to_vec(&self) -> Vec<T> {
+    fn to_vec(&self) -> Vec<Self::Entry> {
         let cnt = self.usable_count();
         let mut res = Vec::with_capacity(cnt);
         for i in 0..cnt {
@@ -116,7 +115,7 @@ where
 impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -168,10 +167,12 @@ where
     }
 }
 
-impl<'a, T> MapObserver<T> for StdMapObserver<'a, T>
+impl<'a, T> MapObserver for StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
+
     #[inline]
     fn get(&self, pos: usize) -> &T {
         &self.as_slice()[pos]
@@ -308,7 +309,7 @@ where
 impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -360,10 +361,12 @@ where
     }
 }
 
-impl<'a, T, const N: usize> MapObserver<T> for ConstMapObserver<'a, T, N>
+impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
+
     #[inline]
     fn initial(&self) -> T {
         self.initial
@@ -480,7 +483,7 @@ where
 impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -532,10 +535,12 @@ where
     }
 }
 
-impl<'a, T> MapObserver<T> for VariableMapObserver<'a, T>
+impl<'a, T> MapObserver for VariableMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
+
     #[inline]
     fn initial(&self) -> T {
         self.initial
@@ -653,7 +658,7 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8> + Observer<I, S>,
+    M: MapObserver<Entry = u8> + Observer<I, S>,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -682,7 +687,7 @@ where
 
 impl<M> HasLen for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8>,
+    M: MapObserver,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -690,10 +695,12 @@ where
     }
 }
 
-impl<M> MapObserver<u8> for HitcountsMapObserver<M>
+impl<M> MapObserver for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8>,
+    M: MapObserver<Entry = u8>,
 {
+    type Entry = u8;
+
     #[inline]
     fn initial(&self) -> u8 {
         self.base.initial()
@@ -734,7 +741,7 @@ where
 
 impl<M> AsSlice<u8> for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8> + AsSlice<u8>,
+    M: MapObserver + AsSlice<u8>,
 {
     #[inline]
     fn as_slice(&self) -> &[u8] {
@@ -743,7 +750,7 @@ where
 }
 impl<M> AsMutSlice<u8> for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8> + AsMutSlice<u8>,
+    M: MapObserver + AsMutSlice<u8>,
 {
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [u8] {
@@ -780,7 +787,7 @@ where
 impl<'a, I, S, T> Observer<I, S> for MultiMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -808,10 +815,12 @@ where
     }
 }
 
-impl<'a, T> MapObserver<T> for MultiMapObserver<'a, T>
+impl<'a, T> MapObserver for MultiMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
+
     #[inline]
     fn get(&self, idx: usize) -> &T {
         let elem = self.intervals.query_point(idx).next().unwrap();
