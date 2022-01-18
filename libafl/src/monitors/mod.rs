@@ -779,7 +779,7 @@ impl Default for ClientPerfMonitor {
         Self::new()
     }
 }
-
+/// Monitor Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::monitors::{Monitor, SimpleMonitor};
@@ -788,44 +788,46 @@ pub mod pybind {
     use super::ClientStats;
     use core::time::Duration;
 
-
     #[pyclass(unsendable, name = "SimpleMonitor")]
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
+    /// Python class for SimpleMonitor
     pub struct PythonSimpleMonitor {
+        /// Rust wrapped SimpleMonitor object
         pub simple_monitor: SimpleMonitor<fn(String)>,
     }
 
     #[pymethods]
     impl PythonSimpleMonitor {
         #[new]
-        fn new(/*_print_fn: PyObject */) -> Self {
-            // TODO: "Fix can't capture dynamic environment in a fn item" error -> Use move
-            // fn a (s: String){
+        fn new(/*py_print_fn: PyObject */) -> Self {
+            // TODO: Find a fix to: closures can only be coerced to `fn` types if they 
+            // do not capture any variables and print_fn expected to be fn pointer.
+            // fn printf_fn (s: String){
             //     Python::with_gil(|py| -> PyResult<()> {
             //         print_fn.call1(py, (PyUnicode::new(py, &s),));
             //         Ok(())
             //     });
             // }
             Self {
-                simple_monitor: SimpleMonitor::new(|s| println!("{}", s))
+                simple_monitor: SimpleMonitor::new(|s| println!("{}", s)),
             }
         }
     }
 
-    #[derive(Clone)]
-    pub enum PythonMonitorWrapper {
+    #[derive(Clone, Debug)]
+    enum PythonMonitorWrapper {
         Simple(PythonSimpleMonitor),
     }
 
-    // Should not be exposed to user
     #[pyclass(unsendable, name = "Monitor")]
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
+    /// EventManager Trait binding
     pub struct PythonMonitor {
-        pub monitor: PythonMonitorWrapper,
+        monitor: PythonMonitorWrapper,
     }
 
     impl PythonMonitor {
-        pub fn get_monitor(&self) -> &impl Monitor {
+        fn get_monitor(&self) -> &impl Monitor {
             match &self.monitor {
                 PythonMonitorWrapper::Simple(py_simple_monitor) => {
                     &py_simple_monitor.simple_monitor
@@ -833,7 +835,7 @@ pub mod pybind {
             }
         }
 
-        pub fn get_mut_monitor(&mut self) -> &mut impl Monitor {
+        fn get_mut_monitor(&mut self) -> &mut impl Monitor {
             match &mut self.monitor {
                 PythonMonitorWrapper::Simple(py_simple_monitor) => {
                     &mut py_simple_monitor.simple_monitor
@@ -871,6 +873,7 @@ pub mod pybind {
         }
     }
 
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonSimpleMonitor>()?;
         m.add_class::<PythonMonitor>()?;

@@ -426,34 +426,33 @@ where
     }
 }
 
+/// SimpleEventManager Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use pyo3::prelude::*;
-    use crate::inputs::BytesInput;
-    use crate::monitors::SimpleMonitor;
-    use crate::monitors::pybind::{PythonMonitor, PythonSimpleMonitor};
     use crate::events::SimpleEventManager;
-    
+    use crate::inputs::BytesInput;
+    use crate::monitors::pybind::PythonMonitor;
+    use pyo3::prelude::*;
+
     #[pyclass(unsendable, name = "SimpleEventManager")]
+    #[derive(Debug)]
+    /// Python class for SimpleEventManager
     pub struct PythonSimpleEventManager {
-        pub simple_event_manager: SimpleEventManager<
-                BytesInput, 
-                PythonMonitor
-            >
+        /// Rust wrapped SimpleEventManager object
+        pub simple_event_manager: SimpleEventManager<BytesInput, PythonMonitor>,
     }
 
     #[pymethods]
     impl PythonSimpleEventManager {
         #[new]
-        fn new(
-            py_monitor: PythonMonitor
-        ) -> Self {
-            Self{
-                simple_event_manager: SimpleEventManager::new(py_monitor)
+        fn new(py_monitor: PythonMonitor) -> Self {
+            Self {
+                simple_event_manager: SimpleEventManager::new(py_monitor),
             }
         }
     }
 
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonSimpleEventManager>()?;
         Ok(())

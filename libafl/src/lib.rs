@@ -334,6 +334,7 @@ use pyo3::prelude::*;
 #[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "libafl")]
+/// Register the classes to the python module
 pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     observers::map::pybind::register(py, m)?;
     feedbacks::map::pybind::register(py, m)?;

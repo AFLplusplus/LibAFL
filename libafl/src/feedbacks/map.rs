@@ -665,18 +665,19 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
+/// Map Feedback Python bindings
 pub mod pybind {
-    use crate::bolts::rands::StdRand;
-    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
     use crate::feedbacks::map::{MapFeedbackState, MaxMapFeedback};
     use crate::inputs::BytesInput;
-    use crate::observers::map::{OwnedMapObserver, pybind::{PythonOwnedMapObserverI32, PythonMapObserverI32}};
-    use crate::state::StdState;
+    use crate::observers::map::pybind::PythonMapObserverI32;
+    use crate::state::pybind::MyStdState;
     use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "MapFeedbackStateI32")]
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
+    /// Python class for MapFeedbackState
     pub struct PythonMapFeedbackStateI32 {
+        /// Rust wrapped MapFeedbackState object
         pub map_feedback_state: MapFeedbackState<i32>,
     }
 
@@ -685,26 +686,20 @@ pub mod pybind {
         #[staticmethod]
         fn with_observer(py_observer: &PythonMapObserverI32) -> Self {
             Self {
-                map_feedback_state: MapFeedbackState::with_observer(
-                    py_observer,
-                ),
+                map_feedback_state: MapFeedbackState::with_observer(py_observer),
             }
         }
     }
 
     #[pyclass(unsendable, name = "MaxMapFeedbackI32")]
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
+    /// Python class for MaxMapFeedback
     pub struct PythonMaxMapFeedbackI32 {
+        /// Rust wrapped MaxMapFeedback object
         pub max_map_feedback: MaxMapFeedback<
             BytesInput,
             PythonMapObserverI32,
-            StdState<
-                InMemoryCorpus<BytesInput>, 
-                (MapFeedbackState<i32>, ()), 
-                BytesInput, 
-                StdRand, 
-                OnDiskCorpus<BytesInput>
-            >,
+            MyStdState,
             i32,
         >,
     }
@@ -724,7 +719,8 @@ pub mod pybind {
             }
         }
     }
-
+    
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonMapFeedbackStateI32>()?;
         m.add_class::<PythonMaxMapFeedbackI32>()?;

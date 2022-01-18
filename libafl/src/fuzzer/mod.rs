@@ -663,73 +663,73 @@ where
     }
 }
 
-
 #[cfg(feature = "python")]
+/// Fuzzer Python bindings
 pub mod pybind {
+    use crate::corpus::QueueCorpusScheduler;
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::pybind::PythonExecutorI32;
+    use crate::feedbacks::map::pybind::PythonMaxMapFeedbackI32;
+    use crate::feedbacks::{CrashFeedback, MaxMapFeedback};
+    use crate::fuzzer::{Fuzzer, StdFuzzer};
+    use crate::inputs::BytesInput;
+    use crate::mutators::scheduled::{havoc_mutations, StdScheduledMutator};
+    use crate::observers::map::pybind::PythonMapObserverI32;
+    use crate::stages::StdMutationalStage;
+    use crate::state::pybind::{MyStdState, PythonStdState};
     use pyo3::prelude::*;
     use tuple_list::tuple_list;
-    use crate::bolts::rands::StdRand;
-    use crate::feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback};
-    use crate::feedbacks::map::pybind::PythonMaxMapFeedbackI32;
-    use crate::fuzzer::{StdFuzzer, Fuzzer};
-    use crate::corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler};
-    use crate::inputs::BytesInput;
-    use crate::observers::map::{OwnedMapObserver, pybind::PythonMapObserverI32};
-    use crate::state::{StdState, pybind::{PythonStdState, MyStdState}};
-    use crate::events::simple::pybind::PythonSimpleEventManager;
-    use crate::executors::inprocess::pybind::PythonOwnedInProcessExecutorI32;
-    use crate::mutators::scheduled::{havoc_mutations, StdScheduledMutator};
-    use crate::stages::StdMutationalStage;
 
+    /// Temporary StdFuzzer with fixed generics
     pub type MyStdFuzzer = StdFuzzer<
         QueueCorpusScheduler,
-        MaxMapFeedback<
-            BytesInput,
-            PythonMapObserverI32,
-            MyStdState,
-            i32,
-        >,
+        MaxMapFeedback<BytesInput, PythonMapObserverI32, MyStdState, i32>,
         BytesInput,
         CrashFeedback,
         (PythonMapObserverI32, ()),
         MyStdState,
     >;
-
+    /// Python class for StdFuzzer
     #[pyclass(unsendable, name = "StdFuzzerI32")]
+    #[derive(Debug)]
     pub struct PythonStdFuzzerI32 {
-        pub std_fuzzer: MyStdFuzzer
+        /// Rust wrapped StdFuzzer object
+        pub std_fuzzer: MyStdFuzzer,
     }
 
     #[pymethods]
     impl PythonStdFuzzerI32 {
         #[new]
-        fn new(
-            py_max_map_feedback: PythonMaxMapFeedbackI32,
-        ) -> Self {
-            Self{
+        fn new(py_max_map_feedback: PythonMaxMapFeedbackI32) -> Self {
+            Self {
                 std_fuzzer: StdFuzzer::new(
-                    QueueCorpusScheduler::new(), 
-                    py_max_map_feedback.max_map_feedback, 
-                    CrashFeedback::new()
-                )
+                    QueueCorpusScheduler::new(),
+                    py_max_map_feedback.max_map_feedback,
+                    CrashFeedback::new(),
+                ),
             }
         }
 
-        pub fn fuzz_loop(
+        fn fuzz_loop(
             &mut self,
-            py_executor: &mut PythonOwnedInProcessExecutorI32,
+            py_executor: &mut PythonExecutorI32,
             py_state: &mut PythonStdState,
-            py_mgr: &mut PythonSimpleEventManager,
-        ){
-            self.std_fuzzer.fuzz_loop(
-                &mut tuple_list!(StdMutationalStage::new(StdScheduledMutator::new(havoc_mutations()))),
-                &mut py_executor.owned_in_process_executor,
-                &mut py_state.std_state,
-                &mut py_mgr.simple_event_manager
-            ).expect("Failed to generate the initial corpus".into());
+            py_mgr: &mut PythonEventManager,
+        ) {
+            self.std_fuzzer
+                .fuzz_loop(
+                    &mut tuple_list!(StdMutationalStage::new(StdScheduledMutator::new(
+                        havoc_mutations()
+                    ))),
+                    py_executor,
+                    &mut py_state.std_state,
+                    py_mgr,
+                )
+                .expect("Failed to generate the initial corpus".into());
         }
     }
 
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonStdFuzzerI32>()?;
         Ok(())

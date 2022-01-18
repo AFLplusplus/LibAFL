@@ -140,41 +140,34 @@ mod test {
 }
 
 #[cfg(feature = "python")]
+/// Executor Python bindings
 pub mod pybind {
-    use crate::bolts::{rands::StdRand, tuples::tuple_list};
-    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
     use crate::events::pybind::PythonEventManager;
     use crate::executors::{
-        inprocess::{pybind::PythonOwnedInProcessExecutorI32, OwnedInProcessExecutor},
-        Executor, ExitKind, HasObservers,
+        inprocess::pybind::PythonOwnedInProcessExecutorI32, Executor, ExitKind, HasObservers,
     };
-    use crate::feedbacks::MapFeedbackState;
-    use crate::fuzzer::pybind::{MyStdFuzzer, PythonStdFuzzerI32};
-    use crate::inputs::{BytesInput, HasBytesVec, HasTargetBytes, Input};
-    use crate::monitors::pybind::PythonMonitor;
-    use crate::observers::{map::pybind::PythonMapObserverI32, ObserversTuple};
-    use crate::state::{
-        pybind::{MyStdState, PythonStdState},
-        StdState,
-    };
-
+    use crate::fuzzer::pybind::MyStdFuzzer;
+    use crate::inputs::BytesInput;
+    use crate::observers::map::pybind::PythonMapObserverI32;
+    use crate::state::pybind::MyStdState;
     use crate::Error;
     use pyo3::prelude::*;
 
     #[derive(Debug)]
-    pub enum PythonExecutorWrapperI32 {
+    enum PythonExecutorWrapperI32 {
         OwnedInProcess(*mut PythonOwnedInProcessExecutorI32),
     }
 
-    // Not Exposed to user
+    
     #[pyclass(unsendable, name = "ExecutorI32")]
     #[derive(Debug)]
+    /// Executor + HasObservers Trait binding
     pub struct PythonExecutorI32 {
-        pub executor: PythonExecutorWrapperI32,
+        executor: PythonExecutorWrapperI32,
     }
 
     impl PythonExecutorI32 {
-        pub fn get_executor(
+        fn get_executor(
             &self,
         ) -> &(impl Executor<PythonEventManager, BytesInput, MyStdState, MyStdFuzzer>
                  + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
@@ -183,12 +176,11 @@ pub mod pybind {
                     PythonExecutorWrapperI32::OwnedInProcess(py_owned_inprocess_executor) => {
                         &(*(*py_owned_inprocess_executor)).owned_in_process_executor
                     }
-                    _ => panic!("Executor not supported"),
                 }
             }
         }
 
-        pub fn get_mut_executor(
+        fn get_mut_executor(
             &self,
         ) -> &mut (impl Executor<PythonEventManager, BytesInput, MyStdState, MyStdFuzzer>
                      + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
@@ -197,7 +189,6 @@ pub mod pybind {
                     PythonExecutorWrapperI32::OwnedInProcess(py_owned_inprocess_executor) => {
                         &mut (*(*py_owned_inprocess_executor)).owned_in_process_executor
                     }
-                    _ => panic!("Executor not supported"),
                 }
             }
         }
@@ -241,6 +232,7 @@ pub mod pybind {
         }
     }
 
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonExecutorI32>()?;
         Ok(())

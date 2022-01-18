@@ -771,99 +771,8 @@ where
         }
     }
 }
-
-// #[derive(Serialize, Deserialize, Debug, Clone)] // TODO: Clone needed ?
-// #[serde(bound = "T: serde::de::DeserializeOwned")]
-// #[allow(clippy::unsafe_derive_deserialize)]
-// pub struct OwnedMapObserver<T>
-// where
-//     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-// {
-//     map: Vec<T>,
-//     initial: T,
-//     name: String,
-// }
-
-// impl<I, S, T> Observer<I, S> for OwnedMapObserver<T>
-// where
-//     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-//     Self: MapObserver<T>,
-// {
-//     #[inline]
-//     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-//         self.reset_map()
-//     }
-// }
-
-// impl<T> Named for OwnedMapObserver<T>
-// where
-//     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-// {
-//     #[inline]
-//     fn name(&self) -> &str {
-//         self.name.as_str()
-//     }
-// }
-
-// impl<T> HasLen for OwnedMapObserver<T>
-// where
-//     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-// {
-//     #[inline]
-//     fn len(&self) -> usize {
-//         self.map.as_slice().len()
-//     }
-// }
-
-// impl<T> MapObserver<T> for OwnedMapObserver<T>
-// where
-//     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
-// {
-//     #[inline]
-//     fn map(&self) -> Option<&[T]> {
-//         Some(self.map.as_slice())
-//     }
-
-//     #[inline]
-//     fn map_mut(&mut self) -> Option<&mut [T]> {
-//         Some(self.map.as_mut_slice())
-//     }
-
-//     #[inline]
-//     fn initial(&self) -> T {
-//         self.initial
-//     }
-
-//     #[inline]
-//     fn initial_mut(&mut self) -> &mut T {
-//         &mut self.initial
-//     }
-
-//     #[inline]
-//     fn set_initial(&mut self, initial: T) {
-//         self.initial = initial;
-//     }
-// }
-
-// impl<T> OwnedMapObserver<T>
-// where
-//     T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-// {
-//     /// Creates a new [`MapObserver`]
-//     #[must_use]
-//     pub fn new(name: &'static str, map: Vec<T>) -> Self {
-//         let initial = if map.is_empty() { T::default() } else { map[0] };
-//         Self {
-//             map: map,
-//             name: name.to_string(),
-//             initial,
-//         }
-//     }
-// }
-
-/// The Map Observer retrieves the state of a map,
-/// that will get updated by the target.
-/// A well-known example is the AFL-Style coverage map.
+/// Exact copy of StdMapObserver that owns its map
+/// Used for python bindings
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
@@ -953,19 +862,21 @@ where
     }
 }
 
+/// MapObserver Python bindings
+
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::bolts::{tuples::Named, HasLen};
-    use crate::inputs::Input;
     use crate::observers::{map::OwnedMapObserver, MapObserver, Observer};
-    use crate::state::pybind::MyStdState;
     use crate::Error;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
     #[pyclass(unsendable, name = "OwnedMapObserverI32")]
     #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for OwnedMapObserver (i.e. StdMapObserver with owned map)
     pub struct PythonOwnedMapObserverI32 {
+        /// Rust wrapped OwnedMapObserver object
         pub owned_map_observer: OwnedMapObserver<i32>,
     }
 
@@ -980,25 +891,21 @@ pub mod pybind {
         }
     }
 
-    // TODO: Impl on enum (PythonMapObserverWrapperI32 replaces PythonMapObserverI32)
     #[derive(Serialize, Deserialize, Debug, Clone)]
-    // #[serde(bound = "T: serde::de::DeserializeOwned")]
-    // #[allow(clippy::unsafe_derive_deserialize)]
-    pub enum PythonMapObserverWrapperI32 {
-        Owned(PythonOwnedMapObserverI32), // Other observers to be added
+    enum PythonMapObserverWrapperI32 {
+        Owned(PythonOwnedMapObserverI32),
     }
 
     // Should not be exposed to user
     #[pyclass(unsendable, name = "MapObserverI32")]
     #[derive(Serialize, Deserialize, Debug, Clone)]
-    // #[serde(bound = "T: serde::de::DeserializeOwned")]
-    // #[allow(clippy::unsafe_derive_deserialize)]
+    /// MapObserver + Observer Trait binding
     pub struct PythonMapObserverI32 {
-        pub map_observer: PythonMapObserverWrapperI32,
+        map_observer: PythonMapObserverWrapperI32,
     }
 
     impl PythonMapObserverI32 {
-        pub fn get_map_observer(&self) -> &impl MapObserver<i32> {
+        fn get_map_observer(&self) -> &impl MapObserver<i32> {
             match &self.map_observer {
                 PythonMapObserverWrapperI32::Owned(map_observer) => {
                     &map_observer.owned_map_observer
@@ -1006,7 +913,7 @@ pub mod pybind {
             }
         }
 
-        pub fn get_mut_map_observer(&mut self) -> &mut impl MapObserver<i32> {
+        fn get_mut_map_observer(&mut self) -> &mut impl MapObserver<i32> {
             match &mut self.map_observer {
                 PythonMapObserverWrapperI32::Owned(map_observer) => {
                     &mut map_observer.owned_map_observer
@@ -1066,7 +973,6 @@ pub mod pybind {
         }
     }
 
-    // Hardcode types ?
     impl<I, S> Observer<I, S> for PythonMapObserverI32
     where
         Self: MapObserver<i32>,
@@ -1077,6 +983,7 @@ pub mod pybind {
         }
     }
 
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonOwnedMapObserverI32>()?;
         m.add_class::<PythonMapObserverI32>()?;

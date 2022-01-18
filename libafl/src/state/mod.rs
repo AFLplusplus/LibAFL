@@ -640,11 +640,12 @@ where
 }
 
 #[cfg(feature = "python")]
+/// State Python bindings
 pub mod pybind {
     use crate::bolts::{rands::StdRand, tuples::tuple_list};
     use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
     use crate::events::pybind::PythonEventManager;
-    use crate::executors::{inprocess::pybind::PythonOwnedInProcessExecutorI32, pybind::PythonExecutorI32};
+    use crate::executors::pybind::PythonExecutorI32;
     use crate::feedbacks::map::{pybind::PythonMapFeedbackStateI32, MapFeedbackState};
     use crate::fuzzer::pybind::PythonStdFuzzerI32;
     use crate::generators::pybind::PythonRandPrintablesGeneratorI32;
@@ -653,7 +654,7 @@ pub mod pybind {
     use pyo3::prelude::*;
     use std::path::PathBuf;
 
-    // Temporary fixed generics state
+    /// Temporary StdState with fixed generics
     pub type MyStdState = StdState<
         InMemoryCorpus<BytesInput>,
         (MapFeedbackState<i32>, ()),
@@ -663,8 +664,10 @@ pub mod pybind {
     >;
 
     #[pyclass(unsendable, name = "StdState")]
+    #[derive(Debug)]
+    /// Python class for StdState
     pub struct PythonStdState {
-        // I32 ??
+        /// Rust wrapped StdState object
         pub std_state: MyStdState,
     }
 
@@ -706,6 +709,7 @@ pub mod pybind {
         }
     }
 
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonStdState>()?;
         Ok(())

@@ -126,43 +126,32 @@ where
     }
 }
 
+/// Generator Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use pyo3::prelude::*;
-    use crate::bolts::rands::StdRand;
-    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
-    use crate::feedbacks::MapFeedbackState;
-    use crate::inputs::BytesInput;
-    use crate::state::StdState;
     use crate::generators::RandPrintablesGenerator;
+    use crate::state::pybind::MyStdState;
+    use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "RandPrintablesGenerator")]
-    pub struct  PythonRandPrintablesGeneratorI32{ 
-        pub rand_printable_generator: RandPrintablesGenerator<
-            StdState<
-                InMemoryCorpus<BytesInput>, 
-                (MapFeedbackState<i32>, ()), 
-                BytesInput, 
-                StdRand, 
-                OnDiskCorpus<BytesInput>
-            >,
-        >
+    /// Python class for RandPrintablesGenerator
+    #[derive(Debug)]
+    pub struct PythonRandPrintablesGeneratorI32 {
+        /// Rust wrapped SimpleEventManager object
+        pub rand_printable_generator: RandPrintablesGenerator<MyStdState>,
     }
 
     #[pymethods]
-    impl PythonRandPrintablesGeneratorI32{
+    impl PythonRandPrintablesGeneratorI32 {
         #[new]
-        fn new(
-            max_size: usize
-        ) -> Self{
-            Self{
-                rand_printable_generator: RandPrintablesGenerator::new(max_size)
+        fn new(max_size: usize) -> Self {
+            Self {
+                rand_printable_generator: RandPrintablesGenerator::new(max_size),
             }
         }
     }
 
-
-
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonRandPrintablesGeneratorI32>()?;
         Ok(())

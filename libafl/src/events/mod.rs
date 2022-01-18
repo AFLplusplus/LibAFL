@@ -543,32 +543,35 @@ mod tests {
         };
     }
 }
+/// EventManager Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::events::simple::pybind::PythonSimpleEventManager;
     use crate::events::{
-        Event, EventFirer, EventManager, EventProcessor, EventRestarter, HasEventManagerId,
-        ProgressReporter, EventManagerId
+        Event, EventFirer, EventManager, EventManagerId, EventProcessor, EventRestarter,
+        HasEventManagerId, ProgressReporter,
     };
     use crate::executors::pybind::PythonExecutorI32;
-    use crate::inputs::{BytesInput, Input};
+    use crate::inputs::BytesInput;
     use crate::pybind::MyStdFuzzer;
     use crate::state::pybind::MyStdState;
     use crate::Error;
     use pyo3::prelude::*;
 
-    pub enum PythonEventManagerWrapper {
+    #[derive(Debug)]
+    enum PythonEventManagerWrapper {
         Simple(*mut PythonSimpleEventManager),
     }
 
-    // Should not be exposed to user
+    /// EventManager Trait binding
     #[pyclass(unsendable, name = "EventManager")]
+    #[derive(Debug)]
     pub struct PythonEventManager {
-        pub event_manager: PythonEventManagerWrapper,
+        event_manager: PythonEventManagerWrapper,
     }
 
     impl PythonEventManager {
-        pub fn get_event_manager(
+        fn get_event_manager(
             &self,
         ) -> &impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer> {
             unsafe {
@@ -580,9 +583,10 @@ pub mod pybind {
             }
         }
 
-        pub fn get_mut_event_manager(
+        fn get_mut_event_manager(
             &mut self,
-        ) -> &mut impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer> {
+        ) -> &mut impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer>
+        {
             unsafe {
                 match &mut self.event_manager {
                     PythonEventManagerWrapper::Simple(py_simple_event_manager) => {
@@ -633,6 +637,7 @@ pub mod pybind {
 
     impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer> for PythonEventManager {}
 
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonEventManager>()?;
         Ok(())
