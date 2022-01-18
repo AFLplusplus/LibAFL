@@ -19,7 +19,7 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 use libc::c_int;
 
 #[cfg(all(windows, feature = "std"))]
@@ -39,13 +39,13 @@ use core::{ffi::c_void, ptr::write_volatile};
 use core::sync::atomic::{compiler_fence, Ordering};
 
 #[repr(C)]
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 struct Timeval {
     pub tv_sec: i64,
     pub tv_usec: i64,
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 impl Debug for Timeval {
     #[allow(clippy::cast_sign_loss)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -60,29 +60,29 @@ impl Debug for Timeval {
 }
 
 #[repr(C)]
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 #[derive(Debug)]
 struct Itimerval {
     pub it_interval: Timeval,
     pub it_value: Timeval,
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 extern "C" {
     fn setitimer(which: c_int, new_value: *mut Itimerval, old_value: *mut Itimerval) -> c_int;
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
     executor: E,
-    #[cfg(all(unix, not(target_vendor = "apple")))]
+    #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
-    #[cfg(all(unix, not(target_vendor = "apple")))]
+    #[cfg(target_os = "linux")]
     timerid: libc::timer_t,
-    #[cfg(target_vendor = "apple")]
+    #[cfg(all(unix, not(target_os = "linux")))]
     itimerval: Itimerval,
     #[cfg(windows)]
     milli_sec: i64,
@@ -101,7 +101,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
             .finish_non_exhaustive()
     }
 
-    #[cfg(all(unix, not(target_vendor = "apple")))]
+    #[cfg(target_os = "linux")]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
             .field("executor", &self.executor)
@@ -113,7 +113,7 @@ impl<E: Debug> Debug for TimeoutExecutor<E> {
             .finish()
     }
 
-    #[cfg(target_vendor = "apple")]
+    #[cfg(all(unix, not(target_os = "linux")))]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
             .field("executor", &self.executor)
@@ -130,7 +130,7 @@ type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
     param2: *mut TP_TIMER,
 );
 
-#[cfg(all(unix, not(target_vendor = "apple")))]
+#[cfg(target_os = "linux")]
 impl<E> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
@@ -179,7 +179,7 @@ impl<E> TimeoutExecutor<E> {
     }
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 impl<E> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
@@ -322,7 +322,7 @@ where
     }
 }
 
-#[cfg(all(unix, not(target_vendor = "apple")))]
+#[cfg(target_os = "linux")]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z>,
@@ -345,7 +345,7 @@ where
     }
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z>,
@@ -383,7 +383,7 @@ where
     }
 }
 
-#[cfg(all(unix, not(target_vendor = "apple")))]
+#[cfg(target_os = "linux")]
 impl<E> HasPostRunReset for TimeoutExecutor<E> {
     /// Disarm currently running timer
     fn post_run_reset(&self) {
@@ -394,7 +394,7 @@ impl<E> HasPostRunReset for TimeoutExecutor<E> {
     }
 }
 
-#[cfg(target_vendor = "apple")]
+#[cfg(all(unix, not(target_os = "linux")))]
 impl<E> HasPostRunReset for TimeoutExecutor<E> {
     /// Disarm currently running timer
     fn post_run_reset(&self) {
