@@ -38,6 +38,7 @@ fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
 pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug {
+    /// Type of each entry in this map
     type Entry: PrimInt + Default + Copy + Debug;
 
     /// Get the value at `idx`
