@@ -22,7 +22,7 @@ pub fn main() {
             .silence(true)
             // add arguments only if --libafl or --libafl-no-link are present
             .need_libafl_arg(true)
-            .from_args(&args)
+            .parse_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "fuzzbench")
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")

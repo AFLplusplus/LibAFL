@@ -63,7 +63,7 @@ pub struct ClangWrapper {
     need_libafl_arg: bool,
     has_libafl_arg: bool,
 
-    from_args_called: bool,
+    parse_args_called: bool,
     base_args: Vec<String>,
     cc_args: Vec<String>,
     link_args: Vec<String>,
@@ -72,7 +72,7 @@ pub struct ClangWrapper {
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
 impl CompilerWrapper for ClangWrapper {
-    fn from_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
+    fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>,
     {
@@ -83,13 +83,13 @@ impl CompilerWrapper for ClangWrapper {
             ));
         }
 
-        if self.from_args_called {
+        if self.parse_args_called {
             return Err(Error::Unknown(
-                "CompilerWrapper::from_args cannot be called twice on the same instance"
+                "CompilerWrapper::parse_args cannot be called twice on the same instance"
                     .to_string(),
             ));
         }
-        self.from_args_called = true;
+        self.parse_args_called = true;
 
         if args.len() == 1 {
             return Err(Error::InvalidArguments(
@@ -283,7 +283,7 @@ impl ClangWrapper {
             bit_mode: 0,
             need_libafl_arg: false,
             has_libafl_arg: false,
-            from_args_called: false,
+            parse_args_called: false,
             base_args: vec![],
             cc_args: vec![],
             link_args: vec![],
@@ -342,7 +342,7 @@ mod tests {
     #[test]
     fn test_clang_version() {
         if let Err(res) = ClangWrapper::new()
-            .from_args(&["my-clang", "-v"])
+            .parse_args(&["my-clang", "-v"])
             .unwrap()
             .run()
         {
