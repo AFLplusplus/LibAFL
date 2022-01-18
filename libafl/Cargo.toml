@@ -12,7 +12,7 @@ edition = "2021"
 
 [features]
 default = ["std", "derive", "llmp_compression", "rand_trait", "fork"]
-std = ["serde_json", "serde_json/std", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid"] # print, env, launcher ... support
+std = ["serde_json", "serde_json/std", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid", "tui", "crossterm"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
@@ -70,6 +70,8 @@ regex = { version = "1", optional = true }
 build_id = { version = "0.2.1", git = "https://github.com/domenukk/build_id", rev = "6a61943", optional = true }
 uuid = { version = "0.8.2", optional = true, features = ["serde", "v4"] }
 libm = "0.2.1"
+tui = { version = "0.16", features = ["crossterm"], optional = true }
+crossterm = { version = "0.20", optional = true  }
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
