@@ -106,7 +106,7 @@ impl PerfTuiContext {
 
         // Calculate each stage
         // Make sure we only iterate over used stages
-        for (stage_index, features) in m.used_stages() {
+        for (_stage_index, features) in m.used_stages() {
             let mut features_percentages = vec![];
 
             for (feature_index, feature) in features.iter().enumerate() {
