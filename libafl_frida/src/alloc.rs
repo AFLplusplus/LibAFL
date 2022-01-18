@@ -8,6 +8,7 @@ use nix::{
 use backtrace::Backtrace;
 #[cfg(any(
     target_os = "linux",
+    target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
 ))]
 use libc::{sysconf, _SC_PAGESIZE};
@@ -15,6 +16,7 @@ use rangemap::RangeSet;
 use serde::{Deserialize, Serialize};
 #[cfg(any(
     target_os = "linux",
+    target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
 ))]
 use std::io;
@@ -72,6 +74,7 @@ impl Allocator {
     /// Creates a new [`Allocator`] (not supported on this platform!)
     #[cfg(not(any(
         target_os = "linux",
+        target_vendor = "apple",
         all(target_arch = "aarch64", target_os = "android")
     )))]
     #[must_use]
@@ -82,6 +85,7 @@ impl Allocator {
     /// Creates a new [`Allocator`]
     #[cfg(any(
         target_os = "linux",
+        target_vendor = "apple",
         all(target_arch = "aarch64", target_os = "android")
     ))]
     #[must_use]
