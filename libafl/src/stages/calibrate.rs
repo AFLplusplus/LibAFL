@@ -28,7 +28,7 @@ pub struct CalibrationStage<I, O, OT, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     I: Input,
-    O: MapObserver,
+    O: MapObserver<Entry = T>,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I> + HasMetadata,
 {
@@ -46,7 +46,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     EM: EventFirer<I>,
     I: Input,
-    O: MapObserver,
+    O: MapObserver<Entry = T>,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
@@ -306,7 +306,7 @@ impl<I, O, OT, S, T> CalibrationStage<I, O, OT, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     I: Input,
-    O: MapObserver,
+    O: MapObserver<Entry = T>,
     OT: ObserversTuple<I, S>,
     S: HasCorpus<I> + HasMetadata,
 {
