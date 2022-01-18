@@ -16,12 +16,12 @@ use std::{
 
 use libafl::{
     bolts::{
-        AsSlice,
         current_nanos, current_time,
         os::dup2,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
     corpus::{
         Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
