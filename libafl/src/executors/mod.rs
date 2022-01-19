@@ -32,6 +32,7 @@ pub mod command;
 pub use command::CommandExecutor;
 
 use crate::{
+    bolts::AsSlice,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
