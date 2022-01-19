@@ -863,7 +863,6 @@ where
 }
 
 /// MapObserver Python bindings
-
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::bolts::{tuples::Named, HasLen};

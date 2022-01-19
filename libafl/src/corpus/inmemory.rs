@@ -87,3 +87,35 @@ where
         }
     }
 }
+
+/// InMemoryCorpus Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::corpus::InMemoryCorpus;
+    use crate::inputs::BytesInput;
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    #[pyclass(unsendable, name = "InMemoryCorpus")]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for InMemoryCorpus
+    pub struct PythonInMemoryCorpus {
+        /// Rust wrapped InMemoryCorpus object
+        pub in_memory_corpus: InMemoryCorpus<BytesInput>,
+    }
+
+    #[pymethods]
+    impl PythonInMemoryCorpus {
+        #[new]
+        fn new() -> Self {
+            Self {
+                in_memory_corpus: InMemoryCorpus::new(),
+            }
+        }
+    }
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonInMemoryCorpus>()?;
+        Ok(())
+    }
+}
