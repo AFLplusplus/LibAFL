@@ -19,6 +19,8 @@ Welcome to `LibAFL`
     clippy::unreadable_literal
 )]
 #![cfg_attr(debug_assertions, warn(
+    missing_debug_implementations,
+    missing_docs,
     //trivial_casts,
     trivial_numeric_casts,
     unused_extern_crates,
@@ -27,6 +29,8 @@ Welcome to `LibAFL`
     //unused_results
 ))]
 #![cfg_attr(not(debug_assertions), deny(
+    missing_debug_implementations,
+    missing_docs,
     //trivial_casts,
     trivial_numeric_casts,
     unused_extern_crates,

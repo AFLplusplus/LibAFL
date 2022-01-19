@@ -3,6 +3,7 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
+#[allow(missing_docs)]
 pub mod tui;
 
 use alloc::{string::String, vec::Vec};

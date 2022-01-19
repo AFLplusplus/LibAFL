@@ -29,7 +29,7 @@ use crate::{
 mod ui;
 use ui::TuiUI;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct TimedStat {
     pub time: Duration,
     pub item: u64,
@@ -41,7 +41,7 @@ impl Into<(f64, f64)> for TimedStat {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TimedStats {
     pub series: Vec<TimedStat>,
     pub max: u64,
@@ -78,7 +78,7 @@ impl TimedStats {
 }
 
 #[cfg(feature = "introspection")]
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct PerfTuiContext {
     pub scheduler: f64,
     pub manager: f64,
@@ -151,7 +151,7 @@ impl PerfTuiContext {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct ClientTuiContext {
     pub corpus: u64,
     pub objectives: u64,
@@ -174,7 +174,7 @@ impl ClientTuiContext {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TuiContext {
     pub graphs: Vec<String>,
 
@@ -217,7 +217,7 @@ impl TuiContext {
 }
 
 /// Tracking monitor during fuzzing and display with tui-rs.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TuiMonitor {
     pub(crate) context: Arc<RwLock<TuiContext>>,
 
