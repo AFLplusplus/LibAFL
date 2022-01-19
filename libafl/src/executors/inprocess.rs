@@ -35,7 +35,7 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers, HasPostRunReset},
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
@@ -112,16 +112,6 @@ where
     fn observers_mut(&mut self) -> &mut OT {
         &mut self.observers
     }
-}
-
-impl<'a, H, I, OT, S> HasPostRunReset for InProcessExecutor<'a, H, I, OT, S>
-where
-    H: FnMut(&I) -> ExitKind,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
-    #[inline]
-    fn post_run_reset(&self) {}
 }
 
 impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
@@ -278,7 +268,7 @@ impl InProcessHandlers {
     pub fn new<E, EM, I, OF, OT, S, Z>() -> Result<Self, Error>
     where
         I: Input,
-        E: HasObservers<I, OT, S> + HasPostRunReset,
+        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         OT: ObserversTuple<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OF: Feedback<I, S>,
@@ -430,7 +420,7 @@ mod unix_signal_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            ExitKind, HasObservers, HasPostRunReset,
+            Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -572,7 +562,7 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers<I, OT, S> + HasPostRunReset,
+        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -620,7 +610,7 @@ mod unix_signal_handler {
 
             // TODO tell the parent to not restart
         } else {
-            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
             // disarms timeout in case of TimeoutExecutor
             executor.post_run_reset();
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
@@ -699,7 +689,7 @@ mod windows_exception_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            ExitKind, HasObservers, HasPostRunReset,
+            Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -843,7 +833,7 @@ mod windows_exception_handler {
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers<I, OT, S> + HasPostRunReset,
+        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -868,7 +858,7 @@ mod windows_exception_handler {
             LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
 
-            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
             executor.post_run_reset();
             data.tp_timer = ptr::null_mut();
         }

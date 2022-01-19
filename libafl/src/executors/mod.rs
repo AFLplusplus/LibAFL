@@ -69,12 +69,6 @@ where
     fn observers_mut(&mut self) -> &mut OT;
 }
 
-/// Allows access to custom Reset Handler
-pub trait HasPostRunReset {
-    /// Reset the state, e.g., disable timers
-    fn post_run_reset(&self);
-}
-
 /// An executor takes the given inputs, and runs the harness/target.
 pub trait Executor<EM, I, S, Z>: Debug
 where
@@ -100,11 +94,9 @@ where
     {
         WithObservers::new(self, observers)
     }
-}
 
-impl<EM, I, S, Z> HasPostRunReset for dyn Executor<EM, I, S, Z> {
-    #[inline]
-    fn post_run_reset(&self) {}
+    /// Custom Reset Handler, e.g., to reset timers
+    fn post_run_reset(&mut self) {}
 }
 
 /// A simple executor that does nothing.
@@ -129,6 +121,8 @@ where
             Ok(ExitKind::Ok)
         }
     }
+
+    fn post_run_reset(&mut self) {}
 }
 
 #[cfg(test)]

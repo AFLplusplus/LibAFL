@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    executors::{Executor, ExitKind, HasObservers, HasPostRunReset},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
     Error,
@@ -76,7 +76,7 @@ extern "C" {
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout excutor is a wrapper that sets a timeout before each run
-pub struct TimeoutExecutor<E: HasPostRunReset> {
+pub struct TimeoutExecutor<E> {
     executor: E,
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
@@ -92,7 +92,7 @@ pub struct TimeoutExecutor<E: HasPostRunReset> {
     critical: RTL_CRITICAL_SECTION,
 }
 
-impl<E: Debug + HasPostRunReset> Debug for TimeoutExecutor<E> {
+impl<E: Debug> Debug for TimeoutExecutor<E> {
     #[cfg(windows)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
@@ -131,7 +131,7 @@ type PTP_TIMER_CALLBACK = unsafe extern "system" fn(
 );
 
 #[cfg(target_os = "linux")]
-impl<E: HasPostRunReset> TimeoutExecutor<E> {
+impl<E> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
@@ -180,7 +180,7 @@ impl<E: HasPostRunReset> TimeoutExecutor<E> {
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E: HasPostRunReset> TimeoutExecutor<E> {
+impl<E> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
@@ -223,7 +223,7 @@ impl<E: HasPostRunReset> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E: HasInProcessHandlers + HasPostRunReset> TimeoutExecutor<E> {
+impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
         let milli_sec = exec_tmout.as_millis() as i64;
@@ -265,7 +265,7 @@ impl<E: HasInProcessHandlers + HasPostRunReset> TimeoutExecutor<E> {
 #[cfg(windows)]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasInProcessHandlers + HasPostRunReset,
+    E: Executor<EM, I, S, Z> + HasInProcessHandlers,
     I: Input,
 {
     #[allow(clippy::cast_sign_loss)]
@@ -320,12 +320,22 @@ where
             ret
         }
     }
+
+    /// Deletes this timer queue
+    /// # Safety
+    /// Will dereference the given `tp_timer` pointer, unchecked.
+    fn post_run_reset(&mut self) {
+        unsafe {
+            CloseThreadpoolTimer(self.tp_timer);
+        }
+        self.executor.post_run_reset();
+    }
 }
 
 #[cfg(target_os = "linux")]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasPostRunReset,
+    E: Executor<EM, I, S, Z>,
     I: Input,
 {
     fn run_target(
@@ -343,12 +353,20 @@ where
             ret
         }
     }
+
+    fn post_run_reset(&mut self) {
+        unsafe {
+            let disarmed: libc::itimerspec = zeroed();
+            libc::timer_settime(self.timerid, 0, &disarmed as *const _, null_mut());
+        }
+        self.executor.post_run_reset();
+    }
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
 impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasPostRunReset,
+    E: Executor<EM, I, S, Z>,
     I: Input,
 {
     fn run_target(
@@ -365,11 +383,19 @@ where
             ret
         }
     }
+
+    fn post_run_reset(&mut self) {
+        unsafe {
+            let mut itimerval_zero: Itimerval = zeroed();
+            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
+        }
+        self.executor.post_run_reset();
+    }
 }
 
 impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutExecutor<E>
 where
-    E: HasObservers<I, OT, S> + HasPostRunReset,
+    E: HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
 {
     #[inline]
@@ -380,42 +406,5 @@ where
     #[inline]
     fn observers_mut(&mut self) -> &mut OT {
         self.executor.observers_mut()
-    }
-}
-
-#[cfg(target_os = "linux")]
-impl<E: HasPostRunReset> HasPostRunReset for TimeoutExecutor<E> {
-    /// Disarm currently running timer
-    fn post_run_reset(&self) {
-        unsafe {
-            let disarmed: libc::itimerspec = zeroed();
-            libc::timer_settime(self.timerid, 0, &disarmed as *const _, null_mut());
-            self.executor.post_run_reset();
-        }
-    }
-}
-
-#[cfg(all(unix, not(target_os = "linux")))]
-impl<E: HasPostRunReset> HasPostRunReset for TimeoutExecutor<E> {
-    /// Disarm currently running timer
-    fn post_run_reset(&self) {
-        unsafe {
-            let mut itimerval_zero: Itimerval = zeroed();
-            setitimer(ITIMER_REAL, &mut itimerval_zero, null_mut());
-            self.executor.post_run_reset();
-        }
-    }
-}
-
-#[cfg(all(windows, feature = "std"))]
-impl<E: HasPostRunReset> HasPostRunReset for TimeoutExecutor<E> {
-    /// Deletes this timer queue
-    /// # Safety
-    /// Will dereference the given `tp_timer` pointer, unchecked.
-    fn post_run_reset(&self) {
-        unsafe {
-            CloseThreadpoolTimer(self.tp_timer);
-            self.executor.post_run_reset();
-        }
     }
 }
