@@ -156,6 +156,7 @@ fn main() {
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
             .args(&custom_flags)
+            .arg("-DUSE_NEW_PM")
             .arg(src_dir.join("afl-coverage-pass.cc"))
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])
