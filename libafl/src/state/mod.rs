@@ -643,7 +643,7 @@ where
 /// State Python bindings
 pub mod pybind {
     use crate::bolts::{rands::StdRand, tuples::tuple_list};
-    use crate::corpus::{InMemoryCorpus, OnDiskCorpus};
+    use crate::corpus::pybind::PythonCorpus;
     use crate::events::pybind::PythonEventManager;
     use crate::executors::pybind::PythonExecutorI32;
     use crate::feedbacks::map::{pybind::PythonMapFeedbackStateI32, MapFeedbackState};
@@ -652,15 +652,14 @@ pub mod pybind {
     use crate::inputs::BytesInput;
     use crate::state::StdState;
     use pyo3::prelude::*;
-    use std::path::PathBuf;
 
     /// Temporary StdState with fixed generics
     pub type MyStdState = StdState<
-        InMemoryCorpus<BytesInput>,
+        PythonCorpus,
         (MapFeedbackState<i32>, ()),
         BytesInput,
         StdRand,
-        OnDiskCorpus<BytesInput>,
+        PythonCorpus
     >;
 
     #[pyclass(unsendable, name = "StdState")]
@@ -676,14 +675,15 @@ pub mod pybind {
         #[new]
         fn new(
             seed: u64,
-            dir_path_name: String,
+            corpus: PythonCorpus,
+            solutions: PythonCorpus,
             py_map_feedback_state: PythonMapFeedbackStateI32,
         ) -> Self {
             Self {
                 std_state: StdState::new(
                     StdRand::with_seed(seed),
-                    InMemoryCorpus::new(),
-                    OnDiskCorpus::new(PathBuf::from(dir_path_name)).unwrap(),
+                    corpus,
+                    solutions,
                     tuple_list!(py_map_feedback_state.map_feedback_state),
                 ),
             }

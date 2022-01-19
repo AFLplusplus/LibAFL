@@ -346,5 +346,9 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     executors::pybind::register(py, m)?;
     executors::inprocess::pybind::register(py, m)?;
     generators::pybind::register(py, m)?;
+    corpus::pybind::register(py, m)?;
+    corpus::ondisk::pybind::register(py, m)?;
+    corpus::inmemory::pybind::register(py, m)?;
+    corpus::cached::pybind::register(py, m)?;
     Ok(())
 }

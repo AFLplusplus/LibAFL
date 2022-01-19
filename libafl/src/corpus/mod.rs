@@ -168,7 +168,7 @@ pub mod pybind {
     }
 
     /// Corpus Trait binding
-    #[pyclass(unsendable, name = "EventManager")]
+    #[pyclass(unsendable, name = "Corpus")]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct PythonCorpus {
         corpus: PythonCorpusWrapper,
