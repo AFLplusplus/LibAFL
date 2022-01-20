@@ -71,8 +71,8 @@ regex = { version = "1", optional = true }
 build_id = { version = "0.2.1", git = "https://github.com/domenukk/build_id", rev = "6a61943", optional = true }
 uuid = { version = "0.8.2", optional = true, features = ["serde", "v4"] }
 libm = "0.2.1"
-tui = { version = "0.16.0", git = "https://github.com/fdehau/tui-rs", rev = "853d9047b0f83e50dabbfc0359692e44bbbb5f1a", features = ["crossterm"], optional = true }
-crossterm = { version = "0.22", optional = true }
+tui = { version = "0.16", default-features = false, features = ['crossterm'], optional = true }
+crossterm = { version = "0.20", optional = true }
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
