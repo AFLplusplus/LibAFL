@@ -2,7 +2,6 @@
 
 use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
-use num_traits::PrimInt;
 
 use crate::{
     corpus::{Corpus, IsFavoredMetadata, PowerScheduleTestcaseMetaData, Testcase},
@@ -34,13 +33,12 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<E, EM, I, M, O, OT, S, T, Z>
+pub struct PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
-    O: MapObserver<T>,
+    O: MapObserver,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
@@ -50,17 +48,16 @@ where
     /// The employed power schedule strategy
     strat: PowerSchedule,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, I, O, OT, S, T, Z)>,
+    phantom: PhantomData<(E, EM, I, O, OT, S, Z)>,
 }
 
-impl<E, EM, I, M, O, OT, S, T, Z> MutationalStage<E, EM, I, M, S, Z>
-    for PowerMutationalStage<E, EM, I, M, O, OT, S, T, Z>
+impl<E, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
+    for PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
-    O: MapObserver<T>,
+    O: MapObserver,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
@@ -153,14 +150,12 @@ where
     }
 }
 
-impl<E, EM, I, M, O, OT, S, T, Z> Stage<E, EM, S, Z>
-    for PowerMutationalStage<E, EM, I, M, O, OT, S, T, Z>
+impl<E, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
-    O: MapObserver<T>,
+    O: MapObserver,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
@@ -180,13 +175,12 @@ where
     }
 }
 
-impl<E, EM, I, M, O, OT, S, T, Z> PowerMutationalStage<E, EM, I, M, O, OT, S, T, Z>
+impl<E, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
 where
-    T: PrimInt + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned + Debug,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     I: Input,
     M: Mutator<I, S>,
-    O: MapObserver<T>,
+    O: MapObserver,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,

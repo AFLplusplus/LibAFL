@@ -7,7 +7,10 @@ this helps finding mem errors early.
 */
 
 use backtrace::Backtrace;
-use core::fmt::{self, Debug, Formatter};
+use core::{
+    fmt::{self, Debug, Formatter},
+    ptr::addr_of_mut,
+};
 use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
 use hashbrown::HashMap;
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
@@ -362,7 +365,7 @@ impl AsanRuntime {
             rlim_cur: 0,
             rlim_max: 0,
         };
-        assert!(unsafe { getrlimit(RLIMIT_STACK, &mut stack_rlimit as *mut rlimit) } == 0);
+        assert!(unsafe { getrlimit(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
 
         stack_rlimit.rlim_cur as usize
     }
@@ -375,7 +378,7 @@ impl AsanRuntime {
             rlim_cur: 0,
             rlim_max: 0,
         };
-        assert!(unsafe { getrlimit64(RLIMIT_STACK, &mut stack_rlimit as *mut rlimit64) } == 0);
+        assert!(unsafe { getrlimit64(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
 
         stack_rlimit.rlim_cur as usize
     }
@@ -387,7 +390,7 @@ impl AsanRuntime {
     #[must_use]
     pub fn current_stack() -> (usize, usize) {
         let mut stack_var = 0xeadbeef;
-        let stack_address = &mut stack_var as *mut _ as *mut c_void as usize;
+        let stack_address = addr_of_mut!(stack_var) as usize;
         let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
         unsafe {
@@ -1853,7 +1856,7 @@ impl AsanRuntime {
             ; self_addr:
             ; .qword self as *mut _  as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+            ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
             ; .qword AsanRuntime::handle_trap as *mut c_void as i64
         );
@@ -2155,7 +2158,6 @@ impl AsanRuntime {
             .unwrap()
             .arch_detail()
             .operands();
-
         // Ignore lea instruction
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.

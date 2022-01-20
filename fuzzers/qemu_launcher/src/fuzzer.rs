@@ -11,6 +11,7 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::tuple_list,
+        AsSlice,
     },
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,

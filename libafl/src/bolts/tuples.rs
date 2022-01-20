@@ -2,12 +2,15 @@
 
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 
-use core::any::TypeId;
+use core::{
+    any::TypeId,
+    ptr::{addr_of, addr_of_mut},
+};
 
 use xxhash_rust::xxh3::xxh3_64;
 
 #[rustversion::nightly]
-/// From https://stackoverflow.com/a/60138532/7658998
+/// From <https://stackoverflow.com/a/60138532/7658998>
 const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // Helper trait. `VALUE` is false, except for the specialization of the
     // case where `T == U`.
@@ -142,7 +145,7 @@ where
 {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            unsafe { (&self.0 as *const _ as *const T).as_ref() }
+            unsafe { (addr_of!(self.0) as *const T).as_ref() }
         } else {
             self.1.match_first_type::<T>()
         }
@@ -150,7 +153,7 @@ where
 
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+            unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }
         } else {
             self.1.match_first_type_mut::<T>()
         }
@@ -178,7 +181,7 @@ where
     fn match_type<T: 'static>(&self, f: fn(t: &T)) {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            f(unsafe { (&self.0 as *const _ as *const T).as_ref() }.unwrap());
+            f(unsafe { (addr_of!(self.0) as *const T).as_ref() }.unwrap());
         }
         self.1.match_type::<T>(f);
     }
@@ -186,7 +189,7 @@ where
     fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T)) {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            f(unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }.unwrap());
+            f(unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }.unwrap());
         }
         self.1.match_type_mut::<T>(f);
     }
@@ -251,7 +254,7 @@ where
 {
     fn match_name<T>(&self, name: &str) -> Option<&T> {
         if type_eq::<Head, T>() && name == self.0.name() {
-            unsafe { (&self.0 as *const _ as *const T).as_ref() }
+            unsafe { (addr_of!(self.0) as *const T).as_ref() }
         } else {
             self.1.match_name::<T>(name)
         }
@@ -259,7 +262,7 @@ where
 
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
         if type_eq::<Head, T>() && name == self.0.name() {
-            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+            unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }
         } else {
             self.1.match_name_mut::<T>(name)
         }
@@ -291,7 +294,7 @@ where
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T> {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
-            unsafe { (&self.0 as *const _ as *const T).as_ref() }
+            unsafe { (addr_of!(self.0) as *const T).as_ref() }
         } else {
             self.1.match_name_type::<T>(name)
         }
@@ -300,7 +303,7 @@ where
     fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
-            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+            unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }
         } else {
             self.1.match_name_type_mut::<T>(name)
         }
