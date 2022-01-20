@@ -9,7 +9,7 @@ use hashbrown::HashMap;
 use tui::{backend::CrosstermBackend, Terminal};
 
 use std::{
-    cmp::{max, min},
+    collections::VecDeque,
     io::{self, BufRead},
     string::String,
     sync::{Arc, RwLock},
@@ -29,6 +29,9 @@ use crate::{
 mod ui;
 use ui::TuiUI;
 
+const DEFAULT_TIME_WINDOW: u64 = 60 * 10; // 10 min
+const DEFAULT_LOGS_NUMBER: usize = 128;
+
 #[derive(Debug, Copy, Clone)]
 pub struct TimedStat {
     pub time: Duration,
@@ -43,36 +46,47 @@ impl Into<(f64, f64)> for TimedStat {
 
 #[derive(Debug, Clone)]
 pub struct TimedStats {
-    pub series: Vec<TimedStat>,
-    pub max: u64,
-    pub min: u64,
+    pub series: VecDeque<TimedStat>,
+    pub window: Duration,
 }
 
 impl TimedStats {
-    pub fn new() -> Self {
+    pub fn new(window: Duration) -> Self {
         Self {
-            series: vec![],
-            max: u64::MIN,
-            min: u64::MAX,
+            series: VecDeque::new(),
+            window,
         }
     }
 
     pub fn add(&mut self, time: Duration, item: u64) {
-        if self.series.is_empty() || self.series[self.series.len() - 1].item != item {
-            self.series.push(TimedStat { time, item });
-            self.max = max(self.max, item);
-            self.min = min(self.min, item);
+        if self.series.is_empty() || self.series.back().unwrap().item != item {
+            if self.series.front().is_some() {
+                if time - self.series.front().unwrap().time > self.window {
+                    self.series.pop_front();
+                }
+            }
+            self.series.push_back(TimedStat { time, item });
         }
     }
 
     pub fn add_now(&mut self, item: u64) {
         if self.series.is_empty() || self.series[self.series.len() - 1].item != item {
-            self.series.push(TimedStat {
-                time: current_time(),
-                item,
-            });
-            self.max = max(self.max, item);
-            self.min = min(self.min, item);
+            let time = current_time();
+            if self.series.front().is_some() {
+                if time - self.series.front().unwrap().time > self.window {
+                    self.series.pop_front();
+                }
+            }
+            self.series.push_back(TimedStat { time, item });
+        }
+    }
+
+    pub fn update_window(&mut self, window: Duration) {
+        self.window = window;
+        while !self.series.is_empty()
+            && self.series.back().unwrap().time - self.series.front().unwrap().time > window
+        {
+            self.series.pop_front();
         }
     }
 }
@@ -178,6 +192,7 @@ impl ClientTuiContext {
 pub struct TuiContext {
     pub graphs: Vec<String>,
 
+    // TODO update the window using the UI key press events (+/-)
     pub corpus_size_timed: TimedStats,
     pub objective_size_timed: TimedStats,
     pub execs_per_sec_timed: TimedStats,
@@ -187,7 +202,7 @@ pub struct TuiContext {
 
     pub clients: HashMap<usize, ClientTuiContext>,
 
-    pub client_logs: Vec<String>, // TODO set max size
+    pub client_logs: VecDeque<String>,
 
     pub clients_num: usize,
     pub total_execs: u64,
@@ -199,15 +214,15 @@ impl TuiContext {
     pub fn new(start_time: Duration) -> Self {
         Self {
             graphs: vec!["corpus".into(), "objectives".into(), "exec/sec".into()],
-            corpus_size_timed: TimedStats::new(),
-            objective_size_timed: TimedStats::new(),
-            execs_per_sec_timed: TimedStats::new(),
+            corpus_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
+            objective_size_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
+            execs_per_sec_timed: TimedStats::new(Duration::from_secs(DEFAULT_TIME_WINDOW)),
 
             #[cfg(feature = "introspection")]
             introspection: HashMap::default(),
             clients: HashMap::default(),
 
-            client_logs: vec![],
+            client_logs: VecDeque::with_capacity(DEFAULT_LOGS_NUMBER),
 
             clients_num: 0,
             total_execs: 0,
@@ -283,7 +298,10 @@ impl Monitor for TuiMonitor {
                 .entry(sender_id as usize)
                 .or_default()
                 .grab_data(client, exec_sec);
-            ctx.client_logs.push(fmt);
+            while ctx.client_logs.len() >= DEFAULT_LOGS_NUMBER {
+                ctx.client_logs.pop_front();
+            }
+            ctx.client_logs.push_back(fmt);
         }
 
         #[cfg(feature = "introspection")]
@@ -342,10 +360,14 @@ fn run_tui_thread(
         let mut ui = TuiUI::new(title, enhanced_graphics);
 
         let mut last_tick = Instant::now();
+        let mut cnt = 0;
         loop {
-            terminal.flush().unwrap();
+            // to avoid initial ui glitches
+            if cnt < 8 {
+                let _ = terminal.clear();
+                cnt += 1;
+            }
             terminal.draw(|f| ui.draw(f, &context))?;
-            terminal.flush().unwrap();
 
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())
@@ -386,6 +408,7 @@ fn run_tui_thread(
                 enable_raw_mode()?;
                 execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
 
+                cnt = 0;
                 ui.should_quit = false;
             }
         }

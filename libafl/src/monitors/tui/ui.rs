@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use super::*;
 
 use tui::{
@@ -7,43 +9,15 @@ use tui::{
     symbols,
     text::{Span, Spans},
     widgets::{
-        Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, ListState, Paragraph, Row,
-        Table, Tabs,
+        Axis, Block, Borders, Cell, Chart, Dataset, List, ListItem, Paragraph, Row, Table, Tabs,
     },
     Frame,
 };
 
-use std::sync::{Arc, RwLock};
-
-/*
-pub fn next<T>(state: &mut ListState, items: &[T]) {
-    let i = match state.selected() {
-        Some(i) => {
-            if i >= items.len() - 1 {
-                0
-            } else {
-                i + 1
-            }
-        }
-        None => 0,
-    };
-    state.select(Some(i));
-}
-
-pub fn previous<T>(state: &mut ListState, items: &[T]) {
-    let i = match state.selected() {
-        Some(i) => {
-            if i == 0 {
-                items.len() - 1
-            } else {
-                i - 1
-            }
-        }
-        None => 0,
-    };
-    state.select(Some(i));
-}
-*/
+use std::{
+    cmp::{max, min},
+    sync::{Arc, RwLock},
+};
 
 #[derive(Default)]
 pub struct TuiUI {
@@ -53,9 +27,9 @@ pub struct TuiUI {
     clients_idx: usize,
     clients: usize,
     charts_tab_idx: usize,
+    graph_data: Vec<(f64, f64)>,
 
     pub should_quit: bool,
-    pub client_logs: ListState,
 }
 
 impl TuiUI {
@@ -74,9 +48,8 @@ impl TuiUI {
             'q' => {
                 self.should_quit = true;
             }
-            'n' => {
-                // never 0
-                self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
+            'g' => {
+                self.charts_tab_idx = (self.charts_tab_idx + 1) % 3;
             }
             't' => {
                 self.show_logs = !self.show_logs;
@@ -90,14 +63,16 @@ impl TuiUI {
     //pub fn on_down(&mut self) {}
 
     pub fn on_right(&mut self) {
-        self.charts_tab_idx = (self.charts_tab_idx + 1) % 3;
+        // never 0
+        self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
     }
 
     pub fn on_left(&mut self) {
-        if self.charts_tab_idx > 0 {
-            self.charts_tab_idx -= 1;
+        // never 0
+        if self.clients_idx == 1 {
+            self.clients_idx = self.clients - 1;
         } else {
-            self.charts_tab_idx = 2;
+            self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
         }
     }
 
@@ -159,7 +134,7 @@ impl TuiUI {
             .block(
                 Block::default()
                     .title(Span::styled(
-                        "charts (l/r arrows to switch)",
+                        "charts (`g` switch)",
                         Style::default()
                             .fg(Color::LightCyan)
                             .add_modifier(Modifier::BOLD),
@@ -219,22 +194,14 @@ impl TuiUI {
     ) where
         B: Backend,
     {
-        let (min_x, max_x, min_y, max_y, min_lbl_x, med_lbl_x, max_lbl_x) =
-            if stats.series.is_empty() {
-                (0, 0, 0, 0, "n/a".into(), "n/a".into(), "n/a".into())
-            } else {
-                let end = stats.series[stats.series.len() - 1].time;
-                let start = end.saturating_sub(Duration::from_secs(5 * 60));
-                (
-                    start.as_secs(),
-                    end.as_secs(),
-                    stats.min,
-                    stats.max,
-                    format_duration_hms(&start),
-                    format_duration_hms(&((end - start) / 2)),
-                    format_duration_hms(&end),
-                )
-            };
+        if stats.series.is_empty() {
+            return;
+        }
+        let start = stats.series.front().unwrap().time;
+        let end = stats.series.back().unwrap().time;
+        let min_lbl_x = format_duration_hms(&start);
+        let med_lbl_x = format_duration_hms(&((end - start) / 2));
+        let max_lbl_x = format_duration_hms(&end);
 
         let x_labels = vec![
             Span::styled(min_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
@@ -242,23 +209,55 @@ impl TuiUI {
             Span::styled(max_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
         ];
 
-        let mut data = vec![];
-        let mut prev = (min_x, 0);
-        for ts in &stats.series {
-            let t = ts.time.as_secs();
-            if t > prev.0 + 1 {
-                for v in prev.0 + 1..t {
-                    data.push((v as f64, prev.1 as f64));
+        let max_x = area.width as u64;
+        let window = end - start;
+        let time_unit = if max_x > window.as_secs() {
+            0 // millis / 10
+        } else if max_x > window.as_secs() * 60 {
+            1 // secs
+        } else {
+            2 // min
+        };
+        let convert_time = |d: &Duration| -> u64 {
+            if time_unit == 0 {
+                (d.as_millis() / 10) as u64
+            } else if time_unit == 1 {
+                d.as_secs()
+            } else {
+                (d.as_secs() * 60)
+            }
+        };
+        let window_unit = convert_time(&window);
+        if window_unit == 0 {
+            return;
+        }
+
+        let to_x = |d: &Duration| (convert_time(d) - convert_time(&start)) * max_x / window_unit;
+
+        self.graph_data.clear();
+
+        let mut max_y = u64::MIN;
+        let mut min_y = u64::MAX;
+        let mut prev = (0, 0);
+        for ts in stats.series.iter() {
+            let x = to_x(&ts.time);
+            if x > prev.0 + 1 && x < max_x {
+                for v in (prev.0 + 1)..x {
+                    self.graph_data.push((v as f64, prev.1 as f64));
                 }
             }
-            prev = (t, ts.item);
-            data.push((t as f64, ts.item as f64));
+            prev = (x, ts.item);
+            self.graph_data.push((x as f64, ts.item as f64));
+            max_y = max(ts.item, max_y);
+            min_y = min(ts.item, min_y);
         }
         if max_x > prev.0 + 1 {
-            for v in prev.0 + 1..max_x {
-                data.push((v as f64, prev.1 as f64));
+            for v in (prev.0 + 1)..max_x {
+                self.graph_data.push((v as f64, prev.1 as f64));
             }
         }
+
+        //println!("max_x: {}, len: {}", max_x, self.graph_data.len());
 
         let datasets = vec![Dataset::default()
             //.name("data")
@@ -272,7 +271,7 @@ impl TuiUI {
                     .fg(Color::LightYellow)
                     .add_modifier(Modifier::BOLD),
             )
-            .data(&data)];
+            .data(&self.graph_data)];
         let chart = Chart::new(datasets)
             .block(
                 Block::default()
@@ -288,7 +287,7 @@ impl TuiUI {
                 Axis::default()
                     .title("time")
                     .style(Style::default().fg(Color::Gray))
-                    .bounds([min_x as f64, max_x as f64])
+                    .bounds([0.0, max_x as f64])
                     .labels(x_labels),
             )
             .y_axis(
@@ -301,7 +300,7 @@ impl TuiUI {
                             format!("{}", min_y),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
-                        Span::raw("0"),
+                        Span::raw(format!("{}", (max_y - min_y) / 2)),
                         Span::styled(
                             format!("{}", max_y),
                             Style::default().add_modifier(Modifier::BOLD),
@@ -338,7 +337,7 @@ impl TuiUI {
                         .unwrap()
                         .execs_per_sec_timed
                         .series
-                        .last()
+                        .back()
                         .map(|x| x.item)
                         .unwrap_or(0)
                 ))),
@@ -371,7 +370,7 @@ impl TuiUI {
 
         let client_block = Block::default()
             .title(Span::styled(
-                format!("client #{} (`n` to switch)", self.clients_idx),
+                format!("client #{} (l/r arrows to switch)", self.clients_idx),
                 Style::default()
                     .fg(Color::LightCyan)
                     .add_modifier(Modifier::BOLD),
@@ -495,11 +494,6 @@ impl TuiUI {
             .iter()
             .map(|msg| ListItem::new(Span::raw(msg)))
             .collect();
-        let sel = if logs.is_empty() {
-            None
-        } else {
-            Some(logs.len() - 1)
-        };
         let logs = List::new(logs).block(
             Block::default().borders(Borders::ALL).title(Span::styled(
                 "clients logs (`t` to show/hide)",
@@ -508,7 +502,6 @@ impl TuiUI {
                     .add_modifier(Modifier::BOLD),
             )),
         );
-        f.render_stateful_widget(logs, area, &mut self.client_logs);
-        self.client_logs.select(sel);
+        f.render_widget(logs, area);
     }
 }
