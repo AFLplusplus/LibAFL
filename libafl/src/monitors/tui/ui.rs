@@ -309,6 +309,7 @@ impl TuiUI {
         f.render_widget(chart, area);
     }
 
+    #[allow(clippy::too_many_lines)]
     fn draw_text<B>(&mut self, f: &mut Frame<B>, app: &Arc<RwLock<TuiContext>>, area: Rect)
     where
         B: Backend,

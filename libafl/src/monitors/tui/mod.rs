@@ -55,10 +55,10 @@ impl TimedStats {
 
     pub fn add(&mut self, time: Duration, item: u64) {
         if self.series.is_empty() || self.series.back().unwrap().item != item {
-            if self.series.front().is_some() {
-                if time - self.series.front().unwrap().time > self.window {
-                    self.series.pop_front();
-                }
+            if self.series.front().is_some()
+                && time - self.series.front().unwrap().time > self.window
+            {
+                self.series.pop_front();
             }
             self.series.push_back(TimedStat { time, item });
         }
@@ -67,10 +67,10 @@ impl TimedStats {
     pub fn add_now(&mut self, item: u64) {
         if self.series.is_empty() || self.series[self.series.len() - 1].item != item {
             let time = current_time();
-            if self.series.front().is_some() {
-                if time - self.series.front().unwrap().time > self.window {
-                    self.series.pop_front();
-                }
+            if self.series.front().is_some()
+                && time - self.series.front().unwrap().time > self.window
+            {
+                self.series.pop_front();
             }
             self.series.push_back(TimedStat { time, item });
         }
@@ -325,6 +325,7 @@ impl TuiMonitor {
     }
 
     /// Creates the monitor with a given `start_time`.
+    #[must_use]
     pub fn with_time(title: String, enhanced_graphics: bool, start_time: Duration) -> Self {
         let context = Arc::new(RwLock::new(TuiContext::new(start_time)));
         run_tui_thread(
