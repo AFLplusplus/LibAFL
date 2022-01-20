@@ -343,7 +343,9 @@ fn run_tui_thread(
 
         let mut last_tick = Instant::now();
         loop {
+            terminal.flush().unwrap();
             terminal.draw(|f| ui.draw(f, &context))?;
+            terminal.flush().unwrap();
 
             let timeout = tick_rate
                 .checked_sub(last_tick.elapsed())

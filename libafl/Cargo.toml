@@ -12,12 +12,13 @@ edition = "2021"
 
 [features]
 default = ["std", "derive", "llmp_compression", "rand_trait", "fork"]
-std = ["serde_json", "serde_json/std", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid", "tui", "crossterm"] # print, env, launcher ... support
+std = ["serde_json", "serde_json/std", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid", "tui_monitor"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
 introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
+tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
 # features hiding dependencies licensed under GPL
 gpl = []
 # features hiding dependencies licensed under AGPL

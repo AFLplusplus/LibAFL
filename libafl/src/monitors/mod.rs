@@ -3,6 +3,7 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
+#[cfg(feature = "tui_monitor")]
 #[allow(missing_docs)]
 pub mod tui;
 
