@@ -3,6 +3,7 @@
 #[cfg(any(windows, unix))]
 use core::{
     fmt::{self, Debug, Formatter},
+    ptr::{addr_of, addr_of_mut},
     time::Duration,
 };
 
@@ -151,11 +152,7 @@ impl<E> TimeoutExecutor<E> {
         let mut timerid: libc::timer_t = null_mut();
         unsafe {
             // creates a new per-process interval timer
-            libc::timer_create(
-                libc::CLOCK_MONOTONIC,
-                null_mut(),
-                std::ptr::addr_of_mut!(timerid),
-            );
+            libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
         }
         Self {
             executor,
@@ -350,12 +347,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         unsafe {
-            libc::timer_settime(
-                self.timerid,
-                0,
-                std::ptr::addr_of_mut!(self.itimerspec),
-                null_mut(),
-            );
+            libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
             // reset timer
             self.post_run_reset();
@@ -366,7 +358,7 @@ where
     fn post_run_reset(&mut self) {
         unsafe {
             let disarmed: libc::itimerspec = zeroed();
-            libc::timer_settime(self.timerid, 0, std::ptr::addr_of!(disarmed), null_mut());
+            libc::timer_settime(self.timerid, 0, addr_of!(disarmed), null_mut());
         }
         self.executor.post_run_reset();
     }

@@ -857,10 +857,6 @@ mod windows_exception_handler {
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
-
-            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
-            executor.post_run_reset();
-            data.tp_timer = ptr::null_mut();
         }
 
         let code = ExceptionCode::try_from(
@@ -905,10 +901,16 @@ mod windows_exception_handler {
 
             // TODO tell the parent to not restart
         } else {
+            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+            // reset timer
+            if !data.tp_timer.is_null() {
+                executor.post_run_reset();
+                data.tp_timer = ptr::null_mut();
+            }
+
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
             let observers = executor.observers();
 
             #[cfg(feature = "std")]

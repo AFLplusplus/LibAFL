@@ -97,6 +97,7 @@ where
     }
 
     /// Custom Reset Handler, e.g., to reset timers
+    #[inline]
     fn post_run_reset(&mut self) {}
 }
 
@@ -122,8 +123,6 @@ where
             Ok(ExitKind::Ok)
         }
     }
-
-    fn post_run_reset(&mut self) {}
 }
 
 #[cfg(test)]
