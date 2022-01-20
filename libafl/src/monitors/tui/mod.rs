@@ -38,12 +38,6 @@ pub struct TimedStat {
     pub item: u64,
 }
 
-impl Into<(f64, f64)> for TimedStat {
-    fn into(self) -> (f64, f64) {
-        ((self.time.as_secs()) as f64, self.item as f64)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct TimedStats {
     pub series: VecDeque<TimedStat>,
@@ -51,6 +45,7 @@ pub struct TimedStats {
 }
 
 impl TimedStats {
+    #[must_use]
     pub fn new(window: Duration) -> Self {
         Self {
             series: VecDeque::new(),
@@ -103,6 +98,7 @@ pub struct PerfTuiContext {
 
 #[cfg(feature = "introspection")]
 impl PerfTuiContext {
+    #[allow(clippy::cast_precision_loss)]
     pub fn grab_data(&mut self, m: &ClientPerfMonitor) {
         // Calculate the elapsed time from the monitor
         let elapsed: f64 = m.elapsed_cycles() as f64;
@@ -211,6 +207,7 @@ pub struct TuiContext {
 
 impl TuiContext {
     /// Create a new TUI context
+    #[must_use]
     pub fn new(start_time: Duration) -> Self {
         Self {
             graphs: vec!["corpus".into(), "objectives".into(), "exec/sec".into()],
@@ -322,6 +319,7 @@ impl Monitor for TuiMonitor {
 
 impl TuiMonitor {
     /// Creates the monitor
+    #[must_use]
     pub fn new(title: String, enhanced_graphics: bool) -> Self {
         Self::with_time(title, enhanced_graphics, current_time())
     }
@@ -364,7 +362,7 @@ fn run_tui_thread(
         loop {
             // to avoid initial ui glitches
             if cnt < 8 {
-                let _ = terminal.clear();
+                drop(terminal.clear());
                 cnt += 1;
             }
             terminal.draw(|f| ui.draw(f, &context))?;

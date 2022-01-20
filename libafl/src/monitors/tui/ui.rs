@@ -1,6 +1,4 @@
-#![allow(unused)]
-
-use super::*;
+use super::{current_time, format_duration_hms, Duration, String, TimedStats, TuiContext};
 
 use tui::{
     backend::Backend,
@@ -39,7 +37,7 @@ impl TuiUI {
             enhanced_graphics,
             show_logs: true,
             clients_idx: 1,
-            ..Default::default()
+            ..TuiUI::default()
         }
     }
 
@@ -184,6 +182,7 @@ impl TuiUI {
         }
     }
 
+    #[allow(clippy::too_many_lines, clippy::cast_precision_loss)]
     fn draw_time_chart<B>(
         &mut self,
         title: &str,
@@ -209,7 +208,7 @@ impl TuiUI {
             Span::styled(max_lbl_x, Style::default().add_modifier(Modifier::BOLD)),
         ];
 
-        let max_x = area.width as u64;
+        let max_x = u64::from(area.width);
         let window = end - start;
         let time_unit = if max_x > window.as_secs() {
             0 // millis / 10
@@ -224,7 +223,7 @@ impl TuiUI {
             } else if time_unit == 1 {
                 d.as_secs()
             } else {
-                (d.as_secs() * 60)
+                d.as_secs() * 60
             }
         };
         let window_unit = convert_time(&window);
@@ -239,7 +238,7 @@ impl TuiUI {
         let mut max_y = u64::MIN;
         let mut min_y = u64::MAX;
         let mut prev = (0, 0);
-        for ts in stats.series.iter() {
+        for ts in &stats.series {
             let x = to_x(&ts.time);
             if x > prev.0 + 1 && x < max_x {
                 for v in (prev.0 + 1)..x {
@@ -338,8 +337,7 @@ impl TuiUI {
                         .execs_per_sec_timed
                         .series
                         .back()
-                        .map(|x| x.item)
-                        .unwrap_or(0)
+                        .map_or(0, |x| x.item)
                 ))),
             ]),
         ];
@@ -484,6 +482,7 @@ impl TuiUI {
         }
     }
 
+    #[allow(clippy::unused_self)]
     fn draw_logs<B>(&mut self, f: &mut Frame<B>, app: &Arc<RwLock<TuiContext>>, area: Rect)
     where
         B: Backend,
