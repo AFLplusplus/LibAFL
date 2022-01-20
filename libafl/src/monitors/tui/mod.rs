@@ -312,7 +312,7 @@ impl Monitor for TuiMonitor {
                     .write()
                     .unwrap()
                     .introspection
-                    .entry(i)
+                    .entry(i + 1)
                     .or_default()
                     .grab_data(&client.introspection_monitor);
             }
