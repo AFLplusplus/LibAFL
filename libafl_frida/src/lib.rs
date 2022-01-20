@@ -319,7 +319,7 @@ impl Default for FridaOptions {
             enable_asan: false,
             enable_asan_leak_detection: false,
             enable_asan_continue_after_error: false,
-            enable_asan_allocation_backtraces: true,
+            enable_asan_allocation_backtraces: false,
             asan_max_allocation: 1 << 30,
             asan_max_total_allocation: 1 << 32,
             asan_max_allocation_panics: false,
