@@ -3,7 +3,6 @@
 #[cfg(any(windows, unix))]
 use core::{
     fmt::{self, Debug, Formatter},
-    ptr::{addr_of, addr_of_mut},
     time::Duration,
 };
 
@@ -19,6 +18,9 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
+
+#[cfg(target_os = "linux")]
+use core::ptr::{addr_of, addr_of_mut};
 
 #[cfg(all(unix, not(target_os = "linux")))]
 use libc::c_int;
