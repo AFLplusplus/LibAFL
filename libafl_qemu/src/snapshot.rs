@@ -154,7 +154,7 @@ impl QemuSnapshotHelper {
                     prev = None;
                     if let Some(p) = perms {
                         if info.perms != *p {
-                            emulator.change_prot(page, SNAPSHOT_PAGE_SIZE, info.perms);
+                            emulator.mprotect(page, SNAPSHOT_PAGE_SIZE, info.perms);
                         }
                     }
                 } else {

@@ -6,6 +6,7 @@ use core::{
     mem::{size_of, transmute, MaybeUninit},
     ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
 };
+use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
@@ -468,27 +469,42 @@ impl Emulator {
         unsafe { libafl_set_brk(brk) };
     }
 
-    pub fn map_private(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
-        let res = unsafe {
-            target_mmap(
-                addr,
-                size as u64,
-                perms.into(),
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-                -1,
-                0,
-            )
-        };
+    fn mmap(&self, addr: u64, size: usize, perms: MmapPerms, flags: c_int) -> Result<u64, ()> {
+        let res = unsafe { target_mmap(addr, size as u64, perms.into(), flags, -1, 0) };
         if res == 0 {
-            Err(format!("Failed to map {}", addr))
+            Err(())
         } else {
             Ok(res)
         }
     }
 
-    pub fn change_prot(&self, addr: u64, size: usize, perms: MmapPerms) -> bool {
+    pub fn map_private(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
+        self.mmap(
+            addr,
+            size,
+            perms.into(),
+            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+        )
+        .map_err(|_| format!("Failed to map {}", addr))
+    }
+
+    pub fn map_fixed(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
+        self.mmap(
+            addr,
+            size,
+            perms.into(),
+            libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+        )
+        .map_err(|_| format!("Failed to map {}", addr))
+    }
+
+    pub fn mprotect(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<(), String> {
         let res = unsafe { target_mprotect(addr, size as u64, perms.into()) };
-        return res > 0;
+        if res == 0 {
+            Ok(())
+        } else {
+            Err(format!("Failed to mprotect {}", addr))
+        }
     }
 
     pub fn unmap(&self, addr: u64, size: usize) -> Result<(), String> {
@@ -776,6 +792,26 @@ pub mod pybind {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.emu
                     .map_private(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
+
+        fn map_fixed(&self, addr: u64, size: usize, perms: i32) -> PyResult<u64> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.emu
+                    .map_fixed(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
+
+        fn mprotect(&self, addr: u64, size: usize, perms: i32) -> PyResult<()> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.emu
+                    .mprotect(addr, size, p)
                     .map_err(PyValueError::new_err)
             } else {
                 Err(PyValueError::new_err("Invalid perms"))
