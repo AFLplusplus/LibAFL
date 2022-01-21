@@ -9,6 +9,9 @@ pub use encoded::*;
 pub mod gramatron;
 pub use gramatron::*;
 
+pub mod generalized;
+pub use generalized::*;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 #[cfg(feature = "nautilus")]
