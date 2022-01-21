@@ -1862,11 +1862,11 @@ impl AsanRuntime {
         );
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
-        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
-        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
-        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
-        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(3));
-        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(1));
+        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(2));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(3));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(5));
     }
 
     ///
