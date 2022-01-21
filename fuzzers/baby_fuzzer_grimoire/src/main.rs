@@ -5,17 +5,17 @@ use std::{fs, path::PathBuf};
 use std::ptr::write_volatile;
 
 use libafl::{
-    bolts::{AsSlice, current_nanos, rands::StdRand, tuples::tuple_list},
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
-    inputs::{HasTargetBytes, GeneralizedInput},
+    inputs::{GeneralizedInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, GrimoireExtensionMutator, scheduled::StdScheduledMutator},
+    mutators::{havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator},
     observers::StdMapObserver,
-    stages::{GeneralizationStage, mutational::StdMutationalStage},
+    stages::{mutational::StdMutationalStage, GeneralizationStage},
     state::StdState,
 };
 
@@ -28,9 +28,13 @@ fn signals_set(idx: usize) {
 }
 
 fn is_sub<T: PartialEq>(mut haystack: &[T], needle: &[T]) -> bool {
-    if needle.len() == 0 { return true; }
+    if needle.len() == 0 {
+        return true;
+    }
     while !haystack.is_empty() {
-        if haystack.starts_with(needle) { return true; }
+        if haystack.starts_with(needle) {
+            return true;
+        }
         haystack = &haystack[1..];
     }
     false
@@ -61,16 +65,15 @@ pub fn main() {
     let mut harness = |input: &GeneralizedInput| {
         let target_bytes = input.target_bytes();
         let bytes = target_bytes.as_slice();
-        
+
         if is_sub(bytes, "fn".as_bytes()) {
             signals_set(2);
         }
-        
-        
+
         if is_sub(bytes, "pippopippo".as_bytes()) {
             signals_set(3);
         }
-        
+
         unsafe {
             if input.grimoire_mutated {
                 println!(">>> {}", std::str::from_utf8_unchecked(bytes));
@@ -118,7 +121,7 @@ pub fn main() {
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-    
+
     let generalization = GeneralizationStage::new(&observer);
 
     // Create the executor for an in-process function with just one observer
@@ -133,15 +136,20 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::with_max_iterations(havoc_mutations(), 2);
-    let grimoire_mutator = StdScheduledMutator::with_max_iterations(tuple_list!(GrimoireExtensionMutator::new()), 2);
-    let mut stages = tuple_list!(generalization, StdMutationalStage::new(mutator), StdMutationalStage::new(grimoire_mutator));
+    let grimoire_mutator =
+        StdScheduledMutator::with_max_iterations(tuple_list!(GrimoireExtensionMutator::new()), 2);
+    let mut stages = tuple_list!(
+        generalization,
+        StdMutationalStage::new(mutator),
+        StdMutationalStage::new(grimoire_mutator)
+    );
 
     for input in initial_inputs {
         fuzzer
             .evaluate_input(&mut state, &mut executor, &mut mgr, input)
             .unwrap();
     }
-    
+
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
