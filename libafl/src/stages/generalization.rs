@@ -374,7 +374,7 @@ where
                     .iter()
                     .filter(|x| x.is_some())
                     .map(|x| x.unwrap()),
-            ); //maybe copied()
+            );
             candidate.bytes_mut().extend(
                 payload[end..]
                     .iter()

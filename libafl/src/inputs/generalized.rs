@@ -116,6 +116,20 @@ impl GeneralizedInput {
         self.generalized = Some(res);
     }
 
+    /// Extend the generalized input
+    pub fn generalized_extend(&mut self, other: &[GeneralizedItem]) {
+        let gen = self.generalized.get_or_insert_with(|| vec![]);
+        if gen.last().is_some()
+            && other.first().is_some()
+            && *gen.last().unwrap() == GeneralizedItem::Gap
+            && *other.first().unwrap() == GeneralizedItem::Gap
+        {
+            gen.extend_from_slice(&other[1..]);
+        } else {
+            gen.extend_from_slice(other);
+        }
+    }
+
     /// Get the generalized input
     pub fn generalized(&self) -> Option<&[GeneralizedItem]> {
         self.generalized.as_ref().map(|x| x.as_slice())
