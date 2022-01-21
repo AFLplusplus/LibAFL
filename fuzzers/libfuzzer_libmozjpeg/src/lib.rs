@@ -11,6 +11,7 @@ use libafl::{
         current_nanos,
         rands::StdRand,
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::{setup_restarting_mgr_std, EventConfig},
