@@ -92,6 +92,30 @@ impl GeneralizedInput {
         }
     }
 
+    /// Fill the generalized vector from a slice of option (None -> Gap)
+    pub fn generalized_from_options(&mut self, v: &[Option<u8>]) {
+        let mut res = vec![];
+        let mut bytes = vec![];
+        for e in v {
+            match e {
+                None => {
+                    if bytes.len() > 0 {
+                        res.push(GeneralizedItem::Bytes(bytes.clone()));
+                        bytes.clear();
+                    }
+                    res.push(GeneralizedItem::Gap);
+                }
+                Some(b) => {
+                    bytes.push(*b);
+                }
+            }
+        }
+        if bytes.len() > 0 {
+            res.push(GeneralizedItem::Bytes(bytes));
+        }
+        self.generalized = Some(res);
+    }
+
     /// Get the generalized input
     pub fn generalized(&self) -> Option<&[GeneralizedItem]> {
         self.generalized.as_ref().map(|x| x.as_slice())

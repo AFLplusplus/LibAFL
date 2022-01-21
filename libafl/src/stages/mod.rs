@@ -19,6 +19,9 @@ pub use calibrate::{CalibrationStage, PowerScheduleMetadata};
 pub mod power;
 pub use power::PowerMutationalStage;
 
+pub mod generalization;
+pub use generalization::GeneralizationStage;
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
