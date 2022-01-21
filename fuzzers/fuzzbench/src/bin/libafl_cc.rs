@@ -17,7 +17,7 @@ pub fn main() {
 
         let mut cc = ClangWrapper::new();
 
-        #[cfg(linux)]
+        #[cfg(target_os = "linux")]
         cc.add_pass(LLVMPasses::AutoTokens);
 
         if let Some(code) = cc
