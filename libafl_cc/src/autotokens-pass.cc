@@ -141,12 +141,12 @@ bool isIgnoreFunction(const llvm::Function *F) {
 
 }
 
-class AFLdict2filePass : public ModulePass {
+class AutoTokensPass : public ModulePass {
 
  public:
   static char ID;
 
-  AFLdict2filePass() : ModulePass(ID) {
+  AutoTokensPass() : ModulePass(ID) {
 
 
   }
@@ -162,7 +162,7 @@ class AFLdict2filePass : public ModulePass {
 
 }  // namespace
 
-char AFLdict2filePass::ID = 0;
+char AutoTokensPass::ID = 0;
 
 
 void dict2file(int fd, uint8_t *mem, uint32_t len) {
@@ -202,7 +202,7 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
 
 }
 
-bool AFLdict2filePass::runOnModule(Module &M) {
+bool AutoTokensPass::runOnModule(Module &M) {
 
   DenseMap<Value *, std::string *> valueMap;
   char *                           ptr;
@@ -719,19 +719,19 @@ bool AFLdict2filePass::runOnModule(Module &M) {
 }
 
 
-static void registerAFLdict2filePass(const PassManagerBuilder &,
+static void registerAutoTokensPass(const PassManagerBuilder &,
                                      legacy::PassManagerBase &PM) {
 
-  PM.add(new AFLdict2filePass());
+  PM.add(new AutoTokensPass());
 
 }
 
-static RegisterPass<AFLdict2filePass> X("afl-dict2file",
-                                        "afl++ dict2file instrumentation pass",
+static RegisterPass<AutoTokensPass> X("autotokens",
+                                        "autotokens instrumentation pass",
                                         false, false);
 
-static RegisterStandardPasses RegisterAFLdict2filePass(
-    PassManagerBuilder::EP_OptimizerLast, registerAFLdict2filePass);
+static RegisterStandardPasses RegisterAutoTokensPass(
+    PassManagerBuilder::EP_OptimizerLast, registerAutoTokensPass);
 
-static RegisterStandardPasses RegisterAFLdict2filePass0(
-    PassManagerBuilder::EP_EnabledOnOptLevel0, registerAFLdict2filePass);
+static RegisterStandardPasses RegisterAutoTokensPass0(
+    PassManagerBuilder::EP_EnabledOnOptLevel0, registerAutoTokensPass);

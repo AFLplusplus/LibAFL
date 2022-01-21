@@ -142,7 +142,7 @@ fn main() {
 
         println!("cargo:rerun-if-changed=src/cmplog-routines-pass.cc");
         println!("cargo:rerun-if-changed=src/afl-coverage-pass.cc");
-        println!("cargo:rerun-if-changed=src/dict2file-pass.cc");
+        println!("cargo:rerun-if-changed=src/autotokens-pass.cc");
 
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
@@ -167,12 +167,12 @@ fn main() {
         let _ = Command::new(llvm_bindir.join("clang++"))
             .args(&cxxflags)
             .args(&custom_flags)
-            .arg(src_dir.join("dict2file-pass.cc"))
+            .arg(src_dir.join("autotokens-pass.cc"))
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])
-            .arg(out_dir.join(format!("dict2file-pass.{}", dll_extension())))
+            .arg(out_dir.join(format!("autotokens-pass.{}", dll_extension())))
             .status()
-            .expect("Failed to compile dict2file-pass.cc");
+            .expect("Failed to compile autotokens-pass.cc");
     } else {
         write!(
             &mut clang_constants_file,

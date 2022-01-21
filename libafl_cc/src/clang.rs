@@ -32,7 +32,7 @@ pub enum LLVMPasses {
     /// The AFL coverage pass
     AFLCoverage,
     /// The Autodict pass
-    Dict2File,
+    AutoTokens,
 }
 
 impl LLVMPasses {
@@ -44,8 +44,8 @@ impl LLVMPasses {
                 .join(format!("cmplog-routines-pass.{}", dll_extension())),
             LLVMPasses::AFLCoverage => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("afl-coverage-pass.{}", dll_extension())),
-            LLVMPasses::Dict2File => {
-                PathBuf::from(env!("OUT_DIR")).join(format!("dict2file-pass.{}", dll_extension()))
+            LLVMPasses::AutoTokens => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("autotokens-pass.{}", dll_extension()))
             }
         }
     }
