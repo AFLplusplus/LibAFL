@@ -27,6 +27,7 @@ pub fn main() {
             .link_staticlib(&dir, "fuzzbench")
             .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
             .add_pass(LLVMPasses::CmpLogRtn)
+            .add_pass(LLVMPasses::AutoTokens)
             .run()
             .expect("Failed to run the wrapped compiler")
         {
