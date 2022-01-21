@@ -132,8 +132,9 @@ HARNESS_EXPORTS extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_
         return 0;
     }
 
-
-    // func1();
+#ifdef TEST_ASAN
+    func1();
+#endif
 
     std::vector<unsigned char> v(data, data + size);
     if (png_sig_cmp(v.data(), 0, kPngHeaderSize)) {
