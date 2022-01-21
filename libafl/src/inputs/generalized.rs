@@ -26,14 +26,23 @@ pub struct GeneralizedInput {
     /// The raw input bytes
     bytes: Vec<u8>,
     generalized: Option<Vec<GeneralizedItem>>,
+    /// If was mutated or not by Grimoire
+    pub grimoire_mutated: bool,
 }
 
 impl Input for GeneralizedInput {
     /// Generate a name for this input
     fn generate_name(&self, _idx: usize) -> String {
         let mut hasher = AHasher::new_with_keys(0, 0);
+        // TODO add generalized
         hasher.write(self.bytes());
         format!("{:016x}", hasher.finish())
+    }
+
+    /// An hook executed before being added to the corpus
+    fn wrapped_as_testcase(&mut self) {
+        // restore to allow bit-level mutations
+        self.grimoire_mutated = false;
     }
 }
 
@@ -59,7 +68,11 @@ impl HasBytesVec for GeneralizedInput {
 impl HasTargetBytes for GeneralizedInput {
     #[inline]
     fn target_bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::from(&self.bytes)
+        if self.grimoire_mutated {
+            OwnedSlice::from(&self.bytes)
+        } else {
+            OwnedSlice::from(self.generalized_to_bytes())
+        }
     }
 }
 
@@ -89,6 +102,7 @@ impl GeneralizedInput {
         Self {
             bytes,
             generalized: None,
+            grimoire_mutated: false,
         }
     }
 
@@ -127,6 +141,23 @@ impl GeneralizedInput {
             gen.extend_from_slice(&other[1..]);
         } else {
             gen.extend_from_slice(other);
+        }
+    }
+
+    /// Convert generalized to bytes
+    pub fn generalized_to_bytes(&self) -> Vec<u8> {
+        match &self.generalized {
+            None => vec![],
+            Some(gen) => {
+                let mut bytes = vec![];
+                for item in gen {
+                    match item {
+                        GeneralizedItem::Bytes(b) => bytes.extend_from_slice(&b),
+                        _ => (),
+                    }
+                }
+                bytes
+            }
         }
     }
 

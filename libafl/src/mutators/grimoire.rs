@@ -37,7 +37,9 @@ where
         match other.generalized() {
             None => Ok(MutationResult::Skipped),
             Some(gen) => {
+                // TODO choose subinput with prob 0.5
                 input.generalized_extend(gen);
+                input.grimoire_mutated = true;
                 Ok(MutationResult::Mutated)
             }
         }
