@@ -15,15 +15,19 @@ extern "C" {
     pub static mut __afl_area_ptr: *mut u8;
 
     /// Start of libafl dict section
+    #[cfg(target_os = "linux")]
     pub static __dict_start: *const u8;
 
     /// End of libafl dict section
+    #[cfg(target_os = "linux")]
     pub static __dict_end: *const u8;
 }
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
 // Better & rusty(?) name
+#[cfg(target_os = "linux")]
 pub use __dict_end as DICT_STOP;
+#[cfg(target_os = "linux")]
 pub use __dict_start as DICT_START;
 
 /// The size of the map for edges.
