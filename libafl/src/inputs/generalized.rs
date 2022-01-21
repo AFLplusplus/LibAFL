@@ -41,6 +41,10 @@ impl Input for GeneralizedInput {
 
     /// An hook executed before being added to the corpus
     fn wrapped_as_testcase(&mut self) {
+        // remove generalized for inputs generated with bit-level mutations
+        if !self.grimoire_mutated {
+            self.generalized = None;
+        }
         // restore to allow bit-level mutations
         self.grimoire_mutated = false;
     }
@@ -69,9 +73,9 @@ impl HasTargetBytes for GeneralizedInput {
     #[inline]
     fn target_bytes(&self) -> OwnedSlice<u8> {
         if self.grimoire_mutated {
-            OwnedSlice::from(&self.bytes)
-        } else {
             OwnedSlice::from(self.generalized_to_bytes())
+        } else {
+            OwnedSlice::from(&self.bytes)
         }
     }
 }
