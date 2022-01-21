@@ -16,6 +16,10 @@ pub fn main() {
         dir.pop();
 
         let mut cc = ClangWrapper::new();
+
+        #[cfg(linux)]
+        cc.add_pass(LLVMPasses::AutoTokens);
+
         if let Some(code) = cc
             .cpp(is_cpp)
             // silence the compiler wrapper output, needed for some configure scripts.

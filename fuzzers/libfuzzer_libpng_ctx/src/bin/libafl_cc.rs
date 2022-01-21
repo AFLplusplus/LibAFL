@@ -23,7 +23,6 @@ pub fn main() {
             .parse_args(&args)
             .expect("Failed to parse the command line")
             .add_pass(LLVMPasses::AFLCoverage)
-            .add_pass(LLVMPasses::AutoTokens)
             .add_arg("-mllvm")
             .add_arg("-ctx") // Context sensitive coverage
             .link_staticlib(&dir, "libfuzzer_libpng")
