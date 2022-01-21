@@ -1,5 +1,9 @@
 //! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
 
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
