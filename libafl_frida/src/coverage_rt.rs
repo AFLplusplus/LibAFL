@@ -1,4 +1,5 @@
 //! Functionality regarding binary-only coverage collection.
+use core::ptr::addr_of_mut;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use rangemap::RangeMap;
 use std::ffi::c_void;
@@ -140,7 +141,7 @@ impl CoverageRuntime {
             ;   popfq
             ;   ret
             ;map_addr:
-            ;.qword &mut self.map as *mut _ as *mut c_void as i64
+            ;.qword addr_of_mut!(self.map) as i64
             ;previous_loc:
             ;.qword 0
         );
@@ -176,7 +177,7 @@ impl CoverageRuntime {
 
             self.current_log_impl = writer.pc();
             writer.put_bytes(self.blob_maybe_log());
-            let prev_loc_pointer = &mut self.previous_pc as *mut _ as u64; // Get the pointer to self.previous_pc
+            let prev_loc_pointer = addr_of_mut!(self.previous_pc) as u64; // Get the pointer to self.previous_pc
 
             writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
 

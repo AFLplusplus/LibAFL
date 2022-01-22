@@ -2,10 +2,11 @@
 
 use crate::{
     bolts::current_time,
+    bolts::tuples::MatchName,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::{FeedbackStatesTuple, MapFeedbackState},
+    feedbacks::MapFeedbackState,
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
@@ -18,45 +19,35 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use num_traits::PrimInt;
+use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+pub struct CalibrationStage<I, O, OT, S>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
     I: Input,
-    O: MapObserver<T>,
+    O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasMetadata,
 {
     map_observer_name: String,
     stage_max: usize,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, FT, I, O, OT, S, T, Z)>,
+    phantom: PhantomData<(I, O, OT, S)>,
 }
 
 const CAL_STAGE_START: usize = 4;
 const CAL_STAGE_MAX: usize = 16;
 
-impl<C, E, EM, FT, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
-    for CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+impl<E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
     I: Input,
-    O: MapObserver<T>,
+    O: MapObserver,
+    for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata + HasFeedbackStates<FT> + HasClientPerfMonitor,
+    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -102,8 +93,6 @@ where
             .observers()
             .match_name::<O>(&self.map_observer_name)
             .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-            .map()
-            .unwrap()
             .to_vec();
 
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
@@ -145,19 +134,17 @@ where
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
                 .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-                .map()
-                .unwrap()
                 .to_vec();
 
             let history_map = &mut state
                 .feedback_states_mut()
-                .match_name_mut::<MapFeedbackState<T>>(&self.map_observer_name)
+                .match_name_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name)
                 .unwrap()
                 .history_map;
 
             for j in 0..map_len {
-                if map_first[j] != map[j] && history_map[j] != T::max_value() {
-                    history_map[j] = T::max_value();
+                if map_first[j] != map[j] && history_map[j] != O::Entry::max_value() {
+                    history_map[j] = O::Entry::max_value();
                     unstable_entries += 1;
                 };
             }
@@ -314,18 +301,12 @@ impl PowerScheduleMetadata {
 
 crate::impl_serdeany!(PowerScheduleMetadata);
 
-impl<C, E, EM, FT, I, O, OT, S, T, Z> CalibrationStage<C, E, EM, FT, I, O, OT, S, T, Z>
+impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
-    FT: FeedbackStatesTuple,
     I: Input,
-    O: MapObserver<T>,
+    O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasCorpus<I> + HasMetadata,
 {
     /// Create a new [`CalibrationStage`].
     pub fn new(state: &mut S, map_observer_name: &O) -> Self {

@@ -33,19 +33,17 @@ pub struct Automaton {
 
 #[derive(Clone, Debug)]
 /// Generates random inputs from a grammar automatron
-pub struct GramatronGenerator<'a, R, S>
+pub struct GramatronGenerator<'a, S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     automaton: &'a Automaton,
-    phantom: PhantomData<(R, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<'a, R, S> Generator<GramatronInput, S> for GramatronGenerator<'a, R, S>
+impl<'a, S> Generator<GramatronInput, S> for GramatronGenerator<'a, S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     fn generate(&mut self, state: &mut S) -> Result<GramatronInput, Error> {
         let mut input = GramatronInput::new(vec![]);
@@ -58,10 +56,9 @@ where
     }
 }
 
-impl<'a, R, S> GramatronGenerator<'a, R, S>
+impl<'a, S> GramatronGenerator<'a, S>
 where
-    R: Rand,
-    S: HasRand<R>,
+    S: HasRand,
 {
     /// Returns a new [`GramatronGenerator`]
     #[must_use]

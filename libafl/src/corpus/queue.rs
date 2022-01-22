@@ -1,7 +1,6 @@
 //! The queue corpus scheduler implements an AFL-like queue mechanism
 
 use alloc::borrow::ToOwned;
-use core::marker::PhantomData;
 
 use crate::{
     corpus::{Corpus, CorpusScheduler},
@@ -12,19 +11,11 @@ use crate::{
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueCorpusScheduler<C, I, S>
-where
-    S: HasCorpus<C, I>,
-    C: Corpus<I>,
-    I: Input,
-{
-    phantom: PhantomData<(C, I, S)>,
-}
+pub struct QueueCorpusScheduler;
 
-impl<C, I, S> CorpusScheduler<I, S> for QueueCorpusScheduler<C, I, S>
+impl<I, S> CorpusScheduler<I, S> for QueueCorpusScheduler
 where
-    S: HasCorpus<C, I>,
-    C: Corpus<I>,
+    S: HasCorpus<I>,
     I: Input,
 {
     /// Gets the next entry in the queue
@@ -48,27 +39,15 @@ where
     }
 }
 
-impl<C, I, S> QueueCorpusScheduler<C, I, S>
-where
-    S: HasCorpus<C, I>,
-    C: Corpus<I>,
-    I: Input,
-{
+impl QueueCorpusScheduler {
     /// Creates a new `QueueCorpusScheduler`
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
-impl<C, I, S> Default for QueueCorpusScheduler<C, I, S>
-where
-    S: HasCorpus<C, I>,
-    C: Corpus<I>,
-    I: Input,
-{
+impl Default for QueueCorpusScheduler {
     fn default() -> Self {
         Self::new()
     }

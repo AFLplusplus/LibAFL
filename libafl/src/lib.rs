@@ -3,7 +3,7 @@ Welcome to `LibAFL`
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(feature = "RUSTC_IS_NIGHTLY", feature(min_specialization))]
+#![cfg_attr(unstable_feature, feature(specialization))]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::pedantic)]
 #![allow(
@@ -113,11 +113,11 @@ pub mod stats {
     pub use crate::monitors::UserStats;
 }
 
-use alloc::string::String;
-use core::fmt;
+use alloc::string::{FromUtf8Error, String};
+use core::{array::TryFromSliceError, fmt, num::ParseIntError, num::TryFromIntError};
 
 #[cfg(feature = "std")]
-use std::{env::VarError, io, num::ParseIntError, num::TryFromIntError, string::FromUtf8Error};
+use std::{env::VarError, io};
 
 /// Main error struct for AFL
 #[derive(Debug)]
@@ -209,10 +209,9 @@ impl From<io::Error> for Error {
     }
 }
 
-#[cfg(feature = "std")]
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
-        Self::Unknown(format!("Could not convert byte to utf-8: {:?}", err))
+        Self::Unknown(format!("Could not convert byte / utf-8: {:?}", err))
     }
 }
 
@@ -223,17 +222,21 @@ impl From<VarError> for Error {
     }
 }
 
-#[cfg(feature = "std")]
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
         Self::Unknown(format!("Failed to parse Int: {:?}", err))
     }
 }
 
-#[cfg(feature = "std")]
 impl From<TryFromIntError> for Error {
     fn from(err: TryFromIntError) -> Self {
         Self::IllegalState(format!("Expected conversion failed: {:?}", err))
+    }
+}
+
+impl From<TryFromSliceError> for Error {
+    fn from(err: TryFromSliceError) -> Self {
+        Self::IllegalArgument(format!("Could not convert slice: {:?}", err))
     }
 }
 

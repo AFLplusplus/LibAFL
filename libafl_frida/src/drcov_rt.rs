@@ -2,6 +2,7 @@
 use crate::helper::FridaRuntime;
 use ahash::AHasher;
 use libafl::{
+    bolts::AsSlice,
     inputs::{HasTargetBytes, Input},
     Error,
 };

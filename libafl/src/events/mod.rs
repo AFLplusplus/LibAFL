@@ -6,7 +6,10 @@ pub mod llmp;
 pub use llmp::*;
 
 use ahash::AHasher;
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
@@ -187,8 +190,6 @@ where
     UpdateExecStats {
         /// The time of generation of the [`Event`]
         time: Duration,
-        /// The stability of this fuzzer node, if known
-        stability: Option<f32>,
         /// The executions of this client
         executions: usize,
         /// [`PhantomData`]
@@ -210,8 +211,6 @@ where
         time: Duration,
         /// The executions of this client
         executions: usize,
-        /// The stability of this fuzzer node, if known
-        stability: Option<f32>,
         /// Current performance statistics
         introspection_monitor: Box<ClientPerfMonitor>,
 
@@ -256,7 +255,6 @@ where
             } => "Testcase",
             Event::UpdateExecStats {
                 time: _,
-                stability: _,
                 executions: _,
                 phantom: _,
             }
@@ -269,7 +267,6 @@ where
             Event::UpdatePerfMonitor {
                 time: _,
                 executions: _,
-                stability: _,
                 introspection_monitor: _,
                 phantom: _,
             } => "PerfMonitor",
@@ -351,7 +348,6 @@ where
         S: HasExecutions + HasClientPerfMonitor,
     {
         let executions = *state.executions();
-        let stability = *state.stability();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
@@ -361,11 +357,22 @@ where
                 state,
                 Event::UpdateExecStats {
                     executions,
-                    stability,
                     time: cur,
                     phantom: PhantomData,
                 },
             )?;
+
+            if let Some(x) = state.stability() {
+                let stability = f64::from(*x);
+                self.fire(
+                    state,
+                    Event::UpdateUserStats {
+                        name: "stability".to_string(),
+                        value: UserStats::Float(stability),
+                        phantom: PhantomData,
+                    },
+                )?;
+            }
 
             // If performance monitor are requested, fire the `UpdatePerfMonitor` event
             #[cfg(feature = "introspection")]
@@ -381,7 +388,6 @@ where
                     Event::UpdatePerfMonitor {
                         executions,
                         time: cur,
-                        stability,
                         introspection_monitor: Box::new(state.introspection_monitor().clone()),
                         phantom: PhantomData,
                     },

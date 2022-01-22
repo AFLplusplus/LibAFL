@@ -17,25 +17,23 @@ use super::{Stage, TracingStage};
 
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
-pub struct ConcolicTracingStage<C, EM, I, OT, S, TE, Z>
+pub struct ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
-    inner: TracingStage<C, EM, I, OT, S, TE, Z>,
+    inner: TracingStage<EM, I, OT, S, TE, Z>,
     observer_name: String,
 }
 
-impl<E, C, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<C, EM, I, OT, S, TE, Z>
+impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
     #[inline]
     fn perform(
@@ -67,16 +65,15 @@ where
     }
 }
 
-impl<C, EM, I, OT, S, TE, Z> ConcolicTracingStage<C, EM, I, OT, S, TE, Z>
+impl<EM, I, OT, S, TE, Z> ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    C: Corpus<I>,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
-    pub fn new(inner: TracingStage<C, EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
+    pub fn new(inner: TracingStage<EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
         Self {
             inner,
             observer_name,
@@ -98,7 +95,6 @@ use crate::monitors::PerfFeature;
 #[cfg(feature = "concolic_mutation")]
 #[allow(clippy::too_many_lines)]
 fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {
-    use core::mem::size_of;
     use hashbrown::HashMap;
     use z3::{
         ast::{Ast, Bool, Dynamic, BV},
@@ -171,9 +167,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                 Some(BV::from_u64(&ctx, value, u32::from(bits)).into())
             }
             SymExpr::Integer128 { high: _, low: _ } => todo!(),
-            SymExpr::NullPointer => {
-                Some(BV::from_u64(&ctx, 0, (8 * size_of::<usize>()) as u32).into())
-            }
+            SymExpr::NullPointer => Some(BV::from_u64(&ctx, 0, usize::BITS).into()),
             SymExpr::True => Some(Bool::from_bool(&ctx, true).into()),
             SymExpr::False => Some(Bool::from_bool(&ctx, false).into()),
             SymExpr::Bool { value } => Some(Bool::from_bool(&ctx, value).into()),
@@ -345,21 +339,19 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
 #[derive(Clone, Debug)]
-pub struct SimpleConcolicMutationalStage<C, EM, I, S, Z>
+pub struct SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    C: Corpus<I>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
-    _phantom: PhantomData<(C, EM, I, S, Z)>,
+    _phantom: PhantomData<(EM, I, S, Z)>,
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<E, C, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<C, EM, I, S, Z>
+impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input + HasBytesVec,
-    C: Corpus<I>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -399,11 +391,10 @@ where
     }
 }
 
-impl<C, EM, I, S, Z> Default for SimpleConcolicMutationalStage<C, EM, I, S, Z>
+impl<EM, I, S, Z> Default for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    C: Corpus<I>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<C, I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
     fn default() -> Self {
         Self {

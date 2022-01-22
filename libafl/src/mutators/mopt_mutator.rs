@@ -360,29 +360,23 @@ pub enum MOptMode {
 
 /// This is the main struct of `MOpt`, an `AFL` mutator.
 /// See the original `MOpt` implementation in <https://github.com/puppet-meteor/MOpt-AFL>
-pub struct StdMOptMutator<C, I, MT, R, S, SC>
+pub struct StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
-    phantom: PhantomData<(C, I, R, S, SC)>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<C, I, MT, R, S, SC> Debug for StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> Debug for StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -394,14 +388,11 @@ where
     }
 }
 
-impl<C, I, MT, R, S, SC> Mutator<I, S> for StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> Mutator<I, S> for StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     #[inline]
     fn mutate(
@@ -532,14 +523,11 @@ where
     }
 }
 
-impl<C, I, MT, R, S, SC> StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     /// Create a new [`StdMOptMutator`].
     pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
@@ -619,14 +607,11 @@ where
     }
 }
 
-impl<C, I, MT, R, S, SC> ComposedByMutations<I, MT, S> for StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     /// Get the mutations
     #[inline]
@@ -641,14 +626,11 @@ where
     }
 }
 
-impl<C, I, MT, R, S, SC> ScheduledMutator<I, MT, S> for StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {

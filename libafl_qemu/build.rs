@@ -66,6 +66,10 @@ fn main() {
 
     println!("cargo:rustc-cfg=cpu_target=\"{}\"", cpu_target);
 
+    if std::env::var("DOCS_RS").is_ok() {
+        return; // only build when we're not generating docs
+    }
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
@@ -95,7 +99,36 @@ fn main() {
             "cargo:warning=Qemu not found, cloning with git ({})...",
             QEMU_REVISION
         );
+        fs::create_dir_all(&qemu_path).unwrap();
         Command::new("git")
+            .current_dir(&qemu_path)
+            .arg("init")
+            .status()
+            .unwrap();
+        Command::new("git")
+            .current_dir(&qemu_path)
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg(QEMU_URL)
+            .status()
+            .unwrap();
+        Command::new("git")
+            .current_dir(&qemu_path)
+            .arg("fetch")
+            .arg("--depth")
+            .arg("1")
+            .arg("origin")
+            .arg(QEMU_REVISION)
+            .status()
+            .unwrap();
+        Command::new("git")
+            .current_dir(&qemu_path)
+            .arg("checkout")
+            .arg("FETCH_HEAD")
+            .status()
+            .unwrap();
+        /*Command::new("git")
             .current_dir(&out_dir_path)
             .arg("clone")
             .arg(QEMU_URL)
@@ -106,7 +139,7 @@ fn main() {
             .arg("checkout")
             .arg(QEMU_REVISION)
             .status()
-            .unwrap();
+            .unwrap();*/
         fs::write(&qemu_rev, QEMU_REVISION).unwrap();
     }
 

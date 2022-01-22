@@ -3,11 +3,10 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     mem::transmute,
-    ptr,
+    ptr::{self, addr_of},
 };
 
 use libafl::{
-    corpus::Corpus,
     events::{EventFirer, EventRestarter},
     executors::{
         inprocess::inprocess_get_state, Executor, ExitKind, HasObservers, InProcessExecutor,
@@ -474,7 +473,7 @@ where
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
 {
-    pub fn new<EM, OC, OF, Z>(
+    pub fn new<EM, OF, Z>(
         harness_fn: &'a mut H,
         emulator: &'a Emulator,
         helpers: QT,
@@ -485,9 +484,8 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<I> + EventRestarter<S>,
-        OC: Corpus<I>,
         OF: Feedback<I, S>,
-        S: HasSolutions<OC, I> + HasClientPerfMonitor,
+        S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let slf = Self {
@@ -801,7 +799,7 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        unsafe { QEMU_HELPERS_PTR = &self.helpers as *const _ as *const c_void };
+        unsafe { QEMU_HELPERS_PTR = addr_of!(self.helpers) as *const c_void };
         self.helpers.pre_exec_all(self.emulator, input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
         self.helpers.post_exec_all(self.emulator, input);

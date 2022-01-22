@@ -170,15 +170,11 @@ where
             Event::UpdateExecStats {
                 time,
                 executions,
-                stability,
                 phantom: _,
             } => {
                 // TODO: The monitor buffer should be added on client add.
                 let client = monitor.client_stats_mut_for(client_id);
                 client.update_executions(*executions as u64, *time);
-                if let Some(stability) = stability {
-                    client.update_stability(*stability);
-                }
                 monitor.display(event.name().to_string(), client_id);
                 Ok(BrokerEventResult::Handled)
             }
@@ -196,7 +192,6 @@ where
             Event::UpdatePerfMonitor {
                 time,
                 executions,
-                stability,
                 introspection_monitor,
                 phantom: _,
             } => {
@@ -207,10 +202,6 @@ where
 
                 // Update the normal monitor for this client
                 client.update_executions(*executions as u64, *time);
-
-                if let Some(stability) = stability {
-                    client.update_stability(*stability);
-                }
 
                 // Update the performance monitor for this client
                 client.update_introspection_monitor((**introspection_monitor).clone());
@@ -844,7 +835,7 @@ where
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
             let staterestorer: StateRestorer<SP> =
-                StateRestorer::new(self.shmem_provider.new_map(256 * 1024 * 1024)?);
+                StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
@@ -877,9 +868,9 @@ where
 
                 compiler_fence(Ordering::SeqCst);
 
+                #[allow(clippy::manual_assert)]
                 if !staterestorer.has_content() {
                     #[cfg(unix)]
-                    #[allow(clippy::manual_assert)]
                     if child_status == 137 {
                         // Out of Memory, see https://tldp.org/LDP/abs/html/exitcodes.html
                         // and https://github.com/AFLplusplus/LibAFL/issues/32 for discussion.
@@ -985,7 +976,7 @@ mod tests {
 
         let mut llmp_client = LlmpClient::new(
             shmem_provider.clone(),
-            LlmpSharedMap::new(0, shmem_provider.new_map(1024).unwrap()),
+            LlmpSharedMap::new(0, shmem_provider.new_shmem(1024).unwrap()),
         )
         .unwrap();
 
@@ -1016,7 +1007,7 @@ mod tests {
 
         // First, create a channel from the current fuzzer to the next to store state between restarts.
         let mut staterestorer = StateRestorer::<StdShMemProvider>::new(
-            shmem_provider.new_map(256 * 1024 * 1024).unwrap(),
+            shmem_provider.new_shmem(256 * 1024 * 1024).unwrap(),
         );
 
         staterestorer.reset();

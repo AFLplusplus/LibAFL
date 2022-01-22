@@ -1,6 +1,6 @@
 [package]
 name = "frida_libpng"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 build = "build.rs"
@@ -30,7 +30,7 @@ reqwest = { version = "0.11.4", features = ["blocking"] }
 [dependencies]
 libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public" ] } #,  "llmp_small_maps", "llmp_debug"]}
 capstone = "0.10.0"
-frida-gum = { version = "0.6.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.6.3", features = [ "auto-download", "event-sink", "invocation-listener"] }
 libafl_frida = { path = "../../libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../libafl_targets", features = ["sancov_cmplog"] }
 lazy_static = "1.4.0"

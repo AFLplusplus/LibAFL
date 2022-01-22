@@ -11,6 +11,7 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
+        AsMutSlice,
     },
     corpus::{
         CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
@@ -101,17 +102,15 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
         out_dir.push("queue");
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+        let mut shmem_provider_client = shmem_provider.clone();
 
         let monitor = MultiMonitor::new(|s| println!("{}", s));
 
         let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
             // Coverage map shared between target and fuzzer
-            let mut shmem = StdShMemProvider::new()
-                .expect("Failed to init shared memory")
-                .new_map(MAP_SIZE)
-                .unwrap();
+            let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
-            let shmem_map = shmem.map_mut();
+            let shmem_map = shmem.as_mut_slice();
 
             // Create an observation channel using the coverage map
             let edges_observer = unsafe {
@@ -171,13 +170,22 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = TimeoutForkserverExecutor::new(
-                ForkserverExecutor::with_debug(
-                    self.program.clone(),
-                    self.arguments,
-                    self.shmem_testcase,
-                    tuple_list!(edges_observer, time_observer),
-                    self.debug_output,
-                )
+                if self.shmem_testcase {
+                    ForkserverExecutor::with_shmem_inputs(
+                        self.program.clone(),
+                        self.arguments,
+                        tuple_list!(edges_observer, time_observer),
+                        self.debug_output,
+                        &mut shmem_provider_client,
+                    )
+                } else {
+                    ForkserverExecutor::new(
+                        self.program.clone(),
+                        self.arguments,
+                        tuple_list!(edges_observer, time_observer),
+                        self.debug_output,
+                    )
+                }
                 .expect("Failed to create the executor."),
                 timeout,
             )

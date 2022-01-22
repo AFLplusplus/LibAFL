@@ -105,7 +105,7 @@ where
 /// # Example
 /// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}};
-/// use libafl::{Error, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
+/// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///

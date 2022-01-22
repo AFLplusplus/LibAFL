@@ -23,13 +23,12 @@ use capstone::{
     Capstone,
 };
 use core::fmt::{self, Debug, Formatter};
-
 #[cfg(unix)]
 use frida_gum::CpuContext;
-use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::Transformer, Gum, Module, ModuleDetails,
-    ModuleMap, PageProtection,
-};
+
+#[cfg(unix)]
+use frida_gum::instruction_writer::InstructionWriter;
+use frida_gum::{stalker::Transformer, Gum, Module, ModuleDetails, ModuleMap, PageProtection};
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 #[cfg(target_arch = "aarch64")]
@@ -125,6 +124,7 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_me = f.debug_struct("FridaInstrumentationHelper");
         dbg_me
+            .field("transformer", &self.transformer)
             .field("capstone", &self.capstone)
             .field("ranges", &self.ranges)
             .field("module_map", &"<ModuleMap>")

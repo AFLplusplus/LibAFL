@@ -1,7 +1,7 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 use alloc::vec::Vec;
-use core::{marker::PhantomData, mem::size_of};
+use core::mem::size_of;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -127,20 +127,12 @@ impl Tokens {
 
 /// Inserts a random token at a random position in the `Input`.
 #[derive(Debug, Default)]
-pub struct TokenInsert<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
-    phantom: PhantomData<(I, R, S)>,
-}
+pub struct TokenInsert;
 
-impl<I, R, S> Mutator<I, S> for TokenInsert<I, R, S>
+impl<I, S> Mutator<I, S> for TokenInsert
 where
     I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
+    S: HasMetadata + HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -184,49 +176,29 @@ where
     }
 }
 
-impl<I, R, S> Named for TokenInsert<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl Named for TokenInsert {
     fn name(&self) -> &str {
         "TokenInsert"
     }
 }
 
-impl<I, R, S> TokenInsert<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl TokenInsert {
     /// Create a `TokenInsert` `Mutation`.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// A `TokenReplace` [`Mutator`] replaces a random part of the input with one of a range of tokens.
 /// From AFL terms, this is called as `Dictionary` mutation (which doesn't really make sense ;) ).
 #[derive(Debug, Default)]
-pub struct TokenReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
-    phantom: PhantomData<(I, R, S)>,
-}
+pub struct TokenReplace;
 
-impl<I, R, S> Mutator<I, S> for TokenReplace<I, R, S>
+impl<I, S> Mutator<I, S> for TokenReplace
 where
     I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
+    S: HasMetadata + HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -266,49 +238,29 @@ where
     }
 }
 
-impl<I, R, S> Named for TokenReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl Named for TokenReplace {
     fn name(&self) -> &str {
         "TokenReplace"
     }
 }
 
-impl<I, R, S> TokenReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl TokenReplace {
     /// Creates a new `TokenReplace` struct.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// A `I2SRandReplace` [`Mutator`] replaces a random matching input-2-state comparison operand with the other.
 /// it needs a valid [`CmpValuesMetadata`] in the state.
 #[derive(Debug, Default)]
-pub struct I2SRandReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
-    phantom: PhantomData<(I, R, S)>,
-}
+pub struct I2SRandReplace;
 
-impl<I, R, S> Mutator<I, S> for I2SRandReplace<I, R, S>
+impl<I, S> Mutator<I, S> for I2SRandReplace
 where
     I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
+    S: HasMetadata + HasRand + HasMaxSize,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(
@@ -471,29 +423,17 @@ where
     }
 }
 
-impl<I, R, S> Named for I2SRandReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl Named for I2SRandReplace {
     fn name(&self) -> &str {
         "I2SRandReplace"
     }
 }
 
-impl<I, R, S> I2SRandReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl I2SRandReplace {
     /// Creates a new `I2SRandReplace` struct.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
