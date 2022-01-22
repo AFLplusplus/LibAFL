@@ -10,7 +10,7 @@ use std::ffi::c_void;
 use libafl::{inputs::{Input, HasTargetBytes}, Error};
 use rangemap::RangeMap;
 
-use crate::helper::{FridaRuntime, FridaInstrumentationHelper};
+use crate::helper::FridaRuntime;
 extern "C" {
     /// Tracks cmplog instructions
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);

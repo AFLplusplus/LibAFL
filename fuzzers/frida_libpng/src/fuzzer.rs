@@ -47,7 +47,8 @@ use libafl::{
 use libafl_frida::{
     coverage_rt::MAP_SIZE,
     executor::FridaInProcessExecutor,
-    helper::{FridaHelper, FridaInstrumentationHelper},
+    coverage_rt::CoverageRuntime,
+    helper::FridaInstrumentationHelper,
     FridaOptions,
 };
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
@@ -208,11 +209,13 @@ unsafe fn fuzz(
 
         let gum = Gum::obtain();
         let frida_options = FridaOptions::parse_env_options();
+        let coverage = CoverageRuntime::new();
         let mut frida_helper = FridaInstrumentationHelper::new(
             &gum,
             &frida_options,
             module_name,
             modules_to_instrument,
+            tuple_list!(coverage),
         );
 
         // Create an observation channel using the coverage map
