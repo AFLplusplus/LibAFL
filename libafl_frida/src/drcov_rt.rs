@@ -8,8 +8,8 @@ use libafl::{
 };
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
-use std::hash::Hasher;
 use std::collections::HashMap;
+use std::hash::Hasher;
 
 /// Generates `DrCov` traces
 #[derive(Debug, Clone)]
@@ -63,7 +63,6 @@ impl DrCovRuntime {
             stalked_addresses: HashMap::new(),
         }
     }
-
 
     /// Add a stalked address to real address mapping.
     #[inline]
