@@ -42,18 +42,18 @@ impl Tokens {
     /// Creates a new token from autodict
     #[cfg(feature = "std")]
     pub unsafe fn from_autodict(
-        dict_start: *const u8,
-        dict_stop: *const u8,
+        token_start: *const u8,
+        token_stop: *const u8,
     ) -> Result<Self, Error> {
         let mut ret = Self::new(vec![]);
 
-        let section_size: usize = dict_stop.offset_from(dict_start).try_into().unwrap();
+        let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
         // println!("size: {}", section_size);
-        let slice = std::slice::from_raw_parts(dict_start, section_size);
+        let slice = std::slice::from_raw_parts(token_start, section_size);
 
         let mut head = 0;
 
-        // Now we know the beginning and the end of the dictionary section.. let's parse them into tokens
+        // Now we know the beginning and the end of the token section.. let's parse them into tokens
         loop {
             if head >= section_size {
                 // Sanity Check
@@ -65,7 +65,7 @@ impl Tokens {
             if size > 0 {
                 ret.add_token(&slice[head..head + size].to_vec());
                 println!(
-                    "Autodict token, size: {} content: {:x?}",
+                    "Token size: {} content: {:x?}",
                     size,
                     &slice[head..head + size].to_vec()
                 );

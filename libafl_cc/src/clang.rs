@@ -31,7 +31,7 @@ pub enum LLVMPasses {
     CmpLogRtn,
     /// The AFL coverage pass
     AFLCoverage,
-    /// The Autodict pass
+    /// The Autotoken pass
     AutoTokens,
 }
 
