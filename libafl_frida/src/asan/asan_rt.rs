@@ -2297,7 +2297,11 @@ impl AsanRuntime {
                 }
                 X86Register::Rsp => {
                     // In this case rsp clobbered
-                    writer.put_lea_reg_reg_offset(X86Register::Rdi, X86Register::Rsp, redzone_size + 0x8 * 6);
+                    writer.put_lea_reg_reg_offset(
+                        X86Register::Rdi,
+                        X86Register::Rsp,
+                        redzone_size + 0x8 * 6,
+                    );
                 }
                 _ => {
                     writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
@@ -2319,7 +2323,11 @@ impl AsanRuntime {
                 }
                 X86Register::Rsp => {
                     // In this case rsp is also clobbered
-                    writer.put_lea_reg_reg_offset(X86Register::Rsi, X86Register::Rsp, redzone_size + 0x8 * 6);
+                    writer.put_lea_reg_reg_offset(
+                        X86Register::Rsi,
+                        X86Register::Rsp,
+                        redzone_size + 0x8 * 6,
+                    );
                 }
                 _ => {
                     writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
