@@ -55,6 +55,11 @@ impl Tokens {
 
         // Now we know the beginning and the end of the dictionary section.. let's parse them into tokens
         loop {
+            if head >= section_size {
+                // Sanity Check
+                assert!(head == section_size);
+                break;
+            }
             let size = slice[head] as usize;
             head += 1;
             if size > 0 {
@@ -65,11 +70,6 @@ impl Tokens {
                     &slice[head..head + size].to_vec()
                 );
                 head += size;
-            }
-            if head >= section_size {
-                // Sanity Check
-                assert!(head == section_size);
-                break;
             }
         }
 
