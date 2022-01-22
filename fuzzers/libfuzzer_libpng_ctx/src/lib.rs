@@ -41,9 +41,7 @@ use libafl::{
     Error,
 };
 
-use libafl_targets::{
-    edges_map_from_ptr, libfuzzer_initialize, libfuzzer_test_one_input, DICT_START, DICT_STOP,
-};
+use libafl_targets::{edges_map_from_ptr, libfuzzer_initialize, libfuzzer_test_one_input};
 
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(time.parse()?))
@@ -186,7 +184,6 @@ pub fn libafl_main() {
         });
 
         println!("We're a client, let's fuzz :)");
-        let autodict_tokens = unsafe { Tokens::from_autodict(DICT_START, DICT_STOP)? };
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {

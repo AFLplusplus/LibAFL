@@ -50,8 +50,8 @@ use libafl::{
     Error,
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
-    MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, DICT_START,
+    DICT_STOP, EDGES_MAP, MAX_EDGES_NUM,
 };
 
 /// The fuzzer main (as `no_mangle` C function)
@@ -351,12 +351,17 @@ fn fuzz(
     // The order of the stages matter!
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
+    // Autodict Tokens
+    let autodict_tokens = unsafe { Tokens::from_autodict(DICT_START, DICT_STOP)? };
+
     // Read tokens
     if let Some(tokenfile) = tokenfile {
         if state.metadata().get::<Tokens>().is_none() {
             state.add_metadata(Tokens::from_tokens_file(tokenfile)?);
         }
     }
+
+    state.add_metadata(autodict_tokens);
 
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
