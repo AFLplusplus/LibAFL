@@ -254,7 +254,7 @@ pub fn libafl_main() {
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
-        // .stdout_file(Some("/dev/null"))
+        .stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {
