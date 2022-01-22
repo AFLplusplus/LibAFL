@@ -375,12 +375,6 @@ where
         self.transformer.as_ref().unwrap()
     }
 
-    /// Register the current thread with the [`FridaInstrumentationHelper`]
-    #[cfg(unix)]
-    pub fn register_thread(&mut self) {
-        self.runtime_mut::<AsanRuntime>().unwrap().register_thread();
-    }
-
     /// Initializa all
     pub fn init(
         &mut self,
@@ -407,8 +401,13 @@ where
     }
 
     /// Pointer to coverage map
-    pub fn map_ptr_mut(&mut self) -> *mut u8 {
-        self.runtime_mut::<CoverageRuntime>().unwrap().map_ptr_mut()
+    pub fn map_ptr_mut(&mut self) -> Option<*mut u8> {
+        if let Some(rt) = self.runtime_mut::<CoverageRuntime>() {
+            Some(rt.map_ptr_mut())
+        }
+        else{
+            None
+        }
     }
 
     /// Ranges

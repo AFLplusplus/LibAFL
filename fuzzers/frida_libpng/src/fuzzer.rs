@@ -46,6 +46,7 @@ use libafl::{
 
 use libafl_frida::{
     coverage_rt::CoverageRuntime, coverage_rt::MAP_SIZE, executor::FridaInProcessExecutor,
+    asan::asan_rt::AsanRuntime,
     helper::FridaInstrumentationHelper, FridaOptions,
 };
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
@@ -207,18 +208,19 @@ unsafe fn fuzz(
         let gum = Gum::obtain();
         let frida_options = FridaOptions::parse_env_options();
         let coverage = CoverageRuntime::new();
+        let asan = AsanRuntime::new(frida_options.clone());
         let mut frida_helper = FridaInstrumentationHelper::new(
             &gum,
             &frida_options,
             module_name,
             modules_to_instrument,
-            tuple_list!(coverage),
+            tuple_list!(coverage, asan),
         );
 
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
-            frida_helper.map_ptr_mut(),
+            frida_helper.map_ptr_mut().unwrap(),
             MAP_SIZE,
         ));
 
