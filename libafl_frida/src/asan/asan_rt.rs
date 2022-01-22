@@ -15,6 +15,7 @@ use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
 use hashbrown::HashMap;
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+use libafl::bolts::AsSlice;
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{

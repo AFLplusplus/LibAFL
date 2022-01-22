@@ -9,6 +9,7 @@ use libafl::{
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 use std::hash::Hasher;
+use std::collections::HashMap;
 
 /// Generates `DrCov` traces
 #[derive(Debug, Clone)]
@@ -17,6 +18,7 @@ pub struct DrCovRuntime {
     pub drcov_basic_blocks: Vec<DrCovBasicBlock>,
     /// The memory ragnes of this target
     ranges: RangeMap<usize, (u16, String)>,
+    stalked_addresses: HashMap<usize, usize>,
 }
 
 impl FridaRuntime for DrCovRuntime {
@@ -58,7 +60,22 @@ impl DrCovRuntime {
         Self {
             drcov_basic_blocks: vec![],
             ranges: RangeMap::new(),
+            stalked_addresses: HashMap::new(),
         }
+    }
+
+
+    /// Add a stalked address to real address mapping.
+    #[inline]
+    pub fn add_stalked_address(&mut self, stalked: usize, real: usize) {
+        self.stalked_addresses.insert(stalked, real);
+    }
+
+    #[must_use]
+    pub fn real_address_for_stalked(&self, stalked: usize) -> usize {
+        self.stalked_addresses
+            .get(&stalked)
+            .map_or(stalked, |addr| *addr)
     }
 }
 

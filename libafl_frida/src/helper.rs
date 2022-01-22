@@ -124,7 +124,6 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_me = f.debug_struct("FridaInstrumentationHelper");
         dbg_me
-            .field("transformer", &self.transformer)
             .field("capstone", &self.capstone)
             .field("ranges", &self.ranges)
             .field("module_map", &"<ModuleMap>")
@@ -256,44 +255,45 @@ where
                         if first {
                             first = false;
                             //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                            if let Some(rt) = helper.coverage_runtime() {
+                            if let Some(rt) = helper.runtime::<CoverageRuntime>() {
                                 rt.emit_coverage_mapping(address, &output);
                             }
-                            #[cfg(unix)]
-                            if helper.options().drcov_enabled() {
+
+
+                            if let Some(rt) = helper.runtime::<DrCovRuntime>() {
                                 instruction.put_callout(|context| {
                                     let real_address =
-                                        helper.asan_runtime.real_address_for_stalked(pc(&context));
+                                        rt.real_address_for_stalked(pc(&context));
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
-                                    helper
-                                        .drcov_runtime
+                                        rt
                                         .drcov_basic_blocks
                                         .push(DrCovBasicBlock::new(real_address, real_address + 4));
                                 });
                             }
                         }
 
-                        if helper.options().asan_enabled() {
+
+                        if let Some(rt) = helper.runtime::<AsanRuntime>() {
                             #[cfg(all(target_arch = "x86_64", unix))]
-                            if let Ok((segment, width, basereg, indexreg, scale, disp)) = helper
-                                .asan_runtime
+                            if let Ok((segment, width, basereg, indexreg, scale, disp)) = rt
                                 .asan_is_interesting_instruction(&helper.capstone, address, instr)
                             {
-                                helper.asan_runtime.emit_shadow_check(
+                                rt.emit_shadow_check(
                                     address, &output, segment, width, basereg, indexreg, scale,
                                     disp,
                                 );
                             }
+
                             #[cfg(target_arch = "aarch64")]
-                            if let Ok((basereg, indexreg, displacement, width, shift, extender)) =
-                                helper.asan_runtime.asan_is_interesting_instruction(
+                            if let Ok((basereg, indexreg, displacement, width, shift, extender)) = rt
+                                .asan_is_interesting_instruction(
                                     &helper.capstone,
                                     address,
                                     instr,
                                 )
                             {
-                                helper.asan_runtime.emit_shadow_check(
+                                rt.emit_shadow_check(
                                     address,
                                     &output,
                                     basereg,
@@ -304,15 +304,13 @@ where
                                     extender,
                                 );
                             }
+
                         }
-                        if helper.options().cmplog_enabled() {
-                            #[cfg(not(target_arch = "aarch64"))]
-                            todo!("Implement cmplog for non-aarch64 targets");
-                            #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-                            // check if this instruction is a compare instruction and if so save the registers values
-                            if let Ok((op1, op2, special_case)) = helper
-                                .cmplog_runtime
-                                .cmplog_is_interesting_instruction(&helper.capstone, address, instr)
+
+                        #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+                        if let Some(rt) = helper.runtime::<CmpLogRuntime>() {
+                            if let Ok((op1, op2, special_case)) = rt
+                            .cmplog_is_interesting_instruction(&helper.capstone, address, instr)
                             {
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
                                 helper.cmplog_runtime.emit_comparison_handling(
@@ -326,11 +324,13 @@ where
                         }
 
                         #[cfg(unix)]
-                        if helper.options().asan_enabled() || helper.options().drcov_enabled() {
-                            helper.asan_runtime.add_stalked_address(
-                                output.writer().pc() as usize - 4,
-                                address as usize,
-                            );
+                        if let Some(rt) = helper.runtime::<AsanRuntime>(){
+                            rt.add_stalked_address(output.writer().pc() as usize - 4, address as usize);
+                        }
+
+                        #[cfg(unix)]
+                        if let Some(rt) = helper.runtime::<DrCovRuntime>(){
+                            rt.add_stalked_address(output.writer().pc() as usize - 4, address as usize);
                         }
                     }
                     instruction.keep();
@@ -341,41 +341,21 @@ where
         helper
     }
 
-    pub fn coverage_runtime(&self) -> Option<&CoverageRuntime> {
-        self.runtimes.match_first_type::<CoverageRuntime>()
+
+    pub fn runtime<R>(&self) -> Option<&R>
+    where
+    R: FridaRuntime
+    {
+        self.runtimes.match_first_type::<R>()
     }
 
-    pub fn coverage_runtime_mut(&mut self) -> Option<&mut CoverageRuntime> {
-        self.runtimes.match_first_type_mut::<CoverageRuntime>()
+    pub fn runtime_mut<R>(&self) -> Option<&mut R>
+    where
+    R: FridaRuntime
+    {
+        self.runtimes.match_first_type_mut::<R>()
     }
 
-    #[cfg(unix)]
-    pub fn asan_runtime(&self) -> Option<&AsanRuntime> {
-        self.runtimes.match_first_type::<AsanRuntime>()
-    }
-
-    #[cfg(unix)]
-    pub fn asan_runtime_mut(&mut self) -> Option<&mut AsanRuntime> {
-        self.runtimes.match_first_type_mut::<AsanRuntime>()
-    }
-
-    pub fn drcov_runtime(&self) -> Option<&DrCovRuntime> {
-        self.runtimes.match_first_type::<DrCovRuntime>()
-    }
-
-    pub fn drcov_runtime_mut(&mut self) -> Option<&mut DrCovRuntime> {
-        self.runtimes.match_first_type_mut::<DrCovRuntime>()
-    }
-
-    #[cfg(feature = "cmplog")]
-    pub fn cmplog_runtime(&self) -> Option<&CmpLogRuntime> {
-        self.runtimes.match_first_type::<CmpLogRuntime>()
-    }
-
-    #[cfg(feature = "cmplog")]
-    pub fn cmplog_runtime_mut(&mut self) -> Option<&mut CmpLogRuntime> {
-        self.runtime.match_first_type_mut::<CmpLogRuntime>()
-    }
 
     /// Returns ref to the Transformer
     pub fn transformer(&self) -> &Transformer<'a> {
@@ -385,7 +365,7 @@ where
     /// Register the current thread with the [`FridaInstrumentationHelper`]
     #[cfg(unix)]
     pub fn register_thread(&mut self) {
-        self.asan_runtime.register_thread();
+        self.runtime::<AsanRuntime>().unwrap().register_thread();
     }
 
     /// Initializa all
@@ -415,7 +395,7 @@ where
 
     /// Pointer to coverage map
     pub fn map_ptr_mut(&mut self) -> *mut u8 {
-        self.coverage_rt.map_ptr_mut()
+        self.runtime_mut::<CoverageRuntime>().unwrap().map_ptr_mut()
     }
 
     /// Ranges
