@@ -194,7 +194,6 @@ pub fn libafl_main() {
                 "PLTE".as_bytes().to_vec(),
                 "IEND".as_bytes().to_vec(),
             ]));
-            state.add_metadata(autodict_tokens);
         }
 
         // Setup a basic mutator with a mutational stage

@@ -362,7 +362,8 @@ fn fuzz(
     }
 
     // Autodict Tokens
-    if cfg!(target_os = "linux") {
+    #[cfg(target_os = "linux")]
+    {
         let autodict_tokens = unsafe { Tokens::from_autodict(DICT_START, DICT_STOP)? };
         state.add_metadata(autodict_tokens);
     }
