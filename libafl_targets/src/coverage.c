@@ -18,12 +18,12 @@ uint8_t* __afl_area_ptr = __afl_area_ptr_local;
 
 // Weak symbols, LLVM Passes overwrites them if we really use it
 #ifdef __linux__
-extern uint8_t __attribute__((weak)) __start_libafl_dict;
-extern uint8_t __attribute__((weak)) __stop_libafl_dict;
+extern uint8_t __attribute__((weak)) __start_libafl_token;
+extern uint8_t __attribute__((weak)) __stop_libafl_token;
 
 // Expose the start of libafl_dict section as C symbols
-uint8_t* __dict_start = &__start_libafl_dict;
-uint8_t* __dict_end = &__stop_libafl_dict;
+uint8_t* __token_start = &__start_libafl_token;
+uint8_t* __token_end = &__stop_libafl_token;
 #endif
 
 

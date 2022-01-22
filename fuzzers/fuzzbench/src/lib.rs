@@ -55,7 +55,7 @@ use libafl_targets::{
 };
 
 #[cfg(target_os = "linux")]
-use libafl_targets::{DICT_START, DICT_STOP};
+use libafl_targets::{TOKEN_START, TOKEN_STOP};
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -364,7 +364,7 @@ fn fuzz(
     // Autodict Tokens
     #[cfg(target_os = "linux")]
     {
-        let autodict_tokens = unsafe { Tokens::from_autodict(DICT_START, DICT_STOP)? };
+        let autodict_tokens = unsafe { Tokens::from_autodict(TOKEN_START, TOKEN_STOP)? };
         state.add_metadata(autodict_tokens);
     }
 

@@ -216,7 +216,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
   if (!ptr || *ptr != '/') {
     fprintf(stderr, "AFL_LLVM_DICT2FILE is not set to an absolute path: %s\n", ptr);
-    fprintf(stderr, "Writing tokens into libafl_dict section\n");
+    fprintf(stderr, "Writing tokens into libafl_tokens section\n");
 
     use_file = false;
   }
@@ -711,7 +711,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
       // The actual dict
       GlobalVariable *dict = new GlobalVariable(M, arrayTy, true, GlobalVariable::ExternalLinkage, ConstantDataArray::get(Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))), "libafl_dictionary_" + M.getName());
-      dict->setSection("libafl_dict");
+      dict->setSection("libafl_token");
     }
   }
 
