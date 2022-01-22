@@ -1,4 +1,4 @@
-use crate::helper::FridaInstrumentationHelper;
+use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 
 use core::fmt::{self, Debug, Formatter};
 use frida_gum::{
@@ -57,6 +57,7 @@ where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
+    RT: FridaRuntimeTuple,
 {
     /// Instruct the target about the input and run
     #[inline]
@@ -116,6 +117,7 @@ where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
+    RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`]
     pub fn new(

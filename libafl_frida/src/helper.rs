@@ -255,11 +255,11 @@ where
                         if first {
                             first = false;
                             //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                            if let Some(rt) = helper.runtime::<CoverageRuntime>() {
+                            if let Some(rt) = helper.runtime_mut::<CoverageRuntime>() {
                                 rt.emit_coverage_mapping(address, &output);
                             }
 
-                            if let Some(rt) = helper.runtime::<DrCovRuntime>() {
+                            if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
                                 instruction.put_callout(|context| {
                                     let real_address = rt.real_address_for_stalked(pc(&context));
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
@@ -315,7 +315,7 @@ where
                         }
 
                         #[cfg(unix)]
-                        if let Some(rt) = helper.runtime::<AsanRuntime>() {
+                        if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
                             rt.add_stalked_address(
                                 output.writer().pc() as usize - 4,
                                 address as usize,
@@ -323,7 +323,7 @@ where
                         }
 
                         #[cfg(unix)]
-                        if let Some(rt) = helper.runtime::<DrCovRuntime>() {
+                        if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
                             rt.add_stalked_address(
                                 output.writer().pc() as usize - 4,
                                 address as usize,
@@ -345,7 +345,7 @@ where
         self.runtimes.match_first_type::<R>()
     }
 
-    pub fn runtime_mut<R>(&self) -> Option<&mut R>
+    pub fn runtime_mut<R>(&mut self) -> Option<&mut R>
     where
         R: FridaRuntime,
     {
@@ -360,7 +360,7 @@ where
     /// Register the current thread with the [`FridaInstrumentationHelper`]
     #[cfg(unix)]
     pub fn register_thread(&mut self) {
-        self.runtime::<AsanRuntime>().unwrap().register_thread();
+        self.runtime_mut::<AsanRuntime>().unwrap().register_thread();
     }
 
     /// Initializa all

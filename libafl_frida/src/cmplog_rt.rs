@@ -7,7 +7,10 @@ use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use libafl_targets;
 use libafl_targets::CMPLOG_MAP_W;
 use std::ffi::c_void;
+use libafl::{inputs::{Input, HasTargetBytes}, Error};
+use rangemap::RangeMap;
 
+use crate::helper::{FridaRuntime, FridaInstrumentationHelper};
 extern "C" {
     /// Tracks cmplog instructions
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
@@ -67,7 +70,7 @@ impl FridaRuntime for CmpLogRuntime {
     fn init(
         &mut self,
         gum: &frida_gum::Gum,
-        helper: &FridaInstrumentationHelper,
+        ranges: &RangeMap<usize, (u16, String)>,
         modules_to_instrument: &[&str],
     ) {
         self.generate_instrumentation_blobs();
@@ -76,7 +79,6 @@ impl FridaRuntime for CmpLogRuntime {
     fn pre_exec<I: Input + HasTargetBytes>(
         &mut self,
         input: &I,
-        helper: &FridaInstrumentationHelper,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -84,7 +86,6 @@ impl FridaRuntime for CmpLogRuntime {
     fn post_exec<I: Input + HasTargetBytes>(
         &mut self,
         input: &I,
-        helper: &FridaInstrumentationHelper,
     ) -> Result<(), Error> {
         Ok(())
     }
