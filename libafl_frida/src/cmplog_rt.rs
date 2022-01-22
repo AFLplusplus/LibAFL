@@ -4,11 +4,14 @@
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use libafl::{
+    inputs::{HasTargetBytes, Input},
+    Error,
+};
 use libafl_targets;
 use libafl_targets::CMPLOG_MAP_W;
-use std::ffi::c_void;
-use libafl::{inputs::{Input, HasTargetBytes}, Error};
 use rangemap::RangeMap;
+use std::ffi::c_void;
 
 use crate::helper::FridaRuntime;
 extern "C" {
@@ -76,17 +79,11 @@ impl FridaRuntime for CmpLogRuntime {
         self.generate_instrumentation_blobs();
     }
 
-    fn pre_exec<I: Input + HasTargetBytes>(
-        &mut self,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
-    fn post_exec<I: Input + HasTargetBytes>(
-        &mut self,
-        _input: &I,
-    ) -> Result<(), Error> {
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 }

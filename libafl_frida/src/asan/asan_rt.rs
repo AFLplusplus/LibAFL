@@ -255,6 +255,7 @@ impl FridaRuntime for AsanRuntime {
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
         */
+        self.register_thread();
     }
     fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
         &mut self,

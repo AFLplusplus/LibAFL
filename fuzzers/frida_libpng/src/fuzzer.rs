@@ -45,11 +45,8 @@ use libafl::{
 };
 
 use libafl_frida::{
-    coverage_rt::MAP_SIZE,
-    executor::FridaInProcessExecutor,
-    coverage_rt::CoverageRuntime,
-    helper::FridaInstrumentationHelper,
-    FridaOptions,
+    coverage_rt::CoverageRuntime, coverage_rt::MAP_SIZE, executor::FridaInProcessExecutor,
+    helper::FridaInstrumentationHelper, FridaOptions,
 };
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
@@ -292,10 +289,7 @@ unsafe fn fuzz(
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        #[cfg(unix)]
-        frida_helper.register_thread();
         // Create the executor for an in-process function with just one observer for edge coverage
-
         #[cfg(unix)]
         let mut executor = FridaInProcessExecutor::new(
             &gum,

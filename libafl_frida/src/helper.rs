@@ -280,22 +280,34 @@ where
 
                         let res = if let Some(rt) = helper.runtime::<AsanRuntime>() {
                             rt.asan_is_interesting_instruction(&helper.capstone, address, instr)
-                        }
-                        else{
+                        } else {
                             None
                         };
 
                         #[cfg(all(target_arch = "x86_64", unix))]
                         if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
-                            if let Some(rt) = helper.runtime_mut::<AsanRuntime>(){
-                                rt.emit_shadow_check(address, &output, segment, width, basereg, indexreg, scale, disp);
+                            if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
+                                rt.emit_shadow_check(
+                                    address, &output, segment, width, basereg, indexreg, scale,
+                                    disp,
+                                );
                             }
                         }
 
                         #[cfg(target_arch = "aarch64")]
-                        if let Some((basereg, indexreg, displacement, width, shift, extender)) = res {
-                            if let Some(rt) = helper.runtime_mut::<AsanRuntime>(){
-                                rt.emit_shadow_check(address, &output, basereg, indexreg, displacement, width, shift, extender);
+                        if let Some((basereg, indexreg, displacement, width, shift, extender)) = res
+                        {
+                            if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
+                                rt.emit_shadow_check(
+                                    address,
+                                    &output,
+                                    basereg,
+                                    indexreg,
+                                    displacement,
+                                    width,
+                                    shift,
+                                    extender,
+                                );
                             }
                         }
 
@@ -335,6 +347,9 @@ where
                 }
             });
             helper.transformer = Some(transformer);
+            helper
+                .runtimes
+                .init_all(gum, &helper.ranges, modules_to_instrument);
         }
         helper
     }
