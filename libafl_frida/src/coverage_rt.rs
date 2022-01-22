@@ -2,6 +2,8 @@
 use core::ptr::addr_of_mut;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use rangemap::RangeMap;
+
+#[cfg(target_arch = "aarch64")]
 use std::ffi::c_void;
 
 #[cfg(target_arch = "x86_64")]
@@ -36,7 +38,7 @@ impl FridaRuntime for CoverageRuntime {
     fn init(
         &mut self,
         _gum: &frida_gum::Gum,
-        ranges: &RangeMap<usize, (u16, String)>,
+        _ranges: &RangeMap<usize, (u16, String)>,
         _modules_to_instrument: &[&str],
     ) {
         self.generate_maybe_log_blob();

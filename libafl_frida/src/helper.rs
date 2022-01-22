@@ -5,7 +5,7 @@ use libafl::{
 };
 use libafl_targets::drcov::DrCovBasicBlock;
 
-#[cfg(feature = "cmplog")]
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
 #[cfg(windows)]
 use crate::FridaOptions;
@@ -40,7 +40,9 @@ const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;
 #[cfg(not(any(target_vendor = "apple", target_os = "windows")))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANONYMOUS;
 
+/// The Runtime trait
 pub trait FridaRuntime: 'static + Debug {
+    /// Initialization
     fn init(
         &mut self,
         gum: &Gum,
@@ -48,12 +50,16 @@ pub trait FridaRuntime: 'static + Debug {
         modules_to_instrument: &[&str],
     );
 
+    /// Method called before execution
     fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 
+    /// Method called after execution
     fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 }
 
+/// The tuple for Frida Runtime
 pub trait FridaRuntimeTuple: MatchFirstType + Debug {
+    /// Initialization
     fn init_all(
         &mut self,
         gum: &Gum,
@@ -61,23 +67,25 @@ pub trait FridaRuntimeTuple: MatchFirstType + Debug {
         modules_to_instrument: &[&str],
     );
 
+    /// Method called before execution
     fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 
+    /// Method called after execution
     fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
 }
 
 impl FridaRuntimeTuple for () {
     fn init_all(
         &mut self,
-        gum: &Gum,
-        ranges: &RangeMap<usize, (u16, String)>,
-        modules_to_instrument: &[&str],
+        _gum: &Gum,
+        _ranges: &RangeMap<usize, (u16, String)>,
+        _modules_to_instrument: &[&str],
     ) {
     }
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -270,31 +278,24 @@ where
                             }
                         }
 
-                        if let Some(rt) = helper.runtime::<AsanRuntime>() {
-                            #[cfg(all(target_arch = "x86_64", unix))]
-                            if let Ok((segment, width, basereg, indexreg, scale, disp)) =
-                                rt.asan_is_interesting_instruction(&helper.capstone, address, instr)
-                            {
-                                rt.emit_shadow_check(
-                                    address, &output, segment, width, basereg, indexreg, scale,
-                                    disp,
-                                );
-                            }
+                        let res = if let Some(rt) = helper.runtime::<AsanRuntime>() {
+                            rt.asan_is_interesting_instruction(&helper.capstone, address, instr)
+                        }
+                        else{
+                            None
+                        };
 
-                            #[cfg(target_arch = "aarch64")]
-                            if let Ok((basereg, indexreg, displacement, width, shift, extender)) =
-                                rt.asan_is_interesting_instruction(&helper.capstone, address, instr)
-                            {
-                                rt.emit_shadow_check(
-                                    address,
-                                    &output,
-                                    basereg,
-                                    indexreg,
-                                    displacement,
-                                    width,
-                                    shift,
-                                    extender,
-                                );
+                        #[cfg(all(target_arch = "x86_64", unix))]
+                        if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
+                            if let Some(rt) = helper.runtime_mut::<AsanRuntime>(){
+                                rt.emit_shadow_check(address, &output, segment, width, basereg, indexreg, scale, disp);
+                            }
+                        }
+
+                        #[cfg(target_arch = "aarch64")]
+                        if let Some((basereg, indexreg, displacement, width, shift, extender)) = res {
+                            if let Some(rt) = helper.runtime_mut::<AsanRuntime>(){
+                                rt.emit_shadow_check(address, &output, basereg, indexreg, displacement, width, shift, extender);
                             }
                         }
 
@@ -338,6 +339,7 @@ where
         helper
     }
 
+    /// Return the runtime
     pub fn runtime<R>(&self) -> Option<&R>
     where
         R: FridaRuntime,
@@ -345,6 +347,7 @@ where
         self.runtimes.match_first_type::<R>()
     }
 
+    /// Return the mutable runtime
     pub fn runtime_mut<R>(&mut self) -> Option<&mut R>
     where
         R: FridaRuntime,
@@ -373,12 +376,12 @@ where
         self.runtimes.init_all(gum, ranges, modules_to_instrument);
     }
 
-    /// Pre_exec all
+    /// Method called before execution
     pub fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
         self.runtimes.pre_exec_all(input)
     }
 
-    /// Post_exec all
+    /// Method called after execution
     pub fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
         self.runtimes.post_exec_all(input)
     }

@@ -70,6 +70,7 @@ impl DrCovRuntime {
         self.stalked_addresses.insert(stalked, real);
     }
 
+    /// Translate stalked address into the real address
     #[must_use]
     pub fn real_address_for_stalked(&self, stalked: usize) -> usize {
         self.stalked_addresses

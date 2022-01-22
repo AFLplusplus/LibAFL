@@ -159,7 +159,7 @@ impl FridaRuntime for AsanRuntime {
     fn init(
         &mut self,
         gum: &Gum,
-        ranges: &RangeMap<usize, (u16, String)>,
+        _ranges: &RangeMap<usize, (u16, String)>,
         modules_to_instrument: &[&str],
     ) {
         unsafe {
@@ -2132,29 +2132,27 @@ impl AsanRuntime {
 
     /// Determine if the instruction is 'interesting' for the purposes of ASAN
     #[cfg(target_arch = "aarch64")]
+    #[must_use]
     #[inline]
     pub fn asan_is_interesting_instruction(
         &self,
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
-    ) -> Result<
-        (
-            capstone::RegId,
-            capstone::RegId,
-            i32,
-            u32,
-            Arm64Shift,
-            Arm64Extender,
-        ),
-        (),
-    > {
+    ) -> Option<(
+        capstone::RegId,
+        capstone::RegId,
+        i32,
+        u32,
+        Arm64Shift,
+        Arm64Extender,
+    )> {
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.mnemonic().unwrap() {
             "ldaxr" | "stlxr" | "ldxr" | "stxr" | "ldar" | "stlr" | "ldarb" | "ldarh" | "ldaxp"
             | "ldaxrb" | "ldaxrh" | "stlrb" | "stlrh" | "stlxp" | "stlxrb" | "stlxrh" | "ldxrb"
-            | "ldxrh" | "stxrb" | "stxrh" => return Err(()),
+            | "ldxrh" | "stxrb" | "stxrh" => return None,
             _ => (),
         }
 
@@ -2164,12 +2162,12 @@ impl AsanRuntime {
             .arch_detail()
             .operands();
         if operands.len() < 2 {
-            return Err(());
+            return None;
         }
 
         if let Arm64Operand(arm64operand) = operands.last().unwrap() {
             if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                return Ok((
+                return Some((
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
@@ -2180,12 +2178,13 @@ impl AsanRuntime {
             }
         }
 
-        Err(())
+        None
     }
 
     /// Checks if the current instruction is interesting for address sanitization.
     #[cfg(all(target_arch = "x86_64", unix))]
     #[inline]
+    #[must_use]
     #[allow(clippy::unused_self)]
     #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
@@ -2193,7 +2192,7 @@ impl AsanRuntime {
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(RegId, u8, RegId, RegId, i32, i64), ()> {
+    ) -> Option<(RegId, u8, RegId, RegId, i32, i64)> {
         let operands = capstone
             .insn_detail(instr)
             .unwrap()
@@ -2203,7 +2202,7 @@ impl AsanRuntime {
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.
         match instr.mnemonic().unwrap() {
-            "lea" | "nop" => return Err(()),
+            "lea" | "nop" => return None,
 
             _ => (),
         }
@@ -2211,7 +2210,7 @@ impl AsanRuntime {
         // This is a TODO! In this case, both the src and the dst are mem operand
         // so we would need to return two operadns?
         if instr.mnemonic().unwrap().starts_with("rep") {
-            return Err(());
+            return None;
         }
 
         for operand in operands {
@@ -2231,7 +2230,7 @@ impl AsanRuntime {
                     );
                     */
                     if opmem.segment() == RegId(0) {
-                        return Ok((
+                        return Some((
                             opmem.segment(),
                             x86operand.size,
                             opmem.base(),
@@ -2244,7 +2243,7 @@ impl AsanRuntime {
             }
         }
 
-        Err(())
+        None
     }
 
     /// Emits a asan shadow byte check.

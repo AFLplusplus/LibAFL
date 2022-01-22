@@ -69,23 +69,23 @@ impl FridaRuntime for CmpLogRuntime {
     /// This will generate the instrumentation blobs for the current arch.
     fn init(
         &mut self,
-        gum: &frida_gum::Gum,
-        ranges: &RangeMap<usize, (u16, String)>,
-        modules_to_instrument: &[&str],
+        _gum: &frida_gum::Gum,
+        _ranges: &RangeMap<usize, (u16, String)>,
+        _modules_to_instrument: &[&str],
     ) {
         self.generate_instrumentation_blobs();
     }
 
     fn pre_exec<I: Input + HasTargetBytes>(
         &mut self,
-        input: &I,
+        _input: &I,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec<I: Input + HasTargetBytes>(
         &mut self,
-        input: &I,
+        _input: &I,
     ) -> Result<(), Error> {
         Ok(())
     }
