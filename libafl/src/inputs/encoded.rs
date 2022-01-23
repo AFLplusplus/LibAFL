@@ -185,7 +185,7 @@ impl Tokenizer for NaiveTokenizer {
 }
 
 /// A codes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EncodedInput {
     /// The input representation as list of codes
     codes: Vec<u32>,

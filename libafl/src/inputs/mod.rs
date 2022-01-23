@@ -20,6 +20,7 @@ use alloc::{
 };
 use core::{clone::Clone, fmt::Debug};
 use serde::{Deserialize, Serialize};
+use std::hash::Hash;
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
 
@@ -28,7 +29,7 @@ use crate::bolts::fs::write_file_atomic;
 use crate::{bolts::ownedref::OwnedSlice, Error};
 
 /// An input for the target
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
     #[cfg(feature = "std")]
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
@@ -67,7 +68,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 }
 
 /// An input for tests, mainly. There is no real use much else.
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct NopInput {}
 impl Input for NopInput {
     fn generate_name(&self, _idx: usize) -> String {
