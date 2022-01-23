@@ -425,7 +425,6 @@ where
         Ok((state, mgr))
     }
 }
-
 /// SimpleEventManager Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
