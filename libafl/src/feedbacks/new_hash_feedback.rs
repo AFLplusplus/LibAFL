@@ -127,7 +127,7 @@ where
     {
         let observer = observers
             .match_name::<O>(&self.observer_name)
-            .expect("A NewHashFeedback needs a StacktraceObserver");
+            .expect("A NewHashFeedback needs a BacktraceObserver");
 
         let backtrace_state = _state
             .feedback_states_mut()
