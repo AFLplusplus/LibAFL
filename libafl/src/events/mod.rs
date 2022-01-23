@@ -575,9 +575,9 @@ pub mod pybind {
             &self,
         ) -> &impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer> {
             unsafe {
-                match &self.event_manager {
+                match self.event_manager {
                     PythonEventManagerWrapper::Simple(py_simple_event_manager) => {
-                        &(*(*py_simple_event_manager)).simple_event_manager
+                        &(*py_simple_event_manager).simple_event_manager
                     }
                 }
             }
@@ -588,9 +588,9 @@ pub mod pybind {
         ) -> &mut impl EventManager<PythonExecutorI32, BytesInput, MyStdState, MyStdFuzzer>
         {
             unsafe {
-                match &mut self.event_manager {
+                match self.event_manager {
                     PythonEventManagerWrapper::Simple(py_simple_event_manager) => {
-                        &mut (*(*py_simple_event_manager)).simple_event_manager
+                        &mut (*py_simple_event_manager).simple_event_manager
                     }
                 }
             }

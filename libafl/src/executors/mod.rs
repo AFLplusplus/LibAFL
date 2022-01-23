@@ -172,9 +172,9 @@ pub mod pybind {
         ) -> &(impl Executor<PythonEventManager, BytesInput, MyStdState, MyStdFuzzer>
                  + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
             unsafe {
-                match &self.executor {
+                match self.executor {
                     PythonExecutorWrapperI32::OwnedInProcess(py_owned_inprocess_executor) => {
-                        &(*(*py_owned_inprocess_executor)).owned_in_process_executor
+                        &(*py_owned_inprocess_executor).owned_in_process_executor
                     }
                 }
             }
@@ -185,9 +185,9 @@ pub mod pybind {
         ) -> &mut (impl Executor<PythonEventManager, BytesInput, MyStdState, MyStdFuzzer>
                      + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
             unsafe {
-                match &self.executor {
+                match self.executor {
                     PythonExecutorWrapperI32::OwnedInProcess(py_owned_inprocess_executor) => {
-                        &mut (*(*py_owned_inprocess_executor)).owned_in_process_executor
+                        &mut (*py_owned_inprocess_executor).owned_in_process_executor
                     }
                 }
             }

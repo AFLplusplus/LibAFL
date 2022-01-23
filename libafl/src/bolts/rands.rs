@@ -430,3 +430,81 @@ mod tests {
         println!("random value: {}", mutator.rng.next_u32());
     }
 }
+
+#[cfg(feature = "python")]
+/// Rand Python bindings
+pub mod pybind {
+    use super::Rand;
+    use crate::bolts::{current_nanos, rands::StdRand};
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    #[pyclass(unsendable, name = "StdRand")]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for StdRand
+    pub struct PythonStdRand {
+        /// Rust wrapped StdRand object
+        pub std_rand: StdRand,
+    }
+
+    #[pymethods]
+    impl PythonStdRand {
+        #[staticmethod]
+        fn with_current_nanos() -> Self {
+            Self {
+                std_rand: StdRand::with_seed(current_nanos()),
+            }
+        }
+
+        #[staticmethod]
+        fn with_seed(seed: u64) -> Self {
+            Self {
+                std_rand: StdRand::with_seed(seed),
+            }
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    enum PythonRandWrapper {
+        StdRand(PythonStdRand),
+    }
+
+    /// Rand Trait binding
+    #[pyclass(unsendable, name = "Rand")]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct PythonRand {
+        rand: PythonRandWrapper,
+    }
+
+    #[pymethods]
+    impl PythonRand {
+        #[staticmethod]
+        fn new_from_std(py_std_rand: PythonStdRand) -> Self {
+            Self {
+                rand: PythonRandWrapper::StdRand(py_std_rand),
+            }
+        }
+    }
+
+    impl Rand for PythonRand {
+        fn set_seed(&mut self, seed: u64) {
+            match &mut self.rand {
+                PythonRandWrapper::StdRand(py_std_rand) => py_std_rand.std_rand.set_seed(seed),
+            }
+        }
+
+        #[inline]
+        fn next(&mut self) -> u64 {
+            match &mut self.rand {
+                PythonRandWrapper::StdRand(py_std_rand) => py_std_rand.std_rand.next(),
+            }
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdRand>()?;
+        m.add_class::<PythonRand>()?;
+        Ok(())
+    }
+}

@@ -642,7 +642,8 @@ where
 #[cfg(feature = "python")]
 /// State Python bindings
 pub mod pybind {
-    use crate::bolts::{rands::StdRand, tuples::tuple_list};
+    use crate::bolts::rands::pybind::PythonRand;
+    use crate::bolts::tuples::tuple_list;
     use crate::corpus::pybind::PythonCorpus;
     use crate::events::pybind::PythonEventManager;
     use crate::executors::pybind::PythonExecutorI32;
@@ -654,13 +655,8 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     /// Temporary StdState with fixed generics
-    pub type MyStdState = StdState<
-        PythonCorpus,
-        (MapFeedbackState<i32>, ()),
-        BytesInput,
-        StdRand,
-        PythonCorpus
-    >;
+    pub type MyStdState =
+        StdState<PythonCorpus, (MapFeedbackState<i32>, ()), BytesInput, PythonRand, PythonCorpus>;
 
     #[pyclass(unsendable, name = "StdState")]
     #[derive(Debug)]
@@ -674,14 +670,14 @@ pub mod pybind {
     impl PythonStdState {
         #[new]
         fn new(
-            seed: u64,
+            py_rand: PythonRand,
             corpus: PythonCorpus,
             solutions: PythonCorpus,
             py_map_feedback_state: PythonMapFeedbackStateI32,
         ) -> Self {
             Self {
                 std_state: StdState::new(
-                    StdRand::with_seed(seed),
+                    py_rand,
                     corpus,
                     solutions,
                     tuple_list!(py_map_feedback_state.map_feedback_state),
