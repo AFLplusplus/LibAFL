@@ -206,7 +206,7 @@ where
     }
 }
 #[cfg(feature = "python")]
-/// OnDiskCorpus Python bindings
+/// `OnDiskCorpus` Python bindings
 pub mod pybind {
     use std::path::PathBuf;
 

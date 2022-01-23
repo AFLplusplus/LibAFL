@@ -134,7 +134,7 @@ where
     }
 }
 
-/// CachedOnDiskCorpus Python bindings
+/// ``CachedOnDiskCorpus`` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use std::path::PathBuf;

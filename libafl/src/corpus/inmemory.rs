@@ -88,7 +88,7 @@ where
     }
 }
 
-/// InMemoryCorpus Python bindings
+/// `InMemoryCorpus` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::corpus::InMemoryCorpus;

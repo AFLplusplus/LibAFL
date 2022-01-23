@@ -141,7 +141,7 @@ mod test {
 }
 
 #[cfg(feature = "python")]
-/// Executor Python bindings
+/// `Executor` Python bindings
 pub mod pybind {
     use crate::events::pybind::PythonEventManager;
     use crate::executors::{
@@ -181,7 +181,7 @@ pub mod pybind {
         }
 
         fn get_mut_executor(
-            &self,
+            &mut self,
         ) -> &mut (impl Executor<PythonEventManager, BytesInput, MyStdState, MyStdFuzzer>
                      + HasObservers<BytesInput, (PythonMapObserverI32, ()), MyStdState>) {
             unsafe {

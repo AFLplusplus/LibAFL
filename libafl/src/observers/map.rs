@@ -984,7 +984,7 @@ where
     }
 }
 
-/// Exact copy of StdMapObserver that owns its map
+/// Exact copy of `StdMapObserver` that owns its map
 /// Used for python bindings
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
@@ -1134,7 +1134,7 @@ where
         }
     }
 }
-/// MapObserver Python bindings
+/// `MapObserver` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::bolts::{tuples::Named, HasLen};
@@ -1245,7 +1245,7 @@ pub mod pybind {
         fn set_initial(&mut self, initial: i32) {
             match &mut self.map_observer {
                 PythonMapObserverWrapperI32::Owned(map_observer) => {
-                    map_observer.owned_map_observer.set_initial(initial)
+                    map_observer.owned_map_observer.set_initial(initial);
                 }
             }
         }

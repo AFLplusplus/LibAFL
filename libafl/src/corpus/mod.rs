@@ -146,7 +146,7 @@ impl Default for RandCorpusScheduler {
 /// The current `Std` is a [`RandCorpusScheduler`], although this may change in the future, if another [`CorpusScheduler`] delivers better results.
 pub type StdCorpusScheduler = RandCorpusScheduler;
 
-/// Corpus Python bindings
+/// `Corpus` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::corpus::inmemory::pybind::PythonInMemoryCorpus;

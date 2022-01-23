@@ -432,7 +432,7 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
-/// Rand Python bindings
+/// `Rand` Python bindings
 pub mod pybind {
     use super::Rand;
     use crate::bolts::{current_nanos, rands::StdRand};

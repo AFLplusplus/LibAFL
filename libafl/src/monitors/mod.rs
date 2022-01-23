@@ -784,7 +784,7 @@ impl Default for ClientPerfMonitor {
         Self::new()
     }
 }
-/// Monitor Python bindings
+/// `Monitor` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::monitors::{Monitor, SimpleMonitor};
@@ -874,7 +874,7 @@ pub mod pybind {
         }
 
         fn display(&mut self, event_msg: String, sender_id: u32) {
-            self.get_mut_monitor().display(event_msg, sender_id)
+            self.get_mut_monitor().display(event_msg, sender_id);
         }
     }
 

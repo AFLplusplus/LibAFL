@@ -543,7 +543,7 @@ mod tests {
         };
     }
 }
-/// EventManager Python bindings
+/// `EventManager` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::events::simple::pybind::PythonSimpleEventManager;

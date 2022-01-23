@@ -640,7 +640,7 @@ where
 }
 
 #[cfg(feature = "python")]
-/// State Python bindings
+/// `State` Python bindings
 pub mod pybind {
     use crate::bolts::rands::pybind::PythonRand;
     use crate::bolts::tuples::tuple_list;
@@ -654,7 +654,7 @@ pub mod pybind {
     use crate::state::StdState;
     use pyo3::prelude::*;
 
-    /// Temporary StdState with fixed generics
+    /// Temporary `StdState` with fixed generics
     pub type MyStdState =
         StdState<PythonCorpus, (MapFeedbackState<i32>, ()), BytesInput, PythonRand, PythonCorpus>;
 

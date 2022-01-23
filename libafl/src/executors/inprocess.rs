@@ -333,7 +333,7 @@ impl InProcessHandlers {
     }
 }
 
-/// Exact copy of InProcessExecutor that "owns" its harness
+/// Exact copy of `InProcessExecutor` that "owns" its harness
 /// Used for python bindings
 #[allow(dead_code)]
 pub struct OwnedInProcessExecutor<I, OT, S>
@@ -1314,7 +1314,7 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
-/// InProcess Python bindings
+/// `InProcess` Python bindings
 pub mod pybind {
     use crate::bolts::tuples::tuple_list;
     use crate::events::pybind::PythonEventManager;

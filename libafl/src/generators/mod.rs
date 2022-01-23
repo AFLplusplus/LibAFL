@@ -126,7 +126,7 @@ where
     }
 }
 
-/// Generator Python bindings
+/// `Generator` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::generators::RandPrintablesGenerator;

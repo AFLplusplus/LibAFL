@@ -425,7 +425,7 @@ where
         Ok((state, mgr))
     }
 }
-/// SimpleEventManager Python bindings
+/// `SimpleEventManager` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::events::SimpleEventManager;

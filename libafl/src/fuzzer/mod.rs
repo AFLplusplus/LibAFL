@@ -664,7 +664,7 @@ where
 }
 
 #[cfg(feature = "python")]
-/// Fuzzer Python bindings
+/// `Fuzzer` Python bindings
 pub mod pybind {
     use crate::corpus::QueueCorpusScheduler;
     use crate::events::pybind::PythonEventManager;
@@ -680,7 +680,7 @@ pub mod pybind {
     use pyo3::prelude::*;
     use tuple_list::tuple_list;
 
-    /// Temporary StdFuzzer with fixed generics
+    /// Temporary `StdFuzzer` with fixed generics
     pub type MyStdFuzzer = StdFuzzer<
         QueueCorpusScheduler,
         MaxMapFeedback<BytesInput, PythonMapObserverI32, MyStdState, i32>,
