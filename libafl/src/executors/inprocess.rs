@@ -475,7 +475,7 @@ pub mod common_signal_handlers {
 
     use crate::{
         bolts::os::unix_signals::Signal,
-        executors::{inprocess::GLOBAL_STATE, ExitKind, HasObservers},
+        executors::{ExitKind, HasObservers},
         inputs::Input,
         observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasSolutions},

@@ -12,7 +12,7 @@ use std::{
         io::{AsRawFd, RawFd},
         process::CommandExt,
     },
-    process::{Command, Stdio},
+    process::{ChildStderr, Command, Stdio},
 };
 
 use crate::{
@@ -201,6 +201,7 @@ impl OutFile {
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
+    err_pipe: ChildStderr,
     child_pid: Pid,
     status: i32,
     last_run_timed_out: i32,
@@ -219,17 +220,17 @@ impl Forkserver {
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
-        let (stdout, stderr) = if debug_output {
-            (Stdio::inherit(), Stdio::inherit())
+        let stdout = if debug_output {
+            Stdio::inherit()
         } else {
-            (Stdio::null(), Stdio::null())
+            Stdio::null()
         };
 
-        match Command::new(target)
+        let child = match Command::new(target)
             .args(args)
             .stdin(Stdio::null())
             .stdout(stdout)
-            .stderr(stderr)
+            .stderr(Stdio::piped())
             .env("LD_BIND_LAZY", "1")
             .setlimit(memlimit)
             .setsid()
@@ -242,22 +243,26 @@ impl Forkserver {
             )
             .spawn()
         {
-            Ok(_) => {}
-            Err(err) => {
-                return Err(Error::Forkserver(format!(
-                    "Could not spawn the forkserver: {:#?}",
-                    err
-                )));
+            Ok(child) => {
+                println!("got it running");
+                Ok(child)
             }
+            Err(err) => Err(Error::Forkserver(format!(
+                "Could not spawn the forkserver: {:#?}",
+                err
+            ))),
         };
 
         // Ctl_pipe.read_end and st_pipe.write_end are unnecessary for the parent, so we'll close them
         ctl_pipe.close_read_end();
         st_pipe.close_write_end();
 
+        let err_pipe = child.unwrap().stderr.take().unwrap();
+
         Ok(Self {
             st_pipe,
             ctl_pipe,
+            err_pipe,
             child_pid: Pid::from_raw(0),
             status: 0,
             last_run_timed_out: 0,
@@ -303,7 +308,6 @@ impl Forkserver {
 
         let rlen = self.st_pipe.read(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
-
         Ok((rlen, val))
     }
 
@@ -541,7 +545,7 @@ where
         use_shmem_testcase: bool,
         observers: OT,
     ) -> Result<Self, Error> {
-        Self::with_debug(target, arguments, use_shmem_testcase, observers, false)
+        Self::with_debug(target, arguments, use_shmem_testcase, observers, true)
     }
 
     /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers, with debug mode
@@ -711,7 +715,15 @@ where
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
+            println!("Got crash yes");
+            println!("with input={:?}", input);
         }
+
+        let mut buf = String::new();
+        self.forkserver
+            .err_pipe
+            .read_to_string(&mut buf)
+            .expect("failed");
 
         self.forkserver.set_child_pid(Pid::from_raw(0));
 
