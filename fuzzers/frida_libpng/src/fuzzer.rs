@@ -20,6 +20,7 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
     corpus::{
         ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus,

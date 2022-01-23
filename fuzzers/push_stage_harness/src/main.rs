@@ -8,7 +8,7 @@ use core::cell::{Cell, RefCell};
 use std::{path::PathBuf, rc::Rc};
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{
         Corpus, CorpusScheduler, InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler, Testcase,
     },

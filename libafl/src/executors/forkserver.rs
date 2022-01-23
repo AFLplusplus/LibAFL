@@ -19,6 +19,7 @@ use crate::{
     bolts::{
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
@@ -832,6 +833,7 @@ mod tests {
         bolts::{
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
             tuples::tuple_list,
+            AsMutSlice,
         },
         executors::ForkserverExecutor,
         inputs::NopInput,

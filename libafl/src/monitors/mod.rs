@@ -3,6 +3,10 @@
 pub mod multi;
 pub use multi::MultiMonitor;
 
+#[cfg(all(feature = "tui_monitor", feature = "std"))]
+#[allow(missing_docs)]
+pub mod tui;
+
 use alloc::{string::String, vec::Vec};
 
 #[cfg(feature = "introspection")]
@@ -17,6 +21,7 @@ use crate::bolts::{current_time, format_duration_hms};
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
 /// User-defined stat types
+/// TODO define aggregation function (avg, median, max, ...)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum UserStats {
     /// A numerical value

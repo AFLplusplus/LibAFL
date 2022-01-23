@@ -542,7 +542,7 @@ impl LlmpMsg {
 
     /// Gets the buffer from this message as slice, with the corrent length.
     #[inline]
-    pub fn as_slice<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
+    pub fn try_as_slice<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
         unsafe {
             if self.in_shmem(map) {
                 Ok(self.as_slice_unsafe())
@@ -1110,7 +1110,7 @@ where
         #[allow(clippy::cast_ptr_alignment)]
         let mut end_of_page_msg = (*out).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
         (*end_of_page_msg).map_size = new_map_shmem.shmem.len();
-        (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_slice();
+        (*end_of_page_msg).shm_str = *new_map_shmem.shmem.id().as_array();
 
         /* Send the last msg on the old buf */
         self.send(out, true)?;
@@ -1439,7 +1439,7 @@ where
                     // Map the new page. The old one should be unmapped by Drop
                     self.current_recv_shmem =
                         LlmpSharedMap::existing(self.shmem_provider.shmem_from_id_and_size(
-                            ShMemId::from_slice(&pageinfo_cpy.shm_str),
+                            ShMemId::from_array(&pageinfo_cpy.shm_str),
                             pageinfo_cpy.map_size,
                         )?);
                     page = self.current_recv_shmem.page_mut();
@@ -1512,7 +1512,7 @@ where
                     (*msg).sender,
                     (*msg).tag,
                     (*msg).flags,
-                    (*msg).as_slice(&mut self.current_recv_shmem)?,
+                    (*msg).try_as_slice(&mut self.current_recv_shmem)?,
                 )),
                 None => None,
             })
@@ -1527,7 +1527,7 @@ where
             Ok((
                 (*msg).sender,
                 (*msg).tag,
-                (*msg).as_slice(&mut self.current_recv_shmem)?,
+                (*msg).try_as_slice(&mut self.current_recv_shmem)?,
             ))
         }
     }
@@ -1997,7 +1997,7 @@ where
             (*msg).tag = LLMP_TAG_NEW_SHM_CLIENT;
             #[allow(clippy::cast_ptr_alignment)]
             let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-            (*pageinfo).shm_str = *shmem_description.id.as_slice();
+            (*pageinfo).shm_str = *shmem_description.id.as_array();
             (*pageinfo).map_size = shmem_description.size;
             sender.send(msg, true)
         }
@@ -2329,7 +2329,7 @@ where
                         let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
 
                         match self.shmem_provider.shmem_from_id_and_size(
-                            ShMemId::from_slice(&(*pageinfo).shm_str),
+                            ShMemId::from_array(&(*pageinfo).shm_str),
                             (*pageinfo).map_size,
                         ) {
                             Ok(new_shmem) => {
@@ -2363,7 +2363,7 @@ where
                     let mut should_forward_msg = true;
 
                     let map = &mut self.llmp_clients[client_id as usize].current_recv_shmem;
-                    let msg_buf = (*msg).as_slice(map)?;
+                    let msg_buf = (*msg).try_as_slice(map)?;
                     if let LlmpMsgHookResult::Handled =
                         (on_new_msg)(client_id, (*msg).tag, (*msg).flags, msg_buf)?
                     {

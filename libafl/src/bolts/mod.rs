@@ -30,6 +30,12 @@ pub trait AsSlice<T> {
     fn as_slice(&self) -> &[T];
 }
 
+/// Can be converted to a mutable slice
+pub trait AsMutSlice<T> {
+    /// Convert to a slice
+    fn as_mut_slice(&mut self) -> &mut [T];
+}
+
 /// Has a length field
 pub trait HasLen {
     /// The length

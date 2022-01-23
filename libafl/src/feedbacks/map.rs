@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{
         tuples::{MatchName, Named},
-        AsSlice, HasRefCnt,
+        AsMutSlice, AsSlice, HasRefCnt,
     },
     corpus::Testcase,
     events::{Event, EventFirer},
@@ -214,6 +214,12 @@ impl AsSlice<usize> for MapIndexesMetadata {
         self.list.as_slice()
     }
 }
+impl AsMutSlice<usize> for MapIndexesMetadata {
+    /// Convert to a slice
+    fn as_mut_slice(&mut self) -> &mut [usize] {
+        self.list.as_mut_slice()
+    }
+}
 
 impl HasRefCnt for MapIndexesMetadata {
     fn refcnt(&self) -> isize {
@@ -247,6 +253,13 @@ impl AsSlice<usize> for MapNoveltiesMetadata {
     #[must_use]
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
+    }
+}
+impl AsMutSlice<usize> for MapNoveltiesMetadata {
+    /// Convert to a slice
+    #[must_use]
+    fn as_mut_slice(&mut self) -> &mut [usize] {
+        self.list.as_mut_slice()
     }
 }
 impl MapNoveltiesMetadata {
@@ -308,7 +321,7 @@ where
     /// Create new `MapFeedbackState` for the observer type.
     pub fn with_observer<O>(map_observer: &O) -> Self
     where
-        O: MapObserver<T>,
+        O: MapObserver<Entry = T>,
         T: Debug,
     {
         Self {
@@ -335,7 +348,7 @@ pub struct MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<T>,
+    O: MapObserver,
     N: IsNovel<T>,
     S: HasFeedbackStates,
 {
@@ -355,7 +368,7 @@ impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<T>,
+    O: MapObserver<Entry = T>,
     N: IsNovel<T>,
     I: Input,
     S: HasFeedbackStates + HasClientPerfMonitor + Debug,
@@ -464,7 +477,7 @@ where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
-    O: MapObserver<T>,
+    O: MapObserver,
     S: HasFeedbackStates,
 {
     #[inline]
@@ -485,7 +498,7 @@ where
         + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
-    O: MapObserver<T>,
+    O: MapObserver,
     S: HasFeedbackStates,
 {
     /// Create new `MapFeedback`
@@ -557,7 +570,7 @@ pub struct ReachabilityFeedback<O> {
 
 impl<O> ReachabilityFeedback<O>
 where
-    O: MapObserver<usize>,
+    O: MapObserver<Entry = usize>,
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
     #[must_use]
@@ -583,7 +596,7 @@ where
 impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
-    O: MapObserver<usize>,
+    O: MapObserver<Entry = usize>,
     S: HasClientPerfMonitor,
 {
     fn is_interesting<EM, OT>(
@@ -632,7 +645,7 @@ where
 
 impl<O> Named for ReachabilityFeedback<O>
 where
-    O: MapObserver<usize>,
+    O: MapObserver<Entry = usize>,
 {
     #[inline]
     fn name(&self) -> &str {

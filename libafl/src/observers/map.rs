@@ -5,7 +5,12 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt::Debug, hash::Hasher, slice::from_raw_parts};
+use core::{
+    fmt::Debug,
+    hash::Hasher,
+    iter::Flatten,
+    slice::{from_raw_parts, Iter, IterMut},
+};
 use intervaltree::IntervalTree;
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
@@ -14,41 +19,36 @@ use crate::{
     bolts::{
         ownedref::{OwnedRefMut, OwnedSliceMut},
         tuples::Named,
-        HasLen,
+        AsMutSlice, AsSlice, HasLen,
     },
     observers::Observer,
     Error,
 };
 
-/// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
-pub trait MapObserver<T>: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
-where
-    T: PrimInt + Default + Copy + Debug,
-{
-    /// Get the map if the observer can be represented with a slice
-    fn map(&self) -> Option<&[T]>;
+/// Compute the hash of a slice
+fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
+    let mut hasher = AHasher::new_with_keys(0, 0);
+    let ptr = slice.as_ptr() as *const u8;
+    let map_size = slice.len() / core::mem::size_of::<T>();
+    unsafe {
+        hasher.write(from_raw_parts(ptr, map_size));
+    }
+    hasher.finish()
+}
 
-    /// Get the map (mutable) if the observer can be represented with a slice
-    fn map_mut(&mut self) -> Option<&mut [T]>;
+/// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
+pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug {
+    /// Type of each entry in this map
+    type Entry: PrimInt + Default + Copy + Debug;
 
     /// Get the value at `idx`
-    fn get(&self, idx: usize) -> &T {
-        &self
-            .map()
-            .expect("Cannot get a map that cannot be represented as slice")[idx]
-    }
+    fn get(&self, idx: usize) -> &Self::Entry;
 
     /// Get the value at `idx` (mutable)
-    fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self
-            .map_mut()
-            .expect("Cannot get a map that cannot be represented as slice")[idx]
-    }
+    fn get_mut(&mut self, idx: usize) -> &mut Self::Entry;
 
     /// Get the number of usable entries in the map (all by default)
-    fn usable_count(&self) -> usize {
-        self.len()
-    }
+    fn usable_count(&self) -> usize;
 
     /// Count the set bytes in the map
     fn count_bytes(&self) -> u64 {
@@ -64,27 +64,16 @@ where
     }
 
     /// Compute the hash of the map
-    fn hash(&self) -> u64 {
-        let mut hasher = AHasher::new_with_keys(0, 0);
-        let slice = self
-            .map()
-            .expect("Cannot hash a map that cannot be represented as slice");
-        let ptr = slice.as_ptr() as *const u8;
-        let map_size = slice.len() / core::mem::size_of::<T>();
-        unsafe {
-            hasher.write(from_raw_parts(ptr, map_size));
-        }
-        hasher.finish()
-    }
+    fn hash(&self) -> u64;
 
     /// Get the initial value for reset()
-    fn initial(&self) -> T;
+    fn initial(&self) -> Self::Entry;
 
     /// Get the initial value for reset()
-    fn initial_mut(&mut self) -> &mut T;
+    fn initial_mut(&mut self) -> &mut Self::Entry;
 
     /// Set the initial value for reset()
-    fn set_initial(&mut self, initial: T);
+    fn set_initial(&mut self, initial: Self::Entry);
 
     /// Reset the map
     #[inline]
@@ -96,6 +85,16 @@ where
             *self.get_mut(i) = initial;
         }
         Ok(())
+    }
+
+    /// Get these observer's contents as [`Vec`]
+    fn to_vec(&self) -> Vec<Self::Entry> {
+        let cnt = self.usable_count();
+        let mut res = Vec::with_capacity(cnt);
+        for i in 0..cnt {
+            res.push(*self.get(i));
+        }
+        res
     }
 }
 
@@ -117,7 +116,7 @@ where
 impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -145,18 +144,53 @@ where
     }
 }
 
-impl<'a, T> MapObserver<T> for StdMapObserver<'a, T>
+impl<'a, 'it, T> IntoIterator for &'it StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Iter<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'a, 'it, T> IntoIterator for &'it mut StdMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = IterMut<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
+    }
+}
+
+impl<'a, T> MapObserver for StdMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Entry = T;
+
     #[inline]
-    fn map(&self) -> Option<&[T]> {
-        Some(self.map.as_slice())
+    fn get(&self, pos: usize) -> &T {
+        &self.as_slice()[pos]
     }
 
     #[inline]
-    fn map_mut(&mut self) -> Option<&mut [T]> {
-        Some(self.map.as_mut_slice())
+    fn get_mut(&mut self, idx: usize) -> &mut T {
+        &mut self.as_mut_slice()[idx]
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    fn hash(&self) -> u64 {
+        hash_slice(self.as_slice())
     }
 
     #[inline]
@@ -172,6 +206,31 @@ where
     #[inline]
     fn set_initial(&mut self, initial: T) {
         self.initial = initial;
+    }
+
+    fn to_vec(&self) -> Vec<T> {
+        self.as_slice().to_vec()
+    }
+}
+
+impl<'a, T> AsSlice<T> for StdMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[must_use]
+    #[inline]
+    fn as_slice(&self) -> &[T] {
+        self.map.as_slice()
+    }
+}
+impl<'a, T> AsMutSlice<T> for StdMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[must_use]
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        self.map.as_mut_slice()
     }
 }
 
@@ -251,7 +310,7 @@ where
 impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -279,24 +338,35 @@ where
     }
 }
 
-impl<'a, T, const N: usize> MapObserver<T> for ConstMapObserver<'a, T, N>
+impl<'a, 'it, T, const N: usize> IntoIterator for &'it ConstMapObserver<'a, T, N>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
-    #[inline]
-    fn usable_count(&self) -> usize {
-        N
-    }
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Iter<'it, T>;
 
-    #[inline]
-    fn map(&self) -> Option<&[T]> {
-        Some(self.map.as_slice())
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
     }
+}
 
-    #[inline]
-    fn map_mut(&mut self) -> Option<&mut [T]> {
-        Some(self.map.as_mut_slice())
+impl<'a, 'it, T, const N: usize> IntoIterator for &'it mut ConstMapObserver<'a, T, N>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = IterMut<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
     }
+}
+
+impl<'a, T, const N: usize> MapObserver for ConstMapObserver<'a, T, N>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Entry = T;
 
     #[inline]
     fn initial(&self) -> T {
@@ -311,6 +381,47 @@ where
     #[inline]
     fn set_initial(&mut self, initial: T) {
         self.initial = initial;
+    }
+
+    #[inline]
+    fn get(&self, idx: usize) -> &T {
+        &self.as_slice()[idx]
+    }
+
+    #[inline]
+    fn get_mut(&mut self, idx: usize) -> &mut T {
+        &mut self.as_mut_slice()[idx]
+    }
+
+    fn usable_count(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    fn hash(&self) -> u64 {
+        hash_slice(self.as_slice())
+    }
+
+    fn to_vec(&self) -> Vec<T> {
+        self.as_slice().to_vec()
+    }
+}
+
+impl<'a, T, const N: usize> AsSlice<T> for ConstMapObserver<'a, T, N>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[inline]
+    fn as_slice(&self) -> &[T] {
+        self.map.as_slice()
+    }
+}
+impl<'a, T, const N: usize> AsMutSlice<T> for ConstMapObserver<'a, T, N>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        self.map.as_mut_slice()
     }
 }
 
@@ -373,7 +484,7 @@ where
 impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -401,24 +512,35 @@ where
     }
 }
 
-impl<'a, T> MapObserver<T> for VariableMapObserver<'a, T>
+impl<'a, 'it, T> IntoIterator for &'it VariableMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
-    #[inline]
-    fn map(&self) -> Option<&[T]> {
-        Some(self.map.as_slice())
-    }
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Iter<'it, T>;
 
-    #[inline]
-    fn map_mut(&mut self) -> Option<&mut [T]> {
-        Some(self.map.as_mut_slice())
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
     }
+}
 
-    #[inline]
-    fn usable_count(&self) -> usize {
-        *self.size.as_ref()
+impl<'a, 'it, T> IntoIterator for &'it mut VariableMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = IterMut<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
     }
+}
+
+impl<'a, T> MapObserver for VariableMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Entry = T;
 
     #[inline]
     fn initial(&self) -> T {
@@ -433,6 +555,45 @@ where
     #[inline]
     fn set_initial(&mut self, initial: T) {
         self.initial = initial;
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        *self.size.as_ref()
+    }
+
+    fn get(&self, idx: usize) -> &T {
+        &self.as_slice()[idx]
+    }
+
+    fn get_mut(&mut self, idx: usize) -> &mut T {
+        &mut self.as_mut_slice()[idx]
+    }
+
+    fn hash(&self) -> u64 {
+        hash_slice(self.as_slice())
+    }
+    fn to_vec(&self) -> Vec<T> {
+        self.as_slice().to_vec()
+    }
+}
+
+impl<'a, T> AsSlice<T> for VariableMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[inline]
+    fn as_slice(&self) -> &[T] {
+        self.map.as_slice()
+    }
+}
+impl<'a, T> AsMutSlice<T> for VariableMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        self.map.as_mut_slice()
     }
 }
 
@@ -498,7 +659,7 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8> + Observer<I, S>,
+    M: MapObserver<Entry = u8> + Observer<I, S>,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -527,7 +688,7 @@ where
 
 impl<M> HasLen for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8>,
+    M: MapObserver,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -535,24 +696,11 @@ where
     }
 }
 
-impl<M> MapObserver<u8> for HitcountsMapObserver<M>
+impl<M> MapObserver for HitcountsMapObserver<M>
 where
-    M: MapObserver<u8>,
+    M: MapObserver<Entry = u8>,
 {
-    #[inline]
-    fn map(&self) -> Option<&[u8]> {
-        self.base.map()
-    }
-
-    #[inline]
-    fn map_mut(&mut self) -> Option<&mut [u8]> {
-        self.base.map_mut()
-    }
-
-    #[inline]
-    fn usable_count(&self) -> usize {
-        self.base.usable_count()
-    }
+    type Entry = u8;
 
     #[inline]
     fn initial(&self) -> u8 {
@@ -567,6 +715,47 @@ where
     #[inline]
     fn set_initial(&mut self, initial: u8) {
         self.base.set_initial(initial);
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        self.base.usable_count()
+    }
+
+    #[inline]
+    fn get(&self, idx: usize) -> &u8 {
+        self.base.get(idx)
+    }
+
+    #[inline]
+    fn get_mut(&mut self, idx: usize) -> &mut u8 {
+        self.base.get_mut(idx)
+    }
+
+    fn hash(&self) -> u64 {
+        self.base.hash()
+    }
+    fn to_vec(&self) -> Vec<u8> {
+        self.base.to_vec()
+    }
+}
+
+impl<M> AsSlice<u8> for HitcountsMapObserver<M>
+where
+    M: MapObserver + AsSlice<u8>,
+{
+    #[inline]
+    fn as_slice(&self) -> &[u8] {
+        self.base.as_slice()
+    }
+}
+impl<M> AsMutSlice<u8> for HitcountsMapObserver<M>
+where
+    M: MapObserver + AsMutSlice<u8>,
+{
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        self.base.as_mut_slice()
     }
 }
 
@@ -585,19 +774,20 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct MultiMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     maps: Vec<OwnedSliceMut<'a, T>>,
     intervals: IntervalTree<usize, usize>,
     len: usize,
     initial: T,
     name: String,
+    iter_idx: usize,
 }
 
 impl<'a, I, S, T> Observer<I, S> for MultiMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -607,7 +797,7 @@ where
 
 impl<'a, T> Named for MultiMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -617,7 +807,7 @@ where
 
 impl<'a, T> HasLen for MultiMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     #[inline]
     fn len(&self) -> usize {
@@ -625,19 +815,11 @@ where
     }
 }
 
-impl<'a, T> MapObserver<T> for MultiMapObserver<'a, T>
+impl<'a, T> MapObserver for MultiMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
-    #[inline]
-    fn map(&self) -> Option<&[T]> {
-        None
-    }
-
-    #[inline]
-    fn map_mut(&mut self) -> Option<&mut [T]> {
-        None
-    }
+    type Entry = T;
 
     #[inline]
     fn get(&self, idx: usize) -> &T {
@@ -705,11 +887,15 @@ where
         }
         Ok(())
     }
+
+    fn usable_count(&self) -> usize {
+        self.len()
+    }
 }
 
 impl<'a, T> MultiMapObserver<'a, T>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
     /// Creates a new [`MultiMapObserver`]
     #[must_use]
@@ -738,6 +924,7 @@ where
             len: idx,
             name: name.to_string(),
             initial,
+            iter_idx: 0,
         }
     }
 
@@ -768,9 +955,35 @@ where
             len: idx,
             name: name.to_string(),
             initial,
+            iter_idx: 0,
         }
     }
 }
+
+impl<'a, 'it, T> IntoIterator for &'it mut MultiMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = Flatten<IterMut<'it, OwnedSliceMut<'a, T>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.maps.iter_mut().flatten()
+    }
+}
+
+impl<'a, 'it, T> IntoIterator for &'it MultiMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Flatten<Iter<'it, OwnedSliceMut<'a, T>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.maps.iter().flatten()
+    }
+}
+
 /// Exact copy of StdMapObserver that owns its map
 /// Used for python bindings
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -788,7 +1001,7 @@ where
 impl<I, S, T> Observer<I, S> for OwnedMapObserver<T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver<T>,
+    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -816,18 +1029,53 @@ where
     }
 }
 
-impl<T> MapObserver<T> for OwnedMapObserver<T>
+impl<'it, T> IntoIterator for &'it OwnedMapObserver<T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Iter<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'it, T> IntoIterator for &'it mut OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = IterMut<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
+    }
+}
+
+impl<T> MapObserver for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Entry = T;
+
     #[inline]
-    fn map(&self) -> Option<&[T]> {
-        Some(self.map.as_slice())
+    fn get(&self, pos: usize) -> &T {
+        &self.as_slice()[pos]
     }
 
     #[inline]
-    fn map_mut(&mut self) -> Option<&mut [T]> {
-        Some(self.map.as_mut_slice())
+    fn get_mut(&mut self, idx: usize) -> &mut T {
+        &mut self.as_mut_slice()[idx]
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    fn hash(&self) -> u64 {
+        hash_slice(self.as_slice())
     }
 
     #[inline]
@@ -844,12 +1092,38 @@ where
     fn set_initial(&mut self, initial: T) {
         self.initial = initial;
     }
+
+    fn to_vec(&self) -> Vec<T> {
+        self.as_slice().to_vec()
+    }
+}
+
+impl<T> AsSlice<T> for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[must_use]
+    #[inline]
+    fn as_slice(&self) -> &[T] {
+        self.map.as_slice()
+    }
+}
+impl<T> AsMutSlice<T> for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[must_use]
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        self.map.as_mut_slice()
+    }
 }
 
 impl<T> OwnedMapObserver<T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
+
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
     pub fn new(name: &'static str, map: Vec<T>) -> Self {
@@ -861,7 +1135,6 @@ where
         }
     }
 }
-
 /// MapObserver Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
@@ -903,24 +1176,6 @@ pub mod pybind {
         map_observer: PythonMapObserverWrapperI32,
     }
 
-    impl PythonMapObserverI32 {
-        fn get_map_observer(&self) -> &impl MapObserver<i32> {
-            match &self.map_observer {
-                PythonMapObserverWrapperI32::Owned(map_observer) => {
-                    &map_observer.owned_map_observer
-                }
-            }
-        }
-
-        fn get_mut_map_observer(&mut self) -> &mut impl MapObserver<i32> {
-            match &mut self.map_observer {
-                PythonMapObserverWrapperI32::Owned(map_observer) => {
-                    &mut map_observer.owned_map_observer
-                }
-            }
-        }
-    }
-
     #[pymethods]
     impl PythonMapObserverI32 {
         #[staticmethod]
@@ -931,54 +1186,113 @@ pub mod pybind {
         }
     }
 
-    impl MapObserver<i32> for PythonMapObserverI32 {
-        #[inline]
-        fn map(&self) -> Option<&[i32]> {
-            self.get_map_observer().map()
-        }
+    impl MapObserver for PythonMapObserverI32 {
+        type Entry = i32;
 
         #[inline]
-        fn map_mut(&mut self) -> Option<&mut [i32]> {
-            self.get_mut_map_observer().map_mut()
+        fn get(&self, idx: usize) -> &i32 {
+            match &self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    &map_observer.owned_map_observer.get(idx)
+                }
+            }
         }
-
+    
+        #[inline]
+        fn get_mut(&mut self, idx: usize) -> &mut i32 {
+            match &mut self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.get_mut(idx)
+                }
+            }
+        }
+    
+        #[inline]
+        fn usable_count(&self) -> usize {
+            match &self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.usable_count()
+                }
+            }
+        }
+    
+        fn hash(&self) -> u64 {
+            match &self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.hash()
+                }
+            }
+        }
+    
         #[inline]
         fn initial(&self) -> i32 {
-            self.get_map_observer().initial()
+            match &self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.initial()
+                }
+            }
         }
-
+    
         #[inline]
         fn initial_mut(&mut self) -> &mut i32 {
-            self.get_mut_map_observer().initial_mut()
+            match &mut self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.initial_mut()
+                }
+            }
         }
-
+    
         #[inline]
         fn set_initial(&mut self, initial: i32) {
-            self.get_mut_map_observer().set_initial(initial)
+            match &mut self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.set_initial(initial)
+                }
+            }
+        }
+    
+        fn to_vec(&self) -> Vec<i32> {
+            match &self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.to_vec()
+                }
+            }
         }
     }
 
     impl Named for PythonMapObserverI32 {
         #[inline]
         fn name(&self) -> &str {
-            self.get_map_observer().name()
+            match &self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.name()
+                }
+            }
         }
     }
 
     impl HasLen for PythonMapObserverI32 {
         #[inline]
         fn len(&self) -> usize {
-            self.get_map_observer().len()
+            match &self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.len()
+                }
+            }
         }
     }
 
     impl<I, S> Observer<I, S> for PythonMapObserverI32
     where
-        Self: MapObserver<i32>,
+        Self: MapObserver,
     {
         #[inline]
         fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-            self.get_mut_map_observer().reset_map()
+            match &mut self.map_observer {
+                PythonMapObserverWrapperI32::Owned(map_observer) => {
+                    map_observer.owned_map_observer.pre_exec(_state, _input)
+                }
+            }
         }
     }
 
@@ -989,3 +1303,5 @@ pub mod pybind {
         Ok(())
     }
 }
+
+
