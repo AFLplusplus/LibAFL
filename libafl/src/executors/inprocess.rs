@@ -44,6 +44,7 @@ use crate::{
     Error,
 };
 
+use alloc::boxed::Box;
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
 pub struct InProcessExecutor<'a, H, I, OT, S>
