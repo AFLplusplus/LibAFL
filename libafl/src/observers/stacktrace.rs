@@ -6,13 +6,17 @@ use crate::{
         tuples::Named,
     },
     executors::ExitKind,
+    inputs::Input,
     observers::Observer,
     Error,
 };
 use ahash::AHasher;
+use backtrace::Backtrace;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Debug, hash::Hasher, io::Read, process::ChildStderr};
+use std::{
+    collections::hash_map::DefaultHasher, fmt::Debug, hash::Hasher, io::Read, process::ChildStderr,
+};
 
 use super::ObserverWithHashField;
 
@@ -22,34 +26,42 @@ pub enum BacktraceHashValueWrapper {
     /// shared memory instance
     Shmem(Box<StdShMem>),
     /// static variable
-    StaticVariable(u64),
+    StaticVariable((u64, u64)),
     /// Neither is set
     None,
 }
 
 impl BacktraceHashValueWrapper {
-    fn store_stacktrace_hash(&mut self, hash: u64) {
+    /// store a hash value in the [`BacktraceHashValueWrapper`]
+    fn store_stacktrace_hash(&mut self, bt_hash: u64, input_hash: u64) {
         match self {
             Self::Shmem(shmem) => {
                 let map = shmem.map_mut();
-                let hash_bytes = hash.to_be_bytes();
-                map.copy_from_slice(&hash_bytes);
+                let bt_hash_bytes = bt_hash.to_be_bytes();
+                let input_hash_bytes = input_hash.to_be_bytes();
+                map.copy_from_slice(&[bt_hash_bytes, input_hash_bytes].concat());
             }
             Self::StaticVariable(_) => {
-                *self = Self::StaticVariable(hash);
+                *self = Self::StaticVariable((bt_hash, input_hash));
             }
             Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet22!"),
         }
     }
 
-    fn get_stacktrace_hash(&self) -> u64 {
+    /// get the hash value from the [`BacktraceHashValueWrapper`]
+    fn get_stacktrace_hash(&self) -> (u64, u64) {
         match &self {
             Self::Shmem(shmem) => {
                 let map = shmem.map();
-                u64::from_be_bytes(map[0..8].try_into().expect("Incorrectly sized"))
+                (
+                    u64::from_be_bytes(map[0..8].try_into().expect("Incorrectly sized")),
+                    u64::from_be_bytes(map[8..16].try_into().expect("Incorrectly sized")),
+                )
             }
-            Self::StaticVariable(var) => *var,
-            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet11!"),
+            Self::StaticVariable(hash_tuple) => *hash_tuple,
+            Self::None => {
+                panic!("BacktraceSharedMemoryWrapper is not set yet11!")
+            }
         }
     }
 }
@@ -58,67 +70,23 @@ impl BacktraceHashValueWrapper {
 /// Static variable storing shared memory information
 pub static mut BACKTRACE_HASH_VALUE: BacktraceHashValueWrapper = BacktraceHashValueWrapper::None;
 
-/// Utilities for setting up the signal handler and panic handler to collect the backtrace
-pub mod stacktrace_hooks {
-    use crate::bolts::os::unix_signals::Signal;
-    use ahash::AHasher;
-    use backtrace::Backtrace;
-    use libc::{
-        c_int, c_void, sigaction, sigaddset, sigemptyset, siginfo_t, SA_NODEFER, SA_SIGINFO,
-        SIGALRM,
-    };
-    use std::hash::Hasher;
-    use std::{mem, panic, ptr};
-
-    /// Collects the backtrace via Backtrace and Debug
-    /// (Debug is currently used for dev purposes, symbols hash will be used eventually)
-    pub fn collect_backtrace() {
-        let b = Backtrace::new();
-        // will use symbols later
-        let trace = format!("{:?}", b);
-        eprintln!("{}", trace);
-        let mut hasher = AHasher::new_with_keys(0, 0);
-        hasher.write(trace.as_bytes());
-        let hash = hasher.finish();
-        println!("backtrace collected with hash={}", hash);
-        unsafe {
-            crate::observers::BACKTRACE_HASH_VALUE.store_stacktrace_hash(hash);
-        }
-    }
-
-    /// setup backtrace collection in a rust panic hook when the harness is rust code
-    pub fn setup_rust_panic_hook() {
-        panic::set_hook(Box::new(|_panic_info| {
-            collect_backtrace();
-        }));
-    }
-
-    /// setup backtrace collection in a signal handler when the harness is linked via FFI
-    pub unsafe fn setup_signal_handler() {
-        fn signal_handler(sig: c_int, _info: siginfo_t, _con: *mut c_void) {
-            println!("Received signal sig={}", sig);
-            collect_backtrace();
-        }
-        let signals = vec![
-            Signal::SigAlarm,
-            Signal::SigUser2,
-            Signal::SigAbort,
-            Signal::SigBus,
-            Signal::SigPipe,
-            Signal::SigFloatingPointException,
-            Signal::SigIllegalInstruction,
-            Signal::SigSegmentationFault,
-            Signal::SigTrap,
-        ];
-        let mut sa: sigaction = mem::zeroed();
-        sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
-        sigaddset(&mut sa.sa_mask as *mut libc::sigset_t, SIGALRM);
-        sa.sa_sigaction = signal_handler as usize;
-        sa.sa_flags = SA_NODEFER | SA_SIGINFO;
-        for sig in signals {
-            sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut());
-        }
-    }
+/// Collects the backtrace via [`Backtrace`] and [`Debug`]
+/// ([`Debug`] is currently used for dev purposes, symbols hash will be used eventually)
+#[must_use]
+pub fn collect_backtrace() -> u64 {
+    let b = Backtrace::new();
+    // will use symbols later
+    let trace = format!("{:?}", b);
+    eprintln!("{}", trace);
+    let mut hasher = AHasher::new_with_keys(0, 0);
+    hasher.write(trace.as_bytes());
+    let hash = hasher.finish();
+    println!(
+        "backtrace collected with hash={} at pid={}",
+        hash,
+        std::process::id()
+    );
+    hash
 }
 
 /// An enum encoding the types of harnesses
@@ -139,13 +107,9 @@ pub struct BacktraceObserver {
 }
 
 impl BacktraceObserver {
-    /// Creates a new [`StacktraceObserver`] with the given name.
+    /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: &str, harness_type: HarnessType) -> Self {
-        match harness_type {
-            HarnessType::RUST => stacktrace_hooks::setup_rust_panic_hook(),
-            HarnessType::FFI => unsafe { stacktrace_hooks::setup_signal_handler() },
-        }
         Self {
             observer_name: observer_name.to_string(),
             harness_type,
@@ -156,23 +120,23 @@ impl BacktraceObserver {
     /// Setup the shared memory and store it in [`BACKTRACE_HASH_VALUE`]
     pub fn setup_shmem() {
         let shmem_provider = StdShMemProvider::new();
-        println!("panic hook is being set");
-        let shmem = shmem_provider.unwrap().new_map(8).unwrap();
+        let mut shmem = shmem_provider.unwrap().new_map(16).unwrap();
+        shmem.map_mut().fill(0);
         let boxed_shmem = Box::<StdShMem>::new(shmem);
         unsafe {
             BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::Shmem(boxed_shmem);
         }
     }
 
-    /// Init the [`BACKTRACE_HASH_VALUE`] to `BacktraceHashValueWrapper::StaticVariable(0)`
+    /// Init the [`BACKTRACE_HASH_VALUE`] to [`BacktraceHashValueWrapper::StaticVariable`](0)
     pub fn setup_static_variable() {
         unsafe {
-            BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::StaticVariable(0);
+            BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::StaticVariable((0, 0));
         }
     }
 
     /// returns harness_type for this [`BacktraceObserver`] instance
-    pub fn get_harness_type(&self) -> &HarnessType {
+    pub fn harness_type(&self) -> &HarnessType {
         &self.harness_type
     }
 }
@@ -203,17 +167,36 @@ impl Default for BacktraceObserver {
 
 impl<I, S> Observer<I, S> for BacktraceObserver
 where
-    I: Debug,
+    I: Input + Debug,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        unsafe {
-            let hash = BACKTRACE_HASH_VALUE.get_stacktrace_hash();
-            println!("hash from parent process is {}", hash);
-            self.update_hash(hash);
+    fn post_exec(&mut self, _state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+        let mut hasher = DefaultHasher::new();
+        input.hash(&mut hasher);
+        let input_hash = hasher.finish();
+        let (bt_hash, current_input_hash) = unsafe { BACKTRACE_HASH_VALUE.get_stacktrace_hash() };
+        if current_input_hash != input_hash {
+            match exit_kind {
+                ExitKind::Crash => {
+                    println!("Got crash, will collect");
+                    let bt_hash = collect_backtrace();
+                    unsafe { BACKTRACE_HASH_VALUE.store_stacktrace_hash(bt_hash, input_hash) };
+                    self.update_hash(bt_hash);
+                }
+                _ => (),
+            }
+        } else {
+            println!("double call");
+            match exit_kind {
+                ExitKind::Crash => {
+                    println!("hash from parent process is {}", bt_hash);
+                    self.update_hash(bt_hash);
+                }
+                _ => (),
+            }
         }
         Ok(())
     }
@@ -249,7 +232,7 @@ pub struct CommandBacktraceObserver {
 }
 
 impl CommandBacktraceObserver {
-    /// Creates a new [`StacktraceObserver`] with the given name.
+    /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: &str) -> Self {
         Self {
