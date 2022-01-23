@@ -1123,7 +1123,6 @@ impl<T> OwnedMapObserver<T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
-
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
     pub fn new(name: &'static str, map: Vec<T>) -> Self {
@@ -1197,7 +1196,7 @@ pub mod pybind {
                 }
             }
         }
-    
+
         #[inline]
         fn get_mut(&mut self, idx: usize) -> &mut i32 {
             match &mut self.map_observer {
@@ -1206,7 +1205,7 @@ pub mod pybind {
                 }
             }
         }
-    
+
         #[inline]
         fn usable_count(&self) -> usize {
             match &self.map_observer {
@@ -1215,7 +1214,7 @@ pub mod pybind {
                 }
             }
         }
-    
+
         fn hash(&self) -> u64 {
             match &self.map_observer {
                 PythonMapObserverWrapperI32::Owned(map_observer) => {
@@ -1223,7 +1222,7 @@ pub mod pybind {
                 }
             }
         }
-    
+
         #[inline]
         fn initial(&self) -> i32 {
             match &self.map_observer {
@@ -1232,7 +1231,7 @@ pub mod pybind {
                 }
             }
         }
-    
+
         #[inline]
         fn initial_mut(&mut self) -> &mut i32 {
             match &mut self.map_observer {
@@ -1241,7 +1240,7 @@ pub mod pybind {
                 }
             }
         }
-    
+
         #[inline]
         fn set_initial(&mut self, initial: i32) {
             match &mut self.map_observer {
@@ -1250,7 +1249,7 @@ pub mod pybind {
                 }
             }
         }
-    
+
         fn to_vec(&self) -> Vec<i32> {
             match &self.map_observer {
                 PythonMapObserverWrapperI32::Owned(map_observer) => {
@@ -1303,5 +1302,3 @@ pub mod pybind {
         Ok(())
     }
 }
-
-

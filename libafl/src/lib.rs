@@ -330,7 +330,6 @@ pub extern "C" fn external_current_millis() -> u64 {
     1000
 }
 
-
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 

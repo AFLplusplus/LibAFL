@@ -157,7 +157,8 @@ pub mod pybind {
         #[new]
         fn new(path: String, cache_max_len: usize) -> Self {
             Self {
-                cached_on_disk_corpus: CachedOnDiskCorpus::new(PathBuf::from(path), cache_max_len).unwrap(),
+                cached_on_disk_corpus: CachedOnDiskCorpus::new(PathBuf::from(path), cache_max_len)
+                    .unwrap(),
             }
         }
     }

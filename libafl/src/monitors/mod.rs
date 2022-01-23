@@ -805,7 +805,7 @@ pub mod pybind {
     impl PythonSimpleMonitor {
         #[new]
         fn new(/*py_print_fn: PyObject */) -> Self {
-            // TODO: Find a fix to: closures can only be coerced to `fn` types if they 
+            // TODO: Find a fix to: closures can only be coerced to `fn` types if they
             // do not capture any variables and print_fn expected to be fn pointer.
             // fn printf_fn (s: String){
             //     Python::with_gil(|py| -> PyResult<()> {

@@ -159,7 +159,6 @@ pub mod pybind {
         OwnedInProcess(*mut PythonOwnedInProcessExecutorI32),
     }
 
-    
     #[pyclass(unsendable, name = "ExecutorI32")]
     #[derive(Debug)]
     /// Executor + HasObservers Trait binding

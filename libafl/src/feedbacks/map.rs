@@ -709,12 +709,7 @@ pub mod pybind {
     /// Python class for MaxMapFeedback
     pub struct PythonMaxMapFeedbackI32 {
         /// Rust wrapped MaxMapFeedback object
-        pub max_map_feedback: MaxMapFeedback<
-            BytesInput,
-            PythonMapObserverI32,
-            MyStdState,
-            i32,
-        >,
+        pub max_map_feedback: MaxMapFeedback<BytesInput, PythonMapObserverI32, MyStdState, i32>,
     }
 
     #[pymethods]
@@ -732,7 +727,7 @@ pub mod pybind {
             }
         }
     }
-    
+
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonMapFeedbackStateI32>()?;

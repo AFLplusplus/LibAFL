@@ -228,10 +228,10 @@ pub mod pybind {
             match &self.corpus {
                 PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
                     py_in_memory_corpus.in_memory_corpus.count()
-                },
+                }
                 PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
                     py_cached_on_disk_corpus.cached_on_disk_corpus.count()
-                },
+                }
                 PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
                     py_on_disk_corpus.on_disk_corpus.count()
                 }
@@ -243,10 +243,10 @@ pub mod pybind {
             match &mut self.corpus {
                 PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
                     py_in_memory_corpus.in_memory_corpus.add(testcase)
-                },
+                }
                 PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
                     py_cached_on_disk_corpus.cached_on_disk_corpus.add(testcase)
-                },
+                }
                 PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
                     py_on_disk_corpus.on_disk_corpus.add(testcase)
                 }
@@ -258,10 +258,12 @@ pub mod pybind {
             match &mut self.corpus {
                 PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
                     py_in_memory_corpus.in_memory_corpus.replace(idx, testcase)
-                },
+                }
                 PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-                    py_cached_on_disk_corpus.cached_on_disk_corpus.replace(idx, testcase)
-                },
+                    py_cached_on_disk_corpus
+                        .cached_on_disk_corpus
+                        .replace(idx, testcase)
+                }
                 PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
                     py_on_disk_corpus.on_disk_corpus.replace(idx, testcase)
                 }
@@ -273,10 +275,10 @@ pub mod pybind {
             match &mut self.corpus {
                 PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
                     py_in_memory_corpus.in_memory_corpus.remove(idx)
-                },
+                }
                 PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
                     py_cached_on_disk_corpus.cached_on_disk_corpus.remove(idx)
-                },
+                }
                 PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
                     py_on_disk_corpus.on_disk_corpus.remove(idx)
                 }
@@ -288,10 +290,10 @@ pub mod pybind {
             match &self.corpus {
                 PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
                     py_in_memory_corpus.in_memory_corpus.get(idx)
-                },
+                }
                 PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
                     py_cached_on_disk_corpus.cached_on_disk_corpus.get(idx)
-                },
+                }
                 PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
                     py_on_disk_corpus.on_disk_corpus.get(idx)
                 }
@@ -303,10 +305,10 @@ pub mod pybind {
             match &self.corpus {
                 PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
                     py_in_memory_corpus.in_memory_corpus.current()
-                },
+                }
                 PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
                     py_cached_on_disk_corpus.cached_on_disk_corpus.current()
-                },
+                }
                 PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
                     py_on_disk_corpus.on_disk_corpus.current()
                 }
@@ -318,10 +320,10 @@ pub mod pybind {
             match &mut self.corpus {
                 PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
                     py_in_memory_corpus.in_memory_corpus.current_mut()
-                },
+                }
                 PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
                     py_cached_on_disk_corpus.cached_on_disk_corpus.current_mut()
-                },
+                }
                 PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
                     py_on_disk_corpus.on_disk_corpus.current_mut()
                 }
