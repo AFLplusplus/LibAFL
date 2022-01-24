@@ -3,7 +3,10 @@ Welcome to `LibAFL`
 */
 
 #![cfg_attr(not(feature = "std"), no_std)]
+// For `type_eq`
 #![cfg_attr(unstable_feature, feature(specialization))]
+// For `type_id` and owned things
+#![cfg_attr(unstable_feature, feature(intrinsics))]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::pedantic)]
 #![allow(
