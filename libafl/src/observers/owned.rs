@@ -1,6 +1,7 @@
-//! A dynamic collection of owned observers
+//! A dynamic collection of owned observers, working only with unstable rust
 
 use core::{any::Any, fmt::Debug};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
@@ -39,9 +40,11 @@ crate::create_anymap_for_trait!(
 pub use observers_anymap::{AnyMap as ObserversAnyMap, NamedAnyMap as NamedObserversAnyMap};
 
 /// An owned list of `Observer` trait objects
-#[derive(Debug, Default)]
+/// This is not really serializable, using this struct needs [`EventConfig::AlwaysUnique`] as configuration
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ObserversOwnedMap<I: 'static + Debug, S: 'static + Debug> {
     /// The named trait objects map
+    #[serde(skip_serializing)]
     pub map: NamedObserversAnyMap<I, S>,
 }
 
