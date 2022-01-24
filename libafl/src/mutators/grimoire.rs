@@ -1,6 +1,8 @@
 //! Grimoire is the rewritten grimoire mutator in rust.
 //! See the original repo [`Grimoire`](https://github.com/RUB-SysSec/grimoire) for more details.
 
+use core::cmp::{max, min};
+
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
@@ -12,10 +14,79 @@ use crate::{
 
 const RECURSIVE_REPLACEMENT_DEPTH: [usize; 6] = [2, 4, 8, 16, 32, 64];
 const MAX_RECURSIVE_REPLACEMENT_LEN: usize = 64 << 10;
+const CHOOSE_SUBINPUT_PROB: u64 = 50;
+
+fn extend_with_random_generalized<S>(
+    state: &mut S,
+    items: &mut Vec<GeneralizedItem>,
+    gap_indices: &mut Vec<usize>,
+) -> Result<bool, Error>
+where
+    S: HasRand + HasCorpus<GeneralizedInput>,
+{
+    let count = state.corpus().count();
+    let idx = state.rand_mut().below(count as u64) as usize;
+
+    // TODO store as metadata an HashSet of corpus idx that are generalized
+    if state
+        .corpus()
+        .get(idx)?
+        .borrow_mut()
+        .load_input()?
+        .generalized()
+        .is_none()
+    {
+        return Ok(true);
+    }
+
+    if state.rand_mut().below(100) > CHOOSE_SUBINPUT_PROB {
+        if state.rand_mut().below(100) < 50 {
+            let rand1 = state.rand_mut().next() as usize;
+            let rand2 = state.rand_mut().next() as usize;
+
+            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let other = other_testcase.load_input()?;
+
+            if other.generalized_len() > 0 {
+                let gen = other.generalized().unwrap();
+
+                for (i, _) in gen
+                    .iter()
+                    .enumerate()
+                    .filter(|&(_, x)| *x == GeneralizedItem::Gap)
+                {
+                    gap_indices.push(i);
+                }
+                let min_idx = gap_indices[rand1 % gap_indices.len()];
+                let max_idx = gap_indices[rand2 % gap_indices.len()];
+                let (min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
+
+                gap_indices.clear();
+
+                // TODO check that starts and ends with a Gap
+                items.extend_from_slice(&gen[min_idx..max_idx + 1]);
+
+                return Ok(false);
+            }
+        }
+
+        // TODO get random token
+    }
+
+    let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+    let other = other_testcase.load_input()?;
+    let gen = other.generalized().unwrap();
+
+    items.extend_from_slice(&gen);
+
+    Ok(false)
+}
 
 /// Extend the generalized input with another random one from the corpus
 #[derive(Debug, Default)]
-pub struct GrimoireExtensionMutator {}
+pub struct GrimoireExtensionMutator {
+    gap_indices: Vec<usize>,
+}
 
 impl<S> Mutator<GeneralizedInput, S> for GrimoireExtensionMutator
 where
@@ -31,20 +102,15 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-        let other = other_testcase.load_input()?;
-
-        // TODO store as metadata an HashSet of corpus idx that are generalized
-        match other.generalized() {
-            None => Ok(MutationResult::Skipped),
-            Some(gen) => {
-                // TODO choose subinput with prob 0.5
-                input.generalized_extend(gen);
-                input.grimoire_mutated = true;
-                Ok(MutationResult::Mutated)
-            }
+        // TODO trim input if ending with Gap
+        if extend_with_random_generalized(
+            state,
+            input.generalized_mut().as_mut().unwrap(),
+            &mut self.gap_indices,
+        )? {
+            Ok(MutationResult::Skipped)
+        } else {
+            Ok(MutationResult::Mutated)
         }
     }
 }
@@ -59,7 +125,9 @@ impl GrimoireExtensionMutator {
     /// Creates a new [`GrimoireExtensionMutator`].
     #[must_use]
     pub fn new() -> Self {
-        Self {}
+        Self {
+            gap_indices: vec![],
+        }
     }
 }
 
@@ -86,9 +154,6 @@ where
 
         let mut mutated = MutationResult::Skipped;
 
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
-
         let depth = *state.rand_mut().choose(&RECURSIVE_REPLACEMENT_DEPTH);
         for _ in 0..depth {
             let len = input.generalized_len();
@@ -108,17 +173,10 @@ where
             let selected = *state.rand_mut().choose(&self.gap_indices);
             self.gap_indices.clear();
 
-            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
-            let other = other_testcase.load_input()?;
-
-            if other.generalized().is_none() {
-                continue;
-            }
-
             self.scratch.extend_from_slice(&gen[selected + 1..]);
 
             gen.truncate(selected);
-            gen.extend_from_slice(&other.generalized().unwrap());
+            extend_with_random_generalized(state, gen, &mut self.gap_indices)?;
             gen.extend_from_slice(&self.scratch);
 
             self.scratch.clear();
