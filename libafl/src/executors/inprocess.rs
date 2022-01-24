@@ -12,9 +12,12 @@ use core::{
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
+    borrow::BorrowMut,
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+
+use alloc::boxed::Box;
 
 #[cfg(all(feature = "std", unix))]
 use nix::{
@@ -44,27 +47,34 @@ use crate::{
     Error,
 };
 
-use alloc::boxed::Box;
-/// The inmem executor simply calls a target function, then returns afterwards.
+/// The process executor simply calls a target function, as mutable reference to a closure
+pub type InProcessExecutor<'a, H, I, OT, S> = GenericInProcessExecutor<H, &'a mut H, I, OT, S>;
+/// The process executor simply calls a target function, as boxed `FnMut` trait object
+pub type OwnedInProcessExecutor<I, OT, S> =
+    GenericInProcessExecutor<dyn FnMut(&I) -> ExitKind, Box<dyn FnMut(&I) -> ExitKind>, I, OT, S>;
+
+/// The process executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
-pub struct InProcessExecutor<'a, H, I, OT, S>
+pub struct GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: &'a mut H,
+    harness_fn: HB,
     /// The observers, observing each run
     observers: OT,
     // Crash and timeout hah
     handlers: InProcessHandlers,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<(I, S, *const H)>,
 }
 
-impl<'a, H, I, OT, S> Debug for InProcessExecutor<'a, H, I, OT, S>
+impl<H, HB, I, OT, S> Debug for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -76,9 +86,10 @@ where
     }
 }
 
-impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
+impl<EM, H, HB, I, OT, S, Z> Executor<EM, I, S, Z> for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -92,15 +103,16 @@ where
     ) -> Result<ExitKind, Error> {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
-        let ret = (self.harness_fn)(input);
+        let ret = (self.harness_fn.borrow_mut())(input);
         self.handlers.post_run_target();
         Ok(ret)
     }
 }
 
-impl<'a, H, I, OT, S> HasObservers<I, OT, S> for InProcessExecutor<'a, H, I, OT, S>
+impl<H, HB, I, OT, S> HasObservers<I, OT, S> for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -115,9 +127,10 @@ where
     }
 }
 
-impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
+impl<H, HB, I, OT, S> GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -128,7 +141,7 @@ where
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OF, Z>(
-        harness_fn: &'a mut H,
+        harness_fn: HB,
         observers: OT,
         _fuzzer: &mut Z,
         _state: &mut S,
@@ -167,13 +180,13 @@ where
     /// Retrieve the harness function.
     #[inline]
     pub fn harness(&self) -> &H {
-        self.harness_fn
+        self.harness_fn.borrow()
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
     pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
+        self.harness_fn.borrow_mut()
     }
 
     /// The inprocess handlers
@@ -330,146 +343,6 @@ impl InProcessHandlers {
             crash_handler: ptr::null(),
             timeout_handler: ptr::null(),
         }
-    }
-}
-
-/// Exact copy of `InProcessExecutor` that "owns" its harness
-/// Used for python bindings
-#[allow(dead_code)]
-pub struct OwnedInProcessExecutor<I, OT, S>
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
-    /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: Box<dyn FnMut(&I) -> ExitKind>,
-    /// The observers, observing each run
-    observers: OT,
-    // Crash and timeout hah
-    handlers: InProcessHandlers,
-    phantom: PhantomData<(I, S)>,
-}
-
-impl<I, OT, S> Debug for OwnedInProcessExecutor<I, OT, S>
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InProcessExecutor")
-            .field("harness_fn", &"<fn>")
-            .field("observers", &self.observers)
-            .finish_non_exhaustive()
-    }
-}
-
-impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for OwnedInProcessExecutor<I, OT, S>
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
-    #[inline]
-    fn run_target(
-        &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
-    ) -> Result<ExitKind, Error> {
-        self.handlers
-            .pre_run_target(self, fuzzer, state, mgr, input);
-        let ret = (self.harness_fn)(input);
-        self.handlers.post_run_target();
-        Ok(ret)
-    }
-}
-
-impl<I, OT, S> HasObservers<I, OT, S> for OwnedInProcessExecutor<I, OT, S>
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
-    }
-}
-
-impl<I, OT, S> OwnedInProcessExecutor<I, OT, S>
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
-    /// Create a new in mem executor.
-    /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
-    /// depending on different corpus or state.
-    /// * `harness_fn` - the harness, executiong the function
-    /// * `observers` - the observers observing the target during execution
-    /// This may return an error on unix, if signal handler setup fails
-    pub fn new<EM, OF, Z>(
-        harness_fn: Box<dyn FnMut(&I) -> ExitKind>,
-        observers: OT,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-    ) -> Result<Self, Error>
-    where
-        EM: EventFirer<I> + EventRestarter<S>,
-        OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
-        Z: HasObjective<I, OF, S>,
-    {
-        let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z>()?;
-        #[cfg(windows)]
-        unsafe {
-            /*
-                See https://github.com/AFLplusplus/LibAFL/pull/403
-                This one reserves certain amount of memory for the stack.
-                If stack overflow happens during fuzzing on windows, the program is transferred to our exception handler for windows.
-                However, if we run out of the stack memory again in this exception handler, we'll crash with STATUS_ACCESS_VIOLATION.
-                We need this API call because with the llmp_compression
-                feature enabled, the exception handler uses a lot of stack memory (in the compression lib code) on release build.
-                As far as I have observed, the compression uses around 0x10000 bytes, but for safety let's just reserve 0x20000 bytes for our exception handlers.
-                This number 0x20000 could vary depending on the compilers optimization for future compression library changes.
-            */
-            let mut stack_reserved = 0x20000;
-            SetThreadStackGuarantee(&mut stack_reserved);
-        }
-        Ok(Self {
-            harness_fn,
-            observers,
-            handlers,
-            phantom: PhantomData,
-        })
-    }
-
-    /// Retrieve the harness function.
-    #[inline]
-    pub fn harness(&self) -> &impl FnMut(&I) -> ExitKind {
-        &self.harness_fn
-    }
-
-    /// Retrieve the harness function for a mutable reference.
-    #[inline]
-    pub fn harness_mut(&mut self) -> &mut impl FnMut(&I) -> ExitKind {
-        &mut self.harness_fn
-    }
-
-    /// The inprocess handlers
-    #[inline]
-    pub fn handlers(&self) -> &InProcessHandlers {
-        &self.handlers
-    }
-
-    /// The inprocess handlers, mut
-    #[inline]
-    pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
-        &mut self.handlers
     }
 }
 
@@ -1109,9 +982,10 @@ pub trait HasInProcessHandlers {
 }
 
 #[cfg(windows)]
-impl<'a, H, I, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, I, OT, S>
+impl<H, HB, I, OT, S> HasInProcessHandlers for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -1126,7 +1000,7 @@ where
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1140,7 +1014,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1157,7 +1031,7 @@ where
 impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
     for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1203,7 +1077,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1247,7 +1121,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
