@@ -18,7 +18,7 @@ use libafl::{
         CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::EventConfig,
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -50,18 +50,18 @@ where
     #[builder(default = None, setter(strip_option))]
     configuration: Option<String>,
     /// Timeout of the executor
-    #[builder(default = None, setter(strip_option))]
+    #[builder(default = None)]
     timeout: Option<u64>,
     /// Input directories
     input_dirs: &'a [PathBuf],
     /// Output directory
     output_dir: PathBuf,
     /// Dictionary
-    #[builder(default = None, setter(strip_option))]
+    #[builder(default = None)]
     tokens_file: Option<PathBuf>,
     /// Flag if use CmpLog
-    #[builder(default = false)]
-    use_cmplog: bool,
+    #[builder(default = None)]
+    use_cmplog: Option<bool>,
     /// The port the fuzzing nodes communicate over
     /// This will spawn a server on this port, and connect to other brokers using this port.
     #[builder(default = 1337_u16)]
@@ -75,6 +75,9 @@ where
     /// Bytes harness
     #[builder(setter(strip_option))]
     harness: Option<H>,
+    /// Fuzz `iterations` number of times, instead of indefinitely; implies use of `fuzz_loop_for`
+    #[builder(default = None)]
+    iterations: Option<u64>,
 }
 
 impl<'a, H> Debug for QemuBytesCoverageSugar<'a, H>
@@ -100,6 +103,7 @@ where
                     &"None"
                 },
             )
+            .field("iterations", &self.iterations)
             .finish()
     }
 }
@@ -137,7 +141,9 @@ where
 
         let monitor = MultiMonitor::new(|s| println!("{}", s));
 
-        let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
+        let mut run_client = |state: Option<StdState<_, _, _, _, _>>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                              _core_id| {
             // Create an observation channel using the coverage map
             let edges = unsafe { &mut edges::EDGES_MAP };
             let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
@@ -204,7 +210,7 @@ where
                 ExitKind::Ok
             };
 
-            if self.use_cmplog {
+            if self.use_cmplog.unwrap_or(false) {
                 let executor = QemuExecutor::new(
                     &mut harness,
                     emulator,
@@ -270,7 +276,19 @@ where
 
                     // The order of the stages matter!
                     let mut stages = tuple_list!(tracing, i2s, mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+
+                    if let Some(iters) = self.iterations {
+                        fuzzer.fuzz_loop_for(
+                            &mut stages,
+                            &mut executor,
+                            &mut state,
+                            &mut mgr,
+                            iters,
+                        )?;
+                        mgr.on_restart(&mut state)?;
+                    } else {
+                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    }
                 } else {
                     // Setup a basic mutator
                     let mutator = StdScheduledMutator::new(havoc_mutations());
@@ -278,7 +296,19 @@ where
 
                     // The order of the stages matter!
                     let mut stages = tuple_list!(tracing, i2s, mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+
+                    if let Some(iters) = self.iterations {
+                        fuzzer.fuzz_loop_for(
+                            &mut stages,
+                            &mut executor,
+                            &mut state,
+                            &mut mgr,
+                            iters,
+                        )?;
+                        mgr.on_restart(&mut state)?;
+                    } else {
+                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    }
                 }
             } else {
                 let executor = QemuExecutor::new(
@@ -337,7 +367,19 @@ where
 
                     // The order of the stages matter!
                     let mut stages = tuple_list!(mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+
+                    if let Some(iters) = self.iterations {
+                        fuzzer.fuzz_loop_for(
+                            &mut stages,
+                            &mut executor,
+                            &mut state,
+                            &mut mgr,
+                            iters,
+                        )?;
+                        mgr.on_restart(&mut state)?;
+                    } else {
+                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    }
                 } else {
                     // Setup a basic mutator
                     let mutator = StdScheduledMutator::new(havoc_mutations());
@@ -345,7 +387,19 @@ where
 
                     // The order of the stages matter!
                     let mut stages = tuple_list!(mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+
+                    if let Some(iters) = self.iterations {
+                        fuzzer.fuzz_loop_for(
+                            &mut stages,
+                            &mut executor,
+                            &mut state,
+                            &mut mgr,
+                            iters,
+                        )?;
+                        mgr.on_restart(&mut state)?;
+                    } else {
+                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    }
                 }
             }
             Ok(())
@@ -381,6 +435,10 @@ pub mod pybind {
         output_dir: PathBuf,
         broker_port: u16,
         cores: Cores,
+        use_cmplog: Option<bool>,
+        iterations: Option<u64>,
+        tokens_file: Option<PathBuf>,
+        timeout: Option<u64>,
     }
 
     #[pymethods]
@@ -392,12 +450,20 @@ pub mod pybind {
             output_dir: PathBuf,
             broker_port: u16,
             cores: Vec<usize>,
+            use_cmplog: Option<bool>,
+            iterations: Option<u64>,
+            tokens_file: Option<PathBuf>,
+            timeout: Option<u64>,
         ) -> Self {
             Self {
                 input_dirs,
                 output_dir,
                 broker_port,
                 cores: cores.into(),
+                use_cmplog,
+                iterations,
+                tokens_file,
+                timeout,
             }
         }
 
@@ -417,8 +483,12 @@ pub mod pybind {
                     })
                     .unwrap();
                 })
+                .use_cmplog(self.use_cmplog)
+                .timeout(self.timeout)
+                .tokens_file(self.tokens_file.clone())
+                .iterations(self.iterations)
                 .build()
-                .run(&emulator.emu);
+                .run(&emulator.emu)
         }
     }
 
