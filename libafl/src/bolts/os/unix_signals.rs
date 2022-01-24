@@ -4,7 +4,7 @@ use core::{
     cell::UnsafeCell,
     fmt::{self, Display, Formatter},
     mem, ptr,
-    ptr::write_volatile,
+    ptr::{addr_of_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
 
@@ -214,11 +214,11 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
     let mut ss: stack_t = mem::zeroed();
     ss.ss_size = SIGNAL_STACK_SIZE;
     ss.ss_sp = SIGNAL_STACK_PTR;
-    sigaltstack(&mut ss as *mut stack_t, ptr::null_mut() as _);
+    sigaltstack(addr_of_mut!(ss), ptr::null_mut() as _);
 
     let mut sa: sigaction = mem::zeroed();
-    sigemptyset(&mut sa.sa_mask as *mut libc::sigset_t);
-    sigaddset(&mut sa.sa_mask as *mut libc::sigset_t, SIGALRM);
+    sigemptyset(addr_of_mut!(sa.sa_mask));
+    sigaddset(addr_of_mut!(sa.sa_mask), SIGALRM);
     sa.sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK;
     sa.sa_sigaction = handle_signal as usize;
     let signals = handler.signals();
@@ -230,7 +230,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
             }),
         );
 
-        if sigaction(sig as i32, &mut sa as *mut sigaction, ptr::null_mut()) < 0 {
+        if sigaction(sig as i32, addr_of_mut!(sa), ptr::null_mut()) < 0 {
             #[cfg(feature = "std")]
             {
                 let err_str = CString::new(format!("Failed to setup {} handler", sig)).unwrap();

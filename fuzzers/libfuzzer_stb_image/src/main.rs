@@ -7,7 +7,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 use std::{env, path::PathBuf};
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{
         Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,

@@ -1,6 +1,6 @@
 [package]
 name = "symcc_runtime"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>", "Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Build Concolic Tracing tools based on SymCC in Rust"
