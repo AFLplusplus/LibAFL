@@ -1,5 +1,6 @@
 //! Poor-rust-man's downcasts to have AnyMap
 
+use alloc::boxed::Box;
 use core::{
     any::{Any, TypeId},
     ptr::addr_of,

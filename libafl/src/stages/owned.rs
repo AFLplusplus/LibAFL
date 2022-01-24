@@ -1,5 +1,7 @@
 //! A dynamic collection of owned Stages
 
+use alloc::boxed::Box;
+
 use crate::{
     bolts::anymap::AsAny,
     stages::{Stage, StagesTuple},
