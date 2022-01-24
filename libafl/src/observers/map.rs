@@ -1159,7 +1159,10 @@ pub mod pybind {
                 fn new(name: String, map: Vec<$datatype>) -> Self {
                     Self {
                         //TODO: Not leak memory
-                        owned_map_observer: OwnedMapObserver::new(Box::leak(name.into_boxed_str()), map),
+                        owned_map_observer: OwnedMapObserver::new(
+                            Box::leak(name.into_boxed_str()),
+                            map,
+                        ),
                     }
                 }
             }
@@ -1276,9 +1279,7 @@ pub mod pybind {
                 #[inline]
                 fn len(&self) -> usize {
                     match &self.map_observer {
-                        $wrapper_name::Owned(map_observer) => {
-                            map_observer.owned_map_observer.len()
-                        }
+                        $wrapper_name::Owned(map_observer) => map_observer.owned_map_observer.len(),
                     }
                 }
             }
@@ -1296,18 +1297,74 @@ pub mod pybind {
                     }
                 }
             }
-        }
+        };
     }
-    
-    define_python_map_observer!(PythonOwnedMapObserverI8, "OwnedMapObserverI8", PythonMapObserverI8, "MapObserverI8", i8, WrapperI8);
-    define_python_map_observer!(PythonOwnedMapObserverI16, "OwnedMapObserverI16", PythonMapObserverI16, "MapObserverI16", i16, WrapperI16);
-    define_python_map_observer!(PythonOwnedMapObserverI32, "OwnedMapObserverI32", PythonMapObserverI32, "MapObserverI32", i32, WrapperI32);
-    define_python_map_observer!(PythonOwnedMapObserverI64, "OwnedMapObserverI64", PythonMapObserverI64, "MapObserverI64", i64, WrapperI64);
 
-    define_python_map_observer!(PythonOwnedMapObserverU8, "OwnedMapObserverU8", PythonMapObserverU8, "MapObserverU8", u8, WrapperU8);
-    define_python_map_observer!(PythonOwnedMapObserverU16, "OwnedMapObserverU16", PythonMapObserverU16, "MapObserverU16", u16, WrapperU16);
-    define_python_map_observer!(PythonOwnedMapObserverU32, "OwnedMapObserverU32", PythonMapObserverU32, "MapObserverU32", u32, WrapperU32);
-    define_python_map_observer!(PythonOwnedMapObserverU64, "OwnedMapObserverU64", PythonMapObserverU64, "MapObserverU64", u64, WrapperU64);
+    define_python_map_observer!(
+        PythonOwnedMapObserverI8,
+        "OwnedMapObserverI8",
+        PythonMapObserverI8,
+        "MapObserverI8",
+        i8,
+        WrapperI8
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverI16,
+        "OwnedMapObserverI16",
+        PythonMapObserverI16,
+        "MapObserverI16",
+        i16,
+        WrapperI16
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverI32,
+        "OwnedMapObserverI32",
+        PythonMapObserverI32,
+        "MapObserverI32",
+        i32,
+        WrapperI32
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverI64,
+        "OwnedMapObserverI64",
+        PythonMapObserverI64,
+        "MapObserverI64",
+        i64,
+        WrapperI64
+    );
+
+    define_python_map_observer!(
+        PythonOwnedMapObserverU8,
+        "OwnedMapObserverU8",
+        PythonMapObserverU8,
+        "MapObserverU8",
+        u8,
+        WrapperU8
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverU16,
+        "OwnedMapObserverU16",
+        PythonMapObserverU16,
+        "MapObserverU16",
+        u16,
+        WrapperU16
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverU32,
+        "OwnedMapObserverU32",
+        PythonMapObserverU32,
+        "MapObserverU32",
+        u32,
+        WrapperU32
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverU64,
+        "OwnedMapObserverU64",
+        PythonMapObserverU64,
+        "MapObserverU64",
+        u64,
+        WrapperU64
+    );
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -1319,7 +1376,7 @@ pub mod pybind {
         m.add_class::<PythonMapObserverI32>()?;
         m.add_class::<PythonOwnedMapObserverI64>()?;
         m.add_class::<PythonMapObserverI64>()?;
-    
+
         m.add_class::<PythonOwnedMapObserverU8>()?;
         m.add_class::<PythonMapObserverU8>()?;
         m.add_class::<PythonOwnedMapObserverU16>()?;
