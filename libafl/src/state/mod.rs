@@ -447,7 +447,7 @@ where
         Ok(())
     }
 
-    /// Loads all intial inputs, even if they are not consiered `intesting`.
+    /// Loads all intial inputs, even if they are not considered `interesting`.
     /// This is rarely the right method, use `load_initial_inputs`,
     /// and potentially fix your `Feedback`, instead.
     pub fn load_initial_inputs_forced<E, EM, Z>(
