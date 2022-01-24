@@ -1,7 +1,7 @@
 //! A dynamic collection of owned observers, working only with unstable rust
 
 use core::{any::Any, fmt::Debug};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
     bolts::{
@@ -41,11 +41,28 @@ pub use observers_anymap::{AnyMap as ObserversAnyMap, NamedAnyMap as NamedObserv
 
 /// An owned list of `Observer` trait objects
 /// This is not really serializable, using this struct needs [`EventConfig::AlwaysUnique`] as configuration
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default)]
 pub struct ObserversOwnedMap<I: 'static + Debug, S: 'static + Debug> {
     /// The named trait objects map
-    #[serde(skip_serializing)]
     pub map: NamedObserversAnyMap<I, S>,
+}
+
+impl<I: 'static + Debug, S: 'static + Debug> Serialize for ObserversOwnedMap<I, S> {
+    fn serialize<T>(&self, _serializer: T) -> Result<T::Ok, T::Error>
+    where
+        T: Serializer,
+    {
+        panic!("Cannot serialize ObserversOwnedMap, use EventConfig::AlwaysUnique as event manager configuration");
+    }
+}
+
+impl<'de, I: 'static + Debug, S: 'static + Debug> Deserialize<'de> for ObserversOwnedMap<I, S> {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        panic!("Cannot deserialize ObserversOwnedMap, use EventConfig::AlwaysUnique as event manager configuration");
+    }
 }
 
 impl<I: 'static + Debug, S: 'static + Debug> ObserversTuple<I, S> for ObserversOwnedMap<I, S> {

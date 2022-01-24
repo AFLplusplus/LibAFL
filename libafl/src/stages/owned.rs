@@ -1,6 +1,6 @@
 //! A dynamic collection of owned Stages
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 
 use crate::{
     bolts::anymap::AsAny,
