@@ -174,14 +174,14 @@ where
             self.gap_indices.clear();
 
             self.scratch.extend_from_slice(&gen[selected + 1..]);
-
             gen.truncate(selected);
-            extend_with_random_generalized(state, gen, &mut self.gap_indices)?;
+
+            if !extend_with_random_generalized(state, gen, &mut self.gap_indices)? {
+                mutated = MutationResult::Mutated;
+            }
+
             gen.extend_from_slice(&self.scratch);
-
             self.scratch.clear();
-
-            mutated = MutationResult::Mutated;
         }
 
         Ok(mutated)
