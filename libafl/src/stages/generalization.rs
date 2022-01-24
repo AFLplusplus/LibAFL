@@ -93,7 +93,7 @@ where
         if !self.verify_input(fuzzer, executor, state, manager, &novelties, original)? {
             return Ok(());
         }
-        
+
         self.find_gaps(
             fuzzer,
             executor,
@@ -276,7 +276,7 @@ where
             '"' as u8,
             '"' as u8,
         )?;
-        
+
         if payload.len() <= MAX_GENERALIZED_LEN {
             // Save the modified input in the corpus
             let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();

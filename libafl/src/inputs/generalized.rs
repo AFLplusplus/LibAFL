@@ -148,6 +148,23 @@ impl GeneralizedInput {
         }
     }
 
+    /// Get the size of the generalized
+    pub fn generalized_len(&self) -> usize {
+        match &self.generalized {
+            None => 0,
+            Some(gen) => {
+                let mut size = 0;
+                for item in gen {
+                    match item {
+                        GeneralizedItem::Bytes(b) => size += b.len(),
+                        GeneralizedItem::Gap => size += 1,
+                    }
+                }
+                size
+            }
+        }
+    }
+
     /// Convert generalized to bytes
     pub fn generalized_to_bytes(&self) -> Vec<u8> {
         match &self.generalized {
