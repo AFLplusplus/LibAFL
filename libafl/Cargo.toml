@@ -98,10 +98,6 @@ windows = { version = "0.29.0", features = ["std", "Win32_Foundation", "Win32_Sy
 [target.'cfg(windows)'.build-dependencies]
 windows = "0.29.0"
 
-[lib]
-name = "libafl"
-crate-type = ["cdylib", "rlib"]
-
 [[bench]]
 name = "rand_speeds"
 harness = false

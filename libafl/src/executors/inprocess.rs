@@ -4,6 +4,7 @@
 //! Needs the `fork` feature flag.
 
 use core::{
+    borrow::BorrowMut,
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -12,7 +13,6 @@ use core::{
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
-    borrow::BorrowMut,
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
