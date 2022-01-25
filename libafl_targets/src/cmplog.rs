@@ -188,11 +188,11 @@ where
         }
     }
 
-    fn map(&self) -> &CmpLogMap {
+    fn cmp_map(&self) -> &CmpLogMap {
         self.map.as_ref()
     }
 
-    fn map_mut(&mut self) -> &mut CmpLogMap {
+    fn cmp_map_mut(&mut self) -> &mut CmpLogMap {
         self.map.as_mut()
     }
 }

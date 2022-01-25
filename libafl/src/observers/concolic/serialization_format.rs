@@ -488,7 +488,7 @@ impl<T: ShMem> MessageFileWriter<ShMemCursor<T>> {
     }
 }
 
-impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
+impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::ShMem>> {
     /// Creates a new `MessageFileWriter` by reading a [`ShMem`] from the given environment variable.
     pub fn from_stdshmem_env_with_name(env_name: impl AsRef<str>) -> io::Result<Self> {
         Self::from_shmem(
@@ -507,4 +507,4 @@ impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
 
 /// A writer that will write messages to a shared memory buffer.
 pub type StdShMemMessageFileWriter =
-    MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
+    MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::ShMem>>;

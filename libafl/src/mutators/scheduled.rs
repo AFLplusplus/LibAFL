@@ -11,7 +11,7 @@ use crate::{
     bolts::{
         rands::Rand,
         tuples::{tuple_list, tuple_list_type, NamedTuple},
-        AsSlice,
+        AsMutSlice, AsSlice,
     },
     corpus::Corpus,
     inputs::Input,
@@ -33,8 +33,15 @@ pub struct LogMutationMetadata {
 crate::impl_serdeany!(LogMutationMetadata);
 
 impl AsSlice<String> for LogMutationMetadata {
+    #[must_use]
     fn as_slice(&self) -> &[String] {
         self.list.as_slice()
+    }
+}
+impl AsMutSlice<String> for LogMutationMetadata {
+    #[must_use]
+    fn as_mut_slice(&mut self) -> &mut [String] {
+        self.list.as_mut_slice()
     }
 }
 

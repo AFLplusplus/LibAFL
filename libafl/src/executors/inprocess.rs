@@ -943,13 +943,13 @@ mod windows_exception_handler {
                 event_mgr.await_restart_safe();
                 compiler_fence(Ordering::SeqCst);
 
+                ExitProcess(1);
+
                 LeaveCriticalSection(
                     (data.critical as *mut RTL_CRITICAL_SECTION)
                         .as_mut()
                         .unwrap(),
                 );
-
-                ExitProcess(1);
             }
         }
         compiler_fence(Ordering::SeqCst);
