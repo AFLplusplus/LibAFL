@@ -9,7 +9,7 @@ pub use cmp::*;
 #[cfg(feature = "std")]
 pub mod stacktrace;
 #[cfg(feature = "std")]
-pub use stacktrace::CommandBacktraceObserver;
+pub use stacktrace::ASANBacktraceObserver;
 #[cfg(feature = "std")]
 pub use stacktrace::*;
 

@@ -7,7 +7,7 @@ use core::{
 #[cfg(feature = "std")]
 use std::process::Child;
 
-use crate::observers::CommandBacktraceObserver;
+use crate::observers::ASANBacktraceObserver;
 #[cfg(feature = "std")]
 use crate::{executors::HasObservers, inputs::Input, observers::ObserversTuple, Error};
 
@@ -83,7 +83,7 @@ where
         let stderr = child.stderr.as_mut().unwrap();
         match self
             .observers
-            .match_name_mut::<CommandBacktraceObserver>("CommandBacktraceObserver")
+            .match_name_mut::<ASANBacktraceObserver>("CommandBacktraceObserver")
         {
             Some(ob) => ob.parse_asan_output(stderr),
             None => (),

@@ -21,7 +21,7 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{get_asan_runtime_flags, CommandBacktraceObserver, StdMapObserver},
+    observers::{get_asan_runtime_flags, ASANBacktraceObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -40,7 +40,7 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", signals.map_mut());
     // Create a stacktrace observer
-    let bt_observer = CommandBacktraceObserver::new("CommandBacktraceObserver");
+    let bt_observer = ASANBacktraceObserver::new("CommandBacktraceObserver");
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
@@ -52,7 +52,7 @@ pub fn main() {
     // A feedback to choose if an input is a solution or not
     let objective = feedback_and!(
         CrashFeedback::new(),
-        NewHashFeedback::<CommandBacktraceObserver>::new_with_observer(
+        NewHashFeedback::<ASANBacktraceObserver>::new_with_observer(
             "CommandBacktraceObserver",
             &bt_observer
         )

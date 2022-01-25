@@ -226,12 +226,12 @@ pub fn get_asan_runtime_flags() -> String {
 
 /// An observer looking at the backtrace of target command using ASAN output
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CommandBacktraceObserver {
+pub struct ASANBacktraceObserver {
     observer_name: String,
     hash: Option<u64>,
 }
 
-impl CommandBacktraceObserver {
+impl ASANBacktraceObserver {
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: &str) -> Self {
@@ -259,7 +259,7 @@ impl CommandBacktraceObserver {
     }
 }
 
-impl ObserverWithHashField for CommandBacktraceObserver {
+impl ObserverWithHashField for ASANBacktraceObserver {
     /// Gets the hash value of this observer.
     #[must_use]
     fn hash(&self) -> &Option<u64> {
@@ -277,13 +277,13 @@ impl ObserverWithHashField for CommandBacktraceObserver {
     }
 }
 
-impl Default for CommandBacktraceObserver {
+impl Default for ASANBacktraceObserver {
     fn default() -> Self {
         Self::new("CommandBacktraceObserver")
     }
 }
 
-impl<I, S> Observer<I, S> for CommandBacktraceObserver
+impl<I, S> Observer<I, S> for ASANBacktraceObserver
 where
     I: Debug,
 {
@@ -301,7 +301,7 @@ where
     }
 }
 
-impl Named for CommandBacktraceObserver {
+impl Named for ASANBacktraceObserver {
     fn name(&self) -> &str {
         &self.observer_name
     }
