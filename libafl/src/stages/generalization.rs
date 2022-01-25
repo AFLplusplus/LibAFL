@@ -5,13 +5,15 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData};
+use hashbrown::HashSet;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::AsSlice,
     corpus::Corpus,
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{GeneralizedInput, HasBytesVec},
+    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
@@ -24,6 +26,23 @@ use crate::{
 use crate::monitors::PerfFeature;
 
 const MAX_GENERALIZED_LEN: usize = 8192;
+
+/// A state metadata holding the set of indexes related to the generalized corpus entries
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct GeneralizedIndexesMetadata {
+    /// The set of indexes
+    pub indexes: HashSet<usize>,
+}
+
+crate::impl_serdeany!(GeneralizedIndexesMetadata);
+
+impl GeneralizedIndexesMetadata {
+    /// Create the metadata
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
 
 fn increment_by_offset(_list: &[Option<u8>], idx: usize, off: u8) -> usize {
     idx + 1 + off as usize
@@ -45,7 +64,7 @@ pub struct GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
     OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<GeneralizedInput>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
 {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
@@ -57,7 +76,7 @@ where
     O: MapObserver,
     E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
     OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<GeneralizedInput>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
 {
     #[inline]
     fn perform(
@@ -68,6 +87,14 @@ where
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
+        if state
+            .metadata()
+            .get::<GeneralizedIndexesMetadata>()
+            .is_none()
+        {
+            state.add_metadata(GeneralizedIndexesMetadata::new());
+        }
+
         let (mut payload, original, novelties) = {
             start_timer!(state);
             let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
@@ -75,6 +102,14 @@ where
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
 
             if input.generalized().is_some() {
+                drop(input);
+                drop(entry);
+                state
+                    .metadata_mut()
+                    .get_mut::<GeneralizedIndexesMetadata>()
+                    .unwrap()
+                    .indexes
+                    .insert(corpus_idx);
                 return Ok(());
             }
 
@@ -279,14 +314,32 @@ where
 
         if payload.len() <= MAX_GENERALIZED_LEN {
             // Save the modified input in the corpus
-            let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
-            entry.load_input()?;
-            entry
-                .input_mut()
-                .as_mut()
+            {
+                let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
+                entry.load_input()?;
+                entry
+                    .input_mut()
+                    .as_mut()
+                    .unwrap()
+                    .generalized_from_options(&payload);
+                entry.store_input()?;
+
+                debug_assert!(
+                    entry.load_input()?.generalized().unwrap().first()
+                        == Some(&GeneralizedItem::Gap)
+                );
+                debug_assert!(
+                    entry.load_input()?.generalized().unwrap().last()
+                        == Some(&GeneralizedItem::Gap)
+                );
+            }
+
+            state
+                .metadata_mut()
+                .get_mut::<GeneralizedIndexesMetadata>()
                 .unwrap()
-                .generalized_from_options(&payload);
-            entry.store_input()?;
+                .indexes
+                .insert(corpus_idx);
         }
 
         Ok(())
@@ -297,7 +350,7 @@ impl<EM, O, OT, S, Z> GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
     OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<GeneralizedInput>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
 {
     /// Create a new [`GeneralizationStage`].
     pub fn new(map_observer: &O) -> Self {

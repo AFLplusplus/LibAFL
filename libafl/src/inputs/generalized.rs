@@ -114,6 +114,9 @@ impl GeneralizedInput {
     pub fn generalized_from_options(&mut self, v: &[Option<u8>]) {
         let mut res = vec![];
         let mut bytes = vec![];
+        if v.first() != Some(&None) {
+            res.push(GeneralizedItem::Gap);
+        }
         for e in v {
             match e {
                 None => {
@@ -130,6 +133,9 @@ impl GeneralizedInput {
         }
         if bytes.len() > 0 {
             res.push(GeneralizedItem::Bytes(bytes));
+        }
+        if res.last() != Some(&GeneralizedItem::Gap) {
+            res.push(GeneralizedItem::Gap);
         }
         self.generalized = Some(res);
     }

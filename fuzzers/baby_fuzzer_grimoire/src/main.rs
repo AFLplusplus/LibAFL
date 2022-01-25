@@ -13,10 +13,13 @@ use libafl::{
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::{GeneralizedInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::{havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator},
+    mutators::{
+        havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator,
+        GrimoireRecursiveReplacementMutator, Tokens,
+    },
     observers::StdMapObserver,
     stages::{mutational::StdMutationalStage, GeneralizationStage},
-    state::StdState,
+    state::{HasMetadata, StdState},
 };
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -76,7 +79,8 @@ pub fn main() {
 
         unsafe {
             if input.grimoire_mutated {
-                println!(">>> {}", std::str::from_utf8_unchecked(bytes));
+                // println!(">>> {:?}", input.generalized());
+                println!(">>> {:?}", std::str::from_utf8_unchecked(bytes));
             }
         }
         signals_set(1);
@@ -109,6 +113,13 @@ pub fn main() {
         tuple_list!(feedback_state),
     );
 
+    if state.metadata().get::<Tokens>().is_none() {
+        state.add_metadata(Tokens::new(vec![
+            "FOO".as_bytes().to_vec(),
+            "BAR".as_bytes().to_vec(),
+        ]));
+    }
+
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{}", s));
 
@@ -136,8 +147,13 @@ pub fn main() {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::with_max_iterations(havoc_mutations(), 2);
-    let grimoire_mutator =
-        StdScheduledMutator::with_max_iterations(tuple_list!(GrimoireExtensionMutator::new()), 2);
+    let grimoire_mutator = StdScheduledMutator::with_max_iterations(
+        tuple_list!(
+            GrimoireExtensionMutator::new(),
+            GrimoireRecursiveReplacementMutator::new()
+        ),
+        2,
+    );
     let mut stages = tuple_list!(
         generalization,
         StdMutationalStage::new(mutator),
