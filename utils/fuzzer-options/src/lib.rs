@@ -77,6 +77,8 @@ pub struct FuzzerOptions {
     pub token_files: Vec<PathBuf>,
 }
 
+#[must_use]
+/// Parse from `std::env::args_os()`, exit on error
 pub fn parse_args() -> FuzzerOptions {
     #[cfg(feature = "libafl_qemu")]
     return FuzzerOptions::parse_from(filter_qemu_args());
