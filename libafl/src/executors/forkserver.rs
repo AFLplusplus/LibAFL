@@ -6,13 +6,14 @@ use core::{
     time::Duration,
 };
 use std::{
-    fs::{File, OpenOptions},
+    fs::{self, File, OpenOptions},
     io::{self, prelude::*, ErrorKind, SeekFrom},
     os::unix::{
         io::{AsRawFd, RawFd},
         process::CommandExt,
     },
-    process::{ChildStderr, Command, Stdio},
+    path::Path,
+    process::{Command, Stdio},
 };
 
 use crate::{
@@ -201,7 +202,6 @@ impl OutFile {
 pub struct Forkserver {
     st_pipe: Pipe,
     ctl_pipe: Pipe,
-    err_pipe: ChildStderr,
     child_pid: Pid,
     status: i32,
     last_run_timed_out: i32,
@@ -220,18 +220,30 @@ impl Forkserver {
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
-        let stdout = if debug_output {
-            Stdio::inherit()
+        let (stdout, stderr) = if debug_output {
+            (Stdio::inherit(), Stdio::inherit())
         } else {
-            Stdio::null()
+            (Stdio::null(), Stdio::null())
         };
 
-        let child = match Command::new(target)
+        let flags = vec![
+            // "exitcode=0",
+            "abort_on_error=1",
+            "handle_abort=1",
+            "handle_segv=1",
+            "handle_sigbus=1",
+            "handle_sigill=1",
+            "handle_sigfpe=1",
+            "log_path=asanlogs/asan",
+        ];
+
+        match Command::new(target)
             .args(args)
             .stdin(Stdio::null())
             .stdout(stdout)
-            .stderr(Stdio::piped())
+            .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
+            .env("ASAN_OPTIONS", flags.join(":"))
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
@@ -243,26 +255,24 @@ impl Forkserver {
             )
             .spawn()
         {
-            Ok(child) => {
+            Ok(_) => {
                 println!("got it running");
-                Ok(child)
             }
-            Err(err) => Err(Error::Forkserver(format!(
-                "Could not spawn the forkserver: {:#?}",
-                err
-            ))),
+            Err(err) => {
+                return Err(Error::Forkserver(format!(
+                    "Could not spawn the forkserver: {:#?}",
+                    err
+                )))
+            }
         };
 
         // Ctl_pipe.read_end and st_pipe.write_end are unnecessary for the parent, so we'll close them
         ctl_pipe.close_read_end();
         st_pipe.close_write_end();
 
-        let err_pipe = child.unwrap().stderr.take().unwrap();
-
         Ok(Self {
             st_pipe,
             ctl_pipe,
-            err_pipe,
             child_pid: Pid::from_raw(0),
             status: 0,
             last_run_timed_out: 0,
@@ -716,14 +726,16 @@ where
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
             println!("Got crash yes");
-            println!("with input={:?}", input);
+            let log_path = format!("asanlogs/asan.{}", self.forkserver.child_pid());
+            let mut asan_output = File::open(Path::new(&log_path))
+                .expect(format!("can't find asan log at {}", &log_path).as_str());
+            let mut buf = String::new();
+            asan_output
+                .read_to_string(&mut buf)
+                .expect("Failed to read asan log");
+            fs::remove_file(&log_path).expect(format!("Failed to delete {}", &log_path).as_str());
+            println!("Horaaaaay: {}", buf);
         }
-
-        let mut buf = String::new();
-        self.forkserver
-            .err_pipe
-            .read_to_string(&mut buf)
-            .expect("failed");
 
         self.forkserver.set_child_pid(Pid::from_raw(0));
 
