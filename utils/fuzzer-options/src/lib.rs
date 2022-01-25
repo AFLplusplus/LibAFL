@@ -1,5 +1,5 @@
 ///! todo top level docs
-use clap::Parser;
+use clap::{AppSettings, Parser, Subcommand};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -11,24 +11,10 @@ fn parse_timeout(src: &str) -> Duration {
 }
 
 #[derive(Parser, Debug)]
-/// Generic options for fuzzer configuration
+#[clap(setting(AppSettings::ArgRequiredElseHelp))]
 pub struct FuzzerOptions {
-    /// output solutions directory
-    #[clap(short = 'o', long = "crashes", default_value = "solutions")]
-    pub crashes: PathBuf,
-
-    /// input corpus directories
-    #[clap(
-        short = 'i',
-        long = "corpus",
-        default_values = &["corpus"],
-        multiple_values = true
-    )]
-    pub corpora: Vec<PathBuf>,
-
-    /// which cores to bind, i.e. --cores 1,2-4,5
-    #[clap(short = 'c', long = "cores", default_value = "0", parse(try_from_str = Cores::from_cmdline))]
-    pub cores: Cores,
+    #[clap(subcommand)]
+    pub command: Commands,
 
     /// timeout for each target execution (milliseconds)
     #[clap(short = 't', long = "timeout", takes_value = true, default_value = "2000", parse(from_str = parse_timeout))]
@@ -38,22 +24,63 @@ pub struct FuzzerOptions {
     #[clap(short = 'v', long = "verbose")]
     pub verbose: bool,
 
-    /// port on which the broker should listen
-    #[clap(short = 'p', long = "port", default_value = "1337")]
-    pub port: u16,
-
     /// file to which all client output should be written
     #[clap(short = 's', long = "stdout")]
     pub stdout: Option<String>,
-
-    /// paths to fuzzer token files
-    #[clap(short = 'x', long = "tokens", multiple_values = true)]
-    pub token_files: Vec<PathBuf>,
 
     /// trailing arguments (after "--") will be passed directly to QEMU
     #[cfg(feature = "libafl_qemu")]
     #[clap(last = true)]
     pub qemu_args: Vec<String>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Fuzz mode: mutates the starting corpus indefinitely, looking for crashes
+    Fuzz {
+        #[clap(
+            short = 'x',
+            long = "tokens",
+            multiple_values = true,
+            parse(from_os_str)
+        )]
+        token_files: Vec<PathBuf>,
+
+        /// input corpus directories
+        #[clap(
+            short = 'i',
+            long = "corpus",
+            default_values = &["corpus"],
+            multiple_values = true,
+            parse(from_os_str)
+        )]
+        corpora: Vec<PathBuf>,
+
+        /// output solutions directory
+        #[clap(
+            short = 'o',
+            long = "crashes",
+            default_value = "solutions",
+            parse(from_os_str)
+        )]
+        crashes: PathBuf,
+
+        /// which cores to bind, i.e. --cores 1,2-4,5
+        #[clap(short = 'c', long = "cores", default_value = "0", parse(try_from_str = Cores::from_cmdline))]
+        cores: Cores,
+
+        /// port on which the broker should listen
+        #[clap(short = 'p', long = "port", default_value = "1337")]
+        port: u16,
+    },
+
+    #[clap(setting(AppSettings::ArgRequiredElseHelp))]
+    /// Replay mode: runs a single input file through the fuzz harness
+    Replay {
+        /// input corpus directories
+        #[clap(short = 'i', long = "input-file", parse(from_os_str))]
+        input_file: PathBuf,
+    },
 }
 
 #[must_use]
