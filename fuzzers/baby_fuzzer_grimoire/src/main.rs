@@ -15,7 +15,8 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         havoc_mutations, scheduled::StdScheduledMutator, GrimoireExtensionMutator,
-        GrimoireRecursiveReplacementMutator, Tokens,
+        GrimoireRandomDeleteMutator, GrimoireRecursiveReplacementMutator,
+        GrimoireStringReplacementMutator, Tokens,
     },
     observers::StdMapObserver,
     stages::{mutational::StdMutationalStage, GeneralizationStage},
@@ -150,9 +151,13 @@ pub fn main() {
     let grimoire_mutator = StdScheduledMutator::with_max_iterations(
         tuple_list!(
             GrimoireExtensionMutator::new(),
-            GrimoireRecursiveReplacementMutator::new()
+            GrimoireRecursiveReplacementMutator::new(),
+            GrimoireStringReplacementMutator::new(),
+            // give more probability to avoid large inputs
+            GrimoireRandomDeleteMutator::new(),
+            GrimoireRandomDeleteMutator::new(),
         ),
-        2,
+        3,
     );
     let mut stages = tuple_list!(
         generalization,

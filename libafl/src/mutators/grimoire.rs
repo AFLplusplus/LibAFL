@@ -244,13 +244,13 @@ impl GrimoireRecursiveReplacementMutator {
     }
 }
 
-/// Extend the generalized input with another random one from the corpus
+/// Replace matching tokens with others from the tokens metadata
 #[derive(Debug, Default)]
 pub struct GrimoireStringReplacementMutator {}
 
 impl<S> Mutator<GeneralizedInput, S> for GrimoireStringReplacementMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,
@@ -292,6 +292,9 @@ where
 
         'first: for item in &mut gen[..rand_idx] {
             if let GeneralizedItem::Bytes(bytes) = item {
+                if bytes.len() < token_1.len() {
+                    continue;
+                }
                 for i in 0..(bytes.len() - token_1.len()) {
                     if bytes[i..].starts_with(token_1) {
                         bytes.splice(i..(i + token_1.len()), token_2.clone());
@@ -307,6 +310,9 @@ where
         if mutated == MutationResult::Skipped || !stop_at_first {
             'second: for item in &mut gen[rand_idx..] {
                 if let GeneralizedItem::Bytes(bytes) = item {
+                    if bytes.len() < token_1.len() {
+                        continue;
+                    }
                     for i in 0..(bytes.len() - token_1.len()) {
                         if bytes[i..].starts_with(token_1) {
                             bytes.splice(i..(i + token_1.len()), token_2.clone());
@@ -337,5 +343,68 @@ impl GrimoireStringReplacementMutator {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+/// Randomly delete a part of the generalized input
+#[derive(Debug, Default)]
+pub struct GrimoireRandomDeleteMutator {
+    gap_indices: Vec<usize>,
+}
+
+impl<S> Mutator<GeneralizedInput, S> for GrimoireRandomDeleteMutator
+where
+    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+{
+    fn mutate(
+        &mut self,
+        state: &mut S,
+        input: &mut GeneralizedInput,
+        _stage_idx: i32,
+    ) -> Result<MutationResult, Error> {
+        if input.generalized().is_none() {
+            return Ok(MutationResult::Skipped);
+        }
+
+        input.grimoire_mutated = true;
+        let gen = input.generalized_mut().as_mut().unwrap();
+
+        for (i, _) in gen
+            .iter()
+            .enumerate()
+            .filter(|&(_, x)| *x == GeneralizedItem::Gap)
+        {
+            self.gap_indices.push(i);
+        }
+        let min_idx =
+            self.gap_indices[state.rand_mut().below(self.gap_indices.len() as u64) as usize];
+        let max_idx =
+            self.gap_indices[state.rand_mut().below(self.gap_indices.len() as u64) as usize];
+        let (min_idx, max_idx) = (min(min_idx, max_idx), max(min_idx, max_idx));
+
+        self.gap_indices.clear();
+
+        if min_idx != max_idx {
+            gen.drain(min_idx..max_idx);
+            Ok(MutationResult::Mutated)
+        } else {
+            Ok(MutationResult::Skipped)
+        }
+    }
+}
+
+impl Named for GrimoireRandomDeleteMutator {
+    fn name(&self) -> &str {
+        "GrimoireRandomDeleteMutator"
+    }
+}
+
+impl GrimoireRandomDeleteMutator {
+    /// Creates a new [`GrimoireExtensionMutator`].
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            gap_indices: vec![],
+        }
     }
 }
