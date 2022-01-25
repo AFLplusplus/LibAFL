@@ -479,20 +479,15 @@ impl Emulator {
     }
 
     pub fn map_private(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
-        self.mmap(
-            addr,
-            size,
-            perms.into(),
-            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-        )
-        .map_err(|_| format!("Failed to map {}", addr))
+        self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
+            .map_err(|_| format!("Failed to map {}", addr))
     }
 
     pub fn map_fixed(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
         self.mmap(
             addr,
             size,
-            perms.into(),
+            perms,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
         .map_err(|_| format!("Failed to map {}", addr))

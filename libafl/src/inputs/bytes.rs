@@ -105,18 +105,3 @@ impl BytesInput {
         Self { bytes }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::bolts::rands::{Rand, StdRand};
-
-    #[test]
-    fn test_input() {
-        let mut rand = StdRand::with_seed(0);
-        assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(100) < 100);
-        assert_eq!(rand.below(1), 0);
-        assert_eq!(rand.between(10, 10), 10);
-        assert!(rand.between(11, 20) > 10);
-    }
-}

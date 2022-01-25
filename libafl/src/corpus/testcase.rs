@@ -99,7 +99,8 @@ where
 
     /// Set the input
     #[inline]
-    pub fn set_input(&mut self, input: I) {
+    pub fn set_input(&mut self, mut input: I) {
+        input.wrapped_as_testcase();
         self.input = Some(input);
     }
 
@@ -157,19 +158,22 @@ where
     where
         T: Into<I>,
     {
-        Testcase {
+        let mut slf = Testcase {
             input: Some(input.into()),
             filename: None,
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
             executions: 0,
-        }
+        };
+        slf.input.as_mut().unwrap().wrapped_as_testcase();
+        slf
     }
 
     /// Create a new Testcase instance given an [`Input`] and a `filename`
     #[inline]
-    pub fn with_filename(input: I, filename: String) -> Self {
+    pub fn with_filename(mut input: I, filename: String) -> Self {
+        input.wrapped_as_testcase();
         Testcase {
             input: Some(input),
             filename: Some(filename),
@@ -182,7 +186,8 @@ where
 
     /// Create a new Testcase instance given an [`Input`] and the number of executions
     #[inline]
-    pub fn with_executions(input: I, executions: usize) -> Self {
+    pub fn with_executions(mut input: I, executions: usize) -> Self {
+        input.wrapped_as_testcase();
         Testcase {
             input: Some(input),
             filename: None,
