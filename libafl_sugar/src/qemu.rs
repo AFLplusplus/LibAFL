@@ -488,7 +488,7 @@ pub mod pybind {
                 .tokens_file(self.tokens_file.clone())
                 .iterations(self.iterations)
                 .build()
-                .run(&emulator.emu)
+                .run(&emulator.emu);
         }
     }
 
