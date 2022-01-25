@@ -198,7 +198,7 @@ fn count_textual_inputs(dir: &Path) -> (usize, usize) {
             let (found, tot) = count_textual_inputs(&path);
             textuals += found;
             total += tot;
-        } else if !attr.is_file() || attr.len() == 0 {
+        } else if attr.is_file() && attr.len() != 0 {
             let mut file = File::open(&path).expect("No file found");
             let mut buffer = vec![];
             file.read_to_end(&mut buffer).expect("Buffer overflow");
@@ -520,7 +520,7 @@ fn fuzz_text(
     // This one is composed by two Feedbacks in OR
     let feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, true),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
@@ -632,7 +632,14 @@ fn fuzz_text(
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
+            .load_from_directory(
+                &mut fuzzer,
+                &mut executor,
+                &mut mgr,
+                &seed_dir,
+                false,
+                &mut |_, _, path| GeneralizedInput::from_bytes_file(path),
+            )
             .unwrap_or_else(|_| {
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);

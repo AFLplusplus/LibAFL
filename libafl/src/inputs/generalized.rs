@@ -6,6 +6,11 @@ use core::hash::Hasher;
 use core::{cell::RefCell, convert::From};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "std")]
+use crate::Error;
+#[cfg(feature = "std")]
+use std::{fs::File, io::Read, path::Path};
+
 use crate::{
     bolts::{ownedref::OwnedSlice, HasLen},
     inputs::{HasBytesVec, HasTargetBytes, Input},
@@ -198,5 +203,22 @@ impl GeneralizedInput {
     /// Get the generalized input (mut)
     pub fn generalized_mut(&mut self) -> &mut Option<Vec<GeneralizedItem>> {
         &mut self.generalized
+    }
+
+    /// Load from a plain file of bytes
+    #[must_use]
+    #[cfg(feature = "std")]
+    pub fn from_bytes_file<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::open(path)?;
+        let mut bytes: Vec<u8> = vec![];
+        file.read_to_end(&mut bytes)?;
+        Ok(Self {
+            bytes,
+            generalized: None,
+            grimoire_mutated: false,
+        })
     }
 }
