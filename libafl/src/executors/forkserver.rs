@@ -23,7 +23,7 @@ use crate::{
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
-    observers::ObserversTuple,
+    observers::{ASANBacktraceObserver, ObserversTuple},
     Error,
 };
 
@@ -726,15 +726,15 @@ where
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
             println!("Got crash yes");
-            let log_path = format!("asanlogs/asan.{}", self.forkserver.child_pid());
-            let mut asan_output = File::open(Path::new(&log_path))
-                .expect(format!("can't find asan log at {}", &log_path).as_str());
-            let mut buf = String::new();
-            asan_output
-                .read_to_string(&mut buf)
-                .expect("Failed to read asan log");
-            fs::remove_file(&log_path).expect(format!("Failed to delete {}", &log_path).as_str());
-            println!("Horaaaaay: {}", buf);
+            if let Some(obs) = self
+                .observers()
+                .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+            {
+                obs.parse_asan_output_from_asan_log_file(
+                    "asanlogs/asan",
+                    self.forkserver.child_pid(),
+                )
+            }
         }
 
         self.forkserver.set_child_pid(Pid::from_raw(0));

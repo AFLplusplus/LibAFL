@@ -12,10 +12,17 @@ use crate::{
 };
 use ahash::AHasher;
 use backtrace::Backtrace;
+use nix::unistd::Pid;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::hash_map::DefaultHasher, fmt::Debug, hash::Hasher, io::Read, process::ChildStderr,
+    collections::hash_map::DefaultHasher,
+    fmt::Debug,
+    fs::{self, File},
+    hash::Hasher,
+    io::Read,
+    path::Path,
+    process::ChildStderr,
 };
 
 use super::ObserverWithHashField;
@@ -241,16 +248,34 @@ impl ASANBacktraceObserver {
         }
     }
 
-    /// parse ASAN error output emited by the target command and compute the hash
-    pub fn parse_asan_output(&mut self, stderr: &mut ChildStderr) {
+    /// read ASAN output from the child stderr and parse it.
+    pub fn parse_asan_output_from_childstderr(&mut self, stderr: &mut ChildStderr) {
         let mut buf = String::new();
         let read = stderr
             .read_to_string(&mut buf)
             .expect("Failed to read the child process stderr");
         println!("Read {} bytes : {}", read, buf);
+        self.parse_asan_output(&buf)
+    }
+
+    /// read ASAN output from the log file and parse it.
+    pub fn parse_asan_output_from_asan_log_file(&mut self, path_base: &str, pid: Pid) {
+        let log_path = format!("{}.{}", path_base, pid);
+        let mut asan_output = File::open(Path::new(&log_path))
+            .expect(format!("can't find asan log at {}", &log_path).as_str());
+        let mut buf = String::new();
+        asan_output
+            .read_to_string(&mut buf)
+            .expect("Failed to read asan log");
+        fs::remove_file(&log_path).expect(format!("Failed to delete {}", &log_path).as_str());
+        self.parse_asan_output(&buf);
+    }
+
+    /// parse ASAN error output emited by the target command and compute the hash
+    pub fn parse_asan_output(&mut self, output: &String) {
         let mut hasher = AHasher::new_with_keys(0, 0);
         let matcher = Regex::new("\\s*#[0-9]*\\s0x[0-9a-f]*\\sin\\s(.*)").unwrap();
-        matcher.captures_iter(&buf).for_each(|m| {
+        matcher.captures_iter(&output).for_each(|m| {
             let g = m.get(1).unwrap();
             hasher.write(g.as_str().as_bytes());
         });
@@ -279,7 +304,7 @@ impl ObserverWithHashField for ASANBacktraceObserver {
 
 impl Default for ASANBacktraceObserver {
     fn default() -> Self {
-        Self::new("CommandBacktraceObserver")
+        Self::new("ASANBacktraceObserver")
     }
 }
 

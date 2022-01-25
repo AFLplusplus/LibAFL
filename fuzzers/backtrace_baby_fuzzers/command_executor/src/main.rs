@@ -40,7 +40,7 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", signals.map_mut());
     // Create a stacktrace observer
-    let bt_observer = ASANBacktraceObserver::new("CommandBacktraceObserver");
+    let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
@@ -53,7 +53,7 @@ pub fn main() {
     let objective = feedback_and!(
         CrashFeedback::new(),
         NewHashFeedback::<ASANBacktraceObserver>::new_with_observer(
-            "CommandBacktraceObserver",
+            "ASANBacktraceObserver",
             &bt_observer
         )
     );
