@@ -120,7 +120,7 @@ impl GeneralizedInput {
         for e in v {
             match e {
                 None => {
-                    if bytes.len() > 0 {
+                    if !bytes.is_empty() {
                         res.push(GeneralizedItem::Bytes(bytes.clone()));
                         bytes.clear();
                     }
@@ -131,7 +131,7 @@ impl GeneralizedInput {
                 }
             }
         }
-        if bytes.len() > 0 {
+        if !bytes.is_empty() {
             res.push(GeneralizedItem::Bytes(bytes));
         }
         if res.last() != Some(&GeneralizedItem::Gap) {
@@ -142,7 +142,7 @@ impl GeneralizedInput {
 
     /// Extend the generalized input
     pub fn generalized_extend(&mut self, other: &[GeneralizedItem]) {
-        let gen = self.generalized.get_or_insert_with(|| vec![]);
+        let gen = self.generalized.get_or_insert_with(Vec::new);
         if gen.last().is_some()
             && other.first().is_some()
             && *gen.last().unwrap() == GeneralizedItem::Gap
@@ -155,6 +155,7 @@ impl GeneralizedInput {
     }
 
     /// Get the size of the generalized
+    #[must_use]
     pub fn generalized_len(&self) -> usize {
         match &self.generalized {
             None => 0,
@@ -172,15 +173,15 @@ impl GeneralizedInput {
     }
 
     /// Convert generalized to bytes
+    #[must_use]
     pub fn generalized_to_bytes(&self) -> Vec<u8> {
         match &self.generalized {
             None => vec![],
             Some(gen) => {
                 let mut bytes = vec![];
                 for item in gen {
-                    match item {
-                        GeneralizedItem::Bytes(b) => bytes.extend_from_slice(&b),
-                        _ => (),
+                    if let GeneralizedItem::Bytes(b) = item {
+                        bytes.extend_from_slice(b);
                     }
                 }
                 bytes
@@ -189,8 +190,9 @@ impl GeneralizedInput {
     }
 
     /// Get the generalized input
+    #[must_use]
     pub fn generalized(&self) -> Option<&[GeneralizedItem]> {
-        self.generalized.as_ref().map(|x| x.as_slice())
+        self.generalized.as_deref()
     }
 
     /// Get the generalized input (mut)

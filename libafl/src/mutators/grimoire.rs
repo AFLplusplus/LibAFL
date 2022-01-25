@@ -78,7 +78,7 @@ where
                 if items.last() == Some(&GeneralizedItem::Gap) {
                     min_idx += 1;
                 }
-                items.extend_from_slice(&gen[min_idx..max_idx + 1]);
+                items.extend_from_slice(&gen[min_idx..=max_idx]);
 
                 debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
                 debug_assert!(items.last() == Some(&GeneralizedItem::Gap));
@@ -113,7 +113,7 @@ where
     if items.last() == Some(&GeneralizedItem::Gap) && gen.first() == Some(&GeneralizedItem::Gap) {
         items.extend_from_slice(&gen[1..]);
     } else {
-        items.extend_from_slice(&gen);
+        items.extend_from_slice(gen);
     }
 
     debug_assert!(items.first() == Some(&GeneralizedItem::Gap));
@@ -194,8 +194,7 @@ where
 
         let depth = *state.rand_mut().choose(&RECURSIVE_REPLACEMENT_DEPTH);
         for _ in 0..depth {
-            let len = input.generalized_len();
-            if len >= MAX_RECURSIVE_REPLACEMENT_LEN {
+            if input.generalized_len() >= MAX_RECURSIVE_REPLACEMENT_LEN {
                 break;
             }
 
@@ -384,11 +383,11 @@ where
 
         self.gap_indices.clear();
 
-        if min_idx != max_idx {
+        if min_idx == max_idx {
+            Ok(MutationResult::Skipped)
+        } else {
             gen.drain(min_idx..max_idx);
             Ok(MutationResult::Mutated)
-        } else {
-            Ok(MutationResult::Skipped)
         }
     }
 }

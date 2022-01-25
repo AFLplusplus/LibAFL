@@ -79,6 +79,7 @@ where
     S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
 {
     #[inline]
+    #[allow(clippy::too_many_lines)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
@@ -97,12 +98,12 @@ where
 
         let (mut payload, original, novelties) = {
             start_timer!(state);
-            let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
-            let input = entry.load_input()?;
+            state.corpus().get(corpus_idx)?.borrow_mut().load_input()?;
             mark_feature_time!(state, PerfFeature::GetInputFromCorpus);
+            let mut entry = state.corpus().get(corpus_idx)?.borrow_mut();
+            let input = entry.input_mut().as_mut().unwrap();
 
             if input.generalized().is_some() {
-                drop(input);
                 drop(entry);
                 state
                     .metadata_mut()
@@ -125,7 +126,7 @@ where
         };
 
         // Do not generalized unstable inputs
-        if !self.verify_input(fuzzer, executor, state, manager, &novelties, original)? {
+        if !self.verify_input(fuzzer, executor, state, manager, &novelties, &original)? {
             return Ok(());
         }
 
@@ -188,7 +189,7 @@ where
             &mut payload,
             &novelties,
             find_next_char,
-            '.' as u8,
+            b'.',
         )?;
         self.find_gaps(
             fuzzer,
@@ -198,7 +199,7 @@ where
             &mut payload,
             &novelties,
             find_next_char,
-            ';' as u8,
+            b';',
         )?;
         self.find_gaps(
             fuzzer,
@@ -208,7 +209,7 @@ where
             &mut payload,
             &novelties,
             find_next_char,
-            ',' as u8,
+            b',',
         )?;
         self.find_gaps(
             fuzzer,
@@ -218,7 +219,7 @@ where
             &mut payload,
             &novelties,
             find_next_char,
-            '\n' as u8,
+            b'\n',
         )?;
         self.find_gaps(
             fuzzer,
@@ -228,7 +229,7 @@ where
             &mut payload,
             &novelties,
             find_next_char,
-            '\r' as u8,
+            b'\r',
         )?;
         self.find_gaps(
             fuzzer,
@@ -238,7 +239,7 @@ where
             &mut payload,
             &novelties,
             find_next_char,
-            '#' as u8,
+            b'#',
         )?;
         self.find_gaps(
             fuzzer,
@@ -248,7 +249,7 @@ where
             &mut payload,
             &novelties,
             find_next_char,
-            ' ' as u8,
+            b' ',
         )?;
 
         self.find_gaps_in_closures(
@@ -258,8 +259,8 @@ where
             manager,
             &mut payload,
             &novelties,
-            '(' as u8,
-            ')' as u8,
+            b'(',
+            b')',
         )?;
         self.find_gaps_in_closures(
             fuzzer,
@@ -268,8 +269,8 @@ where
             manager,
             &mut payload,
             &novelties,
-            '[' as u8,
-            ']' as u8,
+            b'[',
+            b']',
         )?;
         self.find_gaps_in_closures(
             fuzzer,
@@ -278,8 +279,8 @@ where
             manager,
             &mut payload,
             &novelties,
-            '{' as u8,
-            '}' as u8,
+            b'{',
+            b'}',
         )?;
         self.find_gaps_in_closures(
             fuzzer,
@@ -288,8 +289,8 @@ where
             manager,
             &mut payload,
             &novelties,
-            '<' as u8,
-            '>' as u8,
+            b'<',
+            b'>',
         )?;
         self.find_gaps_in_closures(
             fuzzer,
@@ -298,8 +299,8 @@ where
             manager,
             &mut payload,
             &novelties,
-            '\'' as u8,
-            '\'' as u8,
+            b'\'',
+            b'\'',
         )?;
         self.find_gaps_in_closures(
             fuzzer,
@@ -308,8 +309,8 @@ where
             manager,
             &mut payload,
             &novelties,
-            '"' as u8,
-            '"' as u8,
+            b'"',
+            b'"',
         )?;
 
         if payload.len() <= MAX_GENERALIZED_LEN {
@@ -353,6 +354,7 @@ where
     S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
 {
     /// Create a new [`GeneralizationStage`].
+    #[must_use]
     pub fn new(map_observer: &O) -> Self {
         Self {
             map_observer_name: map_observer.name().to_string(),
@@ -361,6 +363,7 @@ where
     }
 
     /// Create a new [`GeneralizationStage`] from name
+    #[must_use]
     pub fn from_name(map_observer_name: &str) -> Self {
         Self {
             map_observer_name: map_observer_name.to_string(),
@@ -375,23 +378,23 @@ where
         state: &mut S,
         manager: &mut EM,
         novelties: &[usize],
-        input: GeneralizedInput,
+        input: &GeneralizedInput,
     ) -> Result<bool, Error>
     where
         E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
     {
         start_timer!(state);
-        executor.observers_mut().pre_exec_all(state, &input)?;
+        executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let _ = executor.run_target(fuzzer, state, manager, &input)?;
+        let _ = executor.run_target(fuzzer, state, manager, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
 
         start_timer!(state);
-        executor.observers_mut().post_exec_all(state, &input)?;
+        executor.observers_mut().post_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         let cnt = executor
@@ -408,6 +411,7 @@ where
         payload.retain(|&x| !(x.is_none() & core::mem::replace(&mut previous, x.is_none())));
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn find_gaps<E>(
         &self,
         fuzzer: &mut Z,
@@ -424,25 +428,19 @@ where
     {
         let mut start = 0;
         while start < payload.len() {
-            let mut end = find_next_index(&payload, start, split_char);
+            let mut end = find_next_index(payload, start, split_char);
             if end > payload.len() {
                 end = payload.len();
             }
             let mut candidate = GeneralizedInput::new(vec![]);
-            candidate.bytes_mut().extend(
-                payload[..start]
-                    .iter()
-                    .filter(|x| x.is_some())
-                    .map(|x| x.unwrap()),
-            );
-            candidate.bytes_mut().extend(
-                payload[end..]
-                    .iter()
-                    .filter(|x| x.is_some())
-                    .map(|x| x.unwrap()),
-            );
+            candidate
+                .bytes_mut()
+                .extend(payload[..start].iter().flatten());
+            candidate
+                .bytes_mut()
+                .extend(payload[end..].iter().flatten());
 
-            if self.verify_input(fuzzer, executor, state, manager, novelties, candidate)? {
+            if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
                 for item in &mut payload[start..end] {
                     *item = None;
                 }
@@ -455,6 +453,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn find_gaps_in_closures<E>(
         &self,
         fuzzer: &mut Z,
@@ -484,20 +483,14 @@ where
             while end > start {
                 if payload[end] == Some(closing_char) {
                     let mut candidate = GeneralizedInput::new(vec![]);
-                    candidate.bytes_mut().extend(
-                        payload[..start]
-                            .iter()
-                            .filter(|x| x.is_some())
-                            .map(|x| x.unwrap()),
-                    );
-                    candidate.bytes_mut().extend(
-                        payload[end..]
-                            .iter()
-                            .filter(|x| x.is_some())
-                            .map(|x| x.unwrap()),
-                    );
+                    candidate
+                        .bytes_mut()
+                        .extend(payload[..start].iter().flatten());
+                    candidate
+                        .bytes_mut()
+                        .extend(payload[end..].iter().flatten());
 
-                    if self.verify_input(fuzzer, executor, state, manager, novelties, candidate)? {
+                    if self.verify_input(fuzzer, executor, state, manager, novelties, &candidate)? {
                         for item in &mut payload[start..end] {
                             *item = None;
                         }
