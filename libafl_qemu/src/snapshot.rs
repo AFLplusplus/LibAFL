@@ -60,6 +60,7 @@ impl QemuSnapshotHelper {
         }
     }
 
+    #[allow(clippy::uninit_assumed_init)]
     pub fn snapshot(&mut self, emulator: &Emulator) {
         self.brk = emulator.get_brk();
         self.pages.clear();
@@ -116,7 +117,7 @@ impl QemuSnapshotHelper {
         self.reset_maps(emulator);
         for acc in self.accesses.iter_mut() {
             for page in unsafe { &(*acc.get()).dirty } {
-                if let Some(info) = self.pages.get_mut(&page) {
+                if let Some(info) = self.pages.get_mut(page) {
                     // TODO avoid duplicated memcpy
                     if let Some(data) = info.data.as_ref() {
                         unsafe { emulator.write_mem(*page, &data[..]) };
@@ -157,12 +158,10 @@ impl QemuSnapshotHelper {
                             emulator.mprotect(page, SNAPSHOT_PAGE_SIZE, info.perms);
                         }
                     }
+                } else if let Some((_, size)) = &mut prev {
+                    *size += SNAPSHOT_PAGE_SIZE;
                 } else {
-                    if let Some((_, size)) = &mut prev {
-                        *size += SNAPSHOT_PAGE_SIZE;
-                    } else {
-                        prev = Some((page, SNAPSHOT_PAGE_SIZE));
-                    }
+                    prev = Some((page, SNAPSHOT_PAGE_SIZE));
                 }
                 page += SNAPSHOT_PAGE_SIZE as u64;
             }
