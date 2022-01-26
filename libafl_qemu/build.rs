@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "fa2b9c4a25f548f15b3d1b1afcfdb75cc7165f9a";
+const QEMU_REVISION: &str = "152fdbe024493f31e60060714caee3b90fdf3d9e";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -221,7 +221,6 @@ fn main() {
                 "--disable-vvfat",
                 "--disable-xen",
                 "--disable-xen-pci-passthrough",
-                "--disable-xfsctl",
             ])
             .status()
             .expect("Configure failed");
