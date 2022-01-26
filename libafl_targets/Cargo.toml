@@ -12,7 +12,7 @@ edition = "2021"
 
 [features]
 default = ["std"]
-std = []
+std = ["libafl/std"]
 libfuzzer = []
 pointer_maps = []
 sancov_pcguard_edges = []
