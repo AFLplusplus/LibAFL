@@ -112,7 +112,7 @@ where
                     OT,
                     S,
                     InProcessExecutorHandlerData,
-                >(&GLOBAL_STATE)
+                >(&GLOBAL_STATE);
             },
         }
 
@@ -363,10 +363,12 @@ pub trait HasHandlerData: 'static + Sync {
     /// get executor
     fn executor<E>(&self) -> &E;
     /// get mutable executor
+    #[allow(clippy::mut_from_ref)]
     fn executor_mut<E>(&self) -> &mut E;
     /// get state
     fn state<S>(&self) -> &S;
     /// get mutable state
+    #[allow(clippy::mut_from_ref)]
     fn state_mut<S>(&self) -> &mut S;
     /// get current input
     fn current_input<I>(&self) -> &I;
@@ -466,7 +468,7 @@ pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
     unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
 }
 
-/// signal handlers and panic_hooks for used BT collection
+/// signal handlers and `panic_hooks` for used BT collection
 pub mod common_signal_handlers {
 
     use std::panic;
@@ -483,8 +485,8 @@ pub mod common_signal_handlers {
 
     use super::HasHandlerData;
 
-    /// invokes the post_exec hook on all observer in case the child process crashes
-    pub unsafe fn setup_bt_panic_hook<E, I, OT, S, D>(data: &'static D)
+    /// invokes the `post_exec` hook on all observer in case the child process crashes
+    pub fn setup_bt_panic_hook<E, I, OT, S, D>(data: &'static D)
     where
         E: HasObservers<I, OT, S>,
         OT: ObserversTuple<I, S>,
@@ -504,8 +506,8 @@ pub mod common_signal_handlers {
         }));
     }
 
-    /// invokes the post_exec hook on all observer in case the child process crashes
-    pub unsafe fn child_crash_handler<E, I, OT, S, D>(
+    /// invokes the `post_exec` hook on all observer in case the child process crashes
+    pub fn child_crash_handler<E, I, OT, S, D>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -1337,7 +1339,7 @@ where
                         .harness_type()
                     {
                         crate::observers::HarnessType::FFI => {
-                            setup_signal_handler(&mut FORK_EXECUTOR_GLOBAL_DATA)?
+                            setup_signal_handler(&mut FORK_EXECUTOR_GLOBAL_DATA)?;
                         }
                         crate::observers::HarnessType::RUST => {
                             setup_bt_panic_hook::<
@@ -1346,7 +1348,7 @@ where
                                 OT,
                                 S,
                                 InProcessForkExecutorGlobalData,
-                            >(&FORK_EXECUTOR_GLOBAL_DATA)
+                            >(&FORK_EXECUTOR_GLOBAL_DATA);
                         }
                     }
 

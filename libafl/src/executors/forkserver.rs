@@ -749,7 +749,7 @@ where
                 .observers_mut()
                 .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
             {
-                obs.parse_asan_output_from_asan_log_file(&Pid::from_raw(pid))
+                obs.parse_asan_output_from_asan_log_file(&Pid::from_raw(pid));
             }
         }
 

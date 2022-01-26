@@ -21,7 +21,7 @@ use crate::{
 pub trait HashSetState<T> {
     /// creates a new instance with a specific hashset
     fn with_hash_set(name: &'static str, hash_set: HashSet<T>) -> Self;
-    /// updates the hash_set with the given value
+    /// updates the `hash_set` with the given value
     fn update_hash_set(&mut self, value: T) -> Result<bool, Error>;
 }
 
@@ -160,7 +160,7 @@ impl<O> NewHashFeedback<O>
 where
     O: ObserverWithHashField + Named + Debug,
 {
-    /// Returns a new [`NewHashFeedback`]. Carefull, it's recommended to use 'new_with_observer'
+    /// Returns a new [`NewHashFeedback`]. Carefull, it's recommended to use `new_with_observer`
     /// Setting an observer name that doesn't exist would eventually trigger a panic.
     #[must_use]
     pub fn new(feedback_name: &str, observer_name: &str) -> Self {

@@ -108,6 +108,7 @@ pub enum HarnessType {
 }
 
 /// An observer looking at the backtrace after the harness crashes
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct BacktraceObserver {
     observer_name: String,
@@ -144,7 +145,8 @@ impl BacktraceObserver {
         }
     }
 
-    /// returns harness_type for this [`BacktraceObserver`] instance
+    /// returns `harness_type` for this [`BacktraceObserver`] instance
+    #[must_use]
     pub fn harness_type(&self) -> &HarnessType {
         &self.harness_type
     }
@@ -187,25 +189,13 @@ where
         input.hash(&mut hasher);
         let input_hash = hasher.finish();
         let (bt_hash, current_input_hash) = unsafe { BACKTRACE_HASH_VALUE.get_stacktrace_hash() };
-        if current_input_hash != input_hash {
-            match exit_kind {
-                ExitKind::Crash => {
-                    println!("Got crash, will collect");
-                    let bt_hash = collect_backtrace();
-                    unsafe { BACKTRACE_HASH_VALUE.store_stacktrace_hash(bt_hash, input_hash) };
-                    self.update_hash(bt_hash);
-                }
-                _ => (),
+
+        if exit_kind == &ExitKind::Crash {
+            if current_input_hash != input_hash {
+                let bt_hash = collect_backtrace();
+                unsafe { BACKTRACE_HASH_VALUE.store_stacktrace_hash(bt_hash, input_hash) };
             }
-        } else {
-            println!("double call");
-            match exit_kind {
-                ExitKind::Crash => {
-                    println!("hash from parent process is {}", bt_hash);
-                    self.update_hash(bt_hash);
-                }
-                _ => (),
-            }
+            self.update_hash(bt_hash);
         }
         Ok(())
     }
@@ -220,7 +210,7 @@ impl Named for BacktraceObserver {
 /// static variable of ASAN log path
 pub static ASAN_LOG_PATH: &str = "./asanlog";
 
-/// returns the recommended ASAN runtime flags to capture the backtrace correctly with log_path set
+/// returns the recommended ASAN runtime flags to capture the backtrace correctly with `log_path` set
 #[must_use]
 pub fn get_asan_runtime_flags_with_log_path() -> String {
     let mut flags = get_asan_runtime_flags();
@@ -268,27 +258,29 @@ impl ASANBacktraceObserver {
         stderr
             .read_to_string(&mut buf)
             .expect("Failed to read the child process stderr");
-        self.parse_asan_output(&buf)
+        self.parse_asan_output(&buf);
     }
 
     /// read ASAN output from the log file and parse it.
     pub fn parse_asan_output_from_asan_log_file(&mut self, pid: &Pid) {
         let log_path = format!("{}.{}", ASAN_LOG_PATH, pid);
         let mut asan_output = File::open(Path::new(&log_path))
-            .expect(format!("Can't find asan log at {}", &log_path).as_str());
+            .unwrap_or_else(|_| panic!("Can't find asan log at {}", &log_path));
+
         let mut buf = String::new();
         asan_output
             .read_to_string(&mut buf)
             .expect("Failed to read asan log");
-        fs::remove_file(&log_path).expect(format!("Failed to delete {}", &log_path).as_str());
+        fs::remove_file(&log_path).unwrap_or_else(|_| panic!("Failed to delete {}", &log_path));
+
         self.parse_asan_output(&buf);
     }
 
     /// parse ASAN error output emited by the target command and compute the hash
-    pub fn parse_asan_output(&mut self, output: &String) {
+    pub fn parse_asan_output(&mut self, output: &str) {
         let mut hasher = AHasher::new_with_keys(0, 0);
         let matcher = Regex::new("\\s*#[0-9]*\\s0x[0-9a-f]*\\sin\\s(.*)").unwrap();
-        matcher.captures_iter(&output).for_each(|m| {
+        matcher.captures_iter(output).for_each(|m| {
             let g = m.get(1).unwrap();
             hasher.write(g.as_str().as_bytes());
         });

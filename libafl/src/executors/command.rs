@@ -81,12 +81,11 @@ where
         };
 
         let stderr = child.stderr.as_mut().unwrap();
-        match self
+        if let Some(obs) = self
             .observers
             .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
         {
-            Some(ob) => ob.parse_asan_output_from_childstderr(stderr),
-            None => (),
+            obs.parse_asan_output_from_childstderr(stderr);
         };
 
         res
