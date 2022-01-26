@@ -713,7 +713,6 @@ where
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
-            println!("Got crash yes");
             if let Some(obs) = self
                 .observers_mut()
                 .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")

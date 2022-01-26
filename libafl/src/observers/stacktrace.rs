@@ -266,7 +266,6 @@ impl ASANBacktraceObserver {
         let read = stderr
             .read_to_string(&mut buf)
             .expect("Failed to read the child process stderr");
-        println!("Read {} bytes : {}", read, buf);
         self.parse_asan_output(&buf)
     }
 
@@ -274,13 +273,12 @@ impl ASANBacktraceObserver {
     pub fn parse_asan_output_from_asan_log_file(&mut self, pid: &Pid) {
         let log_path = format!("{}.{}", ASAN_LOG_PATH, pid);
         let mut asan_output = File::open(Path::new(&log_path))
-            .expect(format!("can't find asan log at {}", &log_path).as_str());
+            .expect(format!("Can't find asan log at {}", &log_path).as_str());
         let mut buf = String::new();
         asan_output
             .read_to_string(&mut buf)
             .expect("Failed to read asan log");
         fs::remove_file(&log_path).expect(format!("Failed to delete {}", &log_path).as_str());
-        println!("horay: {}", &buf);
         self.parse_asan_output(&buf);
     }
 
