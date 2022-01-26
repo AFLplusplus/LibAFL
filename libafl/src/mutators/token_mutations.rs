@@ -39,13 +39,13 @@ impl Tokens {
         Self { token_vec }
     }
 
-    /// Creates a new token from autodict
-    #[cfg(feature = "std")]
-    pub unsafe fn from_autodict(
+    ///  Reads from an autotokens section, returning the count of new entries read
+    pub unsafe fn add_from_autotokens(
+        &mut self,
         token_start: *const u8,
         token_stop: *const u8,
-    ) -> Result<Self, Error> {
-        let mut ret = Self::new(vec![]);
+    ) -> Result<usize, Error> {
+        let mut entries = 0;
 
         let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
         // println!("size: {}", section_size);
@@ -63,16 +63,28 @@ impl Tokens {
             let size = slice[head] as usize;
             head += 1;
             if size > 0 {
-                ret.add_token(&slice[head..head + size].to_vec());
+                self.add_token(&slice[head..head + size].to_vec());
+                #[cfg(feature = "std")]
                 println!(
                     "Token size: {} content: {:x?}",
                     size,
                     &slice[head..head + size].to_vec()
                 );
                 head += size;
+                entries += 1;
             }
         }
 
+        Ok(entries)
+    }
+
+    /// Creates a new token from autotokens
+    pub unsafe fn from_autotokens(
+        token_start: *const u8,
+        token_stop: *const u8,
+    ) -> Result<Self, Error> {
+        let mut ret = Self::new(vec![]);
+        ret.add_from_autotokens(token_start, token_stop)?;
         Ok(ret)
     }
 
@@ -100,7 +112,7 @@ impl Tokens {
 
     /// Reads a tokens file, returning the count of new entries read
     #[cfg(feature = "std")]
-    pub fn add_tokens_from_file<P>(&mut self, file: P) -> Result<u32, Error>
+    pub fn add_tokens_from_file<P>(&mut self, file: P) -> Result<usize, Error>
     where
         P: AsRef<Path>,
     {
