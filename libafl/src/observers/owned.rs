@@ -8,6 +8,7 @@ use crate::{
         anymap::{pack_type_id, AsAny},
         tuples::MatchName,
     },
+    executors::ExitKind,
     observers::{Observer, ObserversTuple},
     Error,
 };
@@ -71,9 +72,14 @@ impl<I: 'static + Debug, S: 'static + Debug> ObserversTuple<I, S> for ObserversO
             .for_each_mut(&mut |_, ob| ob.pre_exec(state, input))
     }
 
-    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         self.map
-            .for_each_mut(&mut |_, ob| ob.post_exec(state, input))
+            .for_each_mut(&mut |_, ob| ob.post_exec(state, input, exit_kind))
     }
 }
 

@@ -19,7 +19,9 @@ use core::{
 #[cfg(feature = "std")]
 use std::intrinsics::transmute;
 
+#[cfg(feature = "std")]
 use libc::{siginfo_t, ucontext_t};
+
 #[cfg(all(feature = "std", unix))]
 use nix::{
     sys::wait::{waitpid, WaitStatus},
@@ -39,7 +41,6 @@ use crate::observers::{BacktraceObserver, HarnessType};
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 use crate::{
-    bolts::os::unix_signals::Signal,
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -51,7 +52,7 @@ use crate::{
 };
 
 #[cfg(feature = "std")]
-use crate::bolts::os::unix_signals::Handler;
+use crate::bolts::os::unix_signals::{Handler, Signal};
 #[cfg(feature = "std")]
 use crate::executors::inprocess::common_signal_handlers::setup_bt_panic_hook;
 
@@ -1118,6 +1119,7 @@ where
 }
 
 /// The signature of the crash handler function
+#[cfg(feature = "std")]
 pub type ForkHandlerFuncPtr =
     unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
 
