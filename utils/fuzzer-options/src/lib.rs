@@ -1,4 +1,36 @@
-///! todo top level docs
+//! A one-size-fits-most approach to defining runtime behavior of LibAFL fuzzers
+//!
+//! The most common pattern of use will be to:
+//!
+//! - import and call `parse_args`
+//! - destructure the sub-commands
+//! - pull out the options/arguments that are of interest to you/your fuzzer
+//! - ignore the rest with `..`
+//!
+//! There are two sub-commands: `fuzz` and `replay`. Each one takes a few global options as well
+//! as a few that are specific to themselves. An invocation of the standard example (available
+//! in the `examples/` directory) is shown below:
+//!
+//! ```
+//! cargo run --example standard fuzz -v -t 5000 -x tokens.dict
+//! ```
+//!
+//! # Examples
+//!
+//! ```
+//! use fuzzer_options::{parse_args, Commands};
+//!
+//! let parsed = parse_args();
+//!
+//! match &parsed.command {
+//!     // destructure sub-commands
+//!     Commands::Fuzz { token_files, .. } => {
+//!         // call appropriate logic, passing in w/e options/args you need
+//!         fuzz(&token_files)
+//!     }
+//!     Commands::Replay { input_file, .. } => replay(&input_file),
+//! }
+//! ```
 use clap::{AppSettings, Parser, Subcommand};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -11,26 +43,29 @@ fn parse_timeout(src: &str) -> Duration {
 }
 
 #[derive(Parser, Debug)]
-#[clap(setting(AppSettings::ArgRequiredElseHelp))]
+#[clap(
+    setting(AppSettings::ArgRequiredElseHelp),
+    setting(AppSettings::SubcommandPrecedenceOverArg)
+)]
 pub struct FuzzerOptions {
     #[clap(subcommand)]
     pub command: Commands,
 
     /// timeout for each target execution (milliseconds)
-    #[clap(short = 't', long = "timeout", takes_value = true, default_value = "2000", parse(from_str = parse_timeout))]
+    #[clap(short = 't', long = "timeout", takes_value = true, default_value = "2000", parse(from_str = parse_timeout), global = true)]
     pub timeout: Duration,
 
     /// whether or not to print debug info
-    #[clap(short = 'v', long = "verbose")]
+    #[clap(short = 'v', long = "verbose", global = true)]
     pub verbose: bool,
 
     /// file to which all client output should be written
-    #[clap(short = 's', long = "stdout")]
+    #[clap(short = 's', long = "stdout", global = true)]
     pub stdout: Option<String>,
 
     /// trailing arguments (after "--") will be passed directly to QEMU
     #[cfg(feature = "libafl_qemu")]
-    #[clap(last = true)]
+    #[clap(last = true, , global = true)]
     pub qemu_args: Vec<String>,
 }
 

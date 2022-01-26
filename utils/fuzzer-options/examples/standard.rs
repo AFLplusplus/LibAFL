@@ -5,7 +5,6 @@ fn fuzz(_: &[PathBuf]) {}
 fn replay(_: &PathBuf) {}
 
 fn main() {
-    // standard usage
     let parsed = parse_args();
 
     match &parsed.command {
@@ -16,4 +15,6 @@ fn main() {
         }
         Commands::Replay { input_file, .. } => replay(&input_file),
     }
+
+    println!("{:?}", parsed);
 }
