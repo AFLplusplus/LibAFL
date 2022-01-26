@@ -138,7 +138,7 @@ impl BacktraceObserver {
         }
     }
 
-    /// Init the [`BACKTRACE_HASH_VALUE`] to [`BacktraceHashValueWrapper::StaticVariable`](0)
+    /// Init the [`BACKTRACE_HASH_VALUE`] to [`BacktraceHashValueWrapper::StaticVariable`] with `(0.0)`
     pub fn setup_static_variable() {
         unsafe {
             BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::StaticVariable((0, 0));

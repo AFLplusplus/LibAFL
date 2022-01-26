@@ -111,7 +111,7 @@ where
     }
 }
 
-/// A trait for obervers with a hash field that can be used with [`NewHashFeedback`]
+/// A trait for obervers with a hash field
 pub trait ObserverWithHashField {
     /// get the value of the hash field
     fn hash(&self) -> &Option<u64>;
