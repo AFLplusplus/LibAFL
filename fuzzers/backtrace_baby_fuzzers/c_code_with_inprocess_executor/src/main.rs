@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use libafl::bolts::AsSlice;
 use libafl::executors::InProcessExecutor;
 use libafl::observers::ConstMapObserver;
 use libafl::{

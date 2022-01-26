@@ -2,8 +2,9 @@
 
 use crate::{
     bolts::{
-        shmem::{ShMem, ShMemProvider, StdShMem, StdShMemProvider},
+        shmem::{ShMemProvider, StdShMemProvider},
         tuples::Named,
+        AsMutSlice, AsSlice,
     },
     executors::ExitKind,
     inputs::Input,
@@ -27,6 +28,7 @@ use std::{
 
 use super::ObserverWithHashField;
 
+type StdShMem = <StdShMemProvider as ShMemProvider>::ShMem;
 /// A struct that stores needed information to persist the backtrace across prcesses/runs
 #[derive(Debug)]
 pub enum BacktraceHashValueWrapper {
@@ -43,7 +45,7 @@ impl BacktraceHashValueWrapper {
     fn store_stacktrace_hash(&mut self, bt_hash: u64, input_hash: u64) {
         match self {
             Self::Shmem(shmem) => {
-                let map = shmem.map_mut();
+                let map = shmem.as_mut_slice();
                 let bt_hash_bytes = bt_hash.to_be_bytes();
                 let input_hash_bytes = input_hash.to_be_bytes();
                 map.copy_from_slice(&[bt_hash_bytes, input_hash_bytes].concat());
@@ -59,7 +61,7 @@ impl BacktraceHashValueWrapper {
     fn get_stacktrace_hash(&self) -> (u64, u64) {
         match &self {
             Self::Shmem(shmem) => {
-                let map = shmem.map();
+                let map = shmem.as_slice();
                 (
                     u64::from_be_bytes(map[0..8].try_into().expect("Incorrectly sized")),
                     u64::from_be_bytes(map[8..16].try_into().expect("Incorrectly sized")),
@@ -127,8 +129,8 @@ impl BacktraceObserver {
     /// Setup the shared memory and store it in [`BACKTRACE_HASH_VALUE`]
     pub fn setup_shmem() {
         let shmem_provider = StdShMemProvider::new();
-        let mut shmem = shmem_provider.unwrap().new_map(16).unwrap();
-        shmem.map_mut().fill(0);
+        let mut shmem = shmem_provider.unwrap().new_shmem(16).unwrap();
+        shmem.as_mut_slice().fill(0);
         let boxed_shmem = Box::<StdShMem>::new(shmem);
         unsafe {
             BACKTRACE_HASH_VALUE = BacktraceHashValueWrapper::Shmem(boxed_shmem);
@@ -263,7 +265,7 @@ impl ASANBacktraceObserver {
     /// read ASAN output from the child stderr and parse it.
     pub fn parse_asan_output_from_childstderr(&mut self, stderr: &mut ChildStderr) {
         let mut buf = String::new();
-        let read = stderr
+        stderr
             .read_to_string(&mut buf)
             .expect("Failed to read the child process stderr");
         self.parse_asan_output(&buf)

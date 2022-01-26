@@ -7,8 +7,9 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{unix_shmem, ShMem, ShMemProvider},
+        shmem::{unix_shmem, ShMemProvider},
         tuples::tuple_list,
+        AsMutSlice, AsSlice,
     },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
@@ -30,11 +31,11 @@ use libafl::{
 #[allow(clippy::similar_names)]
 pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
-    let mut signals = shmem_provider.new_map(16).unwrap();
+    let mut signals = shmem_provider.new_shmem(16).unwrap();
     let mut signals_clone = signals.clone();
 
     let mut signals_set = |idx: usize| {
-        let a = signals.map_mut();
+        let a = signals.as_mut_slice();
         a[idx] = 1;
     };
 
@@ -48,7 +49,6 @@ pub fn main() {
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
                 if buf.len() > 2 && buf[2] == b'c' {
-                    // removed the windows panic for simplicity, will add later
                     #[cfg(unix)]
                     panic!("panic 1");
                 }
@@ -66,7 +66,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", signals_clone.map_mut());
+    let observer = StdMapObserver::new("signals", signals_clone.as_mut_slice());
     // Create a stacktrace observer
     let bt_observer =
         BacktraceObserver::new("BacktraceObserver", libafl::observers::HarnessType::RUST);

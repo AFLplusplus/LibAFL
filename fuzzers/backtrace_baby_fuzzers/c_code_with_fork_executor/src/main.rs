@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use libafl::bolts::shmem::ShMemProvider;
+use libafl::bolts::AsSlice;
 use libafl::observers::ConstMapObserver;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, shmem::UnixShMemProvider, tuples::tuple_list},

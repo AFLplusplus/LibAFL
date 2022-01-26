@@ -9,6 +9,7 @@ use libafl::{
         rands::StdRand,
         shmem::{unix_shmem, ShMem, ShMemId, ShMemProvider},
         tuples::tuple_list,
+        AsMutSlice, AsSlice,
     },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
@@ -34,11 +35,11 @@ use std::{
 #[allow(clippy::similar_names)]
 pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
-    let mut signals = shmem_provider.new_map(3).unwrap();
+    let mut signals = shmem_provider.new_shmem(3).unwrap();
     let shmem_id = signals.id();
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", signals.map_mut());
+    let observer = StdMapObserver::new("signals", signals.as_mut_slice());
     // Create a stacktrace observer
     let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
 
