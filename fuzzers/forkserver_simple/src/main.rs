@@ -137,7 +137,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // If we should debug the child
-    let debug_child = res.value_of("debug_child").is_some();
+    let debug_child = res.is_present("debug_child");
 
     // Create the executor for the forkserver
     let args = match res.values_of("arguments") {
