@@ -11,13 +11,13 @@
 //! as a few that are specific to themselves. An invocation of the standard example (available
 //! in the `examples/` directory) is shown below:
 //!
-//! ```
+//! ```ignore
 //! cargo run --example standard fuzz -v -t 5000 -x tokens.dict
 //! ```
 //!
 //! # Examples
 //!
-//! ```
+//! ```ignore
 //! use fuzzer_options::{parse_args, Commands};
 //!
 //! let parsed = parse_args();
@@ -31,7 +31,13 @@
 //!     Commands::Replay { input_file, .. } => replay(&input_file),
 //! }
 //! ```
+
+#[cfg(all(feature = "libafl_frida", feature = "libafl_qemu"))]
+compile_error!("cannot use libafl_frida and libafl_qemu at the same time");
+
 use clap::{AppSettings, Parser, Subcommand};
+#[cfg(feature = "libafl_frida")]
+use std::error;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -44,10 +50,34 @@ fn parse_timeout(src: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(src.parse()?))
 }
 
+/// helper function to go from MODULE@0x12345 to (String, usize); aka an instrumentation location
+#[cfg(feature = "libafl_frida")]
+fn parse_instrumentation_location(
+    location: &str,
+) -> Result<(String, usize), Box<dyn error::Error + Send + Sync + 'static>> {
+    let pos = location
+        .find('@')
+        .ok_or("Expected an '@' in location specifier")?;
+
+    let (module, offset) = location.split_at(pos);
+
+    Ok((
+        module.to_string(),
+        usize::from_str_radix(
+            offset
+                .get(1..)
+                .ok_or("index out of range")?
+                .trim_start_matches("0x"),
+            16,
+        )?,
+    ))
+}
+
 #[derive(Parser, Debug)]
 #[clap(
     setting(AppSettings::ArgRequiredElseHelp),
-    setting(AppSettings::SubcommandPrecedenceOverArg)
+    setting(AppSettings::SubcommandPrecedenceOverArg),
+    setting(AppSettings::ArgsNegateSubcommands)
 )]
 pub struct FuzzerOptions {
     #[clap(subcommand)]
@@ -64,6 +94,75 @@ pub struct FuzzerOptions {
     /// file to which all client output should be written
     #[clap(short, long, global = true)]
     pub stdout: Option<String>,
+
+    /// enable Address Sanitizer (ASAN)
+    #[clap(short = 'A', long)]
+    pub asan: bool,
+
+    /// enable CmpLog instrumentation
+    #[cfg_attr(
+        feature = "libafl_frida",
+        clap(short = 'C', long, global = true, help_heading = "Frida Options")
+    )]
+    #[cfg_attr(not(feature = "libafl_frida"), clap(short = 'C', long))]
+    pub cmplog: bool,
+
+    /// enable ASAN leak detection
+    #[cfg(feature = "libafl_frida")]
+    #[clap(short, long, global = true, help_heading = "ASAN Options")]
+    pub detect_leaks: bool,
+
+    /// instruct ASAN to continue after a memory error is detected
+    #[cfg(feature = "libafl_frida")]
+    #[clap(long, global = true, help_heading = "ASAN Options")]
+    pub continue_on_error: bool,
+
+    /// instruct ASAN to gather (and report) allocation-/free-site backtraces
+    #[cfg(feature = "libafl_frida")]
+    #[clap(long, global = true, help_heading = "ASAN Options")]
+    pub allocation_backtraces: bool,
+
+    /// the maximum size that the ASAN allocator should allocate
+    #[cfg(feature = "libafl_frida")]
+    #[clap(
+        short,
+        long,
+        default_value = "1073741824",  // 1_usize << 30
+        global = true,
+        help_heading = "ASAN Options"
+    )]
+    pub max_allocation: usize,
+
+    /// the maximum total allocation size that the ASAN allocator should allocate
+    #[cfg(feature = "libafl_frida")]
+    #[clap(
+        short = 'M',
+        long,
+        default_value = "4294967296",  // 1_usize << 32
+        global = true,
+        help_heading = "ASAN Options"
+    )]
+    pub max_total_allocation: usize,
+
+    /// instruct ASAN to panic if the max ASAN allocation size is exceeded
+    #[cfg(feature = "libafl_frida")]
+    #[clap(long, global = true, help_heading = "ASAN Options")]
+    pub max_allocation_panics: bool,
+
+    /// disable coverage
+    #[cfg(feature = "libafl_frida")]
+    #[clap(long, global = true, help_heading = "Frida Options")]
+    pub disable_coverage: bool,
+
+    /// enable DrCov (aarch64 only)
+    #[cfg(feature = "libafl_frida")]
+    #[clap(long, global = true, help_heading = "Frida Options")]
+    pub drcov: bool,
+
+    /// locations which will not be instrumented for ASAN or coverage purposes (ex: mod_name@0x12345)
+    #[cfg(feature = "libafl_frida")]
+    #[clap(short = 'D', long, global = true, help_heading = "Frida Options", parse(try_from_str = parse_instrumentation_location), multiple_occurrences = true)]
+    pub dont_instrument: Option<Vec<(String, usize)>>,
 
     /// trailing arguments (after "--") will be passed directly to QEMU
     #[cfg(feature = "libafl_qemu")]
@@ -111,9 +210,17 @@ pub enum Commands {
     #[clap(setting(AppSettings::ArgRequiredElseHelp))]
     /// Replay mode: runs a single input file through the fuzz harness
     Replay {
-        /// input corpus directories
+        /// path to file that should be sent to the harness for crash reproduction
         #[clap(short, long, parse(from_os_str))]
         input_file: PathBuf,
+
+        /// path to harness
+        #[clap(short, long, parse(from_os_str))]
+        harness: Option<PathBuf>,
+
+        /// path to harness
+        #[clap(short = 'a', long, multiple_occurrences = true)]
+        harness_args: Option<Vec<String>>,
     },
 }
 
@@ -123,19 +230,31 @@ pub fn parse_args() -> FuzzerOptions {
     FuzzerOptions::parse()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "libafl_qemu"))]
 mod tests {
     use super::*;
 
     #[test]
-    #[cfg(feature = "libafl_qemu")]
     /// pass a standard option and `--` followed by some options that FuzzerOptions doesn't know
     /// about; expect the standard option to work normally, and everything after `--` to be
     /// collected into `qemu_args`
     fn standard_option_with_trailing_variable_length_args_collected() {
-        let parsed =
-            FuzzerOptions::parse_from(["some-command", "--port", "1336", "--", "-L", "qemu-bound"]);
-        assert_eq!(parsed.port, 1336);
-        assert_eq!(parsed.qemu_args, ["-L", "qemu-bound"])
+        let parsed = FuzzerOptions::parse_from([
+            "some-command",
+            "fuzz",
+            "--broker-port",
+            "1336",
+            "-i",
+            "corpus-1",
+            "-i",
+            "corpus-2",
+            "--",
+            "-L",
+            "qemu-bound",
+        ]);
+        if let Commands::Fuzz { broker_port, .. } = &parsed.command {
+            assert_eq!(*broker_port, 1336);
+            assert_eq!(parsed.qemu_args, ["-L", "qemu-bound"])
+        }
     }
 }

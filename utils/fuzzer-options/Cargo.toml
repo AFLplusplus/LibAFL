@@ -11,3 +11,4 @@ authors = ["Ben 'epi' Risher <epibar052@gmail.com>"]
 clap = { version = "3.0", features = ["derive", "wrap_help"] }
 libafl = { path = "../../libafl/" }
 libafl_qemu = { path = "../../libafl_qemu/", optional = true }
+libafl_frida = { path = "../../libafl_frida/", optional = true }
