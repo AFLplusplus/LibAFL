@@ -30,7 +30,8 @@ pub struct TokenSection {
 }
 
 impl TokenSection {
-    /// Ini
+    /// Init
+    #[must_use]
     pub fn new(section: (*const u8, *const u8)) -> Self {
         Self {
             start: section.0,
@@ -56,6 +57,7 @@ impl Tokens {
         Self { token_vec }
     }
 
+    #[must_use]
     /// Build tokens from vec
     pub fn parse_vec(mut self, vec: Vec<Vec<u8>>) -> Self {
         self.token_vec = vec;
