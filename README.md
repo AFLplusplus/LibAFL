@@ -1,6 +1,6 @@
 # LibAFL, the fuzzer library.
 
- <img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/master/static/aflpp_bg.svg" alt="AFL++ Logo">
+<img align="right" src="https://raw.githubusercontent.com/AFLplusplus/Website/master/static/aflpp_bg.svg" alt="AFL++ logo" width="250" heigh="250">
 
 Advanced Fuzzing Library - Slot your own fuzzers together and extend their features using Rust.
 
