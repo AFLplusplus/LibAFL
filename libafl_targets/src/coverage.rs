@@ -24,17 +24,11 @@ extern "C" {
 }
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
-// Better & rusty(?) name
-#[cfg(target_os = "linux")]
-pub use __token_start as TOKEN_START;
-#[cfg(target_os = "linux")]
-pub use __token_stop as TOKEN_STOP;
-
 /// Return token section's start and end as a tuple
 #[cfg(target_os = "linux")]
 #[must_use]
-pub unsafe fn token_section() -> (*const u8, *const u8) {
-    (__token_start, __token_stop)
+pub fn token_section() -> (*const u8, *const u8) {
+    unsafe { (__token_start, __token_stop) }
 }
 
 /// The size of the map for edges.

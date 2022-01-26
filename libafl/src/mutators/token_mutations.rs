@@ -126,9 +126,11 @@ impl Tokens {
     }
 
     /// Creates a new token from autotokens
-    pub unsafe fn from_autotokens(autotoken: TokenSection) -> Result<Self, Error> {
+    pub fn from_autotokens(autotoken: TokenSection) -> Result<Self, Error> {
         let mut ret = Self::new(vec![]);
-        ret.add_from_autotokens(autotoken)?;
+        unsafe {
+            ret.add_from_autotokens(autotoken)?;
+        }
         Ok(ret)
     }
 

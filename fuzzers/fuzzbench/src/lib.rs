@@ -362,7 +362,7 @@ fn fuzz(
         }
         #[cfg(target_os = "linux")]
         {
-            let token_section = unsafe { TokenSection::new(token_section()) };
+            let token_section = TokenSection::new(token_section());
             toks = toks.parse_autotokens(token_section)?;
         }
 
