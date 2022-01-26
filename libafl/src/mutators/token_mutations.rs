@@ -49,7 +49,7 @@ impl Tokens {
 
         let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
         // println!("size: {}", section_size);
-        let slice = std::slice::from_raw_parts(token_start, section_size);
+        let slice = core::slice::from_raw_parts(token_start, section_size);
 
         let mut head = 0;
 
