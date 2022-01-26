@@ -23,7 +23,7 @@ use crate::{
 };
 
 /// A state metadata holding a list of tokens
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct Tokens {
     token_vec: Vec<Vec<u8>>,

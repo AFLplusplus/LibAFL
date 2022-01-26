@@ -355,9 +355,17 @@ fn fuzz(
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
-    if let Some(tokenfile) = tokenfile {
-        if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::from_tokens_file(tokenfile)?);
+    if state.metadata().get::<Tokens>().is_none() {
+        let mut toks = Tokens::default();
+        if let Some(tokenfile) = tokenfile {
+            toks.add_tokens_from_file(tokenfile)?;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            toks.add_from_autotokens(TOKEN_START, TOKEN_STOP)?;
+        }
+        if !toks.tokens().is_empty() {
+            state.add_metadata(toks);
         }
     }
 
