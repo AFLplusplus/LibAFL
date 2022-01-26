@@ -38,7 +38,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens, TokenSection,
+        StdMOptMutator, StdScheduledMutator, TokenSection, Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
@@ -365,7 +365,7 @@ fn fuzz(
             let token_section = unsafe { TokenSection::new(token_section()) };
             toks = toks.parse_autotokens(token_section)?;
         }
-        
+
         if !toks.tokens().is_empty() {
             state.add_metadata(toks);
         }
