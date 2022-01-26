@@ -8,13 +8,16 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedback_and,
+    feedbacks::{
+        CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
+    },
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{ConstMapObserver, HitcountsMapObserver},
+    observers::{ASANBacktraceObserver, ConstMapObserver, HitcountsMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -36,8 +39,11 @@ pub fn main() {
         shmem_map,
     ));
 
+    let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
+
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+    let bt_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -45,7 +51,10 @@ pub fn main() {
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does
-    let objective = CrashFeedback::new();
+    let objective = feedback_and!(
+        CrashFeedback::new(),
+        NewHashFeedback::new_with_observer("NewHashFeedback", &bt_observer)
+    );
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -58,7 +67,7 @@ pub fn main() {
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
         // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
+        tuple_list!(feedback_state, bt_state),
     );
 
     // The Monitor trait define how the fuzzer stats are reported to the user
@@ -79,7 +88,7 @@ pub fn main() {
         "./target/release/program".to_string(),
         &[],
         true,
-        tuple_list!(edges_observer),
+        tuple_list!(edges_observer, bt_observer),
     )
     .expect("Failed to create the executor.");
 
