@@ -87,7 +87,6 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
 {
-    #[inline]
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
@@ -98,22 +97,19 @@ where
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
 
-        match self
+        if let Some(obs) = self
             .observers
             .match_name::<BacktraceObserver>("BacktraceObserver")
-            .unwrap()
-            .harness_type()
         {
-            HarnessType::FFI => (),
-            HarnessType::RUST => unsafe {
+            if obs.harness_type() == &HarnessType::RUST {
                 setup_bt_panic_hook::<
                     InProcessExecutor<H, I, OT, S>,
                     I,
                     OT,
                     S,
                     InProcessExecutorHandlerData,
-                >(&GLOBAL_STATE);
-            },
+                >(unsafe { &GLOBAL_STATE });
+            }
         }
 
         let ret = (self.harness_fn)(input);

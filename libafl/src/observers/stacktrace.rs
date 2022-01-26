@@ -99,7 +99,7 @@ pub fn collect_backtrace() -> u64 {
 }
 
 /// An enum encoding the types of harnesses
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum HarnessType {
     /// Harness type when the harness is rust code
     RUST,
