@@ -249,6 +249,7 @@ where
                 let mut first = true;
                 for instruction in basic_block {
                     let instr = instruction.instr();
+                    let instr_size = instr.bytes().len();
                     let address = instr.address();
                     //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
 
@@ -272,8 +273,10 @@ where
                                     let real_address = rt.real_address_for_stalked(pc(&context));
                                     //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
                                     //println!("{}:0x{:016x}", name, real_address - range.start);
-                                    rt.drcov_basic_blocks
-                                        .push(DrCovBasicBlock::new(real_address, real_address + 4));
+                                    rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
+                                        real_address,
+                                        real_address + instr_size,
+                                    ));
                                 });
                             }
                         }
@@ -330,7 +333,7 @@ where
                         #[cfg(unix)]
                         if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
                             rt.add_stalked_address(
-                                output.writer().pc() as usize - 4,
+                                output.writer().pc() as usize - instr_size,
                                 address as usize,
                             );
                         }
@@ -338,7 +341,7 @@ where
                         #[cfg(unix)]
                         if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
                             rt.add_stalked_address(
-                                output.writer().pc() as usize - 4,
+                                output.writer().pc() as usize - instr_size,
                                 address as usize,
                             );
                         }
@@ -404,8 +407,7 @@ where
     pub fn map_ptr_mut(&mut self) -> Option<*mut u8> {
         if let Some(rt) = self.runtime_mut::<CoverageRuntime>() {
             Some(rt.map_ptr_mut())
-        }
-        else{
+        } else {
             None
         }
     }

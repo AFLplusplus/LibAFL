@@ -70,7 +70,8 @@ impl DrCovRuntime {
         self.stalked_addresses.insert(stalked, real);
     }
 
-    /// Translate stalked address into the real address
+    /// Resolves the real address from a stalker stalked address if possible, if there is no
+    /// real address, the stalked address is returned.
     #[must_use]
     pub fn real_address_for_stalked(&self, stalked: usize) -> usize {
         self.stalked_addresses

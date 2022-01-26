@@ -45,9 +45,8 @@ use libafl::{
 };
 
 use libafl_frida::{
-    coverage_rt::CoverageRuntime, coverage_rt::MAP_SIZE, executor::FridaInProcessExecutor,
-    asan::asan_rt::AsanRuntime,
-    helper::FridaInstrumentationHelper, FridaOptions,
+    asan::asan_rt::AsanRuntime, coverage_rt::CoverageRuntime, coverage_rt::MAP_SIZE,
+    executor::FridaInProcessExecutor, helper::FridaInstrumentationHelper, FridaOptions,
 };
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
