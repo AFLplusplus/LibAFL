@@ -1,6 +1,8 @@
-use libafl::inputs::{HasTargetBytes, Input};
-use libafl::Error;
-
+use libafl::{
+    bolts::AsSlice,
+    inputs::{HasTargetBytes, Input},
+    Error,
+};
 #[cfg(unix)]
 use libafl_targets::drcov::DrCovBasicBlock;
 

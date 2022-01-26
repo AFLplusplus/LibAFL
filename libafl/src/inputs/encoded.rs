@@ -1,5 +1,6 @@
 //! The `EncodedInput` is the "normal" input, a map of codes, that can be sent directly to the client
 //! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
+//! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
 use ahash::AHasher;
 use core::hash::Hasher;

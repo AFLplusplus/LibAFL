@@ -4,8 +4,9 @@ use core::{
     convert::Into,
     ffi::c_void,
     mem::{size_of, transmute, MaybeUninit},
-    ptr::{copy_nonoverlapping, null},
+    ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
 };
+use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
@@ -190,6 +191,9 @@ extern "C" {
     fn target_mmap(start: u64, len: u64, target_prot: i32, flags: i32, fd: i32, offset: u64)
         -> u64;
 
+    /// int target_mprotect(abi_ulong start, abi_ulong len, int prot);
+    fn target_mprotect(start: u64, len: u64, target_prot: i32) -> i32;
+
     /// int target_munmap(abi_ulong start, abi_ulong len)
     fn target_munmap(start: u64, len: u64) -> i32;
 
@@ -262,7 +266,7 @@ impl Iterator for GuestMaps {
         }
         unsafe {
             let mut ret: MapInfo = MaybeUninit::uninit().assume_init();
-            self.c_iter = libafl_maps_next(self.c_iter, &mut ret as *mut _);
+            self.c_iter = libafl_maps_next(self.c_iter, addr_of_mut!(ret));
             if self.c_iter.is_null() {
                 None
             } else {
@@ -333,11 +337,18 @@ impl Emulator {
         Emulator { _private: () }
     }
 
+    /// This function gets the memory mappings from the emulator.
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
         GuestMaps::new()
     }
 
+    /// Write a value to a guest address.
+    ///
+    /// # Safety
+    /// This will write to a translated guest address (using `g2h`).
+    /// It just adds `guest_base` and writes to that location, without checking the bounds.
+    /// This may only be safely used for valid guest addresses!
     pub unsafe fn write_mem<T>(&self, addr: u64, buf: &[T]) {
         let host_addr = self.g2h(addr);
         copy_nonoverlapping(
@@ -347,6 +358,12 @@ impl Emulator {
         );
     }
 
+    /// Read a value from a guest address.
+    ///
+    /// # Safety
+    /// This will read from a translated guest address (using `g2h`).
+    /// It just adds `guest_base` and writes to that location, without checking the bounds.
+    /// This may only be safely used for valid guest addresses!
     pub unsafe fn read_mem<T>(&self, addr: u64, buf: &mut [T]) {
         let host_addr = self.g2h(addr);
         copy_nonoverlapping(
@@ -367,7 +384,7 @@ impl Emulator {
         R: Into<i32>,
     {
         let reg = reg.into();
-        let success = unsafe { libafl_qemu_write_reg(reg, &val as *const _ as *const u8) };
+        let success = unsafe { libafl_qemu_write_reg(reg, addr_of!(val) as *const u8) };
         if success == 0 {
             Err(format!("Failed to write to register {}", reg))
         } else {
@@ -382,7 +399,7 @@ impl Emulator {
     {
         let reg = reg.into();
         let mut val = T::zero();
-        let success = unsafe { libafl_qemu_read_reg(reg, &mut val as *mut _ as *mut u8) };
+        let success = unsafe { libafl_qemu_read_reg(reg, addr_of_mut!(val) as *mut u8) };
         if success == 0 {
             Err(format!("Failed to read register {}", reg))
         } else {
@@ -414,6 +431,11 @@ impl Emulator {
         }
     }
 
+    /// This function will run the emulator until the next breakpoint, or until finish.
+    /// # Safety
+    ///
+    /// Should, in general, be safe to call.
+    /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(&self) {
         libafl_qemu_run();
     }
@@ -447,21 +469,41 @@ impl Emulator {
         unsafe { libafl_set_brk(brk) };
     }
 
-    pub fn map_private(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
-        let res = unsafe {
-            target_mmap(
-                addr,
-                size as u64,
-                perms.into(),
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-                -1,
-                0,
-            )
-        };
+    fn mmap(&self, addr: u64, size: usize, perms: MmapPerms, flags: c_int) -> Result<u64, ()> {
+        let res = unsafe { target_mmap(addr, size as u64, perms.into(), flags, -1, 0) };
         if res == 0 {
-            Err(format!("Failed to map {}", addr))
+            Err(())
         } else {
             Ok(res)
+        }
+    }
+
+    pub fn map_private(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
+        self.mmap(
+            addr,
+            size,
+            perms.into(),
+            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+        )
+        .map_err(|_| format!("Failed to map {}", addr))
+    }
+
+    pub fn map_fixed(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
+        self.mmap(
+            addr,
+            size,
+            perms.into(),
+            libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+        )
+        .map_err(|_| format!("Failed to map {}", addr))
+    }
+
+    pub fn mprotect(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<(), String> {
+        let res = unsafe { target_mprotect(addr, size as u64, perms.into()) };
+        if res == 0 {
+            Ok(())
+        } else {
+            Err(format!("Failed to mprotect {}", addr))
         }
     }
 
@@ -750,6 +792,26 @@ pub mod pybind {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.emu
                     .map_private(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
+
+        fn map_fixed(&self, addr: u64, size: usize, perms: i32) -> PyResult<u64> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.emu
+                    .map_fixed(addr, size, p)
+                    .map_err(PyValueError::new_err)
+            } else {
+                Err(PyValueError::new_err("Invalid perms"))
+            }
+        }
+
+        fn mprotect(&self, addr: u64, size: usize, perms: i32) -> PyResult<()> {
+            if let Ok(p) = MmapPerms::try_from(perms) {
+                self.emu
+                    .mprotect(addr, size, p)
                     .map_err(PyValueError::new_err)
             } else {
                 Err(PyValueError::new_err("Invalid perms"))

@@ -95,7 +95,6 @@ use crate::monitors::PerfFeature;
 #[cfg(feature = "concolic_mutation")]
 #[allow(clippy::too_many_lines)]
 fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<Vec<(usize, u8)>> {
-    use core::mem::size_of;
     use hashbrown::HashMap;
     use z3::{
         ast::{Ast, Bool, Dynamic, BV},
@@ -168,9 +167,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
                 Some(BV::from_u64(&ctx, value, u32::from(bits)).into())
             }
             SymExpr::Integer128 { high: _, low: _ } => todo!(),
-            SymExpr::NullPointer => {
-                Some(BV::from_u64(&ctx, 0, (8 * size_of::<usize>()) as u32).into())
-            }
+            SymExpr::NullPointer => Some(BV::from_u64(&ctx, 0, usize::BITS).into()),
             SymExpr::True => Some(Bool::from_bool(&ctx, true).into()),
             SymExpr::False => Some(Bool::from_bool(&ctx, false).into()),
             SymExpr::Bool { value } => Some(Bool::from_bool(&ctx, value).into()),

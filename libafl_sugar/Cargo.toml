@@ -1,6 +1,6 @@
 [package]
 name = "libafl_sugar"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Sugar builders to create common fuzzers with LibAFL"
 documentation = "https://docs.rs/libafl_sugar"
@@ -26,9 +26,10 @@ aarch64 = ["libafl_qemu/aarch64"] # build qemu for aarch64
 pyo3-build-config = { version = "0.15", optional = true }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.7.0" }
-libafl_targets = { path = "../libafl_targets", version = "0.7.0" }
-libafl_qemu = { path = "../libafl_qemu", version = "0.7.0" }
+libafl = { path = "../libafl", version = "0.7.1" }
+libafl_targets = { path = "../libafl_targets", version = "0.7.1" }
+libafl_qemu = { path = "../libafl_qemu", version = "0.7.1" }
+
 typed-builder = "0.9.1" # Implement the builder pattern at compiletime
 #pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
 pyo3 = { version = "0.15", optional = true }

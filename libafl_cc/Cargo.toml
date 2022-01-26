@@ -1,6 +1,6 @@
 [package]
 name = "libafl_cc"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Commodity library to wrap compilers and link LibAFL"
 documentation = "https://docs.rs/libafl_cc"

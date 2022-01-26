@@ -1,5 +1,6 @@
 //! Bolts are no conceptual fuzzing elements, but they keep libafl-based fuzzers together.
 
+pub mod anymap;
 #[cfg(feature = "llmp_compression")]
 pub mod compress;
 pub mod cpu;
@@ -28,6 +29,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub trait AsSlice<T> {
     /// Convert to a slice
     fn as_slice(&self) -> &[T];
+}
+
+/// Can be converted to a mutable slice
+pub trait AsMutSlice<T> {
+    /// Convert to a slice
+    fn as_mut_slice(&mut self) -> &mut [T];
 }
 
 /// Has a length field
