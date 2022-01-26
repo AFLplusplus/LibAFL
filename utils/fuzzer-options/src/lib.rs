@@ -24,22 +24,24 @@
 //!
 //! match &parsed.command {
 //!     // destructure sub-commands
-//!     Commands::Fuzz { token_files, .. } => {
+//!     Commands::Fuzz { tokens, .. } => {
 //!         // call appropriate logic, passing in w/e options/args you need
-//!         fuzz(&token_files)
+//!         fuzz(&tokens)
 //!     }
 //!     Commands::Replay { input_file, .. } => replay(&input_file),
 //! }
 //! ```
 use clap::{AppSettings, Parser, Subcommand};
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
 use libafl::bolts::os::Cores;
+use libafl::Error;
 
 /// helper function to go from a parsed cli string to a `Duration`
-fn parse_timeout(src: &str) -> Duration {
-    Duration::from_millis(src.parse::<u64>().unwrap())
+fn parse_timeout(src: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(src.parse()?))
 }
 
 #[derive(Parser, Debug)]
@@ -52,20 +54,20 @@ pub struct FuzzerOptions {
     pub command: Commands,
 
     /// timeout for each target execution (milliseconds)
-    #[clap(short = 't', long = "timeout", takes_value = true, default_value = "2000", parse(from_str = parse_timeout), global = true)]
+    #[clap(short, long, takes_value = true, default_value = "1000", parse(try_from_str = parse_timeout), global = true)]
     pub timeout: Duration,
 
     /// whether or not to print debug info
-    #[clap(short = 'v', long = "verbose", global = true)]
+    #[clap(short, long, global = true)]
     pub verbose: bool,
 
     /// file to which all client output should be written
-    #[clap(short = 's', long = "stdout", global = true)]
+    #[clap(short, long, global = true)]
     pub stdout: Option<String>,
 
     /// trailing arguments (after "--") will be passed directly to QEMU
     #[cfg(feature = "libafl_qemu")]
-    #[clap(last = true, , global = true)]
+    #[clap(last = true, global = true)]
     pub qemu_args: Vec<String>,
 }
 
@@ -73,47 +75,44 @@ pub struct FuzzerOptions {
 pub enum Commands {
     /// Fuzz mode: mutates the starting corpus indefinitely, looking for crashes
     Fuzz {
-        #[clap(
-            short = 'x',
-            long = "tokens",
-            multiple_values = true,
-            parse(from_os_str)
-        )]
-        token_files: Vec<PathBuf>,
+        /// paths to fuzzer token files (aka 'dictionaries')
+        #[clap(short = 'x', long, multiple_values = true, parse(from_os_str))]
+        tokens: Vec<PathBuf>,
 
         /// input corpus directories
         #[clap(
-            short = 'i',
-            long = "corpus",
-            default_values = &["corpus"],
+            short,
+            long,
+            default_values = &["corpus/"],
             multiple_values = true,
             parse(from_os_str)
         )]
-        corpora: Vec<PathBuf>,
+        input: Vec<PathBuf>,
 
         /// output solutions directory
-        #[clap(
-            short = 'o',
-            long = "crashes",
-            default_value = "solutions",
-            parse(from_os_str)
-        )]
-        crashes: PathBuf,
+        #[clap(short, long, default_value = "solutions/", parse(from_os_str))]
+        output: PathBuf,
 
-        /// which cores to bind, i.e. --cores 1,2-4,5
-        #[clap(short = 'c', long = "cores", default_value = "0", parse(try_from_str = Cores::from_cmdline))]
+        /// Spawn a client in each of the provided cores. Use 'all' to select all available
+        /// cores. 'none' to run a client without binding to any core.
+        /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
+        #[clap(short, long, default_value = "0", parse(try_from_str = Cores::from_cmdline))]
         cores: Cores,
 
         /// port on which the broker should listen
-        #[clap(short = 'p', long = "port", default_value = "1337")]
-        port: u16,
+        #[clap(short = 'p', long, default_value = "1337", name = "PORT")]
+        broker_port: u16,
+
+        /// ip:port where a remote broker is already listening
+        #[clap(short = 'a', long, parse(try_from_str), name = "REMOTE")]
+        remote_broker_addr: Option<SocketAddr>,
     },
 
     #[clap(setting(AppSettings::ArgRequiredElseHelp))]
     /// Replay mode: runs a single input file through the fuzz harness
     Replay {
         /// input corpus directories
-        #[clap(short = 'i', long = "input-file", parse(from_os_str))]
+        #[clap(short, long, parse(from_os_str))]
         input_file: PathBuf,
     },
 }
