@@ -15,6 +15,8 @@ use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+
+#[cfg(feature = "std")]
 use std::intrinsics::transmute;
 
 use libc::{siginfo_t, ucontext_t};
@@ -31,24 +33,27 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
 #[cfg(feature = "std")]
-use crate::observers::BacktraceObserver;
+use crate::observers::{BacktraceObserver, HarnessType};
 
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 use crate::{
-    bolts::os::unix_signals::{Handler, Signal},
+    bolts::os::unix_signals::Signal,
     events::{EventFirer, EventRestarter},
-    executors::{
-        inprocess::common_signal_handlers::setup_bt_panic_hook, Executor, ExitKind, HasObservers,
-    },
+    executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
-    observers::{HarnessType, ObserversTuple},
+    observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
+
+#[cfg(feature = "std")]
+use crate::bolts::os::unix_signals::Handler;
+#[cfg(feature = "std")]
+use crate::executors::inprocess::common_signal_handlers::setup_bt_panic_hook;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
@@ -97,6 +102,7 @@ where
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
 
+        #[cfg(feature = "std")]
         if let Some(obs) = self
             .observers
             .match_name::<BacktraceObserver>("BacktraceObserver")
@@ -161,7 +167,9 @@ where
         S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
+        #[cfg(feature = "std")]
         BacktraceObserver::setup_static_variable();
+
         let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z, H>()?;
         #[cfg(windows)]
         unsafe {
@@ -465,6 +473,7 @@ pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
 }
 
 /// signal handlers and `panic_hooks` for used BT collection
+#[cfg(feature = "std")]
 pub mod common_signal_handlers {
 
     use std::panic;
@@ -489,9 +498,7 @@ pub mod common_signal_handlers {
         I: Input,
         D: HasHandlerData,
     {
-        println!("Setting uo the bt panic hook");
         panic::set_hook(Box::new(|_panic_info| {
-            println!("panic_hook invoked");
             let executor = data.executor_mut::<E>();
             let observers = executor.observers_mut();
             let state = data.state_mut::<S>();
@@ -1121,6 +1128,7 @@ pub struct InChildProcessHandlers {
     pub crash_handler: *const c_void,
 }
 
+#[cfg(feature = "std")]
 impl InChildProcessHandlers {
     /// Call before running a target.
     pub fn pre_run_target<E, EM, I, S, Z>(
@@ -1159,7 +1167,6 @@ impl InChildProcessHandlers {
         S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
-        println!("creating new InChildProcessHandlers");
         #[cfg(any(unix, windows))]
         // unsafe
         {
@@ -1238,9 +1245,10 @@ pub static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
         current_input_ptr: ptr::null(),
     };
 
+#[cfg(feature = "std")]
 impl Handler for InProcessForkExecutorGlobalData {
+    #[cfg(unix)]
     fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
-        println!("called with pid={}", std::process::id());
         match signal {
             Signal::SigUser2 | Signal::SigAlarm => (),
             _ => unsafe {

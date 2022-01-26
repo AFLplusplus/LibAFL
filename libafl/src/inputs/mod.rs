@@ -23,29 +23,42 @@ use alloc::{
 };
 use core::{clone::Clone, fmt::Debug};
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 #[cfg(feature = "std")]
-use std::{fs::File, io::Read, path::Path};
+use std::{fs::File, hash::Hash, io::Read, path::Path};
 
 #[cfg(feature = "std")]
 use crate::bolts::fs::write_file_atomic;
 use crate::{bolts::ownedref::OwnedSlice, Error};
 
 /// An input for the target
+#[cfg(not(feature = "std"))]
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+    /// Write this input to the file
+    fn to_file<P>(&self, _path: P) -> Result<(), Error> {
+        Err(Error::NotImplemented("Not supported in no_std".into()))
+    }
+
+    /// Write this input to the file
+    fn from_file<P>(_path: P) -> Result<Self, Error> {
+        Err(Error::NotImplemented("Not supprted in no_std".into()))
+    }
+
+    /// Generate a name for this input
+    fn generate_name(&self, idx: usize) -> String;
+
+    /// An hook executed if the input is stored as `Testcase`
+    fn wrapped_as_testcase(&mut self) {}
+}
+
+/// An input for the target
+#[cfg(feature = "std")]
 pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
-    #[cfg(feature = "std")]
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
     where
         P: AsRef<Path>,
     {
         write_file_atomic(path, &postcard::to_allocvec(self)?)
-    }
-
-    #[cfg(not(feature = "std"))]
-    /// Write this input to the file
-    fn to_file<P>(&self, _path: P) -> Result<(), Error> {
-        Err(Error::NotImplemented("Not supported in no_std".into()))
     }
 
     /// Load the contents of this input from a file
@@ -58,12 +71,6 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
         let mut bytes: Vec<u8> = vec![];
         file.read_to_end(&mut bytes)?;
         Ok(postcard::from_bytes(&bytes)?)
-    }
-
-    /// Write this input to the file
-    #[cfg(not(feature = "std"))]
-    fn from_file<P>(_path: P) -> Result<Self, Error> {
-        Err(Error::NotImplemented("Not supprted in no_std".into()))
     }
 
     /// Generate a name for this input
