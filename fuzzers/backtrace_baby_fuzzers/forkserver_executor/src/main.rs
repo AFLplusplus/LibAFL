@@ -4,6 +4,7 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::tuple_list,
+        AsMutSlice,
     },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
@@ -28,10 +29,11 @@ pub fn main() {
     const MAP_SIZE: usize = 65536;
 
     //Coverage map shared between observer and executor
-    let mut shmem = StdShMemProvider::new().unwrap().new_map(MAP_SIZE).unwrap();
+    let mut shmem_provider = StdShMemProvider::new().unwrap();
+    let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
-    let shmem_map = shmem.map_mut();
+    let shmem_map = shmem.as_mut_slice();
 
     // Create an observation channel using the signals map
     let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
@@ -84,11 +86,12 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for the forkserver
-    let mut executor = ForkserverExecutor::new(
+    let mut executor = ForkserverExecutor::with_shmem_inputs(
         "./target/release/program".to_string(),
         &[],
-        true,
         tuple_list!(edges_observer, bt_observer),
+        true,
+        &mut shmem_provider,
     )
     .expect("Failed to create the executor.");
 

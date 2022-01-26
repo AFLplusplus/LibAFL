@@ -244,9 +244,7 @@ impl Forkserver {
             )
             .spawn()
         {
-            Ok(_) => {
-                println!("got it running");
-            }
+            Ok(_) => (),
             Err(err) => {
                 return Err(Error::Forkserver(format!(
                     "Could not spawn the forkserver: {:#?}",
