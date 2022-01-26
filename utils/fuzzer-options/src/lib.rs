@@ -215,12 +215,16 @@ pub enum Commands {
         input_file: PathBuf,
 
         /// path to harness
-        #[clap(short, long, parse(from_os_str))]
+        #[clap(short = 'H', long, parse(from_os_str))]
         harness: Option<PathBuf>,
 
         /// path to harness
         #[clap(short = 'a', long, multiple_occurrences = true)]
         harness_args: Option<Vec<String>>,
+
+        /// Run the same input multiple times
+        #[clap(short, long, default_missing_value = "1", min_values = 0)]
+        repeat: Option<usize>,
     },
 }
 
