@@ -38,7 +38,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens,
+        StdMOptMutator, StdScheduledMutator, TokenSection, Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
@@ -53,6 +53,9 @@ use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,
 };
+
+#[cfg(target_os = "linux")]
+use libafl_targets::token_section;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -352,9 +355,19 @@ fn fuzz(
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
-    if let Some(tokenfile) = tokenfile {
-        if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::from_tokens_file(tokenfile)?);
+    if state.metadata().get::<Tokens>().is_none() {
+        let mut toks = Tokens::default();
+        if let Some(tokenfile) = tokenfile {
+            toks = toks.parse_tokens_file(vec![tokenfile])?;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let token_section = TokenSection::new(token_section());
+            toks = toks.parse_autotokens(token_section)?;
+        }
+
+        if !toks.tokens().is_empty() {
+            state.add_metadata(toks);
         }
     }
 
