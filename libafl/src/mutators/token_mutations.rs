@@ -22,6 +22,23 @@ use crate::{
     Error,
 };
 
+#[derive(Debug, Clone, Copy)]
+/// Struct for token start and end
+pub struct TokenSection {
+    start: *const u8,
+    stop: *const u8,
+}
+
+impl TokenSection {
+    /// Ini
+    pub fn new(section: (*const u8, *const u8)) -> Self {
+        Self {
+            start: section.0,
+            stop: section.1,
+        }
+    }
+}
+
 /// A state metadata holding a list of tokens
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
@@ -39,52 +56,77 @@ impl Tokens {
         Self { token_vec }
     }
 
-    ///  Reads from an autotokens section, returning the count of new entries read
-    pub unsafe fn add_from_autotokens(
-        &mut self,
-        token_start: *const u8,
-        token_stop: *const u8,
-    ) -> Result<usize, Error> {
-        let mut entries = 0;
+    /// Build tokens from vec
+    pub fn parse_vec(mut self, vec: Vec<Vec<u8>>) -> Self {
+        self.token_vec = vec;
+        self
+    }
 
-        let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
-        // println!("size: {}", section_size);
-        let slice = core::slice::from_raw_parts(token_start, section_size);
-
-        let mut head = 0;
-
-        // Now we know the beginning and the end of the token section.. let's parse them into tokens
-        loop {
-            if head >= section_size {
-                // Sanity Check
-                assert!(head == section_size);
-                break;
-            }
-            let size = slice[head] as usize;
-            head += 1;
-            if size > 0 {
-                self.add_token(&slice[head..head + size].to_vec());
-                #[cfg(feature = "std")]
-                println!(
-                    "Token size: {} content: {:x?}",
-                    size,
-                    &slice[head..head + size].to_vec()
-                );
-                head += size;
-                entries += 1;
-            }
+    /// Build tokens from files
+    pub fn parse_tokens_file<P>(mut self, files: Vec<P>) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        for file in files {
+            self.add_tokens_from_file(file)?;
         }
+        Ok(self)
+    }
 
-        Ok(entries)
+    /// Build tokens from autotokens
+    pub fn parse_autotokens(mut self, autotoken: TokenSection) -> Result<Self, Error> {
+        unsafe {
+            self.add_from_autotokens(autotoken)?;
+        }
+        Ok(self)
+    }
+
+    ///  Reads from an autotokens section, returning the count of new entries read
+    #[cfg(target_os = "linux")]
+    pub unsafe fn add_from_autotokens(&mut self, autotoken: TokenSection) -> Result<usize, Error> {
+        if cfg!(target_os = "linux") {
+            let mut entries = 0;
+            let token_start = autotoken.start;
+            let token_stop = autotoken.stop;
+            let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
+            // println!("size: {}", section_size);
+            let slice = core::slice::from_raw_parts(token_start, section_size);
+
+            let mut head = 0;
+
+            // Now we know the beginning and the end of the token section.. let's parse them into tokens
+            loop {
+                if head >= section_size {
+                    // Sanity Check
+                    assert!(head == section_size);
+                    break;
+                }
+                let size = slice[head] as usize;
+                head += 1;
+                if size > 0 {
+                    self.add_token(&slice[head..head + size].to_vec());
+                    #[cfg(feature = "std")]
+                    println!(
+                        "Token size: {} content: {:x?}",
+                        size,
+                        &slice[head..head + size].to_vec()
+                    );
+                    head += size;
+                    entries += 1;
+                }
+            }
+
+            Ok(entries)
+        } else {
+            // TODO: Autodict for OSX and windows
+            Ok(0)
+        }
     }
 
     /// Creates a new token from autotokens
-    pub unsafe fn from_autotokens(
-        token_start: *const u8,
-        token_stop: *const u8,
-    ) -> Result<Self, Error> {
+    pub unsafe fn from_autotokens(autotoken: TokenSection) -> Result<Self, Error> {
         let mut ret = Self::new(vec![]);
-        ret.add_from_autotokens(token_start, token_stop)?;
+        ret.add_from_autotokens(autotoken)?;
         Ok(ret)
     }
 

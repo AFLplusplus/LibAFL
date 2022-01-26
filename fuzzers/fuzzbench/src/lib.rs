@@ -38,7 +38,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, Tokens,
+        StdMOptMutator, StdScheduledMutator, Tokens, TokenSection,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
@@ -55,7 +55,7 @@ use libafl_targets::{
 };
 
 #[cfg(target_os = "linux")]
-use libafl_targets::{TOKEN_START, TOKEN_STOP};
+use libafl_targets::token_section;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -358,22 +358,17 @@ fn fuzz(
     if state.metadata().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
-            toks.add_tokens_from_file(tokenfile)?;
+            toks = toks.parse_tokens_file(vec![tokenfile])?;
         }
         #[cfg(target_os = "linux")]
         {
-            toks.add_from_autotokens(TOKEN_START, TOKEN_STOP)?;
+            let token_section = unsafe { TokenSection::new(token_section()) };
+            toks = toks.parse_autotokens(token_section)?;
         }
+        
         if !toks.tokens().is_empty() {
             state.add_metadata(toks);
         }
-    }
-
-    // Autodict Tokens
-    #[cfg(target_os = "linux")]
-    {
-        let autodict_tokens = unsafe { Tokens::from_autotokens(TOKEN_START, TOKEN_STOP)? };
-        state.add_metadata(autodict_tokens);
     }
 
     // In case the corpus is empty (on first run), reset

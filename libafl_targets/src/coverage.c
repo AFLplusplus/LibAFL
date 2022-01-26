@@ -20,7 +20,7 @@ extern EXT_VAR(__stop_libafl_token, uint8_t);
 
 // Expose the start of libafl_token section as C symbols
 uint8_t* __token_start = &__start_libafl_token;
-uint8_t* __token_end = &__stop_libafl_token;
+uint8_t* __token_stop = &__stop_libafl_token;
 #endif
 
 
