@@ -84,7 +84,6 @@ impl Tokens {
     }
 
     ///  Reads from an autotokens section, returning the count of new entries read
-    #[cfg(target_os = "linux")]
     pub unsafe fn add_from_autotokens(&mut self, autotoken: TokenSection) -> Result<usize, Error> {
         if cfg!(target_os = "linux") {
             let mut entries = 0;
