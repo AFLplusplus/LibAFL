@@ -388,13 +388,15 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let _ = executor.run_target(fuzzer, state, manager, input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
 
         start_timer!(state);
-        executor.observers_mut().post_exec_all(state, input)?;
+        executor
+            .observers_mut()
+            .post_exec_all(state, input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         let cnt = executor
