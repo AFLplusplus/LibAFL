@@ -97,6 +97,19 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
         }
         res
     }
+
+    /// Get the number of set entries with the specified indexes
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && *self.get(*i) != initial {
+                res += 1;
+            }
+        }
+        res
+    }
 }
 
 /// The Map Observer retrieves the state of a map,

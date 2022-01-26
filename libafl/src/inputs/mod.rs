@@ -9,6 +9,9 @@ pub use encoded::*;
 pub mod gramatron;
 pub use gramatron::*;
 
+pub mod generalized;
+pub use generalized::*;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 #[cfg(feature = "nautilus")]
@@ -65,6 +68,9 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
 
     /// Generate a name for this input
     fn generate_name(&self, idx: usize) -> String;
+
+    /// An hook executed if the input is stored as `Testcase`
+    fn wrapped_as_testcase(&mut self) {}
 }
 
 /// An input for tests, mainly. There is no real use much else.
@@ -81,6 +87,7 @@ impl HasTargetBytes for NopInput {
     }
 }
 
+// TODO change this to fn target_bytes(&self, buffer: &mut Vec<u8>) -> &[u8];
 /// Can be represented with a vector of bytes
 /// This representation is not necessarily deserializable
 /// Instead, it can be used as bytes input for a target
