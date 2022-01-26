@@ -11,6 +11,8 @@ pub trait QemuHelper<I, S>: 'static + Debug
 where
     I: Input,
 {
+    const HOOKS_DO_SIDE_EFFECTS: bool = true;
+
     fn init<'a, H, OT, QT>(&self, _executor: &QemuExecutor<'a, H, I, OT, QT, S>)
     where
         H: FnMut(&I) -> ExitKind,
@@ -113,4 +115,11 @@ impl QemuInstrumentationFilter {
             QemuInstrumentationFilter::None => true,
         }
     }
+}
+
+pub fn hash_me(mut x: u64) -> u64 {
+    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
+    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
+    x = (x.overflowing_shr(16).0 ^ x) ^ x;
+    x
 }

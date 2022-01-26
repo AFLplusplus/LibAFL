@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     emu::Emulator,
     executor::QemuExecutor,
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -78,6 +78,57 @@ where
     }
 }
 
+#[derive(Debug)]
+pub struct QemuCmpLogChildHelper {
+    filter: QemuInstrumentationFilter,
+}
+
+impl QemuCmpLogChildHelper {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            filter: QemuInstrumentationFilter::None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
+        Self { filter }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: u64) -> bool {
+        self.filter.allowed(addr)
+    }
+}
+
+impl Default for QemuCmpLogChildHelper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<I, S> QemuHelper<I, S> for QemuCmpLogChildHelper
+where
+    I: Input,
+    S: HasMetadata,
+{
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
+    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    where
+        H: FnMut(&I) -> ExitKind,
+        OT: ObserversTuple<I, S>,
+        QT: QemuHelperTuple<I, S>,
+    {
+        executor.hook_cmp_generation(gen_hashed_cmp_ids::<I, QT, S>);
+        executor.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
+        executor.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
+        executor.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
+        executor.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
+    }
+}
+
 pub fn gen_unique_cmp_ids<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
@@ -108,6 +159,26 @@ where
         meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
         id as u64
     }))
+}
+
+pub fn gen_hashed_cmp_ids<I, QT, S>(
+    _emulator: &Emulator,
+    helpers: &mut QT,
+    state: &mut S,
+    pc: u64,
+    _size: usize,
+) -> Option<u64>
+where
+    S: HasMetadata,
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    if let Some(h) = helpers.match_first_type::<QemuEdgeCoverageChildHelper>() {
+        if !h.must_instrument(src) && !h.must_instrument(dest) {
+            return None;
+        }
+    }
+    Some(hash_me(pc))
 }
 
 pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8) {
