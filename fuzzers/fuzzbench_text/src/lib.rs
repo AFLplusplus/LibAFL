@@ -44,7 +44,7 @@ use libafl::{
         },
         scheduled::havoc_mutations,
         token_mutations::I2SRandReplace,
-        tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
+        tokens_mutations, StdMOptMutator, StdScheduledMutator, TokenSection, Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
