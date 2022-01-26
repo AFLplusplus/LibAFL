@@ -65,6 +65,7 @@ impl Tokens {
     }
 
     /// Build tokens from files
+    #[cfg(feature = "std")]
     pub fn parse_tokens_file<P>(mut self, files: Vec<P>) -> Result<Self, Error>
     where
         P: AsRef<Path>,
