@@ -215,6 +215,18 @@ impl Named for BacktraceObserver {
     }
 }
 
+/// static variable of ASAN log path
+pub static ASAN_LOG_PATH: &str = "./asanlog";
+
+/// returns the recommended ASAN runtime flags to capture the backtrace correctly with log_path set
+#[must_use]
+pub fn get_asan_runtime_flags_with_log_path() -> String {
+    let mut flags = get_asan_runtime_flags();
+    flags.push_str(":log_path=");
+    flags.push_str(ASAN_LOG_PATH);
+    flags
+}
+
 /// returns the recommended ASAN runtime flags to capture the backtrace correctly
 #[must_use]
 pub fn get_asan_runtime_flags() -> String {
@@ -259,8 +271,8 @@ impl ASANBacktraceObserver {
     }
 
     /// read ASAN output from the log file and parse it.
-    pub fn parse_asan_output_from_asan_log_file(&mut self, path_base: &str, pid: Pid) {
-        let log_path = format!("{}.{}", path_base, pid);
+    pub fn parse_asan_output_from_asan_log_file(&mut self, pid: &Pid) {
+        let log_path = format!("{}.{}", ASAN_LOG_PATH, pid);
         let mut asan_output = File::open(Path::new(&log_path))
             .expect(format!("can't find asan log at {}", &log_path).as_str());
         let mut buf = String::new();
@@ -268,6 +280,7 @@ impl ASANBacktraceObserver {
             .read_to_string(&mut buf)
             .expect("Failed to read asan log");
         fs::remove_file(&log_path).expect(format!("Failed to delete {}", &log_path).as_str());
+        println!("horay: {}", &buf);
         self.parse_asan_output(&buf);
     }
 

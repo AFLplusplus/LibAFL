@@ -6,13 +6,12 @@ use core::{
     time::Duration,
 };
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{File, OpenOptions},
     io::{self, prelude::*, ErrorKind, SeekFrom},
     os::unix::{
         io::{AsRawFd, RawFd},
         process::CommandExt,
     },
-    path::Path,
     process::{Command, Stdio},
 };
 
@@ -23,7 +22,7 @@ use crate::{
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
-    observers::{ASANBacktraceObserver, ObserversTuple},
+    observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     Error,
 };
 
@@ -226,24 +225,13 @@ impl Forkserver {
             (Stdio::null(), Stdio::null())
         };
 
-        let flags = vec![
-            // "exitcode=0",
-            "abort_on_error=1",
-            "handle_abort=1",
-            "handle_segv=1",
-            "handle_sigbus=1",
-            "handle_sigill=1",
-            "handle_sigfpe=1",
-            "log_path=asanlogs/asan",
-        ];
-
         match Command::new(target)
             .args(args)
             .stdin(Stdio::null())
             .stdout(stdout)
             .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
-            .env("ASAN_OPTIONS", flags.join(":"))
+            .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
@@ -555,7 +543,7 @@ where
         use_shmem_testcase: bool,
         observers: OT,
     ) -> Result<Self, Error> {
-        Self::with_debug(target, arguments, use_shmem_testcase, observers, true)
+        Self::with_debug(target, arguments, use_shmem_testcase, observers, false)
     }
 
     /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers, with debug mode
@@ -727,13 +715,10 @@ where
             exit_kind = ExitKind::Crash;
             println!("Got crash yes");
             if let Some(obs) = self
-                .observers()
+                .observers_mut()
                 .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
             {
-                obs.parse_asan_output_from_asan_log_file(
-                    "asanlogs/asan",
-                    self.forkserver.child_pid(),
-                )
+                obs.parse_asan_output_from_asan_log_file(&Pid::from_raw(pid))
             }
         }
 
