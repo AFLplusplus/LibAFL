@@ -12,6 +12,16 @@ use num_traits::Num;
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 use strum_macros::EnumIter;
 
+#[cfg(not(any(feature = "x86_64", feature = "aarch64")))]
+/// GuestAddr is u32 for 32-bit targets
+pub type GuestAddr = u32;
+
+#[cfg(any(feature = "x86_64", feature = "aarch64"))]
+/// GuestAddr is u64 for 64-bit targets
+pub type GuestAddr = u64;
+
+pub type GuestUsize = GuestAddr;
+
 #[cfg(feature = "python")]
 use pyo3::{prelude::*, PyIterProtocol};
 
@@ -120,9 +130,9 @@ impl SyscallHookResult {
 #[repr(C)]
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct MapInfo {
-    start: u64,
-    end: u64,
-    offset: u64,
+    start: GuestAddr,
+    end: GuestAddr,
+    offset: GuestAddr,
     path: *const u8,
     flags: i32,
     is_priv: i32,
@@ -131,17 +141,17 @@ pub struct MapInfo {
 #[cfg_attr(feature = "python", pymethods)]
 impl MapInfo {
     #[must_use]
-    pub fn start(&self) -> u64 {
+    pub fn start(&self) -> GuestAddr {
         self.start
     }
 
     #[must_use]
-    pub fn end(&self) -> u64 {
+    pub fn end(&self) -> GuestAddr {
         self.end
     }
 
     #[must_use]
-    pub fn offset(&self) -> u64 {
+    pub fn offset(&self) -> GuestAddr {
         self.offset
     }
 
@@ -349,7 +359,7 @@ impl Emulator {
     /// This will write to a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    pub unsafe fn write_mem(&self, addr: u64, buf: &[u8]) {
+    pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
         let host_addr = self.g2h(addr);
         copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
     }
@@ -360,7 +370,7 @@ impl Emulator {
     /// This will read from a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    pub unsafe fn read_mem(&self, addr: u64, buf: &mut [u8]) {
+    pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
         let host_addr = self.g2h(addr);
         copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
     }
@@ -399,27 +409,27 @@ impl Emulator {
         }
     }
 
-    pub fn set_breakpoint(&self, addr: u64) {
+    pub fn set_breakpoint(&self, addr: GuestAddr) {
         unsafe {
-            libafl_qemu_set_breakpoint(addr);
+            libafl_qemu_set_breakpoint(addr.into());
         }
     }
 
-    pub fn remove_breakpoint(&self, addr: u64) {
+    pub fn remove_breakpoint(&self, addr: GuestAddr) {
         unsafe {
-            libafl_qemu_remove_breakpoint(addr);
+            libafl_qemu_remove_breakpoint(addr.into());
         }
     }
 
-    pub fn set_hook(&self, addr: u64, callback: extern "C" fn(u64), val: u64) {
+    pub fn set_hook(&self, addr: GuestAddr, callback: extern "C" fn(u64), val: u64) {
         unsafe {
-            libafl_qemu_set_hook(addr, callback, val);
+            libafl_qemu_set_hook(addr.into(), callback, val);
         }
     }
 
-    pub fn remove_hook(&self, addr: u64) {
+    pub fn remove_hook(&self, addr: GuestAddr) {
         unsafe {
-            libafl_qemu_remove_hook(addr);
+            libafl_qemu_remove_hook(addr.into());
         }
     }
 
@@ -433,13 +443,13 @@ impl Emulator {
     }
 
     #[must_use]
-    pub fn g2h<T>(&self, addr: u64) -> *mut T {
-        unsafe { transmute(addr + guest_base as u64) }
+    pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
+        unsafe { transmute(addr as usize + guest_base) }
     }
 
     #[must_use]
-    pub fn h2g<T>(&self, addr: *const T) -> u64 {
-        unsafe { (addr as usize - guest_base) as u64 }
+    pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
+        unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
     #[must_use]
@@ -448,21 +458,27 @@ impl Emulator {
     }
 
     #[must_use]
-    pub fn load_addr(&self) -> u64 {
-        unsafe { libafl_load_addr() }
+    pub fn load_addr(&self) -> GuestAddr {
+        unsafe { libafl_load_addr() as GuestAddr }
     }
 
     #[must_use]
-    pub fn get_brk(&self) -> u64 {
-        unsafe { libafl_get_brk() }
+    pub fn get_brk(&self) -> GuestAddr {
+        unsafe { libafl_get_brk() as GuestAddr }
     }
 
-    pub fn set_brk(&self, brk: u64) {
-        unsafe { libafl_set_brk(brk) };
+    pub fn set_brk(&self, brk: GuestAddr) {
+        unsafe { libafl_set_brk(brk.into()) };
     }
 
-    fn mmap(&self, addr: u64, size: usize, perms: MmapPerms, flags: c_int) -> Result<u64, ()> {
-        let res = unsafe { target_mmap(addr, size as u64, perms.into(), flags, -1, 0) };
+    fn mmap(
+        &self,
+        addr: GuestAddr,
+        size: usize,
+        perms: MmapPerms,
+        flags: c_int,
+    ) -> Result<u64, ()> {
+        let res = unsafe { target_mmap(addr.into(), size as u64, perms.into(), flags, -1, 0) };
         if res == 0 {
             Err(())
         } else {
@@ -470,12 +486,23 @@ impl Emulator {
         }
     }
 
-    pub fn map_private(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
+    pub fn map_private(
+        &self,
+        addr: GuestAddr,
+        size: usize,
+        perms: MmapPerms,
+    ) -> Result<GuestAddr, String> {
         self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
             .map_err(|_| format!("Failed to map {}", addr))
+            .map(|addr| addr as GuestAddr)
     }
 
-    pub fn map_fixed(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
+    pub fn map_fixed(
+        &self,
+        addr: GuestAddr,
+        size: usize,
+        perms: MmapPerms,
+    ) -> Result<GuestAddr, String> {
         self.mmap(
             addr,
             size,
@@ -483,10 +510,11 @@ impl Emulator {
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
         .map_err(|_| format!("Failed to map {}", addr))
+        .map(|addr| addr as GuestAddr)
     }
 
-    pub fn mprotect(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<(), String> {
-        let res = unsafe { target_mprotect(addr, size as u64, perms.into()) };
+    pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
+        let res = unsafe { target_mprotect(addr.into(), size as u64, perms.into()) };
         if res == 0 {
             Ok(())
         } else {
@@ -494,8 +522,8 @@ impl Emulator {
         }
     }
 
-    pub fn unmap(&self, addr: u64, size: usize) -> Result<(), String> {
-        if unsafe { target_munmap(addr, size as u64) } == 0 {
+    pub fn unmap(&self, addr: GuestAddr, size: usize) -> Result<(), String> {
+        if unsafe { target_munmap(addr.into(), size as u64) } == 0 {
             Ok(())
         } else {
             Err(format!("Failed to unmap {}", addr))
@@ -652,14 +680,14 @@ impl Emulator {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use super::{MmapPerms, SyscallHookResult};
+    use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
     use core::mem::transmute;
     use pyo3::exceptions::PyValueError;
     use pyo3::{prelude::*, types::PyInt};
     use std::convert::TryFrom;
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
-    static mut PY_GENERIC_HOOKS: Vec<(u64, PyObject)> = vec![];
+    static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];
 
     extern "C" fn py_syscall_hook_wrapper(
         sys_num: i32,
@@ -719,13 +747,13 @@ pub mod pybind {
             }
         }
 
-        fn write_mem(&self, addr: u64, buf: &[u8]) {
+        fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
             unsafe {
                 self.emu.write_mem(addr, buf);
             }
         }
 
-        fn read_mem(&self, addr: u64, size: usize) -> Vec<u8> {
+        fn read_mem(&self, addr: GuestAddr, size: usize) -> Vec<u8> {
             let mut buf = vec![0; size];
             unsafe {
                 self.emu.read_mem(addr, &mut buf);
@@ -737,19 +765,19 @@ pub mod pybind {
             self.emu.num_regs()
         }
 
-        fn write_reg(&self, reg: i32, val: u64) -> PyResult<()> {
+        fn write_reg(&self, reg: i32, val: GuestUsize) -> PyResult<()> {
             self.emu.write_reg(reg, val).map_err(PyValueError::new_err)
         }
 
-        fn read_reg(&self, reg: i32) -> PyResult<u64> {
+        fn read_reg(&self, reg: i32) -> PyResult<GuestUsize> {
             self.emu.read_reg(reg).map_err(PyValueError::new_err)
         }
 
-        fn set_breakpoint(&self, addr: u64) {
+        fn set_breakpoint(&self, addr: GuestAddr) {
             self.emu.set_breakpoint(addr);
         }
 
-        fn remove_breakpoint(&self, addr: u64) {
+        fn remove_breakpoint(&self, addr: GuestAddr) {
             self.emu.remove_breakpoint(addr);
         }
 
@@ -759,11 +787,11 @@ pub mod pybind {
             }
         }
 
-        fn g2h(&self, addr: u64) -> u64 {
+        fn g2h(&self, addr: GuestAddr) -> u64 {
             self.emu.g2h::<*const u8>(addr) as u64
         }
 
-        fn h2g(&self, addr: u64) -> u64 {
+        fn h2g(&self, addr: u64) -> GuestAddr {
             self.emu.h2g(unsafe { transmute::<_, *const u8>(addr) })
         }
 
@@ -771,11 +799,11 @@ pub mod pybind {
             self.emu.binary_path().to_owned()
         }
 
-        fn load_addr(&self) -> u64 {
+        fn load_addr(&self) -> GuestAddr {
             self.emu.load_addr()
         }
 
-        fn map_private(&self, addr: u64, size: usize, perms: i32) -> PyResult<u64> {
+        fn map_private(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.emu
                     .map_private(addr, size, p)
@@ -785,7 +813,7 @@ pub mod pybind {
             }
         }
 
-        fn map_fixed(&self, addr: u64, size: usize, perms: i32) -> PyResult<u64> {
+        fn map_fixed(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.emu
                     .map_fixed(addr, size, p)
@@ -795,7 +823,7 @@ pub mod pybind {
             }
         }
 
-        fn mprotect(&self, addr: u64, size: usize, perms: i32) -> PyResult<()> {
+        fn mprotect(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<()> {
             if let Ok(p) = MmapPerms::try_from(perms) {
                 self.emu
                     .mprotect(addr, size, p)
@@ -805,7 +833,7 @@ pub mod pybind {
             }
         }
 
-        fn unmap(&self, addr: u64, size: usize) -> PyResult<()> {
+        fn unmap(&self, addr: GuestAddr, size: usize) -> PyResult<()> {
             self.emu.unmap(addr, size).map_err(PyValueError::new_err)
         }
 
@@ -816,7 +844,7 @@ pub mod pybind {
             self.emu.set_pre_syscall_hook(py_syscall_hook_wrapper);
         }
 
-        fn set_hook(&self, addr: u64, hook: PyObject) {
+        fn set_hook(&self, addr: GuestAddr, hook: PyObject) {
             unsafe {
                 let idx = PY_GENERIC_HOOKS.len();
                 PY_GENERIC_HOOKS.push((addr, hook));
@@ -824,7 +852,7 @@ pub mod pybind {
             }
         }
 
-        fn remove_hook(&self, addr: u64) {
+        fn remove_hook(&self, addr: GuestAddr) {
             unsafe {
                 PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
             }
