@@ -2,6 +2,7 @@ use fuzzer_options::{parse_args, Commands};
 use std::env;
 use std::path::{Path, PathBuf};
 
+// make sure to add `features = ["libafl_qemu"]` to fuzzer-options in Cargo.toml
 use libafl_qemu::Emulator;
 
 fn fuzz_with_qemu(_: &[PathBuf], qemu_args: &[String]) {

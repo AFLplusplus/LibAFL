@@ -32,7 +32,7 @@
 //! }
 //! ```
 
-use clap::{AppSettings, IntoApp, Parser, Subcommand};
+use clap::{App, AppSettings, IntoApp, Parser, Subcommand};
 #[cfg(feature = "libafl_frida")]
 use std::error;
 use std::net::SocketAddr;
@@ -226,8 +226,9 @@ pub enum Commands {
 }
 
 impl FuzzerOptions {
-    pub fn with_subcommand(mode: clap::App) -> clap::App {
-        let app: clap::App = Self::into_app();
+    /// given an `App`, add it to FuzzerOptions as a subcommand and return the resulting `App`
+    pub fn with_subcommand(mode: App) -> App {
+        let app: App = Self::into_app();
         app.subcommand(mode)
     }
 }
