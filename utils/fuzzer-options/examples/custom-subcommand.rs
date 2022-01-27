@@ -3,12 +3,12 @@ use fuzzer_options::FuzzerOptions;
 
 fn custom_func(_: &str) {}
 
+/// subcommand help
 #[derive(Parser, Debug)]
 #[clap(name = "custom")]
-/// subcommand help
 struct CustomFooParser {
-    #[clap(short, long)]
     /// a very cromulent option
+    #[clap(short, long)]
     bar: String,
 }
 

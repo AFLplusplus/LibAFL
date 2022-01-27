@@ -205,8 +205,8 @@ pub enum Commands {
         remote_broker_addr: Option<SocketAddr>,
     },
 
-    #[clap(setting(AppSettings::ArgRequiredElseHelp))]
     /// Replay mode: runs a single input file through the fuzz harness
+    #[clap(setting(AppSettings::ArgRequiredElseHelp))]
     Replay {
         /// path to file that should be sent to the harness for crash reproduction
         #[clap(short, long, parse(from_os_str))]
@@ -235,8 +235,8 @@ impl FuzzerOptions {
     }
 }
 
-#[must_use]
 /// Parse from `std::env::args_os()`, exit on error
+#[must_use]
 pub fn parse_args() -> FuzzerOptions {
     FuzzerOptions::parse()
 }
@@ -245,10 +245,10 @@ pub fn parse_args() -> FuzzerOptions {
 mod tests {
     use super::*;
 
-    #[test]
     /// pass a standard option and `--` followed by some options that `FuzzerOptions` doesn't know
     /// about; expect the standard option to work normally, and everything after `--` to be
     /// collected into `qemu_args`
+    #[test]
     fn standard_option_with_trailing_variable_length_args_collected() {
         let parsed = FuzzerOptions::parse_from([
             "some-command",
