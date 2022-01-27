@@ -89,7 +89,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             None => EventConfig::AlwaysUnique,
         };
 
-        if self.use_cmplog {
+        if self.use_cmplog.unwrap_or(false) {
             println!("[WARNING] use of cmplog not currently supported, use_cmplog ignored.");
         }
 
@@ -249,6 +249,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
                         iters,
                     )?;
                     mgr.on_restart(&mut state)?;
+                    std::process::exit(0);
                 } else {
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
@@ -269,6 +270,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
                         iters,
                     )?;
                     mgr.on_restart(&mut state)?;
+                    std::process::exit(0);
                 } else {
                     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                 }
@@ -310,6 +312,10 @@ pub mod pybind {
         output_dir: PathBuf,
         broker_port: u16,
         cores: Cores,
+        use_cmplog: Option<bool>,
+        iterations: Option<u64>,
+        tokens_file: Option<PathBuf>,
+        timeout: Option<u64>,
     }
 
     #[pymethods]
