@@ -227,8 +227,8 @@ pub enum Commands {
 }
 
 impl FuzzerOptions {
-    #[must_use]
     /// given an `App`, add it to `FuzzerOptions` as a subcommand and return the resulting `App`
+    #[must_use]
     pub fn with_subcommand(mode: App) -> App {
         let app: App = Self::into_app();
         app.subcommand(mode)
