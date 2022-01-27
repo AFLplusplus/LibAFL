@@ -1,4 +1,4 @@
-//! A one-size-fits-most approach to defining runtime behavior of LibAFL fuzzers
+//! A one-size-fits-most approach to defining runtime behavior of `LibAFL` fuzzers
 //!
 //! The most common pattern of use will be to:
 //!
@@ -76,6 +76,7 @@ fn parse_instrumentation_location(
     setting(AppSettings::SubcommandPrecedenceOverArg),
     setting(AppSettings::ArgsNegateSubcommands)
 )]
+#[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
     #[clap(subcommand)]
     pub command: Commands,
@@ -226,7 +227,8 @@ pub enum Commands {
 }
 
 impl FuzzerOptions {
-    /// given an `App`, add it to FuzzerOptions as a subcommand and return the resulting `App`
+    #[must_use]
+    /// given an `App`, add it to `FuzzerOptions` as a subcommand and return the resulting `App`
     pub fn with_subcommand(mode: App) -> App {
         let app: App = Self::into_app();
         app.subcommand(mode)
@@ -244,7 +246,7 @@ mod tests {
     use super::*;
 
     #[test]
-    /// pass a standard option and `--` followed by some options that FuzzerOptions doesn't know
+    /// pass a standard option and `--` followed by some options that `FuzzerOptions` doesn't know
     /// about; expect the standard option to work normally, and everything after `--` to be
     /// collected into `qemu_args`
     fn standard_option_with_trailing_variable_length_args_collected() {
@@ -263,7 +265,7 @@ mod tests {
         ]);
         if let Commands::Fuzz { broker_port, .. } = &parsed.command {
             assert_eq!(*broker_port, 1336);
-            assert_eq!(parsed.qemu_args, ["-L", "qemu-bound"])
+            assert_eq!(parsed.qemu_args, ["-L", "qemu-bound"]);
         }
     }
 }
