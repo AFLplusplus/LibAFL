@@ -74,9 +74,9 @@ pub fn fuzz() {
 
     // Get the return address
     let stack_ptr: u64 = emu.read_reg(Regs::Rsp).unwrap();
-    let mut ret_addr = [0u64];
+    let mut ret_addr = [0; 8];
     unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
-    let ret_addr = ret_addr[0];
+    let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {:#x}", stack_ptr);
     println!("Return address = {:#x}", ret_addr);
