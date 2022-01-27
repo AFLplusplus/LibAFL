@@ -8,7 +8,7 @@ fn main() {
     let parsed = parse_args();
 
     match &parsed.command {
-        // destructure sub-commands
+        // destructure subcommands
         Commands::Fuzz { tokens, .. } => {
             // call appropriate logic, passing in w/e options/args you need
             fuzz(tokens)

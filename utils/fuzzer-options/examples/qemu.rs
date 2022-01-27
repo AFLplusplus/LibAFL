@@ -5,8 +5,11 @@ use std::path::{Path, PathBuf};
 use libafl_qemu::Emulator;
 
 fn fuzz_with_qemu(_: &[PathBuf], qemu_args: &[String]) {
+    env::remove_var("LD_LIBRARY_PATH");
+
     let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(qemu_args, &env);
+
+    let _emu = Emulator::new(qemu_args, &env);
     // do other stuff...
 }
 
@@ -18,7 +21,7 @@ fn main() {
     let parsed = parse_args();
 
     match &parsed.command {
-        // destructure sub-commands
+        // destructure subcommands
         Commands::Fuzz { tokens, .. } => {
             // notice that `qemu_args` is available on the FuzzerOptions struct directly, while
             // `tokens` needs to be yoinked from the Commands::Fuzz variant

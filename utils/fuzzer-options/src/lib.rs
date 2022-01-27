@@ -3,11 +3,11 @@
 //! The most common pattern of use will be to:
 //!
 //! - import and call `parse_args`
-//! - destructure the sub-commands
+//! - destructure the subcommands
 //! - pull out the options/arguments that are of interest to you/your fuzzer
 //! - ignore the rest with `..`
 //!
-//! There are two sub-commands: `fuzz` and `replay`. Each one takes a few global options as well
+//! There are two subcommands: `fuzz` and `replay`. Each one takes a few global options as well
 //! as a few that are specific to themselves. An invocation of the standard example (available
 //! in the `examples/` directory) is shown below:
 //!
@@ -23,7 +23,7 @@
 //! let parsed = parse_args();
 //!
 //! match &parsed.command {
-//!     // destructure sub-commands
+//!     // destructure subcommands
 //!     Commands::Fuzz { tokens, .. } => {
 //!         // call appropriate logic, passing in w/e options/args you need
 //!         fuzz(&tokens)
@@ -32,10 +32,7 @@
 //! }
 //! ```
 
-#[cfg(all(feature = "libafl_frida", feature = "libafl_qemu"))]
-compile_error!("cannot use libafl_frida and libafl_qemu at the same time");
-
-use clap::{AppSettings, Parser, Subcommand};
+use clap::{AppSettings, IntoApp, Parser, Subcommand};
 #[cfg(feature = "libafl_frida")]
 use std::error;
 use std::net::SocketAddr;
@@ -226,6 +223,13 @@ pub enum Commands {
         #[clap(short, long, default_missing_value = "1", min_values = 0)]
         repeat: Option<usize>,
     },
+}
+
+impl FuzzerOptions {
+    pub fn with_subcommand(mode: clap::App) -> clap::App {
+        let app: clap::App = Self::into_app();
+        app.subcommand(mode)
+    }
 }
 
 #[must_use]
