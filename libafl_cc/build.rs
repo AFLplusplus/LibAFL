@@ -80,6 +80,7 @@ fn main() {
 
     println!("cargo:rerun-if-env-changed=LLVM_CONFIG");
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
+    println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
 
     let mut custom_flags = vec![];
 
@@ -90,6 +91,11 @@ fn main() {
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
     custom_flags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={}", edges_map_size));
+
+    let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
+        .map_or(Ok(65536), str::parse)
+        .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
+    custom_flags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={}", acc_map_size));
 
     let llvm_config = find_llvm_config();
     println!("cargo:warning={}", llvm_config);
@@ -112,10 +118,14 @@ fn main() {
             
             /// The size of the edges map
             pub const EDGES_MAP_SIZE: usize = {};
+
+            /// The size of the accounting maps
+            pub const ACCOUNTING_MAP_SIZE: usize = {};
             ",
             llvm_bindir.join("clang"),
             llvm_bindir.join("clang++"),
-            edges_map_size
+            edges_map_size,
+            acc_map_size
         )
         .expect("Could not write file");
 

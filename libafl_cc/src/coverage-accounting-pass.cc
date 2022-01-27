@@ -52,7 +52,7 @@
 
 typedef uint32_t prev_loc_t;
 
-#define MAP_SIZE LIBAFL_EDGES_MAP_SIZE
+#define MAP_SIZE LIBAFL_ACCOUNTING_MAP_SIZE
 
 using namespace llvm;
 
@@ -154,11 +154,7 @@ bool AFLCoverage::runOnModule(Module &M) {
     FATAL("Bad value of the instrumentation ratio (must be between 1 and 100)");
 
   /* Get globals for the SHM region and the previous location. Note that
-     __afl_prev_loc is thread-local. */
-
-  GlobalVariable *AFLMapPtr =
-      new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
-                         GlobalValue::ExternalLinkage, 0, "__afl_area_ptr");
+     __afl_acc_prev_loc is thread-local. */
 
   GlobalVariable *AFLMemWritePtr =
       new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
@@ -172,10 +168,10 @@ bool AFLCoverage::runOnModule(Module &M) {
 
 #if defined(__ANDROID__) || defined(__HAIKU__)
     AFLPrevLoc = new GlobalVariable(
-        M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_loc");
+        M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_acc_prev_loc");
 #else
   AFLPrevLoc = new GlobalVariable(
-      M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_prev_loc", 0,
+      M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_acc_prev_loc", 0,
       GlobalVariable::GeneralDynamicTLSModel, 0, false);
 #endif
 
@@ -214,6 +210,8 @@ bool AFLCoverage::runOnModule(Module &M) {
           if (I.mayWriteToMemory())
               ++WritesCnt;
       }
+      
+      if (!ReadsCnt && !WritesCnt) continue;
 
       /* Make up cur_loc */
 
@@ -226,39 +224,15 @@ bool AFLCoverage::runOnModule(Module &M) {
       LoadInst *PrevLoc = IRB.CreateLoad(AFLPrevLoc);
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
-      /* Load SHM pointer */
-
-      LoadInst *MapPtr = IRB.CreateLoad(AFLMapPtr);
-      MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-      Value *MapPtrIdx = IRB.CreateGEP(MapPtr, IRB.CreateXor(PrevLoc, CurLoc));
-
-      /* Update bitmap */
-
-      if (ThreadSafe) {  /* Atomic */
-
-        IRB.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, MapPtrIdx, One,
-#if LLVM_VERSION_MAJOR >= 13
-                            llvm::MaybeAlign(1),
-#endif
-                            llvm::AtomicOrdering::Monotonic);
-      } else {
-
-        LoadInst *Counter = IRB.CreateLoad(MapPtrIdx);
-        Counter->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-        Value *Incr = IRB.CreateAdd(Counter, One);
-
-        IRB.CreateStore(Incr, MapPtrIdx)
-            ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-      }                                                  /* non atomic case */
-
       if (ReadsCnt > 0) {
+
+        /* Load SHM pointer */
 
         LoadInst *MemReadPtr = IRB.CreateLoad(AFLMemReadPtr);
         MemReadPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         Value *MemReadPtrIdx = IRB.CreateGEP(MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
+
+        /* Update bitmap */
 
         LoadInst *MemReadCount = IRB.CreateLoad(MemReadPtrIdx);
         MemReadCount->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
@@ -270,10 +244,14 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       if (WritesCnt > 0) {
 
+        /* Load SHM pointer */
+
         LoadInst *MemWritePtr = IRB.CreateLoad(AFLMemWritePtr);
         MemWritePtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         Value *MemWritePtrIdx = IRB.CreateGEP(MemWritePtr, IRB.CreateXor(PrevLoc, CurLoc));
-      
+
+        /* Update bitmap */
+
         LoadInst *MemWriteCount = IRB.CreateLoad(MemWritePtrIdx);
         MemWriteCount->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
         Value *MemWriteIncr = IRB.CreateAdd(MemWriteCount, ConstantInt::get(Int32Ty, WritesCnt));

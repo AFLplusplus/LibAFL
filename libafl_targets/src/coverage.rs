@@ -1,11 +1,21 @@
 //! Coverage maps as static mut array
 
-use crate::EDGES_MAP_SIZE;
+use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE};
 
 /// The map for edges.
 #[no_mangle]
 pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
+
+/// The map for accounting mem reads.
+#[no_mangle]
+pub static mut __afl_memread_ptr_local: [u8; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];
+pub use __afl_memread_ptr_local as ACCOUNTING_MEMREAD_MAP;
+
+/// The map for accounting mem writes.
+#[no_mangle]
+pub static mut __afl_memwrite_ptr_local: [u8; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];
+pub use __afl_memwrite_ptr_local as ACCOUNTING_MEMWRITE_MAP;
 
 /// The max count of edges tracked.
 pub static mut MAX_EDGES_NUM: usize = 0;
@@ -13,6 +23,12 @@ pub static mut MAX_EDGES_NUM: usize = 0;
 extern "C" {
     /// The area pointer points to the edges map.
     pub static mut __afl_area_ptr: *mut u8;
+
+    /// The area pointer points to the accounting mem reads map.
+    pub static mut __afl_memread_ptr: *mut u32;
+
+    /// The area pointer points to the accounting mem writes map.
+    pub static mut __afl_memwrite_ptr: *mut u32;
 
     /// Start of libafl token section
     #[cfg(target_os = "linux")]
@@ -23,6 +39,8 @@ extern "C" {
     pub static __token_stop: *const u8;
 }
 pub use __afl_area_ptr as EDGES_MAP_PTR;
+pub use __afl_memread_ptr as ACCOUNTING_MEMREAD_MAP_PTR;
+pub use __afl_memwrite_ptr as ACCOUNTING_MEMWRITE_MAP_PTR;
 
 /// Return token section's start and end as a tuple
 #[cfg(target_os = "linux")]
