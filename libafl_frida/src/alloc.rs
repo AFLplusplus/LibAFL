@@ -107,6 +107,7 @@ impl Allocator {
         // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
         let mut userspace_max: usize = 0;
 
+        // Enumerate memory ranges that are already occupied.
         for prot in [
             PageProtection::Read,
             PageProtection::Write,
@@ -117,9 +118,23 @@ impl Allocator {
                 let end = start + details.memory_range().size();
                 occupied_ranges.push((start, end));
                 // println!("{:x} {:x}", start, end);
-                if end > userspace_max {
-                    userspace_max = end;
+                let base: usize = 2;
+                // On x64, if end > 2**48, then that's in vsyscall or something.
+                #[cfg(target_arch = "x86_64")]
+                if end <= base.pow(48) {
+                    if end > userspace_max {
+                        userspace_max = end;
+                    }
                 }
+
+                // On x64, if end > 2**52, then range is not in userspace
+                #[cfg(target_arch = "aarch64")]
+                if end <= base.pow(52) {
+                    if end > userspace_max {
+                        userspace_max = end;
+                    }
+                }
+
                 true
             });
         }
