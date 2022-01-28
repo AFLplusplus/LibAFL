@@ -19,7 +19,7 @@ use core::{
 #[cfg(feature = "std")]
 use std::intrinsics::transmute;
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 use libc::{siginfo_t, ucontext_t};
 
 #[cfg(all(feature = "std", unix))]
@@ -27,6 +27,9 @@ use nix::{
     sys::wait::{waitpid, WaitStatus},
     unistd::{fork, ForkResult},
 };
+
+#[cfg(windows)]
+use windows::Win32::System::Diagnostics::Debug::EXCEPTION_POINTERS;
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
@@ -40,6 +43,9 @@ use crate::observers::{BacktraceObserver, HarnessType};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
+#[cfg(windows)]
+use crate::bolts::os::windows_exceptions::{ExceptionCode, Handler, CRASH_EXCEPTIONS};
+
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
@@ -51,10 +57,10 @@ use crate::{
     Error,
 };
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 use crate::bolts::os::unix_signals::{Handler, Signal};
 #[cfg(feature = "std")]
-use crate::executors::inprocess::common_signal_handlers::setup_bt_panic_hook;
+use crate::executors::inprocess::bt_signal_handlers::setup_bt_panic_hook;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
@@ -475,14 +481,23 @@ pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
 
 /// signal handlers and `panic_hooks` for used BT collection
 #[cfg(feature = "std")]
-pub mod common_signal_handlers {
+pub mod bt_signal_handlers {
 
     use std::panic;
 
+    #[cfg(all(unix))]
     use libc::{siginfo_t, ucontext_t};
 
+    #[cfg(all(unix))]
+    use crate::bolts::os::unix_signals::Signal;
+
+    #[cfg(all(windows))]
+    use windows::Win32::System::Diagnostics::Debug::EXCEPTION_POINTERS;
+
+    #[cfg(all(windows))]
+    use super::InProcessExecutorHandlerData;
+
     use crate::{
-        bolts::os::unix_signals::Signal,
         executors::{ExitKind, HasObservers},
         inputs::Input,
         observers::ObserversTuple,
@@ -511,11 +526,33 @@ pub mod common_signal_handlers {
     }
 
     /// invokes the `post_exec` hook on all observer in case the child process crashes
+    #[cfg(unix)]
     pub fn child_crash_handler<E, I, OT, S, D>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
         data: &D,
+    ) where
+        E: HasObservers<I, OT, S>,
+        OT: ObserversTuple<I, S>,
+        S: HasSolutions<I> + HasClientPerfMonitor,
+        I: Input,
+        D: HasHandlerData,
+    {
+        let executor = data.executor_mut::<E>();
+        let observers = executor.observers_mut();
+        let state = data.state_mut::<S>();
+        let input = data.current_input::<I>();
+        observers
+            .post_exec_all(state, input, &ExitKind::Crash)
+            .expect("Failed to run post_exec on observers");
+    }
+
+    /// invokes the `post_exec` hook on all observer in case the child process crashes
+    #[cfg(windows)]
+    pub fn child_crash_handler<E, I, OT, S, D>(
+        _exception_pointers: *mut EXCEPTION_POINTERS,
+        data: &mut InProcessExecutorHandlerData,
     ) where
         E: HasObservers<I, OT, S>,
         OT: ObserversTuple<I, S>,
@@ -1119,9 +1156,14 @@ where
 }
 
 /// The signature of the crash handler function
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 pub type ForkHandlerFuncPtr =
     unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
+
+/// The signature of the crash handler function
+#[cfg(all(feature = "std", windows))]
+pub type ForkHandlerFuncPtr =
+    unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessForkExecutorGlobalData);
 
 /// The inmem executor's handlers.
 #[derive(Debug)]
@@ -1175,7 +1217,7 @@ impl InChildProcessHandlers {
             // let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
-                crash_handler: common_signal_handlers::child_crash_handler::<
+                crash_handler: bt_signal_handlers::child_crash_handler::<
                     E,
                     I,
                     OT,
@@ -1263,6 +1305,7 @@ impl Handler for InProcessForkExecutorGlobalData {
         }
     }
 
+    #[cfg(unix)]
     fn signals(&self) -> Vec<Signal> {
         vec![
             Signal::SigAlarm,
@@ -1275,6 +1318,23 @@ impl Handler for InProcessForkExecutorGlobalData {
             Signal::SigSegmentationFault,
             Signal::SigTrap,
         ]
+    }
+
+    #[cfg(windows)]
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
+    fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+        unsafe {
+            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
+            if !data.crash_handler.is_null() {
+                let func: ForkHandlerFuncPtr = transmute(data.crash_handler);
+                (func)(exception_pointers, data);
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    fn exceptions(&self) -> Vec<ExceptionCode> {
+        CRASH_EXCEPTIONS.to_vec()
     }
 }
 

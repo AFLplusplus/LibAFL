@@ -13,7 +13,6 @@ use crate::{
 };
 use ahash::AHasher;
 use backtrace::Backtrace;
-use nix::unistd::Pid;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -262,7 +261,7 @@ impl ASANBacktraceObserver {
     }
 
     /// read ASAN output from the log file and parse it.
-    pub fn parse_asan_output_from_asan_log_file(&mut self, pid: &Pid) {
+    pub fn parse_asan_output_from_asan_log_file(&mut self, pid: i32) {
         let log_path = format!("{}.{}", ASAN_LOG_PATH, pid);
         let mut asan_output = File::open(Path::new(&log_path))
             .unwrap_or_else(|_| panic!("Can't find asan log at {}", &log_path));
