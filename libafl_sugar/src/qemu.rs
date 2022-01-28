@@ -286,6 +286,7 @@ where
                             iters,
                         )?;
                         mgr.on_restart(&mut state)?;
+                        std::process::exit(0);
                     } else {
                         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
@@ -306,6 +307,7 @@ where
                             iters,
                         )?;
                         mgr.on_restart(&mut state)?;
+                        std::process::exit(0);
                     } else {
                         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
@@ -377,6 +379,7 @@ where
                             iters,
                         )?;
                         mgr.on_restart(&mut state)?;
+                        std::process::exit(0);
                     } else {
                         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
@@ -397,6 +400,7 @@ where
                             iters,
                         )?;
                         mgr.on_restart(&mut state)?;
+                        std::process::exit(0);
                     } else {
                         fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
                     }
