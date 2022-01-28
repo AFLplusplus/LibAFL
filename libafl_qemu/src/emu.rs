@@ -3,7 +3,7 @@
 use core::{
     convert::Into,
     ffi::c_void,
-    mem::{size_of, transmute, MaybeUninit},
+    mem::{transmute, MaybeUninit},
     ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
 };
 use libc::c_int;
@@ -349,13 +349,9 @@ impl Emulator {
     /// This will write to a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    pub unsafe fn write_mem<T>(&self, addr: u64, buf: &[T]) {
+    pub unsafe fn write_mem(&self, addr: u64, buf: &[u8]) {
         let host_addr = self.g2h(addr);
-        copy_nonoverlapping(
-            buf.as_ptr() as *const _ as *const u8,
-            host_addr,
-            buf.len() * size_of::<T>(),
-        );
+        copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
     }
 
     /// Read a value from a guest address.
@@ -364,13 +360,9 @@ impl Emulator {
     /// This will read from a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    pub unsafe fn read_mem<T>(&self, addr: u64, buf: &mut [T]) {
+    pub unsafe fn read_mem(&self, addr: u64, buf: &mut [u8]) {
         let host_addr = self.g2h(addr);
-        copy_nonoverlapping(
-            host_addr as *const u8,
-            buf.as_mut_ptr() as *mut _ as *mut u8,
-            buf.len() * size_of::<T>(),
-        );
+        copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
     }
 
     #[must_use]
@@ -479,20 +471,15 @@ impl Emulator {
     }
 
     pub fn map_private(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
-        self.mmap(
-            addr,
-            size,
-            perms.into(),
-            libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-        )
-        .map_err(|_| format!("Failed to map {}", addr))
+        self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
+            .map_err(|_| format!("Failed to map {}", addr))
     }
 
     pub fn map_fixed(&self, addr: u64, size: usize, perms: MmapPerms) -> Result<u64, String> {
         self.mmap(
             addr,
             size,
-            perms.into(),
+            perms,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
         .map_err(|_| format!("Failed to map {}", addr))

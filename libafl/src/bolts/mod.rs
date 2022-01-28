@@ -2,6 +2,7 @@
 
 #[cfg(any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"))]
 pub mod cli;
+pub mod anymap;
 #[cfg(feature = "llmp_compression")]
 pub mod compress;
 pub mod cpu;

@@ -8,6 +8,11 @@ pub use cmp::*;
 
 pub mod concolic;
 
+#[cfg(unstable_feature)]
+pub mod owned;
+#[cfg(unstable_feature)]
+pub use owned::*;
+
 use alloc::string::{String, ToString};
 use core::{fmt::Debug, time::Duration};
 use serde::{Deserialize, Serialize};
