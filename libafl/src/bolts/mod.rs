@@ -1,5 +1,7 @@
 //! Bolts are no conceptual fuzzing elements, but they keep libafl-based fuzzers together.
 
+#[cfg(any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"))]
+pub mod cli;
 #[cfg(feature = "llmp_compression")]
 pub mod compress;
 pub mod cpu;

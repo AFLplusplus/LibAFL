@@ -19,6 +19,10 @@ rand_trait = ["rand_core"] # If set, libafl's rand implementations will implemen
 introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
 tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
+cli = ["clap"]  # expose bolts::cli
+qemu_cli = ["cli"]
+frida_cli = ["cli"]
+
 # features hiding dependencies licensed under GPL
 gpl = []
 # features hiding dependencies licensed under AGPL
@@ -73,6 +77,7 @@ uuid = { version = "0.8.2", optional = true, features = ["serde", "v4"] }
 libm = "0.2.1"
 tui = { version = "0.16", default-features = false, features = ['crossterm'], optional = true }
 crossterm = { version = "0.20", optional = true }
+clap = {version = "3.0", features = ["derive", "wrap_help"], optional = true}
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 

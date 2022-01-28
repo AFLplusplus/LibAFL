@@ -7,40 +7,86 @@
 //! - pull out the options/arguments that are of interest to you/your fuzzer
 //! - ignore the rest with `..`
 //!
-//! There are two subcommands: `fuzz` and `replay`. Each one takes a few global options as well
-//! as a few that are specific to themselves. An invocation of the standard example (available
-//! in the `examples/` directory) is shown below:
+//! There are two provided subcommands: `fuzz` and `replay`. Each one takes a few global options
+//! as well as a few that are specific to themselves.
+//!
+//! # Example (Most Common)
+//!
+//! The most common usage of the cli parser. Just call `parse_args` and use the results.
 //!
 //! ```ignore
-//! cargo run --example standard fuzz -v -t 5000 -x tokens.dict
-//! ```
+//! use libafl::bolts::cli::{parse_args, SubCommand};
+//! use std::path::{Path, PathBuf};
 //!
-//! # Examples
+//! fn fuzz(_: &[PathBuf]) {}
+//! fn replay(_: &Path) {}
 //!
-//! ```ignore
-//! use fuzzer_options::{parse_args, Commands};
+//! fn main() {
+//!     // make sure to add `features = ["cli"]` to the `libafl` crate in `Cargo.toml`
+//!     let parsed = parse_args();
 //!
-//! let parsed = parse_args();
-//!
-//! match &parsed.command {
-//!     // destructure subcommands
-//!     Commands::Fuzz { tokens, .. } => {
-//!         // call appropriate logic, passing in w/e options/args you need
-//!         fuzz(&tokens)
+//!     match &parsed.command {
+//!         // destructure subcommands
+//!         SubCommand::Fuzz { tokens, .. } => {
+//!             // call appropriate logic, passing in w/e options/args you need
+//!             fuzz(tokens)
+//!         }
+//!         SubCommand::Replay { input_file, .. } => replay(input_file),
 //!     }
-//!     Commands::Replay { input_file, .. } => replay(&input_file),
+//!
+//!     println!("{:?}", parsed);
 //! }
 //! ```
+//!
+//! ## Example (`libafl_qemu`)
+//!
+//! ```ignore
+//! use libafl::bolts::cli::{parse_args, SubCommand};
+//! use std::env;
+//! use std::path::{Path, PathBuf};
+//!
+//! // make sure to add `features = ["qemu_cli"]` to the `libafl` crate in `Cargo.toml`
+//! use libafl_qemu::Emulator;
+//!
+//! fn fuzz_with_qemu(_: &[PathBuf], qemu_args: &[String]) {
+//!     env::remove_var("LD_LIBRARY_PATH");
+//!
+//!     let env: Vec<(String, String)> = env::vars().collect();
+//!
+//!     let emu = Emulator::new(&mut qemu_args.to_vec(), &mut env);
+//!     // do other stuff...
+//! }
+//!
+//! fn replay(_: &Path) {}
+//!
+//! fn main() {
+//!     // example command line invocation:
+//!     // ./path-to-fuzzer fuzz -x something.dict -- ./path-to-fuzzer -L /path/for/qemu_tack_L ./target --target-opts
+//!     let parsed = parse_args();
+//!
+//!     match &parsed.command {
+//!         // destructure subcommands
+//!         SubCommand::Fuzz { tokens, .. } => {
+//!             // notice that `qemu_args` is available on the FuzzerOptions struct directly, while
+//!             // `tokens` needs to be yoinked from the SubCommand::Fuzz variant
+//!             fuzz_with_qemu(tokens, &parsed.qemu_args)
+//!         }
+//!         SubCommand::Replay { input_file, .. } => replay(input_file),
+//!     }
+//!
+//!     println!("{:?}", parsed);
+//! }
+//!```
 
 use clap::{App, AppSettings, IntoApp, Parser, Subcommand};
-#[cfg(feature = "libafl_frida")]
+#[cfg(feature = "frida_cli")]
 use std::error;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use libafl::bolts::os::Cores;
-use libafl::Error;
+use super::os::Cores;
+use crate::Error;
 
 /// helper function to go from a parsed cli string to a `Duration`
 fn parse_timeout(src: &str) -> Result<Duration, Error> {
@@ -48,7 +94,7 @@ fn parse_timeout(src: &str) -> Result<Duration, Error> {
 }
 
 /// helper function to go from MODULE@0x12345 to (String, usize); aka an instrumentation location
-#[cfg(feature = "libafl_frida")]
+#[cfg(feature = "frida_cli")]
 fn parse_instrumentation_location(
     location: &str,
 ) -> Result<(String, usize), Box<dyn error::Error + Send + Sync + 'static>> {
@@ -70,6 +116,7 @@ fn parse_instrumentation_location(
     ))
 }
 
+/// Top-level container for cli options/arguments/subcommands
 #[derive(Parser, Debug)]
 #[clap(
     setting(AppSettings::ArgRequiredElseHelp),
@@ -78,8 +125,9 @@ fn parse_instrumentation_location(
 )]
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
+    /// grouping of subcommands
     #[clap(subcommand)]
-    pub command: Commands,
+    pub command: SubCommand,
 
     /// timeout for each target execution (milliseconds)
     #[clap(short, long, takes_value = true, default_value = "1000", parse(try_from_str = parse_timeout), global = true)]
@@ -99,29 +147,29 @@ pub struct FuzzerOptions {
 
     /// enable CmpLog instrumentation
     #[cfg_attr(
-        feature = "libafl_frida",
+        feature = "frida_cli",
         clap(short = 'C', long, global = true, help_heading = "Frida Options")
     )]
-    #[cfg_attr(not(feature = "libafl_frida"), clap(short = 'C', long))]
+    #[cfg_attr(not(feature = "frida_cli"), clap(short = 'C', long))]
     pub cmplog: bool,
 
     /// enable ASAN leak detection
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(short, long, global = true, help_heading = "ASAN Options")]
     pub detect_leaks: bool,
 
     /// instruct ASAN to continue after a memory error is detected
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(long, global = true, help_heading = "ASAN Options")]
     pub continue_on_error: bool,
 
     /// instruct ASAN to gather (and report) allocation-/free-site backtraces
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(long, global = true, help_heading = "ASAN Options")]
     pub allocation_backtraces: bool,
 
     /// the maximum size that the ASAN allocator should allocate
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(
         short,
         long,
@@ -132,7 +180,7 @@ pub struct FuzzerOptions {
     pub max_allocation: usize,
 
     /// the maximum total allocation size that the ASAN allocator should allocate
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(
         short = 'M',
         long,
@@ -143,33 +191,34 @@ pub struct FuzzerOptions {
     pub max_total_allocation: usize,
 
     /// instruct ASAN to panic if the max ASAN allocation size is exceeded
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(long, global = true, help_heading = "ASAN Options")]
     pub max_allocation_panics: bool,
 
     /// disable coverage
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(long, global = true, help_heading = "Frida Options")]
     pub disable_coverage: bool,
 
     /// enable DrCov (aarch64 only)
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(long, global = true, help_heading = "Frida Options")]
     pub drcov: bool,
 
     /// locations which will not be instrumented for ASAN or coverage purposes (ex: mod_name@0x12345)
-    #[cfg(feature = "libafl_frida")]
+    #[cfg(feature = "frida_cli")]
     #[clap(short = 'D', long, global = true, help_heading = "Frida Options", parse(try_from_str = parse_instrumentation_location), multiple_occurrences = true)]
     pub dont_instrument: Option<Vec<(String, usize)>>,
 
     /// trailing arguments (after "--") will be passed directly to QEMU
-    #[cfg(feature = "libafl_qemu")]
+    #[cfg(feature = "qemu_cli")]
     #[clap(last = true, global = true)]
     pub qemu_args: Vec<String>,
 }
 
+/// grouping of default subcommands
 #[derive(Subcommand, Debug)]
-pub enum Commands {
+pub enum SubCommand {
     /// Fuzz mode: mutates the starting corpus indefinitely, looking for crashes
     Fuzz {
         /// paths to fuzzer token files (aka 'dictionaries')
@@ -228,6 +277,45 @@ pub enum Commands {
 
 impl FuzzerOptions {
     /// given an `App`, add it to `FuzzerOptions` as a subcommand and return the resulting `App`
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use clap::{App, IntoApp, Parser};
+    /// use libafl::bolts::cli::FuzzerOptions;
+    ///
+    /// fn custom_func(_: &str) {}  // not relevant; just for illustrative purposes
+    ///
+    /// #[derive(Parser, Debug)]
+    /// #[clap(name = "custom")]  // the name of the new subcommand
+    /// struct CustomFooParser {
+    ///     /// a very cromulent option
+    ///     #[clap(short, long)]
+    ///     bar: String,
+    /// }
+    ///
+    /// fn main() {
+    ///     // example command line invocation:
+    ///     // ./path-to-bin custom --bar stuff
+    ///     
+    ///     // clap's builder syntax to define the parser would be fine as well, but here we
+    ///     // show the derive option
+    ///     let cmd: App = CustomFooParser::into_app();
+    ///
+    ///     // `with_subcommand` takes an `App`, and returns an `App`
+    ///     let parser = FuzzerOptions::with_subcommand(cmd);
+    ///
+    ///     // use the `App` to parse everything
+    ///     let matches = parser.get_matches();
+    ///
+    ///     // process the results
+    ///     if let Some(("custom", sub_matches)) = matches.subcommand() {
+    ///         custom_func(sub_matches.value_of("bar").unwrap())
+    ///     }
+    ///
+    ///     println!("{:?}", matches);
+    /// }
+    /// ```
     #[must_use]
     pub fn with_subcommand(mode: App) -> App {
         let app: App = Self::into_app();
@@ -236,12 +324,14 @@ impl FuzzerOptions {
 }
 
 /// Parse from `std::env::args_os()`, exit on error
+///
+/// for more information, see the [cli](super::cli) documentation
 #[must_use]
 pub fn parse_args() -> FuzzerOptions {
     FuzzerOptions::parse()
 }
 
-#[cfg(all(test, feature = "libafl_qemu"))]
+#[cfg(all(test, feature = "qemu_cli"))]
 mod tests {
     use super::*;
 
@@ -263,7 +353,7 @@ mod tests {
             "-L",
             "qemu-bound",
         ]);
-        if let Commands::Fuzz { broker_port, .. } = &parsed.command {
+        if let SubCommand::Fuzz { broker_port, .. } = &parsed.command {
             assert_eq!(*broker_port, 1336);
             assert_eq!(parsed.qemu_args, ["-L", "qemu-bound"]);
         }
