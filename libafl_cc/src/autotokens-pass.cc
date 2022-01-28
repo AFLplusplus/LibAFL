@@ -215,8 +215,8 @@ bool AutoTokensPass::runOnModule(Module &M) {
   ptr = getenv("AFL_LLVM_DICT2FILE");
 
   if (!ptr || *ptr != '/') {
-    fprintf(stderr, "AFL_LLVM_DICT2FILE is not set to an absolute path: %s\n", ptr);
-    fprintf(stderr, "Writing tokens into libafl_tokens section\n");
+    // fprintf(stderr, "AFL_LLVM_DICT2FILE is not set to an absolute path: %s\n", ptr);
+    // fprintf(stderr, "Writing tokens into libafl_tokens section\n");
 
     use_file = false;
   }
