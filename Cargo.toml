@@ -19,7 +19,6 @@ members = [
     "libafl_concolic/test/runtime_test",
     "utils/deexit",
     "utils/gramatron/construct_automata",
-    "utils/fuzzer-options",
 ]
 default-members = [
     "libafl",
