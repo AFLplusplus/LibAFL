@@ -1,8 +1,14 @@
-//! Coverage accounting corpus scheduler, more details at https://www.ndss-symposium.org/wp-content/uploads/2020/02/24422-paper.pdf
+//! Coverage accounting corpus scheduler, more details at <https://www.ndss-symposium.org/wp-content/uploads/2020/02/24422-paper.pdf>
 
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
-    corpus::{minimizer::*, Corpus, CorpusScheduler, Testcase},
+    corpus::{
+        minimizer::{
+            IsFavoredMetadata, LenTimeMulFavFactor, MinimizerCorpusScheduler,
+            DEFAULT_SKIP_NON_FAVORED_PROB,
+        },
+        Corpus, CorpusScheduler, Testcase,
+    },
     feedbacks::MapIndexesMetadata,
     inputs::Input,
     state::{HasCorpus, HasMetadata, HasRand},
@@ -121,8 +127,7 @@ where
         if state
             .metadata()
             .get::<TopAccountingMetadata>()
-            .map(|x| x.changed)
-            .unwrap_or(false)
+            .map_or(false, |x| x.changed)
         {
             self.accounting_cull(state)?;
         } else {
@@ -211,12 +216,10 @@ where
                 // if its accounting is equal to others', it's not favored
                 if equal_score {
                     top_acc.map.remove(&elem);
-                } else {
-                    if top_acc.max_accounting[elem] < self.accounting_map[elem] {
-                        new_favoreds.push(elem);
+                } else if top_acc.max_accounting[elem] < self.accounting_map[elem] {
+                    new_favoreds.push(elem);
 
-                        top_acc.max_accounting[elem] = self.accounting_map[elem];
-                    }
+                    top_acc.max_accounting[elem] = self.accounting_map[elem];
                 }
             }
         }
