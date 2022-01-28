@@ -49,12 +49,12 @@ impl Default for TopRatedsMetadata {
 }
 
 /// Compute the favor factor of a [`Testcase`]. Lower is better.
-pub trait FavFactor<I>
+pub trait FavFactor<I, S>
 where
     I: Input,
 {
     /// Computes the favor factor of a [`Testcase`]. Lower is better.
-    fn compute(testcase: &mut Testcase<I>) -> Result<u64, Error>;
+    fn compute(state: &S, testcase: &mut Testcase<I>) -> Result<u64, Error>;
 }
 
 /// Multiply the testcase size with the execution time.
@@ -67,11 +67,11 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<I> FavFactor<I> for LenTimeMulFavFactor<I>
+impl<I, S> FavFactor<I, S> for LenTimeMulFavFactor<I>
 where
     I: Input + HasLen,
 {
-    fn compute(entry: &mut Testcase<I>) -> Result<u64, Error> {
+    fn compute(_: &S, entry: &mut Testcase<I>) -> Result<u64, Error> {
         // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as u64 * entry.cached_len()? as u64)
     }
@@ -84,7 +84,7 @@ where
 pub struct MinimizerCorpusScheduler<CS, F, I, M, S>
 where
     CS: CorpusScheduler<I, S>,
-    F: FavFactor<I>,
+    F: FavFactor<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata,
@@ -97,7 +97,7 @@ where
 impl<CS, F, I, M, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<CS, F, I, M, S>
 where
     CS: CorpusScheduler<I, S>,
-    F: FavFactor<I>,
+    F: FavFactor<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -145,7 +145,7 @@ where
 impl<CS, F, I, M, S> MinimizerCorpusScheduler<CS, F, I, M, S>
 where
     CS: CorpusScheduler<I, S>,
-    F: FavFactor<I>,
+    F: FavFactor<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -162,7 +162,7 @@ where
         let mut new_favoreds = vec![];
         {
             let mut entry = state.corpus().get(idx)?.borrow_mut();
-            let factor = F::compute(&mut *entry)?;
+            let factor = F::compute(&state, &mut *entry)?;
             let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
                 Error::KeyNotFound(format!(
                     "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
@@ -178,7 +178,7 @@ where
                     .get(elem)
                 {
                     let mut old = state.corpus().get(*old_idx)?.borrow_mut();
-                    if factor > F::compute(&mut *old)? {
+                    if factor > F::compute(&state, &mut *old)? {
                         continue;
                     }
 
@@ -255,6 +255,11 @@ where
         }
 
         Ok(())
+    }
+
+    /// Get a reference to the base scheduler
+    pub fn base(&self) -> &CS {
+        &self.base
     }
 
     /// Creates a new [`MinimizerCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
