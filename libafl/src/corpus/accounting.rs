@@ -1,3 +1,5 @@
+//! Coverage accounting corpus scheduler, more details at https://www.ndss-symposium.org/wp-content/uploads/2020/02/24422-paper.pdf
+
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
     corpus::{minimizer::*, Corpus, CorpusScheduler, Testcase},
@@ -77,6 +79,8 @@ impl TopAccountingMetadata {
     }
 }
 
+/// A minimizer scheduler using coverage accounting
+#[derive(Debug)]
 pub struct CoverageAccountingCorpusScheduler<'a, CS, I, S>
 where
     CS: CorpusScheduler<I, S>,
@@ -94,18 +98,15 @@ where
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
-    /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)
     }
 
-    /// Replaces the testcase at the given idx
     fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.on_replace(state, idx, testcase)
     }
 
-    /// Removes an entry from the corpus, returning M if M was present.
     fn on_remove(
         &self,
         state: &mut S,
@@ -115,7 +116,6 @@ where
         self.inner.on_remove(state, idx, testcase)
     }
 
-    /// Gets the next entry
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state
             .metadata()
@@ -149,7 +149,7 @@ where
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
-    /// Update the `Corpus` score using the `MinimizerCorpusScheduler`
+    /// Update the `Corpus` score
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_accounting_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
