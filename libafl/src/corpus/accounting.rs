@@ -9,6 +9,7 @@ use crate::{
     Error,
 };
 
+use alloc::vec::Vec;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
