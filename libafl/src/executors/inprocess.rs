@@ -28,7 +28,7 @@ use nix::{
     unistd::{fork, ForkResult},
 };
 
-#[cfg(windows)]
+#[cfg(all(feature = "std", windows))]
 use windows::Win32::System::Diagnostics::Debug::EXCEPTION_POINTERS;
 
 #[cfg(unix)]
@@ -43,7 +43,7 @@ use crate::observers::{BacktraceObserver, HarnessType};
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-#[cfg(windows)]
+#[cfg(all(feature = "std", windows))]
 use crate::bolts::os::windows_exceptions::{ExceptionCode, Handler, CRASH_EXCEPTIONS};
 
 use crate::{
