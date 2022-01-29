@@ -1191,58 +1191,151 @@ mod tests {
 /// `InProcess` Python bindings
 pub mod pybind {
     use crate::bolts::tuples::tuple_list;
-    use crate::events::pybind::PythonEventManager;
     use crate::executors::{inprocess::OwnedInProcessExecutor, ExitKind};
-    use crate::fuzzer::pybind::PythonStdFuzzerI32;
     use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::observers::pybind::PythonMapObserverI32;
-    use crate::state::pybind::{MyStdState, PythonStdState};
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
 
-    #[pyclass(unsendable, name = "OwnedInProcessExecutorI32")]
-    #[derive(Debug)]
-    /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
-    pub struct PythonOwnedInProcessExecutorI32 {
-        /// Rust wrapped OwnedInProcessExecutor object
-        pub owned_in_process_executor:
-            OwnedInProcessExecutor<BytesInput, (PythonMapObserverI32, ()), MyStdState>,
+    macro_rules! define_python_in_process_executor {
+        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $std_state_name: ident, $event_manager_name: ident, $map_observer_name: ident, $std_fuzzer_name: ident) => {
+
+            use crate::events::pybind::$event_manager_name;
+            use crate::fuzzer::pybind::$std_fuzzer_name;
+            use crate::observers::pybind::$map_observer_name;
+            use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
+
+            #[pyclass(unsendable, name = $py_name)]
+            #[derive(Debug)]
+            /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
+            pub struct $struct_name {
+                /// Rust wrapped OwnedInProcessExecutor object
+                pub owned_in_process_executor: OwnedInProcessExecutor<
+                    BytesInput,
+                    ($map_observer_name, ()),
+                    $my_std_state_type_name,
+                >,
+            }
+
+            #[pymethods]
+            impl $struct_name {
+                #[new]
+                fn new(
+                    harness: PyObject,
+                    py_observer: $map_observer_name,
+                    py_fuzzer: &mut $std_fuzzer_name,
+                    py_state: &mut $std_state_name,
+                    py_event_manager: &mut $event_manager_name,
+                ) -> Self {
+                    Self {
+                        owned_in_process_executor: OwnedInProcessExecutor::new(
+                            Box::new(move |input: &BytesInput| {
+                                Python::with_gil(|py| -> PyResult<()> {
+                                    let args = (PyBytes::new(py, input.bytes()),);
+                                    harness.call1(py, args)?;
+                                    Ok(())
+                                })
+                                .unwrap();
+                                ExitKind::Ok
+                            }),
+                            tuple_list!(py_observer),
+                            &mut py_fuzzer.std_fuzzer,
+                            &mut py_state.std_state,
+                            py_event_manager,
+                        )
+                        .expect("Failed to create the Executor".into()),
+                    }
+                }
+            }
+        };
     }
 
-    #[pymethods]
-    impl PythonOwnedInProcessExecutorI32 {
-        #[new]
-        fn new(
-            harness: PyObject,
-            py_observer: PythonMapObserverI32,
-            py_fuzzer: &mut PythonStdFuzzerI32,
-            py_state: &mut PythonStdState,
-            py_event_manager: &mut PythonEventManager,
-        ) -> Self {
-            Self {
-                owned_in_process_executor: OwnedInProcessExecutor::new(
-                    Box::new(move |input: &BytesInput| {
-                        Python::with_gil(|py| -> PyResult<()> {
-                            let args = (PyBytes::new(py, input.bytes()),);
-                            harness.call1(py, args)?;
-                            Ok(())
-                        })
-                        .unwrap();
-                        ExitKind::Ok
-                    }),
-                    tuple_list!(py_observer),
-                    &mut py_fuzzer.std_fuzzer,
-                    &mut py_state.std_state,
-                    py_event_manager,
-                )
-                .expect("Failed to create the Executor".into()),
-            }
-        }
-    }
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorI8,
+        "OwnedInProcessExecutorI8",
+        MyStdStateI8,
+        PythonStdStateI8,
+        PythonEventManagerI8,
+        PythonMapObserverI8,
+        PythonStdFuzzerI8
+    );
+
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorI16,
+        "OwnedInProcessExecutorI16",
+        MyStdStateI16,
+        PythonStdStateI16,
+        PythonEventManagerI16,
+        PythonMapObserverI16,
+        PythonStdFuzzerI16
+    );
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorI32,
+        "OwnedInProcessExecutorI32",
+        MyStdStateI32,
+        PythonStdStateI32,
+        PythonEventManagerI32,
+        PythonMapObserverI32,
+        PythonStdFuzzerI32
+    );
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorI64,
+        "OwnedInProcessExecutorI64",
+        MyStdStateI64,
+        PythonStdStateI64,
+        PythonEventManagerI64,
+        PythonMapObserverI64,
+        PythonStdFuzzerI64
+    );
+
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorU8,
+        "OwnedInProcessExecutorU8",
+        MyStdStateU8,
+        PythonStdStateU8,
+        PythonEventManagerU8,
+        PythonMapObserverU8,
+        PythonStdFuzzerU8
+    );
+
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorU16,
+        "OwnedInProcessExecutorU16",
+        MyStdStateU16,
+        PythonStdStateU16,
+        PythonEventManagerU16,
+        PythonMapObserverU16,
+        PythonStdFuzzerU16
+    );
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorU32,
+        "OwnedInProcessExecutorU32",
+        MyStdStateU32,
+        PythonStdStateU32,
+        PythonEventManagerU32,
+        PythonMapObserverU32,
+        PythonStdFuzzerU32
+    );
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorU64,
+        "OwnedInProcessExecutorU64",
+        MyStdStateU64,
+        PythonStdStateU64,
+        PythonEventManagerU64,
+        PythonMapObserverU64,
+        PythonStdFuzzerU64
+    );
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonOwnedInProcessExecutorI8>()?;
+        m.add_class::<PythonOwnedInProcessExecutorI16>()?;
         m.add_class::<PythonOwnedInProcessExecutorI32>()?;
+        m.add_class::<PythonOwnedInProcessExecutorI64>()?;
+        
+        m.add_class::<PythonOwnedInProcessExecutorU8>()?;
+        m.add_class::<PythonOwnedInProcessExecutorU16>()?;
+        m.add_class::<PythonOwnedInProcessExecutorU32>()?;
+        m.add_class::<PythonOwnedInProcessExecutorU64>()?;
         Ok(())
     }
 }

@@ -645,69 +645,181 @@ pub mod pybind {
     use crate::bolts::rands::pybind::PythonRand;
     use crate::bolts::tuples::tuple_list;
     use crate::corpus::pybind::PythonCorpus;
-    use crate::events::pybind::PythonEventManager;
-    use crate::executors::pybind::PythonExecutorI32;
-    use crate::feedbacks::map::{pybind::PythonMapFeedbackStateI32, MapFeedbackState};
-    use crate::fuzzer::pybind::PythonStdFuzzerI32;
-    use crate::generators::pybind::PythonRandPrintablesGeneratorI32;
+    use crate::feedbacks::map::MapFeedbackState;
     use crate::inputs::BytesInput;
     use crate::state::StdState;
     use pyo3::prelude::*;
 
-    /// Temporary `StdState` with fixed generics
-    pub type MyStdState =
-        StdState<PythonCorpus, (MapFeedbackState<i32>, ()), BytesInput, PythonRand, PythonCorpus>;
+    macro_rules! define_python_state {
+        ($type_name:ident, $struct_name:ident, $py_name:tt, $datatype:ty, $py_map_feedback_state_name:ident, $event_manager_name: ident,
+        $fuzzer_name: ident, $executor_name: ident, $rand_printable_generator: ident) => {
+            use crate::events::pybind::$event_manager_name;
+            use crate::executors::pybind::$executor_name;
+            use crate::feedbacks::map::pybind::$py_map_feedback_state_name;
+            use crate::fuzzer::pybind::$fuzzer_name;
+            use crate::generators::pybind::$rand_printable_generator;
 
-    #[pyclass(unsendable, name = "StdState")]
-    #[derive(Debug)]
-    /// Python class for StdState
-    pub struct PythonStdState {
-        /// Rust wrapped StdState object
-        pub std_state: MyStdState,
-    }
+            /// `StdState` with fixed generics
+            pub type $type_name = StdState<
+                PythonCorpus,
+                (MapFeedbackState<$datatype>, ()),
+                BytesInput,
+                PythonRand,
+                PythonCorpus,
+            >;
 
-    #[pymethods]
-    impl PythonStdState {
-        #[new]
-        fn new(
-            py_rand: PythonRand,
-            corpus: PythonCorpus,
-            solutions: PythonCorpus,
-            py_map_feedback_state: PythonMapFeedbackStateI32,
-        ) -> Self {
-            Self {
-                std_state: StdState::new(
-                    py_rand,
-                    corpus,
-                    solutions,
-                    tuple_list!(py_map_feedback_state.map_feedback_state),
-                ),
+            #[pyclass(unsendable, name = $py_name)]
+            #[derive(Debug)]
+            /// Python class for StdState
+            pub struct $struct_name {
+                /// Rust wrapped StdState object
+                pub std_state: $type_name,
             }
-        }
 
-        fn generate_initial_inputs(
-            &mut self,
-            py_fuzzer: &mut PythonStdFuzzerI32,
-            py_executor: &mut PythonExecutorI32,
-            py_generator: &mut PythonRandPrintablesGeneratorI32,
-            py_mgr: &mut PythonEventManager,
-            num: usize,
-        ) {
-            self.std_state
-                .generate_initial_inputs(
-                    &mut py_fuzzer.std_fuzzer,
-                    py_executor,
-                    &mut py_generator.rand_printable_generator,
-                    py_mgr,
-                    num,
-                )
-                .expect("Failed to generate the initial corpus".into());
-        }
+            #[pymethods]
+            impl $struct_name {
+                #[new]
+                fn new(
+                    py_rand: PythonRand,
+                    corpus: PythonCorpus,
+                    solutions: PythonCorpus,
+                    py_map_feedback_state: $py_map_feedback_state_name,
+                ) -> Self {
+                    Self {
+                        std_state: StdState::new(
+                            py_rand,
+                            corpus,
+                            solutions,
+                            tuple_list!(py_map_feedback_state.map_feedback_state),
+                        ),
+                    }
+                }
+
+                fn generate_initial_inputs(
+                    &mut self,
+                    py_fuzzer: &mut $fuzzer_name,
+                    py_executor: &mut $executor_name,
+                    py_generator: &mut $rand_printable_generator,
+                    py_mgr: &mut $event_manager_name,
+                    num: usize,
+                ) {
+                    self.std_state
+                        .generate_initial_inputs(
+                            &mut py_fuzzer.std_fuzzer,
+                            py_executor,
+                            &mut py_generator.rand_printable_generator,
+                            py_mgr,
+                            num,
+                        )
+                        .expect("Failed to generate the initial corpus".into());
+                }
+            }
+        };
     }
+
+    define_python_state!(
+        MyStdStateI8,
+        PythonStdStateI8,
+        "StdStateI8",
+        i8,
+        PythonMapFeedbackStateI8,
+        PythonEventManagerI8,
+        PythonStdFuzzerI8,
+        PythonExecutorI8,
+        PythonRandPrintablesGeneratorI8
+    );
+
+    define_python_state!(
+        MyStdStateI16,
+        PythonStdStateI16,
+        "StdStateI16",
+        i16,
+        PythonMapFeedbackStateI16,
+        PythonEventManagerI16,
+        PythonStdFuzzerI16,
+        PythonExecutorI16,
+        PythonRandPrintablesGeneratorI16
+    );
+
+    define_python_state!(
+        MyStdStateI32,
+        PythonStdStateI32,
+        "StdStateI32",
+        i32,
+        PythonMapFeedbackStateI32,
+        PythonEventManagerI32,
+        PythonStdFuzzerI32,
+        PythonExecutorI32,
+        PythonRandPrintablesGeneratorI32
+    );
+
+    define_python_state!(
+        MyStdStateI64,
+        PythonStdStateI64,
+        "StdStateI64",
+        i64,
+        PythonMapFeedbackStateI64,
+        PythonEventManagerI64,
+        PythonStdFuzzerI64,
+        PythonExecutorI64,
+        PythonRandPrintablesGeneratorI64
+    );
+    define_python_state!(
+        MyStdStateU8,
+        PythonStdStateU8,
+        "StdStateU8",
+        u8,
+        PythonMapFeedbackStateU8,
+        PythonEventManagerU8,
+        PythonStdFuzzerU8,
+        PythonExecutorU8,
+        PythonRandPrintablesGeneratorU8
+    );
+    define_python_state!(
+        MyStdStateU16,
+        PythonStdStateU16,
+        "StdStateU16",
+        u16,
+        PythonMapFeedbackStateU16,
+        PythonEventManagerU16,
+        PythonStdFuzzerU16,
+        PythonExecutorU16,
+        PythonRandPrintablesGeneratorU16
+    );
+    define_python_state!(
+        MyStdStateU32,
+        PythonStdStateU32,
+        "StdStateU32",
+        u32,
+        PythonMapFeedbackStateU32,
+        PythonEventManagerU32,
+        PythonStdFuzzerU32,
+        PythonExecutorU32,
+        PythonRandPrintablesGeneratorU32
+    );
+    define_python_state!(
+        MyStdStateU64,
+        PythonStdStateU64,
+        "StdStateU64",
+        u64,
+        PythonMapFeedbackStateU64,
+        PythonEventManagerU64,
+        PythonStdFuzzerU64,
+        PythonExecutorU64,
+        PythonRandPrintablesGeneratorU64
+    );
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdState>()?;
+        m.add_class::<PythonStdStateI8>()?;
+        m.add_class::<PythonStdStateI16>()?;
+        m.add_class::<PythonStdStateI32>()?;
+        m.add_class::<PythonStdStateI64>()?;
+        
+        m.add_class::<PythonStdStateU8>()?;
+        m.add_class::<PythonStdStateU16>()?;
+        m.add_class::<PythonStdStateU32>()?;
+        m.add_class::<PythonStdStateU64>()?;
         Ok(())
     }
 }

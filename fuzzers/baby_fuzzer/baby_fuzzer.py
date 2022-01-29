@@ -40,7 +40,7 @@ feedback_state = libafl.MapFeedbackStateI32.with_observer(map_observer_wrapper(m
 
 feedback = libafl.MaxMapFeedbackI32(feedback_state, map_observer_wrapper(map_observer))
 
-state = libafl.StdState(
+state = libafl.StdStateI32(
     rand_wrapper(libafl.StdRand.with_current_nanos()), 
     corpus_wrapper(libafl.InMemoryCorpus()), 
     corpus_wrapper(libafl.OnDiskCorpus("./crashes")), 

@@ -1306,7 +1306,7 @@ pub mod pybind {
         PythonMapObserverI8,
         "MapObserverI8",
         i8,
-        WrapperI8
+        PythonMapObserverWrapperI8
     );
     define_python_map_observer!(
         PythonOwnedMapObserverI16,
@@ -1314,7 +1314,7 @@ pub mod pybind {
         PythonMapObserverI16,
         "MapObserverI16",
         i16,
-        WrapperI16
+        PythonMapObserverWrapperI16
     );
     define_python_map_observer!(
         PythonOwnedMapObserverI32,
@@ -1322,7 +1322,7 @@ pub mod pybind {
         PythonMapObserverI32,
         "MapObserverI32",
         i32,
-        WrapperI32
+        PythonMapObserverWrapperI32
     );
     define_python_map_observer!(
         PythonOwnedMapObserverI64,
@@ -1330,7 +1330,7 @@ pub mod pybind {
         PythonMapObserverI64,
         "MapObserverI64",
         i64,
-        WrapperI64
+        PythonMapObserverWrapperI64
     );
 
     define_python_map_observer!(
@@ -1339,7 +1339,7 @@ pub mod pybind {
         PythonMapObserverU8,
         "MapObserverU8",
         u8,
-        WrapperU8
+        PythonMapObserverWrapperU8
     );
     define_python_map_observer!(
         PythonOwnedMapObserverU16,
@@ -1347,7 +1347,7 @@ pub mod pybind {
         PythonMapObserverU16,
         "MapObserverU16",
         u16,
-        WrapperU16
+        PythonMapObserverWrapperU16
     );
     define_python_map_observer!(
         PythonOwnedMapObserverU32,
@@ -1355,7 +1355,7 @@ pub mod pybind {
         PythonMapObserverU32,
         "MapObserverU32",
         u32,
-        WrapperU32
+        PythonMapObserverWrapperU32
     );
     define_python_map_observer!(
         PythonOwnedMapObserverU64,
@@ -1363,7 +1363,7 @@ pub mod pybind {
         PythonMapObserverU64,
         "MapObserverU64",
         u64,
-        WrapperU64
+        PythonMapObserverWrapperU64
     );
 
     /// Register the classes to the python module
