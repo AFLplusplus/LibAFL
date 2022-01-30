@@ -554,12 +554,12 @@ pub mod pybind {
     use crate::inputs::BytesInput;
     use crate::Error;
     use pyo3::prelude::*;
-    
+
     macro_rules! define_python_event_manager {
         ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $std_state_name: ident, $executor_name: ident, $my_std_fuzzer_type_name: ident) => {
-            use crate::state::pybind::$std_state_name;
             use crate::executors::pybind::$executor_name;
             use crate::pybind::$my_std_fuzzer_type_name;
+            use crate::state::pybind::$std_state_name;
 
             #[derive(Debug)]
             enum $wrapper_name {
@@ -576,8 +576,12 @@ pub mod pybind {
             impl $struct_name_trait {
                 fn get_event_manager(
                     &self,
-                ) -> &impl EventManager<$executor_name, BytesInput, $std_state_name, $my_std_fuzzer_type_name>
-                {
+                ) -> &impl EventManager<
+                    $executor_name,
+                    BytesInput,
+                    $std_state_name,
+                    $my_std_fuzzer_type_name,
+                > {
                     unsafe {
                         match self.event_manager {
                             $wrapper_name::Simple(py_simple_event_manager) => {
@@ -589,8 +593,12 @@ pub mod pybind {
 
                 fn get_mut_event_manager(
                     &mut self,
-                ) -> &mut impl EventManager<$executor_name, BytesInput, $std_state_name, $my_std_fuzzer_type_name>
-                {
+                ) -> &mut impl EventManager<
+                    $executor_name,
+                    BytesInput,
+                    $std_state_name,
+                    $my_std_fuzzer_type_name,
+                > {
                     unsafe {
                         match self.event_manager {
                             $wrapper_name::Simple(py_simple_event_manager) => {
@@ -623,8 +631,13 @@ pub mod pybind {
 
             impl<S> EventRestarter<S> for $struct_name_trait {}
 
-            impl EventProcessor<$executor_name, BytesInput, $std_state_name, $my_std_fuzzer_type_name>
-                for $struct_name_trait
+            impl
+                EventProcessor<
+                    $executor_name,
+                    BytesInput,
+                    $std_state_name,
+                    $my_std_fuzzer_type_name,
+                > for $struct_name_trait
             {
                 fn process(
                     &mut self,
@@ -721,14 +734,13 @@ pub mod pybind {
         MyStdFuzzerU64
     );
 
-
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonEventManagerI8>()?;
         m.add_class::<PythonEventManagerI16>()?;
         m.add_class::<PythonEventManagerI32>()?;
         m.add_class::<PythonEventManagerI64>()?;
-        
+
         m.add_class::<PythonEventManagerU8>()?;
         m.add_class::<PythonEventManagerU16>()?;
         m.add_class::<PythonEventManagerU32>()?;

@@ -815,7 +815,7 @@ pub mod pybind {
         m.add_class::<PythonStdStateI16>()?;
         m.add_class::<PythonStdStateI32>()?;
         m.add_class::<PythonStdStateI64>()?;
-        
+
         m.add_class::<PythonStdStateU8>()?;
         m.add_class::<PythonStdStateU16>()?;
         m.add_class::<PythonStdStateU32>()?;

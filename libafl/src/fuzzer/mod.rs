@@ -845,7 +845,7 @@ pub mod pybind {
         m.add_class::<PythonStdFuzzerI16>()?;
         m.add_class::<PythonStdFuzzerI32>()?;
         m.add_class::<PythonStdFuzzerI64>()?;
-        
+
         m.add_class::<PythonStdFuzzerU8>()?;
         m.add_class::<PythonStdFuzzerU16>()?;
         m.add_class::<PythonStdFuzzerU32>()?;

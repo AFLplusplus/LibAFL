@@ -1198,7 +1198,6 @@ pub mod pybind {
 
     macro_rules! define_python_in_process_executor {
         ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $std_state_name: ident, $event_manager_name: ident, $map_observer_name: ident, $std_fuzzer_name: ident) => {
-
             use crate::events::pybind::$event_manager_name;
             use crate::fuzzer::pybind::$std_fuzzer_name;
             use crate::observers::pybind::$map_observer_name;
@@ -1331,7 +1330,7 @@ pub mod pybind {
         m.add_class::<PythonOwnedInProcessExecutorI16>()?;
         m.add_class::<PythonOwnedInProcessExecutorI32>()?;
         m.add_class::<PythonOwnedInProcessExecutorI64>()?;
-        
+
         m.add_class::<PythonOwnedInProcessExecutorU8>()?;
         m.add_class::<PythonOwnedInProcessExecutorU16>()?;
         m.add_class::<PythonOwnedInProcessExecutorU32>()?;

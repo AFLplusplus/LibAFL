@@ -16,7 +16,7 @@ def monitor_wrapper(monitor):
 
 def event_manager_wrapper(event_manager):
     if type(event_manager).__name__ == "SimpleEventManager":
-        return libafl.EventManager.new_from_simple(event_manager)
+        return libafl.EventManagerI32.new_from_simple(event_manager)
 
 def corpus_wrapper(corpus):
     if type(corpus).__name__ == "InMemoryCorpus":
@@ -55,6 +55,6 @@ fuzzer = libafl.StdFuzzerI32(feedback)
 
 executor = libafl.OwnedInProcessExecutorI32(harness, map_observer_wrapper(map_observer), fuzzer, state, event_manager_wrapper(mgr))
 
-generator = libafl.RandPrintablesGenerator(32)
+generator = libafl.RandPrintablesGeneratorI32(32)
 
 state.generate_initial_inputs(fuzzer, executor_wrapper(executor), generator, event_manager_wrapper(mgr), 8000000)

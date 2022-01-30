@@ -204,7 +204,7 @@ pub mod pybind {
         m.add_class::<PythonRandPrintablesGeneratorI16>()?;
         m.add_class::<PythonRandPrintablesGeneratorI32>()?;
         m.add_class::<PythonRandPrintablesGeneratorI64>()?;
-        
+
         m.add_class::<PythonRandPrintablesGeneratorU8>()?;
         m.add_class::<PythonRandPrintablesGeneratorU16>()?;
         m.add_class::<PythonRandPrintablesGeneratorU32>()?;

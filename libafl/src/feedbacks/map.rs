@@ -683,9 +683,10 @@ pub mod pybind {
     use crate::feedbacks::map::{MapFeedbackState, MaxMapFeedback};
     use crate::inputs::BytesInput;
     use pyo3::prelude::*;
-    
+
     macro_rules! define_python_map_feedback {
-        ($map_feedback_state_struct_name:ident, $map_feedback_state_py_name:tt, $max_map_feedback_struct_name:ident, $max_map_feedback_py_name:tt, $datatype:ty, $map_observer_name: ident, $std_state_name: ident) => {
+        ($map_feedback_state_struct_name:ident, $map_feedback_state_py_name:tt, $max_map_feedback_struct_name:ident,
+            $max_map_feedback_py_name:tt, $datatype:ty, $map_observer_name: ident, $std_state_name: ident) => {
             use crate::observers::map::pybind::$map_observer_name;
             use crate::state::pybind::$std_state_name;
 
@@ -826,7 +827,7 @@ pub mod pybind {
         m.add_class::<PythonMaxMapFeedbackI16>()?;
         m.add_class::<PythonMaxMapFeedbackI32>()?;
         m.add_class::<PythonMaxMapFeedbackI64>()?;
-        
+
         m.add_class::<PythonMaxMapFeedbackU8>()?;
         m.add_class::<PythonMaxMapFeedbackU16>()?;
         m.add_class::<PythonMaxMapFeedbackU32>()?;

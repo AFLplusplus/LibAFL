@@ -351,7 +351,7 @@ pub mod pybind {
         m.add_class::<PythonExecutorI16>()?;
         m.add_class::<PythonExecutorI32>()?;
         m.add_class::<PythonExecutorI64>()?;
-        
+
         m.add_class::<PythonExecutorU8>()?;
         m.add_class::<PythonExecutorU16>()?;
         m.add_class::<PythonExecutorU32>()?;
