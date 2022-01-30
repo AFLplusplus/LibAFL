@@ -4,6 +4,7 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 use clap::{App, Arg};
+use content_inspector::inspect;
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -13,7 +14,7 @@ use std::{
     env,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process,
 };
 
@@ -34,17 +35,22 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, HasTargetBytes},
+    inputs::{BytesInput, GeneralizedInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::{
-        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, TokenSection, Tokens,
+        grimoire::{
+            GrimoireExtensionMutator, GrimoireRandomDeleteMutator,
+            GrimoireRecursiveReplacementMutator, GrimoireStringReplacementMutator,
+        },
+        scheduled::havoc_mutations,
+        token_mutations::I2SRandReplace,
+        tokens_mutations, StdMOptMutator, StdScheduledMutator, TokenSection, Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
-        StdMutationalStage, TracingStage,
+        GeneralizationStage, StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -171,8 +177,63 @@ pub fn libafl_main() {
             .expect("Could not parse timeout in milliseconds"),
     );
 
-    fuzz(out_dir, crashes, in_dir, tokens, logfile, timeout)
-        .expect("An error occurred while fuzzing");
+    if check_if_textual(&in_dir, &tokens) {
+        fuzz_text(out_dir, crashes, in_dir, tokens, logfile, timeout)
+            .expect("An error occurred while fuzzing");
+    } else {
+        fuzz_binary(out_dir, crashes, in_dir, tokens, logfile, timeout)
+            .expect("An error occurred while fuzzing");
+    }
+}
+
+fn count_textual_inputs(dir: &Path) -> (usize, usize) {
+    let mut textuals = 0;
+    let mut total = 0;
+    for entry in fs::read_dir(dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        let attributes = fs::metadata(&path);
+        if attributes.is_err() {
+            continue;
+        }
+        let attr = attributes.unwrap();
+        if attr.is_dir() {
+            let (found, tot) = count_textual_inputs(&path);
+            textuals += found;
+            total += tot;
+        } else if attr.is_file() && attr.len() != 0 {
+            let mut file = File::open(&path).expect("No file found");
+            let mut buffer = vec![];
+            file.read_to_end(&mut buffer).expect("Buffer overflow");
+
+            if inspect(&buffer).is_text() {
+                println!("Testcase {:?} is text", &path);
+                textuals += 1;
+            } else {
+                println!("Testcase {:?} is binary", &path);
+            }
+            total += 1;
+        }
+    }
+    (textuals, total)
+}
+
+fn check_if_textual(seeds_dir: &Path, tokenfile: &Option<PathBuf>) -> bool {
+    let (found, tot) = count_textual_inputs(&seeds_dir);
+    let is_text = found * 100 / tot > 90; // 90% of text inputs
+    if let Some(tokenfile) = tokenfile {
+        let toks = Tokens::from_tokens_file(tokenfile).unwrap();
+        if !toks.tokens().is_empty() {
+            let mut cnt = 0;
+            for t in toks.tokens() {
+                if inspect(t).is_text() {
+                    cnt += 1;
+                }
+            }
+            return is_text && cnt * 100 / toks.tokens().len() > 90; // 90% of text tokens
+        }
+    }
+    is_text
 }
 
 fn run_testcases(filenames: &[&str]) {
@@ -199,7 +260,7 @@ fn run_testcases(filenames: &[&str]) {
 }
 
 /// The actual fuzzer
-fn fuzz(
+fn fuzz_binary(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
     seed_dir: PathBuf,
@@ -375,6 +436,233 @@ fn fuzz(
     if state.corpus().count() < 1 {
         state
             .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
+            .unwrap_or_else(|_| {
+                println!("Failed to load initial corpus at {:?}", &seed_dir);
+                process::exit(0);
+            });
+        println!("We imported {} inputs from disk.", state.corpus().count());
+    }
+
+    // Remove target ouput (logs still survive)
+    #[cfg(unix)]
+    {
+        let null_fd = file_null.as_raw_fd();
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stderr().as_raw_fd())?;
+    }
+    // reopen file to make sure we're at the end
+    log.replace(
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&logfile)?,
+    );
+
+    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+
+    // Never reached
+    Ok(())
+}
+
+/// The actual fuzzer based on Grimoire
+fn fuzz_text(
+    corpus_dir: PathBuf,
+    objective_dir: PathBuf,
+    seed_dir: PathBuf,
+    tokenfile: Option<PathBuf>,
+    logfile: PathBuf,
+    timeout: Duration,
+) -> Result<(), Error> {
+    let log = RefCell::new(
+        OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&logfile)?,
+    );
+
+    #[cfg(unix)]
+    let mut stdout_cpy = unsafe {
+        let new_fd = dup(io::stdout().as_raw_fd())?;
+        File::from_raw_fd(new_fd)
+    };
+    #[cfg(unix)]
+    let file_null = File::open("/dev/null")?;
+
+    // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
+    let monitor = SimpleMonitor::new(|s| {
+        #[cfg(unix)]
+        writeln!(&mut stdout_cpy, "{}", s).unwrap();
+        #[cfg(windows)]
+        println!("{}", s);
+        writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
+    });
+
+    // We need a shared map to store our state before a crash.
+    // This way, we are able to continue fuzzing afterwards.
+    let mut shmem_provider = StdShMemProvider::new()?;
+
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    {
+        // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
+        Ok(res) => res,
+        Err(err) => match err {
+            Error::ShuttingDown => {
+                return Ok(());
+            }
+            _ => {
+                panic!("Failed to setup the restarter: {}", err);
+            }
+        },
+    };
+
+    // Create an observation channel using the coverage map
+    // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
+    let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
+
+    // Create an observation channel to keep track of the execution time
+    let time_observer = TimeObserver::new("time");
+
+    let cmplog = unsafe { &mut CMPLOG_MAP };
+    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+
+    // The state of the edges feedback.
+    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+
+    // Feedback to rate the interestingness of an input
+    // This one is composed by two Feedbacks in OR
+    let feedback = feedback_or!(
+        // New maximization map feedback linked to the edges observer and the feedback state
+        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, true),
+        // Time feedback, this one does not need a feedback state
+        TimeFeedback::new_with_observer(&time_observer)
+    );
+
+    // A feedback to choose if an input is a solution or not
+    let objective = CrashFeedback::new();
+
+    // If not restarting, create a State from scratch
+    let mut state = state.unwrap_or_else(|| {
+        StdState::new(
+            // RNG
+            StdRand::with_seed(current_nanos()),
+            // Corpus that will be evolved, we keep it in memory for performance
+            OnDiskCorpus::new(corpus_dir).unwrap(),
+            // Corpus in which we store solutions (crashes in this example),
+            // on disk so the user can get them after stopping the fuzzer
+            OnDiskCorpus::new(objective_dir).unwrap(),
+            // States of the feedbacks.
+            // They are the data related to the feedbacks that you want to persist in the State.
+            tuple_list!(feedback_state),
+        )
+    });
+
+    println!("Let's fuzz :)");
+
+    // The actual target run starts here.
+    // Call LLVMFUzzerInitialize() if present.
+    let args: Vec<String> = env::args().collect();
+    if libfuzzer_initialize(&args) == -1 {
+        println!("Warning: LLVMFuzzerInitialize failed with -1")
+    }
+
+    let calibration = CalibrationStage::new(&mut state, &edges_observer);
+
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
+    // Setup a MOPT mutator
+    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
+
+    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+
+    let grimoire_mutator = StdScheduledMutator::with_max_iterations(
+        tuple_list!(
+            GrimoireExtensionMutator::new(),
+            GrimoireRecursiveReplacementMutator::new(),
+            GrimoireStringReplacementMutator::new(),
+            // give more probability to avoid large inputs
+            GrimoireRandomDeleteMutator::new(),
+            GrimoireRandomDeleteMutator::new(),
+        ),
+        3,
+    );
+    let grimoire = StdMutationalStage::new(grimoire_mutator);
+
+    // A minimization+queue policy to get testcasess from the corpus
+    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
+
+    // A fuzzer with feedbacks and a corpus scheduler
+    let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
+
+    // The wrapped harness function, calling out to the LLVM-style harness
+    let mut harness = |input: &GeneralizedInput| {
+        let target = input.target_bytes();
+        let buf = target.as_slice();
+        libfuzzer_test_one_input(buf);
+        ExitKind::Ok
+    };
+
+    let mut tracing_harness = harness;
+
+    let generalization = GeneralizationStage::new(&edges_observer);
+
+    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
+    let mut executor = TimeoutExecutor::new(
+        InProcessExecutor::new(
+            &mut harness,
+            tuple_list!(edges_observer, time_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+        )?,
+        timeout,
+    );
+
+    // Setup a tracing stage in which we log comparisons
+    let tracing = TracingStage::new(TimeoutExecutor::new(
+        InProcessExecutor::new(
+            &mut tracing_harness,
+            tuple_list!(cmplog_observer),
+            &mut fuzzer,
+            &mut state,
+            &mut mgr,
+        )?,
+        // Give it more time!
+        timeout * 10,
+    ));
+
+    // The order of the stages matter!
+    let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
+
+    // Read tokens
+    if state.metadata().get::<Tokens>().is_none() {
+        let mut toks = Tokens::default();
+        if let Some(tokenfile) = tokenfile {
+            toks = toks.parse_tokens_file(vec![tokenfile])?;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let token_section = TokenSection::new(token_section());
+            toks = toks.parse_autotokens(token_section)?;
+        }
+
+        if !toks.tokens().is_empty() {
+            state.add_metadata(toks);
+        }
+    }
+
+    // In case the corpus is empty (on first run), reset
+    if state.corpus().count() < 1 {
+        state
+            .load_from_directory(
+                &mut fuzzer,
+                &mut executor,
+                &mut mgr,
+                &seed_dir,
+                false,
+                &mut |_, _, path| GeneralizedInput::from_bytes_file(path),
+            )
             .unwrap_or_else(|_| {
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);

@@ -40,11 +40,11 @@ clean:
 	$(MAKE) -C libpng-1.6.37 clean
 
 run: all
-	./$(FUZZER_NAME) --cores 0 &
+	./$(FUZZER_NAME) --cores 0 --input ./corpus &
 
 short_test: all
 	rm -rf libafl_unix_shmem_server || true
-	timeout 10s ./$(FUZZER_NAME) --cores 0 &
+	timeout 10s ./$(FUZZER_NAME) --cores 0 --input ./corpus &
 
 test: all
-	timeout 60s ./$(FUZZER_NAME) --cores 0 &
+	timeout 60s ./$(FUZZER_NAME) --cores 0 --input ./corpus &
