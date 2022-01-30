@@ -142,6 +142,7 @@ impl CommandExecutor<(), (), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`].
     /// This is usually the easiest way to construct a [`CommandExecutor`].
+    #[must_use]
     pub fn builder() -> CommandExecutorBuilder {
         CommandExecutorBuilder::new()
     }
@@ -297,7 +298,7 @@ where
 }
 
 /// The builder for a default [`ComandsExecutor`] that should fit most use-cases.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CommandExecutorBuilder {
     debug_child: bool,
     program: Option<OsString>,
@@ -525,7 +526,7 @@ mod tests {
     #[cfg(unix)]
     fn test_builder() {
         let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
-            println!("{}", status)
+            println!("{}", status);
         }));
 
         let mut executor = CommandExecutor::builder();
@@ -549,7 +550,7 @@ mod tests {
     #[cfg(unix)]
     fn test_parse_afl_cmdline() {
         let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
-            println!("{}", status)
+            println!("{}", status);
         }));
 
         let mut executor =

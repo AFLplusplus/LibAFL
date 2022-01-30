@@ -12,7 +12,7 @@ use std::os::unix::prelude::{AsRawFd, RawFd};
 use crate::Error;
 
 /// The default filename to use to deliver testcases to the target
-pub const DEFAULT_OUTFILE: &str = "./.cur_input";
+pub const DEFAULT_OUTFILE: &str = ".cur_input";
 
 /// Creates a `.{file_name}.tmp` file, and writes all bytes to it.
 /// After all bytes have been written, the tmp-file is moved to it's original `path`.
