@@ -22,7 +22,7 @@ use crate::{
     inputs::HasTargetBytes,
 };
 #[cfg(feature = "std")]
-use crate::{executors::HasObservers, inputs::Input, observers::ObserversTuple, Error};
+use crate::{inputs::Input, Error};
 
 #[cfg(all(feature = "std", unix))]
 use crate::executors::{Executor, ExitKind};
@@ -129,34 +129,28 @@ impl CommandConfigurator for StdCommandConfiguator {
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
-/// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StandardCommandConfigurator`].
-pub struct CommandExecutor<EM, I, OT, S, T, Z>
+/// Instead, you can use [`CommandExecutorBuilder()`] to construct a [`CommandExecutor`] backed by a [`StandardCommandConfigurator`].
+pub struct CommandExecutor<EM, I, S, T, Z>
 where
-    OT: Debug,
     T: Debug,
 {
     inner: T,
-    /// [`crate::observers::Observer`]s for this executor
-    observers: OT,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl<EM, I, OT, S, T, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, I, S, T, Z> Debug for CommandExecutor<EM, I, S, T, Z>
 where
-    OT: Debug,
     T: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
             .field("inner", &self.inner)
-            .field("observers", &self.observers)
             .finish()
     }
 }
 
-impl<EM, I, OT, S, T, Z> CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, I, S, T, Z> CommandExecutor<EM, I, S, T, Z>
 where
-    OT: Debug,
     T: Debug,
 {
     /// Accesses the inner value
@@ -165,18 +159,14 @@ where
     }
 }
 
-impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfiguator, Z>
-where
-    OT: Debug + ObserversTuple<I, S>,
-{
+impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfiguator, Z> {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
     pub fn from_cmd_with_file<P>(
         cmd: &Command,
-        observers: OT,
         debug_child: bool,
         path: P,
-    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfiguator, Z>, Error>
+    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfiguator, Z>, Error>
     where
         P: AsRef<Path>,
     {
@@ -194,23 +184,27 @@ where
                 command,
                 debug_child,
             },
-            observers,
             phantom: PhantomData,
         })
     }
 
     /// Parses an AFL-like comandline, replacing `@@` with the input file.
     /// If no `@@` was found, will use stdin for input.
-    pub fn parse_afl_cmdline(
-        args: &[String],
+    pub fn parse_afl_cmdline<IT, O>(
+        args: IT,
         debug_child: bool,
-    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfiguator, Z>, Error> {
+    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfiguator, Z>, Error>
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
         let mut atat_at = None;
-        let mut builder = Self::builder();
+        let mut builder = CommandExecutorBuilder::new();
         builder.debug_child(debug_child);
+        let afl_delim = OsStr::new("@@");
 
-        for (pos, arg) in args.iter().enumerate() {
-            if arg == "@@" {
+        for (pos, arg) in args.into_iter().enumerate() {
+            if arg.as_ref() == afl_delim {
                 if atat_at.is_some() {
                     return Err(Error::IllegalArgument(
                         "Multiple @@ in afl commandline are not permitted".into(),
@@ -232,29 +226,14 @@ where
 
         builder.build()
     }
-
-    fn builder() -> CommandExecutorBuilder<I, OT, S> {
-        CommandExecutorBuilder {
-            program: None,
-            args_before: vec![],
-            input_location: None,
-            args_after: vec![],
-            cwd: None,
-            envs: vec![],
-            debug_child: false,
-            observers: None,
-            phantom: PhantomData,
-        }
-    }
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, OT: Debug, S, T: Debug, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, I, S, T: Debug, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, S, T, Z>
 where
     I: Input + HasTargetBytes,
     T: CommandConfigurator,
-    OT: ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
@@ -289,30 +268,9 @@ where
     }
 }
 
-#[cfg(all(feature = "std", unix))]
-impl<EM, I, OT: Debug, S, T: Debug, Z> HasObservers<I, OT, S>
-    for CommandExecutor<EM, I, OT, S, T, Z>
-where
-    OT: ObserversTuple<I, S>,
-    T: CommandConfigurator,
-{
-    #[inline]
-    fn observers(&self) -> &OT {
-        &self.observers
-    }
-
-    #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
-        &mut self.observers
-    }
-}
-
 /// The builder for a default [`ComandsExecutor`] that should fit most use-cases.
 #[derive(Debug)]
-pub struct CommandExecutorBuilder<I, OT, S>
-where
-    OT: ObserversTuple<I, S>,
-{
+pub struct CommandExecutorBuilder {
     debug_child: bool,
     program: Option<OsString>,
     args_before: Vec<OsString>,
@@ -320,11 +278,22 @@ where
     args_after: Vec<OsString>,
     cwd: Option<PathBuf>,
     envs: Vec<(OsString, OsString)>,
-    observers: Option<OT>,
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
+impl CommandExecutorBuilder {
+    /// Create a new CommandExecutorBuilder
+    pub fn new() -> CommandExecutorBuilder {
+        CommandExecutorBuilder {
+            program: None,
+            args_before: vec![],
+            input_location: None,
+            args_after: vec![],
+            cwd: None,
+            envs: vec![],
+            debug_child: false,
+        }
+    }
+
     /// Set the binary to execute
     /// This option is required.
     pub fn program<O>(&mut self, program: O) -> &mut Self
@@ -348,7 +317,7 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     }
 
     /// Adds an argument to the program's commandline.
-    pub fn arg<O: AsRef<OsStr>>(&mut self, arg: O) -> &mut CommandExecutorBuilder<I, OT, S> {
+    pub fn arg<O: AsRef<OsStr>>(&mut self, arg: O) -> &mut CommandExecutorBuilder {
         match self.input_location {
             Some(InputLocation::StdIn) => self.args_before.push(arg.as_ref().to_owned()),
             Some(_) | None => self.args_after.push(arg.as_ref().to_owned()),
@@ -357,7 +326,7 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     }
 
     /// Adds a range of arguments to the program's commandline.
-    pub fn args<IT, O>(&mut self, args: IT) -> &mut CommandExecutorBuilder<I, OT, S>
+    pub fn args<IT, O>(&mut self, args: IT) -> &mut CommandExecutorBuilder
     where
         IT: IntoIterator<Item = O>,
         O: AsRef<OsStr>,
@@ -369,7 +338,7 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     }
 
     /// Adds a range of environment variables to the executed command.
-    pub fn envs<IT, K, V>(&mut self, vars: IT) -> &mut CommandExecutorBuilder<I, OT, S>
+    pub fn envs<IT, K, V>(&mut self, vars: IT) -> &mut CommandExecutorBuilder
     where
         IT: IntoIterator<Item = (K, V)>,
         K: AsRef<OsStr>,
@@ -382,7 +351,7 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     }
 
     /// Adds an environment variable to the executed command.
-    pub fn env<K, V>(&mut self, key: K, val: V) -> &mut CommandExecutorBuilder<I, OT, S>
+    pub fn env<K, V>(&mut self, key: K, val: V) -> &mut CommandExecutorBuilder
     where
         K: AsRef<OsStr>,
         V: AsRef<OsStr>,
@@ -393,29 +362,22 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     }
 
     /// Sets the working directory for the child process.
-    pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut CommandExecutorBuilder<I, OT, S> {
+    pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut CommandExecutorBuilder {
         self.cwd = Some(dir.as_ref().to_owned());
         self
     }
 
     /// If set to true, the child's output won't be redirecited to `/dev/null`.
     /// Defaults to `false`.
-    pub fn debug_child(&mut self, debug_child: bool) -> &mut CommandExecutorBuilder<I, OT, S> {
+    pub fn debug_child(&mut self, debug_child: bool) -> &mut CommandExecutorBuilder {
         self.debug_child = debug_child;
         self
     }
 
-    /// Sets the observers for the executor.
-    /// This option is required.
-    pub fn observers(&mut self, observers: OT) -> &mut CommandExecutorBuilder<I, OT, S> {
-        self.observers = Some(observers);
-        self
-    }
-
     /// Builds the `ComandExecutor`
-    pub fn build<EM, Z>(
+    pub fn build<EM, I, S, Z>(
         self,
-    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfiguator, Z>, Error> {
+    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfiguator, Z>, Error> {
         let program = if let Some(program) = self.program {
             program
         } else {
@@ -458,15 +420,7 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
             input_location: self.input_location.unwrap(),
             command,
         };
-        Ok(
-            configurator.into_executor(if let Some(observer) = self.observers {
-                observer
-            } else {
-                return Err(Error::IllegalArgument(
-                    "ComandExecutor::builder: no observer set!".into(),
-                ));
-            }),
-        )
+        Ok(configurator.into_executor())
     }
 }
 
@@ -508,17 +462,66 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<EM, I, OT: Debug, S, Z>(
-        self,
-        observers: OT,
-    ) -> CommandExecutor<EM, I, OT, S, Self, Z>
-    where
-        OT: ObserversTuple<I, S>,
-    {
+    fn into_executor<EM, I, S, Z>(self) -> CommandExecutor<EM, I, S, Self, Z> {
         CommandExecutor {
             inner: self,
-            observers,
             phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        events::SimpleEventManager,
+        executors::{
+            command::{CommandExecutor, CommandExecutorBuilder, InputLocation},
+            Executor,
+        },
+        inputs::BytesInput,
+        monitors::SimpleMonitor,
+    };
+
+    #[test]
+    #[cfg(unix)]
+    fn test_builder() {
+        let mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+            println!("{}", status)
+        }));
+
+        let executor = CommandExecutorBuilder::new()
+            .program("ls")
+            .input(InputLocation::Arg { argnum: 0 })
+            .build()
+            .unwrap();
+
+        executor
+            .run_target(
+                &mut (),
+                &mut (),
+                &mut mgr,
+                &BytesInput::new(b"test".to_vec()),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_parse_afl_cmdline() {
+        let mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+            println!("{}", status)
+        }));
+
+        let executor =
+            CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], true)
+                .unwrap();
+        executor
+            .run_target(
+                &mut (),
+                &mut (),
+                &mut mgr,
+                &BytesInput::new(b"test".to_vec()),
+            )
+            .unwrap();
     }
 }
