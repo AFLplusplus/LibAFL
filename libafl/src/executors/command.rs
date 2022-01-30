@@ -50,19 +50,7 @@ pub enum InputLocation {
     },
 }
 
-/// A simple Configurator that takes the most common parameters
-/// Writes the input either to stdio or to a file
-#[derive(Debug)]
-pub struct DefaultConfiguator {
-    /// If set to true, the child output will remain visible
-    /// By default, the child output is hidden to increase execution speed
-    pub debug_child: bool,
-    /// true: input gets delivered via stdink
-    pub input_location: InputLocation,
-    /// The Command to execute
-    pub command: Command,
-}
-
+/// Clones a [`Command`] (without stdio and stdout/stderr - they are not accesible)
 fn clone_command(cmd: &Command) -> Command {
     let mut new_cmd = Command::new(cmd.get_program());
     new_cmd.args(cmd.get_args());
@@ -77,7 +65,20 @@ fn clone_command(cmd: &Command) -> Command {
     new_cmd
 }
 
-impl CommandConfigurator for DefaultConfiguator {
+/// A simple Configurator that takes the most common parameters
+/// Writes the input either to stdio or to a file
+#[derive(Debug)]
+pub struct StdCommandConfiguator {
+    /// If set to true, the child output will remain visible
+    /// By default, the child output is hidden to increase execution speed
+    pub debug_child: bool,
+    /// true: input gets delivered via stdink
+    pub input_location: InputLocation,
+    /// The Command to execute
+    pub command: Command,
+}
+
+impl CommandConfigurator for StdCommandConfiguator {
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
     where
         I: Input + HasTargetBytes,
@@ -128,6 +129,7 @@ impl CommandConfigurator for DefaultConfiguator {
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
+/// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StandardCommandConfigurator`].
 pub struct CommandExecutor<EM, I, OT, S, T, Z>
 where
     OT: Debug,
@@ -163,7 +165,7 @@ where
     }
 }
 
-impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, DefaultConfiguator, Z>
+impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfiguator, Z>
 where
     OT: Debug + ObserversTuple<I, S>,
 {
@@ -174,7 +176,7 @@ where
         observers: OT,
         debug_child: bool,
         path: P,
-    ) -> Result<CommandExecutor<EM, I, OT, S, DefaultConfiguator, Z>, Error>
+    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfiguator, Z>, Error>
     where
         P: AsRef<Path>,
     {
@@ -185,7 +187,7 @@ where
         }
         command.stdin(Stdio::null());
         Ok(Self {
-            inner: DefaultConfiguator {
+            inner: StdCommandConfiguator {
                 input_location: InputLocation::File {
                     out_file: OutFile::create(path)?,
                 },
@@ -202,7 +204,7 @@ where
     pub fn parse_afl_cmdline(
         args: &[String],
         debug_child: bool,
-    ) -> Result<CommandExecutor<EM, I, OT, S, DefaultConfiguator, Z>, Error> {
+    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfiguator, Z>, Error> {
         let mut atat_at = None;
         let mut builder = Self::builder();
         builder.debug_child(debug_child);
@@ -307,7 +309,10 @@ where
 
 /// The builder for a default [`ComandsExecutor`] that should fit most use-cases.
 #[derive(Debug)]
-pub struct CommandExecutorBuilder<I, OT: ObserversTuple<I, S>, S> {
+pub struct CommandExecutorBuilder<I, OT, S>
+where
+    OT: ObserversTuple<I, S>,
+{
     debug_child: bool,
     program: Option<OsString>,
     args_before: Vec<OsString>,
@@ -410,7 +415,7 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     /// Builds the `ComandExecutor`
     pub fn build<EM, Z>(
         self,
-    ) -> Result<CommandExecutor<EM, I, OT, S, DefaultConfiguator, Z>, Error> {
+    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfiguator, Z>, Error> {
         let program = if let Some(program) = self.program {
             program
         } else {
@@ -448,7 +453,7 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
             command.stderr(Stdio::null());
         }
 
-        let configurator = DefaultConfiguator {
+        let configurator = StdCommandConfiguator {
             debug_child: self.debug_child,
             input_location: self.input_location.unwrap(),
             command,
