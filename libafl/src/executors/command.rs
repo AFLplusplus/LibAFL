@@ -33,7 +33,7 @@ use std::time::Duration;
 /// How to deliver input to an external program
 /// `StdIn`: The traget reads from stdin
 /// `File`: The target reads from the specified [`OutFile`]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InputLocation {
     /// Mutate a commandline argument to deliver an input
     Arg {
@@ -138,6 +138,15 @@ where
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
+impl CommandExecutor<(), (), (), (), ()> {
+    /// Creates a builder for a new [`CommandExecutor`],
+    /// backed by a [`StdCommandConfigurator`].
+    /// This is usually the easiest way to construct a [`CommandExecutor`].
+    pub fn builder() -> CommandExecutorBuilder {
+        CommandExecutorBuilder::new()
+    }
+}
+
 impl<EM, I, S, T, Z> Debug for CommandExecutor<EM, I, S, T, Z>
 where
     T: Debug,
@@ -190,6 +199,7 @@ impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfiguator, Z> {
 
     /// Parses an AFL-like comandline, replacing `@@` with the input file.
     /// If no `@@` was found, will use stdin for input.
+    /// The arg 0 is the program.
     pub fn parse_afl_cmdline<IT, O>(
         args: IT,
         debug_child: bool,
@@ -204,7 +214,14 @@ impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfiguator, Z> {
         let afl_delim = OsStr::new("@@");
 
         for (pos, arg) in args.into_iter().enumerate() {
-            if arg.as_ref() == afl_delim {
+            if pos == 0 {
+                if arg.as_ref() == afl_delim {
+                    return Err(Error::IllegalArgument(
+                        "The first argument must not be @@ but the program to execute".into(),
+                    ));
+                }
+                builder.program(arg);
+            } else if arg.as_ref() == afl_delim {
                 if atat_at.is_some() {
                     return Err(Error::IllegalArgument(
                         "Multiple @@ in afl commandline are not permitted".into(),
@@ -280,9 +297,16 @@ pub struct CommandExecutorBuilder {
     envs: Vec<(OsString, OsString)>,
 }
 
+impl Default for CommandExecutorBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CommandExecutorBuilder {
-    /// Create a new CommandExecutorBuilder
-    pub fn new() -> CommandExecutorBuilder {
+    /// Create a new [`CommandExecutorBuilder`]
+    #[must_use]
+    fn new() -> CommandExecutorBuilder {
         CommandExecutorBuilder {
             program: None,
             args_before: vec![],
@@ -376,9 +400,9 @@ impl CommandExecutorBuilder {
 
     /// Builds the `ComandExecutor`
     pub fn build<EM, I, S, Z>(
-        self,
+        &self,
     ) -> Result<CommandExecutor<EM, I, S, StdCommandConfiguator, Z>, Error> {
-        let program = if let Some(program) = self.program {
+        let program = if let Some(program) = &self.program {
             program
         } else {
             return Err(Error::IllegalArgument(
@@ -386,7 +410,7 @@ impl CommandExecutorBuilder {
             ));
         };
         let mut command = Command::new(program);
-        command.args(self.args_before);
+        command.args(&self.args_before);
         match &self.input_location {
             Some(InputLocation::StdIn) => {
                 command.stdin(Stdio::piped());
@@ -405,9 +429,13 @@ impl CommandExecutorBuilder {
                 ))
             }
         }
-        command.args(self.args_after);
-        command.envs(self.envs);
-        if let Some(cwd) = self.cwd {
+        command.args(&self.args_after);
+        command.envs(
+            self.envs
+                .iter()
+                .map(|(k, v)| (k.as_os_str(), v.as_os_str())),
+        );
+        if let Some(cwd) = &self.cwd {
             command.current_dir(cwd);
         }
         if !self.debug_child {
@@ -417,7 +445,7 @@ impl CommandExecutorBuilder {
 
         let configurator = StdCommandConfiguator {
             debug_child: self.debug_child,
-            input_location: self.input_location.unwrap(),
+            input_location: self.input_location.clone().unwrap(),
             command,
         };
         Ok(configurator.into_executor())
@@ -451,7 +479,7 @@ impl CommandExecutorBuilder {
 /// }
 ///
 /// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, I, S, Z> {
-///     MyExecutor.into_executor(())
+///     MyExecutor.into_executor()
 /// }
 /// ```
 #[cfg(all(feature = "std", unix))]
@@ -475,7 +503,7 @@ mod tests {
     use crate::{
         events::SimpleEventManager,
         executors::{
-            command::{CommandExecutor, CommandExecutorBuilder, InputLocation},
+            command::{CommandExecutor, InputLocation},
             Executor,
         },
         inputs::BytesInput,
@@ -485,15 +513,16 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_builder() {
-        let mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
             println!("{}", status)
         }));
 
-        let executor = CommandExecutorBuilder::new()
+        let mut executor = CommandExecutor::builder();
+        executor
             .program("ls")
-            .input(InputLocation::Arg { argnum: 0 })
-            .build()
-            .unwrap();
+            .input(InputLocation::Arg { argnum: 0 });
+        let executor = executor.build();
+        let mut executor = executor.unwrap();
 
         executor
             .run_target(
@@ -508,11 +537,11 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_parse_afl_cmdline() {
-        let mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
             println!("{}", status)
         }));
 
-        let executor =
+        let mut executor =
             CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], true)
                 .unwrap();
         executor

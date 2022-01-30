@@ -55,6 +55,15 @@ pub struct OutFile {
     pub file: File,
 }
 
+impl Clone for OutFile {
+    fn clone(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            file: self.file.try_clone().unwrap(),
+        }
+    }
+}
+
 #[cfg(feature = "std")]
 impl OutFile {
     /// Creates a new [`OutFile`]
