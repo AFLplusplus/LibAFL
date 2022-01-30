@@ -222,7 +222,9 @@ fn fuzz(
             // Create a concolic trace
             ConcolicTracingStage::new(
                 TracingStage::new(
-                    MyCommandConfigurator::default().into_executor(tuple_list!(concolic_observer))
+                    MyCommandConfigurator::default()
+                        .into_executor()
+                        .with_observers(tuple_list!(concolic_observer))
                 ),
                 concolic_observer_name,
             ),
@@ -247,16 +249,13 @@ use std::process::{Child, Command, Stdio};
 #[derive(Default)]
 pub struct MyCommandConfigurator {
     command: Option<Command>,
-};
+}
 
 impl<I> CommandConfigurator<I> for MyCommandConfigurator
 where
     I: HasTargetBytes + Input,
 {
-    fn spawn_child(
-        &mut self,
-        input: &I,
-    ) -> Result<Child, Error> {
+    fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")
