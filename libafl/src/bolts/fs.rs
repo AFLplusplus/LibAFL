@@ -58,7 +58,6 @@ pub struct OutFile {
 #[cfg(feature = "std")]
 impl OutFile {
     /// Creates a new [`OutFile`]
-    #[must_use]
     pub fn create<P>(filename: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -106,7 +105,8 @@ impl OutFile {
 #[cfg(feature = "std")]
 impl Drop for OutFile {
     fn drop(&mut self) {
-        let _ = remove_file(&self.path);
+        // try to remove the file, but ignore errors
+        drop(remove_file(&self.path));
     }
 }
 

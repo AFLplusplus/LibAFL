@@ -206,7 +206,6 @@ impl GeneralizedInput {
     }
 
     /// Load from a plain file of bytes
-    #[must_use]
     #[cfg(feature = "std")]
     pub fn from_bytes_file<P>(path: P) -> Result<Self, Error>
     where

@@ -1,7 +1,7 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 use alloc::vec::Vec;
-use core::mem::size_of;
+use core::{mem::size_of, slice::from_raw_parts};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -30,12 +30,15 @@ pub struct TokenSection {
 }
 
 impl TokenSection {
-    /// Init
+    /// Initialize a [`TokenSection`] from a start addr and end a len
+    ///
+    /// # Safety
+    /// In subsequent functions, the contents of the section will be dereferenced.
     #[must_use]
-    pub fn new(section: (*const u8, *const u8)) -> Self {
+    pub unsafe fn new(start_addr: *const u8, size: usize) -> Self {
         Self {
-            start: section.0,
-            stop: section.1,
+            start: start_addr,
+            stop: start_addr.add(size),
         }
     }
 }
@@ -78,21 +81,21 @@ impl Tokens {
 
     /// Build tokens from autotokens
     pub fn parse_autotokens(mut self, autotoken: TokenSection) -> Result<Self, Error> {
-        unsafe {
-            self.add_from_autotokens(autotoken)?;
-        }
+        self.add_from_autotokens(autotoken)?;
         Ok(self)
     }
 
-    ///  Reads from an autotokens section, returning the count of new entries read
-    pub unsafe fn add_from_autotokens(&mut self, autotoken: TokenSection) -> Result<usize, Error> {
+    /// Reads from an autotokens section, returning the count of new entries read
+    pub fn add_from_autotokens(&mut self, autotoken: TokenSection) -> Result<usize, Error> {
         if cfg!(target_os = "linux") {
             let mut entries = 0;
             let token_start = autotoken.start;
             let token_stop = autotoken.stop;
-            let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
+            let section_size: usize = unsafe { token_stop.offset_from(token_start) }
+                .try_into()
+                .unwrap();
             // println!("size: {}", section_size);
-            let slice = core::slice::from_raw_parts(token_start, section_size);
+            let slice = unsafe { from_raw_parts(token_start, section_size) };
 
             let mut head = 0;
 
@@ -128,9 +131,7 @@ impl Tokens {
     /// Creates a new token from autotokens
     pub fn from_autotokens(autotoken: TokenSection) -> Result<Self, Error> {
         let mut ret = Self::new(vec![]);
-        unsafe {
-            ret.add_from_autotokens(autotoken)?;
-        }
+        ret.add_from_autotokens(autotoken)?;
         Ok(ret)
     }
 

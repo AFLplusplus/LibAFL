@@ -1181,7 +1181,7 @@ pub mod win32_shmem {
                 }
 
                 Ok(Self {
-                    id: ShMemId::try_from_slice(&map_str_bytes).unwrap(),
+                    id: ShMemId::try_from_slice(map_str_bytes).unwrap(),
                     handle,
                     map,
                     map_size,

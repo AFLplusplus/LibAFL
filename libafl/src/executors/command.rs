@@ -67,10 +67,10 @@ fn clone_command(cmd: &Command) -> Command {
     let mut new_cmd = Command::new(cmd.get_program());
     new_cmd.args(cmd.get_args());
     new_cmd.env_clear();
-    new_cmd.envs(cmd.get_envs().filter_map(|(key, value)| match value {
-        Some(value) => Some((key, value)),
-        None => None,
-    }));
+    new_cmd.envs(
+        cmd.get_envs()
+            .filter_map(|(key, value)| value.map(|value| (key, value))),
+    );
     if let Some(cwd) = cmd.get_current_dir() {
         new_cmd.current_dir(cwd);
     }
@@ -78,7 +78,7 @@ fn clone_command(cmd: &Command) -> Command {
 }
 
 impl CommandConfigurator for DefaultConfiguator {
-    fn spawn_child<I: HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error>
+    fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
     where
         I: Input + HasTargetBytes,
     {
@@ -102,10 +102,7 @@ impl CommandConfigurator for DefaultConfiguator {
                 cmd.envs(
                     self.command
                         .get_envs()
-                        .filter_map(|(key, value)| match value {
-                            Some(value) => Some((key, value)),
-                            None => None,
-                        }),
+                        .filter_map(|(key, value)| value.map(|value| (key, value))),
                 );
                 if let Some(cwd) = self.command.get_current_dir() {
                     cmd.current_dir(cwd);
@@ -227,7 +224,7 @@ where
             }
         }
 
-        if !atat_at.is_some() {
+        if atat_at.is_none() {
             builder.input(InputLocation::StdIn);
         }
 
@@ -330,10 +327,6 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     where
         O: AsRef<OsStr>,
     {
-        if self.input_location.is_some() {
-            // This is an error in the user code, no point in returning Err.
-            panic!("input location already set");
-        }
         self.program = Some(program.as_ref().to_owned());
         self
     }
@@ -341,10 +334,11 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     /// Set the input mode and location.
     /// This option is mandatory, if not set, the `build` method will error.
     pub fn input(&mut self, input: InputLocation) -> &mut Self {
-        if self.input_location.is_some() {
-            // This is an error in the user code, no point in returning Err.
-            panic!("input location already set");
-        }
+        // This is an error in the user code, no point in returning Err.
+        assert!(
+            self.input_location.is_none(),
+            "input location already set, cannot set it again"
+        );
         self.input_location = Some(input);
         self
     }
@@ -353,8 +347,7 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
     pub fn arg<O: AsRef<OsStr>>(&mut self, arg: O) -> &mut CommandExecutorBuilder<I, OT, S> {
         match self.input_location {
             Some(InputLocation::StdIn) => self.args_before.push(arg.as_ref().to_owned()),
-            Some(_) => self.args_after.push(arg.as_ref().to_owned()),
-            None => self.args_before.push(arg.as_ref().to_owned()),
+            Some(_) | None => self.args_after.push(arg.as_ref().to_owned()),
         };
         self
     }
