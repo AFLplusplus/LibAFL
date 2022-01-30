@@ -291,7 +291,6 @@ where
 impl<EM, I, OT: Debug, S, T: Debug, Z> HasObservers<I, OT, S>
     for CommandExecutor<EM, I, OT, S, T, Z>
 where
-    I: Input,
     OT: ObserversTuple<I, S>,
     T: CommandConfigurator,
 {
@@ -474,12 +473,9 @@ impl<I, OT: ObserversTuple<I, S>, S> CommandExecutorBuilder<I, OT, S> {
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
-/// impl<EM, I: Input + HasTargetBytes, S, Z> CommandConfigurator<EM, I, S, Z> for MyExecutor {
-///     fn spawn_child(
+/// impl CommandConfigurator for MyExecutor {
+///     fn spawn_child<I: HasTargetBytes>(
 ///        &mut self,
-///        fuzzer: &mut Z,
-///        state: &mut S,
-///        mgr: &mut EM,
 ///        input: &I,
 ///     ) -> Result<Child, Error> {
 ///         let mut command = Command::new("../if");
