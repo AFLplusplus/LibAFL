@@ -158,6 +158,17 @@ where
     }
 }
 
+impl<EM, I, S, Z> From<StdCommandConfiguator>
+    for CommandExecutor<EM, I, S, StdCommandConfiguator, Z>
+{
+    fn from(val: StdCommandConfiguator) -> Self {
+        CommandExecutor {
+            inner: val,
+            phantom: PhantomData,
+        }
+    }
+}
+
 impl<EM, I, S, T, Z> CommandExecutor<EM, I, S, T, Z>
 where
     T: Debug,
@@ -448,7 +459,7 @@ impl CommandExecutorBuilder {
             input_location: self.input_location.clone().unwrap(),
             command,
         };
-        Ok(configurator.into_executor())
+        Ok(configurator.into())
     }
 }
 
