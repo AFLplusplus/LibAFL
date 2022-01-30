@@ -1,12 +1,18 @@
 //! `LibAFL` functionality for filesystem interaction
 
 use std::{
-    fs::{self, OpenOptions},
-    io::Write,
-    path::Path,
+    fs::{self, remove_file, File, OpenOptions},
+    io::{Seek, SeekFrom, Write},
+    path::{Path, PathBuf},
 };
 
+#[cfg(unix)]
+use std::os::unix::prelude::{AsRawFd, RawFd};
+
 use crate::Error;
+
+/// The default filename to use to deliver testcases to the target
+pub const DEFAULT_OUTFILE: &str = "./.cur_input";
 
 /// Creates a `.{file_name}.tmp` file, and writes all bytes to it.
 /// After all bytes have been written, the tmp-file is moved to it's original `path`.
@@ -36,6 +42,72 @@ where
         Ok(())
     }
     inner(path.as_ref(), bytes)
+}
+
+/// An [`OutFile`] to write fuzzer input to.
+/// The target/forkserver will read from this file.
+#[cfg(feature = "std")]
+#[derive(Debug)]
+pub struct OutFile {
+    /// The filename/path too this [`OutFile`]
+    pub path: PathBuf,
+    /// The underlying file that got created
+    pub file: File,
+}
+
+#[cfg(feature = "std")]
+impl OutFile {
+    /// Creates a new [`OutFile`]
+    #[must_use]
+    pub fn create<P>(filename: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&filename)?;
+        f.set_len(0)?;
+        Ok(Self {
+            path: filename.as_ref().to_owned(),
+            file: f,
+        })
+    }
+
+    /// Gets the file as raw file descriptor
+    #[must_use]
+    #[cfg(unix)]
+    pub fn as_raw_fd(&self) -> RawFd {
+        self.file.as_raw_fd()
+    }
+
+    /// Writes the given buffer to the file
+    pub fn write_buf(&mut self, buf: &[u8]) -> Result<(), Error> {
+        self.rewind()?;
+        self.file.write_all(buf)?;
+        self.file.set_len(buf.len() as u64)?;
+        self.file.flush()?;
+        // Rewind again otherwise the target will not read stdin from the beginning
+        self.rewind()
+    }
+
+    /// Rewinds the file to the beginning
+    #[inline]
+    pub fn rewind(&mut self) -> Result<(), Error> {
+        if let Err(err) = self.file.seek(SeekFrom::Start(0)) {
+            Err(err.into())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl Drop for OutFile {
+    fn drop(&mut self) {
+        let _ = remove_file(&self.path);
+    }
 }
 
 #[cfg(test)]

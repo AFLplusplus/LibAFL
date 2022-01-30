@@ -6,17 +6,14 @@ use core::{
     time::Duration,
 };
 use std::{
-    fs::{File, OpenOptions},
-    io::{self, prelude::*, ErrorKind, SeekFrom},
-    os::unix::{
-        io::{AsRawFd, RawFd},
-        process::CommandExt,
-    },
+    io::{self, prelude::*, ErrorKind},
+    os::unix::{io::RawFd, process::CommandExt},
     process::{Command, Stdio},
 };
 
 use crate::{
     bolts::{
+        fs::OutFile,
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
@@ -152,47 +149,6 @@ impl ConfigTarget for Command {
             Ok(())
         };
         unsafe { self.pre_exec(func) }
-    }
-}
-
-/// The [`OutFile`] to write input to.
-/// The target/forkserver will read from this file.
-#[derive(Debug)]
-pub struct OutFile {
-    /// The file
-    file: File,
-}
-
-impl OutFile {
-    /// Creates a new [`OutFile`]
-    pub fn new(file_name: &str) -> Result<Self, Error> {
-        let f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(file_name)?;
-        Ok(Self { file: f })
-    }
-
-    /// Gets the file as raw file descriptor
-    #[must_use]
-    pub fn as_raw_fd(&self) -> RawFd {
-        self.file.as_raw_fd()
-    }
-
-    /// Writes the given buffer to the file
-    pub fn write_buf(&mut self, buf: &[u8]) {
-        self.rewind();
-        self.file.write_all(buf).unwrap();
-        self.file.set_len(buf.len() as u64).unwrap();
-        self.file.flush().unwrap();
-        // Rewind again otherwise the target will not read stdin from the beginning
-        self.rewind();
-    }
-
-    /// Rewinds the file to the beginning
-    pub fn rewind(&mut self) {
-        self.file.seek(SeekFrom::Start(0)).unwrap();
     }
 }
 
@@ -434,7 +390,7 @@ where
             None => {
                 self.executor
                     .out_file_mut()
-                    .write_buf(input.target_bytes().as_slice());
+                    .write_buf(input.target_bytes().as_slice())?;
             }
         }
 
@@ -597,7 +553,7 @@ where
             }
         }
 
-        let out_file = OutFile::new(&out_filename)?;
+        let out_file = OutFile::create(&out_filename)?;
 
         let map = match shmem_provider {
             None => None,
@@ -706,7 +662,7 @@ where
                     .copy_from_slice(target_bytes.as_slice());
             }
             None => {
-                self.out_file.write_buf(input.target_bytes().as_slice());
+                self.out_file.write_buf(input.target_bytes().as_slice())?;
             }
         }
 
