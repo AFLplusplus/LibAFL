@@ -459,6 +459,7 @@ where
                     }
                 }
 
+                #[allow(clippy::cast_lossless)]
                 if mopt.pilot_time > mopt.period_pilot {
                     let new_finds = mopt.total_finds - mopt.finds_until_last_swarm;
                     let f = (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));

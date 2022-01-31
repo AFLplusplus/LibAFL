@@ -60,13 +60,17 @@ For broker2broker communication, all messages are forwarded via network sockets.
 */
 
 use alloc::{string::String, vec::Vec};
+#[cfg(not(target_pointer_width = "64"))]
+use core::sync::atomic::AtomicU32;
+#[cfg(target_pointer_width = "64")]
+use core::sync::atomic::AtomicU64;
 use core::{
     cmp::max,
     fmt::Debug,
     hint,
     mem::size_of,
     ptr, slice,
-    sync::atomic::{fence, AtomicU16, AtomicU64, Ordering},
+    sync::atomic::{fence, AtomicU16, Ordering},
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
@@ -173,7 +177,11 @@ pub type BrokerId = u32;
 /// The flags, indicating, for example, enabled compression.
 pub type Flags = u32;
 /// The message ID, an ever-increasing number, unique only to a sharedmap/page.
+#[cfg(target_pointer_width = "64")]
 pub type MessageId = u64;
+/// The message ID, an ever-increasing number, unique only to a sharedmap/page.
+#[cfg(not(target_pointer_width = "64"))]
+pub type MessageId = u32;
 
 /// This is for the server the broker will spawn.
 /// If an llmp connection is local - use sharedmaps
@@ -519,7 +527,7 @@ pub struct LlmpMsg {
     /// flags, currently only used for indicating compression
     pub flags: Flags, //u32
     /// The message ID, unique per page
-    pub message_id: MessageId, //u64
+    pub message_id: MessageId, //u64 on 64 bit, else u32
     /// Buffer length as specified by the user
     pub buf_len: u64,
     /// (Actual) buffer length after padding
@@ -684,8 +692,12 @@ pub struct LlmpPage {
     pub safe_to_unmap: AtomicU16,
     /// Not used at the moment (would indicate that the sender is no longer there)
     pub sender_dead: AtomicU16,
+    #[cfg(target_pointer_width = "64")]
     /// The current message ID
     pub current_msg_id: AtomicU64,
+    #[cfg(not(target_pointer_width = "64"))]
+    /// The current message ID
+    pub current_msg_id: AtomicU32,
     /// How much space is available on this page in bytes
     pub size_total: usize,
     /// How much space is used on this page in bytes
@@ -1300,7 +1312,7 @@ where
     /// current page. After EOP, this gets replaced with the new one
     pub current_recv_shmem: LlmpSharedMap<SP::ShMem>,
     /// Caches the highest msg id we've seen so far
-    highest_msg_id: u64,
+    highest_msg_id: MessageId,
 }
 
 /// Receiving end of an llmp channel
@@ -2325,37 +2337,36 @@ where
                             msg_buf_len_padded,
                             size_of::<LlmpPayloadSharedMapInfo>()
                         )));
-                    } else {
-                        let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-
-                        match self.shmem_provider.shmem_from_id_and_size(
-                            ShMemId::from_array(&(*pageinfo).shm_str),
-                            (*pageinfo).map_size,
-                        ) {
-                            Ok(new_shmem) => {
-                                let mut new_page = LlmpSharedMap::existing(new_shmem);
-                                let id = next_id;
-                                next_id += 1;
-                                new_page.mark_safe_to_unmap();
-                                self.llmp_clients.push(LlmpReceiver {
-                                    id,
-                                    current_recv_shmem: new_page,
-                                    last_msg_recvd: ptr::null_mut(),
-                                    shmem_provider: self.shmem_provider.clone(),
-                                    highest_msg_id: 0,
-                                });
-                            }
-                            Err(e) => {
-                                #[cfg(feature = "std")]
-                                println!("Error adding client! Ignoring: {:?}", e);
-                                #[cfg(not(feature = "std"))]
-                                return Err(Error::Unknown(format!(
-                                    "Error adding client! PANIC! {:?}",
-                                    e
-                                )));
-                            }
-                        };
                     }
+                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+
+                    match self.shmem_provider.shmem_from_id_and_size(
+                        ShMemId::from_array(&(*pageinfo).shm_str),
+                        (*pageinfo).map_size,
+                    ) {
+                        Ok(new_shmem) => {
+                            let mut new_page = LlmpSharedMap::existing(new_shmem);
+                            let id = next_id;
+                            next_id += 1;
+                            new_page.mark_safe_to_unmap();
+                            self.llmp_clients.push(LlmpReceiver {
+                                id,
+                                current_recv_shmem: new_page,
+                                last_msg_recvd: ptr::null_mut(),
+                                shmem_provider: self.shmem_provider.clone(),
+                                highest_msg_id: 0,
+                            });
+                        }
+                        Err(e) => {
+                            #[cfg(feature = "std")]
+                            println!("Error adding client! Ignoring: {:?}", e);
+                            #[cfg(not(feature = "std"))]
+                            return Err(Error::Unknown(format!(
+                                "Error adding client! PANIC! {:?}",
+                                e
+                            )));
+                        }
+                    };
                 }
                 // handle all other messages
                 _ => {
