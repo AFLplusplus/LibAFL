@@ -184,16 +184,21 @@ where
     }
 
     fn post_exec(&mut self, _state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        let mut hasher = DefaultHasher::new();
-        input.hash(&mut hasher);
-        let input_hash = hasher.finish();
-        let (bt_hash, current_input_hash) = unsafe { BACKTRACE_HASH_VALUE.get_stacktrace_hash() };
-
+        // run if this call resulted after a crash
         if exit_kind == &ExitKind::Crash {
+            // hash input
+            let mut hasher = DefaultHasher::new();
+            input.hash(&mut hasher);
+            let input_hash = hasher.finish();
+            // get last backtrace hash and associated input hash
+            let (bt_hash, current_input_hash) =
+                unsafe { BACKTRACE_HASH_VALUE.get_stacktrace_hash() };
+            // replace if this is a new input
             if current_input_hash != input_hash {
                 let bt_hash = collect_backtrace();
                 unsafe { BACKTRACE_HASH_VALUE.store_stacktrace_hash(bt_hash, input_hash) };
             }
+            // update hash field in this observer
             self.update_hash(bt_hash);
         }
         Ok(())
