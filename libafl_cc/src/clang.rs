@@ -31,6 +31,8 @@ pub enum LLVMPasses {
     CmpLogRtn,
     /// The AFL coverage pass
     AFLCoverage,
+    /// The Autotoken pass
+    AutoTokens,
 }
 
 impl LLVMPasses {
@@ -42,6 +44,9 @@ impl LLVMPasses {
                 .join(format!("cmplog-routines-pass.{}", dll_extension())),
             LLVMPasses::AFLCoverage => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("afl-coverage-pass.{}", dll_extension())),
+            LLVMPasses::AutoTokens => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("autotokens-pass.{}", dll_extension()))
+            }
         }
     }
 }

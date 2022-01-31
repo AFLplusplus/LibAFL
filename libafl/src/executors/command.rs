@@ -7,6 +7,7 @@ use core::{
 #[cfg(feature = "std")]
 use std::process::Child;
 
+use crate::observers::ASANBacktraceObserver;
 #[cfg(feature = "std")]
 use crate::{executors::HasObservers, inputs::Input, observers::ObserversTuple, Error};
 
@@ -15,7 +16,6 @@ use crate::executors::{Executor, ExitKind};
 
 #[cfg(all(feature = "std", unix))]
 use std::time::Duration;
-
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 pub struct CommandExecutor<EM, I, OT: Debug, S, T: Debug, Z> {
@@ -61,7 +61,7 @@ where
 
         let mut child = self.inner.spawn_child(_fuzzer, _state, _mgr, input)?;
 
-        match child
+        let res = match child
             .wait_timeout(Duration::from_secs(5))
             .expect("waiting on child failed")
             .map(|status| status.signal())
@@ -78,7 +78,17 @@ where
                 drop(child.wait());
                 Ok(ExitKind::Timeout)
             }
-        }
+        };
+
+        let stderr = child.stderr.as_mut().unwrap();
+        if let Some(obs) = self
+            .observers
+            .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+        {
+            obs.parse_asan_output_from_childstderr(stderr);
+        };
+
+        res
     }
 }
 

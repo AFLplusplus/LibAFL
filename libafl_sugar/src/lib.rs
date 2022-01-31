@@ -88,5 +88,9 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     {
         qemu::pybind::register(py, m)?;
     }
+    #[cfg(unix)]
+    {
+        forkserver::pybind::register(py, m)?;
+    }
     Ok(())
 }

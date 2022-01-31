@@ -6,6 +6,7 @@ use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
+    executors::ExitKind,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
@@ -209,7 +210,7 @@ where
         Ok(())
     }
 
-    fn post_exec(&mut self, state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = 0;
         }

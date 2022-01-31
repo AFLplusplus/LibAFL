@@ -63,7 +63,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let _ = self
+        let exit_kind = self
             .tracer_executor
             .run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
@@ -73,7 +73,7 @@ where
         start_timer!(state);
         self.tracer_executor
             .observers_mut()
-            .post_exec_all(state, &input)?;
+            .post_exec_all(state, &input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(())
@@ -143,7 +143,7 @@ where
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
         start_timer!(state);
-        let _ = executor.run_target(fuzzer, state, manager, &input)?;
+        let exit_kind = executor.run_target(fuzzer, state, manager, &input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
         *state.executions_mut() += 1;
@@ -151,8 +151,10 @@ where
         start_timer!(state);
         executor
             .shadow_observers_mut()
-            .post_exec_all(state, &input)?;
-        executor.observers_mut().post_exec_all(state, &input)?;
+            .post_exec_all(state, &input, &exit_kind)?;
+        executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(())

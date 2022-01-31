@@ -23,7 +23,7 @@ use crate::{
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
-    observers::ObserversTuple,
+    observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     Error,
 };
 
@@ -232,6 +232,7 @@ impl Forkserver {
             .stdout(stdout)
             .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
+            .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
@@ -243,12 +244,12 @@ impl Forkserver {
             )
             .spawn()
         {
-            Ok(_) => {}
+            Ok(_) => (),
             Err(err) => {
                 return Err(Error::Forkserver(format!(
                     "Could not spawn the forkserver: {:#?}",
                     err
-                )));
+                )))
             }
         };
 
@@ -304,7 +305,6 @@ impl Forkserver {
 
         let rlen = self.st_pipe.read(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
-
         Ok((rlen, val))
     }
 
@@ -745,6 +745,12 @@ where
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
+            if let Some(obs) = self
+                .observers_mut()
+                .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+            {
+                obs.parse_asan_output_from_asan_log_file(pid);
+            }
         }
 
         self.forkserver.set_child_pid(Pid::from_raw(0));
