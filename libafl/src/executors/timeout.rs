@@ -29,9 +29,9 @@ use libc::c_int;
 use windows::Win32::{
     Foundation::FILETIME,
     System::Threading::{
-        CloseThreadpoolTimer, CreateThreadpoolTimer, EnterCriticalSection,
-        InitializeCriticalSection, LeaveCriticalSection, SetThreadpoolTimer, RTL_CRITICAL_SECTION,
-        TP_CALLBACK_ENVIRON_V3, TP_CALLBACK_INSTANCE, TP_TIMER,
+        CreateThreadpoolTimer, EnterCriticalSection, InitializeCriticalSection,
+        LeaveCriticalSection, SetThreadpoolTimer, RTL_CRITICAL_SECTION, TP_CALLBACK_ENVIRON_V3,
+        TP_CALLBACK_INSTANCE, TP_TIMER,
     },
 };
 
@@ -329,7 +329,7 @@ where
     /// Will dereference the given `tp_timer` pointer, unchecked.
     fn post_run_reset(&mut self) {
         unsafe {
-            CloseThreadpoolTimer(self.tp_timer);
+            SetThreadpoolTimer(self.tp_timer, core::ptr::null(), 0, 0);
         }
         self.executor.post_run_reset();
     }
