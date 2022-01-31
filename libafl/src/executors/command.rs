@@ -276,7 +276,7 @@ where
 
         let mut child = self.inner.spawn_child(input)?;
 
-        match child
+        let res = match child
             .wait_timeout(Duration::from_secs(5))
             .expect("waiting on child failed")
             .map(|status| status.signal())
@@ -293,7 +293,9 @@ where
                 drop(child.wait());
                 Ok(ExitKind::Timeout)
             }
-        }
+        };
+
+        res
     }
 }
 
