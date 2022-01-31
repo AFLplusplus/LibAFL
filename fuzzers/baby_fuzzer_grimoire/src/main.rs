@@ -32,7 +32,7 @@ fn signals_set(idx: usize) {
 }
 
 fn is_sub<T: PartialEq>(mut haystack: &[T], needle: &[T]) -> bool {
-    if needle.len() == 0 {
+    if needle.is_empty() {
         return true;
     }
     while !haystack.is_empty() {

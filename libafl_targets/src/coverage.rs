@@ -26,17 +26,26 @@ extern "C" {
 }
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
-/// Return token section's start and end as a tuple
+/// Return Tokens from the compile-time token section
+/// Will return `Error::IllegalState` if no token section was found
+/// In this case, the compilation probably did not include an `AutoTokens`-pass
+///
+/// # Safety
+///
+/// This fn is safe to call, as long as the compilation diid not break, previously
 #[cfg(target_os = "linux")]
 #[must_use]
 pub fn autotokens() -> Result<Tokens, Error> {
-    if __token_start.is_null() || __token_stop.is_null() {
-        Err(Error::IllegalState(
-            "AutoTokens section not found, likely the targe is not compiled with AutoTokens".into(),
-        ))
-    } else {
-        // we can safely unwrap
-        unsafe { Tokens::from_ptrs(__token_start, __token_stop) }
+    unsafe {
+        if __token_start.is_null() || __token_stop.is_null() {
+            Err(Error::IllegalState(
+                "AutoTokens section not found, likely the targe is not compiled with AutoTokens"
+                    .into(),
+            ))
+        } else {
+            // we can safely unwrap
+            Tokens::from_ptrs(__token_start, __token_stop)
+        }
     }
 }
 
