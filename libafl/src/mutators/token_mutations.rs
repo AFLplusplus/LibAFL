@@ -3,6 +3,7 @@
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use alloc::vec::Vec;
+use hashbrown::HashSet;
 use core::{mem::size_of, ops::Add};
 #[cfg(target_os = "linux")]
 use core::{ptr::null, slice::from_raw_parts};
@@ -27,7 +28,9 @@ use crate::{
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct Tokens {
-    token_vec: Vec<Vec<u8>>,
+    // We keep a vec and a set, set for faster deduplication, vec for access
+    tokens_vec: Vec<Vec<u8>>,
+    tokens_set: HashSet<Vec<u8>>,
 }
 
 crate::impl_serdeany!(Tokens);
@@ -36,25 +39,29 @@ crate::impl_serdeany!(Tokens);
 impl Tokens {
     /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
     #[must_use]
-    pub fn new(token_vec: Vec<Vec<u8>>) -> Self {
-        Self { token_vec }
+    pub fn new() -> Self {
+        Self{
+           ..Tokens::default() 
+        }
     }
 
-    #[must_use]
-    /// Build tokens from vec
-    pub fn parse_vec(mut self, vec: Vec<Vec<u8>>) -> Self {
-        self.token_vec = vec;
+    /// Add tokens from a slice of Vecs of bytes
+    pub fn add_tokens(&mut self, vec: &[Vec<u8>]) -> &mut Self {
+        for token in vec {
+            self.add_token(token);
+        }
         self
     }
 
     /// Build tokens from files
     #[cfg(feature = "std")]
-    pub fn parse_tokens_file<P>(mut self, files: Vec<P>) -> Result<Self, Error>
+    pub fn add_from_files<IT, P>(mut self, files: IT) -> Result<Self, Error>
     where
+        IT: IntoIterator<Item = P>,
         P: AsRef<Path>,
     {
         for file in files {
-            self.add_tokens_from_file(file)?;
+            self.add_from_file(file)?;
         }
         Ok(self)
     }
@@ -106,12 +113,12 @@ impl Tokens {
 
     /// Creates a new instance from a file
     #[cfg(feature = "std")]
-    pub fn from_tokens_file<P>(file: P) -> Result<Self, Error>
+    pub fn from_file<P>(file: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
-        let mut ret = Self::new(vec![]);
-        ret.add_tokens_from_file(file)?;
+        let mut ret = Self::new();
+        ret.add_from_file(file)?;
         Ok(ret)
     }
 
@@ -119,21 +126,19 @@ impl Tokens {
     /// Returns `false` if the token was already present and did not get added.
     #[allow(clippy::ptr_arg)]
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
-        if self.token_vec.contains(token) {
+        if !self.tokens_set.insert(token.clone()) {
             return false;
         }
-        self.token_vec.push(token.clone());
+        self.tokens_vec.push(token.clone());
         true
     }
 
     /// Reads a tokens file, returning the count of new entries read
     #[cfg(feature = "std")]
-    pub fn add_tokens_from_file<P>(&mut self, file: P) -> Result<usize, Error>
+    pub fn add_from_file<P>(&mut self, file: P) -> Result<&mut Self, Error>
     where
         P: AsRef<Path>,
     {
-        let mut entries = 0;
-
         // println!("Loading tokens file {:?} ...", file);
 
         let file = File::open(file)?; // panic if not found
@@ -176,18 +181,27 @@ impl Tokens {
             };
 
             // add
-            if self.add_token(&token) {
-                entries += 1;
-            }
+            self.add_token(&token);
         }
 
-        Ok(entries)
+        Ok(self)
+    }
+
+    /// Returns the amount of tokens in this Tokens instance
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.tokens_vec.len()
+    }
+
+    /// Returns if this tokens-instance is empty
+    pub fn is_empty(&self) -> bool {
+        self.tokens_vec.is_empty()
     }
 
     /// Gets the tokens stored in this db
     #[must_use]
     pub fn tokens(&self) -> &[Vec<u8>] {
-        &self.token_vec
+        &self.tokens_vec
     }
 }
 
@@ -196,7 +210,7 @@ impl Add for Tokens {
 
     fn add(self, other: Self) -> Self {
         let mut ret = self;
-        ret.token_vec.extend(other.token_vec);
+        ret.add_tokens(other.tokens());
         ret
     }
 }
@@ -533,7 +547,7 @@ token1="A\x41A"
 token2="B"
         "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
-        let tokens = Tokens::from_tokens_file(&"test.tkns").unwrap();
+        let tokens = Tokens::from_file(&"test.tkns").unwrap();
         #[cfg(feature = "std")]
         println!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);

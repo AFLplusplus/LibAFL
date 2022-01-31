@@ -358,14 +358,12 @@ fn fuzz(
     if state.metadata().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
-            toks = toks.parse_tokens_file(vec![tokenfile])?;
+            toks.add_from_file(tokenfile)?;
         }
         #[cfg(target_os = "linux")]
-        {
-            toks += autotokens();
-        }
+        toks += autotokens();
 
-        if !toks.tokens().is_empty() {
+        if !toks.is_empty() {
             state.add_metadata(toks);
         }
     }
