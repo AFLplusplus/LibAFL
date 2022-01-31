@@ -1,7 +1,7 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 use alloc::vec::Vec;
-use core::{mem::size_of, slice::from_raw_parts, ptr::null, ops::Add};
+use core::{mem::size_of, ops::Add, ptr::null, slice::from_raw_parts};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -21,30 +21,6 @@ use crate::{
     state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
-
-#[derive(Debug, Clone, Copy)]
-/// Struct for token start and end
-pub struct TokensSection {
-    start: *const u8,
-    stop: *const u8,
-}
-
-impl TokensSection {
-    /// Initialize a [`TokensSection`] from a start addr and end a len
-    ///
-    /// # Safety
-    /// In subsequent functions, the contents of the section will be dereferenced.
-    #[must_use]
-    pub unsafe fn new(start_addr: *const u8, size: usize) -> Self {
-        Self {
-            start: start_addr,
-            stop: start_addr.add(size),
-        }
-    }
-
-
-
-}
 
 /// A state metadata holding a list of tokens
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -85,14 +61,17 @@ impl Tokens {
     /// Create a token section from a start and an end pointer
     /// Reads from an autotokens section, returning the count of new entries read
     #[must_use]
-    #[cfg(linux)]
+    #[cfg(target_os = "linux")]
     pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
         let ret = Self::default();
         if token_start == null() || token_stop == null() {
-            return Ok(ret)
+            return Ok(ret);
         }
         if token_stop <= token_start {
-            return Err(Error::IllegalArgument(format!("Tried to create tokens from illegal section: stop < start ({:?} < {:?})", token_stop, token_start)));
+            return Err(Error::IllegalArgument(format!(
+                "Tried to create tokens from illegal section: stop < start ({:?} < {:?})",
+                token_stop, token_start
+            )));
         }
         let section_size: usize = unsafe { token_stop.offset_from(token_start) }
             .try_into()
@@ -124,7 +103,6 @@ impl Tokens {
         }
 
         Ok(ret)
-    
     }
 
     /// Creates a new instance from a file
