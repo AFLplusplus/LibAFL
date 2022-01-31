@@ -5,12 +5,12 @@ use crate::mutators::str_decode;
 #[cfg(target_os = "linux")]
 use alloc::string::ToString;
 use alloc::vec::Vec;
+use core::slice::Iter;
 use core::{mem::size_of, ops::Add};
 #[cfg(target_os = "linux")]
 use core::{ptr::null, slice::from_raw_parts};
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
-use std::slice::Iter;
 #[cfg(feature = "std")]
 use std::{
     fs::File,

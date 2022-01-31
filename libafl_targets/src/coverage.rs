@@ -36,7 +36,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
         ))
     } else {
         // we can safely unwrap
-        unsafe { Tokens::from_ptrs(__token_start, __token_stop).unwrap() }
+        unsafe { Tokens::from_ptrs(__token_start, __token_stop) }
     }
 }
 
