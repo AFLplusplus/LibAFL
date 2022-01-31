@@ -256,7 +256,9 @@ pub mod pybind {
                     unsafe {
                         match self.mutator {
                             $wrapper_name::StdScheduled(py_std_scheduled_mutator) => {
-                                (*py_std_scheduled_mutator).std_scheduled_mutator.mutate(state, input, stage_idx)
+                                (*py_std_scheduled_mutator)
+                                    .std_scheduled_mutator
+                                    .mutate(state, input, stage_idx)
                             }
                         }
                     }
