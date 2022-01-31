@@ -7,7 +7,10 @@ cd "$SCRIPT_DIR/.."
 
 cd fuzzers
 
-for fuzzer in *;
+fuzzers=$(find . -maxdepth 1 -type d | )
+backtrace_fuzzers=$(find ./backtrace_baby_fuzzers -maxdepth 1 -type d)
+
+for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
 do
     cd $fuzzer
     # Clippy checks
