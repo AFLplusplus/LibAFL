@@ -9,9 +9,9 @@ use core::slice::Iter;
 use core::{mem::size_of, ops::Add};
 #[cfg(target_os = "linux")]
 use core::{ptr::null, slice::from_raw_parts};
-use std::ops::AddAssign;
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
+use std::ops::AddAssign;
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -222,18 +222,16 @@ impl AddAssign for Tokens {
     }
 }
 
-impl AddAssign<&[Vec<u8>]> for Tokens
-{
+impl AddAssign<&[Vec<u8>]> for Tokens {
     fn add_assign(&mut self, other: &[Vec<u8>]) {
         self.add_tokens(other);
     }
 }
 
-impl Add<&[Vec<u8>]> for Tokens
-{
+impl Add<&[Vec<u8>]> for Tokens {
     type Output = Self;
     fn add(self, other: &[Vec<u8>]) -> Self {
-        let mut ret = self.clone();
+        let mut ret = self;
         ret.add_tokens(other);
         ret
     }
