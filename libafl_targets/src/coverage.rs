@@ -30,8 +30,8 @@ extern "C" {
     #[cfg(target_os = "linux")]
     pub static __token_stop: *const u8;
 }
-pub use __afl_area_ptr as EDGES_MAP_PTR;
 pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
+pub use __afl_area_ptr as EDGES_MAP_PTR;
 
 /// Return token section's start and end as a tuple
 #[cfg(target_os = "linux")]
