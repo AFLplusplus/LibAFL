@@ -68,7 +68,7 @@ fn clone_command(cmd: &Command) -> Command {
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file
 #[derive(Debug)]
-pub struct StdCommandConfiguator {
+pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     pub debug_child: bool,
@@ -78,7 +78,7 @@ pub struct StdCommandConfiguator {
     pub command: Command,
 }
 
-impl CommandConfigurator for StdCommandConfiguator {
+impl CommandConfigurator for StdCommandConfigurator {
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
     where
         I: Input + HasTargetBytes,
@@ -159,10 +159,10 @@ where
     }
 }
 
-impl<EM, I, S, Z> From<StdCommandConfiguator>
-    for CommandExecutor<EM, I, S, StdCommandConfiguator, Z>
+impl<EM, I, S, Z> From<StdCommandConfigurator>
+    for CommandExecutor<EM, I, S, StdCommandConfigurator, Z>
 {
-    fn from(val: StdCommandConfiguator) -> Self {
+    fn from(val: StdCommandConfigurator) -> Self {
         CommandExecutor {
             inner: val,
             phantom: PhantomData,
@@ -180,14 +180,14 @@ where
     }
 }
 
-impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfiguator, Z> {
+impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfigurator, Z> {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
     pub fn from_cmd_with_file<P>(
         cmd: &Command,
         debug_child: bool,
         path: P,
-    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfiguator, Z>, Error>
+    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfigurator, Z>, Error>
     where
         P: AsRef<Path>,
     {
@@ -198,7 +198,7 @@ impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfiguator, Z> {
         }
         command.stdin(Stdio::null());
         Ok(Self {
-            inner: StdCommandConfiguator {
+            inner: StdCommandConfigurator {
                 input_location: InputLocation::File {
                     out_file: OutFile::create(path)?,
                 },
@@ -215,7 +215,7 @@ impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfiguator, Z> {
     pub fn parse_afl_cmdline<IT, O>(
         args: IT,
         debug_child: bool,
-    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfiguator, Z>, Error>
+    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfigurator, Z>, Error>
     where
         IT: IntoIterator<Item = O>,
         O: AsRef<OsStr>,
@@ -413,7 +413,7 @@ impl CommandExecutorBuilder {
     /// Builds the `ComandExecutor`
     pub fn build<EM, I, S, Z>(
         &self,
-    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfiguator, Z>, Error> {
+    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfigurator, Z>, Error> {
         let program = if let Some(program) = &self.program {
             program
         } else {
@@ -455,7 +455,7 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::null());
         }
 
-        let configurator = StdCommandConfiguator {
+        let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
             input_location: self.input_location.clone().unwrap(),
             command,
