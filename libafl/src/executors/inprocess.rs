@@ -544,7 +544,7 @@ pub mod bt_signal_handlers {
         let state = data.state_mut::<S>();
         let input = data.current_input::<I>();
         observers
-            .post_exec_all(state, input, &ExitKind::Crash)
+            .post_exec_child_all(state, input, &ExitKind::Crash)
             .expect("Failed to run post_exec on observers");
     }
 
@@ -565,7 +565,7 @@ pub mod bt_signal_handlers {
         let state = data.state_mut::<S>();
         let input = data.current_input::<I>();
         observers
-            .post_exec_all(state, input, &ExitKind::Crash)
+            .post_exec_child_all(state, input, &ExitKind::Crash)
             .expect("Failed to run post_exec on observers");
     }
 }
