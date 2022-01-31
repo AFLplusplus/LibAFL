@@ -10,6 +10,7 @@ use core::{mem::size_of, ops::Add};
 use core::{ptr::null, slice::from_raw_parts};
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
+use std::slice::Iter;
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -18,7 +19,7 @@ use std::{
 };
 
 use crate::{
-    bolts::rands::Rand,
+    bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, Input},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{CmpValues, CmpValuesMetadata},
@@ -27,7 +28,7 @@ use crate::{
 };
 
 /// A state metadata holding a list of tokens
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct Tokens {
     // We keep a vec and a set, set for faster deduplication, vec for access
@@ -48,9 +49,13 @@ impl Tokens {
     }
 
     /// Add tokens from a slice of Vecs of bytes
-    pub fn add_tokens(&mut self, vec: &[Vec<u8>]) -> &mut Self {
-        for token in vec {
-            self.add_token(token);
+    pub fn add_tokens<IT, V>(&mut self, tokens: IT) -> &mut Self
+    where
+        IT: IntoIterator<Item = V>,
+        V: AsRef<Vec<u8>>,
+    {
+        for token in tokens {
+            self.add_token(token.as_ref());
         }
         self
     }
@@ -215,8 +220,45 @@ impl Add for Tokens {
 
     fn add(self, other: Self) -> Self {
         let mut ret = self;
-        ret.add_tokens(other.tokens());
+        ret.add_tokens(&other);
         ret
+    }
+}
+
+impl<IT, V> From<IT> for Tokens
+where
+    IT: IntoIterator<Item = V>,
+    V: AsRef<Vec<u8>>,
+{
+    fn from(tokens: IT) -> Self {
+        let mut ret = Self::default();
+        ret.add_tokens(tokens);
+        ret
+    }
+}
+
+impl AsSlice<Vec<u8>> for Tokens {
+    fn as_slice(&self) -> &[Vec<u8>] {
+        self.tokens()
+    }
+}
+
+impl Add for &Tokens {
+    type Output = Tokens;
+
+    fn add(self, other: Self) -> Tokens {
+        let mut ret: Tokens = self.clone();
+        ret.add_tokens(other);
+        ret
+    }
+}
+
+impl<'a, 'it> IntoIterator for &'it Tokens {
+    type Item = <Iter<'it, Vec<u8>> as Iterator>::Item;
+    type IntoIter = Iter<'it, Vec<u8>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
     }
 }
 

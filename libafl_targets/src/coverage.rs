@@ -2,7 +2,7 @@
 
 use crate::EDGES_MAP_SIZE;
 #[cfg(target_os = "linux")]
-use libafl::mutators::Tokens;
+use libafl::{mutators::Tokens, Error};
 
 /// The map for edges.
 #[no_mangle]

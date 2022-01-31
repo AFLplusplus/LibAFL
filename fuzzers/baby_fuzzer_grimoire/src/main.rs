@@ -115,7 +115,7 @@ pub fn main() {
     );
 
     if state.metadata().get::<Tokens>().is_none() {
-        state.add_metadata(Tokens::new(vec![
+        state.add_metadata(Tokens::from(vec![
             "FOO".as_bytes().to_vec(),
             "BAR".as_bytes().to_vec(),
         ]));
