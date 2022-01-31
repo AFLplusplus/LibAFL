@@ -68,7 +68,7 @@ impl BacktraceHashValueWrapper {
             }
             Self::StaticVariable(hash_tuple) => *hash_tuple,
             Self::None => {
-                panic!("BacktraceSharedMemoryWrapper is not set yet11!")
+                panic!("BacktraceSharedMemoryWrapper is not set yet!")
             }
         }
     }
@@ -179,10 +179,6 @@ impl<I, S> Observer<I, S> for BacktraceObserver
 where
     I: Input + Debug,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        Ok(())
-    }
-
     fn post_exec(&mut self, _state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         // run if this call resulted after a crash
         if exit_kind == &ExitKind::Crash {
@@ -202,6 +198,15 @@ where
             self.update_hash(bt_hash);
         }
         Ok(())
+    }
+
+    fn post_exec_child(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.post_exec(state, input, exit_kind)
     }
 }
 

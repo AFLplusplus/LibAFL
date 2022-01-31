@@ -60,7 +60,9 @@ use crate::{
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::os::unix_signals::{Handler, Signal};
 #[cfg(feature = "std")]
-use crate::executors::inprocess::bt_signal_handlers::setup_bt_panic_hook;
+use crate::executors::inprocess::bt_signal_handlers::{
+    setup_bt_panic_hook, setup_child_panic_hook,
+};
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
@@ -379,6 +381,8 @@ pub trait HasHandlerData: 'static + Sync {
     fn state_mut<S>(&self) -> &mut S;
     /// get current input
     fn current_input<I>(&self) -> &I;
+    /// Check if the pointers in the handler are valid
+    fn is_valid(&self) -> bool;
 }
 /// The global state of the in-process harness.
 #[derive(Debug)]
@@ -423,6 +427,16 @@ impl HasHandlerData for InProcessExecutorHandlerData {
 
     fn current_input<I>(&self) -> &I {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
+    }
+
+    #[cfg(windows)]
+    fn is_valid(&self) -> bool {
+        self.in_target == 1
+    }
+
+    #[cfg(not(windows))]
+    fn is_valid(&self) -> bool {
+        !self.current_input_ptr.is_null()
     }
 }
 /// Exception handling needs some nasty unsafe.
@@ -502,7 +516,7 @@ pub mod bt_signal_handlers {
 
     use super::HasHandlerData;
 
-    /// invokes the `post_exec` hook on all observer in case the child process crashes
+    /// invokes the `post_exec` hook on all observer in case of panic
     pub fn setup_bt_panic_hook<E, I, OT, S, D>(data: &'static D)
     where
         E: HasObservers<I, OT, S>,
@@ -510,14 +524,41 @@ pub mod bt_signal_handlers {
         I: Input,
         D: HasHandlerData,
     {
-        panic::set_hook(Box::new(|_panic_info| {
-            let executor = data.executor_mut::<E>();
-            let observers = executor.observers_mut();
-            let state = data.state_mut::<S>();
-            let input = data.current_input::<I>();
-            observers
-                .post_exec_all(state, input, &ExitKind::Crash)
-                .expect("Failed to run post_exec on observers");
+        let old_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |panic_info| {
+            if data.is_valid() {
+                let executor = data.executor_mut::<E>();
+                let observers = executor.observers_mut();
+                let state = data.state_mut::<S>();
+                let input = data.current_input::<I>();
+                observers
+                    .post_exec_all(state, input, &ExitKind::Crash)
+                    .expect("Failed to run post_exec on observers");
+            }
+            old_hook(panic_info);
+        }));
+    }
+
+    /// invokes the `post_exec_child` hook on all observer in case the child process panics
+    pub fn setup_child_panic_hook<E, I, OT, S, D>(data: &'static D)
+    where
+        E: HasObservers<I, OT, S>,
+        OT: ObserversTuple<I, S>,
+        I: Input,
+        D: HasHandlerData,
+    {
+        let old_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |panic_info| {
+            if data.is_valid() {
+                let executor = data.executor_mut::<E>();
+                let observers = executor.observers_mut();
+                let state = data.state_mut::<S>();
+                let input = data.current_input::<I>();
+                observers
+                    .post_exec_child_all(state, input, &ExitKind::Crash)
+                    .expect("Failed to run post_exec on observers");
+            }
+            old_hook(panic_info);
         }));
     }
 
@@ -535,13 +576,16 @@ pub mod bt_signal_handlers {
         I: Input,
         D: HasHandlerData,
     {
-        let executor = data.executor_mut::<E>();
-        let observers = executor.observers_mut();
-        let state = data.state_mut::<S>();
-        let input = data.current_input::<I>();
-        observers
-            .post_exec_all(state, input, &ExitKind::Crash)
-            .expect("Failed to run post_exec on observers");
+        if data.is_valid() {
+            // redundant check, but better to be safe
+            let executor = data.executor_mut::<E>();
+            let observers = executor.observers_mut();
+            let state = data.state_mut::<S>();
+            let input = data.current_input::<I>();
+            observers
+                .post_exec_child_all(state, input, &ExitKind::Crash)
+                .expect("Failed to run post_exec on observers");
+        }
     }
 
     /// invokes the `post_exec` hook on all observer in case the child process crashes
@@ -556,13 +600,16 @@ pub mod bt_signal_handlers {
         I: Input,
         D: HasHandlerData,
     {
-        let executor = data.executor_mut::<E>();
-        let observers = executor.observers_mut();
-        let state = data.state_mut::<S>();
-        let input = data.current_input::<I>();
-        observers
-            .post_exec_all(state, input, &ExitKind::Crash)
-            .expect("Failed to run post_exec on observers");
+        if data.is_valid() {
+            // redundant check, but better to be safe
+            let executor = data.executor_mut::<E>();
+            let observers = executor.observers_mut();
+            let state = data.state_mut::<S>();
+            let input = data.current_input::<I>();
+            observers
+                .post_exec_child_all(state, input, &ExitKind::Crash)
+                .expect("Failed to run post_exec on observers");
+        }
     }
 }
 
@@ -1274,6 +1321,10 @@ impl HasHandlerData for InProcessForkExecutorGlobalData {
     fn current_input<I>(&self) -> &I {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
     }
+
+    fn is_valid(&self) -> bool {
+        !self.current_input_ptr.is_null()
+    }
 }
 
 /// a static variable storing the global state
@@ -1404,7 +1455,7 @@ where
                             setup_signal_handler(&mut FORK_EXECUTOR_GLOBAL_DATA)?;
                         }
                         crate::observers::HarnessType::RUST => {
-                            setup_bt_panic_hook::<
+                            setup_child_panic_hook::<
                                 InProcessForkExecutor<H, I, OT, S, SP>,
                                 I,
                                 OT,
