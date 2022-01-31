@@ -101,6 +101,7 @@ fn main() {
     cc::Build::new()
         .file(src_dir.join("coverage.c"))
         .define("EDGES_MAP_SIZE", Some(&*format!("{}", edges_map_size)))
+        .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{}", acc_map_size)))
         .compile("coverage");
 
     println!("cargo:rerun-if-changed=src/cmplog.h");

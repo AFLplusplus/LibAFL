@@ -135,7 +135,6 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   LLVMContext &C = M.getContext();
 
-  IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
   IntegerType *Int32Ty = IntegerType::getInt32Ty(C);
   uint32_t rand_seed;
   unsigned int cur_loc = 0;
@@ -156,13 +155,9 @@ bool AFLCoverage::runOnModule(Module &M) {
   /* Get globals for the SHM region and the previous location. Note that
      __afl_acc_prev_loc is thread-local. */
 
-  GlobalVariable *AFLMemWritePtr =
-      new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
-                         GlobalValue::ExternalLinkage, 0, "__afl_memwrite_ptr");
-
-  GlobalVariable *AFLMemReadPtr =
-      new GlobalVariable(M, PointerType::get(Int8Ty, 0), false,
-                         GlobalValue::ExternalLinkage, 0, "__afl_memread_ptr");
+  GlobalVariable *AFLMemOpPtr =
+      new GlobalVariable(M, PointerType::get(Int32Ty, 0), false,
+                         GlobalValue::ExternalLinkage, 0, "__afl_acc_memop_ptr");
 
   GlobalVariable *AFLPrevLoc;
 
@@ -174,9 +169,6 @@ bool AFLCoverage::runOnModule(Module &M) {
       M, Int32Ty, false, GlobalValue::ExternalLinkage, 0, "__afl_acc_prev_loc", 0,
       GlobalVariable::GeneralDynamicTLSModel, 0, false);
 #endif
-
-  // other constants we need
-  ConstantInt *One = ConstantInt::get(Int8Ty, 1);
 
   /* Instrument all the things! */
 
@@ -202,17 +194,14 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       if (RandBelow(100) >= InstRatio) continue;
 
-      uint32_t ReadsCnt = 0, WritesCnt = 0;
+      // Start with 1 to implicitly track edge coverage too
+      uint32_t MemCnt = 1;
 
       for (auto &I : BB) {
-          if (I.mayReadFromMemory())
-              ++ReadsCnt;
-          if (I.mayWriteToMemory())
-              ++WritesCnt;
+          if (I.mayReadFromMemory() || I.mayWriteToMemory())
+              ++MemCnt;
       }
       
-      if (!ReadsCnt && !WritesCnt) continue;
-
       /* Make up cur_loc */
 
       cur_loc = RandBelow(map_size);
@@ -224,41 +213,19 @@ bool AFLCoverage::runOnModule(Module &M) {
       LoadInst *PrevLoc = IRB.CreateLoad(AFLPrevLoc);
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
-      if (ReadsCnt > 0) {
+      /* Load SHM pointer */
 
-        /* Load SHM pointer */
+      LoadInst *MemReadPtr = IRB.CreateLoad(AFLMemOpPtr);
+      MemReadPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+      Value *MemReadPtrIdx = IRB.CreateGEP(MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
 
-        LoadInst *MemReadPtr = IRB.CreateLoad(AFLMemReadPtr);
-        MemReadPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        Value *MemReadPtrIdx = IRB.CreateGEP(MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
+      /* Update bitmap */
 
-        /* Update bitmap */
-
-        LoadInst *MemReadCount = IRB.CreateLoad(MemReadPtrIdx);
-        MemReadCount->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        Value *MemReadIncr = IRB.CreateAdd(MemReadCount, ConstantInt::get(Int32Ty, ReadsCnt));
-        IRB.CreateStore(MemReadIncr, MemReadPtrIdx)
-            ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-
-      }
-
-      if (WritesCnt > 0) {
-
-        /* Load SHM pointer */
-
-        LoadInst *MemWritePtr = IRB.CreateLoad(AFLMemWritePtr);
-        MemWritePtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        Value *MemWritePtrIdx = IRB.CreateGEP(MemWritePtr, IRB.CreateXor(PrevLoc, CurLoc));
-
-        /* Update bitmap */
-
-        LoadInst *MemWriteCount = IRB.CreateLoad(MemWritePtrIdx);
-        MemWriteCount->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
-        Value *MemWriteIncr = IRB.CreateAdd(MemWriteCount, ConstantInt::get(Int32Ty, WritesCnt));
-        IRB.CreateStore(MemWriteIncr, MemWritePtrIdx)
-            ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));      
-
-      }
+      LoadInst *MemReadCount = IRB.CreateLoad(MemReadPtrIdx);
+      MemReadCount->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
+      Value *MemReadIncr = IRB.CreateAdd(MemReadCount, ConstantInt::get(Int32Ty, MemCnt));
+      IRB.CreateStore(MemReadIncr, MemReadPtrIdx)
+          ->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
       /* Update prev_loc */
 

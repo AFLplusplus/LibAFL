@@ -59,6 +59,12 @@ impl AccountingIndexesMetadata {
     pub fn new(list: Vec<usize>) -> Self {
         Self { list, tcref: 0 }
     }
+
+    /// Creates a new [`struct@AccountingIndexesMetadata`] specifying the refcount.
+    #[must_use]
+    pub fn with_tcref(list: Vec<usize>, tcref: isize) -> Self {
+        Self { list, tcref }
+    }
 }
 
 /// A state metadata holding a map of favoreds testcases for each map entry
@@ -159,45 +165,36 @@ where
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_accounting_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+        let mut indexes = vec![];
         let mut new_favoreds = vec![];
         {
-            let indexes = {
-                let mut entry = state.corpus().get(idx)?.borrow_mut();
-                entry
-                    .metadata_mut()
-                    .get_mut::<AccountingIndexesMetadata>()
-                    .ok_or_else(|| {
-                        Error::KeyNotFound(format!(
-                    "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
-                    idx
-                ))
-                    })?
-                    .as_slice()
-                    .to_vec()
-            };
+            for idx in 0..self.accounting_map.len() {
+                if self.accounting_map[idx] == 0 {
+                    continue;
+                }
+                indexes.push(idx);
 
-            for elem in indexes {
                 let mut equal_score = false;
                 {
                     let top_acc = state.metadata().get::<TopAccountingMetadata>().unwrap();
 
-                    if let Some(old_idx) = top_acc.map.get(&elem) {
-                        if top_acc.max_accounting[elem] > self.accounting_map[elem] {
+                    if let Some(old_idx) = top_acc.map.get(&idx) {
+                        if top_acc.max_accounting[idx] > self.accounting_map[idx] {
                             continue;
                         }
 
-                        if top_acc.max_accounting[elem] >= self.accounting_map[elem] {
+                        if top_acc.max_accounting[idx] >= self.accounting_map[idx] {
                             equal_score = true;
                         }
 
                         let mut old = state.corpus().get(*old_idx)?.borrow_mut();
                         let must_remove = {
                             let old_meta = old.metadata_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
-                            Error::KeyNotFound(format!(
-                                "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
-                                old_idx
-                            ))
-                        })?;
+                                Error::KeyNotFound(format!(
+                                    "AccountingIndexesMetadata, needed by CoverageAccountingCorpusScheduler, not found in testcase #{}",
+                                    old_idx
+                                ))
+                            })?;
                             *old_meta.refcnt_mut() -= 1;
                             old_meta.refcnt() <= 0
                         };
@@ -215,35 +212,22 @@ where
 
                 // if its accounting is equal to others', it's not favored
                 if equal_score {
-                    top_acc.map.remove(&elem);
-                } else if top_acc.max_accounting[elem] < self.accounting_map[elem] {
-                    new_favoreds.push(elem);
+                    top_acc.map.remove(&idx);
+                } else if top_acc.max_accounting[idx] < self.accounting_map[idx] {
+                    new_favoreds.push(idx);
 
-                    top_acc.max_accounting[elem] = self.accounting_map[elem];
+                    top_acc.max_accounting[idx] = self.accounting_map[idx];
                 }
             }
         }
 
         if new_favoreds.is_empty() {
-            drop(
-                state
-                    .corpus()
-                    .get(idx)?
-                    .borrow_mut()
-                    .metadata_mut()
-                    .remove::<AccountingIndexesMetadata>(),
-            );
             return Ok(());
         }
 
-        *state
-            .corpus()
-            .get(idx)?
-            .borrow_mut()
-            .metadata_mut()
-            .get_mut::<AccountingIndexesMetadata>()
-            .unwrap()
-            .refcnt_mut() = new_favoreds.len() as isize;
+        state.corpus().get(idx)?.borrow_mut().metadata_mut().insert(
+            AccountingIndexesMetadata::with_tcref(indexes, new_favoreds.len() as isize),
+        );
 
         let top_acc = state
             .metadata_mut()
@@ -258,7 +242,7 @@ where
         Ok(())
     }
 
-    /// Cull the `Corpus` using the `MinimizerCorpusScheduler`
+    /// Cull the `Corpus`
     #[allow(clippy::unused_self)]
     pub fn accounting_cull(&self, state: &mut S) -> Result<(), Error> {
         let top_rated = match state.metadata().get::<TopAccountingMetadata>() {
