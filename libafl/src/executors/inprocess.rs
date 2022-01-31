@@ -235,6 +235,7 @@ pub struct InProcessHandlers {
 
 impl InProcessHandlers {
     /// Call before running a target.
+    #[allow(clippy::unused_self)]
     pub fn pre_run_target<E, EM, I, S, Z>(
         &self,
         _executor: &E,

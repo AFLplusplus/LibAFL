@@ -38,11 +38,7 @@ llmp_small_maps = [] # reduces initial map size for llmp
 rustversion = "1.0"
 
 [dev-dependencies]
-criterion = "0.3" # Benchmarking
-ahash = "0.7" # another hash
-fxhash = "0.2.1" # yet another hash
-xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
-serde_json = "1.0"
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 num_cpus = "1.0" # cpu count, for llmp example
 serial_test = "0.5"
 
@@ -99,14 +95,6 @@ windows = { version = "0.29.0", features = ["std", "Win32_Foundation", "Win32_Sy
 
 [target.'cfg(windows)'.build-dependencies]
 windows = "0.29.0"
-
-[[bench]]
-name = "rand_speeds"
-harness = false
-
-[[bench]]
-name = "hash_speeds"
-harness = false
 
 #[profile.release]
 #lto = true
