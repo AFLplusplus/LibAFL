@@ -361,7 +361,9 @@ fn fuzz(
             toks.add_from_file(tokenfile)?;
         }
         #[cfg(target_os = "linux")]
-        toks += autotokens()?;
+        {
+            toks += autotokens()?;
+        }
 
         if !toks.is_empty() {
             state.add_metadata(toks);
