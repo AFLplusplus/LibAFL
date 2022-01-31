@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// An item of the generalized input
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum GeneralizedItem {
     /// Real bytes
     Bytes(Vec<u8>),
@@ -26,7 +26,7 @@ pub enum GeneralizedItem {
 }
 
 /// A bytes input with a generalized version mainly used for Grimoire
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct GeneralizedInput {
     /// The raw input bytes
     bytes: Vec<u8>,
@@ -206,7 +206,6 @@ impl GeneralizedInput {
     }
 
     /// Load from a plain file of bytes
-    #[must_use]
     #[cfg(feature = "std")]
     pub fn from_bytes_file<P>(path: P) -> Result<Self, Error>
     where

@@ -2209,7 +2209,7 @@ where
             .to_string_lossy()
             .into();
         let broker_hello = TcpResponse::BrokerConnectHello {
-            broker_shmem_description: broker_shmem_description,
+            broker_shmem_description,
             hostname,
         };
 

@@ -21,6 +21,7 @@ use crate::{
         tuples::Named,
         AsMutSlice, AsSlice, HasLen,
     },
+    executors::ExitKind,
     observers::Observer,
     Error,
 };
@@ -680,12 +681,12 @@ where
     }
 
     #[inline]
-    fn post_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let cnt = self.usable_count();
         for i in 0..cnt {
             *self.get_mut(i) = COUNT_CLASS_LOOKUP[*self.get(i) as usize];
         }
-        self.base.post_exec(state, input)
+        self.base.post_exec(state, input, exit_kind)
     }
 }
 
