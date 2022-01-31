@@ -9,6 +9,7 @@ use core::slice::Iter;
 use core::{mem::size_of, ops::Add};
 #[cfg(target_os = "linux")]
 use core::{ptr::null, slice::from_raw_parts};
+use std::ops::AddAssign;
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -215,13 +216,34 @@ impl Tokens {
     }
 }
 
+impl AddAssign for Tokens {
+    fn add_assign(&mut self, other: Self) {
+        self.add_tokens(&other);
+    }
+}
+
+impl AddAssign<&[Vec<u8>]> for Tokens
+{
+    fn add_assign(&mut self, other: &[Vec<u8>]) {
+        self.add_tokens(other);
+    }
+}
+
+impl Add<&[Vec<u8>]> for Tokens
+{
+    type Output = Self;
+    fn add(self, other: &[Vec<u8>]) -> Self {
+        let mut ret = self.clone();
+        ret.add_tokens(other);
+        ret
+    }
+}
+
 impl Add for Tokens {
     type Output = Self;
 
     fn add(self, other: Self) -> Self {
-        let mut ret = self;
-        ret.add_tokens(&other);
-        ret
+        self.add(other.tokens_vec.as_slice())
     }
 }
 
