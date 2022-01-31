@@ -64,7 +64,7 @@ impl Tokens {
     #[must_use]
     #[cfg(target_os = "linux")]
     pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
-        let ret = Self::default();
+        let mut ret = Self::default();
         if token_start == null() || token_stop == null() {
             return Err(Err::IllegalArgument("token_start or token_stop is null. If you are using autotokens() you likely did not build your target with the \"AutoTokens\"-pass"));
         }
@@ -74,11 +74,9 @@ impl Tokens {
                 token_stop, token_start
             )));
         }
-        let section_size: usize = unsafe { token_stop.offset_from(token_start) }
-            .try_into()
-            .unwrap();
+        let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
         // println!("size: {}", section_size);
-        let slice = unsafe { from_raw_parts(token_start, section_size) };
+        let slice = from_raw_parts(token_start, section_size);
 
         let mut head = 0;
 
