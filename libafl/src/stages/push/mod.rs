@@ -138,7 +138,7 @@ where
     /// Sets the shared state for this helper (and all other helpers owning the same [`RefCell`])
     #[inline]
     pub fn set_shared_state(&mut self, shared_state: PushStageSharedState<CS, EM, I, OT, S, Z>) {
-        (&mut *self.shared_state.borrow_mut()).replace(shared_state);
+        (*self.shared_state.borrow_mut()).replace(shared_state);
     }
 
     /// Takes the shared state from this helper, replacing it with `None`
