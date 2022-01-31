@@ -1,11 +1,12 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
-use alloc::vec::Vec;
-use core::{mem::size_of, ops::Add, ptr::null, slice::from_raw_parts};
-use serde::{Deserialize, Serialize};
-
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
+use alloc::vec::Vec;
+use core::{mem::size_of, ops::Add};
+#[cfg(target_os = "linux")]
+use core::{ptr::null, slice::from_raw_parts};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
