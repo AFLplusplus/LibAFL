@@ -66,7 +66,7 @@ impl Tokens {
     pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
         let mut ret = Self::default();
         if token_start == null() || token_stop == null() {
-            return Err(Err::IllegalArgument("token_start or token_stop is null. If you are using autotokens() you likely did not build your target with the \"AutoTokens\"-pass"));
+            return Err(Error::IllegalArgument("token_start or token_stop is null. If you are using autotokens() you likely did not build your target with the \"AutoTokens\"-pass"));
         }
         if token_stop <= token_start {
             return Err(Error::IllegalArgument(format!(
