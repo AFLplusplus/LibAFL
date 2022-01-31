@@ -133,6 +133,10 @@
   #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
   __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
 
+  // Weakly defined globals
+  #define EXT_VAR(NAME, TYPE) \
+  TYPE __attribute__((weak, visibility("default"))) NAME
+
 #else
 
 #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
@@ -141,6 +145,11 @@
 // Declare these symbols as weak to allow them to be optionally defined.
 #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                            \
   __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
+
+// Weakly defined globals
+#define EXT_VAR(NAME, TYPE) \
+  TYPE __attribute__((weak, visibility("default"))) NAME
+
 #endif
 
 #define CHECK_WEAK_FN(Name) (Name != NULL)

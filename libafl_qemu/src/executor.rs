@@ -23,6 +23,7 @@ pub use crate::emu::SyscallHookResult;
 use crate::{
     emu::{Emulator, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
+    GuestAddr,
 };
 
 static mut QEMU_HELPERS_PTR: *const c_void = ptr::null();
@@ -120,6 +121,12 @@ where
     }
 }
 
+// function signature for Read or Write hook functions with known length (1, 2, 4, 8)
+type FixedLenHook<QT, S> = fn(&Emulator, &mut QT, &mut S, u64, GuestAddr);
+
+// function signature for Read or Write hook functions with runtime length n
+type DynamicLenHook<QT, S> = fn(&Emulator, &mut QT, &mut S, u64, GuestAddr, usize);
+
 static mut READ1_HOOKS: Vec<*const c_void> = vec![];
 extern "C" fn read1_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
 where
@@ -130,8 +137,8 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &READ1_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr);
+        let func: FixedLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr as GuestAddr);
     }
 }
 
@@ -145,8 +152,8 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &READ2_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr);
+        let func: FixedLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr as GuestAddr);
     }
 }
 
@@ -160,8 +167,8 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &READ4_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr);
+        let func: FixedLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr as GuestAddr);
     }
 }
 
@@ -175,8 +182,8 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &READ8_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr);
+        let func: FixedLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr as GuestAddr);
     }
 }
 
@@ -190,8 +197,15 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &READ_N_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64, usize) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr, size as usize);
+        let func: DynamicLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(
+            &emulator,
+            helpers,
+            state,
+            id,
+            addr as GuestAddr,
+            size as usize,
+        );
     }
 }
 
@@ -205,8 +219,8 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE1_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr);
+        let func: FixedLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr as GuestAddr);
     }
 }
 
@@ -220,8 +234,8 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE2_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr);
+        let func: FixedLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr as GuestAddr);
     }
 }
 
@@ -235,8 +249,8 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE4_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr);
+        let func: FixedLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr as GuestAddr);
     }
 }
 
@@ -250,8 +264,8 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE8_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr);
+        let func: FixedLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(&emulator, helpers, state, id, addr as GuestAddr);
     }
 }
 
@@ -265,8 +279,15 @@ where
     let state = inprocess_get_state::<S>().unwrap();
     let emulator = Emulator::new_empty();
     for hook in unsafe { &WRITE_N_HOOKS } {
-        let func: fn(&Emulator, &mut QT, &mut S, u64, u64, usize) = unsafe { transmute(*hook) };
-        (func)(&emulator, helpers, state, id, addr, size as usize);
+        let func: DynamicLenHook<QT, S> = unsafe { transmute(*hook) };
+        (func)(
+            &emulator,
+            helpers,
+            state,
+            id,
+            addr as GuestAddr,
+            size as usize,
+        );
     }
 }
 
@@ -564,7 +585,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read1_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_read1_execution(&self, hook: FixedLenHook<QT, S>) {
         unsafe {
             READ1_HOOKS.push(hook as *const _);
         }
@@ -573,7 +594,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read2_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_read2_execution(&self, hook: FixedLenHook<QT, S>) {
         unsafe {
             READ2_HOOKS.push(hook as *const _);
         }
@@ -582,7 +603,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read4_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_read4_execution(&self, hook: FixedLenHook<QT, S>) {
         unsafe {
             READ4_HOOKS.push(hook as *const _);
         }
@@ -591,7 +612,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read8_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_read8_execution(&self, hook: FixedLenHook<QT, S>) {
         unsafe {
             READ8_HOOKS.push(hook as *const _);
         }
@@ -600,10 +621,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_read_n_execution(
-        &self,
-        hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64, size: usize),
-    ) {
+    pub fn hook_read_n_execution(&self, hook: DynamicLenHook<QT, S>) {
         unsafe {
             READ_N_HOOKS.push(hook as *const _);
         }
@@ -624,7 +642,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write1_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_write1_execution(&self, hook: FixedLenHook<QT, S>) {
         unsafe {
             WRITE1_HOOKS.push(hook as *const _);
         }
@@ -633,7 +651,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write2_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_write2_execution(&self, hook: FixedLenHook<QT, S>) {
         unsafe {
             WRITE2_HOOKS.push(hook as *const _);
         }
@@ -642,7 +660,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write4_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_write4_execution(&self, hook: FixedLenHook<QT, S>) {
         unsafe {
             WRITE4_HOOKS.push(hook as *const _);
         }
@@ -651,7 +669,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write8_execution(&self, hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64)) {
+    pub fn hook_write8_execution(&self, hook: FixedLenHook<QT, S>) {
         unsafe {
             WRITE8_HOOKS.push(hook as *const _);
         }
@@ -660,10 +678,7 @@ where
     }
 
     #[allow(clippy::unused_self)]
-    pub fn hook_write_n_execution(
-        &self,
-        hook: fn(&Emulator, &mut QT, &mut S, id: u64, addr: u64, size: usize),
-    ) {
+    pub fn hook_write_n_execution(&self, hook: DynamicLenHook<QT, S>) {
         unsafe {
             WRITE_N_HOOKS.push(hook as *const _);
         }
