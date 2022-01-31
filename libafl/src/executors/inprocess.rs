@@ -109,22 +109,6 @@ where
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
 
-        #[cfg(feature = "std")]
-        if let Some(obs) = self
-            .observers
-            .match_name::<BacktraceObserver>("BacktraceObserver")
-        {
-            if obs.harness_type() == &HarnessType::RUST {
-                setup_bt_panic_hook::<
-                    InProcessExecutor<H, I, OT, S>,
-                    I,
-                    OT,
-                    S,
-                    InProcessExecutorHandlerData,
-                >(unsafe { &GLOBAL_STATE });
-            }
-        }
-
         let ret = (self.harness_fn)(input);
 
         self.handlers.post_run_target();
@@ -177,6 +161,18 @@ where
         #[cfg(feature = "std")]
         BacktraceObserver::setup_static_variable();
 
+        #[cfg(feature = "std")]
+        if let Some(obs) = observers.match_name::<BacktraceObserver>("BacktraceObserver") {
+            if obs.harness_type() == &HarnessType::RUST {
+                setup_bt_panic_hook::<
+                    InProcessExecutor<H, I, OT, S>,
+                    I,
+                    OT,
+                    S,
+                    InProcessExecutorHandlerData,
+                >(unsafe { &GLOBAL_STATE });
+            }
+        }
         let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z, H>()?;
         #[cfg(windows)]
         unsafe {
