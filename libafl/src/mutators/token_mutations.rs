@@ -3,10 +3,10 @@
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
 use alloc::vec::Vec;
-use hashbrown::HashSet;
 use core::{mem::size_of, ops::Add};
 #[cfg(target_os = "linux")]
 use core::{ptr::null, slice::from_raw_parts};
+use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
@@ -40,8 +40,8 @@ impl Tokens {
     /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
     #[must_use]
     pub fn new() -> Self {
-        Self{
-           ..Tokens::default() 
+        Self {
+            ..Tokens::default()
         }
     }
 

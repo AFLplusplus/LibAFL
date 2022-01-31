@@ -1,7 +1,7 @@
 //! Coverage maps as static mut array
 
 use crate::EDGES_MAP_SIZE;
-#[cfg(Linux)]
+#[cfg(target_os = "linux")]
 use libafl::mutators::Tokens;
 
 /// The map for edges.
