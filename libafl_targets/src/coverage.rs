@@ -29,8 +29,15 @@ pub use __afl_area_ptr as EDGES_MAP_PTR;
 /// Return token section's start and end as a tuple
 #[cfg(target_os = "linux")]
 #[must_use]
-pub fn autotokens() -> Tokens {
-    unsafe { Tokens::from_ptrs(__token_start, __token_stop) }
+pub fn autotokens() -> Result<Tokens, Error> {
+    if __token_start.is_null() || __token_stop.is_null() {
+        Err(Error::IllegalState(
+            "AutoTokens section not found, likely the targe is not compiled with AutoTokens".into(),
+        ))
+    } else {
+        // we can safely unwrap
+        unsafe { Tokens::from_ptrs(__token_start, __token_stop).unwrap() }
+    }
 }
 
 /// The size of the map for edges.
