@@ -7,7 +7,7 @@ cd "$SCRIPT_DIR/.."
 
 cd fuzzers
 
-fuzzers=$(find . -maxdepth 1 -type d | )
+fuzzers=$(find . -maxdepth 1 -type d)
 backtrace_fuzzers=$(find ./backtrace_baby_fuzzers -maxdepth 1 -type d)
 
 for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
