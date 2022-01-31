@@ -61,7 +61,7 @@ use libafl_targets::{
 };
 
 #[cfg(target_os = "linux")]
-use libafl_targets::token_section;
+use libafl_targets::autotokens;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -423,8 +423,7 @@ fn fuzz_binary(
         }
         #[cfg(target_os = "linux")]
         {
-            let token_section = TokenSection::new(token_section());
-            toks = toks.parse_autotokens(token_section)?;
+            toks += autotokens();
         }
 
         if !toks.tokens().is_empty() {
@@ -643,8 +642,7 @@ fn fuzz_text(
         }
         #[cfg(target_os = "linux")]
         {
-            let token_section = TokenSection::new(token_section());
-            toks = toks.parse_autotokens(token_section)?;
+            toks += autotokens()
         }
 
         if !toks.tokens().is_empty() {

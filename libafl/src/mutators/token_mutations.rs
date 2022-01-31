@@ -1,7 +1,7 @@
 //! Tokens are what afl calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 use alloc::vec::Vec;
-use core::{mem::size_of, slice::from_raw_parts};
+use core::{mem::size_of, slice::from_raw_parts, ptr::null, ops::Add};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -24,13 +24,13 @@ use crate::{
 
 #[derive(Debug, Clone, Copy)]
 /// Struct for token start and end
-pub struct TokenSection {
+pub struct TokensSection {
     start: *const u8,
     stop: *const u8,
 }
 
-impl TokenSection {
-    /// Initialize a [`TokenSection`] from a start addr and end a len
+impl TokensSection {
+    /// Initialize a [`TokensSection`] from a start addr and end a len
     ///
     /// # Safety
     /// In subsequent functions, the contents of the section will be dereferenced.
@@ -41,6 +41,9 @@ impl TokenSection {
             stop: start_addr.add(size),
         }
     }
+
+
+
 }
 
 /// A state metadata holding a list of tokens
@@ -79,60 +82,49 @@ impl Tokens {
         Ok(self)
     }
 
-    /// Build tokens from autotokens
-    pub fn parse_autotokens(mut self, autotoken: TokenSection) -> Result<Self, Error> {
-        self.add_from_autotokens(autotoken)?;
-        Ok(self)
-    }
-
+    /// Create a token section from a start and an end pointer
     /// Reads from an autotokens section, returning the count of new entries read
-    pub fn add_from_autotokens(&mut self, autotoken: TokenSection) -> Result<usize, Error> {
-        if cfg!(target_os = "linux") {
-            let mut entries = 0;
-            let token_start = autotoken.start;
-            let token_stop = autotoken.stop;
-            let section_size: usize = unsafe { token_stop.offset_from(token_start) }
-                .try_into()
-                .unwrap();
-            // println!("size: {}", section_size);
-            let slice = unsafe { from_raw_parts(token_start, section_size) };
-
-            let mut head = 0;
-
-            // Now we know the beginning and the end of the token section.. let's parse them into tokens
-            loop {
-                if head >= section_size {
-                    // Sanity Check
-                    assert!(head == section_size);
-                    break;
-                }
-                let size = slice[head] as usize;
-                head += 1;
-                if size > 0 {
-                    self.add_token(&slice[head..head + size].to_vec());
-                    #[cfg(feature = "std")]
-                    println!(
-                        "Token size: {} content: {:x?}",
-                        size,
-                        &slice[head..head + size].to_vec()
-                    );
-                    head += size;
-                    entries += 1;
-                }
-            }
-
-            Ok(entries)
-        } else {
-            // TODO: Autodict for OSX and windows
-            Ok(0)
+    #[must_use]
+    #[cfg(linux)]
+    pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
+        let ret = Self::default();
+        if token_start == null() || token_stop == null() {
+            return Ok(ret)
         }
-    }
+        if token_stop <= token_start {
+            return Err(Error::IllegalArgument(format!("Tried to create tokens from illegal section: stop < start ({:?} < {:?})", token_stop, token_start)));
+        }
+        let section_size: usize = unsafe { token_stop.offset_from(token_start) }
+            .try_into()
+            .unwrap();
+        // println!("size: {}", section_size);
+        let slice = unsafe { from_raw_parts(token_start, section_size) };
 
-    /// Creates a new token from autotokens
-    pub fn from_autotokens(autotoken: TokenSection) -> Result<Self, Error> {
-        let mut ret = Self::new(vec![]);
-        ret.add_from_autotokens(autotoken)?;
+        let mut head = 0;
+
+        // Now we know the beginning and the end of the token section.. let's parse them into tokens
+        loop {
+            if head >= section_size {
+                // Sanity Check
+                assert!(head == section_size);
+                break;
+            }
+            let size = slice[head] as usize;
+            head += 1;
+            if size > 0 {
+                ret.add_token(&slice[head..head + size].to_vec());
+                /* #[cfg(feature = "std")]
+                println!(
+                    "Token size: {} content: {:x?}",
+                    size,
+                    &slice[head..head + size].to_vec()
+                ); */
+                head += size;
+            }
+        }
+
         Ok(ret)
+    
     }
 
     /// Creates a new instance from a file
@@ -219,6 +211,16 @@ impl Tokens {
     #[must_use]
     pub fn tokens(&self) -> &[Vec<u8>] {
         &self.token_vec
+    }
+}
+
+impl Add for Tokens {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        let mut ret = self;
+        ret.token_vec.extend(other.token_vec);
+        ret
     }
 }
 

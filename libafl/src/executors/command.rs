@@ -129,7 +129,7 @@ impl CommandConfigurator for StdCommandConfiguator {
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
-/// Instead, you can use [`CommandExecutorBuilder()`] to construct a [`CommandExecutor`] backed by a [`StandardCommandConfigurator`].
+/// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
 pub struct CommandExecutor<EM, I, S, T, Z>
 where
     T: Debug,
@@ -140,7 +140,7 @@ where
 
 impl CommandExecutor<(), (), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
-    /// backed by a [`StdCommandConfigurator`].
+    /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
     #[must_use]
     pub fn builder() -> CommandExecutorBuilder {
@@ -297,7 +297,7 @@ where
     }
 }
 
-/// The builder for a default [`ComandsExecutor`] that should fit most use-cases.
+/// The builder for a default [`CommandExecutor`] that should fit most use-cases.
 #[derive(Debug, Clone)]
 pub struct CommandExecutorBuilder {
     debug_child: bool,

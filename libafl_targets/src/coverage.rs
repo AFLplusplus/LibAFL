@@ -1,6 +1,8 @@
 //! Coverage maps as static mut array
 
 use crate::EDGES_MAP_SIZE;
+#[cfg(Linux)]
+use libafl::mutators::Tokens;
 
 /// The map for edges.
 #[no_mangle]
@@ -27,8 +29,8 @@ pub use __afl_area_ptr as EDGES_MAP_PTR;
 /// Return token section's start and end as a tuple
 #[cfg(target_os = "linux")]
 #[must_use]
-pub fn token_section() -> (*const u8, *const u8) {
-    unsafe { (__token_start, __token_stop) }
+pub fn autotokens() -> Tokens {
+    unsafe { Tokens::from_ptrs(__token_start, __token_stop) }
 }
 
 /// The size of the map for edges.
