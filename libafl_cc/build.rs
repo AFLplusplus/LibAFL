@@ -73,6 +73,7 @@ fn find_llvm_config() -> String {
     })
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = Path::new(&out_dir);
