@@ -2,6 +2,8 @@
 //! They may be inserted as part of mutations during fuzzing.
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
+#[cfg(target_os = "linux")]
+use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::{mem::size_of, ops::Add};
 #[cfg(target_os = "linux")]
@@ -189,11 +191,14 @@ impl Tokens {
 
     /// Returns the amount of tokens in this Tokens instance
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.tokens_vec.len()
     }
 
     /// Returns if this tokens-instance is empty
+    #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.tokens_vec.is_empty()
     }
