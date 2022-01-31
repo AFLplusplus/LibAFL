@@ -6,12 +6,14 @@ use crate::mutators::str_decode;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::slice::Iter;
-use core::{mem::size_of, ops::Add};
+use core::{
+    mem::size_of,
+    ops::{Add, AddAssign},
+};
 #[cfg(target_os = "linux")]
 use core::{ptr::null, slice::from_raw_parts};
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
-use std::ops::AddAssign;
 #[cfg(feature = "std")]
 use std::{
     fs::File,
