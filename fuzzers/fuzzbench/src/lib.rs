@@ -38,7 +38,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
-        StdMOptMutator, StdScheduledMutator, TokenSection, Tokens,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
