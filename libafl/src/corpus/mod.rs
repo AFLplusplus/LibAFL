@@ -174,30 +174,6 @@ pub mod pybind {
         corpus: PythonCorpusWrapper,
     }
 
-    // impl PythonCorpus {
-    //     fn get_corpus(&self) -> &impl Corpus<BytesInput> {
-    //         match &self.corpus {
-    //             PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-    //                 &py_in_memory_corpus.in_memory_corpus
-    //             },
-    //             PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-    //                 &py_cached_on_disk_corpus.cached_on_disk_corpus
-    //             }
-    //         }
-    //     }
-
-    //     fn get_mut_corpus(&mut self) -> &mut impl Corpus<BytesInput> {
-    //         match &mut self.corpus {
-    //             PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-    //                 &mut py_in_memory_corpus.in_memory_corpus
-    //             },
-    //             PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-    //                 &mut py_cached_on_disk_corpus.cached_on_disk_corpus
-    //             },
-    //         }
-    //     }
-    // }
-
     #[pymethods]
     impl PythonCorpus {
         #[staticmethod]

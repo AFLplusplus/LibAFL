@@ -161,3 +161,139 @@ where
         }
     }
 }
+
+#[cfg(feature = "python")]
+/// `StdMutationalStage` Python bindings
+pub mod pybind {
+    use crate::inputs::BytesInput;
+    pub use crate::mutators::mutations::*;
+    use crate::stages::StdMutationalStage;
+    use pyo3::prelude::*;
+
+    macro_rules! define_python_std_mutational_stage {
+        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $my_std_fuzzer_type_name: ident, $executor_name: ident, $event_manager_name: ident,
+            $mutator_name: ident) => {
+            
+            use crate::state::pybind::$my_std_state_type_name;
+            use crate::executors::pybind::$executor_name;
+            use crate::events::pybind::$event_manager_name;
+            use crate::mutators::pybind::$mutator_name;
+            use crate::fuzzer::pybind::$my_std_fuzzer_type_name;
+
+            #[pyclass(unsendable, name = $py_name)]
+            #[derive(Debug)]
+            /// Python class for StdMutationalStage
+            pub struct $struct_name {
+                /// Rust wrapped StdMutationalStage object
+                pub std_mutational_stage: StdMutationalStage<
+                    $executor_name,
+                    $event_manager_name,
+                    BytesInput,
+                    $mutator_name,
+                    $my_std_state_type_name,
+                    $my_std_fuzzer_type_name,
+                >,
+            }
+
+            #[pymethods]
+            impl $struct_name {
+                #[staticmethod]
+                fn new(py_mutator: $mutator_name) -> Self {
+                    Self {
+                        std_mutational_stage: StdMutationalStage::new(py_mutator),
+                    }
+                }
+            }
+        };
+    }
+
+    define_python_std_mutational_stage!(
+        PythonStdMutationalStageI8,
+        "StdMutationalStageI8",
+        MyStdStateI8,
+        MyStdFuzzerI8,
+        PythonExecutorI8,
+        PythonEventManagerI8,
+        PythonMutatorI8
+    );
+
+    define_python_std_mutational_stage!(
+        PythonStdMutationalStageI16,
+        "StdMutationalStageI16",
+        MyStdStateI16,
+        MyStdFuzzerI16,
+        PythonExecutorI16,
+        PythonEventManagerI16,
+        PythonMutatorI16
+    );
+    define_python_std_mutational_stage!(
+        PythonStdMutationalStageI32,
+        "StdMutationalStageI32",
+        MyStdStateI32,
+        MyStdFuzzerI32,
+        PythonExecutorI32,
+        PythonEventManagerI32,
+        PythonMutatorI32
+    );
+    define_python_std_mutational_stage!(
+        PythonStdMutationalStageI64,
+        "StdMutationalStageI64",
+        MyStdStateI64,
+        MyStdFuzzerI64,
+        PythonExecutorI64,
+        PythonEventManagerI64,
+        PythonMutatorI64
+    );
+
+    define_python_std_mutational_stage!(
+        PythonStdMutationalStageU8,
+        "StdMutationalStageU8",
+        MyStdStateU8,
+        MyStdFuzzerU8,
+        PythonExecutorU8,
+        PythonEventManagerU8,
+        PythonMutatorU8
+    );
+
+    define_python_std_mutational_stage!(
+        PythonStdMutationalStageU16,
+        "StdMutationalStageU16",
+        MyStdStateU16,
+        MyStdFuzzerU16,
+        PythonExecutorU16,
+        PythonEventManagerU16,
+        PythonMutatorU16
+    );
+    define_python_std_mutational_stage!(
+        PythonStdMutationalStageU32,
+        "StdMutationalStageU32",
+        MyStdStateU32,
+        MyStdFuzzerU32,
+        PythonExecutorU32,
+        PythonEventManagerU32,
+        PythonMutatorU32
+    );
+    define_python_std_mutational_stage!(
+        PythonStdMutationalStageU64,
+        "StdMutationalStageU64",
+        MyStdStateU64,
+        MyStdFuzzerU64,
+        PythonExecutorU64,
+        PythonEventManagerU64,
+        PythonMutatorU64
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdMutationalStageI8>()?;
+        m.add_class::<PythonStdMutationalStageI16>()?;
+        m.add_class::<PythonStdMutationalStageI32>()?;
+        m.add_class::<PythonStdMutationalStageI64>()?;
+
+        m.add_class::<PythonStdMutationalStageU8>()?;
+        m.add_class::<PythonStdMutationalStageU16>()?;
+        m.add_class::<PythonStdMutationalStageU32>()?;
+        m.add_class::<PythonStdMutationalStageU64>()?;
+        Ok(())
+    }
+}
