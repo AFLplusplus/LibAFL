@@ -13,6 +13,7 @@ use libafl::{
     },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
+    executors::{command::CommandConfigurator, Executor},
     feedback_and,
     feedbacks::{
         CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
@@ -25,8 +26,8 @@ use libafl::{
     observers::{get_asan_runtime_flags, ASANBacktraceObserver, StdMapObserver},
     stages::mutational::StdMutationalStage,
     state::StdState,
+    Error,
 };
-use libafl::{executors::command::CommandConfigurator, Error};
 use std::{
     io::Write,
     process::{Child, Command, Stdio},
@@ -93,14 +94,8 @@ pub fn main() {
         shmem_id: ShMemId,
     }
 
-    impl<EM, I: Input + HasTargetBytes, S, Z> CommandConfigurator<EM, I, S, Z> for MyExecutor {
-        fn spawn_child(
-            &mut self,
-            _fuzzer: &mut Z,
-            _state: &mut S,
-            _mgr: &mut EM,
-            input: &I,
-        ) -> Result<Child, Error> {
+    impl CommandConfigurator for MyExecutor {
+        fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
             let mut command = Command::new("./test_command");
 
             let command = command
@@ -119,7 +114,9 @@ pub fn main() {
         }
     }
 
-    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
+    let mut executor = MyExecutor { shmem_id }
+        .into_executor()
+        .with_observers(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
