@@ -434,7 +434,7 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "SimpleEventManager")]
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     /// Python class for SimpleEventManager
     pub struct PythonSimpleEventManager {
         /// Rust wrapped SimpleEventManager object

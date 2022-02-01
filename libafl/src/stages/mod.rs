@@ -50,8 +50,6 @@ use crate::{
 };
 use core::{convert::From, marker::PhantomData};
 
-use core::clone::Clone;
-
 use self::push::PushStage;
 
 /// A stage is one step in the fuzzing process.
@@ -67,8 +65,6 @@ pub trait Stage<E, EM, S, Z> {
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
-
-pub trait CloneStage<E, EM, S, Z> : Stage<E, EM, S, Z> + Clone{}
 
 /// A tuple holding all `Stages` used for fuzzing.
 pub trait StagesTuple<E, EM, S, Z> {
@@ -264,9 +260,9 @@ where
 /// `Stage` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
+    use crate::impl_asany;
     use crate::stages::Stage;
     use crate::Error;
-    use crate::impl_asany;
     use pyo3::prelude::*;
 
     use super::owned::AnyStage;
@@ -274,10 +270,10 @@ pub mod pybind {
     macro_rules! define_python_stage {
         ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $std_havoc_mutations_stage_name: ident, $my_std_state_type_name: ident,
             $my_std_fuzzer_type_name: ident, $executor_name: ident, $event_manager_name: ident) => {
-            use crate::stages::mutational::pybind::$std_havoc_mutations_stage_name;
             use crate::events::pybind::$event_manager_name;
             use crate::executors::pybind::$executor_name;
             use crate::fuzzer::pybind::$my_std_fuzzer_type_name;
+            use crate::stages::mutational::pybind::$std_havoc_mutations_stage_name;
             use crate::state::pybind::$my_std_state_type_name;
 
             #[derive(Debug)]
@@ -336,12 +332,15 @@ pub mod pybind {
 
             impl_asany!($struct_name_trait);
 
-            impl AnyStage<
-                $executor_name,
-                $event_manager_name,
-                $my_std_state_type_name,
-                $my_std_fuzzer_type_name,
-            > for $struct_name_trait{}
+            impl
+                AnyStage<
+                    $executor_name,
+                    $event_manager_name,
+                    $my_std_state_type_name,
+                    $my_std_fuzzer_type_name,
+                > for $struct_name_trait
+            {
+            }
         };
     }
 
@@ -350,7 +349,7 @@ pub mod pybind {
         "StageI8",
         PythonStageWrapperI8,
         PythonStdHavocMutationsStageI8,
-        MyStdStateI8,        
+        MyStdStateI8,
         MyStdFuzzerI8,
         PythonExecutorI8,
         PythonEventManagerI8
@@ -361,7 +360,7 @@ pub mod pybind {
         "StageI16",
         PythonStageWrapperI16,
         PythonStdHavocMutationsStageI16,
-        MyStdStateI16,        
+        MyStdStateI16,
         MyStdFuzzerI16,
         PythonExecutorI16,
         PythonEventManagerI16
@@ -372,7 +371,7 @@ pub mod pybind {
         "StageI32",
         PythonStageWrapperI32,
         PythonStdHavocMutationsStageI32,
-        MyStdStateI32,        
+        MyStdStateI32,
         MyStdFuzzerI32,
         PythonExecutorI32,
         PythonEventManagerI32
@@ -383,7 +382,7 @@ pub mod pybind {
         "StageI64",
         PythonStageWrapperI64,
         PythonStdHavocMutationsStageI64,
-        MyStdStateI64,        
+        MyStdStateI64,
         MyStdFuzzerI64,
         PythonExecutorI64,
         PythonEventManagerI64
@@ -394,7 +393,7 @@ pub mod pybind {
         "StageU8",
         PythonStageWrapperU8,
         PythonStdHavocMutationsStageU8,
-        MyStdStateU8,        
+        MyStdStateU8,
         MyStdFuzzerU8,
         PythonExecutorU8,
         PythonEventManagerU8
@@ -404,7 +403,7 @@ pub mod pybind {
         "StageU16",
         PythonStageWrapperU16,
         PythonStdHavocMutationsStageU16,
-        MyStdStateU16,        
+        MyStdStateU16,
         MyStdFuzzerU16,
         PythonExecutorU16,
         PythonEventManagerU16
@@ -414,7 +413,7 @@ pub mod pybind {
         "StageU32",
         PythonStageWrapperU32,
         PythonStdHavocMutationsStageU32,
-        MyStdStateU32,        
+        MyStdStateU32,
         MyStdFuzzerU32,
         PythonExecutorU32,
         PythonEventManagerU32
@@ -424,7 +423,7 @@ pub mod pybind {
         "StageU64",
         PythonStageWrapperU64,
         PythonStdHavocMutationsStageU64,
-        MyStdStateU64,        
+        MyStdStateU64,
         MyStdFuzzerU64,
         PythonExecutorU64,
         PythonEventManagerU64

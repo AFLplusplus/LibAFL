@@ -561,14 +561,14 @@ pub mod pybind {
             use crate::pybind::$my_std_fuzzer_type_name;
             use crate::state::pybind::$std_state_name;
 
-            #[derive(Debug)]
+            #[derive(Debug, Clone)]
             enum $wrapper_name {
                 Simple(*mut PythonSimpleEventManager),
             }
 
             /// EventManager Trait binding
             #[pyclass(unsendable, name = $py_name_trait)]
-            #[derive(Debug)]
+            #[derive(Debug, Clone)]
             pub struct $struct_name_trait {
                 event_manager: $wrapper_name,
             }

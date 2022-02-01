@@ -49,12 +49,14 @@ use crate::{
 
 /// The process executor simply calls a target function, as mutable reference to a closure
 pub type InProcessExecutor<'a, H, I, OT, S> = GenericInProcessExecutor<H, &'a mut H, I, OT, S>;
+
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<I, OT, S> =
     GenericInProcessExecutor<dyn FnMut(&I) -> ExitKind, Box<dyn FnMut(&I) -> ExitKind>, I, OT, S>;
 
 /// The process executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
+#[derive(Clone)]
 pub struct GenericInProcessExecutor<H, HB, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
@@ -203,7 +205,7 @@ where
 }
 
 /// The inmem executor's handlers.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InProcessHandlers {
     /// On crash C function pointer
     pub crash_handler: *const c_void,
