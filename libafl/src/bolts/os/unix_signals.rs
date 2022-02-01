@@ -17,42 +17,72 @@ use std::ffi::CString;
 #[cfg(target_arch = "arm")]
 pub use libc::c_ulong;
 
+/// ARMv7-specific representation of a saved context
 #[cfg(target_arch = "arm")]
+#[derive(Debug)]
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct mcontext_t {
+    /// Signal Number
     pub trap_no: c_ulong,
+    /// Error Code
     pub error_code: c_ulong,
+    /// Old signal mask
     pub oldmask: c_ulong,
+    /// GPR R0
     pub arm_r0: c_ulong,
+    /// GPR R1
     pub arm_r1: c_ulong,
+    /// GPR R2
     pub arm_r2: c_ulong,
+    /// GPR R3
     pub arm_r3: c_ulong,
+    /// GPR R4
     pub arm_r4: c_ulong,
+    /// GPR R5
     pub arm_r5: c_ulong,
+    /// GPR R6
     pub arm_r6: c_ulong,
+    /// GPR R7
     pub arm_r7: c_ulong,
+    /// GPR R8
     pub arm_r8: c_ulong,
+    /// GPR R9
     pub arm_r9: c_ulong,
+    /// GPR R10
     pub arm_r10: c_ulong,
+    /// Frame Pointer
     pub arm_fp: c_ulong,
+    /// Intra-Procedure Scratch Register
     pub arm_ip: c_ulong,
+    /// Stack Pointer
     pub arm_sp: c_ulong,
+    /// Link Register
     pub arm_lr: c_ulong,
+    /// Program Counter
     pub arm_pc: c_ulong,
+    /// Current Program Status Register
     pub arm_cpsr: c_ulong,
+    /// Fault Address
     pub fault_address: c_ulong,
 }
 
+/// User Context Struct
 #[cfg(target_arch = "arm")]
+#[derive(Debug)]
 #[allow(non_camel_case_types)]
 #[repr(C)]
 pub struct ucontext_t {
+    /// Flags
     pub uc_flags: u32,
+    /// Pointer to the context that will be resumed when this context returns
     pub uc_link: *mut ucontext_t,
+    /// Stack used by this context
     pub uc_stack: stack_t,
+    /// Machine-specific representation of the saved context
     pub uc_mcontext: mcontext_t,
-    pub uc_sigmask: nix::sys::signal::SigSet,
+    /// Set of signals that are blocked when this context is active
+    pub uc_sigmask: libc::sigset_t,
 }
 
 #[cfg(not(target_arch = "arm"))]

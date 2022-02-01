@@ -5,9 +5,10 @@ cd "$SCRIPT_DIR/.."
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
-cd fuzzers
+fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
+backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 
-for fuzzer in *;
+for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
 do
     cd $fuzzer
     # Clippy checks

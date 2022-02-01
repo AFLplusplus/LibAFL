@@ -32,7 +32,7 @@ impl CoverageRuntime {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            map: [0u8; MAP_SIZE],
+            map: [0_u8; MAP_SIZE],
             previous_pc: 0,
             current_log_impl: 0,
             blob_maybe_log: None,

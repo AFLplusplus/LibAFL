@@ -69,7 +69,7 @@ pub fn current_time() -> time::Duration {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
 }
 
-/// external defined function in case of no_std
+/// external defined function in case of `no_std`
 ///
 /// Define your own `external_current_millis()` function via `extern "C"`
 /// which is linked into the binary and called from here.
@@ -79,9 +79,10 @@ extern "C" {
     fn external_current_millis() -> u64;
 }
 
-/// Current time (fixed fallback for no_std)
+/// Current time (fixed fallback for `no_std`)
 #[cfg(not(feature = "std"))]
 #[inline]
+#[must_use]
 pub fn current_time() -> time::Duration {
     let millis = unsafe { external_current_millis() };
     time::Duration::from_millis(millis)
