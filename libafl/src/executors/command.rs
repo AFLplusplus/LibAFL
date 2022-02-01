@@ -17,9 +17,11 @@ use std::{
 use crate::{
     bolts::{
         fs::{OutFile, DEFAULT_OUTFILE},
+        tuples::MatchFirstType,
         AsSlice,
     },
     inputs::HasTargetBytes,
+    observers::{ASANBacktraceObserver, ObserversTuple},
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
@@ -29,6 +31,8 @@ use crate::executors::{Executor, ExitKind};
 
 #[cfg(all(feature = "std", unix))]
 use std::time::Duration;
+
+use super::HasObservers;
 
 /// How to deliver input to an external program
 /// `StdIn`: The traget reads from stdin
@@ -130,15 +134,19 @@ impl CommandConfigurator for StdCommandConfigurator {
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<EM, I, S, T, Z>
+pub struct CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
+    OT: Debug,
 {
     inner: T,
+    observers: OT,
+    /// cache if the AsanBacktraceObserver is present
+    has_asan_observer: bool,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl CommandExecutor<(), (), (), (), ()> {
+impl CommandExecutor<(), (), (), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -148,31 +156,23 @@ impl CommandExecutor<(), (), (), (), ()> {
     }
 }
 
-impl<EM, I, S, T, Z> Debug for CommandExecutor<EM, I, S, T, Z>
+impl<EM, I, OT, S, T, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
+    OT: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
             .field("inner", &self.inner)
+            .field("observers", &self.observers)
             .finish()
     }
 }
 
-impl<EM, I, S, Z> From<StdCommandConfigurator>
-    for CommandExecutor<EM, I, S, StdCommandConfigurator, Z>
-{
-    fn from(val: StdCommandConfigurator) -> Self {
-        CommandExecutor {
-            inner: val,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<EM, I, S, T, Z> CommandExecutor<EM, I, S, T, Z>
+impl<EM, I, OT, S, T, Z> CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
+    OT: Debug,
 {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
@@ -180,14 +180,18 @@ where
     }
 }
 
-impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfigurator, Z> {
+impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>
+where
+    OT: MatchFirstType + Debug,
+{
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
     pub fn from_cmd_with_file<P>(
         cmd: &Command,
         debug_child: bool,
+        observers: OT,
         path: P,
-    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfigurator, Z>, Error>
+    ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
@@ -196,8 +200,22 @@ impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfigurator, Z> {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
+        if observers
+            .match_first_type::<ASANBacktraceObserver>()
+            .is_some()
+        {
+            // we need stderr
+            command.stderr(Stdio::piped());
+        }
         command.stdin(Stdio::null());
+
+        let has_asan_observer = observers
+            .match_first_type::<ASANBacktraceObserver>()
+            .is_some();
+
         Ok(Self {
+            observers,
+            has_asan_observer,
             inner: StdCommandConfigurator {
                 input_location: InputLocation::File {
                     out_file: OutFile::create(path)?,
@@ -214,8 +232,9 @@ impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfigurator, Z> {
     /// The arg 0 is the program.
     pub fn parse_afl_cmdline<IT, O>(
         args: IT,
+        observers: OT,
         debug_child: bool,
-    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfigurator, Z>, Error>
+    ) -> Result<Self, Error>
     where
         IT: IntoIterator<Item = O>,
         O: AsRef<OsStr>,
@@ -253,16 +272,18 @@ impl<EM, I, S, Z> CommandExecutor<EM, I, S, StdCommandConfigurator, Z> {
             builder.input(InputLocation::StdIn);
         }
 
-        builder.build()
+        builder.build(observers)
     }
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, S, T: Debug, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, S, T, Z>
+impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input + HasTargetBytes,
     T: CommandConfigurator,
+    OT: Debug + MatchFirstType,
+    T: Debug,
 {
     fn run_target(
         &mut self,
@@ -295,7 +316,32 @@ where
             }
         };
 
+        if self.has_asan_observer {
+            let stderr = child.stderr.as_mut().ok_or_else(|| {
+                Error::IllegalState(
+                    "Using ASANBacktraceObserver but stderr was not `Stdio::pipe` in CommandExecutor".into(),
+                )
+            })?;
+            let obs = self
+                .observers
+                .match_first_type_mut::<ASANBacktraceObserver>()
+                .unwrap();
+            obs.parse_asan_output_from_childstderr(stderr);
+        };
+
         res
+    }
+}
+
+impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
+    for CommandExecutor<EM, I, OT, S, T, Z>
+{
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
     }
 }
 
@@ -413,9 +459,13 @@ impl CommandExecutorBuilder {
     }
 
     /// Builds the `ComandExecutor`
-    pub fn build<EM, I, S, Z>(
+    pub fn build<EM, I, OT, S, Z>(
         &self,
-    ) -> Result<CommandExecutor<EM, I, S, StdCommandConfigurator, Z>, Error> {
+        observers: OT,
+    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, Error>
+    where
+        OT: Debug + MatchFirstType,
+    {
         let program = if let Some(program) = &self.program {
             program
         } else {
@@ -456,13 +506,20 @@ impl CommandExecutorBuilder {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
+        if observers
+            .match_first_type::<ASANBacktraceObserver>()
+            .is_some()
+        {
+            // we need stderr
+            command.stderr(Stdio::piped());
+        }
 
         let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
             input_location: self.input_location.clone().unwrap(),
             command,
         };
-        Ok(configurator.into())
+        Ok(configurator.into_executor(observers))
     }
 }
 
@@ -493,7 +550,7 @@ impl CommandExecutorBuilder {
 /// }
 ///
 /// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, I, S, Z> {
-///     MyExecutor.into_executor()
+///     MyExecutor.into_executor(())
 /// }
 /// ```
 #[cfg(all(feature = "std", unix))]
@@ -504,8 +561,17 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<EM, I, S, Z>(self) -> CommandExecutor<EM, I, S, Self, Z> {
+    fn into_executor<EM, I, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
+    where
+        OT: Debug + MatchFirstType,
+    {
+        let has_asan_observer = observers
+            .match_first_type::<ASANBacktraceObserver>()
+            .is_some();
+
         CommandExecutor {
+            observers,
+            has_asan_observer,
             inner: self,
             phantom: PhantomData,
         }
@@ -535,7 +601,7 @@ mod tests {
         executor
             .program("ls")
             .input(InputLocation::Arg { argnum: 0 });
-        let executor = executor.build();
+        let executor = executor.build(());
         let mut executor = executor.unwrap();
 
         executor
@@ -556,7 +622,7 @@ mod tests {
         }));
 
         let mut executor =
-            CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], true)
+            CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], (), true)
                 .unwrap();
         executor
             .run_target(

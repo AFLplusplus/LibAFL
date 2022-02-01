@@ -115,8 +115,7 @@ pub fn main() {
     }
 
     let mut executor = MyExecutor { shmem_id }
-        .into_executor()
-        .with_observers(tuple_list!(observer, bt_observer));
+        .into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
