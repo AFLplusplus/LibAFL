@@ -43,10 +43,10 @@ use crate::bolts::shmem::ShMemProvider;
 #[cfg(feature = "std")]
 use crate::observers::{BacktraceObserver, HarnessType};
 
-#[cfg(windows)]
-use windows::Win32::System::Threading::SetThreadStackGuarantee;
 #[cfg(all(feature = "std", windows))]
 use crate::bolts::os::windows_exceptions::{ExceptionCode, Handler, CRASH_EXCEPTIONS};
+#[cfg(windows)]
+use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 /// The process executor simply calls a target function, then returns afterwards.
 #[cfg(all(feature = "std", unix))]
@@ -72,7 +72,6 @@ pub type InProcessExecutor<'a, H, I, OT, S> = GenericInProcessExecutor<H, &'a mu
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<I, OT, S> =
     GenericInProcessExecutor<dyn FnMut(&I) -> ExitKind, Box<dyn FnMut(&I) -> ExitKind>, I, OT, S>;
-
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
@@ -123,7 +122,7 @@ where
     ) -> Result<ExitKind, Error> {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
- 
+
         let ret = (self.harness_fn.borrow_mut())(input);
 
         self.handlers.post_run_target();
@@ -326,7 +325,7 @@ impl InProcessHandlers {
         OF: Feedback<I, S>,
         S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
-        H: FnMut(&I) -> ExitKind,
+        H: FnMut(&I) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {
