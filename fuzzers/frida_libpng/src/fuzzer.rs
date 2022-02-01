@@ -207,13 +207,13 @@ unsafe fn fuzz(
         let gum = Gum::obtain();
         let frida_options = FridaOptions::parse_env_options();
         let coverage = CoverageRuntime::new();
-        let asan = AsanRuntime::new(frida_options.clone());
+        // let asan = AsanRuntime::new(frida_options.clone());
         let mut frida_helper = FridaInstrumentationHelper::new(
             &gum,
             &frida_options,
             module_name,
             modules_to_instrument,
-            tuple_list!(coverage, asan),
+            tuple_list!(coverage),
         );
 
         // Create an observation channel using the coverage map

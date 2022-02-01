@@ -26,7 +26,8 @@ use frida_gum::{
 };
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::helper::FridaInstrumentationHelper;
+use crate::utils::{writer_register, instruction_width};
+
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 /// Speciial CmpLog Cases for `aarch64`
@@ -277,7 +278,7 @@ impl CmpLogRuntime {
                 writer.put_ldr_reg_u64(Aarch64Register::X0, value);
             }
             CmplogOperandType::Regid(reg) => {
-                let reg = FridaInstrumentationHelper::writer_register(reg);
+                let reg = writer_register(reg);
                 match reg {
                     Aarch64Register::X0 | Aarch64Register::W0 => {}
                     Aarch64Register::X1 | Aarch64Register::W1 => {
@@ -291,9 +292,9 @@ impl CmpLogRuntime {
                 }
             }
             CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
-                let basereg = FridaInstrumentationHelper::writer_register(basereg);
+                let basereg = writer_register(basereg);
                 let indexreg = if indexreg.0 != 0 {
-                    Some(FridaInstrumentationHelper::writer_register(indexreg))
+                    Some(writer_register(indexreg))
                 } else {
                     None
                 };
@@ -353,7 +354,7 @@ impl CmpLogRuntime {
                 }
             }
             CmplogOperandType::Regid(reg) => {
-                let reg = FridaInstrumentationHelper::writer_register(reg);
+                let reg = writer_register(reg);
                 match reg {
                     Aarch64Register::X1 | Aarch64Register::W1 => {}
                     Aarch64Register::X0 | Aarch64Register::W0 => {
@@ -371,9 +372,9 @@ impl CmpLogRuntime {
                 }
             }
             CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
-                let basereg = FridaInstrumentationHelper::writer_register(basereg);
+                let basereg = writer_register(basereg);
                 let indexreg = if indexreg.0 != 0 {
-                    Some(FridaInstrumentationHelper::writer_register(indexreg))
+                    Some(writer_register(indexreg))
                 } else {
                     None
                 };
@@ -624,7 +625,7 @@ impl CmpLogRuntime {
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
-                    FridaInstrumentationHelper::instruction_width(instr, &operands),
+                    instruction_width(instr, &operands),
                 )),
                 Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
                 _ => return Err(()),
@@ -644,7 +645,7 @@ impl CmpLogRuntime {
                             opmem.base(),
                             opmem.index(),
                             opmem.disp(),
-                            FridaInstrumentationHelper::instruction_width(instr, &operands),
+                            instruction_width(instr, &operands),
                         )),
                         Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
                         _ => return Err(()),

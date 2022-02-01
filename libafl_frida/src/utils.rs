@@ -5,11 +5,12 @@ use frida_gum::instruction_writer::X86Register;
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
-    arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
-    Capstone, Insn,
+    arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand},
+    Insn,
 };
 
-use capstone::RegId;
+#[cfg(target_arch = "aarch64")]
+use num_traits::cast::FromPrimitive;
 
 /// Determine the width of the specified instruction
 #[cfg(target_arch = "aarch64")]

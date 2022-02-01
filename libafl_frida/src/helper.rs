@@ -14,8 +14,8 @@ use crate::{asan::asan_rt::AsanRuntime, FridaOptions};
 use crate::{coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
-    arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand, BuildsCapstone},
-    Capstone, Insn,
+    arch::{self, BuildsCapstone},
+    Capstone,
 };
 #[cfg(all(target_arch = "x86_64", unix))]
 use capstone::{
@@ -31,8 +31,6 @@ use frida_gum::instruction_writer::InstructionWriter;
 use frida_gum::{stalker::Transformer, Gum, Module, ModuleDetails, ModuleMap, PageProtection};
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-#[cfg(target_arch = "aarch64")]
-use num_traits::cast::FromPrimitive;
 use rangemap::RangeMap;
 
 #[cfg(any(target_vendor = "apple"))]
@@ -320,7 +318,7 @@ where
                                 .cmplog_is_interesting_instruction(&helper.capstone, address, instr)
                             {
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                                helper.cmplog_runtime.emit_comparison_handling(
+                                rt.emit_comparison_handling(
                                     address,
                                     &output,
                                     op1,
