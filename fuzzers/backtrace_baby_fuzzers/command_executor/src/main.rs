@@ -1,8 +1,3 @@
-use std::path::PathBuf;
-
-#[cfg(windows)]
-use std::ptr::write_volatile;
-
 use libafl::{
     bolts::{
         current_nanos,
@@ -13,7 +8,7 @@ use libafl::{
     },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
-    executors::{command::CommandConfigurator, Executor},
+    executors::command::CommandConfigurator,
     feedback_and,
     feedbacks::{
         CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
@@ -28,8 +23,11 @@ use libafl::{
     state::StdState,
     Error,
 };
+#[cfg(windows)]
+use std::ptr::write_volatile;
 use std::{
     io::Write,
+    path::PathBuf,
     process::{Child, Command, Stdio},
 };
 
@@ -114,8 +112,7 @@ pub fn main() {
         }
     }
 
-    let mut executor = MyExecutor { shmem_id }
-        .into_executor(tuple_list!(observer, bt_observer));
+    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);

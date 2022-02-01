@@ -17,7 +17,7 @@ use std::{
 use crate::{
     bolts::{
         fs::{OutFile, DEFAULT_OUTFILE},
-        tuples::{MatchFirstType, MatchType},
+        tuples::MatchName,
         AsSlice,
     },
     inputs::HasTargetBytes,
@@ -182,7 +182,7 @@ where
 
 impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>
 where
-    OT: MatchFirstType + Debug,
+    OT: MatchName + Debug,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
@@ -203,7 +203,7 @@ where
         command.stdin(Stdio::null());
 
         let has_asan_observer = observers
-            .match_first_type::<ASANBacktraceObserver>()
+            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some();
         if has_asan_observer {
             command.stderr(Stdio::piped());
@@ -278,7 +278,7 @@ impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S,
 where
     I: Input + HasTargetBytes,
     T: CommandConfigurator,
-    OT: Debug + MatchType + MatchFirstType,
+    OT: Debug + MatchName,
     T: Debug,
 {
     fn run_target(
@@ -318,11 +318,10 @@ where
                     "Using ASANBacktraceObserver but stderr was not `Stdio::pipe` in CommandExecutor".into(),
                 )
             })?;
-            self.observers.match_type_mut::<ASANBacktraceObserver, _>(
-                &mut |obs: &mut ASANBacktraceObserver| {
-                    obs.parse_asan_output_from_childstderr(stderr);
-                },
-            );
+            self.observers
+                .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                .unwrap()
+                .parse_asan_output_from_childstderr(stderr);
         };
 
         res
@@ -460,7 +459,7 @@ impl CommandExecutorBuilder {
         observers: OT,
     ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, Error>
     where
-        OT: Debug + MatchFirstType,
+        OT: Debug + MatchName,
     {
         let program = if let Some(program) = &self.program {
             program
@@ -503,7 +502,7 @@ impl CommandExecutorBuilder {
             command.stderr(Stdio::null());
         }
         if observers
-            .match_first_type::<ASANBacktraceObserver>()
+            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some()
         {
             // we need stderr for ASANBackt
@@ -559,10 +558,10 @@ pub trait CommandConfigurator: Sized + Debug {
     /// Create an `Executor` from this `CommandConfigurator`.
     fn into_executor<EM, I, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
-        OT: Debug + MatchFirstType,
+        OT: Debug + MatchName,
     {
         let has_asan_observer = observers
-            .match_first_type::<ASANBacktraceObserver>()
+            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some();
 
         CommandExecutor {
