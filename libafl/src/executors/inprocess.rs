@@ -827,13 +827,8 @@ mod unix_signal_handler {
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-<<<<<<< HEAD
             let observers = executor.observers();
 
-=======
-            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
-            let observers = executor.observers_mut();
->>>>>>> main
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
 
