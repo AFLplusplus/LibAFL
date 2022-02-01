@@ -165,20 +165,50 @@ where
 #[cfg(feature = "python")]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
+    use crate::bolts::tuples::tuple_list_type;
     use crate::inputs::BytesInput;
     pub use crate::mutators::mutations::*;
+    pub use crate::mutators::mutations::*;
+    use crate::mutators::{havoc_mutations, StdScheduledMutator};
     use crate::stages::StdMutationalStage;
     use pyo3::prelude::*;
 
+    type HavocMutationsType = tuple_list_type!(
+        BitFlipMutator,
+        ByteFlipMutator,
+        ByteIncMutator,
+        ByteDecMutator,
+        ByteNegMutator,
+        ByteRandMutator,
+        ByteAddMutator,
+        WordAddMutator,
+        DwordAddMutator,
+        QwordAddMutator,
+        ByteInterestingMutator,
+        WordInterestingMutator,
+        DwordInterestingMutator,
+        BytesDeleteMutator,
+        BytesDeleteMutator,
+        BytesDeleteMutator,
+        BytesDeleteMutator,
+        BytesExpandMutator,
+        BytesInsertMutator,
+        BytesRandInsertMutator,
+        BytesSetMutator,
+        BytesRandSetMutator,
+        BytesCopyMutator,
+        BytesInsertCopyMutator,
+        BytesSwapMutator,
+        CrossoverInsertMutator,
+        CrossoverReplaceMutator,
+    );
+
     macro_rules! define_python_std_mutational_stage {
-        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $my_std_fuzzer_type_name: ident, $executor_name: ident, $event_manager_name: ident,
-            $mutator_name: ident) => {
-            
-            use crate::state::pybind::$my_std_state_type_name;
-            use crate::executors::pybind::$executor_name;
+        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $my_std_fuzzer_type_name: ident, $executor_name: ident, $event_manager_name: ident) => {
             use crate::events::pybind::$event_manager_name;
-            use crate::mutators::pybind::$mutator_name;
+            use crate::executors::pybind::$executor_name;
             use crate::fuzzer::pybind::$my_std_fuzzer_type_name;
+            use crate::state::pybind::$my_std_state_type_name;
 
             #[pyclass(unsendable, name = $py_name)]
             #[derive(Debug)]
@@ -189,7 +219,7 @@ pub mod pybind {
                     $executor_name,
                     $event_manager_name,
                     BytesInput,
-                    $mutator_name,
+                    StdScheduledMutator<BytesInput, HavocMutationsType, $my_std_state_type_name>,
                     $my_std_state_type_name,
                     $my_std_fuzzer_type_name,
                 >,
@@ -198,9 +228,11 @@ pub mod pybind {
             #[pymethods]
             impl $struct_name {
                 #[staticmethod]
-                fn new(py_mutator: $mutator_name) -> Self {
+                fn new_from_scheduled_havoc_mutations() -> Self {
                     Self {
-                        std_mutational_stage: StdMutationalStage::new(py_mutator),
+                        std_mutational_stage: StdMutationalStage::new(StdScheduledMutator::new(
+                            havoc_mutations(),
+                        )),
                     }
                 }
             }
@@ -208,92 +240,84 @@ pub mod pybind {
     }
 
     define_python_std_mutational_stage!(
-        PythonStdMutationalStageI8,
+        PythonStdHavocMutationsStageI8,
         "StdMutationalStageI8",
         MyStdStateI8,
         MyStdFuzzerI8,
         PythonExecutorI8,
-        PythonEventManagerI8,
-        PythonMutatorI8
+        PythonEventManagerI8
     );
 
     define_python_std_mutational_stage!(
-        PythonStdMutationalStageI16,
+        PythonStdHavocMutationsStageI16,
         "StdMutationalStageI16",
         MyStdStateI16,
         MyStdFuzzerI16,
         PythonExecutorI16,
-        PythonEventManagerI16,
-        PythonMutatorI16
+        PythonEventManagerI16
     );
     define_python_std_mutational_stage!(
-        PythonStdMutationalStageI32,
+        PythonStdHavocMutationsStageI32,
         "StdMutationalStageI32",
         MyStdStateI32,
         MyStdFuzzerI32,
         PythonExecutorI32,
-        PythonEventManagerI32,
-        PythonMutatorI32
+        PythonEventManagerI32
     );
     define_python_std_mutational_stage!(
-        PythonStdMutationalStageI64,
+        PythonStdHavocMutationsStageI64,
         "StdMutationalStageI64",
         MyStdStateI64,
         MyStdFuzzerI64,
         PythonExecutorI64,
-        PythonEventManagerI64,
-        PythonMutatorI64
+        PythonEventManagerI64
     );
 
     define_python_std_mutational_stage!(
-        PythonStdMutationalStageU8,
+        PythonStdHavocMutationsStageU8,
         "StdMutationalStageU8",
         MyStdStateU8,
         MyStdFuzzerU8,
         PythonExecutorU8,
-        PythonEventManagerU8,
-        PythonMutatorU8
+        PythonEventManagerU8
     );
 
     define_python_std_mutational_stage!(
-        PythonStdMutationalStageU16,
+        PythonStdHavocMutationsStageU16,
         "StdMutationalStageU16",
         MyStdStateU16,
         MyStdFuzzerU16,
         PythonExecutorU16,
-        PythonEventManagerU16,
-        PythonMutatorU16
+        PythonEventManagerU16
     );
     define_python_std_mutational_stage!(
-        PythonStdMutationalStageU32,
+        PythonStdHavocMutationsStageU32,
         "StdMutationalStageU32",
         MyStdStateU32,
         MyStdFuzzerU32,
         PythonExecutorU32,
-        PythonEventManagerU32,
-        PythonMutatorU32
+        PythonEventManagerU32
     );
     define_python_std_mutational_stage!(
-        PythonStdMutationalStageU64,
+        PythonStdHavocMutationsStageU64,
         "StdMutationalStageU64",
         MyStdStateU64,
         MyStdFuzzerU64,
         PythonExecutorU64,
-        PythonEventManagerU64,
-        PythonMutatorU64
+        PythonEventManagerU64
     );
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdMutationalStageI8>()?;
-        m.add_class::<PythonStdMutationalStageI16>()?;
-        m.add_class::<PythonStdMutationalStageI32>()?;
-        m.add_class::<PythonStdMutationalStageI64>()?;
+        m.add_class::<PythonStdHavocMutationsStageI8>()?;
+        m.add_class::<PythonStdHavocMutationsStageI16>()?;
+        m.add_class::<PythonStdHavocMutationsStageI32>()?;
+        m.add_class::<PythonStdHavocMutationsStageI64>()?;
 
-        m.add_class::<PythonStdMutationalStageU8>()?;
-        m.add_class::<PythonStdMutationalStageU16>()?;
-        m.add_class::<PythonStdMutationalStageU32>()?;
-        m.add_class::<PythonStdMutationalStageU64>()?;
+        m.add_class::<PythonStdHavocMutationsStageU8>()?;
+        m.add_class::<PythonStdHavocMutationsStageU16>()?;
+        m.add_class::<PythonStdHavocMutationsStageU32>()?;
+        m.add_class::<PythonStdHavocMutationsStageU64>()?;
         Ok(())
     }
 }
