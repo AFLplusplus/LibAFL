@@ -80,6 +80,9 @@ pub mod drcov_rt;
 /// The frida executor
 pub mod executor;
 
+/// Utilities
+pub mod utils;
+
 // for parsing asan and cmplog cores
 use libafl::bolts::os::{CoreId, Cores};
 
