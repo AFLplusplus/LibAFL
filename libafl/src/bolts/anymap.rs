@@ -38,8 +38,6 @@ macro_rules! impl_asany {
     };
 }
 
-// yolo
-
 /// Get a `type_id` from its previously unpacked `u64`.
 /// Opposite of [`unpack_type_id(id)`].
 ///
