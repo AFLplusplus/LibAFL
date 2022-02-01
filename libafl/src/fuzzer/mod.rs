@@ -679,8 +679,8 @@ pub mod pybind {
             use crate::executors::pybind::$executor_name;
             use crate::feedbacks::map::pybind::$max_map_feedback_py_name;
             use crate::observers::map::pybind::$map_observer_name;
-            use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
             use crate::stages::owned::pybind::$stage_tuple_name;
+            use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
 
             /// `StdFuzzer` with fixed generics
             pub type $type_name = StdFuzzer<
@@ -717,7 +717,7 @@ pub mod pybind {
                     py_executor: &mut $executor_name,
                     py_state: &mut $std_state_name,
                     py_mgr: &mut $event_manager_name,
-                    stage_tuple: &mut $stage_tuple_name
+                    stage_tuple: &mut $stage_tuple_name,
                 ) {
                     self.std_fuzzer
                         .fuzz_loop(

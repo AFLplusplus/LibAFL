@@ -77,10 +77,13 @@ pub mod pybind {
                 #[new]
                 fn new(stage: &$stage_name) -> Self {
                     // TODO: Be safe
-                    unsafe{
+                    unsafe {
                         Self {
                             stages_owned_list: StagesOwnedList {
-                                list: vec![Box::new(std::mem::transmute_copy::<$stage_name, $stage_name>(stage))]
+                                list: vec![Box::new(std::mem::transmute_copy::<
+                                    $stage_name,
+                                    $stage_name,
+                                >(stage))],
                             },
                         }
                     }
