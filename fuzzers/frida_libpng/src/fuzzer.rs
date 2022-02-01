@@ -45,8 +45,8 @@ use libafl::{
 };
 
 use libafl_frida::{
-    coverage_rt::CoverageRuntime, coverage_rt::MAP_SIZE,
-    executor::FridaInProcessExecutor, helper::FridaInstrumentationHelper, FridaOptions,
+    coverage_rt::CoverageRuntime, coverage_rt::MAP_SIZE, executor::FridaInProcessExecutor,
+    helper::FridaInstrumentationHelper, FridaOptions,
 };
 
 #[cfg(unix)]
