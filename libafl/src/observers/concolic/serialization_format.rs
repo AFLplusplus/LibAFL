@@ -446,7 +446,7 @@ pub const DEFAULT_ENV_NAME: &str = "SHARED_MEMORY_MESSAGES";
 /// The default shared memory size used by the concolic tracing.
 ///
 /// This amounts to 1GiB of memory, which is considered to be enough for any reasonable trace. It is also assumed
-/// that the memory will not be phsyically mapped until accessed, alleviating reource concerns.
+/// that the memory will not be physically mapped until accessed, alleviating resource concerns.
 pub const DEFAULT_SIZE: usize = 1024 * 1024 * 1024;
 
 impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {

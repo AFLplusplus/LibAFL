@@ -1,4 +1,4 @@
-//! Gramamtron generator
+//! Gramatron generator
 use alloc::{string::String, vec::Vec};
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
@@ -32,7 +32,7 @@ pub struct Automaton {
 }
 
 #[derive(Clone, Debug)]
-/// Generates random inputs from a grammar automatron
+/// Generates random inputs from a grammar automaton
 pub struct GramatronGenerator<'a, S>
 where
     S: HasRand,

@@ -33,7 +33,7 @@ where
     /// The scheduler
     fn scheduler(&self) -> &CS;
 
-    /// The scheduler (mut)
+    /// The scheduler (mutable)
     fn scheduler_mut(&mut self) -> &mut CS;
 }
 
@@ -47,7 +47,7 @@ where
     /// The feedback
     fn feedback(&self) -> &F;
 
-    /// The feedback (mut)
+    /// The feedback (mutable)
     fn feedback_mut(&mut self) -> &mut F;
 }
 
@@ -61,7 +61,7 @@ where
     /// The objective feedback
     fn objective(&self) -> &OF;
 
-    /// The objective feedback (mut)
+    /// The objective feedback (mutable)
     fn objective_mut(&mut self) -> &mut OF;
 }
 
@@ -85,7 +85,7 @@ where
         EM: EventFirer<I>;
 }
 
-/// Evaluate an input modyfing the state of the fuzzer
+/// Evaluate an input modifying the state of the fuzzer
 pub trait EvaluatorObservers<I, OT, S>: Sized
 where
     I: Input,
@@ -106,7 +106,7 @@ where
         EM: EventManager<E, I, S, Self>;
 }
 
-/// Evaluate an input modyfing the state of the fuzzer
+/// Evaluate an input modifying the state of the fuzzer
 pub trait Evaluator<E, EM, I, S> {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new testcase in the corpus
@@ -152,8 +152,8 @@ where
     EM: ProgressReporter<I>,
     S: HasExecutions + HasClientPerfMonitor,
 {
-    /// Fuzz for a single iteration
-    /// Returns the index of the last fuzzed corpus item
+    /// Fuzz for a single iteration.
+    /// Returns the index of the last fuzzed corpus item.
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
@@ -182,8 +182,8 @@ where
         }
     }
 
-    /// Fuzz for n iterations
-    /// Returns the index of the last fuzzed corpus item
+    /// Fuzz for n iterations.
+    /// Returns the index of the last fuzzed corpus item.
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
@@ -225,7 +225,7 @@ where
 pub enum ExecuteInputResult {
     /// No special input
     None,
-    /// This input should be stored ini the corpus
+    /// This input should be stored in the corpus
     Corpus,
     /// This input leads to a solution
     Solution,

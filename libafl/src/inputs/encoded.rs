@@ -1,5 +1,5 @@
 //! The `EncodedInput` is the "normal" input, a map of codes, that can be sent directly to the client
-//! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
+//! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 //! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
 use ahash::AHasher;
@@ -32,9 +32,9 @@ pub trait InputDecoder {
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
-/// Tokenizer is a trait that can tokenize bytes into a ][`Vec`] of tokens
+/// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
 pub trait Tokenizer {
-    /// Tokanize the given bytes
+    /// Tokenize the given bytes
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error>;
 }
 
@@ -101,13 +101,13 @@ impl Default for TokenInputEncoderDecoder {
     }
 }
 
-/// A native tokenizer struct
+/// A naive tokenizer struct
 #[cfg(feature = "std")]
 #[derive(Clone, Debug)]
 pub struct NaiveTokenizer {
     /// Ident regex
     ident_re: Regex,
-    /// Comement regex
+    /// Comment regex
     comment_re: Regex,
     /// String regex
     string_re: Regex,

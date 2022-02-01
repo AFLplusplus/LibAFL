@@ -216,7 +216,7 @@ Now we want to turn our simple fuzzer into a feedback-based one and increase the
 To do that, we need a way to keep track of if a condition is satisfied. The component that feeds the fuzzer with information about properties of a fuzzing run, the satisfied conditions in our case, is the Observer. We use the `StdMapObserver`, the default observer that uses a map to keep track of covered elements. In our fuzzer, each condition is mapped to an entry of such map.
 
 We represent such map as a `static mut` variable.
-As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions in a map modyfing our tested function:
+As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions in a map modifying our tested function:
 
 ```rust
 extern crate libafl;
