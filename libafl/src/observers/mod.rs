@@ -133,7 +133,7 @@ impl<I, S> ObserversTuple<I, S> for () {
 
 impl<Head, Tail, I, S> ObserversTuple<I, S> for (Head, Tail)
 where
-    Head: Observer<I, S>,
+    Head: Observer<I, S> + 'static,
     Tail: ObserversTuple<I, S>,
 {
     fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {

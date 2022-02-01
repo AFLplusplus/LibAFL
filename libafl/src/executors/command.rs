@@ -17,7 +17,7 @@ use std::{
 use crate::{
     bolts::{
         fs::{OutFile, DEFAULT_OUTFILE},
-        tuples::MatchFirstType,
+        tuples::{MatchFirstType, MatchType},
         AsSlice,
     },
     inputs::HasTargetBytes,
@@ -200,18 +200,14 @@ where
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
-        if observers
-            .match_first_type::<ASANBacktraceObserver>()
-            .is_some()
-        {
-            // we need stderr
-            command.stderr(Stdio::piped());
-        }
         command.stdin(Stdio::null());
 
         let has_asan_observer = observers
             .match_first_type::<ASANBacktraceObserver>()
             .is_some();
+        if has_asan_observer {
+            command.stderr(Stdio::piped());
+        }
 
         Ok(Self {
             observers,
@@ -282,7 +278,7 @@ impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S,
 where
     I: Input + HasTargetBytes,
     T: CommandConfigurator,
-    OT: Debug + MatchFirstType,
+    OT: Debug + MatchType + MatchFirstType,
     T: Debug,
 {
     fn run_target(
@@ -322,11 +318,11 @@ where
                     "Using ASANBacktraceObserver but stderr was not `Stdio::pipe` in CommandExecutor".into(),
                 )
             })?;
-            let obs = self
-                .observers
-                .match_first_type_mut::<ASANBacktraceObserver>()
-                .unwrap();
-            obs.parse_asan_output_from_childstderr(stderr);
+            self.observers.match_type_mut::<ASANBacktraceObserver, _>(
+                &mut |obs: &mut ASANBacktraceObserver| {
+                    obs.parse_asan_output_from_childstderr(stderr);
+                },
+            );
         };
 
         res
@@ -510,7 +506,7 @@ impl CommandExecutorBuilder {
             .match_first_type::<ASANBacktraceObserver>()
             .is_some()
         {
-            // we need stderr
+            // we need stderr for ASANBackt
             command.stderr(Stdio::piped());
         }
 

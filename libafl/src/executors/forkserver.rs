@@ -471,6 +471,8 @@ where
     observers: OT,
     map: Option<SP::ShMem>,
     phantom: PhantomData<(I, S)>,
+    /// Cache that indicates if we have a asan observer registered.
+    has_asan_observer: Option<bool>,
 }
 
 impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
@@ -603,6 +605,7 @@ where
         }
 
         Ok(Self {
+            has_asan_observer: None, // initialized on first use
             target,
             args,
             out_file,
@@ -701,11 +704,18 @@ where
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
-            if let Some(obs) = self
-                .observers_mut()
-                .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
-            {
-                obs.parse_asan_output_from_asan_log_file(pid);
+            if self.has_asan_observer.is_none() {
+                self.has_asan_observer = Some(
+                    self.observers()
+                        .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                        .is_some(),
+                );
+            }
+            if self.has_asan_observer.unwrap() {
+                self.observers_mut()
+                    .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                    .unwrap()
+                    .parse_asan_output_from_asan_log_file(pid);
             }
         }
 
