@@ -44,7 +44,7 @@ impl<E, EM, S, Z> StagesOwnedList<E, EM, S, Z> {
 }
 
 #[cfg(feature = "python")]
-/// `Fuzzer` Python bindings
+/// `StagesOwnedList` Python bindings
 pub mod pybind {
     use crate::stages::owned::StagesOwnedList;
     use pyo3::prelude::*;
@@ -62,7 +62,7 @@ pub mod pybind {
             /// Python class for StagesOwnedList
             #[allow(missing_debug_implementations)]
             pub struct $struct_name {
-                /// Rust wrapped StdFuzzer object
+                /// Rust wrapped StagesOwnedList object
                 pub stages_owned_list: StagesOwnedList<
                     $executor_name,
                     $event_manager_name,
@@ -76,10 +76,11 @@ pub mod pybind {
                 //TODO: Add new from list
                 #[new]
                 fn new(stage: &$stage_name) -> Self {
+                    // TODO: Be safe
                     unsafe{
                         Self {
                             stages_owned_list: StagesOwnedList {
-                                list: vec![Box::new(std::mem::transmute_copy::<$stage_name, $stage_name>(stage))]//*(stage as *const $stage_name))],
+                                list: vec![Box::new(std::mem::transmute_copy::<$stage_name, $stage_name>(stage))]
                             },
                         }
                     }

@@ -670,19 +670,17 @@ pub mod pybind {
     use crate::feedbacks::{CrashFeedback, MaxMapFeedback};
     use crate::fuzzer::{Fuzzer, StdFuzzer};
     use crate::inputs::BytesInput;
-    use crate::mutators::scheduled::{havoc_mutations, StdScheduledMutator};
-    use crate::stages::StdMutationalStage;
     use pyo3::prelude::*;
-    use tuple_list::tuple_list;
 
     macro_rules! define_python_fuzzer {
-        ($type_name:ident, $struct_name:ident, $py_name:tt, $datatype:ty, $my_std_state_type_name: ident,
-            $std_state_name: ident, $event_manager_name: ident, $map_observer_name: ident, $max_map_feedback_py_name: ident, $executor_name: ident) => {
+        ($type_name:ident, $struct_name:ident, $py_name:tt, $datatype:ty, $my_std_state_type_name: ident, $std_state_name: ident,
+            $event_manager_name: ident, $map_observer_name: ident, $max_map_feedback_py_name: ident, $executor_name: ident, $stage_tuple_name: ident) => {
             use crate::events::pybind::$event_manager_name;
             use crate::executors::pybind::$executor_name;
             use crate::feedbacks::map::pybind::$max_map_feedback_py_name;
             use crate::observers::map::pybind::$map_observer_name;
             use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
+            use crate::stages::owned::pybind::$stage_tuple_name;
 
             /// `StdFuzzer` with fixed generics
             pub type $type_name = StdFuzzer<
@@ -719,12 +717,11 @@ pub mod pybind {
                     py_executor: &mut $executor_name,
                     py_state: &mut $std_state_name,
                     py_mgr: &mut $event_manager_name,
+                    stage_tuple: &mut $stage_tuple_name
                 ) {
                     self.std_fuzzer
                         .fuzz_loop(
-                            &mut tuple_list!(StdMutationalStage::new(StdScheduledMutator::new(
-                                havoc_mutations()
-                            ))),
+                            &mut stage_tuple.stages_owned_list,
                             py_executor,
                             &mut py_state.std_state,
                             py_mgr,
@@ -745,7 +742,8 @@ pub mod pybind {
         PythonEventManagerI8,
         PythonMapObserverI8,
         PythonMaxMapFeedbackI8,
-        PythonExecutorI8
+        PythonExecutorI8,
+        PythonStagesOwnedListI8
     );
 
     define_python_fuzzer!(
@@ -758,7 +756,8 @@ pub mod pybind {
         PythonEventManagerI16,
         PythonMapObserverI16,
         PythonMaxMapFeedbackI16,
-        PythonExecutorI16
+        PythonExecutorI16,
+        PythonStagesOwnedListI16
     );
 
     define_python_fuzzer!(
@@ -771,7 +770,8 @@ pub mod pybind {
         PythonEventManagerI32,
         PythonMapObserverI32,
         PythonMaxMapFeedbackI32,
-        PythonExecutorI32
+        PythonExecutorI32,
+        PythonStagesOwnedListI32
     );
 
     define_python_fuzzer!(
@@ -784,7 +784,8 @@ pub mod pybind {
         PythonEventManagerI64,
         PythonMapObserverI64,
         PythonMaxMapFeedbackI64,
-        PythonExecutorI64
+        PythonExecutorI64,
+        PythonStagesOwnedListI64
     );
 
     define_python_fuzzer!(
@@ -797,7 +798,8 @@ pub mod pybind {
         PythonEventManagerU8,
         PythonMapObserverU8,
         PythonMaxMapFeedbackU8,
-        PythonExecutorU8
+        PythonExecutorU8,
+        PythonStagesOwnedListU8
     );
 
     define_python_fuzzer!(
@@ -810,7 +812,8 @@ pub mod pybind {
         PythonEventManagerU16,
         PythonMapObserverU16,
         PythonMaxMapFeedbackU16,
-        PythonExecutorU16
+        PythonExecutorU16,
+        PythonStagesOwnedListU16
     );
 
     define_python_fuzzer!(
@@ -823,7 +826,8 @@ pub mod pybind {
         PythonEventManagerU32,
         PythonMapObserverU32,
         PythonMaxMapFeedbackU32,
-        PythonExecutorU32
+        PythonExecutorU32,
+        PythonStagesOwnedListU32
     );
 
     define_python_fuzzer!(
@@ -836,7 +840,8 @@ pub mod pybind {
         PythonEventManagerU64,
         PythonMapObserverU64,
         PythonMaxMapFeedbackU64,
-        PythonExecutorU64
+        PythonExecutorU64,
+        PythonStagesOwnedListU64
     );
 
     /// Register the classes to the python module

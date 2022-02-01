@@ -357,6 +357,7 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     corpus::cached::pybind::register(py, m)?;
     bolts::rands::pybind::register(py, m)?;
     stages::pybind::register(py, m)?;
+    stages::owned::pybind::register(py, m)?;
     stages::mutational::pybind::register(py, m)?;
     Ok(())
 }

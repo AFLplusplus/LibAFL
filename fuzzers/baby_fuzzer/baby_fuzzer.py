@@ -28,6 +28,10 @@ def rand_wrapper(rand):
     if type(rand).__name__ == "StdRand":
         return libafl.Rand.new_from_std(rand)
 
+def stage_wrapper(stage):
+    if type(stage).__name__ == "StdScheduledHavocMutationsStageI32":
+        return libafl.StageI32.new_from_std_scheduled(stage)
+
 # CODE WRITTEN BY USER
 
 def harness(inp):
@@ -57,4 +61,10 @@ executor = libafl.OwnedInProcessExecutorI32(harness, map_observer_wrapper(map_ob
 
 generator = libafl.RandPrintablesGeneratorI32(32)
 
-state.generate_initial_inputs(fuzzer, executor_wrapper(executor), generator, event_manager_wrapper(mgr), 8000000)
+state.generate_initial_inputs(fuzzer, executor_wrapper(executor), generator, event_manager_wrapper(mgr), 8)
+
+stage = libafl.StdScheduledHavocMutationsStageI32.new_from_scheduled_havoc_mutations()
+
+stage_tuple_list = libafl.StagesOwnedListI32(stage_wrapper(stage))
+
+fuzzer.fuzz_loop(executor_wrapper(executor), state, event_manager_wrapper(mgr), stage_tuple_list)
