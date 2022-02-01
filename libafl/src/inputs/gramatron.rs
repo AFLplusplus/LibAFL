@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{bolts::HasLen, inputs::Input, Error};
 
 /// A terminal for gramatron grammar fuzzing
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Terminal {
     /// The state
     pub state: usize,
@@ -32,7 +32,7 @@ impl Terminal {
 }
 
 /// An input for gramatron grammar fuzzing
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct GramatronInput {
     /// The input representation as list of terminals
     terms: Vec<Terminal>,

@@ -2336,6 +2336,14 @@ impl AsanRuntime {
                 X86Register::Rip => {
                     writer.put_mov_reg_address(X86Register::Rdi, true_rip);
                 }
+                X86Register::Rsp => {
+                    // In this case rsp clobbered
+                    writer.put_lea_reg_reg_offset(
+                        X86Register::Rdi,
+                        X86Register::Rsp,
+                        redzone_size + 0x8 * 6,
+                    );
+                }
                 _ => {
                     writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
                 }
@@ -2353,6 +2361,14 @@ impl AsanRuntime {
                 X86Register::Rdi => {
                     // In this case rdi is already clobbered, so we want it from the stack (we pushed rdi onto stack before!)
                     writer.put_mov_reg_reg_offset_ptr(X86Register::Rsi, X86Register::Rsp, -0x28);
+                }
+                X86Register::Rsp => {
+                    // In this case rsp is also clobbered
+                    writer.put_lea_reg_reg_offset(
+                        X86Register::Rsi,
+                        X86Register::Rsp,
+                        redzone_size + 0x8 * 6,
+                    );
                 }
                 _ => {
                     writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());

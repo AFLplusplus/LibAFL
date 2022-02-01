@@ -13,8 +13,23 @@ pub static mut MAX_EDGES_NUM: usize = 0;
 extern "C" {
     /// The area pointer points to the edges map.
     pub static mut __afl_area_ptr: *mut u8;
+
+    /// Start of libafl token section
+    #[cfg(target_os = "linux")]
+    pub static __token_start: *const u8;
+
+    /// End of libafl token section
+    #[cfg(target_os = "linux")]
+    pub static __token_stop: *const u8;
 }
 pub use __afl_area_ptr as EDGES_MAP_PTR;
+
+/// Return token section's start and end as a tuple
+#[cfg(target_os = "linux")]
+#[must_use]
+pub fn token_section() -> (*const u8, *const u8) {
+    unsafe { (__token_start, __token_stop) }
+}
 
 /// The size of the map for edges.
 #[no_mangle]

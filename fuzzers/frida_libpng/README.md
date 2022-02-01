@@ -28,7 +28,7 @@ This means running --cores each client will start itself again to listen for cra
 By restarting the actual fuzzer, it can recover from these exit conditions.
 
 After building the libpng-harness, too, you can run `find . -name libpng-harness.so` to find the location of your harness, then run
-`./target/release/frida_libpng ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0`
+`./target/release/frida_libpng ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0 --input=./corpus`
 
 ## Windows
 You can also fuzz libpng-1.6.37 on windows with frida mode! (still experimental, we have an issue on frida-gum.)
@@ -60,6 +60,6 @@ clang++ -L.\zlib.dll .\harness.o .\libpng16.lib -lzlib -shared -o .\libpng-harne
 ```
 5. Run the fuzzer
 ```
-./frida_libpng.exe ./libpng-harness.dll LLVMFuzzerTestOneInput ./libpng-harness.dll --cores=0
+./frida_libpng.exe ./libpng-harness.dll LLVMFuzzerTestOneInput ./libpng-harness.dll --cores=0 --input=./corpus
 ```
 

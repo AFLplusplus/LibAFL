@@ -12,8 +12,11 @@ use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input}
 
 use grammartec::{
     newtypes::NodeID,
+    rule::RuleIDOrCustom,
     tree::{Tree, TreeLike},
 };
+
+use std::hash::{Hash, Hasher};
 
 /// An [`Input`] implementation for `Nautilus` grammar.
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -84,5 +87,21 @@ impl NautilusInput {
     #[must_use]
     pub fn tree_mut(&mut self) -> &mut Tree {
         &mut self.tree
+    }
+}
+
+impl Hash for NautilusInput {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.tree().paren.hash(state);
+        for r in &self.tree().rules {
+            match r {
+                RuleIDOrCustom::Custom(a, b) => {
+                    a.hash(state);
+                    b.hash(state);
+                }
+                RuleIDOrCustom::Rule(a) => a.hash(state),
+            }
+        }
+        self.tree().sizes.hash(state);
     }
 }

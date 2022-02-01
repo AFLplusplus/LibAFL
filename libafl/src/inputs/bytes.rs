@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// A bytes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BytesInput {
     /// The raw input bytes
     bytes: Vec<u8>,
@@ -103,20 +103,5 @@ impl BytesInput {
     #[must_use]
     pub fn new(bytes: Vec<u8>) -> Self {
         Self { bytes }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::bolts::rands::{Rand, StdRand};
-
-    #[test]
-    fn test_input() {
-        let mut rand = StdRand::with_seed(0);
-        assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(100) < 100);
-        assert_eq!(rand.below(1), 0);
-        assert_eq!(rand.between(10, 10), 10);
-        assert!(rand.between(11, 20) > 10);
     }
 }

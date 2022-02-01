@@ -21,6 +21,7 @@ use crate::{
         tuples::Named,
         AsMutSlice, AsSlice, HasLen,
     },
+    executors::ExitKind,
     observers::Observer,
     Error,
 };
@@ -93,6 +94,19 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
         let mut res = Vec::with_capacity(cnt);
         for i in 0..cnt {
             res.push(*self.get(i));
+        }
+        res
+    }
+
+    /// Get the number of set entries with the specified indexes
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && *self.get(*i) != initial {
+                res += 1;
+            }
         }
         res
     }
@@ -667,12 +681,12 @@ where
     }
 
     #[inline]
-    fn post_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let cnt = self.usable_count();
         for i in 0..cnt {
             *self.get_mut(i) = COUNT_CLASS_LOOKUP[*self.get(i) as usize];
         }
-        self.base.post_exec(state, input)
+        self.base.post_exec(state, input, exit_kind)
     }
 }
 

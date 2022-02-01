@@ -12,6 +12,8 @@ pub mod mopt_mutator;
 pub use mopt_mutator::*;
 pub mod gramatron;
 pub use gramatron::*;
+pub mod grimoire;
+pub use grimoire::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;

@@ -19,7 +19,7 @@ use libafl::{
         CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::EventConfig,
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -50,18 +50,18 @@ where
     #[builder(default = None, setter(strip_option))]
     configuration: Option<String>,
     /// Timeout of the executor
-    #[builder(default = None, setter(strip_option))]
+    #[builder(default = None)]
     timeout: Option<u64>,
     /// Input directories
     input_dirs: &'a [PathBuf],
     /// Output directory
     output_dir: PathBuf,
     /// Dictionary
-    #[builder(default = None, setter(strip_option))]
+    #[builder(default = None)]
     tokens_file: Option<PathBuf>,
     /// Flag if use CmpLog
-    #[builder(default = false)]
-    use_cmplog: bool,
+    #[builder(default = None)]
+    use_cmplog: Option<bool>,
     /// The port used for communication between this fuzzer node and other fuzzer nodes
     #[builder(default = 1337_u16)]
     broker_port: u16,
@@ -74,6 +74,9 @@ where
     /// Bytes harness
     #[builder(setter(strip_option))]
     harness: Option<H>,
+    /// Fuzz `iterations` number of times, instead of indefinitely; implies use of `fuzz_loop_for`
+    #[builder(default = None)]
+    iterations: Option<u64>,
 }
 
 impl<H> Debug for InMemoryBytesCoverageSugar<'_, H>
@@ -137,7 +140,9 @@ where
 
         let monitor = MultiMonitor::new(|s| println!("{}", s));
 
-        let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
+        let mut run_client = |state: Option<StdState<_, _, _, _, _>>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                              _core_id| {
             // Create an observation channel using the coverage map
             let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
             let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
@@ -262,12 +267,36 @@ where
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
-                if self.use_cmplog {
+                if self.use_cmplog.unwrap_or(false) {
                     let mut stages = tuple_list!(tracing, i2s, mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    if let Some(iters) = self.iterations {
+                        fuzzer.fuzz_loop_for(
+                            &mut stages,
+                            &mut executor,
+                            &mut state,
+                            &mut mgr,
+                            iters,
+                        )?;
+                        mgr.on_restart(&mut state)?;
+                        std::process::exit(0);
+                    } else {
+                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    }
                 } else {
                     let mut stages = tuple_list!(mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    if let Some(iters) = self.iterations {
+                        fuzzer.fuzz_loop_for(
+                            &mut stages,
+                            &mut executor,
+                            &mut state,
+                            &mut mgr,
+                            iters,
+                        )?;
+                        mgr.on_restart(&mut state)?;
+                        std::process::exit(0);
+                    } else {
+                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    }
                 }
             } else {
                 // Setup a basic mutator
@@ -275,12 +304,36 @@ where
                 let mutational = StdMutationalStage::new(mutator);
 
                 // The order of the stages matter!
-                if self.use_cmplog {
+                if self.use_cmplog.unwrap_or(false) {
                     let mut stages = tuple_list!(tracing, i2s, mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    if let Some(iters) = self.iterations {
+                        fuzzer.fuzz_loop_for(
+                            &mut stages,
+                            &mut executor,
+                            &mut state,
+                            &mut mgr,
+                            iters,
+                        )?;
+                        mgr.on_restart(&mut state)?;
+                        std::process::exit(0);
+                    } else {
+                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    }
                 } else {
                     let mut stages = tuple_list!(mutational);
-                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    if let Some(iters) = self.iterations {
+                        fuzzer.fuzz_loop_for(
+                            &mut stages,
+                            &mut executor,
+                            &mut state,
+                            &mut mgr,
+                            iters,
+                        )?;
+                        mgr.on_restart(&mut state)?;
+                        std::process::exit(0);
+                    } else {
+                        fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                    }
                 }
             }
 
@@ -322,6 +375,10 @@ pub mod pybind {
         output_dir: PathBuf,
         broker_port: u16,
         cores: Cores,
+        use_cmplog: Option<bool>,
+        iterations: Option<u64>,
+        tokens_file: Option<PathBuf>,
+        timeout: Option<u64>,
     }
 
     #[pymethods]
@@ -333,12 +390,20 @@ pub mod pybind {
             output_dir: PathBuf,
             broker_port: u16,
             cores: Vec<usize>,
+            use_cmplog: Option<bool>,
+            iterations: Option<u64>,
+            tokens_file: Option<PathBuf>,
+            timeout: Option<u64>,
         ) -> Self {
             Self {
                 input_dirs,
                 output_dir,
                 broker_port,
                 cores: cores.into(),
+                use_cmplog,
+                iterations,
+                tokens_file,
+                timeout,
             }
         }
 
@@ -358,6 +423,10 @@ pub mod pybind {
                     })
                     .unwrap();
                 })
+                .use_cmplog(self.use_cmplog)
+                .timeout(self.timeout)
+                .tokens_file(self.tokens_file.clone())
+                .iterations(self.iterations)
                 .build()
                 .run();
         }
