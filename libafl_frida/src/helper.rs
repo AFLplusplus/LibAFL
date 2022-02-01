@@ -3,15 +3,17 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
 };
+
+#[cfg(unix)]
 use libafl_targets::drcov::DrCovBasicBlock;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
+use crate::coverage_rt::CoverageRuntime;
 #[cfg(windows)]
 use crate::FridaOptions;
 #[cfg(unix)]
-use crate::{asan::asan_rt::AsanRuntime, FridaOptions};
-use crate::{coverage_rt::CoverageRuntime, drcov_rt::DrCovRuntime};
+use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime, FridaOptions};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, BuildsCapstone},
@@ -130,7 +132,6 @@ impl<RT> Debug for FridaInstrumentationHelper<'_, RT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let mut dbg_me = f.debug_struct("FridaInstrumentationHelper");
         dbg_me
-            .field("capstone", &self.capstone)
             .field("ranges", &self.ranges)
             .field("module_map", &"<ModuleMap>")
             .field("options", &self.options);
@@ -247,6 +248,7 @@ where
                 let mut first = true;
                 for instruction in basic_block {
                     let instr = instruction.instr();
+                    #[cfg(unix)]
                     let instr_size = instr.bytes().len();
                     let address = instr.address();
                     //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
@@ -266,6 +268,7 @@ where
                                 rt.emit_coverage_mapping(address, &output);
                             }
 
+                            #[cfg(unix)]
                             if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
                                 instruction.put_callout(|context| {
                                     let real_address = rt.real_address_for_stalked(pc(&context));
@@ -279,6 +282,7 @@ where
                             }
                         }
 
+                        #[cfg(unix)]
                         let res = if let Some(rt) = helper.runtime::<AsanRuntime>() {
                             rt.asan_is_interesting_instruction(&helper.capstone, address, instr)
                         } else {

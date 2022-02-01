@@ -81,6 +81,7 @@ pub mod drcov_rt;
 pub mod executor;
 
 /// Utilities
+#[cfg(unix)]
 pub mod utils;
 
 // for parsing asan and cmplog cores

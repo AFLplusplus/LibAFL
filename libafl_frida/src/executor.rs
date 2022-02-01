@@ -159,13 +159,13 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, FH, H, I, OT, S> HasInProcessHandlers
-    for FridaInProcessExecutor<'a, 'b, 'c, FH, H, I, OT, S>
+impl<'a, 'b, 'c, H, I, OT, RT, S> HasInProcessHandlers
+    for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
-    FH: FridaHelper<'b>,
+    RT: FridaRuntimeTuple,
 {
     /// the timeout handler
     #[inline]
