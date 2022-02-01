@@ -50,6 +50,8 @@ use crate::{
 };
 use core::{convert::From, marker::PhantomData};
 
+use core::clone::Clone;
+
 use self::push::PushStage;
 
 /// A stage is one step in the fuzzing process.
@@ -65,6 +67,8 @@ pub trait Stage<E, EM, S, Z> {
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
+
+pub trait CloneStage<E, EM, S, Z> : Stage<E, EM, S, Z> + Clone{}
 
 /// A tuple holding all `Stages` used for fuzzing.
 pub trait StagesTuple<E, EM, S, Z> {
@@ -262,7 +266,10 @@ where
 pub mod pybind {
     use crate::stages::Stage;
     use crate::Error;
+    use crate::impl_asany;
     use pyo3::prelude::*;
+
+    use super::owned::AnyStage;
 
     macro_rules! define_python_stage {
         ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $std_havoc_mutations_stage_name: ident, $my_std_state_type_name: ident,
@@ -326,6 +333,15 @@ pub mod pybind {
                     }
                 }
             }
+
+            impl_asany!($struct_name_trait);
+
+            impl AnyStage<
+                $executor_name,
+                $event_manager_name,
+                $my_std_state_type_name,
+                $my_std_fuzzer_type_name,
+            > for $struct_name_trait{}
         };
     }
 
