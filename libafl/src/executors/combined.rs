@@ -50,7 +50,10 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.primary.run_target(fuzzer, state, mgr, input)
+        let ret = self.primary.run_target(fuzzer, state, mgr, input);
+        self.primary.post_run_reset();
+        self.secondary.post_run_reset();
+        ret
     }
 }
 

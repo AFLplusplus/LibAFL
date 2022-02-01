@@ -598,7 +598,9 @@ where
         *state.executions_mut() += 1;
 
         start_timer!(state);
-        executor.observers_mut().post_exec_all(state, input)?;
+        executor
+            .observers_mut()
+            .post_exec_all(state, input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(exit_kind)
@@ -656,7 +658,9 @@ where
         *state.executions_mut() += 1;
 
         start_timer!(state);
-        executor.observers_mut().post_exec_all(state, input)?;
+        executor
+            .observers_mut()
+            .post_exec_all(state, input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(exit_kind)

@@ -145,6 +145,15 @@ pub struct FuzzerOptions {
     #[clap(short = 'A', long)]
     pub asan: bool,
 
+    /// path to the harness
+    #[clap(short = 'H', long, parse(from_os_str), global = true)]
+    pub harness: Option<PathBuf>,
+
+    /// trailing arguments (after "--"); can be passed directly to the harness
+    #[cfg(not(feature = "qemu_cli"))]
+    #[clap(last = true, global = true, name = "HARNESS_ARGS")]
+    pub harness_args: Vec<String>,
+
     /// enable CmpLog instrumentation
     #[cfg_attr(
         feature = "frida_cli",
@@ -210,7 +219,7 @@ pub struct FuzzerOptions {
     #[clap(short = 'D', long, global = true, help_heading = "Frida Options", parse(try_from_str = parse_instrumentation_location), multiple_occurrences = true)]
     pub dont_instrument: Option<Vec<(String, usize)>>,
 
-    /// trailing arguments (after "--") will be passed directly to QEMU
+    /// trailing arguments (after "--"); can be passed directly to QEMU
     #[cfg(feature = "qemu_cli")]
     #[clap(last = true, global = true)]
     pub qemu_args: Vec<String>,
@@ -260,14 +269,6 @@ pub enum SubCommand {
         /// path to file that should be sent to the harness for crash reproduction
         #[clap(short, long, parse(from_os_str))]
         input_file: PathBuf,
-
-        /// path to harness
-        #[clap(short = 'H', long, parse(from_os_str))]
-        harness: Option<PathBuf>,
-
-        /// path to harness
-        #[clap(short = 'a', long, multiple_occurrences = true)]
-        harness_args: Option<Vec<String>>,
 
         /// Run the same input multiple times
         #[clap(short, long, default_missing_value = "1", min_values = 0)]

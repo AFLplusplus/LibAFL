@@ -1,0 +1,20 @@
+[package]
+name = "libafl_benches"
+version = "0.7.1"
+edition = "2021"
+
+[dev-dependencies]
+criterion = "0.3" # Benchmarking
+ahash = { version = "0.7", default-features=false, features=["compile-time-rng"] } # The hash function already used in hashbrown
+rustc-hash = { version = "1.0", default-features=false } # yet another hash
+xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
+libafl = { path = "../../libafl", default-features=false } # libafl
+
+[[bench]]
+name = "rand_speeds"
+harness = false
+
+[[bench]]
+name = "hash_speeds"
+harness = false
+

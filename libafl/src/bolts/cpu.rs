@@ -33,6 +33,7 @@ pub fn read_time_counter() -> u64 {
 /// change this implementation rather than every instead of [`read_time_counter`]
 /// On unsupported architectures, it's falling back to normal system time, in millis.
 #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+#[must_use]
 pub fn read_time_counter() -> u64 {
     current_nanos()
 }
