@@ -330,7 +330,7 @@ where
     }
 }
 
-/// [`EventFirer`] fire an event.
+/// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter<I>: EventFirer<I>
 where
     I: Input,
