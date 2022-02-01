@@ -13,7 +13,7 @@ use crate::{
 };
 
 /// An entry in the Testcase Corpus
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct Testcase<I>
 where
@@ -31,6 +31,8 @@ where
     cached_len: Option<usize>,
     /// Number of executions done at discovery time
     executions: usize,
+    /// If it has been fuzzed
+    fuzzed: bool,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -152,6 +154,18 @@ where
         &mut self.executions
     }
 
+    /// Get if it was fuzzed
+    #[inline]
+    pub fn fuzzed(&self) -> bool {
+        self.fuzzed
+    }
+
+    /// Set if it was fuzzed
+    #[inline]
+    pub fn set_fuzzed(&mut self, fuzzed: bool) {
+        self.fuzzed = fuzzed;
+    }
+
     /// Create a new Testcase instace given an input
     #[inline]
     pub fn new<T>(input: T) -> Self
@@ -160,11 +174,7 @@ where
     {
         let mut slf = Testcase {
             input: Some(input.into()),
-            filename: None,
-            metadata: SerdeAnyMap::new(),
-            exec_time: None,
-            cached_len: None,
-            executions: 0,
+            ..Testcase::default()
         };
         slf.input.as_mut().unwrap().wrapped_as_testcase();
         slf
@@ -177,10 +187,7 @@ where
         Testcase {
             input: Some(input),
             filename: Some(filename),
-            metadata: SerdeAnyMap::new(),
-            exec_time: None,
-            cached_len: None,
-            executions: 0,
+            ..Testcase::default()
         }
     }
 
@@ -190,18 +197,19 @@ where
         input.wrapped_as_testcase();
         Testcase {
             input: Some(input),
-            filename: None,
-            metadata: SerdeAnyMap::new(),
-            exec_time: None,
-            cached_len: None,
             executions,
+            ..Testcase::default()
         }
     }
+}
 
-    /// Create a new, empty, [`Testcase`].
-    #[must_use]
+impl<I> Default for Testcase<I>
+where
+    I: Input,
+{
+    /// Create a new default Testcase
     #[inline]
-    pub fn default() -> Self {
+    fn default() -> Self {
         Testcase {
             input: None,
             filename: None,
@@ -209,6 +217,7 @@ where
             exec_time: None,
             cached_len: None,
             executions: 0,
+            fuzzed: false,
         }
     }
 }

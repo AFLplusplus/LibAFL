@@ -33,6 +33,8 @@ pub enum LLVMPasses {
     AFLCoverage,
     /// The Autotoken pass
     AutoTokens,
+    /// The Coverage Accouting (BB metric) pass
+    CoverageAccounting,
 }
 
 impl LLVMPasses {
@@ -47,6 +49,8 @@ impl LLVMPasses {
             LLVMPasses::AutoTokens => {
                 PathBuf::from(env!("OUT_DIR")).join(format!("autotokens-pass.{}", dll_extension()))
             }
+            LLVMPasses::CoverageAccounting => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("coverage-accounting-pass.{}", dll_extension())),
         }
     }
 }

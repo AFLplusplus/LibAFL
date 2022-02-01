@@ -23,6 +23,9 @@ fn main() {
     let cmplog_map_h: usize = option_env!("LIBAFL_CMPLOG_MAP_H")
         .map_or(Ok(32), str::parse)
         .expect("Could not parse LIBAFL_CMPLOG_MAP_H");
+    let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
+        .map_or(Ok(65536), str::parse)
+        .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
 
     write!(
         constants_file,
@@ -36,8 +39,10 @@ fn main() {
         pub const CMPLOG_MAP_W: usize = {};
         /// The height of the `CmpLog` map
         pub const CMPLOG_MAP_H: usize = {};
+        /// The size of the accounting maps
+        pub const ACCOUNTING_MAP_SIZE: usize = {};
 ",
-        edges_map_size, cmp_map_size, cmplog_map_w, cmplog_map_h
+        edges_map_size, cmp_map_size, cmplog_map_w, cmplog_map_h, acc_map_size
     )
     .expect("Could not write file");
 
@@ -45,6 +50,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=LIBAFL_CMP_MAP_SIZE");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_W");
     println!("cargo:rerun-if-env-changed=LIBAFL_CMPLOG_MAP_H");
+    println!("cargo:rerun-if-env-changed=LIBAFL_ACCOUNTING_MAP_SIZE");
 
     //std::env::set_var("CC", "clang");
     //std::env::set_var("CXX", "clang++");
@@ -95,6 +101,7 @@ fn main() {
     cc::Build::new()
         .file(src_dir.join("coverage.c"))
         .define("EDGES_MAP_SIZE", Some(&*format!("{}", edges_map_size)))
+        .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{}", acc_map_size)))
         .compile("coverage");
 
     println!("cargo:rerun-if-changed=src/cmplog.h");

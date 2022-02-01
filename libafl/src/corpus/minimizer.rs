@@ -257,6 +257,11 @@ where
         Ok(())
     }
 
+    /// Get a reference to the base scheduler
+    pub fn base(&self) -> &CS {
+        &self.base
+    }
+
     /// Creates a new [`MinimizerCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(base: CS) -> Self {
