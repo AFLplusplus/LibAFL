@@ -57,10 +57,13 @@ use crate::{
     Error,
 };
 
-#[cfg(all(feature = "std", unix))]
-use crate::{bolts::os::unix_signals::{Handler, Signal}, executors::inprocess::bt_signal_handlers::setup_child_panic_hook};
 #[cfg(feature = "std")]
 use crate::executors::inprocess::bt_signal_handlers::setup_bt_panic_hook;
+#[cfg(all(feature = "std", unix))]
+use crate::{
+    bolts::os::unix_signals::{Handler, Signal},
+    executors::inprocess::bt_signal_handlers::setup_child_panic_hook,
+};
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]

@@ -9,11 +9,11 @@ use libafl_targets::drcov::DrCovBasicBlock;
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
+use crate::coverage_rt::CoverageRuntime;
 #[cfg(windows)]
 use crate::FridaOptions;
 #[cfg(unix)]
-use crate::{asan::asan_rt::AsanRuntime, FridaOptions, drcov_rt::DrCovRuntime};
-use crate::coverage_rt::CoverageRuntime;
+use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime, FridaOptions};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, BuildsCapstone},
