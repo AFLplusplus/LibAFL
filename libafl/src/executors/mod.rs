@@ -95,6 +95,10 @@ where
     {
         WithObservers::new(self, observers)
     }
+
+    /// Custom Reset Handler, e.g., to reset timers
+    #[inline]
+    fn post_run_reset(&mut self) {}
 }
 
 /// A simple executor that does nothing.

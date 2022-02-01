@@ -305,7 +305,7 @@ impl InProcessHandlers {
     pub fn new<E, EM, I, OF, OT, S, Z, H>() -> Result<Self, Error>
     where
         I: Input,
-        E: HasObservers<I, OT, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         OT: ObserversTuple<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OF: Feedback<I, S>,
@@ -628,8 +628,7 @@ mod unix_signal_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            timeout::unix_remove_timeout,
-            ExitKind, HasObservers,
+            Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -775,7 +774,7 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers<I, OT, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -783,8 +782,6 @@ mod unix_signal_handler {
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
-        unix_remove_timeout();
-
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
             as *mut libc::c_void as *mut ucontext_t);
@@ -825,11 +822,14 @@ mod unix_signal_handler {
 
             // TODO tell the parent to not restart
         } else {
+            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+            // disarms timeout in case of TimeoutExecutor
+            executor.post_run_reset();
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
             let observers = executor.observers_mut();
+
             let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             data.current_input_ptr = ptr::null();
 
@@ -908,8 +908,7 @@ mod windows_exception_handler {
         events::{Event, EventFirer, EventRestarter},
         executors::{
             inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            timeout::windows_delete_timer_queue,
-            ExitKind, HasObservers,
+            Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
@@ -1053,7 +1052,7 @@ mod windows_exception_handler {
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers<I, OT, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -1062,7 +1061,7 @@ mod windows_exception_handler {
         Z: HasObjective<I, OF, S>,
     {
         // Have we set a timer_before?
-        if let Some(x) =
+        if let Some(_) =
             (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
         {
             /*
@@ -1077,9 +1076,6 @@ mod windows_exception_handler {
             compiler_fence(Ordering::SeqCst);
             LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
             compiler_fence(Ordering::SeqCst);
-
-            windows_delete_timer_queue(x);
-            data.tp_timer = ptr::null_mut();
         }
 
         let code = ExceptionCode::try_from(
@@ -1124,10 +1120,16 @@ mod windows_exception_handler {
 
             // TODO tell the parent to not restart
         } else {
+            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+            // reset timer
+            if !data.tp_timer.is_null() {
+                executor.post_run_reset();
+                data.tp_timer = ptr::null_mut();
+            }
+
             let state = (data.state_ptr as *mut S).as_mut().unwrap();
             let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
             let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
             let observers = executor.observers();
 
             #[cfg(feature = "std")]
