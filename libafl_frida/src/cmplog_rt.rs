@@ -26,8 +26,7 @@ use frida_gum::{
 };
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::utils::{writer_register, instruction_width};
-
+use crate::utils::{instruction_width, writer_register};
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 /// Speciial CmpLog Cases for `aarch64`

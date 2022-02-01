@@ -94,7 +94,7 @@ pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
 #[must_use]
 #[inline]
 #[allow(clippy::unused_self)]
-pub fn writer_register(reg: RegId) -> X86Register {
+pub fn writer_register(reg: capstone::RegId) -> X86Register {
     let regint: u16 = reg.0;
     match regint {
         19 => X86Register::Eax,
