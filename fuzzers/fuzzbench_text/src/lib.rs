@@ -44,7 +44,7 @@ use libafl::{
         },
         scheduled::havoc_mutations,
         token_mutations::I2SRandReplace,
-        tokens_mutations, StdMOptMutator, StdScheduledMutator, TokenSection, Tokens,
+        tokens_mutations, StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     stages::{
@@ -61,7 +61,7 @@ use libafl_targets::{
 };
 
 #[cfg(target_os = "linux")]
-use libafl_targets::token_section;
+use libafl_targets::autotokens;
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -222,7 +222,7 @@ fn check_if_textual(seeds_dir: &Path, tokenfile: &Option<PathBuf>) -> bool {
     let (found, tot) = count_textual_inputs(&seeds_dir);
     let is_text = found * 100 / tot > 90; // 90% of text inputs
     if let Some(tokenfile) = tokenfile {
-        let toks = Tokens::from_tokens_file(tokenfile).unwrap();
+        let toks = Tokens::from_file(tokenfile).unwrap();
         if !toks.tokens().is_empty() {
             let mut cnt = 0;
             for t in toks.tokens() {
@@ -419,15 +419,14 @@ fn fuzz_binary(
     if state.metadata().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
-            toks = toks.parse_tokens_file(vec![tokenfile])?;
+            toks.add_from_file(tokenfile)?;
         }
         #[cfg(target_os = "linux")]
         {
-            let token_section = TokenSection::new(token_section());
-            toks = toks.parse_autotokens(token_section)?;
+            toks += autotokens()?;
         }
 
-        if !toks.tokens().is_empty() {
+        if !toks.is_empty() {
             state.add_metadata(toks);
         }
     }
@@ -639,15 +638,14 @@ fn fuzz_text(
     if state.metadata().get::<Tokens>().is_none() {
         let mut toks = Tokens::default();
         if let Some(tokenfile) = tokenfile {
-            toks = toks.parse_tokens_file(vec![tokenfile])?;
+            toks.add_from_file(tokenfile)?;
         }
         #[cfg(target_os = "linux")]
         {
-            let token_section = TokenSection::new(token_section());
-            toks = toks.parse_autotokens(token_section)?;
+            toks += autotokens()?;
         }
 
-        if !toks.tokens().is_empty() {
+        if !toks.is_empty() {
             state.add_metadata(toks);
         }
     }

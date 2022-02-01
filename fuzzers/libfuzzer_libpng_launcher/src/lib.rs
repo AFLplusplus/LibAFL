@@ -188,7 +188,7 @@ pub fn libafl_main() {
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::new(vec![
+            state.add_metadata(Tokens::from([
                 vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                 "IHDR".as_bytes().to_vec(),
                 "IDAT".as_bytes().to_vec(),
