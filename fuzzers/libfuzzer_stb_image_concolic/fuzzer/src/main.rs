@@ -245,19 +245,15 @@ fn fuzz(
 use std::process::{Child, Command, Stdio};
 
 #[derive(Default)]
-pub struct MyCommandConfigurator;
+pub struct MyCommandConfigurator {
+    command: Option<Command>,
+}
 
-impl<EM, I, S, Z> CommandConfigurator<EM, I, S, Z> for MyCommandConfigurator
+impl<I> CommandConfigurator<I> for MyCommandConfigurator
 where
     I: HasTargetBytes + Input,
 {
-    fn spawn_child(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        input: &I,
-    ) -> Result<Child, Error> {
+    fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")

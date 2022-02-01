@@ -28,7 +28,11 @@ fn criterion_benchmark(c: &mut Criterion) {
         })
     });
     c.bench_function("fxhash", |b| {
-        b.iter(|| fxhash::hash64(black_box(&bench_vec)))
+        b.iter(|| {
+            let mut hasher = rustc_hash::FxHasher::default();
+            hasher.write(black_box(&bench_vec));
+            hasher.finish()
+        })
     });
 }
 

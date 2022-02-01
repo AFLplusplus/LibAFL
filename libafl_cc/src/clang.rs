@@ -158,6 +158,11 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push("-lBcrypt".into());
             new_args.push("-lAdvapi32".into());
         }
+        // required by timer API (timer_create, timer_settime)
+        #[cfg(target_os = "linux")]
+        if linking {
+            new_args.push("-lrt".into());
+        }
         // MacOS has odd linker behavior sometimes
         #[cfg(target_vendor = "apple")]
         if linking {

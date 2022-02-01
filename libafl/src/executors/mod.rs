@@ -15,7 +15,7 @@ pub use timeout::TimeoutExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-pub use forkserver::{Forkserver, ForkserverExecutor, OutFile, TimeoutForkserverExecutor};
+pub use forkserver::{Forkserver, ForkserverExecutor, TimeoutForkserverExecutor};
 
 pub mod combined;
 pub use combined::CombinedExecutor;
@@ -95,6 +95,10 @@ where
     {
         WithObservers::new(self, observers)
     }
+
+    /// Custom Reset Handler, e.g., to reset timers
+    #[inline]
+    fn post_run_reset(&mut self) {}
 }
 
 /// A simple executor that does nothing.

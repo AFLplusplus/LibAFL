@@ -1118,7 +1118,6 @@ pub mod win32_shmem {
         fmt::{self, Debug, Formatter},
         ptr, slice,
     };
-    use std::convert::TryInto;
     use uuid::Uuid;
 
     const INVALID_HANDLE_VALUE: isize = -1;
@@ -1181,7 +1180,7 @@ pub mod win32_shmem {
                 }
 
                 Ok(Self {
-                    id: ShMemId::try_from_slice(&map_str_bytes).unwrap(),
+                    id: ShMemId::try_from_slice(map_str_bytes).unwrap(),
                     handle,
                     map,
                     map_size,

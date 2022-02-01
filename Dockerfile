@@ -29,7 +29,6 @@ COPY libafl_derive/Cargo.toml libafl_derive/Cargo.toml
 COPY scripts/dummy.rs libafl_derive/src/lib.rs
 
 COPY libafl/Cargo.toml libafl/build.rs libafl/
-COPY libafl/benches libafl/benches
 COPY libafl/examples libafl/examples
 COPY scripts/dummy.rs libafl/src/lib.rs
 

@@ -32,7 +32,7 @@ fn signals_set(idx: usize) {
 }
 
 fn is_sub<T: PartialEq>(mut haystack: &[T], needle: &[T]) -> bool {
-    if needle.len() == 0 {
+    if needle.is_empty() {
         return true;
     }
     while !haystack.is_empty() {
@@ -115,10 +115,7 @@ pub fn main() {
     );
 
     if state.metadata().get::<Tokens>().is_none() {
-        state.add_metadata(Tokens::new(vec![
-            "FOO".as_bytes().to_vec(),
-            "BAR".as_bytes().to_vec(),
-        ]));
+        state.add_metadata(Tokens::from([b"FOO".to_vec(), b"BAR".to_vec()]));
     }
 
     // The Monitor trait define how the fuzzer stats are reported to the user

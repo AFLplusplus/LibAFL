@@ -28,6 +28,7 @@ where
 /// Trait to decode encoded input to bytes
 pub trait InputDecoder {
     /// Decode encoded input to bytes
+    #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
@@ -186,7 +187,7 @@ impl Tokenizer for NaiveTokenizer {
 }
 
 /// A codes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EncodedInput {
     /// The input representation as list of codes
     codes: Vec<u32>,

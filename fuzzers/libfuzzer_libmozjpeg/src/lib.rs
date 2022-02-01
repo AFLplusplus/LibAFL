@@ -128,7 +128,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Add the JPEG tokens if not existing
     if state.metadata().get::<Tokens>().is_none() {
-        state.add_metadata(Tokens::from_tokens_file("./jpeg.dict")?);
+        state.add_metadata(Tokens::from_file("./jpeg.dict")?);
     }
 
     // Setup a basic mutator with a mutational stage
