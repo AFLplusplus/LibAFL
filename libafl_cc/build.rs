@@ -136,6 +136,7 @@ fn main() {
 
         let output = Command::new(&llvm_config)
             .args(&["--ldflags"])
+            .args(&["--libs"])
             .output()
             .expect("Failed to execute llvm-config");
         let ldflags = str::from_utf8(&output.stdout).expect("Invalid llvm-config output");
