@@ -119,23 +119,26 @@ impl CompilerWrapper for ClangWrapper {
             linking = false;
         }
 
+        let mut suppress_linking = 0;
         for arg in &args[1..] {
             match arg.as_ref() {
                 "--libafl-no-link" => {
-                    linking = false;
+                    suppress_linking += 1;
                     self.has_libafl_arg = true;
                     continue;
                 }
                 "--libafl" => {
+                    suppress_linking += 1337;
                     self.has_libafl_arg = true;
                     continue;
                 }
                 "-fsanitize=fuzzer-no-link" => {
-                    linking = false;
+                    suppress_linking += 1;
                     self.has_libafl_arg = true;
                     continue;
                 }
                 "-fsanitize=fuzzer" => {
+                    suppress_linking += 1337;
                     self.has_libafl_arg = true;
                     continue;
                 }
@@ -149,6 +152,17 @@ impl CompilerWrapper for ClangWrapper {
             };
             new_args.push(arg.as_ref().to_string());
         }
+        if linking && suppress_linking > 0 && suppress_linking < 1337 {
+            linking = false;
+            new_args.push(
+                PathBuf::from(env!("OUT_DIR"))
+                    .join(format!("{}no-link-rt.{}", LIB_PREFIX, LIB_EXT))
+                    .into_os_string()
+                    .into_string()
+                    .unwrap(),
+            );
+        }
+
         self.linking = linking;
 
         if self.optimize {
