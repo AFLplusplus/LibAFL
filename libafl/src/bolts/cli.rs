@@ -1,37 +1,26 @@
 //! A one-size-fits-most approach to defining runtime behavior of `LibAFL` fuzzers
 //!
-//! The most common pattern of use will be to:
-//!
-//! - import and call `parse_args`
-//! - destructure the subcommands
-//! - pull out the options/arguments that are of interest to you/your fuzzer
-//! - ignore the rest with `..`
-//!
-//! There are two provided subcommands: `fuzz` and `replay`. Each one takes a few global options
-//! as well as a few that are specific to themselves.
+//! The most common pattern of use will be to import and call `parse_args`.
 //!
 //! # Example (Most Common)
 //!
 //! The most common usage of the cli parser. Just call `parse_args` and use the results.
 //!
 //! ```ignore
-//! use libafl::bolts::cli::{parse_args, SubCommand};
-//! use std::path::{Path, PathBuf};
+//! use libafl::bolts::cli::{parse_args, FuzzerOptions};
 //!
-//! fn fuzz(_: &[PathBuf]) {}
-//! fn replay(_: &Path) {}
+//! fn fuzz(options: FuzzerOptions) {}
+//! fn replay(options: FuzzerOptions) {}
 //!
 //! fn main() {
 //!     // make sure to add `features = ["cli"]` to the `libafl` crate in `Cargo.toml`
 //!     let parsed = parse_args();
-//!
-//!     match &parsed.command {
-//!         // destructure subcommands
-//!         SubCommand::Fuzz { tokens, .. } => {
-//!             // call appropriate logic, passing in w/e options/args you need
-//!             fuzz(tokens)
-//!         }
-//!         SubCommand::Replay { input_file, .. } => replay(input_file),
+//!     
+//!     // call appropriate logic, passing in parsed options
+//!     if parsed.replay.is_some() {
+//!         replay(parsed);
+//!     } else {
+//!         fuzz(parsed);
 //!     }
 //!
 //!     println!("{:?}", parsed);
@@ -41,44 +30,40 @@
 //! ## Example (`libafl_qemu`)
 //!
 //! ```ignore
-//! use libafl::bolts::cli::{parse_args, SubCommand};
+//! use libafl::bolts::cli::{parse_args, FuzzerOptions};
 //! use std::env;
-//! use std::path::{Path, PathBuf};
 //!
 //! // make sure to add `features = ["qemu_cli"]` to the `libafl` crate in `Cargo.toml`
 //! use libafl_qemu::Emulator;
 //!
-//! fn fuzz_with_qemu(_: &[PathBuf], qemu_args: &[String]) {
+//! fn fuzz_with_qemu(mut options: FuzzerOptions) {
 //!     env::remove_var("LD_LIBRARY_PATH");
 //!
 //!     let env: Vec<(String, String)> = env::vars().collect();
 //!
-//!     let emu = Emulator::new(&mut qemu_args.to_vec(), &mut env);
+//!     let emu = Emulator::new(&mut options.qemu_args.to_vec(), &mut env);
 //!     // do other stuff...
 //! }
 //!
-//! fn replay(_: &Path) {}
+//! fn replay(options: FuzzerOptions) {}
 //!
 //! fn main() {
 //!     // example command line invocation:
-//!     // ./path-to-fuzzer fuzz -x something.dict -- ./path-to-fuzzer -L /path/for/qemu_tack_L ./target --target-opts
+//!     // ./path-to-fuzzer -x something.dict -- ./path-to-fuzzer -L /path/for/qemu_tack_L ./target --target-opts
 //!     let parsed = parse_args();
 //!
-//!     match &parsed.command {
-//!         // destructure subcommands
-//!         SubCommand::Fuzz { tokens, .. } => {
-//!             // notice that `qemu_args` is available on the FuzzerOptions struct directly, while
-//!             // `tokens` needs to be yoinked from the SubCommand::Fuzz variant
-//!             fuzz_with_qemu(tokens, &parsed.qemu_args)
-//!         }
-//!         SubCommand::Replay { input_file, .. } => replay(input_file),
+//!     // call appropriate logic, passing in parsed options
+//!     if parsed.replay.is_some() {
+//!         replay(parsed);
+//!     } else {
+//!         fuzz_with_qemu(parsed);
 //!     }
 //!
 //!     println!("{:?}", parsed);
 //! }
 //!```
 
-use clap::{App, AppSettings, IntoApp, Parser, Subcommand};
+use clap::{App, AppSettings, IntoApp, Parser};
 #[cfg(feature = "frida_cli")]
 use std::error;
 use std::net::SocketAddr;
@@ -126,7 +111,7 @@ fn parse_instrumentation_location(
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
     /// timeout for each target execution (milliseconds)
-    #[clap(short, long, takes_value = true, default_value = "1000", parse(try_from_str = parse_timeout), global = true)]
+    #[clap(short, long, takes_value = true, default_value = "1000", parse(try_from_str = parse_timeout), global = true, help_heading = "Fuzz Options")]
     pub timeout: Duration,
 
     /// whether or not to print debug info
@@ -138,11 +123,17 @@ pub struct FuzzerOptions {
     pub stdout: Option<String>,
 
     /// enable Address Sanitizer (ASAN)
-    #[clap(short = 'A', long)]
+    #[clap(short = 'A', long, help_heading = "Fuzz Options")]
     pub asan: bool,
 
     /// path to the harness
-    #[clap(short = 'H', long, parse(from_os_str), global = true)]
+    #[clap(
+        short = 'H',
+        long,
+        parse(from_os_str),
+        global = true,
+        help_heading = "Fuzz Options"
+    )]
     pub harness: Option<PathBuf>,
 
     /// trailing arguments (after "--"); can be passed directly to the harness
@@ -155,7 +146,10 @@ pub struct FuzzerOptions {
         feature = "frida_cli",
         clap(short = 'C', long, global = true, help_heading = "Frida Options")
     )]
-    #[cfg_attr(not(feature = "frida_cli"), clap(short = 'C', long))]
+    #[cfg_attr(
+        not(feature = "frida_cli"),
+        clap(short = 'C', long, help_heading = "Fuzz Options")
+    )]
     pub cmplog: bool,
 
     /// enable ASAN leak detection
@@ -221,7 +215,13 @@ pub struct FuzzerOptions {
     pub qemu_args: Vec<String>,
 
     /// paths to fuzzer token files (aka 'dictionaries')
-    #[clap(short = 'x', long, multiple_values = true, parse(from_os_str))]
+    #[clap(
+        short = 'x',
+        long,
+        multiple_values = true,
+        parse(from_os_str),
+        help_heading = "Fuzz Options"
+    )]
     pub tokens: Vec<PathBuf>,
 
     /// input corpus directories
@@ -230,12 +230,18 @@ pub struct FuzzerOptions {
             long,
             default_values = &["corpus/"],
             multiple_values = true,
-            parse(from_os_str)
+            parse(from_os_str), help_heading = "Corpus Options"
     )]
     pub input: Vec<PathBuf>,
 
     /// output solutions directory
-    #[clap(short, long, default_value = "solutions/", parse(from_os_str))]
+    #[clap(
+        short,
+        long,
+        default_value = "solutions/",
+        parse(from_os_str),
+        help_heading = "Corpus Options"
+    )]
     pub output: PathBuf,
 
     /// Spawn a client in each of the provided cores. Use 'all' to select all available
@@ -253,11 +259,17 @@ pub struct FuzzerOptions {
     pub remote_broker_addr: Option<SocketAddr>,
 
     /// path to file that should be sent to the harness for crash reproduction
-    #[clap(short, long, parse(from_os_str))]
-    pub replay: PathBuf,
+    #[clap(short, long, parse(from_os_str), help_heading = "Replay Options")]
+    pub replay: Option<PathBuf>,
 
     /// Run the same replay input multiple times
-    #[clap(short = 'R', long, default_missing_value = "1", min_values = 0)]
+    #[clap(
+        short = 'R',
+        long,
+        default_missing_value = "1",
+        min_values = 0,
+        help_heading = "Replay Options"
+    )]
     pub repeat: Option<usize>,
 }
 
