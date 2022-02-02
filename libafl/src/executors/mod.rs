@@ -5,6 +5,9 @@ pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub use inprocess::InProcessForkExecutor;
 
+pub mod differential;
+pub use differential::DifferentialExecutor;
+
 /// Timeout executor.
 /// Not possible on `no-std` Windows or `no-std`, but works for unix
 #[cfg(any(unix, feature = "std"))]
@@ -52,11 +55,49 @@ pub enum ExitKind {
     Oom,
     /// The run timed out
     Timeout,
+    /// Special case for [`DifferentialExecutor`] when both exitkinds don't match
+    Differential {
+        /// The exitkind of the primary executor
+        primary: DifferentialExitKind,
+        /// The exitkind of the secondary executor
+        secondary: DifferentialExitKind,
+    },
+    // The run resulted in a custom `ExitKind`.
+    // Custom(Box<dyn SerdeAny>),
+}
+
+/// How one of the diffing executions finished.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DifferentialExitKind {
+    /// The run exited normally.
+    Ok,
+    /// The run resulted in a target crash.
+    Crash,
+    /// The run hit an out of memory error.
+    Oom,
+    /// The run timed out
+    Timeout,
+    /// One of the executors itelf repots a differential, we can't go into further details.
+    Differential,
     // The run resulted in a custom `ExitKind`.
     // Custom(Box<dyn SerdeAny>),
 }
 
 crate::impl_serdeany!(ExitKind);
+
+impl From<ExitKind> for DifferentialExitKind {
+    fn from(exitkind: ExitKind) -> Self {
+        match exitkind {
+            ExitKind::Ok => DifferentialExitKind::Ok,
+            ExitKind::Crash => DifferentialExitKind::Crash,
+            ExitKind::Oom => DifferentialExitKind::Oom,
+            ExitKind::Timeout => DifferentialExitKind::Timeout,
+            ExitKind::Differential { .. } => DifferentialExitKind::Differential,
+        }
+    }
+}
+
+crate::impl_serdeany!(DifferentialExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers<I, OT, S>: Debug
