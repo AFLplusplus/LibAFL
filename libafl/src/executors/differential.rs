@@ -12,12 +12,20 @@ use core::fmt::Debug;
 
 /// A [`DifferentialExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
 #[derive(Debug)]
-pub struct DifferentialExecutor<A: Debug, B: Debug> {
+pub struct DifferentialExecutor<A, B>
+where
+    A: Debug,
+    B: Debug,
+{
     primary: A,
     secondary: B,
 }
 
-impl<A: Debug, B: Debug> DifferentialExecutor<A, B> {
+impl<A, B> DifferentialExecutor<A, B>
+where
+    A: Debug,
+    B: Debug,
+{
     /// Create a new `DifferentialExecutor`, wrapping the given `executor`s.
     pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
     where
