@@ -730,7 +730,7 @@ where
     /// Ref to the last message this sender sent on the last page.
     /// If null, a new page (just) started.
     pub last_msg_sent: *const LlmpMsg,
-    /// A vec of page wrappers, each containing an initialized Shmem
+    /// A vec of page wrappers, each containing an initialized [`ShMem`]
     pub out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
     /// If true, pages will never be pruned.
     /// The broker uses this feature.
