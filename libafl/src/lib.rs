@@ -2,6 +2,7 @@
 Welcome to `LibAFL`
 */
 
+#![allow(incomplete_features)]
 #![cfg_attr(not(feature = "std"), no_std)]
 // For `type_eq`
 #![cfg_attr(unstable_feature, feature(specialization))]
