@@ -340,7 +340,6 @@ mod tests {
     fn standard_option_with_trailing_variable_length_args_collected() {
         let parsed = FuzzerOptions::parse_from([
             "some-command",
-            "fuzz",
             "--broker-port",
             "1336",
             "-i",
@@ -351,9 +350,7 @@ mod tests {
             "-L",
             "qemu-bound",
         ]);
-        if let SubCommand::Fuzz { broker_port, .. } = &parsed.command {
-            assert_eq!(*broker_port, 1336);
-            assert_eq!(parsed.qemu_args, ["-L", "qemu-bound"]);
-        }
+        assert_eq!(parsed.qemu_args, ["-L", "qemu-bound"]);
+        assert_eq!(parsed.broker_port, 1336);
     }
 }
