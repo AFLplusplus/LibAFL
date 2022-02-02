@@ -130,6 +130,15 @@ impl CompilerWrapper for ClangWrapper {
                     self.has_libafl_arg = true;
                     continue;
                 }
+                "-fsanitize=fuzzer-no-link" => {
+                    linking = false;
+                    self.has_libafl_arg = true;
+                    continue;
+                }
+                "-fsanitize=fuzzer" => {
+                    self.has_libafl_arg = true;
+                    continue;
+                }
                 "-x" => self.x_set = true,
                 "-m32" => self.bit_mode = 32,
                 "-m64" => self.bit_mode = 64,
