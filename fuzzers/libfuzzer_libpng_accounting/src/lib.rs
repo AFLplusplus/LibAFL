@@ -21,7 +21,7 @@ use libafl::{
         AsSlice,
     },
     corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
+        Corpus, CoverageAccountingCorpusScheduler, InMemoryCorpus, OnDiskCorpus,
         QueueCorpusScheduler,
     },
     events::EventConfig,
@@ -30,7 +30,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::tui::TuiMonitor,
+    monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -39,7 +39,9 @@ use libafl::{
     Error,
 };
 
-use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{
+    libfuzzer_initialize, libfuzzer_test_one_input, ACCOUNTING_MEMOP_MAP, EDGES_MAP, MAX_EDGES_NUM,
+};
 
 /// Parse a millis string to a [`Duration`]. Used for arg parsing.
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
@@ -141,7 +143,7 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = TuiMonitor::new("Test fuzzer on libpng".into(), true);
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
@@ -186,7 +188,7 @@ pub fn libafl_main() {
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::from([
+            state.add_metadata(Tokens::from(vec![
                 vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                 "IHDR".as_bytes().to_vec(),
                 "IDAT".as_bytes().to_vec(),
@@ -200,7 +202,11 @@ pub fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+        let scheduler = CoverageAccountingCorpusScheduler::new(
+            &mut state,
+            QueueCorpusScheduler::new(),
+            unsafe { &ACCOUNTING_MEMOP_MAP },
+        );
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -237,7 +243,9 @@ pub fn libafl_main() {
         if state.corpus().count() < 1 {
             state
                 .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
-                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
+                .unwrap_or_else(|e| {
+                    panic!("Failed to load initial corpus at {:?} {:?}", &opt.input, e)
+                });
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
@@ -253,7 +261,7 @@ pub fn libafl_main() {
         .cores(&cores)
         .broker_port(broker_port)
         .remote_broker_addr(opt.remote_broker_addr)
-        .stdout_file(Some("/dev/null"))
+        //.stdout_file(Some("/dev/null"))
         .build()
         .launch()
     {

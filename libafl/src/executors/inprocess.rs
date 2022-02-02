@@ -48,14 +48,6 @@ use crate::bolts::os::windows_exceptions::{ExceptionCode, Handler, CRASH_EXCEPTI
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
-/// The process executor simply calls a target function, then returns afterwards.
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::os::unix_signals::{Handler, Signal};
-#[cfg(feature = "std")]
-use crate::executors::inprocess::bt_signal_handlers::{
-    setup_bt_panic_hook, setup_child_panic_hook,
-};
-
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
@@ -73,6 +65,13 @@ pub type InProcessExecutor<'a, H, I, OT, S> = GenericInProcessExecutor<H, &'a mu
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<I, OT, S> =
     GenericInProcessExecutor<dyn FnMut(&I) -> ExitKind, Box<dyn FnMut(&I) -> ExitKind>, I, OT, S>;
+#[cfg(feature = "std")]
+use crate::executors::inprocess::bt_signal_handlers::setup_bt_panic_hook;
+#[cfg(all(feature = "std", unix))]
+use crate::{
+    bolts::os::unix_signals::{Handler, Signal},
+    executors::inprocess::bt_signal_handlers::setup_child_panic_hook,
+};
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]

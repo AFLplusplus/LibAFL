@@ -131,7 +131,7 @@ where
 
         let backtrace_state = _state
             .feedback_states_mut()
-            .match_name_mut::<NewHashFeedbackState<u64>>(&self.observer_name.to_string())
+            .match_name_mut::<NewHashFeedbackState<u64>>(&self.observer_name)
             .unwrap();
 
         match observer.hash() {

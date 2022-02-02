@@ -19,6 +19,9 @@ pub use cached::CachedOnDiskCorpus;
 pub mod queue;
 pub use queue::QueueCorpusScheduler;
 
+pub mod accounting;
+pub use accounting::*;
+
 pub mod minimizer;
 pub use minimizer::{
     FavFactor, IndexesLenTimeMinimizerCorpusScheduler, IsFavoredMetadata,

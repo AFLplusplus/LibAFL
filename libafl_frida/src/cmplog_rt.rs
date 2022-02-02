@@ -4,10 +4,16 @@
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
+use libafl::{
+    inputs::{HasTargetBytes, Input},
+    Error,
+};
 use libafl_targets;
 use libafl_targets::CMPLOG_MAP_W;
+use rangemap::RangeMap;
 use std::ffi::c_void;
 
+use crate::helper::FridaRuntime;
 extern "C" {
     /// Tracks cmplog instructions
     pub fn __libafl_targets_cmplog_instructions(k: u64, shape: u8, arg1: u64, arg2: u64);
@@ -20,7 +26,7 @@ use frida_gum::{
 };
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::helper::FridaInstrumentationHelper;
+use crate::utils::{instruction_width, writer_register};
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 /// Speciial CmpLog Cases for `aarch64`
@@ -59,6 +65,27 @@ pub struct CmpLogRuntime {
     ops_save_register_and_blr_to_populate: Option<Box<[u8]>>,
     ops_handle_tbz_masking: Option<Box<[u8]>>,
     ops_handle_tbnz_masking: Option<Box<[u8]>>,
+}
+
+impl FridaRuntime for CmpLogRuntime {
+    /// Initialize this `CmpLog` runtime.
+    /// This will generate the instrumentation blobs for the current arch.
+    fn init(
+        &mut self,
+        _gum: &frida_gum::Gum,
+        _ranges: &RangeMap<usize, (u16, String)>,
+        _modules_to_instrument: &[&str],
+    ) {
+        self.generate_instrumentation_blobs();
+    }
+
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl CmpLogRuntime {
@@ -201,12 +228,6 @@ impl CmpLogRuntime {
         );
     }
 
-    /// Initialize this `CmpLog` runtime.
-    /// This will generate the instrumentation blobs for the current arch.
-    pub fn init(&mut self) {
-        self.generate_instrumentation_blobs();
-    }
-
     /// Get the blob which saves the context, jumps to the populate function and restores the context
     #[inline]
     #[must_use]
@@ -256,7 +277,7 @@ impl CmpLogRuntime {
                 writer.put_ldr_reg_u64(Aarch64Register::X0, value);
             }
             CmplogOperandType::Regid(reg) => {
-                let reg = FridaInstrumentationHelper::writer_register(reg);
+                let reg = writer_register(reg);
                 match reg {
                     Aarch64Register::X0 | Aarch64Register::W0 => {}
                     Aarch64Register::X1 | Aarch64Register::W1 => {
@@ -270,9 +291,9 @@ impl CmpLogRuntime {
                 }
             }
             CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
-                let basereg = FridaInstrumentationHelper::writer_register(basereg);
+                let basereg = writer_register(basereg);
                 let indexreg = if indexreg.0 != 0 {
-                    Some(FridaInstrumentationHelper::writer_register(indexreg))
+                    Some(writer_register(indexreg))
                 } else {
                     None
                 };
@@ -332,7 +353,7 @@ impl CmpLogRuntime {
                 }
             }
             CmplogOperandType::Regid(reg) => {
-                let reg = FridaInstrumentationHelper::writer_register(reg);
+                let reg = writer_register(reg);
                 match reg {
                     Aarch64Register::X1 | Aarch64Register::W1 => {}
                     Aarch64Register::X0 | Aarch64Register::W0 => {
@@ -350,9 +371,9 @@ impl CmpLogRuntime {
                 }
             }
             CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
-                let basereg = FridaInstrumentationHelper::writer_register(basereg);
+                let basereg = writer_register(basereg);
                 let indexreg = if indexreg.0 != 0 {
-                    Some(FridaInstrumentationHelper::writer_register(indexreg))
+                    Some(writer_register(indexreg))
                 } else {
                     None
                 };
@@ -603,7 +624,7 @@ impl CmpLogRuntime {
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
-                    FridaInstrumentationHelper::instruction_width(instr, &operands),
+                    instruction_width(instr, &operands),
                 )),
                 Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
                 _ => return Err(()),
@@ -623,7 +644,7 @@ impl CmpLogRuntime {
                             opmem.base(),
                             opmem.index(),
                             opmem.disp(),
-                            FridaInstrumentationHelper::instruction_width(instr, &operands),
+                            instruction_width(instr, &operands),
                         )),
                         Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
                         _ => return Err(()),

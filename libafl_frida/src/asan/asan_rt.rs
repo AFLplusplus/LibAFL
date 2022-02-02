@@ -13,9 +13,9 @@ use core::{
 };
 use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
 use hashbrown::HashMap;
+use libafl::bolts::AsSlice;
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-
-use crate::helper::FridaInstrumentationHelper;
+use rangemap::RangeMap;
 
 #[cfg(target_arch = "aarch64")]
 use capstone::{
@@ -56,8 +56,13 @@ use std::{ffi::c_void, ptr::write_volatile};
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
+    helper::FridaRuntime,
+    utils::writer_register,
     FridaOptions,
 };
+
+#[cfg(target_arch = "aarch64")]
+use crate::utils::instruction_width;
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -112,6 +117,7 @@ pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 /// even if the target would not have crashed under normal conditions.
 /// this helps finding mem errors early.
 pub struct AsanRuntime {
+    check_for_leaks_enabled: bool,
     current_report_impl: u64,
     allocator: Allocator,
     regs: [usize; ASAN_SAVE_REGISTER_COUNT],
@@ -146,38 +152,16 @@ impl Debug for AsanRuntime {
     }
 }
 
-impl AsanRuntime {
-    /// Create a new `AsanRuntime`
-    #[must_use]
-    pub fn new(options: FridaOptions) -> AsanRuntime {
-        Self {
-            current_report_impl: 0,
-            allocator: Allocator::new(options.clone()),
-            regs: [0; ASAN_SAVE_REGISTER_COUNT],
-            blob_report: None,
-            blob_check_mem_byte: None,
-            blob_check_mem_halfword: None,
-            blob_check_mem_dword: None,
-            blob_check_mem_qword: None,
-            blob_check_mem_16bytes: None,
-            blob_check_mem_3bytes: None,
-            blob_check_mem_6bytes: None,
-            blob_check_mem_12bytes: None,
-            blob_check_mem_24bytes: None,
-            blob_check_mem_32bytes: None,
-            blob_check_mem_48bytes: None,
-            blob_check_mem_64bytes: None,
-            stalked_addresses: HashMap::new(),
-            options,
-            module_map: None,
-            suppressed_addresses: Vec::new(),
-            shadow_check_func: None,
-        }
-    }
+impl FridaRuntime for AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, _gum: &Gum, modules_to_instrument: &[&str]) {
+    fn init(
+        &mut self,
+        gum: &Gum,
+        _ranges: &RangeMap<usize, (u16, String)>,
+        modules_to_instrument: &[&str],
+    ) {
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
@@ -196,7 +180,7 @@ impl AsanRuntime {
             }
         }
 
-        self.hook_functions(_gum);
+        self.hook_functions(gum);
         /*
         unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
@@ -271,6 +255,64 @@ impl AsanRuntime {
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
         */
+        self.register_thread();
+    }
+    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+        &mut self,
+        input: &I,
+    ) -> Result<(), libafl::Error> {
+        let target_bytes = input.target_bytes();
+        let slice = target_bytes.as_slice();
+
+        self.unpoison(slice.as_ptr() as usize, slice.len());
+        Ok(())
+    }
+
+    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+        &mut self,
+        input: &I,
+    ) -> Result<(), libafl::Error> {
+        if self.check_for_leaks_enabled {
+            self.check_for_leaks();
+        }
+
+        let target_bytes = input.target_bytes();
+        let slice = target_bytes.as_slice();
+        self.poison(slice.as_ptr() as usize, slice.len());
+        self.reset_allocations();
+
+        Ok(())
+    }
+}
+
+impl AsanRuntime {
+    /// Create a new `AsanRuntime`
+    #[must_use]
+    pub fn new(options: FridaOptions) -> AsanRuntime {
+        Self {
+            check_for_leaks_enabled: options.asan_detect_leaks(),
+            current_report_impl: 0,
+            allocator: Allocator::new(options.clone()),
+            regs: [0; ASAN_SAVE_REGISTER_COUNT],
+            blob_report: None,
+            blob_check_mem_byte: None,
+            blob_check_mem_halfword: None,
+            blob_check_mem_dword: None,
+            blob_check_mem_qword: None,
+            blob_check_mem_16bytes: None,
+            blob_check_mem_3bytes: None,
+            blob_check_mem_6bytes: None,
+            blob_check_mem_12bytes: None,
+            blob_check_mem_24bytes: None,
+            blob_check_mem_32bytes: None,
+            blob_check_mem_48bytes: None,
+            blob_check_mem_64bytes: None,
+            stalked_addresses: HashMap::new(),
+            options,
+            module_map: None,
+            suppressed_addresses: Vec::new(),
+            shadow_check_func: None,
+        }
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -2091,29 +2133,27 @@ impl AsanRuntime {
 
     /// Determine if the instruction is 'interesting' for the purposes of ASAN
     #[cfg(target_arch = "aarch64")]
+    #[must_use]
     #[inline]
     pub fn asan_is_interesting_instruction(
         &self,
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
-    ) -> Result<
-        (
-            capstone::RegId,
-            capstone::RegId,
-            i32,
-            u32,
-            Arm64Shift,
-            Arm64Extender,
-        ),
-        (),
-    > {
+    ) -> Option<(
+        capstone::RegId,
+        capstone::RegId,
+        i32,
+        u32,
+        Arm64Shift,
+        Arm64Extender,
+    )> {
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.mnemonic().unwrap() {
             "ldaxr" | "stlxr" | "ldxr" | "stxr" | "ldar" | "stlr" | "ldarb" | "ldarh" | "ldaxp"
             | "ldaxrb" | "ldaxrh" | "stlrb" | "stlrh" | "stlxp" | "stlxrb" | "stlxrh" | "ldxrb"
-            | "ldxrh" | "stxrb" | "stxrh" => return Err(()),
+            | "ldxrh" | "stxrb" | "stxrh" => return None,
             _ => (),
         }
 
@@ -2123,28 +2163,29 @@ impl AsanRuntime {
             .arch_detail()
             .operands();
         if operands.len() < 2 {
-            return Err(());
+            return None;
         }
 
         if let Arm64Operand(arm64operand) = operands.last().unwrap() {
             if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                return Ok((
+                return Some((
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
-                    FridaInstrumentationHelper::instruction_width(instr, &operands),
+                    instruction_width(instr, &operands),
                     arm64operand.shift,
                     arm64operand.ext,
                 ));
             }
         }
 
-        Err(())
+        None
     }
 
     /// Checks if the current instruction is interesting for address sanitization.
     #[cfg(all(target_arch = "x86_64", unix))]
     #[inline]
+    #[must_use]
     #[allow(clippy::unused_self)]
     #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
@@ -2152,7 +2193,7 @@ impl AsanRuntime {
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(RegId, u8, RegId, RegId, i32, i64), ()> {
+    ) -> Option<(RegId, u8, RegId, RegId, i32, i64)> {
         let operands = capstone
             .insn_detail(instr)
             .unwrap()
@@ -2162,7 +2203,7 @@ impl AsanRuntime {
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.
         match instr.mnemonic().unwrap() {
-            "lea" | "nop" => return Err(()),
+            "lea" | "nop" => return None,
 
             _ => (),
         }
@@ -2170,7 +2211,7 @@ impl AsanRuntime {
         // This is a TODO! In this case, both the src and the dst are mem operand
         // so we would need to return two operadns?
         if instr.mnemonic().unwrap().starts_with("rep") {
-            return Err(());
+            return None;
         }
 
         for operand in operands {
@@ -2190,7 +2231,7 @@ impl AsanRuntime {
                     );
                     */
                     if opmem.segment() == RegId(0) {
-                        return Ok((
+                        return Some((
                             opmem.segment(),
                             x86operand.size,
                             opmem.base(),
@@ -2203,7 +2244,7 @@ impl AsanRuntime {
             }
         }
 
-        Err(())
+        None
     }
 
     /// Emits a asan shadow byte check.
@@ -2229,14 +2270,14 @@ impl AsanRuntime {
         let basereg = if basereg.0 == 0 {
             None
         } else {
-            let reg = FridaInstrumentationHelper::writer_register(basereg);
+            let reg = writer_register(basereg);
             Some(reg)
         };
 
         let indexreg = if indexreg.0 == 0 {
             None
         } else {
-            let reg = FridaInstrumentationHelper::writer_register(indexreg);
+            let reg = writer_register(indexreg);
             Some(reg)
         };
 
@@ -2399,9 +2440,9 @@ impl AsanRuntime {
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
-        let basereg = FridaInstrumentationHelper::writer_register(basereg);
+        let basereg = writer_register(basereg);
         let indexreg = if indexreg.0 != 0 {
-            Some(FridaInstrumentationHelper::writer_register(indexreg))
+            Some(writer_register(indexreg))
         } else {
             None
         };

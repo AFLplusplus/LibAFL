@@ -1,11 +1,18 @@
 //! Coverage maps as static mut array
 
-use crate::EDGES_MAP_SIZE;
+use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE};
+#[cfg(target_os = "linux")]
+use libafl::{mutators::Tokens, Error};
 
 /// The map for edges.
 #[no_mangle]
 pub static mut __afl_area_ptr_local: [u8; EDGES_MAP_SIZE] = [0; EDGES_MAP_SIZE];
 pub use __afl_area_ptr_local as EDGES_MAP;
+
+/// The map for accounting mem writes.
+#[no_mangle]
+pub static mut __afl_acc_memop_ptr_local: [u32; ACCOUNTING_MAP_SIZE] = [0; ACCOUNTING_MAP_SIZE];
+pub use __afl_acc_memop_ptr_local as ACCOUNTING_MEMOP_MAP;
 
 /// The max count of edges tracked.
 pub static mut MAX_EDGES_NUM: usize = 0;
@@ -13,6 +20,9 @@ pub static mut MAX_EDGES_NUM: usize = 0;
 extern "C" {
     /// The area pointer points to the edges map.
     pub static mut __afl_area_ptr: *mut u8;
+
+    /// The area pointer points to the accounting mem operations map.
+    pub static mut __afl_acc_memop_ptr: *mut u32;
 
     /// Start of libafl token section
     #[cfg(target_os = "linux")]
@@ -22,13 +32,30 @@ extern "C" {
     #[cfg(target_os = "linux")]
     pub static __token_stop: *const u8;
 }
+pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
-/// Return token section's start and end as a tuple
+/// Return Tokens from the compile-time token section
+/// Will return `Error::IllegalState` if no token section was found
+/// In this case, the compilation probably did not include an `AutoTokens`-pass
+///
+/// # Safety
+///
+/// This fn is safe to call, as long as the compilation diid not break, previously
 #[cfg(target_os = "linux")]
 #[must_use]
-pub fn token_section() -> (*const u8, *const u8) {
-    unsafe { (__token_start, __token_stop) }
+pub fn autotokens() -> Result<Tokens, Error> {
+    unsafe {
+        if __token_start.is_null() || __token_stop.is_null() {
+            Err(Error::IllegalState(
+                "AutoTokens section not found, likely the targe is not compiled with AutoTokens"
+                    .into(),
+            ))
+        } else {
+            // we can safely unwrap
+            Tokens::from_ptrs(__token_start, __token_stop)
+        }
+    }
 }
 
 /// The size of the map for edges.
