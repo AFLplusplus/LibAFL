@@ -125,10 +125,6 @@ fn parse_instrumentation_location(
 )]
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
-    /// grouping of subcommands
-    #[clap(subcommand)]
-    pub command: SubCommand,
-
     /// timeout for each target execution (milliseconds)
     #[clap(short, long, takes_value = true, default_value = "1000", parse(try_from_str = parse_timeout), global = true)]
     pub timeout: Duration,
@@ -223,57 +219,46 @@ pub struct FuzzerOptions {
     #[cfg(feature = "qemu_cli")]
     #[clap(last = true, global = true)]
     pub qemu_args: Vec<String>,
-}
 
-/// grouping of default subcommands
-#[derive(Subcommand, Debug)]
-pub enum SubCommand {
-    /// Fuzz mode: mutates the starting corpus indefinitely, looking for crashes
-    Fuzz {
-        /// paths to fuzzer token files (aka 'dictionaries')
-        #[clap(short = 'x', long, multiple_values = true, parse(from_os_str))]
-        tokens: Vec<PathBuf>,
+    /// paths to fuzzer token files (aka 'dictionaries')
+    #[clap(short = 'x', long, multiple_values = true, parse(from_os_str))]
+    pub tokens: Vec<PathBuf>,
 
-        /// input corpus directories
-        #[clap(
+    /// input corpus directories
+    #[clap(
             short,
             long,
             default_values = &["corpus/"],
             multiple_values = true,
             parse(from_os_str)
-        )]
-        input: Vec<PathBuf>,
+    )]
+    pub input: Vec<PathBuf>,
 
-        /// output solutions directory
-        #[clap(short, long, default_value = "solutions/", parse(from_os_str))]
-        output: PathBuf,
+    /// output solutions directory
+    #[clap(short, long, default_value = "solutions/", parse(from_os_str))]
+    pub output: PathBuf,
 
-        /// Spawn a client in each of the provided cores. Use 'all' to select all available
-        /// cores. 'none' to run a client without binding to any core.
-        /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
-        #[clap(short, long, default_value = "0", parse(try_from_str = Cores::from_cmdline))]
-        cores: Cores,
+    /// Spawn a client in each of the provided cores. Use 'all' to select all available
+    /// cores. 'none' to run a client without binding to any core.
+    /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
+    #[clap(short, long, default_value = "0", parse(try_from_str = Cores::from_cmdline))]
+    pub cores: Cores,
 
-        /// port on which the broker should listen
-        #[clap(short = 'p', long, default_value = "1337", name = "PORT")]
-        broker_port: u16,
+    /// port on which the broker should listen
+    #[clap(short = 'p', long, default_value = "1337", name = "PORT")]
+    pub broker_port: u16,
 
-        /// ip:port where a remote broker is already listening
-        #[clap(short = 'a', long, parse(try_from_str), name = "REMOTE")]
-        remote_broker_addr: Option<SocketAddr>,
-    },
+    /// ip:port where a remote broker is already listening
+    #[clap(short = 'a', long, parse(try_from_str), name = "REMOTE")]
+    pub remote_broker_addr: Option<SocketAddr>,
 
-    /// Replay mode: runs a single input file through the fuzz harness
-    #[clap(setting(AppSettings::ArgRequiredElseHelp))]
-    Replay {
-        /// path to file that should be sent to the harness for crash reproduction
-        #[clap(short, long, parse(from_os_str))]
-        input_file: PathBuf,
+    /// path to file that should be sent to the harness for crash reproduction
+    #[clap(short, long, parse(from_os_str))]
+    pub replay: PathBuf,
 
-        /// Run the same input multiple times
-        #[clap(short, long, default_missing_value = "1", min_values = 0)]
-        repeat: Option<usize>,
-    },
+    /// Run the same replay input multiple times
+    #[clap(short = 'R', long, default_missing_value = "1", min_values = 0)]
+    pub repeat: Option<usize>,
 }
 
 impl FuzzerOptions {
