@@ -1,4 +1,5 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
+//! In comparison to the [`crate::executors::DifferentialExecutor`] it does not run the secondary executor in `run_target`.
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
