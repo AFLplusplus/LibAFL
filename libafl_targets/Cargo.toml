@@ -11,9 +11,10 @@ keywords = ["fuzzing", "testing"]
 edition = "2021"
 
 [features]
-default = ["std"]
+default = ["std", "sanitizers_flags"]
 std = ["libafl/std"]
 libfuzzer = []
+sanitizers_flags = []
 pointer_maps = []
 sancov_pcguard_edges = []
 sancov_pcguard_hitcounts = []
