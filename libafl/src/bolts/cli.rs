@@ -268,7 +268,8 @@ pub struct FuzzerOptions {
         long,
         default_missing_value = "1",
         min_values = 0,
-        help_heading = "Replay Options"
+        help_heading = "Replay Options",
+        requires = "replay"
     )]
     pub repeat: Option<usize>,
 }
