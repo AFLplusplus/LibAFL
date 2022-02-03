@@ -61,7 +61,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
         write_file_atomic(path, &postcard::to_allocvec(self)?)
     }
 
-    /// Load the contents of this input from a file
+    /// Load the content of this input from a file
     #[cfg(feature = "std")]
     fn from_file<P>(path: P) -> Result<Self, Error>
     where
@@ -95,8 +95,8 @@ impl HasTargetBytes for NopInput {
 }
 
 // TODO change this to fn target_bytes(&self, buffer: &mut Vec<u8>) -> &[u8];
-/// Can be represented with a vector of bytes
-/// This representation is not necessarily deserializable
+/// Can be represented with a vector of bytes.
+/// This representation is not necessarily deserializable.
 /// Instead, it can be used as bytes input for a target
 pub trait HasTargetBytes {
     /// Target bytes, that can be written to a target

@@ -55,8 +55,6 @@ For broker2broker communication, all messages are forwarded via network sockets.
 
 Check out the `llmp_test` example in ./examples, or build it with `cargo run --example llmp_test`.
 
-For broker2broker communication, all messages are forwarded via network sockets.
-
 */
 
 use alloc::{string::String, vec::Vec};
@@ -168,7 +166,7 @@ static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHa
     shutting_down: false,
 };
 
-/// TAGs used thorughout llmp
+/// TAGs used throughout llmp
 pub type Tag = u32;
 /// The client ID == the sender id.
 pub type ClientId = u32;
@@ -241,7 +239,7 @@ pub enum TcpResponse {
     },
     /// Notify the client on the other side that it has been accepted.
     LocalClientAccepted {
-        /// The ClientId this client should send messages as
+        /// The ClientId this client should send messages as.
         /// Mainly used for client-side deduplication of incoming messages
         client_id: ClientId,
     },
@@ -506,7 +504,7 @@ pub struct LlmpDescription {
 }
 
 #[derive(Copy, Clone, Debug)]
-/// Result of an LLMP Mesasge hook
+/// Result of an LLMP Message hook
 pub enum LlmpMsgHookResult {
     /// This has been handled in the broker. No need to forward.
     Handled,
@@ -520,7 +518,7 @@ pub enum LlmpMsgHookResult {
 pub struct LlmpMsg {
     /// A tag
     pub tag: Tag, //u32
-    /// Sender of this messge
+    /// Sender of this message
     pub sender: ClientId, //u32
     /// ID of another Broker, for b2b messages
     pub broker: BrokerId, //u32
@@ -686,7 +684,7 @@ pub struct LlmpPage {
     pub magic: u64,
     /// The id of the sender
     pub sender: u32,
-    /// Set to != 1 by the receiver, once it got mapped
+    /// Set to != 1 by the receiver, once it got mapped.
     /// It's not safe for the sender to unmap this page before
     /// (The os may have tidied up the memory when the receiver starts to map)
     pub safe_to_unmap: AtomicU16,
@@ -702,7 +700,7 @@ pub struct LlmpPage {
     pub size_total: usize,
     /// How much space is used on this page in bytes
     pub size_used: usize,
-    /// The maximum amount of bytes that ever got allocated on this page in one go
+    /// The maximum amount of bytes that ever got allocated on this page in one go.
     /// An inidactor of what to use as size for future pages
     pub max_alloc_size: usize,
     /// Pointer to the messages, from here on.
@@ -732,7 +730,7 @@ where
     /// Ref to the last message this sender sent on the last page.
     /// If null, a new page (just) started.
     pub last_msg_sent: *const LlmpMsg,
-    /// A vec of page wrappers, each containing an intialized AfShmem
+    /// A vec of page wrappers, each containing an initialized [`ShMem`]
     pub out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
     /// If true, pages will never be pruned.
     /// The broker uses this feature.
@@ -1305,7 +1303,7 @@ where
 {
     /// Id of this provider
     pub id: u32,
-    /// Pointer to the last meg this received
+    /// Pointer to the last message received
     pub last_msg_recvd: *const LlmpMsg,
     /// The shmem provider
     pub shmem_provider: SP,
@@ -1503,7 +1501,7 @@ where
         }
     }
 
-    /// Returns the next message, tag, buf, if avaliable, else None
+    /// Returns the next message, tag, buf, if available, else None
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(ClientId, Tag, &[u8])>, Error> {
@@ -1733,7 +1731,7 @@ where
     /// Broadcast map from broker to all clients
     pub llmp_out: LlmpSender<SP>,
     /// Users of Llmp can add message handlers in the broker.
-    /// This allows us to intercept messages right in the broker
+    /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SP>>,
     /// The ShMemProvider to use
@@ -1974,7 +1972,7 @@ where
             .expect("Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.");
     }
 
-    /// Broadcasts the given buf to all lients
+    /// Broadcasts the given buf to all clients
     pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         self.llmp_out.send_buf(tag, buf)
     }
@@ -1984,7 +1982,7 @@ where
         self.llmp_out.send_buf_with_flags(tag, flags, buf)
     }
 
-    /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
+    /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker.
     /// Does so on the given port.
     #[cfg(feature = "std")]
     pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
@@ -2593,7 +2591,7 @@ where
         self.receiver.recv_blocking()
     }
 
-    /// The current page could have changed in recv (EOP)
+    /// The current page could have changed in recv (EOP).
     /// Alloc the next message, internally handling end of page by allocating a new one.
     /// # Safety
     /// Should be safe, but returns an unsafe ptr
@@ -2602,14 +2600,14 @@ where
         self.sender.alloc_next(buf_len)
     }
 
-    /// Returns the next message, tag, buf, if avaliable, else None
+    /// Returns the next message, tag, buf, if available, else None
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(ClientId, Tag, &[u8])>, Error> {
         self.receiver.recv_buf()
     }
 
-    /// Receives a buf from the broker, looping until a messages becomes avaliable
+    /// Receives a buf from the broker, looping until a message becomes available
     #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(ClientId, Tag, &[u8]), Error> {
         self.receiver.recv_buf_blocking()

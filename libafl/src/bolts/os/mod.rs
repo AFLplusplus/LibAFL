@@ -171,10 +171,10 @@ impl Cores {
         Self::from_cmdline("all")
     }
 
-    /// Parses core binding args from user input
+    /// Parses core binding args from user input.
     /// Returns a Vec of CPU IDs.
-    /// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
-    /// ` ./fuzzer --cores all` -> one client runs on each available core
+    /// * `./fuzzer --cores 1,2-4,6`: clients run in cores 1,2,3,4,6
+    /// * `./fuzzer --cores all`: one client runs on each available core
     pub fn from_cmdline(args: &str) -> Result<Self, Error> {
         let mut cores: Vec<CoreId> = vec![];
 
@@ -246,10 +246,10 @@ impl TryFrom<&str> for Cores {
     }
 }
 
-/// Parses core binding args from user input
+/// Parses core binding args from user input.
 /// Returns a Vec of CPU IDs.
-/// `./fuzzer --cores 1,2-4,6` -> clients run in cores 1,2,3,4,6
-/// ` ./fuzzer --cores all` -> one client runs on each available core
+/// * `./fuzzer --cores 1,2-4,6`: clients run in cores 1,2,3,4,6
+/// * `./fuzzer --cores all`: one client runs on each available core
 #[must_use]
 #[cfg(feature = "std")]
 #[deprecated(since = "0.7.1", note = "Use Cores::from_cmdline instead")]

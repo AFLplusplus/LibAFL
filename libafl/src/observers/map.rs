@@ -37,7 +37,7 @@ fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
     hasher.finish()
 }
 
-/// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
+/// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug {
     /// Type of each entry in this map
     type Entry: PrimInt + Default + Copy + Debug;
@@ -70,7 +70,7 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     /// Get the initial value for reset()
     fn initial(&self) -> Self::Entry;
 
-    /// Get the initial value for reset()
+    /// Get the initial value for reset() (mutable)
     fn initial_mut(&mut self) -> &mut Self::Entry;
 
     /// Set the initial value for reset()

@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 pub type SymExprRef = NonZeroUsize;
 
 /// [`Location`]s are code locations encountered during concolic tracing, that are constructed from pointers, but not always in a meaningful way.
-/// Therefore, a location is an opague value that can only be compared against itself.
+/// Therefore, a location is an opaque value that can only be compared against itself.
 ///
 /// It is possible to get at the underlying value using [`Into::into`], should this restriction be too inflexible for your usecase.
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]

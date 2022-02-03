@@ -200,7 +200,7 @@ impl GeneralizedInput {
         self.generalized.as_deref()
     }
 
-    /// Get the generalized input (mut)
+    /// Get the generalized input (mutable)
     pub fn generalized_mut(&mut self) -> &mut Option<Vec<GeneralizedItem>> {
         &mut self.generalized
     }

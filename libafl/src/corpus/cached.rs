@@ -90,7 +90,7 @@ where
         self.inner.current()
     }
 
-    /// Current testcase scheduled (mut)
+    /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<usize> {
         self.inner.current_mut()

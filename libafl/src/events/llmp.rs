@@ -521,7 +521,7 @@ where
     }
 }
 
-/// A manager that can restart on the fly, storing states in-between (in `on_resatrt`)
+/// A manager that can restart on the fly, storing states in-between (in `on_restart`)
 #[cfg(feature = "std")]
 #[derive(Debug)]
 pub struct LlmpRestartingEventManager<I, OT, S, SP>
@@ -658,7 +658,7 @@ where
         &self.staterestorer
     }
 
-    /// Get the staterestorer (mut)
+    /// Get the staterestorer (mutable)
     pub fn staterestorer_mut(&mut self) -> &mut StateRestorer<SP> {
         &mut self.staterestorer
     }
