@@ -111,40 +111,38 @@ fn parse_instrumentation_location(
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
     /// timeout for each target execution (milliseconds)
-    #[clap(short, long, takes_value = true, default_value = "1000", parse(try_from_str = parse_timeout), global = true, help_heading = "Fuzz Options")]
+    #[clap(short, long, default_value = "1000", parse(try_from_str = parse_timeout), help_heading = "Fuzz Options")]
     pub timeout: Duration,
 
     /// whether or not to print debug info
-    #[clap(short, long, global = true)]
+    #[clap(short, long)]
     pub verbose: bool,
 
     /// file to which all client output should be written
-    #[clap(short, long, global = true)]
-    pub stdout: Option<String>,
+    #[clap(short, long, default_value = "/dev/null")]
+    pub stdout: String,
 
     /// enable Address Sanitizer (ASAN)
     #[clap(short = 'A', long, help_heading = "Fuzz Options")]
     pub asan: bool,
 
+    /// number of fuzz iterations to perform
+    #[clap(short = 'I', long, help_heading = "Fuzz Options", default_value = "0")]
+    pub iterations: usize,
+
     /// path to the harness
-    #[clap(
-        short = 'H',
-        long,
-        parse(from_os_str),
-        global = true,
-        help_heading = "Fuzz Options"
-    )]
+    #[clap(short = 'H', long, parse(from_os_str), help_heading = "Fuzz Options")]
     pub harness: Option<PathBuf>,
 
     /// trailing arguments (after "--"); can be passed directly to the harness
     #[cfg(not(feature = "qemu_cli"))]
-    #[clap(last = true, global = true, name = "HARNESS_ARGS")]
+    #[clap(last = true, name = "HARNESS_ARGS")]
     pub harness_args: Vec<String>,
 
     /// enable CmpLog instrumentation
     #[cfg_attr(
         feature = "frida_cli",
-        clap(short = 'C', long, global = true, help_heading = "Frida Options")
+        clap(short = 'C', long, help_heading = "Frida Options")
     )]
     #[cfg_attr(
         not(feature = "frida_cli"),
@@ -154,17 +152,17 @@ pub struct FuzzerOptions {
 
     /// enable ASAN leak detection
     #[cfg(feature = "frida_cli")]
-    #[clap(short, long, global = true, help_heading = "ASAN Options")]
+    #[clap(short, long, help_heading = "ASAN Options")]
     pub detect_leaks: bool,
 
     /// instruct ASAN to continue after a memory error is detected
     #[cfg(feature = "frida_cli")]
-    #[clap(long, global = true, help_heading = "ASAN Options")]
+    #[clap(long, help_heading = "ASAN Options")]
     pub continue_on_error: bool,
 
     /// instruct ASAN to gather (and report) allocation-/free-site backtraces
     #[cfg(feature = "frida_cli")]
-    #[clap(long, global = true, help_heading = "ASAN Options")]
+    #[clap(long, help_heading = "ASAN Options")]
     pub allocation_backtraces: bool,
 
     /// the maximum size that the ASAN allocator should allocate
@@ -173,7 +171,6 @@ pub struct FuzzerOptions {
         short,
         long,
         default_value = "1073741824",  // 1_usize << 30
-        global = true,
         help_heading = "ASAN Options"
     )]
     pub max_allocation: usize,
@@ -184,34 +181,33 @@ pub struct FuzzerOptions {
         short = 'M',
         long,
         default_value = "4294967296",  // 1_usize << 32
-        global = true,
         help_heading = "ASAN Options"
     )]
     pub max_total_allocation: usize,
 
     /// instruct ASAN to panic if the max ASAN allocation size is exceeded
     #[cfg(feature = "frida_cli")]
-    #[clap(long, global = true, help_heading = "ASAN Options")]
+    #[clap(long, help_heading = "ASAN Options")]
     pub max_allocation_panics: bool,
 
     /// disable coverage
     #[cfg(feature = "frida_cli")]
-    #[clap(long, global = true, help_heading = "Frida Options")]
+    #[clap(long, help_heading = "Frida Options")]
     pub disable_coverage: bool,
 
     /// enable DrCov (aarch64 only)
     #[cfg(feature = "frida_cli")]
-    #[clap(long, global = true, help_heading = "Frida Options")]
+    #[clap(long, help_heading = "Frida Options")]
     pub drcov: bool,
 
     /// locations which will not be instrumented for ASAN or coverage purposes (ex: mod_name@0x12345)
     #[cfg(feature = "frida_cli")]
-    #[clap(short = 'D', long, global = true, help_heading = "Frida Options", parse(try_from_str = parse_instrumentation_location), multiple_occurrences = true)]
-    pub dont_instrument: Option<Vec<(String, usize)>>,
+    #[clap(short = 'D', long, help_heading = "Frida Options", parse(try_from_str = parse_instrumentation_location), multiple_occurrences = true)]
+    pub dont_instrument: Vec<(String, usize)>,
 
     /// trailing arguments (after "--"); can be passed directly to QEMU
     #[cfg(feature = "qemu_cli")]
-    #[clap(last = true, global = true)]
+    #[clap(last = true)]
     pub qemu_args: Vec<String>,
 
     /// paths to fuzzer token files (aka 'dictionaries')
@@ -226,11 +222,12 @@ pub struct FuzzerOptions {
 
     /// input corpus directories
     #[clap(
-            short,
-            long,
-            default_values = &["corpus/"],
-            multiple_values = true,
-            parse(from_os_str), help_heading = "Corpus Options"
+        short,
+        long,
+        default_values = &["corpus/"],
+        multiple_values = true,
+        parse(from_os_str),
+        help_heading = "Corpus Options"
     )]
     pub input: Vec<PathBuf>,
 
@@ -330,7 +327,7 @@ pub fn parse_args() -> FuzzerOptions {
     FuzzerOptions::parse()
 }
 
-#[cfg(all(test, feature = "qemu_cli"))]
+#[cfg(all(test, any(feature = "qemu_cli", feature = "frida_cli")))]
 mod tests {
     use super::*;
 
@@ -338,6 +335,7 @@ mod tests {
     /// about; expect the standard option to work normally, and everything after `--` to be
     /// collected into `qemu_args`
     #[test]
+    #[cfg(all(test, feature = "qemu_cli"))]
     fn standard_option_with_trailing_variable_length_args_collected() {
         let parsed = FuzzerOptions::parse_from([
             "some-command",
@@ -353,5 +351,47 @@ mod tests {
         ]);
         assert_eq!(parsed.qemu_args, ["-L", "qemu-bound"]);
         assert_eq!(parsed.broker_port, 1336);
+    }
+
+    /// pass module without @ to `parse_instrumentation_location`, expect error
+    #[test]
+    #[cfg(all(test, feature = "frida_cli"))]
+    fn parse_instrumentation_location_fails_without_at_symbol() {
+        assert!(parse_instrumentation_location("mod_name0x12345").is_err());
+    }
+
+    /// pass module without address to `parse_instrumentation_location`, expect failure
+    #[test]
+    #[cfg(all(test, feature = "frida_cli"))]
+    fn parse_instrumentation_location_failes_without_address() {
+        assert!(parse_instrumentation_location("mod_name@").is_err());
+    }
+
+    /// pass location without 0x to `parse_instrumentation_location`, expect value to be parsed
+    /// as hex, even without 0x
+    #[test]
+    #[cfg(all(test, feature = "frida_cli"))]
+    fn parse_instrumentation_location_succeeds_without_0x() {
+        assert_eq!(
+            parse_instrumentation_location("mod_name@12345").unwrap(),
+            (String::from("mod_name"), 74565)
+        );
+    }
+
+    /// pass location with 0x to `parse_instrumentation_location`, expect value to be parsed as hex
+    #[test]
+    #[cfg(all(test, feature = "frida_cli"))]
+    fn parse_instrumentation_location_succeeds_with_0x() {
+        assert_eq!(
+            parse_instrumentation_location("mod_name@0x12345").unwrap(),
+            (String::from("mod_name"), 74565)
+        );
+    }
+
+    /// pass normal value to `parse_timeout` and get back Duration, simple test for happy-path
+    #[test]
+    #[cfg(all(test, feature = "cli"))]
+    fn parse_timeout_gives_correct_values() {
+        assert_eq!(parse_timeout("1525").unwrap(), Duration::from_millis(1525));
     }
 }
