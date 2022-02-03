@@ -7,9 +7,10 @@ pub mod cmp;
 pub use cmp::*;
 
 #[cfg(feature = "std")]
-pub mod stacktrace;
+pub mod stdout;
+pub use stdout::{StdErrObserver, StdOutObserver};
 #[cfg(feature = "std")]
-pub use stacktrace::ASANBacktraceObserver;
+pub mod stacktrace;
 #[cfg(feature = "std")]
 pub use stacktrace::*;
 

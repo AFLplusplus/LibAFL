@@ -10,9 +10,9 @@ use crate::{
 };
 use core::fmt::Debug;
 
-/// A [`DifferentialExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
+/// A [`DiffExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
 #[derive(Debug)]
-pub struct DifferentialExecutor<A, B>
+pub struct DiffExecutor<A, B>
 where
     A: Debug,
     B: Debug,
@@ -21,12 +21,12 @@ where
     secondary: B,
 }
 
-impl<A, B> DifferentialExecutor<A, B>
+impl<A, B> DiffExecutor<A, B>
 where
     A: Debug,
     B: Debug,
 {
-    /// Create a new `DifferentialExecutor`, wrapping the given `executor`s.
+    /// Create a new `DiffExecutor`, wrapping the given `executor`s.
     pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
     where
         A: Executor<EM, I, S, Z>,
@@ -36,18 +36,18 @@ where
         Self { primary, secondary }
     }
 
-    /// Retrieve the primary `Executor` that is wrapped by this `DifferentialExecutor`.
+    /// Retrieve the primary `Executor` that is wrapped by this `DiffExecutor`.
     pub fn primary(&mut self) -> &mut A {
         &mut self.primary
     }
 
-    /// Retrieve the secondary `Executor` that is wrapped by this `DifferentialExecutor`.
+    /// Retrieve the secondary `Executor` that is wrapped by this `DiffExecutor`.
     pub fn secondary(&mut self) -> &mut B {
         &mut self.secondary
     }
 }
 
-impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for DifferentialExecutor<A, B>
+impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for DiffExecutor<A, B>
 where
     A: Executor<EM, I, S, Z>,
     B: Executor<EM, I, S, Z>,
@@ -68,7 +68,7 @@ where
             Ok(ret1)
         } else {
             // We found a diff in the exit codes!
-            Ok(ExitKind::Differential {
+            Ok(ExitKind::Diff {
                 primary: ret1.into(),
                 secondary: ret2.into(),
             })
@@ -76,7 +76,7 @@ where
     }
 }
 
-impl<A, B, I, OT, S> HasObservers<I, OT, S> for DifferentialExecutor<A, B>
+impl<A, B, I, OT, S> HasObservers<I, OT, S> for DiffExecutor<A, B>
 where
     A: HasObservers<I, OT, S>,
     B: Debug,

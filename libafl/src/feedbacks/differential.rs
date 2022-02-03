@@ -1,9 +1,13 @@
-//! Differential Feedback, comparing the content of two observers of the same type.
+//! Diff Feedback, comparing the content of two observers of the same type.
 //!
 
 use alloc::string::String;
-use core::{fmt::Debug, marker::PhantomData};
+use core::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
 use serde::{Deserialize, Serialize};
+use std::fmt::Formatter;
 
 use crate::{
     bolts::tuples::{MatchName, Named},
@@ -16,13 +20,20 @@ use crate::{
     Error,
 };
 
-/// A [`DifferentialEqFeedback`] compares the content of two [`Observer`]s.
-/// O1 must [https://doc.rust-lang.org/beta/core/cmp/trait.PartialEq.html#how-can-i-compare-two-different-types](implement [`PartialEq`]) as the results are simply matched using `==`.
-/// If both [`Observer`]s are not equal, the testcase is considered to be interesting.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct DifferentialEqFeedback<O1, O2>
+/// The result of a differential test between two observers.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DiffResult {
+    /// The two observers report the same outcome.
+    Equals,
+    /// The two observers report different outcomes.
+    Diff,
+}
+
+/// A [`DiffFeedback`] compares the content of two [`Observer`]s using the given compare function.
+#[derive(Serialize, Deserialize)]
+pub struct DiffFeedback<F, O1, O2>
 where
-    O1: PartialEq<O2>,
+    F: FnMut(&O1, &O2) -> DiffResult,
 {
     /// This feedback's name
     name: String,
@@ -30,21 +41,24 @@ where
     o1_name: String,
     /// The second observer to compare against
     o2_name: String,
-    phantom: PhantomData<(O1, O2)>,
+    /// The function used to compare the two observers
+    compare_fn: F,
+    phantomm: PhantomData<(O1, O2)>,
 }
 
-impl<O1, O2> DifferentialEqFeedback<O1, O2>
+impl<F, O1, O2> DiffFeedback<F, O1, O2>
 where
-    O1: PartialEq<O2> + Named,
+    F: FnMut(&O1, &O2) -> DiffResult,
+    O1: Named,
     O2: Named,
 {
-    /// Create a new [`DifferentialFeedback`] using two observers.
-    pub fn new(name: &str, o1: &O1, o2: &O2) -> Result<Self, Error> {
+    /// Create a new [`DiffFeedback`] using two observers and a test function.
+    pub fn new(name: &str, o1: &O1, o2: &O2, compare_fn: F) -> Result<Self, Error> {
         let o1_name = o1.name().to_string();
         let o2_name = o2.name().to_string();
         if o1_name == o2_name {
             Err(Error::IllegalArgument(format!(
-                "DifferentialFeedback: observer names must be different (both were {})",
+                "DiffFeedback: observer names must be different (both were {})",
                 o1_name
             )))
         } else {
@@ -52,23 +66,42 @@ where
                 o1_name,
                 o2_name,
                 name: name.to_string(),
-                phantom: PhantomData,
+                compare_fn,
+                phantomm: PhantomData,
             })
         }
     }
 }
 
-impl<O1, O2> Named for DifferentialEqFeedback<O1, O2>
+impl<F, O1, O2> Named for DiffFeedback<F, O1, O2>
 where
-    O1: PartialEq<O2>,
+    F: FnMut(&O1, &O2) -> DiffResult,
+    O1: Named,
+    O2: Named,
 {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<I, O1, O2, S> Feedback<I, S> for DifferentialEqFeedback<O1, O2>
+impl<F, O1, O2> Debug for DiffFeedback<F, O1, O2>
 where
+    F: FnMut(&O1, &O2) -> DiffResult,
+    O1: Named,
+    O2: Named,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "DiffFeedback {{ name: {}, o1: {}, o2: {} }}",
+            self.name, self.o1_name, self.o2_name
+        )
+    }
+}
+
+impl<F, I, O1, O2, S> Feedback<I, S> for DiffFeedback<F, O1, O2>
+where
+    F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
     S: HasMetadata + HasClientPerfMonitor,
     O1: Observer<I, S> + PartialEq<O2>,
@@ -87,7 +120,7 @@ where
         OT: ObserversTuple<I, S> + MatchName,
     {
         fn err(name: &str) -> Error {
-            Error::IllegalArgument(format!("DifferentialFeedback: observer {} not found", name))
+            Error::IllegalArgument(format!("DiffFeedback: observer {} not found", name))
         }
 
         let o1: &O1 = observers
@@ -110,7 +143,7 @@ mod tests {
         },
         events::EventFirer,
         executors::ExitKind,
-        feedbacks::{DifferentialEqFeedback, Feedback},
+        feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
         inputs::{BytesInput, Input},
         monitors::ClientPerfMonitor,
         observers::Observer,
@@ -187,17 +220,27 @@ mod tests {
         let o1 = NopObserver::new("o1", true);
         let o2 = NopObserver::new("o2", should_equal);
 
-        let mut diff_feedback = DifferentialEqFeedback::new("diff_feedback", &o1, &o2).unwrap();
+        let mut diff_feedback = DiffFeedback::new("diff_feedback", &o1, &o2, |o1, o2| {
+            if o1 == o2 {
+                DiffResult::Equal
+            } else {
+                DiffResult::Different
+            }
+        })
+        .unwrap();
         let observers = tuple_list![o1, o2];
-        assert_eq!(!should_equal, diff_feedback
-            .is_interesting(
-                &mut nop_state,
-                &mut NopEventFirer {},
-                &BytesInput::new(vec![0]),
-                &observers,
-                &ExitKind::Ok
-            )
-            .unwrap());
+        assert_eq!(
+            !should_equal,
+            diff_feedback
+                .is_interesting(
+                    &mut nop_state,
+                    &mut NopEventFirer {},
+                    &BytesInput::new(vec![0]),
+                    &observers,
+                    &ExitKind::Ok
+                )
+                .unwrap()
+        );
     }
 
     #[test]

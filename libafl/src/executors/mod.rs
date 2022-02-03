@@ -6,7 +6,7 @@ pub use inprocess::InProcessExecutor;
 pub use inprocess::InProcessForkExecutor;
 
 pub mod differential;
-pub use differential::DifferentialExecutor;
+pub use differential::DiffExecutor;
 
 /// Timeout executor.
 /// Not possible on `no-std` Windows or `no-std`, but works for unix
@@ -55,12 +55,12 @@ pub enum ExitKind {
     Oom,
     /// The run timed out
     Timeout,
-    /// Special case for [`DifferentialExecutor`] when both exitkinds don't match
-    Differential {
+    /// Special case for [`DiffExecutor`] when both exitkinds don't match
+    Diff {
         /// The exitkind of the primary executor
-        primary: DifferentialExitKind,
+        primary: DiffExitKind,
         /// The exitkind of the secondary executor
-        secondary: DifferentialExitKind,
+        secondary: DiffExitKind,
     },
     // The run resulted in a custom `ExitKind`.
     // Custom(Box<dyn SerdeAny>),
@@ -68,7 +68,7 @@ pub enum ExitKind {
 
 /// How one of the diffing executions finished.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum DifferentialExitKind {
+pub enum DiffExitKind {
     /// The run exited normally.
     Ok,
     /// The run resulted in a target crash.
@@ -78,26 +78,26 @@ pub enum DifferentialExitKind {
     /// The run timed out
     Timeout,
     /// One of the executors itelf repots a differential, we can't go into further details.
-    Differential,
+    Diff,
     // The run resulted in a custom `ExitKind`.
     // Custom(Box<dyn SerdeAny>),
 }
 
 crate::impl_serdeany!(ExitKind);
 
-impl From<ExitKind> for DifferentialExitKind {
+impl From<ExitKind> for DiffExitKind {
     fn from(exitkind: ExitKind) -> Self {
         match exitkind {
-            ExitKind::Ok => DifferentialExitKind::Ok,
-            ExitKind::Crash => DifferentialExitKind::Crash,
-            ExitKind::Oom => DifferentialExitKind::Oom,
-            ExitKind::Timeout => DifferentialExitKind::Timeout,
-            ExitKind::Differential { .. } => DifferentialExitKind::Differential,
+            ExitKind::Ok => DiffExitKind::Ok,
+            ExitKind::Crash => DiffExitKind::Crash,
+            ExitKind::Oom => DiffExitKind::Oom,
+            ExitKind::Timeout => DiffExitKind::Timeout,
+            ExitKind::Diff { .. } => DiffExitKind::Diff,
         }
     }
 }
 
-crate::impl_serdeany!(DifferentialExitKind);
+crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers<I, OT, S>: Debug
