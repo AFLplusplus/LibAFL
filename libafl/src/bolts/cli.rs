@@ -327,7 +327,10 @@ pub fn parse_args() -> FuzzerOptions {
     FuzzerOptions::parse()
 }
 
-#[cfg(all(test, any(feature = "qemu_cli", feature = "frida_cli")))]
+#[cfg(all(
+    test,
+    any(feature = "cli", feature = "qemu_cli", feature = "frida_cli")
+))]
 mod tests {
     use super::*;
 
@@ -335,7 +338,7 @@ mod tests {
     /// about; expect the standard option to work normally, and everything after `--` to be
     /// collected into `qemu_args`
     #[test]
-    #[cfg(all(test, feature = "qemu_cli"))]
+    #[cfg(feature = "qemu_cli")]
     fn standard_option_with_trailing_variable_length_args_collected() {
         let parsed = FuzzerOptions::parse_from([
             "some-command",
@@ -355,14 +358,14 @@ mod tests {
 
     /// pass module without @ to `parse_instrumentation_location`, expect error
     #[test]
-    #[cfg(all(test, feature = "frida_cli"))]
+    #[cfg(feature = "frida_cli")]
     fn parse_instrumentation_location_fails_without_at_symbol() {
         assert!(parse_instrumentation_location("mod_name0x12345").is_err());
     }
 
     /// pass module without address to `parse_instrumentation_location`, expect failure
     #[test]
-    #[cfg(all(test, feature = "frida_cli"))]
+    #[cfg(feature = "frida_cli")]
     fn parse_instrumentation_location_failes_without_address() {
         assert!(parse_instrumentation_location("mod_name@").is_err());
     }
@@ -370,7 +373,7 @@ mod tests {
     /// pass location without 0x to `parse_instrumentation_location`, expect value to be parsed
     /// as hex, even without 0x
     #[test]
-    #[cfg(all(test, feature = "frida_cli"))]
+    #[cfg(feature = "frida_cli")]
     fn parse_instrumentation_location_succeeds_without_0x() {
         assert_eq!(
             parse_instrumentation_location("mod_name@12345").unwrap(),
@@ -380,7 +383,7 @@ mod tests {
 
     /// pass location with 0x to `parse_instrumentation_location`, expect value to be parsed as hex
     #[test]
-    #[cfg(all(test, feature = "frida_cli"))]
+    #[cfg(feature = "frida_cli")]
     fn parse_instrumentation_location_succeeds_with_0x() {
         assert_eq!(
             parse_instrumentation_location("mod_name@0x12345").unwrap(),
@@ -390,7 +393,7 @@ mod tests {
 
     /// pass normal value to `parse_timeout` and get back Duration, simple test for happy-path
     #[test]
-    #[cfg(all(test, feature = "cli"))]
+    #[cfg(feature = "cli")]
     fn parse_timeout_gives_correct_values() {
         assert_eq!(parse_timeout("1525").unwrap(), Duration::from_millis(1525));
     }
