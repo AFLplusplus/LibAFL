@@ -148,6 +148,7 @@ mod tests {
         observers::Observer,
         state::{HasClientPerfMonitor, HasMetadata},
     };
+    use alloc::string::{String, ToString};
 
     #[derive(Debug)]
     struct NopObserver {
