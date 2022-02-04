@@ -10,7 +10,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::process::Child;
 use std::{
     ffi::{OsStr, OsString},
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
@@ -22,7 +22,7 @@ use crate::{
         AsSlice,
     },
     inputs::HasTargetBytes,
-    observers::{ASANBacktraceObserver, ObserversTuple},
+    observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
@@ -147,10 +147,17 @@ where
     T: Debug,
     OT: Debug,
 {
-    inner: T,
+    /// The wrapped comand configurer
+    configurer: T,
     observers: OT,
     /// cache if the AsanBacktraceObserver is present
     has_asan_observer: bool,
+    /// If set, we found a [`StdErrObserver`] in the observer list.
+    /// Pipe the child's `stderr` instead of closing it.
+    has_stdout_observer: bool,
+    /// If set, we found a [`StdOutObserver`] in the observer list
+    /// Pipe the child's `stdout` instead of closing it.
+    has_stderr_observer: bool,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
@@ -180,7 +187,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
-            .field("inner", &self.inner)
+            .field("inner", &self.configurer)
             .field("observers", &self.observers)
             .finish()
     }
@@ -193,7 +200,7 @@ where
 {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
-        &mut self.inner
+        &mut self.configurer
     }
 }
 
@@ -219,23 +226,35 @@ where
         }
         command.stdin(Stdio::null());
 
+        let has_stdout_observer = observers
+            .match_name::<StdOutObserver>("StdOutObserver")
+            .is_some();
+        if has_stdout_observer {
+            command.stderr(Stdio::piped());
+        }
+
+        let has_stderr_observer = observers
+            .match_name::<StdErrObserver>("StdErrObserver")
+            .is_some();
         let has_asan_observer = observers
             .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some();
-        if has_asan_observer {
+        if has_stderr_observer || has_asan_observer {
             command.stderr(Stdio::piped());
         }
 
         Ok(Self {
             observers,
             has_asan_observer,
-            inner: StdCommandConfigurator {
+            configurer: StdCommandConfigurator {
                 input_location: InputLocation::File {
                     out_file: OutFile::create(path)?,
                 },
                 command,
                 debug_child,
             },
+            has_stdout_observer,
+            has_stderr_observer,
             phantom: PhantomData,
         })
     }
@@ -301,7 +320,7 @@ where
         use std::os::unix::prelude::ExitStatusExt;
         use wait_timeout::ChildExt;
 
-        let mut child = self.inner.spawn_child(input)?;
+        let mut child = self.configurer.spawn_child(input)?;
 
         let res = match child
             .wait_timeout(Duration::from_secs(5))
@@ -322,17 +341,38 @@ where
             }
         };
 
-        if self.has_asan_observer {
-            let stderr = child.stderr.as_mut().ok_or_else(|| {
+        if self.has_asan_observer || self.has_stderr_observer {
+            let mut stderr = String::new();
+            child.stderr.as_mut().ok_or_else(|| {
                 Error::IllegalState(
-                    "Using ASANBacktraceObserver but stderr was not `Stdio::pipe` in CommandExecutor".into(),
+                    "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor".into(),
                 )
-            })?;
+            })?.read_to_string(&mut stderr)?;
+            if self.has_asan_observer {
+                self.observers
+                    .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                    .unwrap()
+                    .parse_asan_output(&stderr);
+            }
+            if self.has_stderr_observer {
+                self.observers
+                    .match_name_mut::<StdErrObserver>("StdErrObserver")
+                    .unwrap()
+                    .stderr = Some(stderr);
+            }
+        }
+        if self.has_stdout_observer {
+            let mut stdout = String::new();
+            child.stdout.as_mut().ok_or_else(|| {
+                Error::IllegalState(
+                    "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor".into(),
+                )
+            })?.read_to_string(&mut stdout)?;
             self.observers
-                .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                .match_name_mut::<StdOutObserver>("StdOutObserver")
                 .unwrap()
-                .parse_asan_output_from_childstderr(stderr);
-        };
+                .stdout = Some(stdout);
+        }
 
         res
     }
@@ -529,9 +569,18 @@ impl CommandExecutorBuilder {
         if observers
             .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some()
+            || observers
+                .match_name::<StdErrObserver>("StdErrObserver")
+                .is_some()
         {
             // we need stderr for ASANBackt
             command.stderr(Stdio::piped());
+        }
+        if observers
+            .match_name::<StdOutObserver>("StdOutObserver")
+            .is_some()
+        {
+            command.stdout(Stdio::piped());
         }
 
         let configurator = StdCommandConfigurator {
@@ -589,10 +638,20 @@ pub trait CommandConfigurator: Sized + Debug {
             .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some();
 
+        let has_stdout_observer = observers
+            .match_name::<StdOutObserver>("StdOutObserver")
+            .is_some();
+
+        let has_stderr_observer = observers
+            .match_name::<StdErrObserver>("StdErrObserver")
+            .is_some();
+
         CommandExecutor {
             observers,
             has_asan_observer,
-            inner: self,
+            has_stdout_observer,
+            has_stderr_observer,
+            configurer: self,
             phantom: PhantomData,
         }
     }

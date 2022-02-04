@@ -7,8 +7,8 @@ pub mod cmp;
 pub use cmp::*;
 
 #[cfg(feature = "std")]
-pub mod stdout;
-pub use stdout::{StdErrObserver, StdOutObserver};
+pub mod stdio;
+pub use stdio::{StdErrObserver, StdOutObserver};
 #[cfg(feature = "std")]
 pub mod stacktrace;
 #[cfg(feature = "std")]
