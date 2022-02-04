@@ -134,9 +134,15 @@ fn main() {
             .expect("Failed to execute llvm-config");
         let cxxflags = str::from_utf8(&output.stdout).expect("Invalid llvm-config output");
 
-        let output = Command::new(&llvm_config)
+        let mut cmd = Command::new(&llvm_config);
+
+        #[cfg(target_vendor = "apple")]
+        {
+            cmd.args(&["--libs"]);
+        }
+
+        let output = cmd
             .args(&["--ldflags"])
-            .args(&["--libs"])
             .output()
             .expect("Failed to execute llvm-config");
         let ldflags = str::from_utf8(&output.stdout).expect("Invalid llvm-config output");
