@@ -1,13 +1,12 @@
 //! Diff Feedback, comparing the content of two observers of the same type.
 //!
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use core::{
-    fmt::{self, Debug},
+    fmt::{self, Debug, Formatter},
     marker::PhantomData,
 };
 use serde::{Deserialize, Serialize};
-use std::fmt::Formatter;
 
 use crate::{
     bolts::tuples::{MatchName, Named},
@@ -24,7 +23,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DiffResult {
     /// The two observers report the same outcome.
-    Equals,
+    Equal,
     /// The two observers report different outcomes.
     Diff,
 }
@@ -224,7 +223,7 @@ mod tests {
             if o1 == o2 {
                 DiffResult::Equal
             } else {
-                DiffResult::Different
+                DiffResult::Diff
             }
         })
         .unwrap();
