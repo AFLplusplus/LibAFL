@@ -327,7 +327,7 @@ impl AsanRuntime {
         &self.allocator
     }
 
-    /// Gets the allocator, mut
+    /// Gets the allocator (mutable)
     pub fn allocator_mut(&mut self) -> &mut Allocator {
         &mut self.allocator
     }

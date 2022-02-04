@@ -30,7 +30,7 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 /// being applied to the input one by one, between executions.
 /// The push version, in contrast to the normal stage, will return each testcase, instead of executing it.
 ///
-/// Default value, how many iterations each stage gets, as an upper bound
+/// Default value, how many iterations each stage gets, as an upper bound.
 /// It may randomly continue earlier.
 ///
 /// The default mutational push stage

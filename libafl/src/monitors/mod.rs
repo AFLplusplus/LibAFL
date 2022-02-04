@@ -1,4 +1,4 @@
-//! Keep stats, and dispaly them to the user. Usually used in a broker, or main node, of some sort.
+//! Keep stats, and display them to the user. Usually used in a broker, or main node, of some sort.
 
 pub mod multi;
 pub use multi::MultiMonitor;
@@ -145,18 +145,18 @@ impl ClientStats {
     }
 }
 
-/// The monitor trait keeps track of all the client's monitor, and offers methods to dispaly them.
+/// The monitor trait keeps track of all the client's monitor, and offers methods to display them.
 pub trait Monitor {
-    /// the client monitor (mut)
+    /// The client monitor (mutable)
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats>;
 
-    /// the client monitor
+    /// The client monitor
     fn client_stats(&self) -> &[ClientStats];
 
-    /// creation time
+    /// Creation time
     fn start_time(&mut self) -> Duration;
 
-    /// show the monitor to the user
+    /// Show the monitor to the user
     fn display(&mut self, event_msg: String, sender_id: u32);
 
     /// Amount of elements in the corpus (combined for all children)
@@ -212,12 +212,12 @@ pub struct NopMonitor {
 }
 
 impl Monitor for NopMonitor {
-    /// the client monitor, mutable
+    /// The client monitor, mutable
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         &mut self.client_stats
     }
 
-    /// the client monitor
+    /// The client monitor
     fn client_stats(&self) -> &[ClientStats] {
         &self.client_stats
     }

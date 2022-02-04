@@ -220,5 +220,9 @@ pub const CLANGXX_PATH: &str = \"clang++\";
         );
     }
 
+    cc::Build::new()
+        .file(src_dir.join("no-link-rt.c"))
+        .compile("no-link-rt");
+
     println!("cargo:rerun-if-changed=build.rs");
 }

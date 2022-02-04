@@ -107,7 +107,7 @@ where
     /// Get the linked observers
     fn observers(&self) -> &OT;
 
-    /// Get the linked observers
+    /// Get the linked observers (mutable)
     fn observers_mut(&mut self) -> &mut OT;
 }
 

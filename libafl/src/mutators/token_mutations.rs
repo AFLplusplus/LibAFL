@@ -1,4 +1,4 @@
-//! Tokens are what afl calls extras or dictionaries.
+//! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
@@ -412,7 +412,7 @@ impl TokenReplace {
 }
 
 /// A `I2SRandReplace` [`Mutator`] replaces a random matching input-2-state comparison operand with the other.
-/// it needs a valid [`CmpValuesMetadata`] in the state.
+/// It needs a valid [`CmpValuesMetadata`] in the state.
 #[derive(Debug, Default)]
 pub struct I2SRandReplace;
 

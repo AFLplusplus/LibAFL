@@ -1,5 +1,5 @@
 //! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
-//! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
+//! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 
 use ahash::AHasher;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
@@ -33,7 +33,7 @@ impl Input for BytesInput {
         write_file_atomic(path, &self.bytes)
     }
 
-    /// Load the contents of this input from a file
+    /// Load the content of this input from a file
     #[cfg(feature = "std")]
     fn from_file<P>(path: P) -> Result<Self, Error>
     where

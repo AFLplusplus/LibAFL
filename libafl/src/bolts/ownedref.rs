@@ -207,7 +207,7 @@ where
     }
 }
 
-/// Wrap a slice and convert to a Vec on serialize
+/// Wrap a slice and convert to a Vec on serialize.
 /// We use a hidden inner enum so the public API can be safe,
 /// unless the user uses the unsafe [`OwnedSlice::from_raw_parts`]
 #[allow(clippy::unsafe_derive_deserialize)]
@@ -328,7 +328,7 @@ where
     }
 }
 
-/// Wrap a mutable slice and convert to a Vec on serialize
+/// Wrap a mutable slice and convert to a Vec on serialize.
 /// We use a hidden inner enum so the public API can be safe,
 /// unless the user uses the unsafe [`OwnedSliceMut::from_raw_parts_mut`]
 #[derive(Debug)]

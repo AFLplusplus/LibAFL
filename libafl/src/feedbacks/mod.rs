@@ -146,7 +146,7 @@ where
     }
 }
 
-/// A cobined feedback consisting of ultiple [`Feedback`]s
+/// A combined feedback consisting of multiple [`Feedback`]s
 #[derive(Debug)]
 pub struct CombinedFeedback<A, B, FL, I, S>
 where
@@ -273,7 +273,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
-    /// The name of this cobination
+    /// The name of this combination
     fn name() -> &'static str;
 
     /// If the feedback pair is interesting
@@ -540,19 +540,19 @@ where
 }
 
 /// Combine two feedbacks with an eager AND operation,
-/// will call all feedbacks functions even if not necessery to conclude the result
+/// will call all feedbacks functions even if not necessary to conclude the result
 pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerAnd, I, S>;
 
 /// Combine two feedbacks with an fast AND operation,
-/// might skip calling feedbacks functions if not necessery to conclude the result
+/// might skip calling feedbacks functions if not necessary to conclude the result
 pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastAnd, I, S>;
 
 /// Combine two feedbacks with an eager OR operation,
-/// will call all feedbacks functions even if not necessery to conclude the result
+/// will call all feedbacks functions even if not necessary to conclude the result
 pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerOr, I, S>;
 
 /// Combine two feedbacks with an fast OR operation,
-/// might skip calling feedbacks functions if not necessery to conclude the result
+/// might skip calling feedbacks functions if not necessary to conclude the result.
 /// This means any feedback that is not first might be skipped, use caution when using with
 /// `TimeFeedback`
 pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastOr, I, S>;
@@ -831,7 +831,7 @@ impl Default for TimeoutFeedback {
 }
 
 /// Nop feedback that annotates execution time in the new testcase, if any
-/// for this Feedback, the testcase is never interesting (use with an OR)
+/// for this Feedback, the testcase is never interesting (use with an OR).
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
