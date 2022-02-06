@@ -747,7 +747,7 @@ where
                     self.debug_child,
                 )?;
 
-                (t.clone(), out_file.clone(), forkserver)
+                (t.clone(), out_file, forkserver)
             }
             _ => {
                 return Err(Error::IllegalArgument(
@@ -782,7 +782,7 @@ where
         }
 
         Ok(ForkserverExecutor {
-            target: target,
+            target,
             args: self.arguments.clone(),
             out_file,
             forkserver,
