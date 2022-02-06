@@ -637,6 +637,151 @@ where
     }
 }
 
+pub struct ForkserverExecutorBuilder<SP> {
+    target: Option<String>,
+    arguments: Vec<String>,
+    out_filename: Option<String>,
+    debug_child: bool,
+    use_stdin: bool,
+    shmem_provider: Option<SP>,
+}
+
+impl<SP> Default for ForkserverExecutorBuilder<SP>
+where SP: ShMemProvider
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<SP> ForkserverExecutorBuilder<SP> 
+where SP: ShMemProvider
+{
+    #[must_use]
+    fn new() -> ForkserverExecutorBuilder<SP> {
+        ForkserverExecutorBuilder {
+            target: None,
+            arguments: vec![],
+            out_filename: None,
+            debug_child: false,
+            use_stdin: false,
+            shmem_provider: None,
+        }
+    }
+
+    pub fn target(&mut self, target: String) -> &mut Self {
+        self.target = Some(target);
+        self
+    }
+
+    pub fn arguments(&mut self, arguments: &[String] ) -> &mut Self {
+        let mut use_stdin = true;
+        let out_filename = ".cur_input".to_string();
+
+        for item in arguments {
+            if item == "@@" && use_stdin {
+                use_stdin = false;
+                self.arguments.push(out_filename.clone());
+            } else {
+                self.arguments.push(item.to_string());
+            }
+        }
+        self.use_stdin = use_stdin;
+        self.out_filename = Some(out_filename);
+
+        self
+    }
+
+    pub fn debug_child(&mut self, debug_child: bool) -> &mut Self {
+        self.debug_child = debug_child;
+        self
+    }
+
+    pub fn shmem_provider(&mut self, shmem_provider: SP) -> &mut Self {
+        self.shmem_provider = Some(shmem_provider);
+        self
+    }
+
+    pub fn build<I, OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<I, OT, S, SP>, Error> 
+    where
+        I: Input + HasTargetBytes,
+        OT: ObserversTuple<I, S>,
+    {
+
+        let map = match &mut self.shmem_provider {
+            None => None,
+            Some(provider) => {
+                // setup shared memory
+                let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+                shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
+
+                let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
+                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+                Some(shmem)
+            }
+        };
+
+        // 
+        let (mut target, mut out_file, mut forkserver) = match (&self.target, &self.out_filename) {
+            (Some(t), Some(o)) => {
+                let out_file = OutFile::create(&o)?;
+                
+                let mut forkserver = Forkserver::new(
+                    t.clone(),
+                    self.arguments.clone(),
+                    out_file.as_raw_fd(),
+                    self.use_stdin,
+                    0,
+                    self.debug_child,
+                )?;
+
+                (t.clone(), out_file.clone(), forkserver)
+            }
+            _ => {
+                return Err(Error::IllegalArgument("ForkserverExecutor::builder: no target or arguments set!".to_string()))
+            }
+        };
+
+
+        let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
+
+        if rlen != 4 {
+            return Err(Error::Forkserver(
+                "Failed to start a forkserver".to_string(),
+            ));
+        }
+        println!("All right - fork server is up.");
+        // If forkserver is responding, we then check if there's any option enabled.
+        if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
+            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & map.is_some() {
+                println!("Using SHARED MEMORY FUZZING feature.");
+                let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
+
+                let send_len = forkserver.write_ctl(send_status)?;
+                if send_len != 4 {
+                    return Err(Error::Forkserver(
+                        "Writing to forkserver failed.".to_string(),
+                    ));
+                }
+            }
+        } else {
+            println!("Forkserver Options are not available.");
+        }
+
+
+        Ok(ForkserverExecutor {
+            target: target,
+            args: self.arguments.clone(),
+            out_file,
+            forkserver,
+            observers,
+            map,
+            phantom: PhantomData,
+            has_asan_observer: None, // initialized on first use
+        })
+    }
+}
+
 impl<EM, I, OT, S, SP, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
