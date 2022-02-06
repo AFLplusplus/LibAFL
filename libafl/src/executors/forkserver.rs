@@ -662,7 +662,11 @@ where
     SP: ShMemProvider,
 {
     #[must_use]
-    /// Init a `ForkserverExecutorBuilder`
+    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
+    /// This is the builder for `ForkserverExecutor`
+    /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
+    /// Else this forkserver will try to write the input to `.cur_input` file.
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     pub fn new() -> ForkserverExecutorBuilder<SP> {
         ForkserverExecutorBuilder {
             target: None,
