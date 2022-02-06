@@ -6,6 +6,7 @@ use core::{
     time::Duration,
 };
 use std::{
+    ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
     os::unix::{io::RawFd, process::CommandExt},
     process::{Command, Stdio},
@@ -15,7 +16,7 @@ use crate::{
     bolts::{
         fs::OutFile,
         os::{dup2, pipes::Pipe},
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider},
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
@@ -166,8 +167,8 @@ pub struct Forkserver {
 impl Forkserver {
     /// Create a new [`Forkserver`]
     pub fn new(
-        target: String,
-        args: Vec<String>,
+        target: OsString,
+        args: Vec<OsString>,
         out_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
@@ -464,8 +465,8 @@ where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
-    target: String,
-    args: Vec<String>,
+    target: OsString,
+    args: Vec<OsString>,
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
@@ -493,136 +494,19 @@ where
     }
 }
 
-impl<I, OT, S> ForkserverExecutor<I, OT, S, StdShMemProvider>
-where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
-    /// This Forserver won't attempt to provide inputs over shared mem but write them to an iput file
-    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    pub fn new(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-    ) -> Result<Self, Error> {
-        Self::new_internal(target, arguments, observers, debug_child, None)
-    }
-}
-
 impl<I, OT, S, SP> ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
-    /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers.
-    pub fn with_shmem_inputs(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-        shmem_provider: &mut SP,
-    ) -> Result<Self, Error> {
-        Self::new_internal(
-            target,
-            arguments,
-            observers,
-            debug_child,
-            Some(shmem_provider),
-        )
-    }
-
-    /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers, with debug mode
-    fn new_internal(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-        shmem_provider: Option<&mut SP>,
-    ) -> Result<Self, Error> {
-        let mut args = Vec::<String>::new();
-        let mut use_stdin = true;
-        let out_filename = ".cur_input".to_string();
-
-        for item in arguments {
-            if item == "@@" && use_stdin {
-                use_stdin = false;
-                args.push(out_filename.clone());
-            } else {
-                args.push(item.to_string());
-            }
-        }
-
-        let out_file = OutFile::create(&out_filename)?;
-
-        let map = match shmem_provider {
-            None => None,
-            Some(provider) => {
-                // setup shared memory
-                let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
-                shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
-
-                let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
-                Some(shmem)
-            }
-        };
-
-        let mut forkserver = Forkserver::new(
-            target.clone(),
-            args.clone(),
-            out_file.as_raw_fd(),
-            use_stdin,
-            0,
-            debug_child,
-        )?;
-
-        let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
-
-        if rlen != 4 {
-            return Err(Error::Forkserver(
-                "Failed to start a forkserver".to_string(),
-            ));
-        }
-        println!("All right - fork server is up.");
-        // If forkserver is responding, we then check if there's any option enabled.
-        if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
-            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & map.is_some() {
-                println!("Using SHARED MEMORY FUZZING feature.");
-                let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
-
-                let send_len = forkserver.write_ctl(send_status)?;
-                if send_len != 4 {
-                    return Err(Error::Forkserver(
-                        "Writing to forkserver failed.".to_string(),
-                    ));
-                }
-            }
-        } else {
-            println!("Forkserver Options are not available.");
-        }
-
-        Ok(Self {
-            has_asan_observer: None, // initialized on first use
-            target,
-            args,
-            out_file,
-            forkserver,
-            observers,
-            map,
-            phantom: PhantomData,
-        })
-    }
-
     /// The `target` binary that's going to run.
-    pub fn target(&self) -> &String {
+    pub fn target(&self) -> &OsString {
         &self.target
     }
 
     /// The `args` used for the binary.
-    pub fn args(&self) -> &[String] {
+    pub fn args(&self) -> &[OsString] {
         &self.args
     }
 
@@ -639,16 +523,18 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
-pub struct ForkserverExecutorBuilder<SP> {
-    target: Option<String>,
-    arguments: Vec<String>,
-    out_filename: Option<String>,
+pub struct ForkserverExecutorBuilder<'a, SP>
+where
+    SP: ShMemProvider,
+{
+    target: Option<OsString>,
+    arguments: Vec<OsString>,
     debug_child: bool,
-    use_stdin: bool,
-    shmem_provider: Option<SP>,
+    shmem_provider: Option<&'a mut SP>,
+    phantom: PhantomData<SP>,
 }
 
-impl<SP> Default for ForkserverExecutorBuilder<SP>
+impl<'a, SP> Default for ForkserverExecutorBuilder<'a, SP>
 where
     SP: ShMemProvider,
 {
@@ -657,7 +543,7 @@ where
     }
 }
 
-impl<SP> ForkserverExecutorBuilder<SP>
+impl<'a, SP> ForkserverExecutorBuilder<'a, SP>
 where
     SP: ShMemProvider,
 {
@@ -667,39 +553,43 @@ where
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
     /// Else this forkserver will try to write the input to `.cur_input` file.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    pub fn new() -> ForkserverExecutorBuilder<SP> {
+    pub fn new() -> ForkserverExecutorBuilder<'a, SP> {
         ForkserverExecutorBuilder {
             target: None,
             arguments: vec![],
-            out_filename: None,
             debug_child: false,
-            use_stdin: false,
             shmem_provider: None,
+            phantom: PhantomData
         }
     }
 
     /// The harness
-    pub fn target(&mut self, target: String) -> &mut Self {
-        self.target = Some(target);
+    pub fn target<O>(&mut self, target: O) -> &mut Self
+    where
+        O: AsRef<OsStr>,
+    {
+        self.target = Some(target.as_ref().to_owned());
         self
     }
 
-    /// Arguments to the harness
-    pub fn arguments(&mut self, arguments: &[String]) -> &mut Self {
-        let mut use_stdin = true;
-        let out_filename = ".cur_input".to_string();
+    /// Adds an argument to the harness's commandline
+    pub fn arg<O>(&mut self, arg: O) -> &mut Self
+    where
+        O: AsRef<OsStr>,
+    {
+        self.arguments.push(arg.as_ref().to_owned());
+        self
+    }
 
-        for item in arguments {
-            if item == "@@" && use_stdin {
-                use_stdin = false;
-                self.arguments.push(out_filename.clone());
-            } else {
-                self.arguments.push(item.to_string());
-            }
+    /// Adds arguments to the harness's commandline
+    pub fn args<IT, O>(&mut self, args: IT) -> &mut Self
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
+        for arg in args {
+            self.arg(arg.as_ref());
         }
-        self.use_stdin = use_stdin;
-        self.out_filename = Some(out_filename);
-
         self
     }
 
@@ -710,7 +600,7 @@ where
     }
 
     /// Shmem provider for shared memory testcases
-    pub fn shmem_provider(&mut self, shmem_provider: SP) -> &mut Self {
+    pub fn shmem_provider(&mut self, shmem_provider: &'a mut SP) -> &mut Self {
         self.shmem_provider = Some(shmem_provider);
         self
     }
@@ -724,6 +614,21 @@ where
         I: Input + HasTargetBytes,
         OT: ObserversTuple<I, S>,
     {
+        let mut args = Vec::<OsString>::new();
+        let mut use_stdin = true;
+        let out_filename = OsString::from(".cur_input");
+
+        for item in &self.arguments {
+            if item == "@@" && use_stdin {
+                use_stdin = false;
+                args.push(out_filename.clone());
+            } else {
+                args.push(item.clone());
+            }
+        }
+
+        let out_file = OutFile::create(&out_filename)?;
+
         let map = match &mut self.shmem_provider {
             None => None,
             Some(provider) => {
@@ -737,25 +642,22 @@ where
             }
         };
 
-        //
-        let (target, out_file, mut forkserver) = match (&self.target, &self.out_filename) {
-            (Some(t), Some(o)) => {
-                let out_file = OutFile::create(&o)?;
-
+        let (target, mut forkserver) = match &self.target {
+            Some(t) => {
                 let forkserver = Forkserver::new(
                     t.clone(),
-                    self.arguments.clone(),
+                    args.clone(),
                     out_file.as_raw_fd(),
-                    self.use_stdin,
+                    use_stdin,
                     0,
                     self.debug_child,
                 )?;
 
-                (t.clone(), out_file, forkserver)
+                (t.clone(), forkserver)
             }
-            _ => {
+            None => {
                 return Err(Error::IllegalArgument(
-                    "ForkserverExecutor::builder: no target or arguments set!".to_string(),
+                    "ForkserverExecutorBuilder::build: target file not found".to_string(),
                 ))
             }
         };
@@ -960,25 +862,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
-
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
             tuples::tuple_list,
             AsMutSlice,
         },
-        executors::ForkserverExecutor,
+        executors::forkserver::ForkserverExecutorBuilder,
         inputs::NopInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
+    use serial_test::serial;
+    use std::ffi::OsString;
     #[test]
     #[serial]
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
-        let bin = "echo";
-        let args = vec![String::from("@@")];
+        let bin = OsString::from("echo");
+        let args = vec![OsString::from("@@")];
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
 
@@ -991,15 +893,14 @@ mod tests {
             shmem_buf,
         ));
 
-        let executor = ForkserverExecutor::<NopInput, _, (), _>::with_shmem_inputs(
-            bin.to_string(),
-            &args,
-            tuple_list!(edges_observer),
-            false,
-            &mut shmem_provider,
-        );
-        // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
+        let executor = ForkserverExecutorBuilder::new()
+            .target(bin)
+            .args(&args)
+            .debug_child(false)
+            .shmem_provider(&mut shmem_provider)
+            .build::<NopInput, _, ()>(tuple_list!(edges_observer));
 
+        // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
             Ok(_) => true,
             Err(e) => match e {
