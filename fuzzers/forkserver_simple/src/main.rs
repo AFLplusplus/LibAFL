@@ -12,9 +12,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::SimpleEventManager,
-    executors::forkserver::{
-        ForkserverExecutorBuilder, TimeoutForkserverExecutor,
-    },
+    executors::forkserver::{ForkserverExecutorBuilder, TimeoutForkserverExecutor},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -151,7 +149,7 @@ pub fn main() {
         .target(res.value_of("executable").unwrap().to_string())
         .args(&args)
         .debug_child(debug_child)
-        .build(tuple_list!(time_observer, edges_observer))
+        .build(tuple_list!(time_observer, edges_observer), None)
         .unwrap();
 
     let mut executor = TimeoutForkserverExecutor::new(

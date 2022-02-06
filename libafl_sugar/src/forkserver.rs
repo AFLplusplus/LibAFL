@@ -18,7 +18,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{TimeoutForkserverExecutor, forkserver::ForkserverExecutorBuilder},
+    executors::{forkserver::ForkserverExecutorBuilder, TimeoutForkserverExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -179,18 +179,19 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 
             let forkserver = if self.shmem_testcase {
                 ForkserverExecutorBuilder::new()
-                .target(self.program.clone())
-                .args(self.arguments)
-                .debug_child(self.debug_output)
-                .shmem_provider(&mut shmem_provider_client)
-                .build(tuple_list!(edges_observer, time_observer))
-            }
-            else{
+                    .target(self.program.clone())
+                    .args(self.arguments)
+                    .debug_child(self.debug_output)
+                    .build(
+                        tuple_list!(edges_observer, time_observer),
+                        Some(&mut shmem_provider_client),
+                    )
+            } else {
                 ForkserverExecutorBuilder::new()
-                .target(self.program.clone())
-                .args(self.arguments)
-                .debug_child(self.debug_output)
-                .build(tuple_list!(edges_observer, time_observer))
+                    .target(self.program.clone())
+                    .args(self.arguments)
+                    .debug_child(self.debug_output)
+                    .build(tuple_list!(edges_observer, time_observer), None)
             };
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
