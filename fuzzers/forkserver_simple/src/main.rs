@@ -12,7 +12,9 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::SimpleEventManager,
-    executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
+    executors::forkserver::{
+        ForkserverExecutor, ForkserverExecutorBuilder, TimeoutForkserverExecutor,
+    },
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -145,15 +147,16 @@ pub fn main() {
         None => [].to_vec(),
     };
 
+    let forkserver = ForkserverExecutorBuilder::new()
+        .target(res.value_of("executable").unwrap().to_string())
+        .arguments(&args)
+        .debug_child(debug_child)
+        .shmem_provider(shmem_provider)
+        .build(tuple_list!(time_observer, edges_observer))
+        .unwrap();
+
     let mut executor = TimeoutForkserverExecutor::new(
-        ForkserverExecutor::with_shmem_inputs(
-            res.value_of("executable").unwrap().to_string(),
-            &args,
-            tuple_list!(edges_observer, time_observer),
-            debug_child,
-            &mut shmem_provider,
-        )
-        .unwrap(),
+        forkserver,
         Duration::from_millis(
             res.value_of("timeout")
                 .unwrap()

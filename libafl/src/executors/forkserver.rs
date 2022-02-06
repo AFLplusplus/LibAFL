@@ -637,6 +637,8 @@ where
     }
 }
 
+/// The builder for `ForkserverExecutor`
+#[derive(Debug)]
 pub struct ForkserverExecutorBuilder<SP> {
     target: Option<String>,
     arguments: Vec<String>,
@@ -647,18 +649,21 @@ pub struct ForkserverExecutorBuilder<SP> {
 }
 
 impl<SP> Default for ForkserverExecutorBuilder<SP>
-where SP: ShMemProvider
+where
+    SP: ShMemProvider,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<SP> ForkserverExecutorBuilder<SP> 
-where SP: ShMemProvider
+impl<SP> ForkserverExecutorBuilder<SP>
+where
+    SP: ShMemProvider,
 {
     #[must_use]
-    fn new() -> ForkserverExecutorBuilder<SP> {
+    /// Init a `ForkserverExecutorBuilder`
+    pub fn new() -> ForkserverExecutorBuilder<SP> {
         ForkserverExecutorBuilder {
             target: None,
             arguments: vec![],
@@ -669,12 +674,14 @@ where SP: ShMemProvider
         }
     }
 
+    /// The harness
     pub fn target(&mut self, target: String) -> &mut Self {
         self.target = Some(target);
         self
     }
 
-    pub fn arguments(&mut self, arguments: &[String] ) -> &mut Self {
+    /// Arguments to the harness
+    pub fn arguments(&mut self, arguments: &[String]) -> &mut Self {
         let mut use_stdin = true;
         let out_filename = ".cur_input".to_string();
 
@@ -692,22 +699,27 @@ where SP: ShMemProvider
         self
     }
 
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     pub fn debug_child(&mut self, debug_child: bool) -> &mut Self {
         self.debug_child = debug_child;
         self
     }
 
+    /// Shmem provider for shared memory testcases
     pub fn shmem_provider(&mut self, shmem_provider: SP) -> &mut Self {
         self.shmem_provider = Some(shmem_provider);
         self
     }
 
-    pub fn build<I, OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<I, OT, S, SP>, Error> 
+    /// Builds `ForkserverExecutor`
+    pub fn build<I, OT, S>(
+        &mut self,
+        observers: OT,
+    ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
     where
         I: Input + HasTargetBytes,
         OT: ObserversTuple<I, S>,
     {
-
         let map = match &mut self.shmem_provider {
             None => None,
             Some(provider) => {
@@ -721,12 +733,12 @@ where SP: ShMemProvider
             }
         };
 
-        // 
-        let (mut target, mut out_file, mut forkserver) = match (&self.target, &self.out_filename) {
+        //
+        let (target, out_file, mut forkserver) = match (&self.target, &self.out_filename) {
             (Some(t), Some(o)) => {
                 let out_file = OutFile::create(&o)?;
-                
-                let mut forkserver = Forkserver::new(
+
+                let forkserver = Forkserver::new(
                     t.clone(),
                     self.arguments.clone(),
                     out_file.as_raw_fd(),
@@ -738,10 +750,11 @@ where SP: ShMemProvider
                 (t.clone(), out_file.clone(), forkserver)
             }
             _ => {
-                return Err(Error::IllegalArgument("ForkserverExecutor::builder: no target or arguments set!".to_string()))
+                return Err(Error::IllegalArgument(
+                    "ForkserverExecutor::builder: no target or arguments set!".to_string(),
+                ))
             }
         };
-
 
         let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
@@ -767,7 +780,6 @@ where SP: ShMemProvider
         } else {
             println!("Forkserver Options are not available.");
         }
-
 
         Ok(ForkserverExecutor {
             target: target,
