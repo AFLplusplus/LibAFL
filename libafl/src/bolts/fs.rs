@@ -12,7 +12,7 @@ use std::os::unix::prelude::{AsRawFd, RawFd};
 use crate::Error;
 
 /// The default filename to use to deliver testcases to the target
-pub const DEFAULT_OUTFILE: &str = ".cur_input";
+pub const OUTFILE_STD: &str = ".cur_input";
 
 /// Creates a `.{file_name}.tmp` file, and writes all bytes to it.
 /// After all bytes have been written, the tmp-file is moved to it's original `path`.
@@ -53,6 +53,14 @@ pub struct OutFile {
     pub path: PathBuf,
     /// The underlying file that got created
     pub file: File,
+}
+
+impl Eq for OutFile {}
+
+impl PartialEq for OutFile {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
 }
 
 impl Clone for OutFile {

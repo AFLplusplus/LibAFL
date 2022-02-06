@@ -4,6 +4,8 @@
 pub mod map;
 pub use map::*;
 
+pub mod differential;
+pub use differential::DiffFeedback;
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
