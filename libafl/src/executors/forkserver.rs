@@ -523,23 +523,23 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
-pub struct ForkserverExecutorBuilder<'a, SP> {
+pub struct ForkserverExecutorBuilder<ShM> {
     target: Option<OsString>,
     arguments: Vec<OsString>,
     debug_child: bool,
-    shmem_provider: Option<&'a mut SP>,
+    shmem: Option<ShM>,
 }
 
-impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
+impl<ShM> ForkserverExecutorBuilder<ShM> {
     /// Builds `ForkserverExecutor`. `shmem_provider` is the shmem provider used to make the `edge_observer` for tracking the coverage.
-    pub fn build<I, OT, S>(
+    pub fn build<I, OT, S, SP_TYPE>(
         &mut self,
         observers: OT,
-    ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
+    ) -> Result<ForkserverExecutor<I, OT, S, SP_TYPE>, Error>
     where
         I: Input + HasTargetBytes,
         OT: ObserversTuple<I, S>,
-        SP: ShMemProvider,
+        SP_TYPE: ShMemProvider,
     {
         let mut args = Vec::<OsString>::new();
         let mut use_stdin = true;
@@ -555,19 +555,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         }
 
         let out_file = OutFile::create(&out_filename)?;
-
-        let map = match &mut self.shmem_provider {
-            None => None,
-            Some(provider) => {
-                // setup shared memory
-                let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
-                shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
-
-                let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
-                Some(shmem)
-            }
-        };
 
         let (target, mut forkserver) = match &self.target {
             Some(t) => {
@@ -589,6 +576,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             }
         };
 
+        let map = self.shmem;
         let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
         if rlen != 4 {
@@ -627,19 +615,19 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     }
 }
 
-impl<'a> ForkserverExecutorBuilder<'a, ()> {
+impl ForkserverExecutorBuilder<()> {
     #[must_use]
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
     /// Else this forkserver will try to write the input to `.cur_input` file.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    pub fn new() -> ForkserverExecutorBuilder<'a, ()> {
+    pub fn new() -> ForkserverExecutorBuilder<()> {
         ForkserverExecutorBuilder {
             target: None,
             arguments: vec![],
             debug_child: false,
-            shmem_provider: None,
+            shmem: None,
         }
     }
 
@@ -685,12 +673,20 @@ impl<'a> ForkserverExecutorBuilder<'a, ()> {
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
         shmem_provider: &mut SP,
-    ) -> ForkserverExecutorBuilder<SP> {
+    ) -> ForkserverExecutorBuilder<<SP as ShMemProvider>::ShMem> {
+        let mut shmem = shmem_provider
+            .new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)
+            .unwrap();
+        shmem.write_to_env("__AFL_SHM_FUZZ_ID").unwrap();
+
+        let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
+        shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+
         ForkserverExecutorBuilder {
             target: self.target,
             arguments: self.arguments,
             debug_child: self.debug_child,
-            shmem_provider: Some(shmem_provider),
+            shmem: Some(shmem),
         }
     }
 }
@@ -893,7 +889,7 @@ mod tests {
             .args(&args)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
-            .build::<NopInput, _, ()>(tuple_list!(edges_observer));
+            .build::<NopInput, _, (), _>(tuple_list!(edges_observer));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
