@@ -531,7 +531,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
-    /// Builds `ForkserverExecutor`. `shmem_provider` is the shmem provider used to make the `edge_observer` for tracking the coverage.
+    /// Builds `ForkserverExecutor`.
     pub fn build<I, OT, S>(
         &mut self,
         observers: OT,
@@ -682,7 +682,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
-    /// Shmem provider
+    /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
         shmem_provider: &mut SP,
