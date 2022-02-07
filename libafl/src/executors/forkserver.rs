@@ -628,12 +628,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 }
 
 impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
-    #[must_use]
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
     /// Else this forkserver will try to write the input to `.cur_input` file.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    #[must_use]
     pub fn new() -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         ForkserverExecutorBuilder {
             target: None,
@@ -644,6 +644,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     /// The harness
+    #[must_use]
     pub fn target<O>(mut self, target: O) -> Self
     where
         O: AsRef<OsStr>,
@@ -653,6 +654,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     /// Adds an argument to the harness's commandline
+    #[must_use]
     pub fn arg<O>(mut self, arg: O) -> Self
     where
         O: AsRef<OsStr>,
@@ -662,6 +664,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     /// Adds arguments to the harness's commandline
+    #[must_use]
     pub fn args<IT, O>(mut self, args: IT) -> Self
     where
         IT: IntoIterator<Item = O>,
