@@ -146,7 +146,7 @@ pub fn main() {
     };
 
     let forkserver = ForkserverExecutorBuilder::new()
-        .target(res.value_of("executable").unwrap().to_string())
+        .program(res.value_of("executable").unwrap().to_string())
         .args(&args)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)

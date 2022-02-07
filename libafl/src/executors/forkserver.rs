@@ -645,7 +645,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
 
     /// The harness
     #[must_use]
-    pub fn target<O>(mut self, target: O) -> Self
+    pub fn program<O>(mut self, target: O) -> Self
     where
         O: AsRef<OsStr>,
     {
