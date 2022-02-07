@@ -523,82 +523,18 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
-pub struct ForkserverExecutorBuilder {
+pub struct ForkserverExecutorBuilder<'a, SP> {
     target: Option<OsString>,
     arguments: Vec<OsString>,
     debug_child: bool,
-    use_shmem_feature: bool,
+    shmem_provider: Option<&'a mut SP>,
 }
 
-impl Default for ForkserverExecutorBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ForkserverExecutorBuilder {
-    #[must_use]
-    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
-    /// This is the builder for `ForkserverExecutor`
-    /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
-    /// Else this forkserver will try to write the input to `.cur_input` file.
-    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    pub fn new() -> ForkserverExecutorBuilder {
-        ForkserverExecutorBuilder {
-            target: None,
-            arguments: vec![],
-            debug_child: false,
-            use_shmem_feature: false,
-        }
-    }
-
-    /// The harness
-    pub fn target<O>(&mut self, target: O) -> &mut Self
-    where
-        O: AsRef<OsStr>,
-    {
-        self.target = Some(target.as_ref().to_owned());
-        self
-    }
-
-    /// Adds an argument to the harness's commandline
-    pub fn arg<O>(&mut self, arg: O) -> &mut Self
-    where
-        O: AsRef<OsStr>,
-    {
-        self.arguments.push(arg.as_ref().to_owned());
-        self
-    }
-
-    /// Adds arguments to the harness's commandline
-    pub fn args<IT, O>(&mut self, args: IT) -> &mut Self
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        for arg in args {
-            self.arg(arg.as_ref());
-        }
-        self
-    }
-
-    /// If the shmem testcases feature is enabled or not
-    pub fn use_shmem_feature(&mut self, use_shmem_feature: bool) -> &mut Self {
-        self.use_shmem_feature = use_shmem_feature;
-        self
-    }
-
-    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    pub fn debug_child(&mut self, debug_child: bool) -> &mut Self {
-        self.debug_child = debug_child;
-        self
-    }
-
+impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Builds `ForkserverExecutor`. `shmem_provider` is the shmem provider used to make the `edge_observer` for tracking the coverage.
-    pub fn build<I, OT, S, SP>(
+    pub fn build<I, OT, S>(
         &mut self,
         observers: OT,
-        shmem_provider: &mut SP,
     ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
     where
         I: Input + HasTargetBytes,
@@ -620,16 +556,17 @@ impl ForkserverExecutorBuilder {
 
         let out_file = OutFile::create(&out_filename)?;
 
-        let map = if self.use_shmem_feature {
-            // setup shared memory
-            let mut shmem = shmem_provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
-            shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
+        let map = match &mut self.shmem_provider {
+            None => None,
+            Some(provider) => {
+                // setup shared memory
+                let mut shmem = provider.new_shmem(MAX_FILE + SHMEM_FUZZ_HDR_SIZE)?;
+                shmem.write_to_env("__AFL_SHM_FUZZ_ID")?;
 
-            let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
-            shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
-            Some(shmem)
-        } else {
-            None
+                let size_in_bytes = (MAX_FILE + SHMEM_FUZZ_HDR_SIZE).to_ne_bytes();
+                shmem.as_mut_slice()[..4].clone_from_slice(&size_in_bytes[..4]);
+                Some(shmem)
+            }
         };
 
         let (target, mut forkserver) = match &self.target {
@@ -687,6 +624,74 @@ impl ForkserverExecutorBuilder {
             phantom: PhantomData,
             has_asan_observer: None, // initialized on first use
         })
+    }
+}
+
+impl<'a> ForkserverExecutorBuilder<'a, ()> {
+    #[must_use]
+    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
+    /// This is the builder for `ForkserverExecutor`
+    /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
+    /// Else this forkserver will try to write the input to `.cur_input` file.
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    pub fn new() -> ForkserverExecutorBuilder<'a, ()> {
+        ForkserverExecutorBuilder {
+            target: None,
+            arguments: vec![],
+            debug_child: false,
+            shmem_provider: None,
+        }
+    }
+
+    /// The harness
+    pub fn target<O>(mut self, target: O) -> Self
+    where
+        O: AsRef<OsStr>,
+    {
+        self.target = Some(target.as_ref().to_owned());
+        self
+    }
+
+    /// Adds an argument to the harness's commandline
+    pub fn arg<O>(mut self, arg: O) -> Self
+    where
+        O: AsRef<OsStr>,
+    {
+        self.arguments.push(arg.as_ref().to_owned());
+        self
+    }
+
+    /// Adds arguments to the harness's commandline
+    pub fn args<IT, O>(mut self, args: IT) -> Self
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        for arg in args {
+            res.push(arg.as_ref().to_owned());
+        }
+        self.arguments = res;
+        self
+    }
+
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    pub fn debug_child(mut self, debug_child: bool) -> Self {
+        self.debug_child = debug_child;
+        self
+    }
+
+    /// Shmem provider
+    pub fn shmem_provider<SP: ShMemProvider>(
+        self,
+        shmem_provider: &mut SP,
+    ) -> ForkserverExecutorBuilder<SP> {
+        ForkserverExecutorBuilder {
+            target: self.target,
+            arguments: self.arguments,
+            debug_child: self.debug_child,
+            shmem_provider: Some(shmem_provider),
+        }
     }
 }
 
@@ -887,7 +892,8 @@ mod tests {
             .target(bin)
             .args(&args)
             .debug_child(false)
-            .build::<NopInput, _, (), _>(tuple_list!(edges_observer), &mut shmem_provider);
+            .shmem_provider(&mut shmem_provider)
+            .build::<NopInput, _, ()>(tuple_list!(edges_observer));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
