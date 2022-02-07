@@ -149,7 +149,10 @@ pub fn main() {
         .target(res.value_of("executable").unwrap().to_string())
         .args(&args)
         .debug_child(debug_child)
-        .build(tuple_list!(time_observer, edges_observer), None)
+        .build(
+            tuple_list!(time_observer, edges_observer),
+            &mut shmem_provider,
+        )
         .unwrap();
 
     let mut executor = TimeoutForkserverExecutor::new(

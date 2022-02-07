@@ -177,22 +177,15 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-            let forkserver = if self.shmem_testcase {
-                ForkserverExecutorBuilder::new()
-                    .target(self.program.clone())
-                    .args(self.arguments)
-                    .debug_child(self.debug_output)
-                    .build(
-                        tuple_list!(edges_observer, time_observer),
-                        Some(&mut shmem_provider_client),
-                    )
-            } else {
-                ForkserverExecutorBuilder::new()
-                    .target(self.program.clone())
-                    .args(self.arguments)
-                    .debug_child(self.debug_output)
-                    .build(tuple_list!(edges_observer, time_observer), None)
-            };
+            let forkserver = ForkserverExecutorBuilder::new()
+                .target(self.program.clone())
+                .args(self.arguments)
+                .debug_child(self.debug_output)
+                .use_shmem_feature(self.shmem_testcase)
+                .build(
+                    tuple_list!(edges_observer, time_observer),
+                    &mut shmem_provider_client,
+                );
 
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = TimeoutForkserverExecutor::new(
