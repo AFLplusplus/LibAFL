@@ -523,32 +523,30 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
-pub struct ForkserverExecutorBuilder<'a, SP> {
+pub struct ForkserverExecutorBuilder {
     target: Option<OsString>,
     arguments: Vec<OsString>,
     debug_child: bool,
-    shmem_provider: Option<&'a mut SP>,
 }
 
-impl<'a, SP> Default for ForkserverExecutorBuilder<'a, SP> {
+impl Default for ForkserverExecutorBuilder {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
+impl ForkserverExecutorBuilder {
     #[must_use]
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
     /// Else this forkserver will try to write the input to `.cur_input` file.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    pub fn new() -> ForkserverExecutorBuilder<'a, SP> {
+    pub fn new() -> ForkserverExecutorBuilder {
         ForkserverExecutorBuilder {
             target: None,
             arguments: vec![],
             debug_child: false,
-            shmem_provider: None,
         }
     }
 
@@ -587,19 +585,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self.debug_child = debug_child;
         self
     }
-}
-
-impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
-    /// Shmem provider
-    pub fn shmem_provider(&mut self, shmem_provider: &'a mut SP) -> &mut Self {
-        self.shmem_provider = Some(shmem_provider);
-        self
-    }
 
     /// Builds `ForkserverExecutor`
-    pub fn build<I, OT, S>(
+    pub fn build<I, OT, S, SP>(
         &mut self,
         observers: OT,
+        shmem_provider: Option<&mut SP>,
     ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
     where
         I: Input + HasTargetBytes,
@@ -621,7 +612,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
         let out_file = OutFile::create(&out_filename)?;
 
-        let map = match &mut self.shmem_provider {
+        let map = match shmem_provider {
             None => None,
             Some(provider) => {
                 // setup shared memory
@@ -889,8 +880,7 @@ mod tests {
             .target(bin)
             .args(&args)
             .debug_child(false)
-            .shmem_provider(&mut shmem_provider)
-            .build::<NopInput, _, ()>(tuple_list!(edges_observer));
+            .build::<NopInput, _, (), _>(tuple_list!(edges_observer), Some(&mut shmem_provider));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
