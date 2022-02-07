@@ -675,6 +675,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
+    #[must_use]
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     pub fn debug_child(mut self, debug_child: bool) -> Self {
         self.debug_child = debug_child;
