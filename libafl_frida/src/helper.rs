@@ -401,6 +401,7 @@ where
     }
 
     /// If stalker is enabled
+    #[inline]
     pub fn stalker_enabled(&self) -> bool {
         self.options.stalker_enabled()
     }
@@ -411,11 +412,13 @@ where
     }
 
     /// Ranges
+    #[inline]
     pub fn ranges(&self) -> &RangeMap<usize, (u16, String)> {
         &self.ranges
     }
 
     /// Mutable ranges
+    #[inline]
     pub fn ranges_mut(&mut self) -> &mut RangeMap<usize, (u16, String)> {
         &mut self.ranges
     }
