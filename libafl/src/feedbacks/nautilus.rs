@@ -10,7 +10,7 @@ use crate::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, NopFeedback},
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,

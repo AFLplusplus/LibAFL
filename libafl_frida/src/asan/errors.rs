@@ -12,7 +12,7 @@ use libafl::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, NopFeedbackState},
     inputs::{HasTargetBytes, Input},
     observers::{Observer, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata},

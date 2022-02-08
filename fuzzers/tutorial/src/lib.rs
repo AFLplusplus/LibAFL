@@ -8,8 +8,8 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
-    corpus::{InMemoryCorpus, OnDiskCorpus, PowerQueueCorpusScheduler},
-    events::{setup_restarting_mgr_std, EventConfig},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, PowerQueueCorpusScheduler},
+    events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -21,8 +21,8 @@ use libafl::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
     },
-    state::StdState,
-    Error,
+    state::{HasCorpus, StdState},
+    Error, Fuzzer,
 };
 
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
