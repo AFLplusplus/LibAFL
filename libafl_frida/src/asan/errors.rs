@@ -615,6 +615,8 @@ where
     I: Input + HasTargetBytes,
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -654,6 +656,10 @@ where
     fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.errors = None;
         Ok(())
+    }
+
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 

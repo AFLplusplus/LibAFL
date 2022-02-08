@@ -41,6 +41,8 @@ impl<S> Feedback<PacketData, S> for PacketLenFeedback
 where
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -72,6 +74,10 @@ where
     #[inline]
     fn discard_metadata(&mut self, _state: &mut S, _input: &PacketData) -> Result<(), Error> {
         Ok(())
+    }
+
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> { 
+        Ok(NopFeedbackState {})
     }
 }
 
