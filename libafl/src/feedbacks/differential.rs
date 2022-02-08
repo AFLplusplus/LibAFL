@@ -28,6 +28,21 @@ pub enum DiffResult {
     Diff,
 }
 
+impl DiffResult {
+    /// Returns `true` if the two observers report the same outcome.
+    pub fn is_equal(&self) -> bool {
+        match self {
+            DiffResult::Equal => true,
+            DiffResult::Diff => false,
+        }
+    }
+
+    /// Returns `true` if the two observers report different outcomes.
+    pub fn is_diff(&self) -> bool {
+        !self.is_equal()
+    }
+}
+
 /// A [`DiffFeedback`] compares the content of two [`Observer`]s using the given compare function.
 #[derive(Serialize, Deserialize)]
 pub struct DiffFeedback<F, O1, O2>
