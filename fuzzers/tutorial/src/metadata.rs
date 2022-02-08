@@ -76,7 +76,7 @@ where
         Ok(())
     }
 
-    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> { 
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }
 }
