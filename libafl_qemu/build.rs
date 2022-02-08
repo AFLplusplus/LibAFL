@@ -247,7 +247,7 @@ fn main() {
         for dir in &[
             build_dir.join("libcommon.fa.p"),
             build_dir.join(&format!("libqemu-{}-linux-user.fa.p", cpu_target)),
-            build_dir.join("libcommon-user.fa.p"),
+            //build_dir.join("libcommon-user.fa.p"),
             //build_dir.join("libqemuutil.a.p"),
             //build_dir.join("libqom.fa.p"),
             //build_dir.join("libhwcore.fa.p"),

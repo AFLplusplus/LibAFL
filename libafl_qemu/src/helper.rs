@@ -117,6 +117,7 @@ impl QemuInstrumentationFilter {
     }
 }
 
+#[must_use]
 pub fn hash_me(mut x: u64) -> u64 {
     x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
     x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
