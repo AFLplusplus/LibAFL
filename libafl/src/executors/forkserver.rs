@@ -19,9 +19,9 @@ use crate::{
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
     },
-    mutators::Tokens,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
+    mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     Error,
 };
@@ -271,8 +271,8 @@ impl Forkserver {
     }
 
     /// Read bytes of any length from the st pipe
-    pub fn read_st_size(&mut self, len: usize) -> Result<(usize, Vec<u8>), Error> {
-        let mut buf = vec![0; len];
+    pub fn read_st_size(&mut self, size: usize) -> Result<(usize, Vec<u8>), Error> {
+        let mut buf = vec![0; size];
 
         let rlen = self.st_pipe.read(&mut buf)?;
         Ok((rlen, buf))
@@ -547,6 +547,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Builds `ForkserverExecutor`.
+    #[allow(clippy::pedantic)]
     pub fn build<I, OT, S>(
         &mut self,
         observers: OT,
@@ -625,7 +626,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autodict_tokens.is_some() {
                 println!("Using AUTODICT feature");
                 send_status = send_status | FS_OPT_AUTODICT;
-            }            
+            }
 
             let send_len = forkserver.write_ctl(send_status)?;
             if send_len != 4 {
@@ -659,10 +660,9 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 }
 
                 if let Some(t) = &mut self.autodict_tokens {
-                    t.parse_autodict(&buf, dict_size as usize)
+                    t.parse_autodict(&buf, dict_size as usize);
                 }
             }
-
         } else {
             println!("Forkserver Options are not available.");
         }
