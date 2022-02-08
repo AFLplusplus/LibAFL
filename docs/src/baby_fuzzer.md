@@ -282,7 +282,7 @@ Feedbacks are used also to decide if an input is a "solution". The feedback that
 
 We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
-```rust
+```rust,ignore
 extern crate libafl;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
@@ -314,8 +314,7 @@ let mut state = StdState::new(
     // Same for objective feedbacks
     &mut objective,
 ).unwrap();
-```
-```rust,ignore
+
 // ...
 
 // A fuzzer with feedbacks and a corpus scheduler

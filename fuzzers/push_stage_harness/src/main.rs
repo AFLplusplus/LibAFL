@@ -14,7 +14,7 @@ use libafl::{
     },
     events::SimpleEventManager,
     executors::ExitKind,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::StdFuzzer,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -38,7 +38,7 @@ pub fn main() {
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::<BytesInput, _, _, _>::new(&feedback_state, &observer);
+    let mut feedback = MaxMapFeedback::<BytesInput, _, _, _>::new("MaxMapFeedback", &observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();

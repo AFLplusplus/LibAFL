@@ -78,11 +78,15 @@ impl Tokens {
 
     /// Create a token section from a start and an end pointer
     /// Reads from an autotokens section, returning the count of new entries read
-    #[must_use]
+    /// 
+    /// # Safety
+    /// The `token_start` and `token_end` pointers must be valid.
+    /// In subsequent use, the area between both pointers will be dereferenced
+    /// and will be interpreted as token bytes, with minimal checks.
     #[cfg(target_os = "linux")]
     pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
         let mut ret = Self::default();
-        if token_start == null() || token_stop == null() {
+        if token_start.is_null() || token_stop.is_null() {
             return Err(Error::IllegalArgument("token_start or token_stop is null. If you are using autotokens() you likely did not build your target with the \"AutoTokens\"-pass".to_string()));
         }
         if token_stop <= token_start {

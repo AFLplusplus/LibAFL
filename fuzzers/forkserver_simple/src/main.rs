@@ -14,7 +14,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_and_fast, feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
@@ -100,7 +100,7 @@ pub fn main() {
         // Must be a crash
         CrashFeedback::new(),
         // Take it onlt if trigger new coverage over crashes
-        MaxMapFeedback::with_names(&"map_objective", &"crash_edges", MAP_SIZE)
+        MaxMapFeedback::<_, _, _, _, _, u8>::with_names("map_objective", "crash_edges", MAP_SIZE)
     );
 
     // create a State from scratch

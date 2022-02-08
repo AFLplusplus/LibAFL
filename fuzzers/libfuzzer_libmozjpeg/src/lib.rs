@@ -85,19 +85,11 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel using the allocations map
     let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map });
 
-    let edges_feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
-    // The state of the cmps feedback.
-    let cmps_feedback_state = MapFeedbackState::with_observer(&cmps_observer);
-
-    // The state of the allocs feedback.
-    let allocs_feedback_state = MapFeedbackState::with_observer(&allocs_observer);
-
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(
-        MaxMapFeedback::new(&edges_feedback_state, &edges_observer),
-        MaxMapFeedback::new(&cmps_feedback_state, &cmps_observer),
-        MaxMapFeedback::new(&allocs_feedback_state, &allocs_observer)
+        MaxMapFeedback::new("EdgesFeedback", &edges_observer),
+        MaxMapFeedback::new("CmpFeedback", &cmps_observer),
+        MaxMapFeedback::new("AllocsFeedback", &allocs_observer)
     );
 
     // A feedback to choose if an input is a solution or not
