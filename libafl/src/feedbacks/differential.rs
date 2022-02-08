@@ -30,6 +30,7 @@ pub enum DiffResult {
 
 impl DiffResult {
     /// Returns `true` if the two observers report the same outcome.
+    #[must_use]
     pub fn is_equal(&self) -> bool {
         match self {
             DiffResult::Equal => true,
@@ -38,6 +39,7 @@ impl DiffResult {
     }
 
     /// Returns `true` if the two observers report different outcomes.
+    #[must_use]
     pub fn is_diff(&self) -> bool {
         !self.is_equal()
     }
