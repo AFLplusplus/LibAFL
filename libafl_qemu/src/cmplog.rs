@@ -164,7 +164,7 @@ where
 pub fn gen_hashed_cmp_ids<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    state: &mut S,
+    _state: &mut S,
     pc: u64,
     _size: usize,
 ) -> Option<u64>
@@ -173,8 +173,8 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuEdgeCoverageChildHelper>() {
-        if !h.must_instrument(src) && !h.must_instrument(dest) {
+    if let Some(h) = helpers.match_first_type::<QemuCmpLogChildHelper>() {
+        if !h.must_instrument(pc) {
             return None;
         }
     }

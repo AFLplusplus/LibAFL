@@ -34,7 +34,7 @@ pub struct SnapshotAccessInfo {
 impl SnapshotAccessInfo {
     pub fn clear(&mut self) {
         self.access_cache_idx = 0;
-        self.access_cache = [u64::MAX; 4];
+        self.access_cache = [GuestAddr::MAX; 4];
         self.dirty.clear();
     }
 }
@@ -141,11 +141,11 @@ impl QemuSnapshotHelper {
 
     pub fn reset_maps(&mut self, emulator: &Emulator) {
         let new_maps = self.new_maps.get_mut().unwrap();
-        for r in new_maps.find(0..u64::MAX) {
+        for r in new_maps.find(0..GuestAddr::MAX) {
             let addr = r.interval().start;
             let end = r.interval().end;
             let perms = r.data();
-            let mut page = addr & (SNAPSHOT_PAGE_SIZE as u64 - 1);
+            let mut page = addr & (SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
             let mut prev = None;
             while page < end {
                 if let Some(info) = self.pages.get(&page) {
@@ -155,7 +155,7 @@ impl QemuSnapshotHelper {
                     prev = None;
                     if let Some(p) = perms {
                         if info.perms != *p {
-                            emulator.mprotect(page, SNAPSHOT_PAGE_SIZE, info.perms);
+                            drop(emulator.mprotect(page, SNAPSHOT_PAGE_SIZE, info.perms));
                         }
                     }
                 } else if let Some((_, size)) = &mut prev {
@@ -163,7 +163,7 @@ impl QemuSnapshotHelper {
                 } else {
                     prev = Some((page, SNAPSHOT_PAGE_SIZE));
                 }
-                page += SNAPSHOT_PAGE_SIZE as u64;
+                page += SNAPSHOT_PAGE_SIZE as GuestAddr;
             }
             if let Some((addr, size)) = prev {
                 drop(emulator.unmap(addr, size));
