@@ -150,6 +150,7 @@ pub fn main() {
         .args(&args)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
+        .use_autodict(true)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 

@@ -269,6 +269,14 @@ impl Forkserver {
         Ok((rlen, val))
     }
 
+    /// Read bytes of any length from the st pipe
+    pub fn read_st_size(&mut self, len: usize) -> Result<(usize, Vec<u8>), Error> {
+        let mut buf = vec![0; len];
+
+        let rlen = self.st_pipe.read(&mut buf)?;
+        Ok((rlen, buf))
+    }
+
     /// Write to the ctl pipe
     pub fn write_ctl(&mut self, val: i32) -> Result<usize, Error> {
         let slen = self.ctl_pipe.write(&val.to_ne_bytes())?;
@@ -608,13 +616,13 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
             let mut send_status = FS_OPT_ENABLED;
 
-            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & map.is_some() {
+            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
                 println!("Using SHARED MEMORY FUZZING feature.");
                 send_status = send_status | FS_OPT_SHDMEM_FUZZ;
             }
 
-            if self.use_autodict {
-                println!("Using Autodict feature");
+            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.use_autodict {
+                println!("Using AUTODICT feature");
                 send_status = send_status | FS_OPT_AUTODICT;
             }            
 
@@ -623,6 +631,33 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 return Err(Error::Forkserver(
                     "Writing to forkserver failed.".to_string(),
                 ));
+            }
+
+            if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
+                let (read_len, dict_size) = forkserver.read_st()?;
+                if read_len != 4 {
+                    return Err(Error::Forkserver(
+                        "Reading from forkserver failed.".to_string(),
+                    ));
+                }
+
+                if dict_size < 2 || dict_size > 0xffffff {
+                    return Err(Error::Forkserver(
+                        "Dictionary has an illegal size".to_string(),
+                    ));
+                }
+
+                println!("Autodict size {:x}", dict_size);
+
+                let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+
+                if rlen != dict_size as usize {
+                    return Err(Error::Forkserver(
+                        "Failed to load autodictionary".to_string(),
+                    ));
+                }
+
+                println!("{:?}", buf);
             }
 
         } else {
