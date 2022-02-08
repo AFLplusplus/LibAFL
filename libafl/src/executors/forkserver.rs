@@ -19,6 +19,7 @@ use crate::{
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
     },
+    mutators::Tokens,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
@@ -540,7 +541,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
     debug_child: bool,
-    use_autodict: bool,
+    autodict_tokens: Option<&'a mut Tokens>,
     shmem_provider: Option<&'a mut SP>,
 }
 
@@ -621,7 +622,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 send_status = send_status | FS_OPT_SHDMEM_FUZZ;
             }
 
-            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.use_autodict {
+            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autodict_tokens.is_some() {
                 println!("Using AUTODICT feature");
                 send_status = send_status | FS_OPT_AUTODICT;
             }            
@@ -657,7 +658,9 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     ));
                 }
 
-                println!("{:?}", buf);
+                if let Some(t) = &mut self.autodict_tokens {
+                    t.parse_autodict(&buf, dict_size as usize)
+                }
             }
 
         } else {
@@ -690,7 +693,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: vec![],
             envs: vec![],
             debug_child: false,
-            use_autodict: false,
+            autodict_tokens: None,
             shmem_provider: None,
         }
     }
@@ -774,8 +777,8 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
 
     /// Use autodict?
     #[must_use]
-    pub fn use_autodict(mut self, use_autodict: bool) -> Self {
-        self.use_autodict = use_autodict;
+    pub fn autodict_tokens(mut self, tokens: &'a mut Tokens) -> Self {
+        self.autodict_tokens = Some(tokens);
         self
     }
 
@@ -789,7 +792,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: self.arguments,
             envs: self.envs,
             debug_child: self.debug_child,
-            use_autodict: self.use_autodict,
+            autodict_tokens: self.autodict_tokens,
             shmem_provider: Some(shmem_provider),
         }
     }
