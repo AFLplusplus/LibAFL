@@ -150,7 +150,7 @@ where
     }
 
     #[inline]
-    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }
 }

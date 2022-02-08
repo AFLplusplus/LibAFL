@@ -2,16 +2,15 @@
 
 use crate::{
     bolts::current_time,
-    bolts::tuples::MatchName,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::MapFeedbackState,
+    feedbacks::{FeedbackState, MapFeedbackState},
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackState, HasMetadata},
     Error,
 };
 use alloc::{
@@ -47,7 +46,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
+    S: HasCorpus<I> + HasMetadata + HasFeedbackState + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -137,7 +136,7 @@ where
                 .to_vec();
 
             let history_map = &mut state
-                .feedback_states_mut()
+                .feedback_state_mut()
                 .match_name_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name)
                 .unwrap()
                 .history_map;

@@ -26,8 +26,9 @@ pub use nautilus::*;
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
+use crate::bolts::tuples::type_eq;
 use crate::{
-    bolts::tuples::{MatchName, Named},
+    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -42,6 +43,7 @@ use core::{
     marker::PhantomData,
     time::Duration,
 };
+use std::ptr::addr_of;
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
@@ -120,7 +122,7 @@ where
     /// This method will be called once during state setup, before the first run of a fuzzer.
     /// This state will be available using `state.feedback_state()`.
     /// When the fuzzer restarts, it will be serialized to disk and restored.
-    fn init_feedback_state(&mut self, state: &mut S) -> Result<Self::FeedbackState, Error>;
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error>;
 }
 
 /// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
@@ -130,6 +132,22 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
     #[inline]
     fn reset(&mut self) -> Result<(), Error> {
         Ok(())
+    }
+
+    /// Gets a state by name
+    fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
+        if type_eq::<Self, T>() && name == self.name() {
+            unsafe { (addr_of!(self) as *mut T).as_mut() }
+        } else {
+            self.match_name_rec_mut(name)
+        }
+    }
+
+    /// Gets a state by name, recursively, if not found
+    #[inline]
+    fn match_name_rec_mut<T>(&mut self, _name: &str) -> Option<&mut T> {
+        // The default impl doesn't have any nested state
+        None
     }
 }
 
@@ -174,6 +192,13 @@ where
         self.state1.reset()?;
         self.state2.reset()
     }
+
+    fn match_name_rec_mut<T>(&mut self, name: &str) -> Option<&mut T> {
+        match self.state1.match_name_rec_mut(name) {
+            Some(state1) => Some(state1),
+            None => self.state2.match_name_rec_mut(name),
+        }
+    }
 }
 impl<A, B> Named for CombinedFeedbackState<A, B>
 where
@@ -186,27 +211,18 @@ where
     }
 }
 
-/// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwned + Debug {
-    /// Resets all the feedback states of the tuple
-    fn reset_all(&mut self) -> Result<(), Error>;
-}
-
-impl FeedbackStatesTuple for () {
-    #[inline]
-    fn reset_all(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-impl<Head, Tail> FeedbackStatesTuple for (Head, Tail)
+impl<A, B> CombinedFeedbackState<A, B>
 where
-    Head: FeedbackState,
-    Tail: FeedbackStatesTuple,
+    A: FeedbackState,
+    B: FeedbackState,
 {
-    fn reset_all(&mut self) -> Result<(), Error> {
-        self.0.reset()?;
-        self.1.reset_all()
+    /// Create a new [`CombinedFeedbackState`] using two [`FeedbackState`]s
+    pub fn new(name: &str, state1: A, state2: B) -> CombinedFeedbackState<A, B> {
+        Self {
+            name: name.to_string(),
+            state1,
+            state2,
+        }
     }
 }
 
@@ -331,11 +347,11 @@ where
         self.second.discard_metadata(state, input)
     }
 
-    fn init_feedback_state(&mut self, state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(CombinedFeedbackState {
             name: format!("{}{}", self.first.name(), self.second.name()),
-            state1: self.first.init_feedback_state(state)?,
-            state2: self.second.init_feedback_state(state)?,
+            state1: self.first.init_state()?,
+            state2: self.second.init_state()?,
         })
     }
 }
@@ -697,8 +713,8 @@ where
     }
 
     #[inline]
-    fn init_feedback_state(&mut self, state: &mut S) -> Result<Self::FeedbackState, Error> {
-        self.inner.init_feedback_state(state)
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
+        self.inner.init_state()
     }
 }
 
@@ -807,7 +823,7 @@ where
     }
 
     #[inline]
-    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }
 }
@@ -850,7 +866,7 @@ where
     }
 
     #[inline]
-    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }
 }
@@ -907,7 +923,7 @@ where
     }
 
     #[inline]
-    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }
 }
@@ -983,7 +999,7 @@ where
     }
 
     #[inline]
-    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }
 }

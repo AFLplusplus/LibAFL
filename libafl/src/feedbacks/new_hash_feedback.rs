@@ -7,13 +7,13 @@ use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchName, Named},
+    bolts::tuples::Named,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, FeedbackState},
     inputs::Input,
     observers::{ObserverWithHashField, ObserversTuple},
-    state::{HasClientPerfMonitor, HasFeedbackStates},
+    state::{HasClientPerfMonitor, HasFeedbackState},
     Error,
 };
 
@@ -110,7 +110,7 @@ pub struct NewHashFeedback<O, T> {
 impl<I, O, S, T> Feedback<I, S> for NewHashFeedback<O, T>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasFeedbackStates,
+    S: HasClientPerfMonitor + HasFeedbackState,
     O: ObserverWithHashField + Named + Debug,
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
@@ -133,7 +133,7 @@ where
             .expect("A NewHashFeedback needs a BacktraceObserver");
 
         let backtrace_state = _state
-            .feedback_states_mut()
+            .feedback_state_mut()
             .match_name_mut::<NewHashFeedbackState<u64>>(&self.observer_name)
             .unwrap();
 
@@ -151,7 +151,7 @@ where
         }
     }
 
-    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(Self::FeedbackState::new(&self.observer_name))
     }
 }

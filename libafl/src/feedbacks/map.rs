@@ -9,10 +9,7 @@ use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{
-        tuples::{MatchName, Named},
-        AsMutSlice, AsSlice, HasRefCnt,
-    },
+    bolts::{tuples::Named, AsMutSlice, AsSlice, HasRefCnt},
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
@@ -20,7 +17,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfMonitor, HasFeedbackState, HasMetadata},
     Error,
 };
 
@@ -340,7 +337,7 @@ where
     R: Reducer<T>,
     O: MapObserver,
     N: IsNovel<T>,
-    S: HasFeedbackStates,
+    S: HasFeedbackState,
 {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
@@ -365,7 +362,7 @@ where
     O: MapObserver<Entry = T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasFeedbackStates + HasClientPerfMonitor + Debug,
+    S: HasFeedbackState + HasClientPerfMonitor + Debug,
 {
     type FeedbackState = MapFeedbackState<T>;
 
@@ -388,7 +385,7 @@ where
         let initial = observer.initial();
 
         let map_state = state
-            .feedback_states_mut()
+            .feedback_state_mut()
             .match_name_mut::<MapFeedbackState<T>>(&self.name)
             .unwrap();
 
@@ -467,7 +464,7 @@ where
         Ok(())
     }
 
-    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(Self::FeedbackState::new(
             &self.state_name,
             self.state_map_size,
@@ -481,7 +478,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver,
-    S: HasFeedbackStates,
+    S: HasFeedbackState,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -502,7 +499,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver,
-    S: HasFeedbackStates,
+    S: HasFeedbackState,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -658,7 +655,7 @@ where
     }
 
     #[inline]
-    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }
 }

@@ -474,7 +474,7 @@ mod tests {
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 
-        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
+        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ()).unwrap();
 
         let mut havoc = StdScheduledMutator::new(havoc_mutations());
 
