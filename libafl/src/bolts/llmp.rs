@@ -55,18 +55,20 @@ For broker2broker communication, all messages are forwarded via network sockets.
 
 Check out the `llmp_test` example in ./examples, or build it with `cargo run --example llmp_test`.
 
-For broker2broker communication, all messages are forwarded via network sockets.
-
 */
 
 use alloc::{string::String, vec::Vec};
+#[cfg(not(target_pointer_width = "64"))]
+use core::sync::atomic::AtomicU32;
+#[cfg(target_pointer_width = "64")]
+use core::sync::atomic::AtomicU64;
 use core::{
     cmp::max,
     fmt::Debug,
     hint,
     mem::size_of,
     ptr, slice,
-    sync::atomic::{fence, AtomicU16, AtomicU64, Ordering},
+    sync::atomic::{fence, AtomicU16, Ordering},
     time::Duration,
 };
 use serde::{Deserialize, Serialize};
@@ -164,7 +166,7 @@ static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHa
     shutting_down: false,
 };
 
-/// TAGs used thorughout llmp
+/// TAGs used throughout llmp
 pub type Tag = u32;
 /// The client ID == the sender id.
 pub type ClientId = u32;
@@ -173,7 +175,11 @@ pub type BrokerId = u32;
 /// The flags, indicating, for example, enabled compression.
 pub type Flags = u32;
 /// The message ID, an ever-increasing number, unique only to a sharedmap/page.
+#[cfg(target_pointer_width = "64")]
 pub type MessageId = u64;
+/// The message ID, an ever-increasing number, unique only to a sharedmap/page.
+#[cfg(not(target_pointer_width = "64"))]
+pub type MessageId = u32;
 
 /// This is for the server the broker will spawn.
 /// If an llmp connection is local - use sharedmaps
@@ -233,7 +239,7 @@ pub enum TcpResponse {
     },
     /// Notify the client on the other side that it has been accepted.
     LocalClientAccepted {
-        /// The ClientId this client should send messages as
+        /// The ClientId this client should send messages as.
         /// Mainly used for client-side deduplication of incoming messages
         client_id: ClientId,
     },
@@ -498,7 +504,7 @@ pub struct LlmpDescription {
 }
 
 #[derive(Copy, Clone, Debug)]
-/// Result of an LLMP Mesasge hook
+/// Result of an LLMP Message hook
 pub enum LlmpMsgHookResult {
     /// This has been handled in the broker. No need to forward.
     Handled,
@@ -512,14 +518,14 @@ pub enum LlmpMsgHookResult {
 pub struct LlmpMsg {
     /// A tag
     pub tag: Tag, //u32
-    /// Sender of this messge
+    /// Sender of this message
     pub sender: ClientId, //u32
     /// ID of another Broker, for b2b messages
     pub broker: BrokerId, //u32
     /// flags, currently only used for indicating compression
     pub flags: Flags, //u32
     /// The message ID, unique per page
-    pub message_id: MessageId, //u64
+    pub message_id: MessageId, //u64 on 64 bit, else u32
     /// Buffer length as specified by the user
     pub buf_len: u64,
     /// (Actual) buffer length after padding
@@ -678,19 +684,23 @@ pub struct LlmpPage {
     pub magic: u64,
     /// The id of the sender
     pub sender: u32,
-    /// Set to != 1 by the receiver, once it got mapped
+    /// Set to != 1 by the receiver, once it got mapped.
     /// It's not safe for the sender to unmap this page before
     /// (The os may have tidied up the memory when the receiver starts to map)
     pub safe_to_unmap: AtomicU16,
     /// Not used at the moment (would indicate that the sender is no longer there)
     pub sender_dead: AtomicU16,
+    #[cfg(target_pointer_width = "64")]
     /// The current message ID
     pub current_msg_id: AtomicU64,
+    #[cfg(not(target_pointer_width = "64"))]
+    /// The current message ID
+    pub current_msg_id: AtomicU32,
     /// How much space is available on this page in bytes
     pub size_total: usize,
     /// How much space is used on this page in bytes
     pub size_used: usize,
-    /// The maximum amount of bytes that ever got allocated on this page in one go
+    /// The maximum amount of bytes that ever got allocated on this page in one go.
     /// An inidactor of what to use as size for future pages
     pub max_alloc_size: usize,
     /// Pointer to the messages, from here on.
@@ -720,7 +730,7 @@ where
     /// Ref to the last message this sender sent on the last page.
     /// If null, a new page (just) started.
     pub last_msg_sent: *const LlmpMsg,
-    /// A vec of page wrappers, each containing an intialized AfShmem
+    /// A vec of page wrappers, each containing an initialized [`ShMem`]
     pub out_shmems: Vec<LlmpSharedMap<SP::ShMem>>,
     /// If true, pages will never be pruned.
     /// The broker uses this feature.
@@ -1293,14 +1303,14 @@ where
 {
     /// Id of this provider
     pub id: u32,
-    /// Pointer to the last meg this received
+    /// Pointer to the last message received
     pub last_msg_recvd: *const LlmpMsg,
     /// The shmem provider
     pub shmem_provider: SP,
     /// current page. After EOP, this gets replaced with the new one
     pub current_recv_shmem: LlmpSharedMap<SP::ShMem>,
     /// Caches the highest msg id we've seen so far
-    highest_msg_id: u64,
+    highest_msg_id: MessageId,
 }
 
 /// Receiving end of an llmp channel
@@ -1491,7 +1501,7 @@ where
         }
     }
 
-    /// Returns the next message, tag, buf, if avaliable, else None
+    /// Returns the next message, tag, buf, if available, else None
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(ClientId, Tag, &[u8])>, Error> {
@@ -1721,7 +1731,7 @@ where
     /// Broadcast map from broker to all clients
     pub llmp_out: LlmpSender<SP>,
     /// Users of Llmp can add message handlers in the broker.
-    /// This allows us to intercept messages right in the broker
+    /// This allows us to intercept messages right in the broker.
     /// This keeps the out map clean.
     pub llmp_clients: Vec<LlmpReceiver<SP>>,
     /// The ShMemProvider to use
@@ -1962,7 +1972,7 @@ where
             .expect("Error when shutting down broker: Could not send LLMP_TAG_EXITING msg.");
     }
 
-    /// Broadcasts the given buf to all lients
+    /// Broadcasts the given buf to all clients
     pub fn send_buf(&mut self, tag: Tag, buf: &[u8]) -> Result<(), Error> {
         self.llmp_out.send_buf(tag, buf)
     }
@@ -1972,7 +1982,7 @@ where
         self.llmp_out.send_buf_with_flags(tag, flags, buf)
     }
 
-    /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker
+    /// Launches a thread using a tcp listener socket, on which new clients may connect to this broker.
     /// Does so on the given port.
     #[cfg(feature = "std")]
     pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
@@ -2197,7 +2207,7 @@ where
             .to_string_lossy()
             .into();
         let broker_hello = TcpResponse::BrokerConnectHello {
-            broker_shmem_description: broker_shmem_description,
+            broker_shmem_description,
             hostname,
         };
 
@@ -2325,37 +2335,36 @@ where
                             msg_buf_len_padded,
                             size_of::<LlmpPayloadSharedMapInfo>()
                         )));
-                    } else {
-                        let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
-
-                        match self.shmem_provider.shmem_from_id_and_size(
-                            ShMemId::from_array(&(*pageinfo).shm_str),
-                            (*pageinfo).map_size,
-                        ) {
-                            Ok(new_shmem) => {
-                                let mut new_page = LlmpSharedMap::existing(new_shmem);
-                                let id = next_id;
-                                next_id += 1;
-                                new_page.mark_safe_to_unmap();
-                                self.llmp_clients.push(LlmpReceiver {
-                                    id,
-                                    current_recv_shmem: new_page,
-                                    last_msg_recvd: ptr::null_mut(),
-                                    shmem_provider: self.shmem_provider.clone(),
-                                    highest_msg_id: 0,
-                                });
-                            }
-                            Err(e) => {
-                                #[cfg(feature = "std")]
-                                println!("Error adding client! Ignoring: {:?}", e);
-                                #[cfg(not(feature = "std"))]
-                                return Err(Error::Unknown(format!(
-                                    "Error adding client! PANIC! {:?}",
-                                    e
-                                )));
-                            }
-                        };
                     }
+                    let pageinfo = (*msg).buf.as_mut_ptr() as *mut LlmpPayloadSharedMapInfo;
+
+                    match self.shmem_provider.shmem_from_id_and_size(
+                        ShMemId::from_array(&(*pageinfo).shm_str),
+                        (*pageinfo).map_size,
+                    ) {
+                        Ok(new_shmem) => {
+                            let mut new_page = LlmpSharedMap::existing(new_shmem);
+                            let id = next_id;
+                            next_id += 1;
+                            new_page.mark_safe_to_unmap();
+                            self.llmp_clients.push(LlmpReceiver {
+                                id,
+                                current_recv_shmem: new_page,
+                                last_msg_recvd: ptr::null_mut(),
+                                shmem_provider: self.shmem_provider.clone(),
+                                highest_msg_id: 0,
+                            });
+                        }
+                        Err(e) => {
+                            #[cfg(feature = "std")]
+                            println!("Error adding client! Ignoring: {:?}", e);
+                            #[cfg(not(feature = "std"))]
+                            return Err(Error::Unknown(format!(
+                                "Error adding client! PANIC! {:?}",
+                                e
+                            )));
+                        }
+                    };
                 }
                 // handle all other messages
                 _ => {
@@ -2582,7 +2591,7 @@ where
         self.receiver.recv_blocking()
     }
 
-    /// The current page could have changed in recv (EOP)
+    /// The current page could have changed in recv (EOP).
     /// Alloc the next message, internally handling end of page by allocating a new one.
     /// # Safety
     /// Should be safe, but returns an unsafe ptr
@@ -2591,14 +2600,14 @@ where
         self.sender.alloc_next(buf_len)
     }
 
-    /// Returns the next message, tag, buf, if avaliable, else None
+    /// Returns the next message, tag, buf, if available, else None
     #[allow(clippy::type_complexity)]
     #[inline]
     pub fn recv_buf(&mut self) -> Result<Option<(ClientId, Tag, &[u8])>, Error> {
         self.receiver.recv_buf()
     }
 
-    /// Receives a buf from the broker, looping until a messages becomes avaliable
+    /// Receives a buf from the broker, looping until a message becomes available
     #[inline]
     pub fn recv_buf_blocking(&mut self) -> Result<(ClientId, Tag, &[u8]), Error> {
         self.receiver.recv_buf_blocking()

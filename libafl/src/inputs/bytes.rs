@@ -1,5 +1,5 @@
 //! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
-//! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
+//! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 
 use ahash::AHasher;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// A bytes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BytesInput {
     /// The raw input bytes
     bytes: Vec<u8>,
@@ -33,7 +33,7 @@ impl Input for BytesInput {
         write_file_atomic(path, &self.bytes)
     }
 
-    /// Load the contents of this input from a file
+    /// Load the content of this input from a file
     #[cfg(feature = "std")]
     fn from_file<P>(path: P) -> Result<Self, Error>
     where
@@ -103,20 +103,5 @@ impl BytesInput {
     #[must_use]
     pub fn new(bytes: Vec<u8>) -> Self {
         Self { bytes }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::bolts::rands::{Rand, StdRand};
-
-    #[test]
-    fn test_input() {
-        let mut rand = StdRand::with_seed(0);
-        assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(100) < 100);
-        assert_eq!(rand.below(1), 0);
-        assert_eq!(rand.between(10, 10), 10);
-        assert!(rand.between(11, 20) > 10);
     }
 }

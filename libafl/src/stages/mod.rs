@@ -4,7 +4,7 @@ A well-known [`Stage`], for example, is the mutational stage, running multiple [
 Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
-/// Mutational stage is the normal fuzzing stage,
+/// Mutational stage is the normal fuzzing stage.
 pub mod mutational;
 pub use mutational::{MutationalStage, StdMutationalStage};
 
@@ -18,6 +18,12 @@ pub use calibrate::{CalibrationStage, PowerScheduleMetadata};
 
 pub mod power;
 pub use power::PowerMutationalStage;
+
+pub mod generalization;
+pub use generalization::GeneralizationStage;
+
+pub mod owned;
+pub use owned::StagesOwnedList;
 
 #[cfg(feature = "std")]
 pub mod concolic;
@@ -187,7 +193,7 @@ where
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
 {
-    /// Create a new [`PushStageAdapter`], warpping the given [`PushStage`]
+    /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
     #[must_use]
     pub fn new(push_stage: PS) -> Self {

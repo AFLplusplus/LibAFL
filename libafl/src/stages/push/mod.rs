@@ -4,7 +4,7 @@
 //! The push stage relies on internal muttability of the supplied `Observers`.
 //!
 
-/// Mutational stage is the normal fuzzing stage,
+/// Mutational stage is the normal fuzzing stage.
 pub mod mutational;
 pub use mutational::StdMutationalPushStage;
 
@@ -93,7 +93,7 @@ where
     /// The shared state, keeping track of the corpus and the fuzzer
     #[allow(clippy::type_complexity)]
     pub shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, I, OT, S, Z>>>>,
-    /// If the last iteraation failed
+    /// If the last iteration failed
     pub errored: bool,
 
     /// The corpus index we're currently working on
@@ -138,7 +138,7 @@ where
     /// Sets the shared state for this helper (and all other helpers owning the same [`RefCell`])
     #[inline]
     pub fn set_shared_state(&mut self, shared_state: PushStageSharedState<CS, EM, I, OT, S, Z>) {
-        (&mut *self.shared_state.borrow_mut()).replace(shared_state);
+        (*self.shared_state.borrow_mut()).replace(shared_state);
     }
 
     /// Takes the shared state from this helper, replacing it with `None`
@@ -191,10 +191,10 @@ where
 {
     /// Gets the [`PushStageHelper`]
     fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, I, OT, S, Z>;
-    /// Gets the [`PushStageHelper`], mut
+    /// Gets the [`PushStageHelper`] (mutable)
     fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, I, OT, S, Z>;
 
-    /// Set the current corpus index this stagve works on
+    /// Set the current corpus index this stage works on
     fn set_current_corpus_idx(&mut self, corpus_idx: usize) {
         self.push_stage_helper_mut().current_corpus_idx = Some(corpus_idx);
     }

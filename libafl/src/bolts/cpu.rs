@@ -9,7 +9,7 @@ use crate::bolts::current_nanos;
 
 /// Read a timestamp for measurements.
 ///
-/// This function is a wrapper around different ways to get a timestamp, fast
+/// This function is a wrapper around different ways to get a timestamp, fast.
 /// In this way, an experiment only has to
 /// change this implementation rather than every instead of `read_time_counter`.
 /// It is using `rdtsc` on `x86_64` and `x86`.
@@ -28,11 +28,12 @@ pub fn read_time_counter() -> u64 {
 
 /// Read a timestamp for measurements.
 ///
-/// This function is a wrapper around different ways to get a timestamp, fast
+/// This function is a wrapper around different ways to get a timestamp, fast.
 /// In this way, an experiment only has to
 /// change this implementation rather than every instead of [`read_time_counter`]
 /// On unsupported architectures, it's falling back to normal system time, in millis.
 #[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+#[must_use]
 pub fn read_time_counter() -> u64 {
     current_nanos()
 }

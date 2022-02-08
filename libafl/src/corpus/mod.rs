@@ -1,4 +1,4 @@
-//! Corpuses contain the testcases, either in mem, on disk, or somewhere else.
+//! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
 pub mod testcase;
 pub use testcase::{PowerScheduleTestcaseMetaData, Testcase};
@@ -18,6 +18,9 @@ pub use cached::CachedOnDiskCorpus;
 
 pub mod queue;
 pub use queue::QueueCorpusScheduler;
+
+pub mod accounting;
+pub use accounting::*;
 
 pub mod minimizer;
 pub use minimizer::{
@@ -67,7 +70,7 @@ where
     /// Current testcase scheduled
     fn current(&self) -> &Option<usize>;
 
-    /// Current testcase scheduled (mut)
+    /// Current testcase scheduled (mutable)
     fn current_mut(&mut self) -> &mut Option<usize>;
 }
 
@@ -142,6 +145,6 @@ impl Default for RandCorpusScheduler {
     }
 }
 
-/// A [`StdCorpusScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s
+/// A [`StdCorpusScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s.
 /// The current `Std` is a [`RandCorpusScheduler`], although this may change in the future, if another [`CorpusScheduler`] delivers better results.
 pub type StdCorpusScheduler = RandCorpusScheduler;

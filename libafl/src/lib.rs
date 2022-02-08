@@ -2,8 +2,12 @@
 Welcome to `LibAFL`
 */
 
+#![allow(incomplete_features)]
 #![cfg_attr(not(feature = "std"), no_std)]
+// For `type_eq`
 #![cfg_attr(unstable_feature, feature(specialization))]
+// For `type_id` and owned things
+#![cfg_attr(unstable_feature, feature(intrinsics))]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::pedantic)]
 #![allow(
@@ -90,31 +94,9 @@ pub mod stages;
 pub mod state;
 
 pub mod fuzzer;
-pub use fuzzer::*;
-
-/// The `stats` module got renamed to [`monitors`].
-/// It monitors and displays the statistics of the fuzzing process.
-#[deprecated(since = "0.7.0", note = "The `stats` module got renamed to `monitors`")]
-pub mod stats {
-    #[deprecated(
-        since = "0.7.0",
-        note = "Use monitors::MultiMonitor instead of stats::MultiStats!"
-    )]
-    pub use crate::monitors::MultiMonitor as MultiStats;
-    #[deprecated(
-        since = "0.7.0",
-        note = "Use monitors::SimpleMonitor instead of stats::SimpleStats!"
-    )]
-    pub use crate::monitors::SimpleMonitor as SimpleStats;
-    #[deprecated(
-        since = "0.7.0",
-        note = "Use monitors::UserMonitor instead of stats::SimpleStats!"
-    )]
-    pub use crate::monitors::UserStats;
-}
-
 use alloc::string::{FromUtf8Error, String};
 use core::{array::TryFromSliceError, fmt, num::ParseIntError, num::TryFromIntError};
+pub use fuzzer::*;
 
 #[cfg(feature = "std")]
 use std::{env::VarError, io};

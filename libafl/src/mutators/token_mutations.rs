@@ -1,11 +1,19 @@
-//! Tokens are what afl calls extras or dictionaries.
+//! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
-use alloc::vec::Vec;
-use core::mem::size_of;
-use serde::{Deserialize, Serialize};
-
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
+#[cfg(target_os = "linux")]
+use alloc::string::ToString;
+use alloc::vec::Vec;
+use core::slice::Iter;
+use core::{
+    mem::size_of,
+    ops::{Add, AddAssign},
+};
+#[cfg(target_os = "linux")]
+use core::{ptr::null, slice::from_raw_parts};
+use hashbrown::HashSet;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -14,7 +22,7 @@ use std::{
 };
 
 use crate::{
-    bolts::rands::Rand,
+    bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, Input},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{CmpValues, CmpValuesMetadata},
@@ -23,9 +31,12 @@ use crate::{
 };
 
 /// A state metadata holding a list of tokens
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct Tokens {
-    token_vec: Vec<Vec<u8>>,
+    // We keep a vec and a set, set for faster deduplication, vec for access
+    tokens_vec: Vec<Vec<u8>>,
+    tokens_set: HashSet<Vec<u8>>,
 }
 
 crate::impl_serdeany!(Tokens);
@@ -34,18 +45,90 @@ crate::impl_serdeany!(Tokens);
 impl Tokens {
     /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
     #[must_use]
-    pub fn new(token_vec: Vec<Vec<u8>>) -> Self {
-        Self { token_vec }
+    pub fn new() -> Self {
+        Self {
+            ..Tokens::default()
+        }
+    }
+
+    /// Add tokens from a slice of Vecs of bytes
+    pub fn add_tokens<IT, V>(&mut self, tokens: IT) -> &mut Self
+    where
+        IT: IntoIterator<Item = V>,
+        V: AsRef<Vec<u8>>,
+    {
+        for token in tokens {
+            self.add_token(token.as_ref());
+        }
+        self
+    }
+
+    /// Build tokens from files
+    #[cfg(feature = "std")]
+    pub fn add_from_files<IT, P>(mut self, files: IT) -> Result<Self, Error>
+    where
+        IT: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        for file in files {
+            self.add_from_file(file)?;
+        }
+        Ok(self)
+    }
+
+    /// Create a token section from a start and an end pointer
+    /// Reads from an autotokens section, returning the count of new entries read
+    #[must_use]
+    #[cfg(target_os = "linux")]
+    pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
+        let mut ret = Self::default();
+        if token_start == null() || token_stop == null() {
+            return Err(Error::IllegalArgument("token_start or token_stop is null. If you are using autotokens() you likely did not build your target with the \"AutoTokens\"-pass".to_string()));
+        }
+        if token_stop <= token_start {
+            return Err(Error::IllegalArgument(format!(
+                "Tried to create tokens from illegal section: stop < start ({:?} < {:?})",
+                token_stop, token_start
+            )));
+        }
+        let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
+        // println!("size: {}", section_size);
+        let slice = from_raw_parts(token_start, section_size);
+
+        let mut head = 0;
+
+        // Now we know the beginning and the end of the token section.. let's parse them into tokens
+        loop {
+            if head >= section_size {
+                // Sanity Check
+                assert!(head == section_size);
+                break;
+            }
+            let size = slice[head] as usize;
+            head += 1;
+            if size > 0 {
+                ret.add_token(&slice[head..head + size].to_vec());
+                /* #[cfg(feature = "std")]
+                println!(
+                    "Token size: {} content: {:x?}",
+                    size,
+                    &slice[head..head + size].to_vec()
+                ); */
+                head += size;
+            }
+        }
+
+        Ok(ret)
     }
 
     /// Creates a new instance from a file
     #[cfg(feature = "std")]
-    pub fn from_tokens_file<P>(file: P) -> Result<Self, Error>
+    pub fn from_file<P>(file: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
-        let mut ret = Self::new(vec![]);
-        ret.add_tokens_from_file(file)?;
+        let mut ret = Self::new();
+        ret.add_from_file(file)?;
         Ok(ret)
     }
 
@@ -53,21 +136,19 @@ impl Tokens {
     /// Returns `false` if the token was already present and did not get added.
     #[allow(clippy::ptr_arg)]
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
-        if self.token_vec.contains(token) {
+        if !self.tokens_set.insert(token.clone()) {
             return false;
         }
-        self.token_vec.push(token.clone());
+        self.tokens_vec.push(token.clone());
         true
     }
 
     /// Reads a tokens file, returning the count of new entries read
     #[cfg(feature = "std")]
-    pub fn add_tokens_from_file<P>(&mut self, file: P) -> Result<u32, Error>
+    pub fn add_from_file<P>(&mut self, file: P) -> Result<&mut Self, Error>
     where
         P: AsRef<Path>,
     {
-        let mut entries = 0;
-
         // println!("Loading tokens file {:?} ...", file);
 
         let file = File::open(file)?; // panic if not found
@@ -110,18 +191,96 @@ impl Tokens {
             };
 
             // add
-            if self.add_token(&token) {
-                entries += 1;
-            }
+            self.add_token(&token);
         }
 
-        Ok(entries)
+        Ok(self)
+    }
+
+    /// Returns the amount of tokens in this Tokens instance
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.tokens_vec.len()
+    }
+
+    /// Returns if this tokens-instance is empty
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.tokens_vec.is_empty()
     }
 
     /// Gets the tokens stored in this db
     #[must_use]
     pub fn tokens(&self) -> &[Vec<u8>] {
-        &self.token_vec
+        &self.tokens_vec
+    }
+}
+
+impl AddAssign for Tokens {
+    fn add_assign(&mut self, other: Self) {
+        self.add_tokens(&other);
+    }
+}
+
+impl AddAssign<&[Vec<u8>]> for Tokens {
+    fn add_assign(&mut self, other: &[Vec<u8>]) {
+        self.add_tokens(other);
+    }
+}
+
+impl Add<&[Vec<u8>]> for Tokens {
+    type Output = Self;
+    fn add(self, other: &[Vec<u8>]) -> Self {
+        let mut ret = self;
+        ret.add_tokens(other);
+        ret
+    }
+}
+
+impl Add for Tokens {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        self.add(other.tokens_vec.as_slice())
+    }
+}
+
+impl<IT, V> From<IT> for Tokens
+where
+    IT: IntoIterator<Item = V>,
+    V: AsRef<Vec<u8>>,
+{
+    fn from(tokens: IT) -> Self {
+        let mut ret = Self::default();
+        ret.add_tokens(tokens);
+        ret
+    }
+}
+
+impl AsSlice<Vec<u8>> for Tokens {
+    fn as_slice(&self) -> &[Vec<u8>] {
+        self.tokens()
+    }
+}
+
+impl Add for &Tokens {
+    type Output = Tokens;
+
+    fn add(self, other: Self) -> Tokens {
+        let mut ret: Tokens = self.clone();
+        ret.add_tokens(other);
+        ret
+    }
+}
+
+impl<'a, 'it> IntoIterator for &'it Tokens {
+    type Item = <Iter<'it, Vec<u8>> as Iterator>::Item;
+    type IntoIter = Iter<'it, Vec<u8>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
     }
 }
 
@@ -253,7 +412,7 @@ impl TokenReplace {
 }
 
 /// A `I2SRandReplace` [`Mutator`] replaces a random matching input-2-state comparison operand with the other.
-/// it needs a valid [`CmpValuesMetadata`] in the state.
+/// It needs a valid [`CmpValuesMetadata`] in the state.
 #[derive(Debug, Default)]
 pub struct I2SRandReplace;
 
@@ -457,7 +616,7 @@ token1="A\x41A"
 token2="B"
         "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
-        let tokens = Tokens::from_tokens_file(&"test.tkns").unwrap();
+        let tokens = Tokens::from_file(&"test.tkns").unwrap();
         #[cfg(feature = "std")]
         println!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);

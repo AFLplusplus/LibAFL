@@ -3,35 +3,7 @@
 use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
 
 use alloc::boxed::Box;
-use core::{
-    any::{Any, TypeId},
-    fmt::Debug,
-    ptr::addr_of,
-};
-
-// yolo
-
-/// Get a `type_id` from its previously unpacked `u64`.
-/// Opposite of [`unpack_type_id(id)`].
-///
-/// # Safety
-/// Probably not safe for future compilers, fine for now.
-#[must_use]
-pub fn pack_type_id(id: u64) -> TypeId {
-    assert_eq_size!(TypeId, u64);
-    unsafe { *(addr_of!(id) as *const TypeId) }
-}
-
-/// Unpack a `type_id` to an `u64`
-/// Opposite of [`pack_type_id(id)`].
-///
-/// # Safety
-/// Probably not safe for future compilers, fine for now.
-#[must_use]
-pub fn unpack_type_id(id: TypeId) -> u64 {
-    assert_eq_size!(TypeId, u64);
-    unsafe { *(addr_of!(id) as *const u64) }
-}
+use core::{any::Any, fmt::Debug};
 
 /// A (de)serializable Any trait
 pub trait SerdeAny: Any + erased_serde::Serialize + Debug {
@@ -97,7 +69,7 @@ macro_rules! create_serde_registry_for_trait {
         pub mod $mod_name {
 
             use alloc::boxed::Box;
-            use core::any::{Any, TypeId};
+            use core::any::TypeId;
             use core::fmt;
             use postcard;
             use serde::{Deserialize, Serialize};
@@ -105,8 +77,9 @@ macro_rules! create_serde_registry_for_trait {
             use hashbrown::hash_map::{Keys, Values, ValuesMut};
             use hashbrown::HashMap;
 
-            use $crate::bolts::serdeany::{
-                pack_type_id, unpack_type_id, DeserializeCallback, DeserializeCallbackSeed,
+            use $crate::bolts::{
+                anymap::{pack_type_id, unpack_type_id},
+                serdeany::{DeserializeCallback, DeserializeCallbackSeed},
             };
             use $crate::Error;
 
@@ -336,7 +309,7 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn get<T>(&self, name: &str) -> Option<&T>
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
@@ -364,7 +337,7 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn get_mut<T>(&mut self, name: &str) -> Option<&mut T>
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
@@ -403,7 +376,7 @@ macro_rules! create_serde_registry_for_trait {
                     >,
                 >
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     #[allow(clippy::manual_map)]
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
@@ -446,7 +419,7 @@ macro_rules! create_serde_registry_for_trait {
                     >,
                 >
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     #[allow(clippy::manual_map)]
                     match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
@@ -492,9 +465,9 @@ macro_rules! create_serde_registry_for_trait {
                 /// Run `func` for each element in this map.
                 #[inline]
                 #[allow(unused_qualifications)]
-                pub fn for_each(
+                pub fn for_each<F: FnMut(&TypeId, &Box<dyn $trait_name>) -> Result<(), Error>>(
                     &self,
-                    func: fn(&TypeId, &Box<dyn $trait_name>) -> Result<(), Error>,
+                    func: &mut F,
                 ) -> Result<(), Error> {
                     for (id, h) in self.map.iter() {
                         for x in h.values() {
@@ -506,9 +479,11 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Run `func` for each element in this map, getting a mutable borrow.
                 #[inline]
-                pub fn for_each_mut(
+                pub fn for_each_mut<
+                    F: FnMut(&TypeId, &mut Box<dyn $trait_name>) -> Result<(), Error>,
+                >(
                     &mut self,
-                    func: fn(&TypeId, &mut Box<dyn $trait_name>) -> Result<(), Error>,
+                    func: &mut F,
                 ) -> Result<(), Error> {
                     for (id, h) in self.map.iter_mut() {
                         for x in h.values_mut() {
@@ -550,7 +525,7 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn contains_type<T>(&self) -> bool
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     self.map.contains_key(&unpack_type_id(TypeId::of::<T>()))
                 }
@@ -560,7 +535,7 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn contains<T>(&self, name: &str) -> bool
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => false,
@@ -592,7 +567,7 @@ macro_rules! create_serde_registry_for_trait {
             {
                 use serde::ser::SerializeSeq;
 
-                let id = $crate::bolts::serdeany::unpack_type_id(self.type_id());
+                let id = $crate::bolts::anymap::unpack_type_id(self.type_id());
                 let mut seq = se.serialize_seq(Some(2))?;
                 seq.serialize_element(&id)?;
                 seq.serialize_element(&$crate::bolts::serdeany::Wrap(self))?;

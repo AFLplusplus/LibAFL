@@ -15,10 +15,10 @@ use core::{
 };
 use serde::{Deserialize, Serialize};
 
-/// A Struct for managing MOpt-mutator parameters
-/// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode
-/// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator
-/// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator
+/// A Struct for managing MOpt-mutator parameters.
+/// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode.
+/// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator.
+/// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator.
 /// With the current implementation we are always in the pacemaker fuzzing mode.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct MOpt {
@@ -459,6 +459,7 @@ where
                     }
                 }
 
+                #[allow(clippy::cast_lossless)]
                 if mopt.pilot_time > mopt.period_pilot {
                     let new_finds = mopt.total_finds - mopt.finds_until_last_swarm;
                     let f = (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));
@@ -619,7 +620,7 @@ where
         &self.mutations
     }
 
-    // Get the mutations (mut)
+    // Get the mutations (mutable)
     #[inline]
     fn mutations_mut(&mut self) -> &mut MT {
         &mut self.mutations

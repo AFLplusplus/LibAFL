@@ -6,24 +6,21 @@ use core::{
     time::Duration,
 };
 use std::{
-    fs::{File, OpenOptions},
-    io::{self, prelude::*, ErrorKind, SeekFrom},
-    os::unix::{
-        io::{AsRawFd, RawFd},
-        process::CommandExt,
-    },
+    io::{self, prelude::*, ErrorKind},
+    os::unix::{io::RawFd, process::CommandExt},
     process::{Command, Stdio},
 };
 
 use crate::{
     bolts::{
+        fs::OutFile,
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
-    observers::ObserversTuple,
+    observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     Error,
 };
 
@@ -155,47 +152,6 @@ impl ConfigTarget for Command {
     }
 }
 
-/// The [`OutFile`] to write input to.
-/// The target/forkserver will read from this file.
-#[derive(Debug)]
-pub struct OutFile {
-    /// The file
-    file: File,
-}
-
-impl OutFile {
-    /// Creates a new [`OutFile`]
-    pub fn new(file_name: &str) -> Result<Self, Error> {
-        let f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(file_name)?;
-        Ok(Self { file: f })
-    }
-
-    /// Gets the file as raw file descriptor
-    #[must_use]
-    pub fn as_raw_fd(&self) -> RawFd {
-        self.file.as_raw_fd()
-    }
-
-    /// Writes the given buffer to the file
-    pub fn write_buf(&mut self, buf: &[u8]) {
-        self.rewind();
-        self.file.write_all(buf).unwrap();
-        self.file.set_len(buf.len() as u64).unwrap();
-        self.file.flush().unwrap();
-        // Rewind again otherwise the target will not read stdin from the beginning
-        self.rewind();
-    }
-
-    /// Rewinds the file to the beginning
-    pub fn rewind(&mut self) {
-        self.file.seek(SeekFrom::Start(0)).unwrap();
-    }
-}
-
 /// The [`Forkserver`] is communication channel with a child process that forks on request of the fuzzer.
 /// The communication happens via pipe.
 #[derive(Debug)]
@@ -232,6 +188,7 @@ impl Forkserver {
             .stdout(stdout)
             .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
+            .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
@@ -243,12 +200,12 @@ impl Forkserver {
             )
             .spawn()
         {
-            Ok(_) => {}
+            Ok(_) => (),
             Err(err) => {
                 return Err(Error::Forkserver(format!(
                     "Could not spawn the forkserver: {:#?}",
                     err
-                )));
+                )))
             }
         };
 
@@ -304,7 +261,6 @@ impl Forkserver {
 
         let rlen = self.st_pipe.read(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
-
         Ok((rlen, val))
     }
 
@@ -434,7 +390,7 @@ where
             None => {
                 self.executor
                     .out_file_mut()
-                    .write_buf(input.target_bytes().as_slice());
+                    .write_buf(input.target_bytes().as_slice())?;
             }
         }
 
@@ -515,6 +471,8 @@ where
     observers: OT,
     map: Option<SP::ShMem>,
     phantom: PhantomData<(I, S)>,
+    /// Cache that indicates if we have a asan observer registered.
+    has_asan_observer: Option<bool>,
 }
 
 impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
@@ -597,7 +555,7 @@ where
             }
         }
 
-        let out_file = OutFile::new(&out_filename)?;
+        let out_file = OutFile::create(&out_filename)?;
 
         let map = match shmem_provider {
             None => None,
@@ -647,6 +605,7 @@ where
         }
 
         Ok(Self {
+            has_asan_observer: None, // initialized on first use
             target,
             args,
             out_file,
@@ -706,7 +665,7 @@ where
                     .copy_from_slice(target_bytes.as_slice());
             }
             None => {
-                self.out_file.write_buf(input.target_bytes().as_slice());
+                self.out_file.write_buf(input.target_bytes().as_slice())?;
             }
         }
 
@@ -745,6 +704,19 @@ where
 
         if libc::WIFSIGNALED(self.forkserver.status()) {
             exit_kind = ExitKind::Crash;
+            if self.has_asan_observer.is_none() {
+                self.has_asan_observer = Some(
+                    self.observers()
+                        .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                        .is_some(),
+                );
+            }
+            if self.has_asan_observer.unwrap() {
+                self.observers_mut()
+                    .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                    .unwrap()
+                    .parse_asan_output_from_asan_log_file(pid)?;
+            }
         }
 
         self.forkserver.set_child_pid(Pid::from_raw(0));

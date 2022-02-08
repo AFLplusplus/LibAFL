@@ -1,4 +1,4 @@
-//! Monitor to disply both cumulative and per-client monitor
+//! Monitor to display both cumulative and per-client monitor
 
 use alloc::{string::String, vec::Vec};
 use core::time::Duration;

@@ -30,7 +30,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::MultiMonitor,
+    monitors::tui::TuiMonitor,
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -141,7 +141,7 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = TuiMonitor::new("Test fuzzer on libpng".into(), true);
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
@@ -186,7 +186,7 @@ pub fn libafl_main() {
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::new(vec![
+            state.add_metadata(Tokens::from([
                 vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                 "IHDR".as_bytes().to_vec(),
                 "IDAT".as_bytes().to_vec(),

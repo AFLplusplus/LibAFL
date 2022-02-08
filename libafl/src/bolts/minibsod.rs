@@ -1,4 +1,4 @@
-//! Implements a mini-bsod generator
+//! Implements a mini-bsod generator.
 //! It dumps all important registers and prints a stacktrace.
 //! You may use the [`crate::bolts::os::unix_signals::ucontext`]
 //! function to get a [`ucontext_t`].
@@ -8,7 +8,7 @@ use std::io::{BufWriter, Write};
 
 use crate::bolts::os::unix_signals::{ucontext_t, Signal};
 
-/// Write the contens of all important registers
+/// Write the content of all important registers
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
@@ -44,7 +44,7 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
-/// Write the contens of all important registers
+/// Write the content of all important registers
 #[cfg(all(
     any(target_os = "linux", target_os = "android"),
     target_arch = "aarch64"
@@ -68,7 +68,7 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
-/// Write the contens of all important registers
+/// Write the content of all important registers
 #[cfg(all(target_os = "linux", target_arch = "arm"))]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -96,7 +96,7 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
-/// Write the contens of all important registers
+/// Write the content of all important registers
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
@@ -120,7 +120,7 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
-/// Write the contens of all important registers
+/// Write the content of all important registers
 #[allow(clippy::unnecessary_wraps, clippy::similar_names)]
 #[cfg(all(target_vendor = "apple", target_arch = "x86_64"))]
 pub fn dump_registers<W: Write>(

@@ -6,7 +6,22 @@ pub use map::*;
 pub mod cmp;
 pub use cmp::*;
 
+#[cfg(feature = "std")]
+pub mod stdio;
+#[cfg(feature = "std")]
+pub use stdio::{StdErrObserver, StdOutObserver};
+
+#[cfg(feature = "std")]
+pub mod stacktrace;
+#[cfg(feature = "std")]
+pub use stacktrace::*;
+
 pub mod concolic;
+
+#[cfg(unstable_feature)]
+pub mod owned;
+#[cfg(unstable_feature)]
+pub use owned::*;
 
 use alloc::string::{String, ToString};
 use core::{fmt::Debug, time::Duration};
@@ -17,6 +32,7 @@ use crate::{
         current_time,
         tuples::{MatchName, Named},
     },
+    executors::ExitKind,
     Error,
 };
 
@@ -36,9 +52,31 @@ pub trait Observer<I, S>: Named + Debug {
         Ok(())
     }
 
-    /// Called right after execution finish.
+    /// Called right after execution finishes.
     #[inline]
-    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Called right before execution starts in the child process, if any.
+    #[inline]
+    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Called right after execution finishes in the child process, if any.
+    #[inline]
+    fn post_exec_child(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -49,7 +87,23 @@ pub trait ObserversTuple<I, S>: MatchName + Debug {
     fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 
     /// This is called right after the last execution
-    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error>;
+
+    /// This is called right before the next execution in the child process, if any.
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+
+    /// This is called right after the last execution in the child process, if any.
+    fn post_exec_child_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error>;
 }
 
 impl<I, S> ObserversTuple<I, S> for () {
@@ -57,7 +111,25 @@ impl<I, S> ObserversTuple<I, S> for () {
         Ok(())
     }
 
-    fn post_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec_all(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn pre_exec_child_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_exec_child_all(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -72,12 +144,41 @@ where
         self.1.pre_exec_all(state, input)
     }
 
-    fn post_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.0.post_exec(state, input)?;
-        self.1.post_exec_all(state, input)
+    fn post_exec_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.0.post_exec(state, input, exit_kind)?;
+        self.1.post_exec_all(state, input, exit_kind)
+    }
+
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+        self.0.pre_exec_child(state, input)?;
+        self.1.pre_exec_child_all(state, input)
+    }
+
+    fn post_exec_child_all(
+        &mut self,
+        state: &mut S,
+        input: &I,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
+        self.0.post_exec_child(state, input, exit_kind)?;
+        self.1.post_exec_child_all(state, input, exit_kind)
     }
 }
 
+/// A trait for obervers with a hash field
+pub trait ObserverWithHashField {
+    /// get the value of the hash field
+    fn hash(&self) -> &Option<u64>;
+    /// update the hash field with the given value
+    fn update_hash(&mut self, hash: u64);
+    /// clears the current value of the hash and sets it to None
+    fn clear_hash(&mut self);
+}
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
@@ -111,7 +212,12 @@ impl<I, S> Observer<I, S> for TimeObserver {
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
         Ok(())
     }

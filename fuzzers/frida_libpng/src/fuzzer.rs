@@ -45,11 +45,12 @@ use libafl::{
 };
 
 use libafl_frida::{
-    coverage_rt::MAP_SIZE,
-    executor::FridaInProcessExecutor,
-    helper::{FridaHelper, FridaInstrumentationHelper},
-    FridaOptions,
+    coverage_rt::CoverageRuntime, coverage_rt::MAP_SIZE, executor::FridaInProcessExecutor,
+    helper::FridaInstrumentationHelper, FridaOptions,
 };
+
+#[cfg(unix)]
+use libafl_frida::asan::asan_rt::AsanRuntime;
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 #[cfg(unix)]
@@ -208,17 +209,20 @@ unsafe fn fuzz(
 
         let gum = Gum::obtain();
         let frida_options = FridaOptions::parse_env_options();
+        let coverage = CoverageRuntime::new();
+        // let asan = AsanRuntime::new(frida_options.clone());
         let mut frida_helper = FridaInstrumentationHelper::new(
             &gum,
             &frida_options,
             module_name,
             modules_to_instrument,
+            tuple_list!(coverage),
         );
 
         // Create an observation channel using the coverage map
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
-            frida_helper.map_ptr_mut(),
+            frida_helper.map_ptr_mut().unwrap(),
             MAP_SIZE,
         ));
 
@@ -271,7 +275,7 @@ unsafe fn fuzz(
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::new(vec![
+            state.add_metadata(Tokens::from([
                 vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                 b"IHDR".to_vec(),
                 b"IDAT".to_vec(),
@@ -289,10 +293,7 @@ unsafe fn fuzz(
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        #[cfg(unix)]
-        frida_helper.register_thread();
         // Create the executor for an in-process function with just one observer for edge coverage
-
         #[cfg(unix)]
         let mut executor = FridaInProcessExecutor::new(
             &gum,

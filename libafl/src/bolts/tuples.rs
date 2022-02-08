@@ -163,14 +163,16 @@ where
 /// Match by type
 pub trait MatchType {
     /// Match by type and call the passed `f` function with a borrow, if found
-    fn match_type<T: 'static>(&self, f: fn(t: &T));
+    fn match_type<T: 'static, FN: FnMut(&T)>(&self, f: &mut FN);
     /// Match by type and call the passed `f` function with a mutable borrow, if found
-    fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T));
+    fn match_type_mut<T: 'static, FN: FnMut(&mut T)>(&mut self, f: &mut FN);
 }
 
 impl MatchType for () {
-    fn match_type<T: 'static>(&self, _f: fn(t: &T)) {}
-    fn match_type_mut<T: 'static>(&mut self, _f: fn(t: &mut T)) {}
+    /// Match by type and call the passed `f` function with a borrow, if found
+    fn match_type<T: 'static, FN: FnMut(&T)>(&self, _: &mut FN) {}
+    /// Match by type and call the passed `f` function with a mutable borrow, if found
+    fn match_type_mut<T: 'static, FN: FnMut(&mut T)>(&mut self, _: &mut FN) {}
 }
 
 impl<Head, Tail> MatchType for (Head, Tail)
@@ -178,20 +180,20 @@ where
     Head: 'static,
     Tail: MatchType,
 {
-    fn match_type<T: 'static>(&self, f: fn(t: &T)) {
+    fn match_type<T: 'static, FN: FnMut(&T)>(&self, f: &mut FN) {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             f(unsafe { (addr_of!(self.0) as *const T).as_ref() }.unwrap());
         }
-        self.1.match_type::<T>(f);
+        self.1.match_type::<T, FN>(f);
     }
 
-    fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T)) {
+    fn match_type_mut<T: 'static, FN: FnMut(&mut T)>(&mut self, f: &mut FN) {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
             f(unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }.unwrap());
         }
-        self.1.match_type_mut::<T>(f);
+        self.1.match_type_mut::<T, FN>(f);
     }
 }
 
@@ -363,7 +365,7 @@ where
     }
 }
 
-/// Merge two `TupeList`
+/// Merge two `TupleList`
 pub trait Merge<T> {
     /// The Resulting [`TupleList`], of an [`Merge::merge()`] call
     type MergeResult;

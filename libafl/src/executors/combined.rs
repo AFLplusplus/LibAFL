@@ -1,4 +1,5 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
+//! In comparison to the [`crate::executors::DiffExecutor`] it does not run the secondary executor in `run_target`.
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
@@ -50,7 +51,10 @@ where
         mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        self.primary.run_target(fuzzer, state, mgr, input)
+        let ret = self.primary.run_target(fuzzer, state, mgr, input);
+        self.primary.post_run_reset();
+        self.secondary.post_run_reset();
+        ret
     }
 }
 

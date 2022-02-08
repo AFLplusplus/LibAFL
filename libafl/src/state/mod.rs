@@ -26,8 +26,8 @@ use crate::{
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
-/// The [`State`] of the fuzzer
-/// Contains all important information about the current run
+/// The [`State`] of the fuzzer.
+/// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any timme.
 pub trait State: Serialize + DeserializeOwned {}
 
@@ -37,7 +37,7 @@ pub trait HasCorpus<I: Input> {
     type Corpus: Corpus<I>;
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
-    /// The testcase corpus (mut)
+    /// The testcase corpus (mutable)
     fn corpus_mut(&mut self) -> &mut Self::Corpus;
 }
 
@@ -55,7 +55,7 @@ pub trait HasSolutions<I: Input> {
     type Solutions: Corpus<I>;
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
-    /// The solutions corpus (mut)
+    /// The solutions corpus (mutable)
     fn solutions_mut(&mut self) -> &mut Self::Solutions;
 }
 
@@ -65,7 +65,7 @@ pub trait HasRand {
     type Rand: Rand;
     /// The rand instance
     fn rand(&self) -> &Self::Rand;
-    /// The rand instance (mut)
+    /// The rand instance (mutable)
     fn rand_mut(&mut self) -> &mut Self::Rand;
 }
 
@@ -80,7 +80,7 @@ pub trait HasClientPerfMonitor {
     /// This node's stability
     fn stability(&self) -> &Option<f32>;
 
-    /// This node's stability (mut)
+    /// This node's stability (mutable)
     fn stability_mut(&mut self) -> &mut Option<f32>;
 }
 
@@ -88,7 +88,7 @@ pub trait HasClientPerfMonitor {
 pub trait HasMetadata {
     /// A map, storing all metadata
     fn metadata(&self) -> &SerdeAnyMap;
-    /// A map, storing all metadata (mut)
+    /// A map, storing all metadata (mutable)
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap;
 
     /// Add a metadata to the metadata map
@@ -117,7 +117,7 @@ pub trait HasFeedbackStates {
     /// The feedback states
     fn feedback_states(&self) -> &Self::FeedbackStates;
 
-    /// The feedback states (mut)
+    /// The feedback states (mutable)
     fn feedback_states_mut(&mut self) -> &mut Self::FeedbackStates;
 }
 
@@ -126,7 +126,7 @@ pub trait HasExecutions {
     /// The executions counter
     fn executions(&self) -> &usize;
 
-    /// The executions counter (mut)
+    /// The executions counter (mutable)
     fn executions_mut(&mut self) -> &mut usize;
 }
 
@@ -135,7 +135,7 @@ pub trait HasStartTime {
     /// The starting time
     fn start_time(&self) -> &Duration;
 
-    /// The starting time (mut)
+    /// The starting time (mutable)
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
@@ -202,7 +202,7 @@ where
         &self.rand
     }
 
-    /// The rand instance (mut)
+    /// The rand instance (mutable)
     #[inline]
     fn rand_mut(&mut self) -> &mut Self::Rand {
         &mut self.rand
@@ -248,7 +248,7 @@ where
         &self.solutions
     }
 
-    /// Returns the solutions corpus (mut)
+    /// Returns the solutions corpus (mutable)
     #[inline]
     fn solutions_mut(&mut self) -> &mut SC {
         &mut self.solutions
@@ -292,7 +292,7 @@ where
         &self.feedback_states
     }
 
-    /// The feedback states (mut)
+    /// The feedback states (mutable)
     #[inline]
     fn feedback_states_mut(&mut self) -> &mut FT {
         &mut self.feedback_states
@@ -313,7 +313,7 @@ where
         &self.executions
     }
 
-    /// The executions counter (mut)
+    /// The executions counter (mutable)
     #[inline]
     fn executions_mut(&mut self) -> &mut usize {
         &mut self.executions
@@ -351,7 +351,7 @@ where
         &self.start_time
     }
 
-    /// The starting time (mut)
+    /// The starting time (mutable)
     #[inline]
     fn start_time_mut(&mut self) -> &mut Duration {
         &mut self.start_time
@@ -367,7 +367,7 @@ where
     FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    /// loads inputs from a directory
+    /// Loads inputs from a directory.
     /// If `forced` is `true`, the value will be loaded,
     /// even if it's not considered to be `interesting`.
     pub fn load_from_directory<E, EM, Z>(
@@ -447,7 +447,7 @@ where
         Ok(())
     }
 
-    /// Loads all intial inputs, even if they are not consiered `intesting`.
+    /// Loads all intial inputs, even if they are not considered `interesting`.
     /// This is rarely the right method, use `load_initial_inputs`,
     /// and potentially fix your `Feedback`, instead.
     pub fn load_initial_inputs_forced<E, EM, Z>(
@@ -602,7 +602,7 @@ where
         &self.stability
     }
 
-    /// This node's stability (mut)
+    /// This node's stability (mutable)
     #[inline]
     fn stability_mut(&mut self) -> &mut Option<f32> {
         &mut self.stability
@@ -632,7 +632,7 @@ where
         &self.stability
     }
 
-    /// This node's stability (mut)
+    /// This node's stability (mutable)
     #[inline]
     fn stability_mut(&mut self) -> &mut Option<f32> {
         &mut self.stability

@@ -5,6 +5,9 @@ pub use inprocess::InProcessExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub use inprocess::InProcessForkExecutor;
 
+pub mod differential;
+pub use differential::DiffExecutor;
+
 /// Timeout executor.
 /// Not possible on `no-std` Windows or `no-std`, but works for unix
 #[cfg(any(unix, feature = "std"))]
@@ -15,7 +18,7 @@ pub use timeout::TimeoutExecutor;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 pub mod forkserver;
 #[cfg(all(feature = "std", feature = "fork", unix))]
-pub use forkserver::{Forkserver, ForkserverExecutor, OutFile, TimeoutForkserverExecutor};
+pub use forkserver::{Forkserver, ForkserverExecutor, TimeoutForkserverExecutor};
 
 pub mod combined;
 pub use combined::CombinedExecutor;
@@ -52,11 +55,49 @@ pub enum ExitKind {
     Oom,
     /// The run timed out
     Timeout,
+    /// Special case for [`DiffExecutor`] when both exitkinds don't match
+    Diff {
+        /// The exitkind of the primary executor
+        primary: DiffExitKind,
+        /// The exitkind of the secondary executor
+        secondary: DiffExitKind,
+    },
+    // The run resulted in a custom `ExitKind`.
+    // Custom(Box<dyn SerdeAny>),
+}
+
+/// How one of the diffing executions finished.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum DiffExitKind {
+    /// The run exited normally.
+    Ok,
+    /// The run resulted in a target crash.
+    Crash,
+    /// The run hit an out of memory error.
+    Oom,
+    /// The run timed out
+    Timeout,
+    /// One of the executors itelf repots a differential, we can't go into further details.
+    Diff,
     // The run resulted in a custom `ExitKind`.
     // Custom(Box<dyn SerdeAny>),
 }
 
 crate::impl_serdeany!(ExitKind);
+
+impl From<ExitKind> for DiffExitKind {
+    fn from(exitkind: ExitKind) -> Self {
+        match exitkind {
+            ExitKind::Ok => DiffExitKind::Ok,
+            ExitKind::Crash => DiffExitKind::Crash,
+            ExitKind::Oom => DiffExitKind::Oom,
+            ExitKind::Timeout => DiffExitKind::Timeout,
+            ExitKind::Diff { .. } => DiffExitKind::Diff,
+        }
+    }
+}
+
+crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers<I, OT, S>: Debug
@@ -66,7 +107,7 @@ where
     /// Get the linked observers
     fn observers(&self) -> &OT;
 
-    /// Get the linked observers
+    /// Get the linked observers (mutable)
     fn observers_mut(&mut self) -> &mut OT;
 }
 
@@ -95,6 +136,10 @@ where
     {
         WithObservers::new(self, observers)
     }
+
+    /// Custom Reset Handler, e.g., to reset timers
+    #[inline]
+    fn post_run_reset(&mut self) {}
 }
 
 /// A simple executor that does nothing.

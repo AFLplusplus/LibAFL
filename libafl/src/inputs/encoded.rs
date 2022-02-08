@@ -1,5 +1,5 @@
 //! The `EncodedInput` is the "normal" input, a map of codes, that can be sent directly to the client
-//! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
+//! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 //! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
 use ahash::AHasher;
@@ -28,12 +28,13 @@ where
 /// Trait to decode encoded input to bytes
 pub trait InputDecoder {
     /// Decode encoded input to bytes
+    #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
-/// Tokenizer is a trait that can tokenize bytes into a ][`Vec`] of tokens
+/// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
 pub trait Tokenizer {
-    /// Tokanize the given bytes
+    /// Tokenize the given bytes
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error>;
 }
 
@@ -100,13 +101,13 @@ impl Default for TokenInputEncoderDecoder {
     }
 }
 
-/// A native tokenizer struct
+/// A naive tokenizer struct
 #[cfg(feature = "std")]
 #[derive(Clone, Debug)]
 pub struct NaiveTokenizer {
     /// Ident regex
     ident_re: Regex,
-    /// Comement regex
+    /// Comment regex
     comment_re: Regex,
     /// String regex
     string_re: Regex,
@@ -186,7 +187,7 @@ impl Tokenizer for NaiveTokenizer {
 }
 
 /// A codes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EncodedInput {
     /// The input representation as list of codes
     codes: Vec<u32>,

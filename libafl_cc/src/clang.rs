@@ -31,6 +31,10 @@ pub enum LLVMPasses {
     CmpLogRtn,
     /// The AFL coverage pass
     AFLCoverage,
+    /// The Autotoken pass
+    AutoTokens,
+    /// The Coverage Accouting (BB metric) pass
+    CoverageAccounting,
 }
 
 impl LLVMPasses {
@@ -42,6 +46,11 @@ impl LLVMPasses {
                 .join(format!("cmplog-routines-pass.{}", dll_extension())),
             LLVMPasses::AFLCoverage => PathBuf::from(env!("OUT_DIR"))
                 .join(format!("afl-coverage-pass.{}", dll_extension())),
+            LLVMPasses::AutoTokens => {
+                PathBuf::from(env!("OUT_DIR")).join(format!("autotokens-pass.{}", dll_extension()))
+            }
+            LLVMPasses::CoverageAccounting => PathBuf::from(env!("OUT_DIR"))
+                .join(format!("coverage-accounting-pass.{}", dll_extension())),
         }
     }
 }
@@ -110,14 +119,26 @@ impl CompilerWrapper for ClangWrapper {
             linking = false;
         }
 
+        let mut suppress_linking = 0;
         for arg in &args[1..] {
             match arg.as_ref() {
                 "--libafl-no-link" => {
-                    linking = false;
+                    suppress_linking += 1;
                     self.has_libafl_arg = true;
                     continue;
                 }
                 "--libafl" => {
+                    suppress_linking += 1337;
+                    self.has_libafl_arg = true;
+                    continue;
+                }
+                "-fsanitize=fuzzer-no-link" => {
+                    suppress_linking += 1;
+                    self.has_libafl_arg = true;
+                    continue;
+                }
+                "-fsanitize=fuzzer" => {
+                    suppress_linking += 1337;
                     self.has_libafl_arg = true;
                     continue;
                 }
@@ -131,6 +152,17 @@ impl CompilerWrapper for ClangWrapper {
             };
             new_args.push(arg.as_ref().to_string());
         }
+        if linking && suppress_linking > 0 && suppress_linking < 1337 {
+            linking = false;
+            new_args.push(
+                PathBuf::from(env!("OUT_DIR"))
+                    .join(format!("{}no-link-rt.{}", LIB_PREFIX, LIB_EXT))
+                    .into_os_string()
+                    .into_string()
+                    .unwrap(),
+            );
+        }
+
         self.linking = linking;
 
         if self.optimize {
@@ -148,6 +180,11 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push("-lws2_32".into());
             new_args.push("-lBcrypt".into());
             new_args.push("-lAdvapi32".into());
+        }
+        // required by timer API (timer_create, timer_settime)
+        #[cfg(target_os = "linux")]
+        if linking {
+            new_args.push("-lrt".into());
         }
         // MacOS has odd linker behavior sometimes
         #[cfg(target_vendor = "apple")]

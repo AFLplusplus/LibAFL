@@ -11,14 +11,14 @@ use crate::{
     emu::{Emulator, MmapPerms},
     executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple},
-    SYS_mmap, SYS_mprotect, SYS_mremap,
+    GuestAddr, SYS_mmap, SYS_mprotect, SYS_mremap,
 };
 
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 
 #[derive(Debug)]
 pub struct SnapshotPageInfo {
-    pub addr: u64,
+    pub addr: GuestAddr,
     pub perms: MmapPerms,
     pub private: bool,
     pub data: Option<Box<[u8; SNAPSHOT_PAGE_SIZE]>>,
@@ -26,9 +26,9 @@ pub struct SnapshotPageInfo {
 
 #[derive(Default, Debug)]
 pub struct SnapshotAccessInfo {
-    pub access_cache: [u64; 4],
+    pub access_cache: [GuestAddr; 4],
     pub access_cache_idx: usize,
-    pub dirty: HashSet<u64>,
+    pub dirty: HashSet<GuestAddr>,
 }
 
 impl SnapshotAccessInfo {
@@ -42,9 +42,9 @@ impl SnapshotAccessInfo {
 #[derive(Debug)]
 pub struct QemuSnapshotHelper {
     pub accesses: ThreadLocal<UnsafeCell<SnapshotAccessInfo>>,
-    pub new_maps: Mutex<IntervalTree<u64, Option<MmapPerms>>>,
-    pub pages: HashMap<u64, SnapshotPageInfo>,
-    pub brk: u64,
+    pub new_maps: Mutex<IntervalTree<GuestAddr, Option<MmapPerms>>>,
+    pub pages: HashMap<GuestAddr, SnapshotPageInfo>,
+    pub brk: GuestAddr,
     pub empty: bool,
 }
 
@@ -80,13 +80,13 @@ impl QemuSnapshotHelper {
                     }
                 }
                 self.pages.insert(addr, info);
-                addr += SNAPSHOT_PAGE_SIZE as u64;
+                addr += SNAPSHOT_PAGE_SIZE as GuestAddr;
             }
         }
         self.empty = false;
     }
 
-    pub fn page_access(&mut self, page: u64) {
+    pub fn page_access(&mut self, page: GuestAddr) {
         unsafe {
             let acc = self.accesses.get_or_default().get();
             if (*acc).access_cache[0] == page
@@ -103,11 +103,11 @@ impl QemuSnapshotHelper {
         }
     }
 
-    pub fn access(&mut self, addr: u64, size: usize) {
+    pub fn access(&mut self, addr: GuestAddr, size: usize) {
         debug_assert!(size > 0);
-        let page = addr & (SNAPSHOT_PAGE_SIZE as u64 - 1);
+        let page = addr & (SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
         self.page_access(page);
-        let second_page = (addr + size as u64 - 1) & (SNAPSHOT_PAGE_SIZE as u64 - 1);
+        let second_page = (addr + size as GuestAddr - 1) & (SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
         if page != second_page {
             self.page_access(second_page);
         }
@@ -129,14 +129,14 @@ impl QemuSnapshotHelper {
         emulator.set_brk(self.brk);
     }
 
-    pub fn add_mapped(&mut self, start: u64, mut size: usize, perms: Option<MmapPerms>) {
+    pub fn add_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
         self.new_maps
             .lock()
             .unwrap()
-            .insert(start..start + (size as u64), perms);
+            .insert(start..start + (size as GuestAddr), perms);
     }
 
     pub fn reset_maps(&mut self, emulator: &Emulator) {
@@ -213,7 +213,7 @@ pub fn trace_write1_snapshot<I, QT, S>(
     helpers: &mut QT,
     _state: &mut S,
     _id: u64,
-    addr: u64,
+    addr: GuestAddr,
 ) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
@@ -229,7 +229,7 @@ pub fn trace_write2_snapshot<I, QT, S>(
     helpers: &mut QT,
     _state: &mut S,
     _id: u64,
-    addr: u64,
+    addr: GuestAddr,
 ) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
@@ -245,7 +245,7 @@ pub fn trace_write4_snapshot<I, QT, S>(
     helpers: &mut QT,
     _state: &mut S,
     _id: u64,
-    addr: u64,
+    addr: GuestAddr,
 ) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
@@ -261,7 +261,7 @@ pub fn trace_write8_snapshot<I, QT, S>(
     helpers: &mut QT,
     _state: &mut S,
     _id: u64,
-    addr: u64,
+    addr: GuestAddr,
 ) where
     I: Input,
     QT: QemuHelperTuple<I, S>,
@@ -277,7 +277,7 @@ pub fn trace_write_n_snapshot<I, QT, S>(
     helpers: &mut QT,
     _state: &mut S,
     _id: u64,
-    addr: u64,
+    addr: GuestAddr,
     size: usize,
 ) where
     I: Input,
@@ -309,7 +309,7 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if result == u64::MAX
+    if result as GuestAddr == GuestAddr::MAX
     /* -1 */
     {
         return result;
@@ -319,19 +319,19 @@ where
             let h = helpers
                 .match_first_type_mut::<QemuSnapshotHelper>()
                 .unwrap();
-            h.add_mapped(result, a1 as usize, Some(prot));
+            h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
         }
     } else if i64::from(sys_num) == SYS_mremap {
         let h = helpers
             .match_first_type_mut::<QemuSnapshotHelper>()
             .unwrap();
-        h.add_mapped(result, a2 as usize, None);
+        h.add_mapped(result as GuestAddr, a2 as usize, None);
     } else if i64::from(sys_num) == SYS_mprotect {
         if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
             let h = helpers
                 .match_first_type_mut::<QemuSnapshotHelper>()
                 .unwrap();
-            h.add_mapped(a0, a2 as usize, Some(prot));
+            h.add_mapped(a0 as GuestAddr, a2 as usize, Some(prot));
         }
     }
     result

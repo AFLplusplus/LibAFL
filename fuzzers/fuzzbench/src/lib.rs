@@ -54,6 +54,9 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
+#[cfg(target_os = "linux")]
+use libafl_targets::autotokens;
+
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
 pub fn libafl_main() {
@@ -352,9 +355,18 @@ fn fuzz(
     let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Read tokens
-    if let Some(tokenfile) = tokenfile {
-        if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::from_tokens_file(tokenfile)?);
+    if state.metadata().get::<Tokens>().is_none() {
+        let mut toks = Tokens::default();
+        if let Some(tokenfile) = tokenfile {
+            toks.add_from_file(tokenfile)?;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            toks += autotokens()?;
+        }
+
+        if !toks.is_empty() {
+            state.add_metadata(toks);
         }
     }
 

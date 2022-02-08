@@ -17,7 +17,7 @@ use libafl::{
         CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
         QueueCorpusScheduler,
     },
-    events::EventConfig,
+    events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
@@ -44,18 +44,18 @@ pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
     #[builder(default = None, setter(strip_option))]
     configuration: Option<String>,
     /// Timeout of the executor
-    #[builder(default = None, setter(strip_option))]
+    #[builder(default = None)]
     timeout: Option<u64>,
     /// Input directories
     input_dirs: &'a [PathBuf],
     /// Output directory
     output_dir: PathBuf,
     /// Dictionary
-    #[builder(default = None, setter(strip_option))]
+    #[builder(default = None)]
     tokens_file: Option<PathBuf>,
     // Flag if use CmpLog
-    //#[builder(default = false)]
-    //use_cmplog: bool,
+    #[builder(default = None)]
+    use_cmplog: Option<bool>,
     #[builder(default = 1337_u16)]
     broker_port: u16,
     /// The list of cores to run on
@@ -74,6 +74,9 @@ pub struct ForkserverBytesCoverageSugar<'a, const MAP_SIZE: usize> {
     #[builder(default = false)]
     /// Print target program output
     debug_output: bool,
+    /// Fuzz `iterations` number of times, instead of indefinitely; implies use of `fuzz_loop_for`
+    #[builder(default = None)]
+    iterations: Option<u64>,
 }
 
 #[allow(clippy::similar_names)]
@@ -85,6 +88,10 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             Some(name) => EventConfig::from_name(name),
             None => EventConfig::AlwaysUnique,
         };
+
+        if self.use_cmplog.unwrap_or(false) {
+            println!("[WARNING] use of cmplog not currently supported, use_cmplog ignored.");
+        }
 
         let timeout = Duration::from_secs(self.timeout.unwrap_or(DEFAULT_TIMEOUT_SECS));
 
@@ -106,7 +113,9 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 
         let monitor = MultiMonitor::new(|s| println!("{}", s));
 
-        let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
+        let mut run_client = |state: Option<StdState<_, _, _, _, _>>,
+                              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                              _core_id| {
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
             shmem.write_to_env("__AFL_SHM_ID").unwrap();
@@ -157,7 +166,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             // Create a dictionary if not existing
             if let Some(tokens_file) = &self.tokens_file {
                 if state.metadata().get::<Tokens>().is_none() {
-                    state.add_metadata(Tokens::from_tokens_file(tokens_file)?);
+                    state.add_metadata(Tokens::from_file(tokens_file)?);
                 }
             }
 
@@ -230,7 +239,20 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 
                 // The order of the stages matter!
                 let mut stages = tuple_list!(mutational);
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+
+                if let Some(iters) = self.iterations {
+                    fuzzer.fuzz_loop_for(
+                        &mut stages,
+                        &mut executor,
+                        &mut state,
+                        &mut mgr,
+                        iters,
+                    )?;
+                    mgr.on_restart(&mut state)?;
+                    std::process::exit(0);
+                } else {
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                }
             } else {
                 // Setup a basic mutator
                 let mutator = StdScheduledMutator::new(havoc_mutations());
@@ -238,7 +260,20 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 
                 // The order of the stages matter!
                 let mut stages = tuple_list!(mutational);
-                fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+
+                if let Some(iters) = self.iterations {
+                    fuzzer.fuzz_loop_for(
+                        &mut stages,
+                        &mut executor,
+                        &mut state,
+                        &mut mgr,
+                        iters,
+                    )?;
+                    mgr.on_restart(&mut state)?;
+                    std::process::exit(0);
+                } else {
+                    fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
+                }
             }
 
             Ok(())
@@ -277,6 +312,10 @@ pub mod pybind {
         output_dir: PathBuf,
         broker_port: u16,
         cores: Cores,
+        use_cmplog: Option<bool>,
+        iterations: Option<u64>,
+        tokens_file: Option<PathBuf>,
+        timeout: Option<u64>,
     }
 
     #[pymethods]
@@ -288,12 +327,20 @@ pub mod pybind {
             output_dir: PathBuf,
             broker_port: u16,
             cores: Vec<usize>,
+            use_cmplog: Option<bool>,
+            iterations: Option<u64>,
+            tokens_file: Option<PathBuf>,
+            timeout: Option<u64>,
         ) -> Self {
             Self {
                 input_dirs,
                 output_dir,
                 broker_port,
                 cores: cores.into(),
+                use_cmplog,
+                iterations,
+                tokens_file,
+                timeout,
             }
         }
 
@@ -307,6 +354,10 @@ pub mod pybind {
                 .cores(&self.cores)
                 .program(program)
                 .arguments(&arguments)
+                .use_cmplog(self.use_cmplog)
+                .timeout(self.timeout)
+                .tokens_file(self.tokens_file.clone())
+                .iterations(self.iterations)
                 .build()
                 .run();
         }

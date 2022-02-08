@@ -8,9 +8,6 @@ use std::{
     os::unix::io::RawFd,
 };
 
-#[cfg(not(feature = "std"))]
-type RawFd = i32;
-
 /// A unix pipe wrapper for `LibAFL`
 #[cfg(feature = "std")]
 #[derive(Debug, Clone)]

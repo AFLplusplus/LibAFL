@@ -21,6 +21,7 @@ use crate::{
         tuples::Named,
         AsMutSlice, AsSlice, HasLen,
     },
+    executors::ExitKind,
     observers::Observer,
     Error,
 };
@@ -36,7 +37,7 @@ fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
     hasher.finish()
 }
 
-/// A [`MapObserver`] observes the static map, as oftentimes used for afl-like coverage information
+/// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
 pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug {
     /// Type of each entry in this map
     type Entry: PrimInt + Default + Copy + Debug;
@@ -69,7 +70,7 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     /// Get the initial value for reset()
     fn initial(&self) -> Self::Entry;
 
-    /// Get the initial value for reset()
+    /// Get the initial value for reset() (mutable)
     fn initial_mut(&mut self) -> &mut Self::Entry;
 
     /// Set the initial value for reset()
@@ -93,6 +94,19 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
         let mut res = Vec::with_capacity(cnt);
         for i in 0..cnt {
             res.push(*self.get(i));
+        }
+        res
+    }
+
+    /// Get the number of set entries with the specified indexes
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && *self.get(*i) != initial {
+                res += 1;
+            }
         }
         res
     }
@@ -241,22 +255,20 @@ where
     /// Creates a new [`MapObserver`]
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
-        let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: OwnedSliceMut::from(map),
             name: name.to_string(),
-            initial,
+            initial: T::default(),
         }
     }
 
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
     pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
-        let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: OwnedSliceMut::from(map),
             name: name.to_string(),
-            initial,
+            initial: T::default(),
         }
     }
 
@@ -266,16 +278,10 @@ where
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
     pub fn new_from_ownedref(name: &'static str, map: OwnedSliceMut<'a, T>) -> Self {
-        let map_slice = map.as_slice();
-        let initial = if map_slice.is_empty() {
-            T::default()
-        } else {
-            map_slice[0]
-        };
         Self {
             map,
             name: name.to_string(),
-            initial,
+            initial: T::default(),
         }
     }
 
@@ -284,11 +290,10 @@ where
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
-        let initial = if len > 0 { *map_ptr } else { T::default() };
         StdMapObserver {
             map: OwnedSliceMut::from_raw_parts_mut(map_ptr, len),
             name: name.to_string(),
-            initial,
+            initial: T::default(),
         }
     }
 }
@@ -433,11 +438,10 @@ where
     #[must_use]
     pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
         assert!(map.len() >= N);
-        let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: OwnedSliceMut::from(map),
             name: name.to_string(),
-            initial,
+            initial: T::default(),
         }
     }
 
@@ -458,11 +462,10 @@ where
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
     pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T) -> Self {
-        let initial = if N > 0 { *map_ptr } else { T::default() };
         ConstMapObserver {
             map: OwnedSliceMut::from_raw_parts_mut(map_ptr, N),
             name: name.to_string(),
-            initial,
+            initial: T::default(),
         }
     }
 }
@@ -603,12 +606,11 @@ where
 {
     /// Creates a new [`MapObserver`]
     pub fn new(name: &'static str, map: &'a mut [T], size: &'a mut usize) -> Self {
-        let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
             map: OwnedSliceMut::from(map),
             size: OwnedRefMut::Ref(size),
             name: name.into(),
-            initial,
+            initial: T::default(),
         }
     }
 
@@ -622,12 +624,11 @@ where
         max_len: usize,
         size: &'a mut usize,
     ) -> Self {
-        let initial = if max_len > 0 { *map_ptr } else { T::default() };
         VariableMapObserver {
             map: OwnedSliceMut::from_raw_parts_mut(map_ptr, max_len),
             size: OwnedRefMut::Ref(size),
             name: name.into(),
-            initial,
+            initial: T::default(),
         }
     }
 }
@@ -667,12 +668,12 @@ where
     }
 
     #[inline]
-    fn post_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let cnt = self.usable_count();
         for i in 0..cnt {
             *self.get_mut(i) = COUNT_CLASS_LOOKUP[*self.get(i) as usize];
         }
-        self.base.post_exec(state, input)
+        self.base.post_exec(state, input, exit_kind)
     }
 }
 
@@ -903,14 +904,10 @@ where
     pub fn new(name: &'static str, maps: &'a mut [&'a mut [T]]) -> Self {
         let mut idx = 0;
         let mut v = 0;
-        let mut initial = T::default();
         let mut builder = vec![];
         let maps: Vec<_> = maps
             .iter_mut()
             .map(|x| {
-                if !x.is_empty() {
-                    initial = x[0];
-                }
                 let l = x.len();
                 let r = (idx..(idx + l), v);
                 idx += l;
@@ -924,7 +921,7 @@ where
             intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
             len: idx,
             name: name.to_string(),
-            initial,
+            initial: T::default(),
             iter_idx: 0,
         }
     }
@@ -934,14 +931,10 @@ where
     pub fn new_owned(name: &'static str, maps: Vec<Vec<T>>) -> Self {
         let mut idx = 0;
         let mut v = 0;
-        let mut initial = T::default();
         let mut builder = vec![];
         let maps: Vec<_> = maps
             .into_iter()
             .map(|x| {
-                if !x.is_empty() {
-                    initial = x[0];
-                }
                 let l = x.len();
                 let r = (idx..(idx + l), v);
                 idx += l;
@@ -955,7 +948,7 @@ where
             intervals: builder.into_iter().collect::<IntervalTree<usize, usize>>(),
             len: idx,
             name: name.to_string(),
-            initial,
+            initial: T::default(),
             iter_idx: 0,
         }
     }
