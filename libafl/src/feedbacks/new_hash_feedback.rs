@@ -64,7 +64,7 @@ where
 {
     /// Create a new [`NewHashFeedbackState`]
     #[must_use]
-    pub fn new(name: &'static str) -> Self {
+    pub fn new(name: &str) -> Self {
         Self {
             hash_set: HashSet::<T>::new(),
             name: name.to_string(),
@@ -101,18 +101,21 @@ where
 
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewHashFeedback<O> {
+pub struct NewHashFeedback<O, T> {
     feedback_name: String,
     observer_name: String,
-    o_type: PhantomData<O>,
+    phantom: PhantomData<(O, T)>,
 }
 
-impl<I, S, O> Feedback<I, S> for NewHashFeedback<O>
+impl<I, O, S, T> Feedback<I, S> for NewHashFeedback<O, T>
 where
     I: Input,
     S: HasClientPerfMonitor + HasFeedbackStates,
     O: ObserverWithHashField + Named + Debug,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
+    type FeedbackState = NewHashFeedbackState<T>;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -147,18 +150,23 @@ where
             }
         }
     }
+
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(Self::FeedbackState::new(&self.observer_name))
+    }
 }
 
-impl<O> Named for NewHashFeedback<O> {
+impl<O, T> Named for NewHashFeedback<O, T> {
     #[inline]
     fn name(&self) -> &str {
         &self.feedback_name
     }
 }
 
-impl<O> NewHashFeedback<O>
+impl<O, T> NewHashFeedback<O, T>
 where
     O: ObserverWithHashField + Named + Debug,
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
     /// Returns a new [`NewHashFeedback`]. Carefull, it's recommended to use `new_with_observer`
     /// Setting an observer name that doesn't exist would eventually trigger a panic.
@@ -167,7 +175,7 @@ where
         Self {
             feedback_name: feedback_name.to_string(),
             observer_name: observer_name.to_string(),
-            o_type: PhantomData,
+            phantom: PhantomData,
         }
     }
 
@@ -177,7 +185,7 @@ where
         Self {
             feedback_name: feedback_name.to_string(),
             observer_name: observer.name().to_string(),
-            o_type: PhantomData,
+            phantom: PhantomData,
         }
     }
 }

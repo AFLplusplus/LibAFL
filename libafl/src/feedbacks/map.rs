@@ -16,7 +16,7 @@ use crate::{
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::{Feedback, FeedbackState},
+    feedbacks::{Feedback, FeedbackState, NopFeedbackState},
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
@@ -311,7 +311,7 @@ where
 {
     /// Create new `MapFeedbackState`
     #[must_use]
-    pub fn new(name: &'static str, map_size: usize) -> Self {
+    pub fn new(name: &str, map_size: usize) -> Self {
         Self {
             history_map: vec![T::min_value(); map_size],
             name: name.to_string(),
@@ -327,16 +327,6 @@ where
         Self {
             history_map: vec![T::min_value(); map_observer.len()],
             name: map_observer.name().to_string(),
-        }
-    }
-
-    /// Create new `MapFeedbackState` using a name and a map.
-    /// The map can be shared.
-    #[must_use]
-    pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
-        Self {
-            history_map,
-            name: name.to_string(),
         }
     }
 }
@@ -360,6 +350,10 @@ where
     name: String,
     /// Name identifier of the observer
     observer_name: String,
+    /// The size of the initial [`MapFeedbackState`] map, at creation time.
+    state_map_size: usize,
+    /// Name of the [`MapFeedbackState`] (or its observer)
+    state_name: String,
     /// Phantom Data of Reducer
     phantom: PhantomData<(I, N, S, R, O, T)>,
 }
@@ -373,6 +367,8 @@ where
     I: Input,
     S: HasFeedbackStates + HasClientPerfMonitor + Debug,
 {
+    type FeedbackState = MapFeedbackState<T>;
+
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -470,6 +466,13 @@ where
         }
         Ok(())
     }
+
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(Self::FeedbackState::new(
+            &self.state_name,
+            self.state_map_size,
+        ))
+    }
 }
 
 impl<I, N, O, R, S, T> Named for MapFeedback<I, N, O, R, S, T>
@@ -510,6 +513,8 @@ where
             name: feedback_state.name().to_string(),
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
+            state_map_size: map_observer.len(),
+            state_name: map_observer.name().to_string(),
         }
     }
 
@@ -527,18 +532,22 @@ where
             name: feedback_state.name().to_string(),
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
+            state_map_size: map_observer.len(),
+            state_name: map_observer.name().to_string(),
         }
     }
 
     /// Create new `MapFeedback`
     #[must_use]
-    pub fn with_names(name: &'static str, observer_name: &'static str) -> Self {
+    pub fn with_names(name: &'static str, observer_name: &'static str, map_size: usize) -> Self {
         Self {
             indexes: None,
             novelties: None,
             name: name.to_string(),
             observer_name: observer_name.to_string(),
             phantom: PhantomData,
+            state_map_size: map_size,
+            state_name: observer_name.to_string(),
         }
     }
 
@@ -547,6 +556,7 @@ where
     pub fn with_names_tracking(
         name: &'static str,
         observer_name: &'static str,
+        map_size: usize,
         track_indexes: bool,
         track_novelties: bool,
     ) -> Self {
@@ -556,6 +566,8 @@ where
             observer_name: observer_name.to_string(),
             name: name.to_string(),
             phantom: PhantomData,
+            state_map_size: map_size,
+            state_name: observer_name.to_string(),
         }
     }
 }
@@ -599,6 +611,8 @@ where
     O: MapObserver<Entry = usize>,
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -629,6 +643,7 @@ where
         }
     }
 
+    #[inline]
     fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
@@ -640,6 +655,11 @@ where
     fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())
+    }
+
+    #[inline]
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 

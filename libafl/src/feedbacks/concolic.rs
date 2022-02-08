@@ -8,7 +8,7 @@ use crate::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, NopFeedbackState},
     inputs::Input,
     observers::{
         concolic::{ConcolicMetadata, ConcolicObserver},
@@ -51,6 +51,8 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -80,7 +82,13 @@ where
         Ok(())
     }
 
+    #[inline]
     fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
+    }
+
+    #[inline]
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }

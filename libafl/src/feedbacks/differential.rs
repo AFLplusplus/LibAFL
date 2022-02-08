@@ -12,7 +12,7 @@ use crate::{
     bolts::tuples::{MatchName, Named},
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, NopFeedbackState},
     inputs::Input,
     observers::{Observer, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata},
@@ -26,6 +26,21 @@ pub enum DiffResult {
     Equal,
     /// The two observers report different outcomes.
     Diff,
+}
+
+impl DiffResult {
+    /// Returns `true` if the two observers report the same outcome.
+    pub fn is_equal(&self) -> bool {
+        match self {
+            DiffResult::Equal => true,
+            DiffResult::Diff => false,
+        }
+    }
+
+    /// Returns `true` if the two observers report different outcomes.
+    pub fn is_diff(&self) -> bool {
+        !self.is_equal()
+    }
 }
 
 /// A [`DiffFeedback`] compares the content of two [`Observer`]s using the given compare function.
@@ -106,6 +121,8 @@ where
     O1: Observer<I, S> + PartialEq<O2>,
     O2: Observer<I, S>,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -130,6 +147,11 @@ where
             .ok_or_else(|| err(&self.o2_name))?;
 
         Ok(o1 != o2)
+    }
+
+    #[inline]
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 

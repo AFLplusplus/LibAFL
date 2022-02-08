@@ -51,6 +51,9 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// The feedback's state.
+    type FeedbackState: FeedbackState;
+
     /// `is_interesting ` return if an input is worth the addition to the corpus
     fn is_interesting<EM, OT>(
         &mut self,
@@ -97,7 +100,7 @@ where
         ret
     }
 
-    /// Append to the testcase the generated metadata in case of a new corpus item
+    /// Append generated mettadata to a testcase in case of a new corpus item
     #[inline]
     fn append_metadata(
         &mut self,
@@ -112,14 +115,74 @@ where
     fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Initializes the feedback state for this feedback.
+    /// This method will be called once during state setup, before the first run of a fuzzer.
+    /// This state will be available using `state.feedback_state()`.
+    /// When the fuzzer restarts, it will be serialized to disk and restored.
+    fn init_feedback_state(&mut self, state: &mut S) -> Result<Self::FeedbackState, Error>;
 }
 
 /// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
 /// of the fuzzer State
 pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug {
     /// Reset the internal state
+    #[inline]
     fn reset(&mut self) -> Result<(), Error> {
         Ok(())
+    }
+}
+
+/// An empty [`FeedbackState`] that persists nothing
+/// Use this if your feedback does not need to store any data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NopFeedbackState {}
+
+impl FeedbackState for NopFeedbackState {
+    #[inline]
+    fn reset(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl Named for NopFeedbackState {
+    #[inline]
+    fn name(&self) -> &str {
+        &"NopFeedbackState"
+    }
+}
+
+/// A type wrapping two different nested [`FeedbackState`] objects.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(bound = "A: serde::de::DeserializeOwned, B: serde::de::DeserializeOwned")]
+pub struct CombinedFeedbackState<A, B>
+where
+    A: FeedbackState,
+    B: FeedbackState,
+{
+    name: String,
+    state1: A,
+    state2: B,
+}
+
+impl<A, B> FeedbackState for CombinedFeedbackState<A, B>
+where
+    A: FeedbackState,
+    B: FeedbackState,
+{
+    fn reset(&mut self) -> Result<(), Error> {
+        self.state1.reset()?;
+        self.state2.reset()
+    }
+}
+impl<A, B> Named for CombinedFeedbackState<A, B>
+where
+    A: FeedbackState,
+    B: FeedbackState,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -130,6 +193,7 @@ pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwn
 }
 
 impl FeedbackStatesTuple for () {
+    #[inline]
     fn reset_all(&mut self) -> Result<(), Error> {
         Ok(())
     }
@@ -172,6 +236,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[inline]
     fn name(&self) -> &str {
         self.name.as_ref()
     }
@@ -205,6 +270,8 @@ where
     I: Input,
     S: HasClientPerfMonitor + Debug,
 {
+    type FeedbackState = CombinedFeedbackState<A::FeedbackState, B::FeedbackState>;
+
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -262,6 +329,14 @@ where
     fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.first.discard_metadata(state, input)?;
         self.second.discard_metadata(state, input)
+    }
+
+    fn init_feedback_state(&mut self, state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(CombinedFeedbackState {
+            name: format!("{}{}", self.first.name(), self.second.name()),
+            state1: self.first.init_feedback_state(state)?,
+            state2: self.second.init_feedback_state(state)?,
+        })
     }
 }
 
@@ -566,7 +641,7 @@ where
     S: HasClientPerfMonitor,
 {
     /// The feedback to invert
-    pub first: A,
+    pub inner: A,
     /// The name
     name: String,
     phantom: PhantomData<(I, S)>,
@@ -581,7 +656,7 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("NotFeedback")
             .field("name", &self.name)
-            .field("first", &self.first)
+            .field("first", &self.inner)
             .finish()
     }
 }
@@ -592,6 +667,8 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = A::FeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -605,18 +682,23 @@ where
         OT: ObserversTuple<I, S>,
     {
         Ok(!self
-            .first
+            .inner
             .is_interesting(state, manager, input, observers, exit_kind)?)
     }
 
     #[inline]
     fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.first.append_metadata(state, testcase)
+        self.inner.append_metadata(state, testcase)
     }
 
     #[inline]
     fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(state, input)
+        self.inner.discard_metadata(state, input)
+    }
+
+    #[inline]
+    fn init_feedback_state(&mut self, state: &mut S) -> Result<Self::FeedbackState, Error> {
+        self.inner.init_feedback_state(state)
     }
 }
 
@@ -642,7 +724,7 @@ where
     pub fn new(first: A) -> Self {
         let name = format!("Not({})", first.name());
         Self {
-            first,
+            inner: first,
             name,
             phantom: PhantomData,
         }
@@ -707,6 +789,8 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -720,6 +804,11 @@ where
         OT: ObserversTuple<I, S>,
     {
         Ok(false)
+    }
+
+    #[inline]
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 
@@ -739,6 +828,8 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -756,6 +847,11 @@ where
         } else {
             Ok(false)
         }
+    }
+
+    #[inline]
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 
@@ -789,6 +885,8 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -806,6 +904,11 @@ where
         } else {
             Ok(false)
         }
+    }
+
+    #[inline]
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 
@@ -844,6 +947,8 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -875,6 +980,11 @@ where
     fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.exec_time = None;
         Ok(())
+    }
+
+    #[inline]
+    fn init_feedback_state(&mut self, _state: &mut S) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 
