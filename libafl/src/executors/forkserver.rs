@@ -721,8 +721,8 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
-        shmem_provider: &mut SP,
-    ) -> ForkserverExecutorBuilder<SP> {
+        shmem_provider: &'a mut SP,
+    ) -> ForkserverExecutorBuilder<'a, SP> {
         ForkserverExecutorBuilder {
             program: self.program,
             arguments: self.arguments,
