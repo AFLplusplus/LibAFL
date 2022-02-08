@@ -169,6 +169,7 @@ impl Forkserver {
     pub fn new(
         target: OsString,
         args: Vec<OsString>,
+        envs: Vec<(OsString, OsString)>,
         out_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
@@ -190,6 +191,7 @@ impl Forkserver {
             .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
             .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
+            .envs(envs)
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
@@ -524,8 +526,9 @@ where
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
 pub struct ForkserverExecutorBuilder<'a, SP> {
-    target: Option<OsString>,
+    program: Option<OsString>,
     arguments: Vec<OsString>,
+    envs: Vec<(OsString, OsString)>,
     debug_child: bool,
     shmem_provider: Option<&'a mut SP>,
 }
@@ -569,11 +572,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             }
         };
 
-        let (target, mut forkserver) = match &self.target {
+        let (target, mut forkserver) = match &self.program {
             Some(t) => {
                 let forkserver = Forkserver::new(
                     t.clone(),
-                    args.clone(),
+                    self.arguments.clone(),
+                    self.envs.clone(),
                     out_file.as_raw_fd(),
                     use_stdin,
                     0,
@@ -636,8 +640,9 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     #[must_use]
     pub fn new() -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         ForkserverExecutorBuilder {
-            target: None,
+            program: None,
             arguments: vec![],
+            envs: vec![],
             debug_child: false,
             shmem_provider: None,
         }
@@ -649,7 +654,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     where
         O: AsRef<OsStr>,
     {
-        self.target = Some(target.as_ref().to_owned());
+        self.program = Some(target.as_ref().to_owned());
         self
     }
 
@@ -674,7 +679,35 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         for arg in args {
             res.push(arg.as_ref().to_owned());
         }
-        self.arguments = res;
+        self.arguments.append(&mut res);
+        self
+    }
+
+    /// Adds an environmental var to the harness's commandline
+    #[must_use]
+    pub fn env<K, V>(mut self, key: K, val: V) -> Self
+    where
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        self.envs
+            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
+        self
+    }
+
+    /// Adds environmental vars to the harness's commandline
+    #[must_use]
+    pub fn envs<IT, K, V>(mut self, vars: IT) -> Self
+    where
+        IT: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        for (ref key, ref val) in vars {
+            res.push((key.as_ref().to_owned(), val.as_ref().to_owned()));
+        }
+        self.envs.append(&mut res);
         self
     }
 
@@ -691,8 +724,9 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         shmem_provider: &mut SP,
     ) -> ForkserverExecutorBuilder<SP> {
         ForkserverExecutorBuilder {
-            target: self.target,
+            program: self.program,
             arguments: self.arguments,
+            envs: self.envs,
             debug_child: self.debug_child,
             shmem_provider: Some(shmem_provider),
         }
@@ -893,7 +927,7 @@ mod tests {
         ));
 
         let executor = ForkserverExecutorBuilder::new()
-            .target(bin)
+            .program(bin)
             .args(&args)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
