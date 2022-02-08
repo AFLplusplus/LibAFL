@@ -182,10 +182,10 @@ where
                     // Corpus in which we store solutions (crashes in this example),
                     // on disk so the user can get them after stopping the fuzzer
                     OnDiskCorpus::new(crashes.clone()).unwrap(),
-                    // States of the feedbacks.
-                    // They are the data related to the feedbacks that you want to persist in the State.
-                    tuple_list!(feedback_state),
+                    &mut feedback,
+                    &mut objective,
                 )
+                .unwrap()
             });
 
             // Create a dictionary if not existing

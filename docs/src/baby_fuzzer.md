@@ -114,8 +114,9 @@ let mut state = StdState::new(
     // Corpus in which we store solutions (crashes in this example),
     // on disk so the user can get them after stopping the fuzzer
     OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-    (),
-);
+    &mut feedbacks,
+    &mut objectives,
+).unwrap();
 ```
 
 It takes a random number generator, that is part of the fuzzer state, in this case, we use the default one `StdRand` but you can choose a different one. We seed it with the current nanoseconds.
@@ -310,9 +311,11 @@ let mut state = StdState::new(
     // on disk so the user can get them after stopping the fuzzer
     OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
     // States of the feedbacks.
-    // They are the data related to the feedbacks that you want to persist in the State.
-    tuple_list!(feedback_state),
-);
+    // The feedbacks can report the data that should persist in the State.
+    &mut feedback,
+    // Same for objective feedbacks
+    &mut objective,
+).unwrap();
 
 // ...
 

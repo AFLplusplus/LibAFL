@@ -233,6 +233,7 @@ mod tests {
         bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         executors::{ExitKind, InProcessExecutor},
+        feedbacks::{NopFeedback, NopFeedbackState},
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
@@ -257,8 +258,10 @@ mod tests {
             rand,
             corpus,
             InMemoryCorpus::<BytesInput>::new(),
-            tuple_list!(),
-        );
+            &mut NopFeedback {},
+            &mut NopFeedback {},
+        )
+        .unwrap();
 
         let monitor = SimpleMonitor::new(|s| {
             println!("{}", s);
@@ -290,8 +293,9 @@ mod tests {
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: StdState<
             InMemoryCorpus<BytesInput>,
-            (),
+            NopFeedbackState,
             BytesInput,
+            NopFeedbackState,
             StdRand,
             InMemoryCorpus<BytesInput>,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();

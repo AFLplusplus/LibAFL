@@ -66,8 +66,10 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state, st_feedback_state),
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
     );
 
     // The Monitor trait define how the fuzzer stats are displayed to the user

@@ -151,10 +151,51 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
     }
 }
 
+/// An empty [`FeedbackState`] that does nothing
+/// Use this as a dummy for testing, or if you don't want to use any feedbacks/objectives.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NopFeedback;
+
+impl<I, S> Feedback<I, S> for NopFeedback
+where
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    type FeedbackState = NopFeedbackState;
+
+    #[inline]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        _observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        Ok(false)
+    }
+
+    #[inline]
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
+    }
+}
+
+impl Named for NopFeedback {
+    #[inline]
+    fn name(&self) -> &str {
+        "NopFeedback"
+    }
+}
+
 /// An empty [`FeedbackState`] that persists nothing
 /// Use this if your feedback does not need to store any data
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NopFeedbackState {}
+pub struct NopFeedbackState;
 
 impl FeedbackState for NopFeedbackState {
     #[inline]
@@ -166,7 +207,7 @@ impl FeedbackState for NopFeedbackState {
 impl Named for NopFeedbackState {
     #[inline]
     fn name(&self) -> &str {
-        &"NopFeedbackState"
+        "NopFeedbackState"
     }
 }
 

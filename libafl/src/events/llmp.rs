@@ -951,6 +951,7 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
         executors::{ExitKind, InProcessExecutor},
+        feedbacks::NopFeedback,
         inputs::BytesInput,
         mutators::BitFlipMutator,
         stages::StdMutationalStage,
@@ -970,7 +971,14 @@ mod tests {
 
         let solutions = InMemoryCorpus::<BytesInput>::new();
 
-        let mut state = StdState::new(rand, corpus, solutions, tuple_list!());
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            solutions,
+            &mut NopFeedback {},
+            &mut NopFeedback {},
+        )
+        .unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
 

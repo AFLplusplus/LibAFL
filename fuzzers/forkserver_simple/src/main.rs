@@ -85,12 +85,6 @@ pub fn main() {
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
-    // The state of the edges feedback for crashes.
-    let objective_state = MapFeedbackState::new("crash_edges", MAP_SIZE);
-
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let feedback = feedback_or!(
@@ -106,7 +100,7 @@ pub fn main() {
         // Must be a crash
         CrashFeedback::new(),
         // Take it onlt if trigger new coverage over crashes
-        MaxMapFeedback::new(&objective_state, &edges_observer)
+        MaxMapFeedback::with_names(&"map_objective", &"crash_edges", MAP_SIZE)
     );
 
     // create a State from scratch
@@ -119,9 +113,12 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state, objective_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{}", s));
