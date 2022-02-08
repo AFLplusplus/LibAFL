@@ -55,7 +55,7 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(
-        MaxMapFeedback::new(&feedback_state, &observer),
+        MaxMapFeedback::new("MaxMapFeedback", &observer),
         NautilusFeedback::new(&context)
     );
 

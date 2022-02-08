@@ -49,7 +49,7 @@ pub fn main() {
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let mut feedback = MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false);
+    let mut feedback = MaxMapFeedback::new_tracking("MaxMapFeedback", &edges_observer, true, false);
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does

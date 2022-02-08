@@ -273,30 +273,28 @@ let mut executor = InProcessExecutor::new(
 .expect("Failed to create the Executor".into());
 ```
 
-Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback. The Feedback is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far in a so-called FeedbackState instance, in our case it maintains the set of conditions satisfied in the previous runs.
+Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e., worth of addition to the corpus) based on this observation. Here comes the notion of Feedback.
+The Feedback is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far in a so-called FeedbackState instance, in our case it maintains the set of conditions satisfied in the previous runs.
 
-We use MaxMapFeedback, a feedback that implements a novelty search over the map of the MapObserver. Basically, if there is a value in the observer's map that is greater than the maximum value registered so far for the same entry, it rates the input as interesting and updates its state.
+We use a `MaxMapFeedback`, a feedback that implements a novelty search over the map of the MapObserver. Basically, if there is a value in the observer's map that is greater than the maximum value registered so far for the same entry, it rates the input as interesting and updates its state.
 
 Feedbacks are used also to decide if an input is a "solution". The feedback that does that is called the Objective Feedback and when it rates an input as interesting it is not saved to the corpus but to the solutions, written in the `crashes` folder in our case. We use the CrashFeedback to tell the fuzzer that if an input causes the program to crash it is a solution for us.
 
 We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
-```rust,ignore
+```rust
 extern crate libafl;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus},
-    feedbacks::{MapFeedbackState, MaxMapFeedback, CrashFeedback},
+    feedbacks::{MaxMapFeedback, CrashFeedback},
     fuzzer::StdFuzzer,
     state::StdState,
     observers::StdMapObserver,
 };
 
-// The state of the edges feedback.
-let feedback_state = MapFeedbackState::with_observer(&observer);
-
 // Feedback to rate the interestingness of an input
-let mut feedback = MaxMapFeedback::new(&feedback_state, &observer);
+let mut feedback = MaxMapFeedback::new("MaxMapFeedback", &observer);
 
 // A feedback to choose if an input is a solution or not
 let mut objective = CrashFeedback::new();
@@ -316,7 +314,8 @@ let mut state = StdState::new(
     // Same for objective feedbacks
     &mut objective,
 ).unwrap();
-
+```
+```rust,ignore
 // ...
 
 // A fuzzer with feedbacks and a corpus scheduler

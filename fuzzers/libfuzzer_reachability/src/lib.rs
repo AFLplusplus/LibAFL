@@ -78,7 +78,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::new(&feedback_state, &edges_observer);
+    let mut feedback = MaxMapFeedback::new("MaxMapFeedback", &edges_observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = ReachabilityFeedback::new(&reachability_observer);

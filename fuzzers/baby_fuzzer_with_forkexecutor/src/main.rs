@@ -71,7 +71,7 @@ pub fn main() {
     let feedback_state = MapFeedbackState::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
-    let mut feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let mut feedback = MaxMapFeedback::new("MaxMapFeedback", &observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();

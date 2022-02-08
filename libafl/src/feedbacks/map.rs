@@ -503,11 +503,11 @@ where
 {
     /// Create new `MapFeedback`
     #[must_use]
-    pub fn new(feedback_state: &MapFeedbackState<T>, map_observer: &O) -> Self {
+    pub fn new(name: &str, map_observer: &O) -> Self {
         Self {
             indexes: None,
             novelties: None,
-            name: feedback_state.name().to_string(),
+            name: name.to_string(),
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
             state_map_size: map_observer.len(),
@@ -518,7 +518,7 @@ where
     /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
     #[must_use]
     pub fn new_tracking(
-        feedback_state: &MapFeedbackState<T>,
+        name: &str,
         map_observer: &O,
         track_indexes: bool,
         track_novelties: bool,
@@ -526,7 +526,7 @@ where
         Self {
             indexes: if track_indexes { Some(vec![]) } else { None },
             novelties: if track_novelties { Some(vec![]) } else { None },
-            name: feedback_state.name().to_string(),
+            name: name.to_string(),
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
             state_map_size: map_observer.len(),
@@ -551,8 +551,8 @@ where
     /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
     #[must_use]
     pub fn with_names_tracking(
-        name: &'static str,
-        observer_name: &'static str,
+        name: &str,
+        observer_name: &str,
         map_size: usize,
         track_indexes: bool,
         track_novelties: bool,
