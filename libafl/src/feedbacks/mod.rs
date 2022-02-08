@@ -41,9 +41,9 @@ use crate::{
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
+    ptr::addr_of,
     time::Duration,
 };
-use std::ptr::addr_of;
 
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,

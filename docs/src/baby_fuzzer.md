@@ -296,10 +296,10 @@ use libafl::{
 let feedback_state = MapFeedbackState::with_observer(&observer);
 
 // Feedback to rate the interestingness of an input
-let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+let mut feedback = MaxMapFeedback::new(&feedback_state, &observer);
 
 // A feedback to choose if an input is a solution or not
-let objective = CrashFeedback::new();
+let mut objective = CrashFeedback::new();
 
 // create a State from scratch
 let mut state = StdState::new(

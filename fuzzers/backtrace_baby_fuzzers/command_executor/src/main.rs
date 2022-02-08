@@ -47,17 +47,17 @@ pub fn main() {
     let bt_feedback_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let mut feedback = MaxMapFeedback::new(&feedback_state, &observer);
 
     // A feedback to choose if an input is a solution or not
-    let objective = feedback_and!(
+    let mut objective = feedback_and!(
         CrashFeedback::new(),
         NewHashFeedback::<ASANBacktraceObserver>::new_with_observer(
             "ASANBacktraceObserver",
             &bt_observer
         )
     );
-    // let objective = CrashFeedback::new();
+    // let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(

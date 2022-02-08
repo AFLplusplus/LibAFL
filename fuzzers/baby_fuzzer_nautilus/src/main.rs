@@ -54,13 +54,13 @@ pub fn main() {
     let feedback_state = MapFeedbackState::with_observer(&observer);
 
     // Feedback to rate the interestingness of an input
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         MaxMapFeedback::new(&feedback_state, &observer),
         NautilusFeedback::new(&context)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(

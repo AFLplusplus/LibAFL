@@ -95,14 +95,14 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let allocs_feedback_state = MapFeedbackState::with_observer(&allocs_observer);
 
     // Feedback to rate the interestingness of an input
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         MaxMapFeedback::new(&edges_feedback_state, &edges_observer),
         MaxMapFeedback::new(&cmps_feedback_state, &cmps_observer),
         MaxMapFeedback::new(&allocs_feedback_state, &allocs_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
