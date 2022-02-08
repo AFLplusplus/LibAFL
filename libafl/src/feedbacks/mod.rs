@@ -143,7 +143,7 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
         }
     }
 
-    /// Gets a state by name
+    /// Gets a state by name (mutable)
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
         if type_eq::<Self, T>() && name == self.name() {
             unsafe { (addr_of!(self) as *mut T).as_mut() }
@@ -152,7 +152,7 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
         }
     }
 
-    /// Gets a state by name, recursively, if not found
+    /// Gets a state by name, recursively, if not found (mutable)
     #[inline]
     fn match_name_rec_mut<T>(&mut self, _name: &str) -> Option<&mut T> {
         // The default impl doesn't have any nested state
@@ -251,16 +251,16 @@ where
     }
 
     fn match_name_rec_mut<T>(&mut self, name: &str) -> Option<&mut T> {
-        match self.state1.match_name_rec_mut(name) {
+        match self.state1.match_name_mut(name) {
             Some(state1) => Some(state1),
-            None => self.state2.match_name_rec_mut(name),
+            None => self.state2.match_name_mut(name),
         }
     }
 
     fn match_name_rec<T>(&self, name: &str) -> Option<&T> {
-        match self.state1.match_name_rec(name) {
+        match self.state1.match_name(name) {
             Some(state1) => Some(state1),
-            None => self.state2.match_name_rec(name),
+            None => self.state2.match_name(name),
         }
     }
 }

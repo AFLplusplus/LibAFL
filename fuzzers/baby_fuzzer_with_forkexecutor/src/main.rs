@@ -67,9 +67,6 @@ pub fn main() {
     let observer = StdMapObserver::new("signals", signals_clone.as_mut_slice());
     // Create a stacktrace observer to add the observers tuple
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&observer);
-
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new("MaxMapFeedback", &observer);
 

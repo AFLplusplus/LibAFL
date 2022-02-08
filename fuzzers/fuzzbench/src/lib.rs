@@ -260,7 +260,6 @@ fn fuzz(
     let cmplog = unsafe { &mut CMPLOG_MAP };
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
-    // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
 
     // Feedback to rate the interestingness of an input

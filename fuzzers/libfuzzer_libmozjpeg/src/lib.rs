@@ -85,7 +85,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel using the allocations map
     let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map });
 
-    // The state of the edges feedback.
     let edges_feedback_state = MapFeedbackState::with_observer(&edges_observer);
 
     // The state of the cmps feedback.

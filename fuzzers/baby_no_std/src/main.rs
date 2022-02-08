@@ -76,9 +76,6 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&observer);
-
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new("MaxMapFeedback", &observer);
 

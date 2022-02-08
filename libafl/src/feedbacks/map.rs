@@ -349,8 +349,6 @@ where
     observer_name: String,
     /// The size of the initial [`MapFeedbackState`] map, at creation time.
     state_map_size: usize,
-    /// Name of the [`MapFeedbackState`] (or its observer)
-    state_name: String,
     /// Phantom Data of Reducer
     phantom: PhantomData<(I, N, S, R, O, T)>,
 }
@@ -386,8 +384,13 @@ where
 
         let map_state = state
             .feedback_state_mut()
-            .match_name_mut::<MapFeedbackState<T>>(&self.name)
-            .unwrap();
+            .match_name_mut::<Self::FeedbackState>(&self.name)
+            .ok_or_else(|| {
+                Error::IllegalState(format!(
+                    "MapFeedbackState with name '{}' not found in state.",
+                    self.name
+                ))
+            })?;
 
         assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
 
@@ -465,10 +468,7 @@ where
     }
 
     fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
-        Ok(Self::FeedbackState::new(
-            &self.state_name,
-            self.state_map_size,
-        ))
+        Ok(Self::FeedbackState::new(&self.name, self.state_map_size))
     }
 }
 
@@ -511,7 +511,6 @@ where
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
             state_map_size: map_observer.len(),
-            state_name: map_observer.name().to_string(),
         }
     }
 
@@ -530,7 +529,6 @@ where
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
             state_map_size: map_observer.len(),
-            state_name: map_observer.name().to_string(),
         }
     }
 
@@ -544,7 +542,6 @@ where
             observer_name: observer_name.to_string(),
             phantom: PhantomData,
             state_map_size: map_size,
-            state_name: observer_name.to_string(),
         }
     }
 
@@ -564,7 +561,6 @@ where
             name: name.to_string(),
             phantom: PhantomData,
             state_map_size: map_size,
-            state_name: observer_name.to_string(),
         }
     }
 }
@@ -633,11 +629,7 @@ where
                 hit_target = true;
             }
         }
-        if hit_target {
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        Ok(hit_target)
     }
 
     #[inline]

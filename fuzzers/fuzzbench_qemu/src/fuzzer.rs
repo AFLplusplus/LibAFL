@@ -252,7 +252,6 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
 
-    // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
 
     // Feedback to rate the interestingness of an input

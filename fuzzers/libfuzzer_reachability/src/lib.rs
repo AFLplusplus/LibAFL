@@ -74,7 +74,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let reachability_observer =
         unsafe { StdMapObserver::new_from_ptr("png.c", __libafl_target_list, TARGET_SIZE) };
 
-    // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
 
     // Feedback to rate the interestingness of an input

@@ -43,7 +43,7 @@ pub fn main() {
 
     let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
 
-    // The state of the edges feedback.
+    
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
     let bt_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
 

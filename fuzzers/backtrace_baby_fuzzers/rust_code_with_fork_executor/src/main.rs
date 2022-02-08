@@ -71,8 +71,8 @@ pub fn main() {
     let bt_observer =
         BacktraceObserver::new("BacktraceObserver", libafl::observers::HarnessType::RUST);
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&observer);
+    
+    
     let bt_feedback_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
