@@ -39,6 +39,8 @@ const FORKSRV_FD: i32 = 198;
 const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
 
@@ -530,6 +532,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
     debug_child: bool,
+    use_autodict: bool,
     shmem_provider: Option<&'a mut SP>,
 }
 
@@ -603,17 +606,25 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         println!("All right - fork server is up.");
         // If forkserver is responding, we then check if there's any option enabled.
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
+            let mut send_status = FS_OPT_ENABLED;
+
             if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & map.is_some() {
                 println!("Using SHARED MEMORY FUZZING feature.");
-                let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
-
-                let send_len = forkserver.write_ctl(send_status)?;
-                if send_len != 4 {
-                    return Err(Error::Forkserver(
-                        "Writing to forkserver failed.".to_string(),
-                    ));
-                }
+                send_status = send_status | FS_OPT_SHDMEM_FUZZ;
             }
+
+            if self.use_autodict {
+                println!("Using Autodict feature");
+                send_status = send_status | FS_OPT_AUTODICT;
+            }            
+
+            let send_len = forkserver.write_ctl(send_status)?;
+            if send_len != 4 {
+                return Err(Error::Forkserver(
+                    "Writing to forkserver failed.".to_string(),
+                ));
+            }
+
         } else {
             println!("Forkserver Options are not available.");
         }
@@ -644,6 +655,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: vec![],
             envs: vec![],
             debug_child: false,
+            use_autodict: false,
             shmem_provider: None,
         }
     }
@@ -725,6 +737,13 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
+    /// Use autodict?
+    #[must_use]
+    pub fn use_autodict(mut self, use_autodict: bool) -> Self {
+        self.use_autodict = use_autodict;
+        self
+    }
+
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
@@ -735,6 +754,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: self.arguments,
             envs: self.envs,
             debug_child: self.debug_child,
+            use_autodict: self.use_autodict,
             shmem_provider: Some(shmem_provider),
         }
     }
