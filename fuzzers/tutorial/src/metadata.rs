@@ -3,7 +3,7 @@ use libafl::{
     corpus::{FavFactor, MinimizerCorpusScheduler, Testcase},
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, MapIndexesMetadata},
+    feedbacks::{Feedback, MapIndexesMetadata, NopFeedbackState},
     observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,

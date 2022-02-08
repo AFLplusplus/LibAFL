@@ -8,12 +8,12 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, PowerQueueCorpusScheduler},
-    events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
+    corpus::{InMemoryCorpus, OnDiskCorpus, PowerQueueCorpusScheduler},
+    events::{setup_restarting_mgr_std, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
-    fuzzer::{Fuzzer, StdFuzzer},
+    fuzzer::StdFuzzer,
     inputs::HasTargetBytes,
     monitors::MultiMonitor,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
@@ -21,7 +21,7 @@ use libafl::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
     },
-    state::{HasCorpus, StdState},
+    state::StdState,
     Error,
 };
 
