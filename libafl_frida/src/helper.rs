@@ -407,11 +407,7 @@ where
 
     /// Pointer to coverage map
     pub fn map_ptr_mut(&mut self) -> Option<*mut u8> {
-        if let Some(rt) = self.runtime_mut::<CoverageRuntime>() {
-            Some(rt.map_ptr_mut())
-        } else {
-            None
-        }
+        self.runtime_mut().map(CoverageRuntime::map_ptr_mut)
     }
 
     /// Ranges
