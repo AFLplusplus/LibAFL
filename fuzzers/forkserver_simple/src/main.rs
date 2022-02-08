@@ -18,13 +18,10 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::{
-        scheduled::havoc_mutations, tokens_mutations,
-        StdScheduledMutator, Tokens,
-    },
+    mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, StdState, HasMetadata},
+    state::{HasCorpus, HasMetadata, StdState},
 };
 use std::path::PathBuf;
 
