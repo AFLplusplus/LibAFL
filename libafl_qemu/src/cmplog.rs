@@ -129,7 +129,7 @@ where
 pub fn gen_unique_cmp_ids<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    state: &mut S,
+    state: Option<&mut S>,
     pc: u64,
     _size: usize,
 ) -> Option<u64>
@@ -143,6 +143,7 @@ where
             return None;
         }
     }
+    let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing");
     if state.metadata().get::<QemuCmpsMapMetadata>().is_none() {
         state.add_metadata(QemuCmpsMapMetadata::new());
     }
@@ -161,7 +162,7 @@ where
 pub fn gen_hashed_cmp_ids<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     pc: u64,
     _size: usize,
 ) -> Option<u64>

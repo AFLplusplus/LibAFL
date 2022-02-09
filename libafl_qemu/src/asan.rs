@@ -452,7 +452,7 @@ where
 pub fn gen_readwrite_asan<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     pc: u64,
     _size: usize,
 ) -> Option<u64>
@@ -472,7 +472,7 @@ where
 pub fn trace_read1_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -486,7 +486,7 @@ pub fn trace_read1_asan<I, QT, S>(
 pub fn trace_read2_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -500,7 +500,7 @@ pub fn trace_read2_asan<I, QT, S>(
 pub fn trace_read4_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -514,7 +514,7 @@ pub fn trace_read4_asan<I, QT, S>(
 pub fn trace_read8_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -528,7 +528,7 @@ pub fn trace_read8_asan<I, QT, S>(
 pub fn trace_read_n_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
     size: usize,
@@ -543,7 +543,7 @@ pub fn trace_read_n_asan<I, QT, S>(
 pub fn trace_write1_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -557,7 +557,7 @@ pub fn trace_write1_asan<I, QT, S>(
 pub fn trace_write2_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -571,7 +571,7 @@ pub fn trace_write2_asan<I, QT, S>(
 pub fn trace_write4_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -585,7 +585,7 @@ pub fn trace_write4_asan<I, QT, S>(
 pub fn trace_write8_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -599,7 +599,7 @@ pub fn trace_write8_asan<I, QT, S>(
 pub fn trace_write_n_asan<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
     size: usize,
@@ -615,7 +615,7 @@ pub fn trace_write_n_asan<I, QT, S>(
 pub fn qasan_fake_syscall<I, QT, S>(
     emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     sys_num: i32,
     a0: u64,
     a1: u64,

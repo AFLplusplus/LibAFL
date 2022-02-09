@@ -210,7 +210,7 @@ where
 pub fn trace_write1_snapshot<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -226,7 +226,7 @@ pub fn trace_write1_snapshot<I, QT, S>(
 pub fn trace_write2_snapshot<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -242,7 +242,7 @@ pub fn trace_write2_snapshot<I, QT, S>(
 pub fn trace_write4_snapshot<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -258,7 +258,7 @@ pub fn trace_write4_snapshot<I, QT, S>(
 pub fn trace_write8_snapshot<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
@@ -274,7 +274,7 @@ pub fn trace_write8_snapshot<I, QT, S>(
 pub fn trace_write_n_snapshot<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
     size: usize,
@@ -292,7 +292,7 @@ pub fn trace_write_n_snapshot<I, QT, S>(
 pub fn trace_mmap_snapshot<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     result: u64,
     sys_num: i32,
     a0: u64,

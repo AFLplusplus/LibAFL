@@ -127,7 +127,7 @@ thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
 pub fn gen_unique_edge_ids<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    state: &mut S,
+    state: Option<&mut S>,
     src: u64,
     dest: u64,
 ) -> Option<u64>
@@ -141,6 +141,7 @@ where
             return None;
         }
     }
+    let state = state.expect("The gen_unique_edge_ids hook works only for in-process fuzzing");
     if state.metadata().get::<QemuEdgesMapMetadata>().is_none() {
         state.add_metadata(QemuEdgesMapMetadata::new());
     }
@@ -173,7 +174,7 @@ where
 pub fn gen_hashed_edge_ids<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     src: u64,
     dest: u64,
 ) -> Option<u64>
@@ -204,7 +205,7 @@ pub extern "C" fn trace_edge_single(id: u64) {
 pub fn gen_addr_block_ids<I, QT, S>(
     _emulator: &Emulator,
     _helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     pc: u64,
 ) -> Option<u64> {
     Some(pc)
@@ -213,7 +214,7 @@ pub fn gen_addr_block_ids<I, QT, S>(
 pub fn gen_hashed_block_ids<I, QT, S>(
     _emulator: &Emulator,
     _helpers: &mut QT,
-    _state: &mut S,
+    _state: Option<&mut S>,
     pc: u64,
 ) -> Option<u64> {
     Some(hash_me(pc))

@@ -12,11 +12,11 @@ use num_traits::Num;
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 use strum_macros::EnumIter;
 
-#[cfg(not(any(feature = "x86_64", feature = "aarch64")))]
+#[cfg(not(any(cpu_target = "x86_64", cpu_target = "aarch64")))]
 /// `GuestAddr` is u32 for 32-bit targets
 pub type GuestAddr = u32;
 
-#[cfg(any(feature = "x86_64", feature = "aarch64"))]
+#[cfg(any(cpu_target = "x86_64", cpu_target = "aarch64"))]
 /// `GuestAddr` is u64 for 64-bit targets
 pub type GuestAddr = u64;
 
