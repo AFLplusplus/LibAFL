@@ -1,5 +1,5 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use strum_macros::EnumIter;
+pub use strum_macros::EnumIter;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;

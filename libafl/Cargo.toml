@@ -60,7 +60,7 @@ num_enum = { version = "0.5.4", default-features = false }
 typed-builder = "0.9.1" # Implement the builder pattern at compiletime
 ahash = { version = "0.7", default-features=false, features=["compile-time-rng"] } # The hash function already used in hashbrown
 intervaltree = { version = "0.2.7", default-features = false, features = ["serde"] }
-backtrace = {version = "0.3.62", optional = true} # Used to get the stacktrace in StacktraceObserver
+backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in StacktraceObserver
 
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] }
 miniz_oxide = { version = "0.5", optional = true}

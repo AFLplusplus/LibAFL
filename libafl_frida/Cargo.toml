@@ -36,7 +36,7 @@ capstone = "0.10.0"
 color-backtrace ={ version = "0.5", features = [ "resolve-modules" ] }
 termcolor = "1.1.2"
 serde = "1.0"
-backtrace = { version = "0.3.58", default-features = false, features = ["std", "serde"] }
+backtrace = { version = "0.3", default-features = false, features = ["std", "serde"] }
 num-traits = "0.2.14"
 ahash = "0.7"
 paste = "1.0"

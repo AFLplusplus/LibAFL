@@ -145,13 +145,11 @@ pub fn main() {
         None => [].to_vec(),
     };
 
-    let mut tokens = Tokens::new();
-    let forkserver = ForkserverExecutorBuilder::new()
+    let forkserver = ForkserverExecutor::builder()
         .program(res.value_of("executable").unwrap().to_string())
         .args(&args)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
-        .autodict_tokens(&mut tokens)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 

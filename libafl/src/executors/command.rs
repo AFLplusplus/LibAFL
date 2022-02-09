@@ -4,24 +4,25 @@ use core::{
     marker::PhantomData,
 };
 
+#[cfg(unix)]
+use std::os::unix::ffi::OsStrExt;
 #[cfg(feature = "std")]
 use std::process::Child;
 use std::{
     ffi::{OsStr, OsString},
-    io::Write,
-    os::unix::prelude::OsStringExt,
+    io::{Read, Write},
     path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
 use crate::{
     bolts::{
-        fs::{OutFile, DEFAULT_OUTFILE},
+        fs::{OutFile, OUTFILE_STD},
         tuples::MatchName,
         AsSlice,
     },
     inputs::HasTargetBytes,
-    observers::{ASANBacktraceObserver, ObserversTuple},
+    observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
@@ -37,8 +38,8 @@ use super::HasObservers;
 /// How to deliver input to an external program
 /// `StdIn`: The traget reads from stdin
 /// `File`: The target reads from the specified [`OutFile`]
-#[derive(Debug, Clone)]
-pub enum InputLocation {
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum InputLocation {
     /// Mutate a commandline argument to deliver an input
     Arg {
         /// The offset of the argument to mutate
@@ -47,7 +48,7 @@ pub enum InputLocation {
     /// Deliver input via `StdIn`
     StdIn,
     /// Deliver the iniput via the specified [`OutFile`]
-    /// You can use specify [`OutFile::create(DEFAULT_OUTFILE)`] to use a default filename.
+    /// You can use specify [`OutFile::create(OUTFILE_STD)`] to use a default filename.
     File {
         /// The fiel to write input to. The target should read input from this location.
         out_file: OutFile,
@@ -71,15 +72,16 @@ fn clone_command(cmd: &Command) -> Command {
 
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file
+/// Use [`CommandExecutor::builder()`] to use this configurator.
 #[derive(Debug)]
 pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
-    pub debug_child: bool,
+    debug_child: bool,
     /// true: input gets delivered via stdink
-    pub input_location: InputLocation,
+    input_location: InputLocation,
     /// The Command to execute
-    pub command: Command,
+    command: Command,
 }
 
 impl CommandConfigurator for StdCommandConfigurator {
@@ -99,7 +101,13 @@ impl CommandConfigurator for StdCommandConfigurator {
 
                 for (i, arg) in args.enumerate() {
                     if i == *argnum {
-                        cmd.arg(OsString::from_vec(input.target_bytes().as_slice().to_vec()));
+                        debug_assert_eq!(arg, "DUMMY");
+                        #[cfg(unix)]
+                        cmd.arg(OsStr::from_bytes(input.target_bytes().as_slice()));
+                        // There is an issue here that the chars on windows are 16 bit wide.
+                        // I can't really test it. Please open a PR if this goes wrong.
+                        #[cfg(not(unix))]
+                        cmd.arg(OsString::from_vec(input.target_bytes().as_vec()));
                     } else {
                         cmd.arg(arg);
                     }
@@ -139,10 +147,17 @@ where
     T: Debug,
     OT: Debug,
 {
-    inner: T,
+    /// The wrapped comand configurer
+    configurer: T,
     observers: OT,
     /// cache if the AsanBacktraceObserver is present
     has_asan_observer: bool,
+    /// If set, we found a [`StdErrObserver`] in the observer list.
+    /// Pipe the child's `stderr` instead of closing it.
+    has_stdout_observer: bool,
+    /// If set, we found a [`StdOutObserver`] in the observer list
+    /// Pipe the child's `stdout` instead of closing it.
+    has_stderr_observer: bool,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
@@ -150,6 +165,15 @@ impl CommandExecutor<(), (), (), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
+    ///
+    /// It mimics the api of [`Command`], specifically, you will use
+    /// `arg`, `args`, `env`, and so on.
+    ///
+    /// By default, input is read from stdin, unless you specify a different location using
+    /// * `arg_input_arg` for input delivered _as_ an command line argument
+    /// * `arg_input_file` for input via a file of a specific name
+    /// * `arg_input_file_std` for a file with default name
+    /// (at the right location in the arguments)
     #[must_use]
     pub fn builder() -> CommandExecutorBuilder {
         CommandExecutorBuilder::new()
@@ -163,7 +187,7 @@ where
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
-            .field("inner", &self.inner)
+            .field("inner", &self.configurer)
             .field("observers", &self.observers)
             .finish()
     }
@@ -176,7 +200,7 @@ where
 {
     /// Accesses the inner value
     pub fn inner(&mut self) -> &mut T {
-        &mut self.inner
+        &mut self.configurer
     }
 }
 
@@ -202,23 +226,35 @@ where
         }
         command.stdin(Stdio::null());
 
+        let has_stdout_observer = observers
+            .match_name::<StdOutObserver>("StdOutObserver")
+            .is_some();
+        if has_stdout_observer {
+            command.stderr(Stdio::piped());
+        }
+
+        let has_stderr_observer = observers
+            .match_name::<StdErrObserver>("StdErrObserver")
+            .is_some();
         let has_asan_observer = observers
             .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some();
-        if has_asan_observer {
+        if has_stderr_observer || has_asan_observer {
             command.stderr(Stdio::piped());
         }
 
         Ok(Self {
             observers,
             has_asan_observer,
-            inner: StdCommandConfigurator {
+            configurer: StdCommandConfigurator {
                 input_location: InputLocation::File {
                     out_file: OutFile::create(path)?,
                 },
                 command,
                 debug_child,
             },
+            has_stdout_observer,
+            has_stderr_observer,
             phantom: PhantomData,
         })
     }
@@ -255,17 +291,10 @@ where
                     ));
                 }
                 atat_at = Some(pos);
-                builder.input(InputLocation::File {
-                    out_file: OutFile::create(DEFAULT_OUTFILE)?,
-                });
-                builder.arg(DEFAULT_OUTFILE);
+                builder.arg_input_file_std();
             } else {
                 builder.arg(arg);
             }
-        }
-
-        if atat_at.is_none() {
-            builder.input(InputLocation::StdIn);
         }
 
         builder.build(observers)
@@ -291,7 +320,7 @@ where
         use std::os::unix::prelude::ExitStatusExt;
         use wait_timeout::ChildExt;
 
-        let mut child = self.inner.spawn_child(input)?;
+        let mut child = self.configurer.spawn_child(input)?;
 
         let res = match child
             .wait_timeout(Duration::from_secs(5))
@@ -312,17 +341,38 @@ where
             }
         };
 
-        if self.has_asan_observer {
-            let stderr = child.stderr.as_mut().ok_or_else(|| {
+        if self.has_asan_observer || self.has_stderr_observer {
+            let mut stderr = String::new();
+            child.stderr.as_mut().ok_or_else(|| {
                 Error::IllegalState(
-                    "Using ASANBacktraceObserver but stderr was not `Stdio::pipe` in CommandExecutor".into(),
+                    "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor".into(),
                 )
-            })?;
+            })?.read_to_string(&mut stderr)?;
+            if self.has_asan_observer {
+                self.observers
+                    .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                    .unwrap()
+                    .parse_asan_output(&stderr);
+            }
+            if self.has_stderr_observer {
+                self.observers
+                    .match_name_mut::<StdErrObserver>("StdErrObserver")
+                    .unwrap()
+                    .stderr = Some(stderr);
+            }
+        }
+        if self.has_stdout_observer {
+            let mut stdout = String::new();
+            child.stdout.as_mut().ok_or_else(|| {
+                Error::IllegalState(
+                    "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor".into(),
+                )
+            })?.read_to_string(&mut stdout)?;
             self.observers
-                .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                .match_name_mut::<StdOutObserver>("StdOutObserver")
                 .unwrap()
-                .parse_asan_output_from_childstderr(stderr);
-        };
+                .stdout = Some(stdout);
+        }
 
         res
     }
@@ -345,9 +395,8 @@ impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
 pub struct CommandExecutorBuilder {
     debug_child: bool,
     program: Option<OsString>,
-    args_before: Vec<OsString>,
-    input_location: Option<InputLocation>,
-    args_after: Vec<OsString>,
+    args: Vec<OsString>,
+    input_location: InputLocation,
     cwd: Option<PathBuf>,
     envs: Vec<(OsString, OsString)>,
 }
@@ -364,9 +413,8 @@ impl CommandExecutorBuilder {
     fn new() -> CommandExecutorBuilder {
         CommandExecutorBuilder {
             program: None,
-            args_before: vec![],
-            input_location: None,
-            args_after: vec![],
+            args: vec![],
+            input_location: InputLocation::StdIn,
             cwd: None,
             envs: vec![],
             debug_child: false,
@@ -385,22 +433,50 @@ impl CommandExecutorBuilder {
 
     /// Set the input mode and location.
     /// This option is mandatory, if not set, the `build` method will error.
-    pub fn input(&mut self, input: InputLocation) -> &mut Self {
-        // This is an error in the user code, no point in returning Err.
-        assert!(
-            self.input_location.is_none(),
-            "input location already set, cannot set it again"
+    fn input(&mut self, input: InputLocation) -> &mut Self {
+        // This is a fatal error in the user code, no point in returning Err.
+        assert_eq!(
+            self.input_location,
+            InputLocation::StdIn,
+            "input location already set to non-stdin, cannot set it again"
         );
-        self.input_location = Some(input);
+        self.input_location = input;
+        self
+    }
+
+    /// Sets the input mode to [`InputLocation::Arg`] and uses the current arg offset as `argnum`.
+    /// During execution, at input will be provided _as argument_ at this position.
+    /// Use [`Self::arg_input_file_std`] if you want to provide the input as a file instead.
+    pub fn arg_input_arg(&mut self) -> &mut Self {
+        let argnum = self.args.len();
+        self.input(InputLocation::Arg { argnum });
+        self.arg("DUMMY");
+        self
+    }
+
+    /// Sets the input mode to [`InputLocation::File`]
+    /// and adds the filename as arg to at the current position.
+    /// Uses a default filename.
+    /// Use [`Self::arg_input_file`] to specify a custom filename.
+    pub fn arg_input_file_std(&mut self) -> &mut Self {
+        self.arg_input_file(OUTFILE_STD);
+        self
+    }
+
+    /// Sets the input mode to [`InputLocation::File`]
+    /// and adds the filename as arg to at the current position.
+    pub fn arg_input_file<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
+        self.arg(path.as_ref());
+        let out_file_std = OutFile::create(path.as_ref()).unwrap();
+        self.input(InputLocation::File {
+            out_file: out_file_std,
+        });
         self
     }
 
     /// Adds an argument to the program's commandline.
     pub fn arg<O: AsRef<OsStr>>(&mut self, arg: O) -> &mut CommandExecutorBuilder {
-        match self.input_location {
-            Some(InputLocation::StdIn) => self.args_before.push(arg.as_ref().to_owned()),
-            Some(_) | None => self.args_after.push(arg.as_ref().to_owned()),
-        };
+        self.args.push(arg.as_ref().to_owned());
         self
     }
 
@@ -469,26 +545,15 @@ impl CommandExecutorBuilder {
             ));
         };
         let mut command = Command::new(program);
-        command.args(&self.args_before);
         match &self.input_location {
-            Some(InputLocation::StdIn) => {
+            InputLocation::StdIn => {
                 command.stdin(Stdio::piped());
             }
-            Some(InputLocation::File { out_file }) => {
+            InputLocation::File { .. } | InputLocation::Arg { .. } => {
                 command.stdin(Stdio::null());
-                command.arg(&out_file.path);
-            }
-            Some(InputLocation::Arg { .. }) => {
-                command.stdin(Stdio::null());
-                command.arg("DUMMY");
-            }
-            None => {
-                return Err(Error::IllegalArgument(
-                    "ComandExecutor::builder: no input_location set!".into(),
-                ))
             }
         }
-        command.args(&self.args_after);
+        command.args(&self.args);
         command.envs(
             self.envs
                 .iter()
@@ -504,14 +569,23 @@ impl CommandExecutorBuilder {
         if observers
             .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some()
+            || observers
+                .match_name::<StdErrObserver>("StdErrObserver")
+                .is_some()
         {
             // we need stderr for ASANBackt
             command.stderr(Stdio::piped());
         }
+        if observers
+            .match_name::<StdOutObserver>("StdOutObserver")
+            .is_some()
+        {
+            command.stdout(Stdio::piped());
+        }
 
         let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
-            input_location: self.input_location.clone().unwrap(),
+            input_location: self.input_location.clone(),
             command,
         };
         Ok(configurator.into_executor(observers))
@@ -564,10 +638,20 @@ pub trait CommandConfigurator: Sized + Debug {
             .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
             .is_some();
 
+        let has_stdout_observer = observers
+            .match_name::<StdOutObserver>("StdOutObserver")
+            .is_some();
+
+        let has_stderr_observer = observers
+            .match_name::<StdErrObserver>("StdErrObserver")
+            .is_some();
+
         CommandExecutor {
             observers,
             has_asan_observer,
-            inner: self,
+            has_stdout_observer,
+            has_stderr_observer,
+            configurer: self,
             phantom: PhantomData,
         }
     }

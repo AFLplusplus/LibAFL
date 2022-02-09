@@ -9,6 +9,7 @@ use std::{
     ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
     os::unix::{io::RawFd, process::CommandExt},
+    path::Path,
     process::{Command, Stdio},
 };
 
@@ -474,8 +475,7 @@ where
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 pub struct ForkserverExecutor<I, OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: Debug,
     SP: ShMemProvider,
 {
     target: OsString,
@@ -491,8 +491,7 @@ where
 
 impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: Debug,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -504,6 +503,14 @@ where
             .field("observers", &self.observers)
             .field("map", &self.map)
             .finish()
+    }
+}
+
+impl ForkserverExecutor<(), (), (), StdShMemProvider> {
+    /// Builder for `ForkserverExecutor`
+    #[must_use]
+    pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
+        ForkserverExecutorBuilder::new()
     }
 }
 
@@ -542,6 +549,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     envs: Vec<(OsString, OsString)>,
     debug_child: bool,
     autodict_tokens: Option<&'a mut Tokens>,
+    out_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
 }
 
@@ -559,7 +567,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     {
         let mut args = Vec::<OsString>::new();
         let mut use_stdin = true;
-        let out_filename = OsString::from(".cur_input");
+        let out_filename = match &self.out_filename {
+            Some(name) => name.clone(),
+            None => OsString::from(".cur_input"),
+        };
 
         for item in &self.arguments {
             if item == "@@" && use_stdin {
@@ -589,7 +600,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             Some(t) => {
                 let forkserver = Forkserver::new(
                     t.clone(),
-                    self.arguments.clone(),
+                    args.clone(),
                     self.envs.clone(),
                     out_file.as_raw_fd(),
                     use_stdin,
@@ -694,6 +705,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             envs: vec![],
             debug_child: false,
             autodict_tokens: None,
+            out_filename: None,
             shmem_provider: None,
         }
     }
@@ -762,10 +774,11 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     #[must_use]
-    /// Place the input at this position, this is equivalent to putting "@@" here.
-    pub fn arg_input_file(mut self) -> Self {
-        self.arguments.push(OsString::from("@@"));
-        self
+    /// Place the input at this position and set the filename for the input.
+    pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
+        let mut moved = self.arg(path.as_ref());
+        moved.out_filename = Some(path.as_ref().as_os_str().to_os_string());
+        moved
     }
 
     #[must_use]
@@ -793,6 +806,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             envs: self.envs,
             debug_child: self.debug_child,
             autodict_tokens: self.autodict_tokens,
+            out_filename: self.out_filename,
             shmem_provider: Some(shmem_provider),
         }
     }
@@ -876,7 +890,7 @@ where
                 self.observers_mut()
                     .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
                     .unwrap()
-                    .parse_asan_output_from_asan_log_file(pid);
+                    .parse_asan_output_from_asan_log_file(pid)?;
             }
         }
 
