@@ -592,7 +592,7 @@ where
             metadata: SerdeAnyMap::default(),
             corpus,
             feedback_state: CombinedFeedbackState::new(
-                "State",
+                "__feedbacks_and_objectives",
                 feedbacks.init_state()?,
                 objectives.init_state()?,
             ),

@@ -138,7 +138,7 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
         if type_eq::<Self, T>() && name == self.name() {
             Some(unsafe { &*(self as *const _ as *const T) })
         } else {
-            self.match_name_rec(name)
+            None
         }
     }
 
@@ -147,22 +147,8 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
         if type_eq::<Self, T>() && name == self.name() {
             Some(unsafe { &mut *(self as *mut _ as *mut T) })
         } else {
-            self.match_name_rec_mut(name)
+            None
         }
-    }
-
-    /// Gets a state by name, recursively, if not found (mutable)
-    #[inline]
-    fn match_name_rec_mut<T: 'static>(&mut self, _name: &str) -> Option<&mut T> {
-        // The default impl doesn't have any nested state
-        None
-    }
-
-    /// Gets a state by name, recursively, if not found
-    #[inline]
-    fn match_name_rec<T: 'static>(&self, _name: &str) -> Option<&T> {
-        // The default impl doesn't have any nested state
-        None
     }
 }
 
@@ -217,6 +203,16 @@ impl FeedbackState for NopFeedbackState {
     fn reset(&mut self) -> Result<(), Error> {
         Ok(())
     }
+
+    #[inline]
+    fn match_name<T: 'static>(&self, _name: &str) -> Option<&T> {
+        None
+    }
+
+    #[inline]
+    fn match_name_mut<T: 'static>(&mut self, _name: &str) -> Option<&mut T> {
+        None
+    }
 }
 
 impl Named for NopFeedbackState {
@@ -249,14 +245,16 @@ where
         self.state2.reset()
     }
 
-    fn match_name_rec_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
+    fn match_name_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
+        // We never return our own state. Recurse immediately.
         match self.state1.match_name_mut(name) {
             Some(state1) => Some(state1),
             None => self.state2.match_name_mut(name),
         }
     }
 
-    fn match_name_rec<T: 'static>(&self, name: &str) -> Option<&T> {
+    fn match_name<T: 'static>(&self, name: &str) -> Option<&T> {
+        // We never return our own state. Recurse immediately.
         match self.state1.match_name(name) {
             Some(state1) => Some(state1),
             None => self.state2.match_name(name),
