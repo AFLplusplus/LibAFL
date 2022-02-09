@@ -6,8 +6,10 @@ use core::{
     time::Duration,
 };
 use std::{
+    ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
     os::unix::{io::RawFd, process::CommandExt},
+    path::Path,
     process::{Command, Stdio},
 };
 
@@ -166,8 +168,9 @@ pub struct Forkserver {
 impl Forkserver {
     /// Create a new [`Forkserver`]
     pub fn new(
-        target: String,
-        args: Vec<String>,
+        target: OsString,
+        args: Vec<OsString>,
+        envs: Vec<(OsString, OsString)>,
         out_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
@@ -189,6 +192,7 @@ impl Forkserver {
             .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
             .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
+            .envs(envs)
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
@@ -460,12 +464,11 @@ where
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 pub struct ForkserverExecutor<I, OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: Debug,
     SP: ShMemProvider,
 {
-    target: String,
-    args: Vec<String>,
+    target: OsString,
+    args: Vec<OsString>,
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
@@ -477,8 +480,7 @@ where
 
 impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: Debug,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -493,21 +495,11 @@ where
     }
 }
 
-impl<I, OT, S> ForkserverExecutor<I, OT, S, StdShMemProvider>
-where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
-    /// This Forserver won't attempt to provide inputs over shared mem but write them to an iput file
-    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    pub fn new(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-    ) -> Result<Self, Error> {
-        Self::new_internal(target, arguments, observers, debug_child, None)
+impl ForkserverExecutor<(), (), (), StdShMemProvider> {
+    /// Builder for `ForkserverExecutor`
+    #[must_use]
+    pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
+        ForkserverExecutorBuilder::new()
     }
 }
 
@@ -517,47 +509,68 @@ where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
-    /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers.
-    pub fn with_shmem_inputs(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-        shmem_provider: &mut SP,
-    ) -> Result<Self, Error> {
-        Self::new_internal(
-            target,
-            arguments,
-            observers,
-            debug_child,
-            Some(shmem_provider),
-        )
+    /// The `target` binary that's going to run.
+    pub fn target(&self) -> &OsString {
+        &self.target
     }
 
-    /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers, with debug mode
-    fn new_internal(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-        shmem_provider: Option<&mut SP>,
-    ) -> Result<Self, Error> {
-        let mut args = Vec::<String>::new();
-        let mut use_stdin = true;
-        let out_filename = ".cur_input".to_string();
+    /// The `args` used for the binary.
+    pub fn args(&self) -> &[OsString] {
+        &self.args
+    }
 
-        for item in arguments {
+    /// The [`Forkserver`] instance.
+    pub fn forkserver(&self) -> &Forkserver {
+        &self.forkserver
+    }
+
+    /// The [`OutFile`] used by this [`Executor`].
+    pub fn out_file(&self) -> &OutFile {
+        &self.out_file
+    }
+}
+
+/// The builder for `ForkserverExecutor`
+#[derive(Debug)]
+pub struct ForkserverExecutorBuilder<'a, SP> {
+    program: Option<OsString>,
+    arguments: Vec<OsString>,
+    envs: Vec<(OsString, OsString)>,
+    out_filename: Option<OsString>,
+    debug_child: bool,
+    shmem_provider: Option<&'a mut SP>,
+}
+
+impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
+    /// Builds `ForkserverExecutor`.
+    pub fn build<I, OT, S>(
+        &mut self,
+        observers: OT,
+    ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
+    where
+        I: Input + HasTargetBytes,
+        OT: ObserversTuple<I, S>,
+        SP: ShMemProvider,
+    {
+        let mut args = Vec::<OsString>::new();
+        let mut use_stdin = true;
+        let out_filename = match &self.out_filename {
+            Some(name) => name.clone(),
+            None => OsString::from(".cur_input"),
+        };
+
+        for item in &self.arguments {
             if item == "@@" && use_stdin {
                 use_stdin = false;
                 args.push(out_filename.clone());
             } else {
-                args.push(item.to_string());
+                args.push(item.clone());
             }
         }
 
         let out_file = OutFile::create(&out_filename)?;
 
-        let map = match shmem_provider {
+        let map = match &mut self.shmem_provider {
             None => None,
             Some(provider) => {
                 // setup shared memory
@@ -570,14 +583,26 @@ where
             }
         };
 
-        let mut forkserver = Forkserver::new(
-            target.clone(),
-            args.clone(),
-            out_file.as_raw_fd(),
-            use_stdin,
-            0,
-            debug_child,
-        )?;
+        let (target, mut forkserver) = match &self.program {
+            Some(t) => {
+                let forkserver = Forkserver::new(
+                    t.clone(),
+                    args.clone(),
+                    self.envs.clone(),
+                    out_file.as_raw_fd(),
+                    use_stdin,
+                    0,
+                    self.debug_child,
+                )?;
+
+                (t.clone(), forkserver)
+            }
+            None => {
+                return Err(Error::IllegalArgument(
+                    "ForkserverExecutorBuilder::build: target file not found".to_string(),
+                ))
+            }
+        };
 
         let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
@@ -604,8 +629,7 @@ where
             println!("Forkserver Options are not available.");
         }
 
-        Ok(Self {
-            has_asan_observer: None, // initialized on first use
+        Ok(ForkserverExecutor {
             target,
             args,
             out_file,
@@ -613,27 +637,120 @@ where
             observers,
             map,
             phantom: PhantomData,
+            has_asan_observer: None, // initialized on first use
         })
     }
+}
 
-    /// The `target` binary that's going to run.
-    pub fn target(&self) -> &String {
-        &self.target
+impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
+    /// This is the builder for `ForkserverExecutor`
+    /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
+    /// Else this forkserver will try to write the input to `.cur_input` file.
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    #[must_use]
+    pub fn new() -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+        ForkserverExecutorBuilder {
+            program: None,
+            arguments: vec![],
+            envs: vec![],
+            out_filename: None,
+            debug_child: false,
+            shmem_provider: None,
+        }
     }
 
-    /// The `args` used for the binary.
-    pub fn args(&self) -> &[String] {
-        &self.args
+    /// The harness
+    #[must_use]
+    pub fn program<O>(mut self, target: O) -> Self
+    where
+        O: AsRef<OsStr>,
+    {
+        self.program = Some(target.as_ref().to_owned());
+        self
     }
 
-    /// The [`Forkserver`] instance.
-    pub fn forkserver(&self) -> &Forkserver {
-        &self.forkserver
+    /// Adds an argument to the harness's commandline
+    #[must_use]
+    pub fn arg<O>(mut self, arg: O) -> Self
+    where
+        O: AsRef<OsStr>,
+    {
+        self.arguments.push(arg.as_ref().to_owned());
+        self
     }
 
-    /// The [`OutFile`] used by this [`Executor`].
-    pub fn out_file(&self) -> &OutFile {
-        &self.out_file
+    /// Adds arguments to the harness's commandline
+    #[must_use]
+    pub fn args<IT, O>(mut self, args: IT) -> Self
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        for arg in args {
+            res.push(arg.as_ref().to_owned());
+        }
+        self.arguments.append(&mut res);
+        self
+    }
+
+    /// Adds an environmental var to the harness's commandline
+    #[must_use]
+    pub fn env<K, V>(mut self, key: K, val: V) -> Self
+    where
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        self.envs
+            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
+        self
+    }
+
+    /// Adds environmental vars to the harness's commandline
+    #[must_use]
+    pub fn envs<IT, K, V>(mut self, vars: IT) -> Self
+    where
+        IT: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        for (ref key, ref val) in vars {
+            res.push((key.as_ref().to_owned(), val.as_ref().to_owned()));
+        }
+        self.envs.append(&mut res);
+        self
+    }
+
+    #[must_use]
+    /// Place the input at this position and set the filename for the input.
+    pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
+        let mut moved = self.arg(path.as_ref());
+        moved.out_filename = Some(path.as_ref().as_os_str().to_os_string());
+        moved
+    }
+
+    #[must_use]
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    pub fn debug_child(mut self, debug_child: bool) -> Self {
+        self.debug_child = debug_child;
+        self
+    }
+
+    /// Shmem provider for forkserver's shared memory testcase feature.
+    pub fn shmem_provider<SP: ShMemProvider>(
+        self,
+        shmem_provider: &'a mut SP,
+    ) -> ForkserverExecutorBuilder<'a, SP> {
+        ForkserverExecutorBuilder {
+            program: self.program,
+            arguments: self.arguments,
+            envs: self.envs,
+            out_filename: self.out_filename,
+            debug_child: self.debug_child,
+            shmem_provider: Some(shmem_provider),
+        }
     }
 }
 
@@ -799,25 +916,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
-
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
             tuples::tuple_list,
             AsMutSlice,
         },
-        executors::ForkserverExecutor,
+        executors::forkserver::ForkserverExecutorBuilder,
         inputs::NopInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
+    use serial_test::serial;
+    use std::ffi::OsString;
     #[test]
     #[serial]
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
-        let bin = "echo";
-        let args = vec![String::from("@@")];
+        let bin = OsString::from("echo");
+        let args = vec![OsString::from("@@")];
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
 
@@ -830,15 +947,14 @@ mod tests {
             shmem_buf,
         ));
 
-        let executor = ForkserverExecutor::<NopInput, _, (), _>::with_shmem_inputs(
-            bin.to_string(),
-            &args,
-            tuple_list!(edges_observer),
-            false,
-            &mut shmem_provider,
-        );
-        // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
+        let executor = ForkserverExecutorBuilder::new()
+            .program(bin)
+            .args(&args)
+            .debug_child(false)
+            .shmem_provider(&mut shmem_provider)
+            .build::<NopInput, _, ()>(tuple_list!(edges_observer));
 
+        // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
             Ok(_) => true,
             Err(e) => match e {

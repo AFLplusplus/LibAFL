@@ -1,5 +1,6 @@
 FUZZER_NAME="forkserver_simple"
 PROJECT_DIR=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+CORPUS_DIR="corpus"
 
 PHONY: all
 
@@ -17,7 +18,7 @@ run:  all
 
 short_test: all
 	rm -rf libafl_unix_shmem_server || true
-	timeout 10s taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
+	timeout 10s taskset -c 0 ./$(FUZZER_NAME) $(PROJECT_DIR)/target/release/program ./$(CORPUS_DIR) @@ 2>/dev/null &
 
 test: all
-	timeout 60s taskset -c 0 ./$(FUZZER_NAME) 2>/dev/null &
+	timeout 60s taskset -c 0 ./$(FUZZER_NAME) $(PROJECT_DIR)/target/release/program ./$(CORPUS_DIR) @@ 2>/dev/null &

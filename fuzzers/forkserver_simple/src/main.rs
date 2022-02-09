@@ -145,15 +145,16 @@ pub fn main() {
         None => [].to_vec(),
     };
 
+    let forkserver = ForkserverExecutor::builder()
+        .program(res.value_of("executable").unwrap().to_string())
+        .args(&args)
+        .debug_child(debug_child)
+        .shmem_provider(&mut shmem_provider)
+        .build(tuple_list!(time_observer, edges_observer))
+        .unwrap();
+
     let mut executor = TimeoutForkserverExecutor::new(
-        ForkserverExecutor::with_shmem_inputs(
-            res.value_of("executable").unwrap().to_string(),
-            &args,
-            tuple_list!(edges_observer, time_observer),
-            debug_child,
-            &mut shmem_provider,
-        )
-        .unwrap(),
+        forkserver,
         Duration::from_millis(
             res.value_of("timeout")
                 .unwrap()
