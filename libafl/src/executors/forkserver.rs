@@ -499,6 +499,7 @@ impl ForkserverExecutor<(), (), (), StdShMemProvider>
 where
 {
     /// Builder for `ForkserverExecutor`
+    #[must_use]
     pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
         ForkserverExecutorBuilder::new()
     }
