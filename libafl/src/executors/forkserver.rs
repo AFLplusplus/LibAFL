@@ -464,8 +464,7 @@ where
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 pub struct ForkserverExecutor<I, OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: Debug,
     SP: ShMemProvider,
 {
     target: OsString,
@@ -481,8 +480,7 @@ where
 
 impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: Debug,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -496,6 +494,16 @@ where
             .finish()
     }
 }
+
+impl ForkserverExecutor<(), (), (), StdShMemProvider>
+where
+{
+    /// Builder
+    pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
+        ForkserverExecutorBuilder::new()
+    }
+}
+
 
 impl<I, OT, S, SP> ForkserverExecutor<I, OT, S, SP>
 where
