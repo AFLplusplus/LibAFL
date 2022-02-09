@@ -37,9 +37,11 @@ __attribute__((weak)) void *__asan_region_is_poisoned(void *beg, size_t size) {
 
 #endif
 
+CmpLogMap* libafl_cmplog_map_ptr = &libafl_cmplog_map;
+
 void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
 
-  STATIC_ASSERT(sizeof(libafl_cmplog_map.vals.operands) == sizeof(libafl_cmplog_map.vals.routines));
+  STATIC_ASSERT(sizeof(libafl_cmplog_map_ptr->vals.operands) == sizeof(libafl_cmplog_map_ptr->vals.routines));
   
   __libafl_targets_cmplog(k, shape, arg1, arg2);
 
@@ -106,20 +108,20 @@ void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2)
 
   uint32_t hits;
 
-  if (libafl_cmplog_map.headers[k].kind != CMPLOG_KIND_RTN) {
-    libafl_cmplog_map.headers[k].kind = CMPLOG_KIND_RTN;
-    libafl_cmplog_map.headers[k].hits = 1;
-    libafl_cmplog_map.headers[k].shape = len - 1;
+  if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_RTN) {
+    libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_RTN;
+    libafl_cmplog_map_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_ptr->headers[k].shape = len - 1;
     hits = 0;
   } else {
-    hits = libafl_cmplog_map.headers[k].hits++;
-    if (libafl_cmplog_map.headers[k].shape < len)
-      libafl_cmplog_map.headers[k].shape = len - 1;
+    hits = libafl_cmplog_map_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_ptr->headers[k].shape < len)
+      libafl_cmplog_map_ptr->headers[k].shape = len - 1;
   }
 
   hits &= CMPLOG_MAP_RTN_H - 1;
-  MEMCPY(libafl_cmplog_map.vals.routines[k][hits].v0, ptr1, len);
-  MEMCPY(libafl_cmplog_map.vals.routines[k][hits].v1, ptr2, len);
+  MEMCPY(libafl_cmplog_map_ptr->vals.routines[k][hits].v0, ptr1, len);
+  MEMCPY(libafl_cmplog_map_ptr->vals.routines[k][hits].v1, ptr2, len);
 
 }
 

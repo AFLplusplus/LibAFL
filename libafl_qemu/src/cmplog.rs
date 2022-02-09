@@ -37,14 +37,7 @@ pub struct QemuCmpLogHelper {
 
 impl QemuCmpLogHelper {
     #[must_use]
-    pub fn new() -> Self {
-        Self {
-            filter: QemuInstrumentationFilter::None,
-        }
-    }
-
-    #[must_use]
-    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationFilter) -> Self {
         Self { filter }
     }
 
@@ -56,7 +49,7 @@ impl QemuCmpLogHelper {
 
 impl Default for QemuCmpLogHelper {
     fn default() -> Self {
-        Self::new()
+        Self::new(QemuInstrumentationFilter::None)
     }
 }
 
@@ -84,14 +77,7 @@ pub struct QemuCmpLogChildHelper {
 
 impl QemuCmpLogChildHelper {
     #[must_use]
-    pub fn new() -> Self {
-        Self {
-            filter: QemuInstrumentationFilter::None,
-        }
-    }
-
-    #[must_use]
-    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationFilter) -> Self {
         Self { filter }
     }
 
@@ -103,7 +89,7 @@ impl QemuCmpLogChildHelper {
 
 impl Default for QemuCmpLogChildHelper {
     fn default() -> Self {
-        Self::new()
+        Self::new(QemuInstrumentationFilter::None)
     }
 }
 
@@ -176,7 +162,7 @@ where
             return None;
         }
     }
-    Some(hash_me(pc))
+    Some(hash_me(pc) & (CMPLOG_MAP_W as u64 - 1))
 }
 
 pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8) {

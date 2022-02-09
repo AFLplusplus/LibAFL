@@ -211,10 +211,17 @@ where
             };
 
             if self.use_cmplog.unwrap_or(false) {
+                let hooks = QemuHooks::new(
+                    &emu,
+                    tuple_list!(
+                        QemuEdgeCoverageHelper::default(),
+                        QemuCmpLogHelper::default(),
+                    ),
+                );
+
                 let executor = QemuExecutor::new(
+                    hooks,
                     &mut harness,
-                    emulator,
-                    tuple_list!(QemuEdgeCoverageHelper::new(), QemuCmpLogHelper::new()),
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
                     &mut state,
@@ -313,10 +320,11 @@ where
                     }
                 }
             } else {
+                let hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default(),));
+
                 let executor = QemuExecutor::new(
+                    hooks,
                     &mut harness,
-                    emulator,
-                    tuple_list!(QemuEdgeCoverageHelper::new()),
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
                     &mut state,

@@ -33,19 +33,24 @@ libafl::impl_serdeany!(QemuEdgesMapMetadata);
 #[derive(Debug)]
 pub struct QemuEdgeCoverageHelper {
     filter: QemuInstrumentationFilter,
+    use_hitcounts: bool,
 }
 
 impl QemuEdgeCoverageHelper {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(filter: QemuInstrumentationFilter) -> Self {
         Self {
-            filter: QemuInstrumentationFilter::None,
+            filter,
+            use_hitcounts: true,
         }
     }
 
     #[must_use]
-    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
-        Self { filter }
+    pub fn without_hitcounts(filter: QemuInstrumentationFilter) -> Self {
+        Self {
+            filter,
+            use_hitcounts: false,
+        }
     }
 
     #[must_use]
@@ -56,7 +61,7 @@ impl QemuEdgeCoverageHelper {
 
 impl Default for QemuEdgeCoverageHelper {
     fn default() -> Self {
-        Self::new()
+        Self::new(QemuInstrumentationFilter::None)
     }
 }
 
@@ -70,28 +75,37 @@ where
         QT: QemuHelperTuple<I, S>,
     {
         hooks.edge_generation(gen_unique_edge_ids::<I, QT, S>);
-        hooks.emulator().set_exec_edge_hook(trace_edge_hitcount);
+        if self.use_hitcounts {
+            hooks.emulator().set_exec_edge_hook(trace_edge_hitcount);
+        } else {
+            hooks.emulator().set_exec_edge_hook(trace_edge_single);
+        }
     }
 }
 
-pub type QemuEdgeCoverageWithBlocksHelper = QemuEdgeCoverageChildHelper;
+pub type QemuCollidingEdgeCoverageHelper = QemuEdgeCoverageChildHelper;
 
 #[derive(Debug)]
 pub struct QemuEdgeCoverageChildHelper {
     filter: QemuInstrumentationFilter,
+    use_hitcounts: bool,
 }
 
 impl QemuEdgeCoverageChildHelper {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(filter: QemuInstrumentationFilter) -> Self {
         Self {
-            filter: QemuInstrumentationFilter::None,
+            filter,
+            use_hitcounts: true,
         }
     }
 
     #[must_use]
-    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
-        Self { filter }
+    pub fn without_hitcounts(filter: QemuInstrumentationFilter) -> Self {
+        Self {
+            filter,
+            use_hitcounts: false,
+        }
     }
 
     #[must_use]
@@ -102,7 +116,7 @@ impl QemuEdgeCoverageChildHelper {
 
 impl Default for QemuEdgeCoverageChildHelper {
     fn default() -> Self {
-        Self::new()
+        Self::new(QemuInstrumentationFilter::None)
     }
 }
 
@@ -117,8 +131,12 @@ where
     where
         QT: QemuHelperTuple<I, S>,
     {
-        hooks.edge_generation(gen_unique_edge_ids::<I, QT, S>);
-        hooks.emulator().set_exec_edge_hook(trace_edge_hitcount);
+        hooks.edge_generation(gen_hashed_edge_ids::<I, QT, S>);
+        if self.use_hitcounts {
+            hooks.emulator().set_exec_edge_hook(trace_edge_hitcount_ptr);
+        } else {
+            hooks.emulator().set_exec_edge_hook(trace_edge_single_ptr);
+        }
     }
 }
 
@@ -171,6 +189,18 @@ where
     }
 }
 
+pub extern "C" fn trace_edge_hitcount(id: u64) {
+    unsafe {
+        EDGES_MAP[id as usize] = EDGES_MAP[id as usize].wrapping_add(1);
+    }
+}
+
+pub extern "C" fn trace_edge_single(id: u64) {
+    unsafe {
+        EDGES_MAP[id as usize] = 1;
+    }
+}
+
 pub fn gen_hashed_edge_ids<I, QT, S>(
     _emulator: &Emulator,
     helpers: &mut QT,
@@ -187,18 +217,20 @@ where
             return None;
         }
     }
-    Some(hash_me(src) ^ hash_me(dest))
+    Some((hash_me(src) ^ hash_me(dest)) & (unsafe { EDGES_MAP_PTR_SIZE } as u64 - 1))
 }
 
-pub extern "C" fn trace_edge_hitcount(id: u64) {
+pub extern "C" fn trace_edge_hitcount_ptr(id: u64) {
     unsafe {
-        EDGES_MAP[id as usize] = EDGES_MAP[id as usize].wrapping_add(1);
+        let ptr = EDGES_MAP_PTR.add(id as usize);
+        *ptr = (*ptr).wrapping_add(1);
     }
 }
 
-pub extern "C" fn trace_edge_single(id: u64) {
+pub extern "C" fn trace_edge_single_ptr(id: u64) {
     unsafe {
-        EDGES_MAP[id as usize] = 1;
+        let ptr = EDGES_MAP_PTR.add(id as usize);
+        *ptr = 1;
     }
 }
 

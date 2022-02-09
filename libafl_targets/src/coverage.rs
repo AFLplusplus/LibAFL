@@ -41,7 +41,7 @@ pub use __afl_area_ptr as EDGES_MAP_PTR;
 ///
 /// # Safety
 ///
-/// This fn is safe to call, as long as the compilation diid not break, previously
+/// This fn is safe to call, as long as the compilation did not break, previously
 #[cfg(target_os = "linux")]
 #[must_use]
 pub fn autotokens() -> Result<Tokens, Error> {

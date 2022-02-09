@@ -172,16 +172,8 @@ pub struct QemuAsanHelper {
 
 impl QemuAsanHelper {
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(filter: QemuInstrumentationFilter) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
-        Self {
-            enabled: true,
-            filter: QemuInstrumentationFilter::None,
-        }
-    }
-
-    #[must_use]
-    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
         Self {
             enabled: true,
             filter,
@@ -410,7 +402,7 @@ impl QemuAsanHelper {
 
 impl Default for QemuAsanHelper {
     fn default() -> Self {
-        Self::new()
+        Self::new(QemuInstrumentationFilter::None)
     }
 }
 
