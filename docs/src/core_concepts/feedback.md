@@ -25,5 +25,5 @@ The `eager` methods are helpful if the second feedback needs to run for every ex
 
 Using the same `Feedback` infrastructure, `LibAFL` supports `Objectives`.
 Apart from a few special objectives for crashes and timeouts, objectives behave precisely like regular feedbacks.
-The main differenence is that the interesting objectives get stored into the fuzzer's `solutions` and will not get used for further mutations.
+The main difference is that the interesting objectives get stored into the fuzzer's `solutions` and will not get used for further mutations.
 The solutions can also be stored with additional metadata depending on the setting.
