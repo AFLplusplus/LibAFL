@@ -495,16 +495,13 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), (), StdShMemProvider>
-where
-{
+impl ForkserverExecutor<(), (), (), StdShMemProvider> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
     pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
         ForkserverExecutorBuilder::new()
     }
 }
-
 
 impl<I, OT, S, SP> ForkserverExecutor<I, OT, S, SP>
 where
