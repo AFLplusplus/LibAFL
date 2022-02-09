@@ -149,7 +149,7 @@ pub fn main() {
         .program(res.value_of("executable").unwrap().to_string())
         .args(&args)
         .debug_child(debug_child)
-        .shmem_provider(&mut shmem_provider)
+        .arg_input_file("inp")
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 

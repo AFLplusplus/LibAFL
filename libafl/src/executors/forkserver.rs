@@ -560,10 +560,18 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         };
 
         for item in &self.arguments {
+            // need special handling for @@
             if item == "@@" && use_stdin {
                 use_stdin = false;
                 args.push(out_filename.clone());
-            } else {
+            }
+            else{
+                if let Some(name) = &self.out_filename {
+                    if name == item && use_stdin {
+                        use_stdin = false;
+                        args.push(out_filename.clone());
+                    }
+                }
                 args.push(item.clone());
             }
         }
@@ -628,6 +636,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         } else {
             println!("Forkserver Options are not available.");
         }
+
+        println!("ForkserverExecutor target: {:?}, arguments: {:?}", target, args);
 
         Ok(ForkserverExecutor {
             target,
