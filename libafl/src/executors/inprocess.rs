@@ -1477,7 +1477,7 @@ where
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // Parent
-                    println!("from parent {} child is {}", std::process::id(), child);
+                    // println!("from parent {} child is {}", std::process::id(), child);
                     self.shmem_provider.post_fork(false)?;
                     self.handlers
                         .pre_run_target(self, fuzzer, state, mgr, input);

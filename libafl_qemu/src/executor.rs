@@ -5,8 +5,9 @@ use core::{
 };
 
 use libafl::{
+    bolts::shmem::ShMemProvider,
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor, InProcessForkExecutor},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
@@ -132,6 +133,146 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
+{
+    #[inline]
+    fn observers(&self) -> &OT {
+        self.inner.observers()
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        self.inner.observers_mut()
+    }
+}
+
+pub struct QemuForkExecutor<'a, H, I, OT, QT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    QT: QemuHelperTuple<I, S>,
+    SP: ShMemProvider,
+{
+    hooks: Pin<Box<QemuHooks<'a, I, QT, S>>>,
+    inner: InProcessForkExecutor<'a, H, I, OT, S, SP>,
+}
+
+impl<'a, H, I, OT, QT, S, SP> Debug for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    QT: QemuHelperTuple<I, S>,
+    SP: ShMemProvider,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("QemuForkExecutor")
+            .field("hooks", &self.hooks)
+            .field("inner", &self.inner)
+            .finish()
+    }
+}
+
+impl<'a, H, I, OT, QT, S, SP> QemuForkExecutor<'a, H, I, OT, QT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    QT: QemuHelperTuple<I, S>,
+    SP: ShMemProvider,
+{
+    pub fn new<EM, OF, Z>(
+        hooks: Pin<Box<QemuHooks<'a, I, QT, S>>>,
+        harness_fn: &'a mut H,
+        observers: OT,
+        fuzzer: &mut Z,
+        state: &mut S,
+        event_mgr: &mut EM,
+        shmem_provider: SP,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<I> + EventRestarter<S>,
+        OF: Feedback<I, S>,
+        S: HasSolutions<I> + HasClientPerfMonitor,
+        Z: HasObjective<I, OF, S>,
+    {
+        Ok(Self {
+            hooks,
+            inner: InProcessForkExecutor::new(
+                harness_fn,
+                observers,
+                fuzzer,
+                state,
+                event_mgr,
+                shmem_provider,
+            )?,
+        })
+    }
+
+    pub fn inner(&self) -> &InProcessForkExecutor<'a, H, I, OT, S, SP> {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut InProcessForkExecutor<'a, H, I, OT, S, SP> {
+        &mut self.inner
+    }
+
+    pub fn hooks(&self) -> &Pin<Box<QemuHooks<'a, I, QT, S>>> {
+        &self.hooks
+    }
+
+    pub fn hooks_mut(&mut self) -> &mut Pin<Box<QemuHooks<'a, I, QT, S>>> {
+        &mut self.hooks
+    }
+
+    pub fn emulator(&self) -> &Emulator {
+        self.hooks.emulator()
+    }
+}
+
+impl<'a, EM, H, I, OT, QT, S, Z, SP> Executor<EM, I, S, Z>
+    for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    QT: QemuHelperTuple<I, S>,
+    SP: ShMemProvider,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut S,
+        mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        let emu = Emulator::new_empty();
+        unsafe {
+            self.hooks
+                .as_mut()
+                .get_unchecked_mut()
+                .helpers_mut()
+                .pre_exec_all(&emu, input)
+        };
+        let r = self.inner.run_target(fuzzer, state, mgr, input);
+        unsafe {
+            self.hooks
+                .as_mut()
+                .get_unchecked_mut()
+                .helpers_mut()
+                .post_exec_all(&emu, input)
+        };
+        r
+    }
+}
+
+impl<'a, H, I, OT, QT, S, SP> HasObservers<I, OT, S> for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    QT: QemuHelperTuple<I, S>,
+    SP: ShMemProvider,
 {
     #[inline]
     fn observers(&self) -> &OT {
