@@ -33,6 +33,10 @@ pub mod elf;
 pub mod helper;
 #[cfg(target_os = "linux")]
 pub use helper::*;
+#[cfg(target_os = "linux")]
+pub mod hooks;
+#[cfg(target_os = "linux")]
+pub use hooks::*;
 
 #[cfg(target_os = "linux")]
 pub mod edges;

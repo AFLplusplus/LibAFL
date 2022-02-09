@@ -1,16 +1,17 @@
 use bio::data_structures::interval_tree::IntervalTree;
-use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
+use libafl::{inputs::Input, state::HasMetadata};
 use std::{
     cell::UnsafeCell,
     collections::{HashMap, HashSet},
+    pin::Pin,
     sync::Mutex,
 };
 use thread_local::ThreadLocal;
 
 use crate::{
     emu::{Emulator, MmapPerms},
-    executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple},
+    hooks::QemuHooks,
     GuestAddr, SYS_mmap, SYS_mprotect, SYS_mremap,
 };
 
@@ -184,19 +185,17 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        executor.hook_write8_execution(trace_write8_snapshot::<I, QT, S>);
-        executor.hook_write4_execution(trace_write4_snapshot::<I, QT, S>);
-        executor.hook_write2_execution(trace_write2_snapshot::<I, QT, S>);
-        executor.hook_write1_execution(trace_write1_snapshot::<I, QT, S>);
-        executor.hook_write_n_execution(trace_write_n_snapshot::<I, QT, S>);
+        hooks.write8_execution(trace_write8_snapshot::<I, QT, S>);
+        hooks.write4_execution(trace_write4_snapshot::<I, QT, S>);
+        hooks.write2_execution(trace_write2_snapshot::<I, QT, S>);
+        hooks.write1_execution(trace_write1_snapshot::<I, QT, S>);
+        hooks.write_n_execution(trace_write_n_snapshot::<I, QT, S>);
 
-        executor.hook_after_syscalls(trace_mmap_snapshot::<I, QT, S>);
+        hooks.after_syscalls(trace_mmap_snapshot::<I, QT, S>);
     }
 
     fn pre_exec(&mut self, emulator: &Emulator, _input: &I) {

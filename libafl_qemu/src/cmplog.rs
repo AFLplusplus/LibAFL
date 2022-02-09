@@ -1,5 +1,6 @@
+use core::pin::Pin;
 use hashbrown::HashMap;
-use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
+use libafl::{inputs::Input, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
 };
@@ -7,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     emu::Emulator,
-    executor::QemuExecutor,
     helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    hooks::QemuHooks,
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -64,17 +65,15 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        executor.hook_cmp_generation(gen_unique_cmp_ids::<I, QT, S>);
-        executor.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
-        executor.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
-        executor.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
-        executor.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
+        hooks.cmp_generation(gen_unique_cmp_ids::<I, QT, S>);
+        hooks.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
+        hooks.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
+        hooks.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
+        hooks.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
     }
 }
 
@@ -115,17 +114,15 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        executor.hook_cmp_generation(gen_hashed_cmp_ids::<I, QT, S>);
-        executor.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
-        executor.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
-        executor.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
-        executor.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
+        hooks.cmp_generation(gen_hashed_cmp_ids::<I, QT, S>);
+        hooks.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
+        hooks.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
+        hooks.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
+        hooks.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
     }
 }
 

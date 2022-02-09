@@ -317,7 +317,10 @@ impl Emulator {
     #[allow(clippy::must_use_candidate, clippy::similar_names)]
     pub fn new(args: &[String], env: &[(String, String)]) -> Emulator {
         unsafe {
-            assert!(!EMULATOR_IS_INITIALIZED);
+            assert!(
+                !EMULATOR_IS_INITIALIZED,
+                "Only an instance of Emulator is permitted"
+            );
         }
         assert!(!args.is_empty());
         let args: Vec<String> = args.iter().map(|x| x.clone() + "\0").collect();

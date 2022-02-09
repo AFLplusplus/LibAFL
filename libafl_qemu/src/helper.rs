@@ -1,9 +1,7 @@
-use core::{fmt::Debug, ops::Range};
-use libafl::{
-    bolts::tuples::MatchFirstType, executors::ExitKind, inputs::Input, observers::ObserversTuple,
-};
+use core::{fmt::Debug, ops::Range, pin::Pin};
+use libafl::{bolts::tuples::MatchFirstType, inputs::Input};
 
-use crate::{emu::Emulator, executor::QemuExecutor};
+use crate::{emu::Emulator, hooks::QemuHooks};
 
 /// A helper for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -13,10 +11,8 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
-    fn init<'a, H, OT, QT>(&self, _executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks<'a, QT>(&self, _hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
     }
@@ -30,10 +26,8 @@ pub trait QemuHelperTuple<I, S>: MatchFirstType + Debug
 where
     I: Input,
 {
-    fn init_all<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks_all<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>;
 
     fn pre_exec_all(&mut self, _emulator: &Emulator, input: &I);
@@ -45,10 +39,8 @@ impl<I, S> QemuHelperTuple<I, S> for ()
 where
     I: Input,
 {
-    fn init_all<'a, H, OT, QT>(&self, _executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks_all<'a, QT>(&self, _hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
     }
@@ -64,14 +56,12 @@ where
     Tail: QemuHelperTuple<I, S>,
     I: Input,
 {
-    fn init_all<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks_all<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        self.0.init(executor);
-        self.1.init_all(executor);
+        self.0.init_hooks(hooks);
+        self.1.init_hooks_all(hooks);
     }
 
     fn pre_exec_all(&mut self, emulator: &Emulator, input: &I) {

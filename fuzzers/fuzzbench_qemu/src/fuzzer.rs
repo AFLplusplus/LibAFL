@@ -53,7 +53,7 @@ use libafl_qemu::{
     edges,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
-    emu::Emulator,
+    emu::Emulator,hooks::QemuHooks,
     filter_qemu_args,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
@@ -322,16 +322,17 @@ fn fuzz(
 
         ExitKind::Ok
     };
+    
+    let hooks = QemuHooks::new(&emu, tuple_list!(
+          QemuEdgeCoverageHelper::new(),
+          QemuCmpLogHelper::new(),
+          //QemuAsanHelper::new(),
+          //QemuSnapshotHelper::new()
+      ));
 
     let executor = QemuExecutor::new(
+        hooks,
         &mut harness,
-        &emu,
-        tuple_list!(
-            QemuEdgeCoverageHelper::new(),
-            QemuCmpLogHelper::new(),
-            //QemuAsanHelper::new(),
-            //QemuSnapshotHelper::new()
-        ),
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,

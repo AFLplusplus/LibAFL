@@ -1,15 +1,15 @@
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
+use libafl::{inputs::Input, state::HasMetadata};
 pub use libafl_targets::{
     edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
 use serde::{Deserialize, Serialize};
-use std::{cell::UnsafeCell, cmp::max};
+use std::{cell::UnsafeCell, cmp::max, pin::Pin};
 
 use crate::{
     emu::Emulator,
-    executor::QemuExecutor,
     helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    hooks::QemuHooks,
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -65,14 +65,12 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        executor.hook_edge_generation(gen_unique_edge_ids::<I, QT, S>);
-        executor.emulator().set_exec_edge_hook(trace_edge_hitcount);
+        hooks.edge_generation(gen_unique_edge_ids::<I, QT, S>);
+        hooks.emulator().set_exec_edge_hook(trace_edge_hitcount);
     }
 }
 
@@ -115,14 +113,12 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        executor.hook_edge_generation(gen_unique_edge_ids::<I, QT, S>);
-        executor.emulator().set_exec_edge_hook(trace_edge_hitcount);
+        hooks.edge_generation(gen_unique_edge_ids::<I, QT, S>);
+        hooks.emulator().set_exec_edge_hook(trace_edge_hitcount);
     }
 }
 

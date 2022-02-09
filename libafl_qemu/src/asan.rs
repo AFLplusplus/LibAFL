@@ -1,11 +1,11 @@
-use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
+use libafl::{inputs::Input, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::{env, fs, ptr};
+use std::{env, fs, pin::Pin, ptr};
 
 use crate::{
     emu::{Emulator, SyscallHookResult},
-    executor::QemuExecutor,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    hooks::QemuHooks,
     GuestAddr, Regs,
 };
 
@@ -421,27 +421,25 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        //executor.hook_read_generation(gen_readwrite_asan::<I, QT, S>);
-        executor.hook_read8_execution(trace_read8_asan::<I, QT, S>);
-        executor.hook_read4_execution(trace_read4_asan::<I, QT, S>);
-        executor.hook_read2_execution(trace_read2_asan::<I, QT, S>);
-        executor.hook_read1_execution(trace_read1_asan::<I, QT, S>);
-        executor.hook_read_n_execution(trace_read_n_asan::<I, QT, S>);
+        //hooks.read_generation(gen_readwrite_asan::<I, QT, S>);
+        hooks.read8_execution(trace_read8_asan::<I, QT, S>);
+        hooks.read4_execution(trace_read4_asan::<I, QT, S>);
+        hooks.read2_execution(trace_read2_asan::<I, QT, S>);
+        hooks.read1_execution(trace_read1_asan::<I, QT, S>);
+        hooks.read_n_execution(trace_read_n_asan::<I, QT, S>);
 
-        //executor.hook_write_generation(gen_readwrite_asan::<I, QT, S>);
-        executor.hook_write8_execution(trace_write8_asan::<I, QT, S>);
-        executor.hook_write4_execution(trace_write4_asan::<I, QT, S>);
-        executor.hook_write2_execution(trace_write2_asan::<I, QT, S>);
-        executor.hook_write1_execution(trace_write1_asan::<I, QT, S>);
-        executor.hook_write_n_execution(trace_write_n_asan::<I, QT, S>);
+        //hooks.write_generation(gen_readwrite_asan::<I, QT, S>);
+        hooks.write8_execution(trace_write8_asan::<I, QT, S>);
+        hooks.write4_execution(trace_write4_asan::<I, QT, S>);
+        hooks.write2_execution(trace_write2_asan::<I, QT, S>);
+        hooks.write1_execution(trace_write1_asan::<I, QT, S>);
+        hooks.write_n_execution(trace_write_n_asan::<I, QT, S>);
 
-        executor.hook_syscalls(qasan_fake_syscall::<I, QT, S>);
+        hooks.syscalls(qasan_fake_syscall::<I, QT, S>);
     }
 
     fn post_exec(&mut self, _emulator: &Emulator, _input: &I) {
@@ -449,6 +447,7 @@ where
     }
 }
 
+/*
 // TODO add pc to generation hooks
 pub fn gen_readwrite_asan<I, QT, S>(
     _emulator: &Emulator,
@@ -468,6 +467,7 @@ where
         None
     }
 }
+*/
 
 pub fn trace_read1_asan<I, QT, S>(
     emulator: &Emulator,
