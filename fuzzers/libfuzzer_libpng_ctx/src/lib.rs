@@ -143,7 +143,9 @@ pub fn libafl_main() {
 
     let monitor = MultiMonitor::new(|s| println!("{}", s));
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>,
+                          mut restarting_mgr,
+                          _core_id| {
         // Create an observation channel using the coverage map
         let edges = unsafe { edges_map_from_ptr() };
         let edges_observer =

@@ -382,6 +382,8 @@ where
         let size = observer.usable_count();
         let initial = observer.initial();
 
+        println!("{:?}", state.feedback_state());
+
         let map_state = state
             .feedback_state_mut()
             .match_name_mut::<Self::FeedbackState>(&self.name)
@@ -392,7 +394,7 @@ where
                 ))
             })?;
 
-        assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
+        assert!(size <= map_state.history_map.len(), "The size of the associated map observer ({}) cannot exceed the size of the history map of the feedback ({}). If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.", size, map_state.history_map.len());
 
         assert!(size <= observer.len());
 
@@ -504,6 +506,7 @@ where
     /// Create new `MapFeedback`
     #[must_use]
     pub fn new(name: &str, map_observer: &O) -> Self {
+        println!("{:?}", map_observer.len());
         Self {
             indexes: None,
             novelties: None,

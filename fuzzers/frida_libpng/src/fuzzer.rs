@@ -188,7 +188,7 @@ unsafe fn fuzz(
 
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>,
+    let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>,
                           mut mgr: LlmpRestartingEventManager<_, _, _, _>,
                           _core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.

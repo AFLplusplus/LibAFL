@@ -87,7 +87,8 @@ pub fn main() {
         &mut feedback,
         // Same for objective feedbacks
         &mut objective,
-    );
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     let mon = SimpleMonitor::new(|s| println!("{}", s));
