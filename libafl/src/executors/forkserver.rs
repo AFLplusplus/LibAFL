@@ -9,6 +9,7 @@ use std::{
     ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
     os::unix::{io::RawFd, process::CommandExt},
+    path::Path,
     process::{Command, Stdio},
 };
 
@@ -529,6 +530,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
+    out_filename: Option<OsString>,
     debug_child: bool,
     shmem_provider: Option<&'a mut SP>,
 }
@@ -546,7 +548,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     {
         let mut args = Vec::<OsString>::new();
         let mut use_stdin = true;
-        let out_filename = OsString::from(".cur_input");
+        let out_filename = match &self.out_filename {
+            Some(name) => name.clone(),
+            None => OsString::from(".cur_input"),
+        };
 
         for item in &self.arguments {
             if item == "@@" && use_stdin {
@@ -643,6 +648,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             program: None,
             arguments: vec![],
             envs: vec![],
+            out_filename: None,
             debug_child: false,
             shmem_provider: None,
         }
@@ -712,10 +718,11 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     #[must_use]
-    /// Place the input at this position, this is equivalent to putting "@@" here.
-    pub fn arg_input_file(mut self) -> Self {
-        self.arguments.push(OsString::from("@@"));
-        self
+    /// Place the input at this position and set the filename for the input.
+    pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
+        let mut moved = self.arg(path.as_ref());
+        moved.out_filename = Some(path.as_ref().as_os_str().to_os_string());
+        moved
     }
 
     #[must_use]
@@ -734,6 +741,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             program: self.program,
             arguments: self.arguments,
             envs: self.envs,
+            out_filename: self.out_filename,
             debug_child: self.debug_child,
             shmem_provider: Some(shmem_provider),
         }
