@@ -576,7 +576,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             Some(t) => {
                 let forkserver = Forkserver::new(
                     t.clone(),
-                    self.arguments.clone(),
+                    args.clone(),
                     self.envs.clone(),
                     out_file.as_raw_fd(),
                     use_stdin,
@@ -620,7 +620,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
         Ok(ForkserverExecutor {
             target,
-            args: self.arguments.clone(),
+            args,
             out_file,
             forkserver,
             observers,
