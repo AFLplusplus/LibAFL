@@ -40,7 +40,6 @@ use crate::{
 
 use core::{
     fmt::{self, Debug, Formatter},
-    intrinsics::transmute,
     marker::PhantomData,
     time::Duration,
 };
@@ -137,7 +136,7 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
     /// Gets a state by name
     fn match_name<T: 'static>(&self, name: &str) -> Option<&T> {
         if type_eq::<Self, T>() && name == self.name() {
-            Some(unsafe { transmute(self) })
+            Some(unsafe { &*(self as *const _ as *const T) })
         } else {
             self.match_name_rec(name)
         }
@@ -146,7 +145,7 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
     /// Gets a state by name (mutable)
     fn match_name_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
         if type_eq::<Self, T>() && name == self.name() {
-            Some(unsafe { transmute(self) })
+            Some(unsafe { &mut *(self as *mut _ as *mut T) })
         } else {
             self.match_name_rec_mut(name)
         }
