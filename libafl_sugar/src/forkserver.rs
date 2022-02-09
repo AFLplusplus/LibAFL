@@ -113,7 +113,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 
         let monitor = MultiMonitor::new(|s| println!("{}", s));
 
-        let mut run_client = |state: Option<StdState<_, _, _, _, _>>,
+        let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>,
                               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
                               _core_id| {
             // Coverage map shared between target and fuzzer

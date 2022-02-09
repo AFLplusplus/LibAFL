@@ -141,7 +141,7 @@ where
 
         let monitor = MultiMonitor::new(|s| println!("{}", s));
 
-        let mut run_client = |state: Option<StdState<_, _, _, _, _>>,
+        let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>,
                               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
                               _core_id| {
             // Create an observation channel using the coverage map

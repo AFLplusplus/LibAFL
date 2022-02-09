@@ -5,13 +5,13 @@ use crate::mutators::str_decode;
 #[cfg(target_os = "linux")]
 use alloc::string::ToString;
 use alloc::vec::Vec;
+#[cfg(target_os = "linux")]
+use core::slice::from_raw_parts;
 use core::slice::Iter;
 use core::{
     mem::size_of,
     ops::{Add, AddAssign},
 };
-#[cfg(target_os = "linux")]
-use core::{ptr::null, slice::from_raw_parts};
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
@@ -78,7 +78,7 @@ impl Tokens {
 
     /// Create a token section from a start and an end pointer
     /// Reads from an autotokens section, returning the count of new entries read
-    /// 
+    ///
     /// # Safety
     /// The `token_start` and `token_end` pointers must be valid.
     /// In subsequent use, the area between both pointers will be dereferenced
