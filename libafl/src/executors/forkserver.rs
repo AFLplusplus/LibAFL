@@ -566,13 +566,20 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 args.push(out_filename.clone());
             }
             else{
+                // if the filename set by arg_input_file matches the item, then set use_stdin to false
                 if let Some(name) = &self.out_filename {
                     if name == item && use_stdin {
                         use_stdin = false;
                         args.push(out_filename.clone());
                     }
+                    else{
+                        args.push(item.clone());
+                    }
                 }
-                args.push(item.clone());
+                else{
+                // default case, just push item into the arguments.
+                    args.push(item.clone());
+                }
             }
         }
 
@@ -637,7 +644,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             println!("Forkserver Options are not available.");
         }
 
-        println!("ForkserverExecutor target: {:?}, arguments: {:?}", target, args);
+        println!("ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}", target, args, use_stdin);
 
         Ok(ForkserverExecutor {
             target,
