@@ -382,8 +382,6 @@ where
         let size = observer.usable_count();
         let initial = observer.initial();
 
-        println!("{:?}", state.feedback_state());
-
         let map_state = state
             .feedback_state_mut()
             .match_name_mut::<Self::FeedbackState>(&self.name)
@@ -506,7 +504,6 @@ where
     /// Create new `MapFeedback`
     #[must_use]
     pub fn new(name: &str, map_observer: &O) -> Self {
-        println!("{:?}", map_observer.len());
         Self {
             indexes: None,
             novelties: None,

@@ -40,8 +40,8 @@ use crate::{
 
 use core::{
     fmt::{self, Debug, Formatter},
+    intrinsics::transmute,
     marker::PhantomData,
-    ptr::addr_of,
     time::Duration,
 };
 
@@ -135,18 +135,18 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
     }
 
     /// Gets a state by name
-    fn match_name<T>(&self, name: &str) -> Option<&T> {
+    fn match_name<T: 'static>(&self, name: &str) -> Option<&T> {
         if type_eq::<Self, T>() && name == self.name() {
-            unsafe { (addr_of!(self) as *const T).as_ref() }
+            Some(unsafe { transmute(self) })
         } else {
             self.match_name_rec(name)
         }
     }
 
     /// Gets a state by name (mutable)
-    fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
+    fn match_name_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
         if type_eq::<Self, T>() && name == self.name() {
-            unsafe { (addr_of!(self) as *mut T).as_mut() }
+            Some(unsafe { transmute(self) })
         } else {
             self.match_name_rec_mut(name)
         }
@@ -154,14 +154,14 @@ pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug
 
     /// Gets a state by name, recursively, if not found (mutable)
     #[inline]
-    fn match_name_rec_mut<T>(&mut self, _name: &str) -> Option<&mut T> {
+    fn match_name_rec_mut<T: 'static>(&mut self, _name: &str) -> Option<&mut T> {
         // The default impl doesn't have any nested state
         None
     }
 
     /// Gets a state by name, recursively, if not found
     #[inline]
-    fn match_name_rec<T>(&self, _name: &str) -> Option<&T> {
+    fn match_name_rec<T: 'static>(&self, _name: &str) -> Option<&T> {
         // The default impl doesn't have any nested state
         None
     }
@@ -250,14 +250,14 @@ where
         self.state2.reset()
     }
 
-    fn match_name_rec_mut<T>(&mut self, name: &str) -> Option<&mut T> {
+    fn match_name_rec_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
         match self.state1.match_name_mut(name) {
             Some(state1) => Some(state1),
             None => self.state2.match_name_mut(name),
         }
     }
 
-    fn match_name_rec<T>(&self, name: &str) -> Option<&T> {
+    fn match_name_rec<T: 'static>(&self, name: &str) -> Option<&T> {
         match self.state1.match_name(name) {
             Some(state1) => Some(state1),
             None => self.state2.match_name(name),
