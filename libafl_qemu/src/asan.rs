@@ -162,8 +162,9 @@ pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> E
     Emulator::new(args, env)
 }
 
+pub type QemuAsanChildHelper = QemuAsanHelper;
+
 #[derive(Debug)]
-// TODO intrumentation filter
 pub struct QemuAsanHelper {
     enabled: bool,
     filter: QemuInstrumentationFilter,
@@ -418,6 +419,8 @@ where
     I: Input,
     S: HasMetadata,
 {
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
     fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
     where
         H: FnMut(&I) -> ExitKind,

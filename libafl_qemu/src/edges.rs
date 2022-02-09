@@ -1,13 +1,15 @@
 use hashbrown::{hash_map::Entry, HashMap};
 use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
-pub use libafl_targets::{EDGES_MAP, EDGES_MAP_SIZE, MAX_EDGES_NUM};
+pub use libafl_targets::{
+    edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE, EDGES_MAP_SIZE, MAX_EDGES_NUM,
+};
 use serde::{Deserialize, Serialize};
 use std::{cell::UnsafeCell, cmp::max};
 
 use crate::{
     emu::Emulator,
     executor::QemuExecutor,
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -74,14 +76,57 @@ where
     }
 }
 
-thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
+pub type QemuEdgeCoverageWithBlocksHelper = QemuEdgeCoverageChildHelper;
 
-fn hash_me(mut x: u64) -> u64 {
-    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
-    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
-    x = (x.overflowing_shr(16).0 ^ x) ^ x;
-    x
+#[derive(Debug)]
+pub struct QemuEdgeCoverageChildHelper {
+    filter: QemuInstrumentationFilter,
 }
+
+impl QemuEdgeCoverageChildHelper {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            filter: QemuInstrumentationFilter::None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
+        Self { filter }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: u64) -> bool {
+        self.filter.allowed(addr)
+    }
+}
+
+impl Default for QemuEdgeCoverageChildHelper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<I, S> QemuHelper<I, S> for QemuEdgeCoverageChildHelper
+where
+    I: Input,
+    S: HasMetadata,
+{
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
+    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    where
+        H: FnMut(&I) -> ExitKind,
+        OT: ObserversTuple<I, S>,
+        QT: QemuHelperTuple<I, S>,
+    {
+        executor.hook_edge_generation(gen_unique_edge_ids::<I, QT, S>);
+        executor.emulator().set_exec_edge_hook(trace_edge_hitcount);
+    }
+}
+
+thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
 
 pub fn gen_unique_edge_ids<I, QT, S>(
     _emulator: &Emulator,
@@ -140,7 +185,7 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuEdgeCoverageHelper>() {
+    if let Some(h) = helpers.match_first_type::<QemuEdgeCoverageChildHelper>() {
         if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
@@ -181,8 +226,9 @@ pub fn gen_hashed_block_ids<I, QT, S>(
 pub extern "C" fn trace_block_transition_hitcount(id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE - 1);
-            EDGES_MAP[x] = EDGES_MAP[x].wrapping_add(1);
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_SIZE - 1);
+            let entry = EDGES_MAP_PTR.add(x);
+            *entry = (*entry).wrapping_add(1);
             *prev_loc.get() = id.overflowing_shr(1).0;
         });
     }
@@ -191,8 +237,9 @@ pub extern "C" fn trace_block_transition_hitcount(id: u64) {
 pub extern "C" fn trace_block_transition_single(id: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
-            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_SIZE - 1);
-            EDGES_MAP[x] = 1;
+            let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_SIZE - 1);
+            let entry = EDGES_MAP_PTR.add(x);
+            *entry = 1;
             *prev_loc.get() = id.overflowing_shr(1).0;
         });
     }
