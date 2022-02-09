@@ -324,8 +324,8 @@ fn fuzz(
     };
     
     let hooks = QemuHooks::new(&emu, tuple_list!(
-          QemuEdgeCoverageHelper::new(),
-          QemuCmpLogHelper::new(),
+          QemuEdgeCoverageHelper::default(),
+          QemuCmpLogHelper::default(),
           //QemuAsanHelper::new(),
           //QemuSnapshotHelper::new()
       ));
