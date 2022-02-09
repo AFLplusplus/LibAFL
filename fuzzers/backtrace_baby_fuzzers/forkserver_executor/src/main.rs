@@ -44,9 +44,6 @@ pub fn main() {
     let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
 
     
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-    let bt_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
-
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = MaxMapFeedback::new_tracking("MaxMapFeedback", &edges_observer, true, false);

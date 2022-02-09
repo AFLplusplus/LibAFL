@@ -232,8 +232,6 @@ pub fn LLVMFuzzerRunDriver(
         let cmplog = unsafe { &mut CMPLOG_MAP };
         let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
-        let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
         let mut feedback = feedback_or!(
