@@ -161,7 +161,7 @@ where
         &self.current
     }
 
-    /// Current testcase scheduled (mut)
+    /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<usize> {
         &mut self.current

@@ -158,7 +158,7 @@ where
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
     /// depending on different corpus or state.
-    /// * `harness_fn` - the harness, executiong the function
+    /// * `harness_fn` - the harness, executing the function
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OF, Z>(
@@ -231,7 +231,7 @@ where
         &self.handlers
     }
 
-    /// The inprocess handlers, mut
+    /// The inprocess handlers (mutable)
     #[inline]
     pub fn handlers_mut(&mut self) -> &mut InProcessHandlers {
         &mut self.handlers

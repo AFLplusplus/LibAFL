@@ -62,7 +62,7 @@ where
     /// Get the mutations
     fn mutations(&self) -> &MT;
 
-    /// Get the mutations (mut)
+    /// Get the mutations (mutable)
     fn mutations_mut(&mut self) -> &mut MT;
 }
 
@@ -78,7 +78,7 @@ where
     /// Get the next mutation to apply
     fn schedule(&self, state: &mut S, input: &I) -> usize;
 
-    /// New default implementation for mutate
+    /// New default implementation for mutate.
     /// Implementations must forward mutate() to this method
     fn scheduled_mutate(
         &mut self,
@@ -158,7 +158,7 @@ where
         &self.mutations
     }
 
-    // Get the mutations (mut)
+    // Get the mutations (mutable)
     #[inline]
     fn mutations_mut(&mut self) -> &mut MT {
         &mut self.mutations

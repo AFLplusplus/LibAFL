@@ -120,7 +120,7 @@ where
     /// Get the `CmpMap`
     fn cmp_map(&self) -> &CM;
 
-    /// Get the `CmpMap` (mut)
+    /// Get the `CmpMap` (mutable)
     fn cmp_map_mut(&mut self) -> &mut CM;
 
     /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.

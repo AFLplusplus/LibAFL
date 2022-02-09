@@ -92,9 +92,14 @@ fn main() {
     println!("cargo:rerun-if-changed=src/common.h");
     println!("cargo:rerun-if-changed=src/common.c");
 
-    cc::Build::new()
-        .file(src_dir.join("common.c"))
-        .compile("common");
+    let mut common = cc::Build::new();
+
+    #[cfg(feature = "sanitizers_flags")]
+    {
+        common.define("DEFAULT_SANITIZERS_OPTIONS", "1");
+    }
+
+    common.file(src_dir.join("common.c")).compile("common");
 
     println!("cargo:rerun-if-changed=src/coverage.c");
 

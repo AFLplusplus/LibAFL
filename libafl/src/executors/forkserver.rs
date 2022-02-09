@@ -715,7 +715,7 @@ where
                 self.observers_mut()
                     .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
                     .unwrap()
-                    .parse_asan_output_from_asan_log_file(pid);
+                    .parse_asan_output_from_asan_log_file(pid)?;
             }
         }
 

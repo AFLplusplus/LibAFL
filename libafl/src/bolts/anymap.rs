@@ -8,11 +8,11 @@ use core::{
 
 /// Convert to an Any trait object
 pub trait AsAny: Any {
-    /// returns this as Any trait
+    /// Returns this as Any trait
     fn as_any(&self) -> &dyn Any;
-    /// returns this as mutable Any trait
+    /// Returns this as mutable Any trait
     fn as_any_mut(&mut self) -> &mut dyn Any;
-    /// returns this as boxed Any trait
+    /// Returns this as boxed Any trait
     fn as_any_boxed(self: Box<Self>) -> Box<dyn Any>;
 }
 
@@ -37,8 +37,6 @@ macro_rules! impl_asany {
         }
     };
 }
-
-// yolo
 
 /// Get a `type_id` from its previously unpacked `u64`.
 /// Opposite of [`unpack_type_id(id)`].

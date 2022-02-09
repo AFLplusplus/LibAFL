@@ -16,8 +16,8 @@ const HASH_CONST: u64 = 0xa5b35705;
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuDuoJrRand;
 
-/// Ways to get random around here
-/// Please note that these are not cryptographically secure
+/// Ways to get random around here.
+/// Please note that these are not cryptographically secure.
 /// Or, even if some might be by accident, at least they are not seeded in a cryptographically secure fashion.
 pub trait Rand: Debug + Serialize + DeserializeOwned {
     /// Sets the seed of this Rand

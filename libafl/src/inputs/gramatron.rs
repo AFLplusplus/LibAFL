@@ -91,7 +91,7 @@ impl GramatronInput {
         }
     }
 
-    /// crop the value to the given length
+    /// Crop the value to the given length
     pub fn crop(&self, from: usize, to: usize) -> Result<Self, Error> {
         if from < to && to <= self.terms.len() {
             let mut terms = vec![];

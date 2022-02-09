@@ -66,7 +66,7 @@ impl fmt::Display for LogSeverity {
 /// Indicate if an event worked or not
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum BrokerEventResult {
-    /// The broker haneled this. No need to pass it on.
+    /// The broker handled this. No need to pass it on.
     Handled,
     /// Pass this message along to the clients.
     Forward,
@@ -295,10 +295,10 @@ where
     /// In this case, if you `fire` faster than the broker can consume
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
-    /// This should not happen for a normal use-cases.
+    /// This should not happen for a normal use-case.
     fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
-    /// Send off an [`Event::Log`] event to the broker
+    /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
     fn log<S>(
         &mut self,
@@ -330,7 +330,7 @@ where
     }
 }
 
-/// [`EventFirer`] fire an event.
+/// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter<I>: EventFirer<I>
 where
     I: Input,
@@ -431,10 +431,10 @@ pub trait EventProcessor<E, I, S, Z> {
 }
 /// The id of this [`EventManager`].
 /// For multi processed [`EventManager`]s,
-/// each connected client sholud have a unique ids.
+/// each connected client should have a unique ids.
 pub trait HasEventManagerId {
     /// The id of this manager. For Multiprocessed [`EventManager`]s,
-    /// each client sholud have a unique ids.
+    /// each client should have a unique ids.
     fn mgr_id(&self) -> EventManagerId;
 }
 

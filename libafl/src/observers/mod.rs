@@ -7,9 +7,12 @@ pub mod cmp;
 pub use cmp::*;
 
 #[cfg(feature = "std")]
-pub mod stacktrace;
+pub mod stdio;
 #[cfg(feature = "std")]
-pub use stacktrace::ASANBacktraceObserver;
+pub use stdio::{StdErrObserver, StdOutObserver};
+
+#[cfg(feature = "std")]
+pub mod stacktrace;
 #[cfg(feature = "std")]
 pub use stacktrace::*;
 
@@ -49,7 +52,7 @@ pub trait Observer<I, S>: Named + Debug {
         Ok(())
     }
 
-    /// Called right after execution finish.
+    /// Called right after execution finishes.
     #[inline]
     fn post_exec(
         &mut self,
@@ -66,7 +69,7 @@ pub trait Observer<I, S>: Named + Debug {
         Ok(())
     }
 
-    /// Called right after execution finish in the child process, if any.
+    /// Called right after execution finishes in the child process, if any.
     #[inline]
     fn post_exec_child(
         &mut self,

@@ -1,5 +1,5 @@
-//! A generic sharememory region to be used by any functions (queues or feedbacks
-// too.)
+//! A generic shared memory region to be used by any functions (queues or feedbacks
+//! too.)
 
 #[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::pipes::Pipe;
@@ -253,7 +253,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
     }
 }
 
-/// A Refernce Counted shared map,
+/// A Reference Counted shared map,
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
@@ -299,7 +299,7 @@ impl<T: ShMemProvider> Drop for RcShMem<T> {
     }
 }
 
-/// A Refernce Counted `ShMemProvider`,
+/// A Reference Counted `ShMemProvider`,
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]

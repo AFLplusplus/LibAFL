@@ -73,6 +73,18 @@ fn find_llvm_config() -> String {
     })
 }
 
+/// Use `xcrun` to get the path to the Xcode SDK tools library path, for linking
+fn find_macos_sdk_libs() -> String {
+    let sdk_path_out = Command::new("xcrun")
+        .args(&["--show-sdk-path"])
+        .output()
+        .expect("Failed to execute xcrun. Make sure you have Xcode installed and executed `sudo xcode-select --install`");
+    format!(
+        "-L{}/usr/lib",
+        String::from_utf8(sdk_path_out.stdout).unwrap().trim()
+    )
+}
+
 #[allow(clippy::too_many_lines)]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
@@ -134,9 +146,15 @@ fn main() {
             .expect("Failed to execute llvm-config");
         let cxxflags = str::from_utf8(&output.stdout).expect("Invalid llvm-config output");
 
-        let output = Command::new(&llvm_config)
+        let mut cmd = Command::new(&llvm_config);
+
+        #[cfg(target_vendor = "apple")]
+        {
+            cmd.args(&["--libs"]);
+        }
+
+        let output = cmd
             .args(&["--ldflags"])
-            .args(&["--libs"])
             .output()
             .expect("Failed to execute llvm-config");
         let ldflags = str::from_utf8(&output.stdout).expect("Invalid llvm-config output");
@@ -144,11 +162,16 @@ fn main() {
         let cxxflags: Vec<&str> = cxxflags.trim().split_whitespace().collect();
         let mut ldflags: Vec<&str> = ldflags.trim().split_whitespace().collect();
 
+        let sdk_path;
         if env::var("CARGO_CFG_TARGET_VENDOR").unwrap().as_str() == "apple" {
             // Needed on macos.
             // Explanation at https://github.com/banach-space/llvm-tutor/blob/787b09ed31ff7f0e7bdd42ae20547d27e2991512/lib/CMakeLists.txt#L59
             ldflags.push("-undefined");
             ldflags.push("dynamic_lookup");
+
+            // In case the system is configured oddly, we may have trouble finding the SDK. Manually add the linker flag, just in case.
+            sdk_path = find_macos_sdk_libs();
+            ldflags.push(&sdk_path);
         };
 
         println!("cargo:rerun-if-changed=src/common-llvm.h");
@@ -219,6 +242,10 @@ pub const CLANGXX_PATH: &str = \"clang++\";
             llvm_config, llvm_config
         );
     }
+
+    cc::Build::new()
+        .file(src_dir.join("no-link-rt.c"))
+        .compile("no-link-rt");
 
     println!("cargo:rerun-if-changed=build.rs");
 }

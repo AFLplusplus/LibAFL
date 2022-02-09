@@ -365,7 +365,7 @@ where
     }
 }
 
-/// Merge two `TupeList`
+/// Merge two `TupleList`
 pub trait Merge<T> {
     /// The Resulting [`TupleList`], of an [`Merge::merge()`] call
     type MergeResult;

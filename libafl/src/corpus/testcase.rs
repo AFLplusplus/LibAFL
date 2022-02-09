@@ -130,7 +130,7 @@ where
         &self.exec_time
     }
 
-    /// Get the execution time of the testcase (mut)
+    /// Get the execution time of the testcase (mutable)
     #[inline]
     pub fn exec_time_mut(&mut self) -> &mut Option<Duration> {
         &mut self.exec_time
@@ -148,7 +148,7 @@ where
         &self.executions
     }
 
-    /// Get the executions (mut)
+    /// Get the executions (mutable)
     #[inline]
     pub fn executions_mut(&mut self) -> &mut usize {
         &mut self.executions

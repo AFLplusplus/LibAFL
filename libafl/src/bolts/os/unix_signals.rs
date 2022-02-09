@@ -290,7 +290,7 @@ pub fn ucontext() -> Result<ucontext_t, Error> {
     } else {
         #[cfg(not(feature = "std"))]
         unsafe {
-            libc::perror(b"Failed to get ucontext\n".as_ptr() as _)
+            libc::perror(b"Failed to get ucontext\n".as_ptr() as _);
         };
         #[cfg(not(feature = "std"))]
         return Err(Error::Unknown("Failed to get ucontex".into()));

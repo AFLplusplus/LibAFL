@@ -52,24 +52,24 @@ impl BacktraceHashValueWrapper {
             Self::StaticVariable(_) => {
                 *self = Self::StaticVariable((bt_hash, input_hash));
             }
-            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet22!"),
+            Self::None => panic!("BacktraceSharedMemoryWrapper is not set yet!"),
         }
     }
 
     /// get the hash value from the [`BacktraceHashValueWrapper`]
-    fn get_stacktrace_hash(&self) -> (u64, u64) {
+    fn get_stacktrace_hash(&self) -> Result<(u64, u64), Error> {
         match &self {
             Self::Shmem(shmem) => {
                 let map = shmem.as_slice();
-                (
-                    u64::from_be_bytes(map[0..8].try_into().expect("Incorrectly sized")),
-                    u64::from_be_bytes(map[8..16].try_into().expect("Incorrectly sized")),
-                )
+                Ok((
+                    u64::from_be_bytes(map[0..8].try_into()?),
+                    u64::from_be_bytes(map[8..16].try_into()?),
+                ))
             }
-            Self::StaticVariable(hash_tuple) => *hash_tuple,
-            Self::None => {
-                panic!("BacktraceSharedMemoryWrapper is not set yet!")
-            }
+            Self::StaticVariable(hash_tuple) => Ok(*hash_tuple),
+            Self::None => Err(Error::IllegalState(
+                "BacktraceSharedMemoryWrapper is not set yet!".into(),
+            )),
         }
     }
 }
@@ -188,7 +188,7 @@ where
             let input_hash = hasher.finish();
             // get last backtrace hash and associated input hash
             let (bt_hash, current_input_hash) =
-                unsafe { BACKTRACE_HASH_VALUE.get_stacktrace_hash() };
+                unsafe { BACKTRACE_HASH_VALUE.get_stacktrace_hash()? };
             // replace if this is a new input
             if current_input_hash != input_hash {
                 let bt_hash = collect_backtrace();
@@ -262,27 +262,27 @@ impl ASANBacktraceObserver {
     }
 
     /// read ASAN output from the child stderr and parse it.
-    pub fn parse_asan_output_from_childstderr(&mut self, stderr: &mut ChildStderr) {
+    pub fn parse_asan_output_from_childstderr(
+        &mut self,
+        stderr: &mut ChildStderr,
+    ) -> Result<(), Error> {
         let mut buf = String::new();
-        stderr
-            .read_to_string(&mut buf)
-            .expect("Failed to read the child process stderr");
+        stderr.read_to_string(&mut buf)?;
         self.parse_asan_output(&buf);
+        Ok(())
     }
 
     /// read ASAN output from the log file and parse it.
-    pub fn parse_asan_output_from_asan_log_file(&mut self, pid: i32) {
+    pub fn parse_asan_output_from_asan_log_file(&mut self, pid: i32) -> Result<(), Error> {
         let log_path = format!("{}.{}", ASAN_LOG_PATH, pid);
-        let mut asan_output = File::open(Path::new(&log_path))
-            .unwrap_or_else(|_| panic!("Can't find asan log at {}", &log_path));
+        let mut asan_output = File::open(Path::new(&log_path))?;
 
         let mut buf = String::new();
-        asan_output
-            .read_to_string(&mut buf)
-            .expect("Failed to read asan log");
-        fs::remove_file(&log_path).unwrap_or_else(|_| panic!("Failed to delete {}", &log_path));
+        asan_output.read_to_string(&mut buf)?;
+        fs::remove_file(&log_path)?;
 
         self.parse_asan_output(&buf);
+        Ok(())
     }
 
     /// parse ASAN error output emited by the target command and compute the hash
