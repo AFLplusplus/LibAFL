@@ -26,6 +26,8 @@ pub trait QemuHelperTuple<I, S>: MatchFirstType + Debug
 where
     I: Input,
 {
+    const HOOKS_DO_SIDE_EFFECTS: bool;
+
     fn init_hooks_all<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
         QT: QemuHelperTuple<I, S>;
@@ -39,6 +41,8 @@ impl<I, S> QemuHelperTuple<I, S> for ()
 where
     I: Input,
 {
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
     fn init_hooks_all<'a, QT>(&self, _hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
         QT: QemuHelperTuple<I, S>,
@@ -56,6 +60,8 @@ where
     Tail: QemuHelperTuple<I, S>,
     I: Input,
 {
+    const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
+
     fn init_hooks_all<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
     where
         QT: QemuHelperTuple<I, S>,

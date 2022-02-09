@@ -196,6 +196,8 @@ where
         S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
+        assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
+
         Ok(Self {
             hooks,
             inner: InProcessForkExecutor::new(
