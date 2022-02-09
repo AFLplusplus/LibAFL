@@ -15,7 +15,7 @@ use std::{
 
 use crate::{
     bolts::{
-        fs::OutFile,
+        fs::{OutFile, OUTFILE_STD},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
@@ -795,6 +795,13 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
         let mut moved = self.arg(path.as_ref());
         moved.out_filename = Some(path.as_ref().as_os_str().to_os_string());
+        moved
+    }
+
+    #[must_use]
+    /// Place the input at this position and set the default filename for the input.
+    pub fn arg_input_file_std(self) -> Self {
+        let moved = self.arg_input_file(OUTFILE_STD);
         moved
     }
 
