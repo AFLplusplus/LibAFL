@@ -179,7 +179,7 @@ impl From<serde_json::Error> for Error {
 #[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
-        Self::Unknown(format!("{:?}", err))
+        Self::Unknown(format!("Unix error: {:?}", err))
     }
 }
 

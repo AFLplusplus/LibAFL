@@ -1449,23 +1449,23 @@ where
                     self.handlers
                         .pre_run_target(self, fuzzer, state, mgr, input);
 
-                    match self
+                    if let Some(bt) = self
                         .observers()
                         .match_name::<BacktraceObserver>("BacktraceObserver")
-                        .unwrap()
-                        .harness_type()
                     {
-                        crate::observers::HarnessType::FFI => {
-                            setup_signal_handler(&mut FORK_EXECUTOR_GLOBAL_DATA)?;
-                        }
-                        crate::observers::HarnessType::RUST => {
-                            setup_child_panic_hook::<
-                                InProcessForkExecutor<H, I, OT, S, SP>,
-                                I,
-                                OT,
-                                S,
-                                InProcessForkExecutorGlobalData,
-                            >(&FORK_EXECUTOR_GLOBAL_DATA);
+                        match bt.harness_type() {
+                            crate::observers::HarnessType::FFI => {
+                                setup_signal_handler(&mut FORK_EXECUTOR_GLOBAL_DATA)?;
+                            }
+                            crate::observers::HarnessType::RUST => {
+                                setup_child_panic_hook::<
+                                    InProcessForkExecutor<H, I, OT, S, SP>,
+                                    I,
+                                    OT,
+                                    S,
+                                    InProcessForkExecutorGlobalData,
+                                >(&FORK_EXECUTOR_GLOBAL_DATA);
+                            }
                         }
                     }
 

@@ -58,7 +58,7 @@ pub use asan::{init_with_asan, QemuAsanHelper};
 #[cfg(target_os = "linux")]
 pub mod executor;
 #[cfg(target_os = "linux")]
-pub use executor::QemuExecutor;
+pub use executor::{QemuExecutor, QemuForkExecutor};
 
 #[cfg(target_os = "linux")]
 pub mod emu;
