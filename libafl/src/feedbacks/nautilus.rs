@@ -80,6 +80,7 @@ where
 {
     type FeedbackState = NopFeedbackState;
 
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -109,10 +110,12 @@ where
         Ok(())
     }
 
+    #[inline]
     fn discard_metadata(&mut self, _state: &mut S, _input: &NautilusInput) -> Result<(), Error> {
         Ok(())
     }
 
+    #[inline]
     fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }
