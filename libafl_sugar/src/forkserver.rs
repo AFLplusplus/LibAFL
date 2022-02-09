@@ -20,7 +20,7 @@ use libafl::{
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     monitors::MultiMonitor,

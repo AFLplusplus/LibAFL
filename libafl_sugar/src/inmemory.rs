@@ -22,7 +22,7 @@ use libafl::{
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
