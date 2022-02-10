@@ -1109,6 +1109,7 @@ mod windows_exception_handler {
         // println!("TIMER INVOKED!");
     }
 
+    #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
