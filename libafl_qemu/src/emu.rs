@@ -27,7 +27,7 @@ use pyo3::{prelude::*, PyIterProtocol};
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
-#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
+#[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq)]
 #[repr(i32)]
 pub enum MmapPerms {
     None = 0,
@@ -201,7 +201,7 @@ extern "C" {
     fn target_mmap(start: u64, len: u64, target_prot: i32, flags: i32, fd: i32, offset: u64)
         -> u64;
 
-    /// int target_mprotect(abi_ulong start, abi_ulong len, int prot);
+    /// int target_mprotect(abi_ulong start, abi_ulong len, int prot)
     fn target_mprotect(start: u64, len: u64, target_prot: i32) -> i32;
 
     /// int target_munmap(abi_ulong start, abi_ulong len)

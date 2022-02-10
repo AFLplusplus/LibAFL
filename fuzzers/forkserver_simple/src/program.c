@@ -1,9 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string.h>
 
 // The following line is needed for shared memeory testcase fuzzing
 __AFL_FUZZ_INIT();
+
+void vuln(char *buf) {
+    if(strcmp(buf, "vuln") == 0) {
+        abort();
+    }
+}
+
 
 int main(int argc, char **argv){
 
@@ -24,7 +31,6 @@ int main(int argc, char **argv){
 
 
     printf("input: %s\n", buf);
-
     if(buf[0] == 'b'){
         if(buf[1] == 'a'){
             if(buf[2] == 'd'){
@@ -32,6 +38,7 @@ int main(int argc, char **argv){
             }
         }
     }
+    vuln(buf);
 
     return 0;
 }

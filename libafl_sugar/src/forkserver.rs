@@ -18,7 +18,7 @@ use libafl::{
         QueueCorpusScheduler,
     },
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
-    executors::{ForkserverExecutor, TimeoutForkserverExecutor},
+    executors::{forkserver::ForkserverExecutorBuilder, TimeoutForkserverExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -174,25 +174,24 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+            let forkserver = if self.shmem_testcase {
+                ForkserverExecutorBuilder::new()
+                    .program(self.program.clone())
+                    .args(self.arguments)
+                    .debug_child(self.debug_output)
+                    .shmem_provider(&mut shmem_provider_client)
+                    .build(tuple_list!(edges_observer, time_observer))
+            } else {
+                ForkserverExecutorBuilder::new()
+                    .program(self.program.clone())
+                    .args(self.arguments)
+                    .debug_child(self.debug_output)
+                    .build(tuple_list!(edges_observer, time_observer))
+            };
+
             // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
             let mut executor = TimeoutForkserverExecutor::new(
-                if self.shmem_testcase {
-                    ForkserverExecutor::with_shmem_inputs(
-                        self.program.clone(),
-                        self.arguments,
-                        tuple_list!(edges_observer, time_observer),
-                        self.debug_output,
-                        &mut shmem_provider_client,
-                    )
-                } else {
-                    ForkserverExecutor::new(
-                        self.program.clone(),
-                        self.arguments,
-                        tuple_list!(edges_observer, time_observer),
-                        self.debug_output,
-                    )
-                }
-                .expect("Failed to create the executor."),
+                forkserver.expect("Failed to create the executor."),
                 timeout,
             )
             .expect("Failed to create the executor.");

@@ -76,6 +76,30 @@ impl Tokens {
         Ok(self)
     }
 
+    /// Parse autodict section
+    pub fn parse_autodict(&mut self, slice: &[u8], size: usize) {
+        let mut head = 0;
+        loop {
+            if head >= size {
+                // Sanity Check
+                assert!(head == size);
+                break;
+            }
+            let size = slice[head] as usize;
+            head += 1;
+            if size > 0 {
+                self.add_token(&slice[head..head + size].to_vec());
+                #[cfg(feature = "std")]
+                println!(
+                    "Token size: {} content: {:x?}",
+                    size,
+                    &slice[head..head + size].to_vec()
+                );
+                head += size;
+            }
+        }
+    }
+
     /// Create a token section from a start and an end pointer
     /// Reads from an autotokens section, returning the count of new entries read
     ///
@@ -99,28 +123,8 @@ impl Tokens {
         // println!("size: {}", section_size);
         let slice = from_raw_parts(token_start, section_size);
 
-        let mut head = 0;
-
         // Now we know the beginning and the end of the token section.. let's parse them into tokens
-        loop {
-            if head >= section_size {
-                // Sanity Check
-                assert!(head == section_size);
-                break;
-            }
-            let size = slice[head] as usize;
-            head += 1;
-            if size > 0 {
-                ret.add_token(&slice[head..head + size].to_vec());
-                /* #[cfg(feature = "std")]
-                println!(
-                    "Token size: {} content: {:x?}",
-                    size,
-                    &slice[head..head + size].to_vec()
-                ); */
-                head += size;
-            }
-        }
+        ret.parse_autodict(slice, section_size);
 
         Ok(ret)
     }

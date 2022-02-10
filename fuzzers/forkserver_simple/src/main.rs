@@ -4,7 +4,7 @@ use libafl::{
         current_nanos,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        tuples::tuple_list,
+        tuples::{tuple_list, Merge},
         AsMutSlice,
     },
     corpus::{
@@ -18,10 +18,10 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, StdState},
+    state::{HasCorpus, HasMetadata, StdState},
 };
 use std::path::PathBuf;
 
@@ -142,15 +142,18 @@ pub fn main() {
         None => [].to_vec(),
     };
 
+    let mut tokens = Tokens::new();
+    let forkserver = ForkserverExecutor::builder()
+        .program(res.value_of("executable").unwrap().to_string())
+        .args(&args)
+        .debug_child(debug_child)
+        .shmem_provider(&mut shmem_provider)
+        .autotokens(&mut tokens)
+        .build(tuple_list!(time_observer, edges_observer))
+        .unwrap();
+
     let mut executor = TimeoutForkserverExecutor::new(
-        ForkserverExecutor::with_shmem_inputs(
-            res.value_of("executable").unwrap().to_string(),
-            &args,
-            tuple_list!(edges_observer, time_observer),
-            debug_child,
-            &mut shmem_provider,
-        )
-        .unwrap(),
+        forkserver,
         Duration::from_millis(
             res.value_of("timeout")
                 .unwrap()
@@ -174,8 +177,10 @@ pub fn main() {
         println!("We imported {} inputs from disk.", state.corpus().count());
     }
 
+    state.add_metadata(tokens);
+
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
