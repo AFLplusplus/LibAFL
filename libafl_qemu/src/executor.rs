@@ -113,16 +113,16 @@ where
                 .as_mut()
                 .get_unchecked_mut()
                 .helpers_mut()
-                .pre_exec_all(&emu, input)
-        };
+                .pre_exec_all(&emu, input);
+        }
         let r = self.inner.run_target(fuzzer, state, mgr, input);
         unsafe {
             self.hooks
                 .as_mut()
                 .get_unchecked_mut()
                 .helpers_mut()
-                .post_exec_all(&emu, input)
-        };
+                .post_exec_all(&emu, input);
+        }
         r
     }
 }
@@ -254,16 +254,16 @@ where
                 .as_mut()
                 .get_unchecked_mut()
                 .helpers_mut()
-                .pre_exec_all(&emu, input)
-        };
+                .pre_exec_all(&emu, input);
+        }
         let r = self.inner.run_target(fuzzer, state, mgr, input);
         unsafe {
             self.hooks
                 .as_mut()
                 .get_unchecked_mut()
                 .helpers_mut()
-                .post_exec_all(&emu, input)
-        };
+                .post_exec_all(&emu, input);
+        }
         r
     }
 }

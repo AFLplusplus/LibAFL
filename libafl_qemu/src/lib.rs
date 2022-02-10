@@ -4,6 +4,7 @@
     any(cpu_target = "x86_64", cpu_target = "aarch64"),
     allow(clippy::useless_conversion)
 )]
+#![allow(clippy::needless_pass_by_value)]
 
 use std::env;
 

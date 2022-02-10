@@ -579,6 +579,7 @@ where
         slf
     }
 
+    #[must_use]
     pub fn match_helper<'b, T>(self: &'b Pin<&mut Self>) -> Option<&'b T>
     where
         T: QemuHelper<I, S>,
@@ -586,6 +587,7 @@ where
         self.helpers.match_first_type::<T>()
     }
 
+    #[must_use]
     pub fn match_helper_mut<'b, T>(self: &'b mut Pin<&mut Self>) -> Option<&'b mut T>
     where
         T: QemuHelper<I, S>,
