@@ -397,6 +397,7 @@ pub struct InProcessExecutorHandlerData {
 unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
+#[allow(unused)]
 impl InProcessExecutorHandlerData {
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
