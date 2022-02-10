@@ -1,5 +1,6 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
+use alloc::boxed::Box;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "std")]
