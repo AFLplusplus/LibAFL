@@ -7,7 +7,7 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{ShMem, UnixShMemProvider},
+        shmem::{ShMem, StdShMemProvider},
         tuples::tuple_list,
     },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
@@ -39,7 +39,7 @@ extern "C" {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+    let mut shmem_provider = StdShMemProvider::new().unwrap();
     unsafe { create_shmem_array() };
     let map_ptr = unsafe { get_ptr() };
     let mut harness = |input: &BytesInput| {
