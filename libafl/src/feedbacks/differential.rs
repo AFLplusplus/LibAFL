@@ -125,9 +125,11 @@ where
 {
     type FeedbackState = NopFeedbackState;
 
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
@@ -166,7 +168,7 @@ mod tests {
         },
         events::EventFirer,
         executors::ExitKind,
-        feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
+        feedbacks::{differential::DiffResult, DiffFeedback, Feedback, NopFeedbackState},
         inputs::{BytesInput, Input},
         monitors::ClientPerfMonitor,
         observers::Observer,
@@ -258,6 +260,7 @@ mod tests {
             diff_feedback
                 .is_interesting(
                     &mut nop_state,
+                    &mut NopFeedbackState {},
                     &mut NopEventFirer {},
                     &BytesInput::new(vec![0]),
                     &observers,

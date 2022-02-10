@@ -15,7 +15,7 @@ use crate::{
     },
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
-    feedbacks::{CombinedFeedbackState, Feedback, FeedbackState},
+    feedbacks::{Feedback, FeedbackState},
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::Input,
@@ -110,15 +110,20 @@ pub trait HasMetadata {
     }
 }
 
-/// Trait for elements offering a feedback
-pub trait HasFeedbackState {
-    /// The associated feedback type implementing [`FeedbackState`].
+/// Trait for elements offering feedback and objective states
+pub trait HasFeedbackObjectiveStates {
+    /// The state tree for feedbacks, stored in the first part of the feedback state tuple
     type FeedbackState: FeedbackState;
-    /// The feedback states
-    fn feedback_state(&self) -> &Self::FeedbackState;
+    /// The state tree for objective feedbacks (2nd part of the tuple)
+    type ObjectiveState: FeedbackState;
 
-    /// The feedback states (mutable)
-    fn feedback_state_mut(&mut self) -> &mut Self::FeedbackState;
+    /// The feedback states and objective state tuple
+    fn feedback_state(&self) -> &Option<Box<(Self::FeedbackState, Self::ObjectiveState)>>;
+
+    /// The feedback states and objective states tuple (mutable)
+    fn feedback_state_mut(
+        &mut self,
+    ) -> &mut Option<Box<(Self::FeedbackState, Self::ObjectiveState)>>;
 }
 
 /// Trait for the execution counter
@@ -160,7 +165,7 @@ where
     /// The corpus
     corpus: C,
     /// States of the feedback, and objectives used to evaluate an input
-    feedback_state: CombinedFeedbackState<FS, OS>,
+    feedback_state: Option<Box<(FS, OS)>>,
     // Solutions corpus
     solutions: SC,
     /// Metadata stored for this state by one of the components
@@ -282,7 +287,7 @@ where
     }
 }
 
-impl<C, FS, I, OS, R, SC> HasFeedbackState for StdState<C, FS, I, OS, R, SC>
+impl<C, FS, I, OS, R, SC> HasFeedbackObjectiveStates for StdState<C, FS, I, OS, R, SC>
 where
     C: Corpus<I>,
     I: Input,
@@ -291,17 +296,19 @@ where
     OS: FeedbackState,
     SC: Corpus<I>,
 {
-    type FeedbackState = CombinedFeedbackState<FS, OS>;
+    type FeedbackState = FS;
+
+    type ObjectiveState = OS;
 
     /// The feedback states
     #[inline]
-    fn feedback_state(&self) -> &Self::FeedbackState {
+    fn feedback_state(&self) -> &Option<Box<(FS, OS)>> {
         &self.feedback_state
     }
 
     /// The feedback states (mutable)
     #[inline]
-    fn feedback_state_mut(&mut self) -> &mut Self::FeedbackState {
+    fn feedback_state_mut(&mut self) -> &mut Option<Box<(FS, OS)>> {
         &mut self.feedback_state
     }
 }
@@ -591,11 +598,10 @@ where
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             corpus,
-            feedback_state: CombinedFeedbackState::new(
-                "__feedbacks_and_objectives",
+            feedback_state: Some(Box::new((
                 feedbacks.init_state()?,
                 objectives.init_state()?,
-            ),
+            ))),
             solutions,
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]

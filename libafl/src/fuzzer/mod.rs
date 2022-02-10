@@ -11,7 +11,9 @@ use crate::{
     observers::ObserversTuple,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasFeedbackObjectiveStates, HasSolutions,
+    },
     Error,
 };
 
@@ -305,9 +307,18 @@ where
     I: Input,
     OF: Feedback<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus<I>
+        + HasSolutions<I>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasFeedbackObjectiveStates<
+            FeedbackState = F::FeedbackState,
+            ObjectiveState = OF::FeedbackState,
+        >,
 {
     /// Evaluate if a set of observation channels has an interesting state
+    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_lines)]
     fn process_execution<EM>(
         &mut self,
         state: &mut S,
@@ -322,47 +333,80 @@ where
     {
         let mut res = ExecuteInputResult::None;
 
+        // since this is the hot path, we use unsafe to optimize away a jump on feedback unwrap (should never happen)
+        // but we want to get around programming errors at development time by using the debug assert here.
+        debug_assert!(state.feedback_state_mut().is_some());
+
+        let mut feedback_state_box =
+            unsafe { state.feedback_state_mut().take().unwrap_unchecked() };
+        let feedback_state = &mut feedback_state_box.0;
+        let objective_state = &mut feedback_state_box.1;
+
         #[cfg(not(feature = "introspection"))]
-        let is_solution = self
-            .objective_mut()
-            .is_interesting(state, manager, &input, observers, exit_kind)?;
+        let is_solution = self.objective_mut().is_interesting(
+            state,
+            objective_state,
+            manager,
+            &input,
+            observers,
+            exit_kind,
+        )?;
 
         #[cfg(feature = "introspection")]
-        let is_solution = self
-            .objective_mut()
-            .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
+        let is_solution = self.objective_mut().is_interesting_introspection(
+            state,
+            objective_state,
+            manager,
+            &input,
+            observers,
+            exit_kind,
+        )?;
 
         if is_solution {
             res = ExecuteInputResult::Solution;
         } else {
             #[cfg(not(feature = "introspection"))]
-            let is_corpus = self
-                .feedback_mut()
-                .is_interesting(state, manager, &input, observers, exit_kind)?;
+            let is_corpus = self.feedback_mut().is_interesting(
+                state,
+                feedback_state,
+                manager,
+                &input,
+                observers,
+                exit_kind,
+            )?;
 
             #[cfg(feature = "introspection")]
-            let is_corpus = self
-                .feedback_mut()
-                .is_interesting_introspection(state, manager, &input, observers, exit_kind)?;
+            let is_corpus = self.feedback_mut().is_interesting_introspection(
+                state,
+                feedback_state,
+                manager,
+                &input,
+                observers,
+                exit_kind,
+            )?;
 
             if is_corpus {
                 res = ExecuteInputResult::Corpus;
             }
         }
 
-        match res {
+        let ret_tuple = match res {
             ExecuteInputResult::None => {
-                self.feedback_mut().discard_metadata(state, &input)?;
-                self.objective_mut().discard_metadata(state, &input)?;
+                self.feedback_mut()
+                    .discard_metadata(state, feedback_state, &input)?;
+                self.objective_mut()
+                    .discard_metadata(state, objective_state, &input)?;
                 Ok((res, None))
             }
             ExecuteInputResult::Corpus => {
                 // Not a solution
-                self.objective_mut().discard_metadata(state, &input)?;
+                self.objective_mut()
+                    .discard_metadata(state, objective_state, &input)?;
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-                self.feedback_mut().append_metadata(state, &mut testcase)?;
+                self.feedback_mut()
+                    .append_metadata(state, feedback_state, &mut testcase)?;
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
@@ -390,11 +434,13 @@ where
             }
             ExecuteInputResult::Solution => {
                 // Not interesting
-                self.feedback_mut().discard_metadata(state, &input)?;
+                self.feedback_mut()
+                    .discard_metadata(state, feedback_state, &input)?;
 
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
-                self.objective_mut().append_metadata(state, &mut testcase)?;
+                self.objective_mut()
+                    .append_metadata(state, objective_state, &mut testcase)?;
                 state.solutions_mut().add(testcase)?;
 
                 if send_events {
@@ -408,7 +454,13 @@ where
 
                 Ok((res, None))
             }
-        }
+        };
+
+        // store the temporal moved out feedback states back into the state
+        // so we can potentially serialize them to disk on crash
+        state.feedback_state_mut().replace(feedback_state_box);
+
+        ret_tuple
     }
 }
 
@@ -419,7 +471,14 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus<I>
+        + HasSolutions<I>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasFeedbackObjectiveStates<
+            FeedbackState = F::FeedbackState,
+            ObjectiveState = OF::FeedbackState,
+        >,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -450,7 +509,14 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus<I>
+        + HasSolutions<I>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasFeedbackObjectiveStates<
+            FeedbackState = F::FeedbackState,
+            ObjectiveState = OF::FeedbackState,
+        >,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -475,14 +541,22 @@ where
     ) -> Result<usize, Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
+
+        // Not on the hot path, we can use normal /safe unwrap here.
+        let mut feedback_state_box = state.feedback_state_mut().take().unwrap();
+        let feedback_state = &mut feedback_state_box.0;
+        let objective_state = &mut feedback_state_box.1;
+
         // Always consider this to be "interesting"
 
         // Not a solution
-        self.objective_mut().discard_metadata(state, &input)?;
+        self.objective_mut()
+            .discard_metadata(state, objective_state, &input)?;
 
         // Add the input to the main corpus
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-        self.feedback_mut().append_metadata(state, &mut testcase)?;
+        self.feedback_mut()
+            .append_metadata(state, feedback_state, &mut testcase)?;
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 
@@ -503,6 +577,10 @@ where
                 executions: *state.executions(),
             },
         )?;
+
+        // store feedback states back into the general state
+        state.feedback_state_mut().replace(feedback_state_box);
+
         Ok(idx)
     }
 }

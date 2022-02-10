@@ -53,7 +53,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasSolutions},
+    state::{HasClientPerfMonitor, HasFeedbackObjectiveStates, HasSolutions},
     Error,
 };
 
@@ -158,7 +158,9 @@ where
     where
         EM: EventFirer<I> + EventRestarter<S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         Z: HasObjective<I, OF, S>,
     {
         #[cfg(feature = "std")]
@@ -310,7 +312,9 @@ impl InProcessHandlers {
         OT: ObserversTuple<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         Z: HasObjective<I, OF, S>,
         H: FnMut(&I) -> ExitKind,
     {
@@ -635,7 +639,7 @@ mod unix_signal_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasFeedbackObjectiveStates, HasMetadata, HasSolutions},
     };
 
     pub type HandlerFuncPtr =
@@ -698,7 +702,9 @@ mod unix_signal_handler {
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -726,9 +732,19 @@ mod unix_signal_handler {
             .post_exec_all(state, input, &ExitKind::Timeout)
             .expect("Observers post_exec_all failed");
 
+        let mut feedback_state_box = state.feedback_state_mut().take().unwrap_unchecked();
+        let objective_state = &mut feedback_state_box.1;
+
         let interesting = fuzzer
             .objective_mut()
-            .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+            .is_interesting(
+                state,
+                objective_state,
+                event_mgr,
+                input,
+                observers,
+                &ExitKind::Timeout,
+            )
             .expect("In timeout handler objective failure.");
 
         if interesting {
@@ -736,7 +752,7 @@ mod unix_signal_handler {
             new_testcase.add_metadata(ExitKind::Timeout);
             fuzzer
                 .objective_mut()
-                .append_metadata(state, &mut new_testcase)
+                .append_metadata(state, objective_state, &mut new_testcase)
                 .expect("Failed adding metadata");
             state
                 .solutions_mut()
@@ -750,7 +766,13 @@ mod unix_signal_handler {
                     },
                 )
                 .expect("Could not send timeouting input");
+        } else {
+            fuzzer
+                .objective_mut()
+                .discard_metadata(state, objective_state, input)
+                .expect("Failed to discard metadata");
         }
+        state.feedback_state_mut().replace(feedback_state_box);
 
         event_mgr.on_restart(state).unwrap();
 
@@ -779,7 +801,9 @@ mod unix_signal_handler {
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -853,9 +877,19 @@ mod unix_signal_handler {
                 writer.flush().unwrap();
             }
 
+            let mut feedback_state_box = state.feedback_state_mut().take().unwrap_unchecked();
+            let objective_state = &mut feedback_state_box.1;
+
             let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                .is_interesting(
+                    state,
+                    objective_state,
+                    event_mgr,
+                    input,
+                    observers,
+                    &ExitKind::Crash,
+                )
                 .expect("In crash handler objective failure.");
 
             if interesting {
@@ -864,7 +898,7 @@ mod unix_signal_handler {
                 new_testcase.add_metadata(ExitKind::Crash);
                 fuzzer
                     .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
+                    .append_metadata(state, objective_state, &mut new_testcase)
                     .expect("Failed adding metadata");
                 state
                     .solutions_mut()
@@ -878,7 +912,14 @@ mod unix_signal_handler {
                         },
                     )
                     .expect("Could not send crashing input");
+            } else {
+                fuzzer
+                    .objective_mut()
+                    .discard_metadata(state, objective_state, input)
+                    .expect("Failed to discard metadata");
             }
+
+            state.feedback_state_mut().replace(feedback_state_box);
 
             event_mgr.on_restart(state).unwrap();
 
@@ -993,9 +1034,19 @@ mod windows_exception_handler {
                 let input = (data.timeout_input_ptr as *const I).as_ref().unwrap();
                 data.timeout_input_ptr = ptr::null_mut();
 
+                let mut feedback_state_box = state.feedback_state_mut().take().unwrap_unchecked();
+                let objective_state = &mut feedback_state_box.1;
+
                 let interesting = fuzzer
                     .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+                    .is_interesting(
+                        state,
+                        objective_state,
+                        event_mgr,
+                        input,
+                        observers,
+                        &ExitKind::Timeout,
+                    )
                     .expect("In timeout handler objective failure.");
 
                 if interesting {
@@ -1003,7 +1054,7 @@ mod windows_exception_handler {
                     new_testcase.add_metadata(ExitKind::Timeout);
                     fuzzer
                         .objective_mut()
-                        .append_metadata(state, &mut new_testcase)
+                        .append_metadata(state, objective_state, &mut new_testcase)
                         .expect("Failed adding metadata");
                     state
                         .solutions_mut()
@@ -1017,7 +1068,14 @@ mod windows_exception_handler {
                             },
                         )
                         .expect("Could not send timeouting input");
+                } else {
+                    fuzzer
+                        .objective_mut()
+                        .discard_metadata(state, objective_state, input)
+                        .expect("Failed to discard metadata");
                 }
+
+                state.feedback_state_mut().replace(feedback_state_box);
 
                 event_mgr.on_restart(state).unwrap();
 
@@ -1140,9 +1198,19 @@ mod windows_exception_handler {
             // Make sure we don't crash in the crash handler forever.
             data.current_input_ptr = ptr::null();
 
+            let mut feedback_state_box = state.feedback_state_mut().take().unwrap_unchecked();
+            let objective_state = &mut feedback_state_box.1;
+
             let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                .is_interesting(
+                    state,
+                    feedback_state,
+                    event_mgr,
+                    input,
+                    observers,
+                    &ExitKind::Crash,
+                )
                 .expect("In crash handler objective failure.");
 
             if interesting {
@@ -1151,7 +1219,7 @@ mod windows_exception_handler {
                 new_testcase.add_metadata(ExitKind::Crash);
                 fuzzer
                     .objective_mut()
-                    .append_metadata(state, &mut new_testcase)
+                    .append_metadata(state, feedback_state, &mut new_testcase)
                     .expect("Failed adding metadata");
                 state
                     .solutions_mut()
@@ -1165,7 +1233,14 @@ mod windows_exception_handler {
                         },
                     )
                     .expect("Could not send crashing input");
+            } else {
+                fuzzer
+                    .objective_mut()
+                    .discard_metadata(state, objective_state, input)
+                    .expect("Failed to discard metadata");
             }
+
+            state.feedback_state_mut().replace(feedback_state_box);
 
             event_mgr.on_restart(state).unwrap();
 

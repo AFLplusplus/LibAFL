@@ -10,7 +10,7 @@ use crate::{
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackState, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackObjectiveStates, HasMetadata},
     Error,
 };
 use alloc::{
@@ -46,7 +46,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasFeedbackState + HasClientPerfMonitor,
+    S: HasCorpus<I> + HasMetadata + HasFeedbackObjectiveStates + HasClientPerfMonitor,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -135,8 +135,10 @@ where
                 .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
                 .to_vec();
 
-            let history_map = &mut state
-                .feedback_state_mut()
+            let feedbacks_and_observers = state.feedback_state_mut().as_mut().unwrap();
+
+            let history_map = &mut feedbacks_and_observers
+                .0
                 .match_name_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name)
                 .unwrap()
                 .history_map;

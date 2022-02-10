@@ -1,6 +1,6 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{any::type_name, fmt::Debug, hash::Hash, marker::PhantomData};
 
 use hashbrown::HashSet;
 use num_traits::PrimInt;
@@ -13,7 +13,7 @@ use crate::{
     feedbacks::{Feedback, FeedbackState},
     inputs::Input,
     observers::{ObserverWithHashField, ObserversTuple},
-    state::{HasClientPerfMonitor, HasFeedbackState},
+    state::{HasClientPerfMonitor, HasFeedbackObjectiveStates},
     Error,
 };
 
@@ -110,7 +110,7 @@ pub struct NewHashFeedback<O, T> {
 impl<I, O, S, T> Feedback<I, S> for NewHashFeedback<O, T>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasFeedbackState,
+    S: HasClientPerfMonitor + HasFeedbackObjectiveStates,
     O: ObserverWithHashField + Named + Debug,
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
 {
@@ -119,6 +119,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
@@ -128,19 +129,22 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
+        let backtrace_state = feedback_state;
+
         let observer = observers
             .match_name::<O>(&self.observer_name)
             .expect("A NewHashFeedback needs a BacktraceObserver");
 
-        let backtrace_state = _state
-            .feedback_state_mut()
-            .match_name_mut::<NewHashFeedbackState<u64>>(&self.observer_name)
-            .unwrap();
-
         match observer.hash() {
             Some(hash) => {
                 let res = backtrace_state
-                    .update_hash_set(*hash)
+                    .update_hash_set(T::from(*hash).ok_or_else(|| {
+                        Error::IllegalState(format!(
+                            "The hash {} cannot be converted to type {}",
+                            hash,
+                            type_name::<T>()
+                        ))
+                    })?)
                     .expect("Failed to update the hash state");
                 Ok(res)
             }

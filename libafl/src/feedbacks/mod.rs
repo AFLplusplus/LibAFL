@@ -26,9 +26,8 @@ pub use nautilus::*;
 use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
-use crate::bolts::tuples::type_eq;
 use crate::{
-    bolts::tuples::Named,
+    bolts::tuples::{type_eq, Named},
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -55,10 +54,11 @@ where
     /// The feedback's state.
     type FeedbackState: FeedbackState;
 
-    /// `is_interesting ` return if an input is worth the addition to the corpus
+    /// `is_interesting` returns if the input last evaluated is worth adding to the corpus
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -75,6 +75,7 @@ where
     fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -88,7 +89,7 @@ where
         let start_time = crate::bolts::cpu::read_time_counter();
 
         // Execute this feedback
-        let ret = self.is_interesting(state, manager, input, observers, exit_kind);
+        let ret = self.is_interesting(state, feedback_state, manager, input, observers, exit_kind);
 
         // Get the elapsed time for checking this feedback
         let elapsed = crate::bolts::cpu::read_time_counter() - start_time;
@@ -103,17 +104,25 @@ where
 
     /// Append generated mettadata to a testcase in case of a new corpus item
     #[inline]
+    #[allow(unused_variables)]
     fn append_metadata(
         &mut self,
-        _state: &mut S,
-        _testcase: &mut Testcase<I>,
+        state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
+        testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    #[allow(unused_variables)]
+    fn discard_metadata(
+        &mut self,
+        state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
+        input: &I,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
@@ -168,6 +177,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         _observers: &OT,
@@ -349,9 +359,11 @@ where
 {
     type FeedbackState = CombinedFeedbackState<A::FeedbackState, B::FeedbackState>;
 
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -365,6 +377,7 @@ where
             &mut self.first,
             &mut self.second,
             state,
+            feedback_state,
             manager,
             input,
             observers,
@@ -373,9 +386,11 @@ where
     }
 
     #[cfg(feature = "introspection")]
+    #[inline]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -389,6 +404,7 @@ where
             &mut self.first,
             &mut self.second,
             state,
+            feedback_state,
             manager,
             input,
             observers,
@@ -397,15 +413,29 @@ where
     }
 
     #[inline]
-    fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.first.append_metadata(state, testcase)?;
-        self.second.append_metadata(state, testcase)
+    fn append_metadata(
+        &mut self,
+        state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
+        self.first
+            .append_metadata(state, &mut feedback_state.state1, testcase)?;
+        self.second
+            .append_metadata(state, &mut feedback_state.state2, testcase)
     }
 
     #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.first.discard_metadata(state, input)?;
-        self.second.discard_metadata(state, input)
+    fn discard_metadata(
+        &mut self,
+        state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
+        input: &I,
+    ) -> Result<(), Error> {
+        self.first
+            .discard_metadata(state, &mut feedback_state.state1, input)?;
+        self.second
+            .discard_metadata(state, &mut feedback_state.state2, input)
     }
 
     fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
@@ -429,10 +459,12 @@ where
     fn name() -> &'static str;
 
     /// If the feedback pair is interesting
+    #[allow(clippy::too_many_arguments)]
     fn is_pair_interesting<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -449,6 +481,7 @@ where
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -482,14 +515,17 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[inline]
     fn name() -> &'static str {
         "Eager OR"
     }
 
+    #[inline]
     fn is_pair_interesting<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -499,16 +535,32 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
-        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
-        let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
+        let a = first.is_interesting(
+            state,
+            &mut feedback_state.state1,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
+        let b = second.is_interesting(
+            state,
+            &mut feedback_state.state2,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
         Ok(a || b)
     }
 
+    #[inline]
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -519,9 +571,23 @@ where
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
-        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+        let a = first.is_interesting_introspection(
+            state,
+            &mut feedback_state.state1,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
 
-        let b = second.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+        let b = second.is_interesting_introspection(
+            state,
+            &mut feedback_state.state2,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
         Ok(a || b)
     }
 }
@@ -533,14 +599,17 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[inline]
     fn name() -> &'static str {
         "Fast OR"
     }
 
+    #[inline]
     fn is_pair_interesting<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -550,19 +619,35 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
-        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
+        let a = first.is_interesting(
+            state,
+            &mut feedback_state.state1,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
         if a {
             return Ok(true);
         }
 
-        second.is_interesting(state, manager, input, observers, exit_kind)
+        second.is_interesting(
+            state,
+            &mut feedback_state.state2,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )
     }
 
+    #[inline]
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -573,13 +658,27 @@ where
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
-        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+        let a = first.is_interesting_introspection(
+            state,
+            &mut feedback_state.state1,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
 
         if a {
             return Ok(true);
         }
 
-        second.is_interesting_introspection(state, manager, input, observers, exit_kind)
+        second.is_interesting_introspection(
+            state,
+            &mut feedback_state.state2,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )
     }
 }
 
@@ -590,14 +689,17 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[inline]
     fn name() -> &'static str {
         "Eager AND"
     }
 
+    #[inline]
     fn is_pair_interesting<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -607,16 +709,32 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
-        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
-        let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
+        let a = first.is_interesting(
+            state,
+            &mut feedback_state.state1,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
+        let b = second.is_interesting(
+            state,
+            &mut feedback_state.state2,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
         Ok(a && b)
     }
 
+    #[inline]
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -627,9 +745,23 @@ where
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
-        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+        let a = first.is_interesting_introspection(
+            state,
+            &mut feedback_state.state1,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
 
-        let b = second.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+        let b = second.is_interesting_introspection(
+            state,
+            &mut feedback_state.state2,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
         Ok(a && b)
     }
 }
@@ -641,14 +773,17 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[inline]
     fn name() -> &'static str {
         "Fast AND"
     }
 
+    #[inline]
     fn is_pair_interesting<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -658,19 +793,35 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
-        let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
+        let a = first.is_interesting(
+            state,
+            &mut feedback_state.state1,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
         if !a {
             return Ok(false);
         }
 
-        second.is_interesting(state, manager, input, observers, exit_kind)
+        second.is_interesting(
+            state,
+            &mut feedback_state.state2,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )
     }
 
+    #[inline]
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
         state: &mut S,
+        feedback_state: &mut CombinedFeedbackState<A::FeedbackState, B::FeedbackState>,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -681,13 +832,27 @@ where
         OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
-        let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
+        let a = first.is_interesting_introspection(
+            state,
+            &mut feedback_state.state1,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?;
 
         if !a {
             return Ok(false);
         }
 
-        second.is_interesting_introspection(state, manager, input, observers, exit_kind)
+        second.is_interesting_introspection(
+            state,
+            &mut feedback_state.state2,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )
     }
 }
 
@@ -746,9 +911,11 @@ where
 {
     type FeedbackState = A::FeedbackState;
 
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
         manager: &mut EM,
         input: &I,
         observers: &OT,
@@ -758,19 +925,34 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
-        Ok(!self
-            .inner
-            .is_interesting(state, manager, input, observers, exit_kind)?)
+        Ok(!self.inner.is_interesting(
+            state,
+            feedback_state,
+            manager,
+            input,
+            observers,
+            exit_kind,
+        )?)
     }
 
     #[inline]
-    fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        self.inner.append_metadata(state, testcase)
+    fn append_metadata(
+        &mut self,
+        state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
+        self.inner.append_metadata(state, feedback_state, testcase)
     }
 
     #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
-        self.inner.discard_metadata(state, input)
+    fn discard_metadata(
+        &mut self,
+        state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
+        input: &I,
+    ) -> Result<(), Error> {
+        self.inner.discard_metadata(state, feedback_state, input)
     }
 
     #[inline]
@@ -868,9 +1050,11 @@ where
 {
     type FeedbackState = NopFeedbackState;
 
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         _observers: &OT,
@@ -907,9 +1091,11 @@ where
 {
     type FeedbackState = NopFeedbackState;
 
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         _observers: &OT,
@@ -964,9 +1150,11 @@ where
 {
     type FeedbackState = NopFeedbackState;
 
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         _observers: &OT,
@@ -1029,6 +1217,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
@@ -1046,7 +1235,12 @@ where
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         *testcase.exec_time_mut() = self.exec_time;
         self.exec_time = None;
         Ok(())
@@ -1054,7 +1248,12 @@ where
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        _input: &I,
+    ) -> Result<(), Error> {
         self.exec_time = None;
         Ok(())
     }

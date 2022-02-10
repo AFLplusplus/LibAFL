@@ -620,6 +620,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
@@ -645,7 +646,13 @@ where
         }
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    #[inline]
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }
@@ -653,11 +660,18 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    #[inline]
+    fn discard_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        _input: &I,
+    ) -> Result<(), Error> {
         self.errors = None;
         Ok(())
     }
 
+    #[inline]
     fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
         Ok(NopFeedbackState {})
     }

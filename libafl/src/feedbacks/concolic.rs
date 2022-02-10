@@ -56,6 +56,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
@@ -74,6 +75,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         if let Some(metadata) = self.metadata.take() {
@@ -83,7 +85,12 @@ where
     }
 
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        _input: &I,
+    ) -> Result<(), Error> {
         Ok(())
     }
 

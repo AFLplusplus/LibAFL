@@ -17,7 +17,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasFeedbackState, HasMetadata},
+    state::{HasClientPerfMonitor, HasFeedbackObjectiveStates, HasMetadata},
     Error,
 };
 
@@ -337,7 +337,7 @@ where
     R: Reducer<T>,
     O: MapObserver,
     N: IsNovel<T>,
-    S: HasFeedbackState,
+    S: HasFeedbackObjectiveStates,
 {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
@@ -360,13 +360,14 @@ where
     O: MapObserver<Entry = T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasFeedbackState + HasClientPerfMonitor + Debug,
+    S: HasFeedbackObjectiveStates + HasClientPerfMonitor + Debug,
 {
     type FeedbackState = MapFeedbackState<T>;
 
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
+        feedback_state: &mut Self::FeedbackState,
         manager: &mut EM,
         _input: &I,
         observers: &OT,
@@ -382,15 +383,7 @@ where
         let size = observer.usable_count();
         let initial = observer.initial();
 
-        let map_state = state
-            .feedback_state_mut()
-            .match_name_mut::<Self::FeedbackState>(&self.name)
-            .ok_or_else(|| {
-                Error::IllegalState(format!(
-                    "MapFeedbackState with name '{}' not found in state.",
-                    self.name
-                ))
-            })?;
+        let map_state = feedback_state;
 
         assert!(size <= map_state.history_map.len(), "The size of the associated map observer ({}) cannot exceed the size of the history map of the feedback ({}). If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.", size, map_state.history_map.len());
 
@@ -444,7 +437,12 @@ where
         Ok(interesting)
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             let meta = MapIndexesMetadata::new(core::mem::take(v));
             testcase.add_metadata(meta);
@@ -457,7 +455,12 @@ where
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        _input: &I,
+    ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
         }
@@ -478,7 +481,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver,
-    S: HasFeedbackState,
+    S: HasFeedbackObjectiveStates,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -499,7 +502,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver,
-    S: HasFeedbackState,
+    S: HasFeedbackObjectiveStates,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -609,6 +612,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
@@ -633,7 +637,12 @@ where
     }
 
     #[inline]
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
             testcase.add_metadata(meta);
@@ -641,7 +650,12 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        _input: &I,
+    ) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())
     }

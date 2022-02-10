@@ -84,6 +84,7 @@ where
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &NautilusInput,
         _observers: &OT,
@@ -99,6 +100,7 @@ where
     fn append_metadata(
         &mut self,
         state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         testcase: &mut Testcase<NautilusInput>,
     ) -> Result<(), Error> {
         let input = testcase.load_input()?.clone();
@@ -111,7 +113,12 @@ where
     }
 
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &NautilusInput) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        _input: &NautilusInput,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
