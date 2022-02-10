@@ -708,6 +708,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     }
 }
 
+impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
