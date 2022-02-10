@@ -15,13 +15,14 @@ use std::{
 
 use crate::{
     bolts::{
-        fs::OutFile,
+        fs::{OutFile, OUTFILE_STD},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
+    mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     Error,
 };
@@ -40,6 +41,8 @@ const FORKSRV_FD: i32 = 198;
 const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
 
@@ -266,6 +269,14 @@ impl Forkserver {
         let rlen = self.st_pipe.read(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
         Ok((rlen, val))
+    }
+
+    /// Read bytes of any length from the st pipe
+    pub fn read_st_size(&mut self, size: usize) -> Result<(usize, Vec<u8>), Error> {
+        let mut buf = vec![0; size];
+
+        let rlen = self.st_pipe.read(&mut buf)?;
+        Ok((rlen, buf))
     }
 
     /// Write to the ctl pipe
@@ -536,13 +547,15 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
-    out_filename: Option<OsString>,
     debug_child: bool,
+    autotokens: Option<&'a mut Tokens>,
+    out_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Builds `ForkserverExecutor`.
+    #[allow(clippy::pedantic)]
     pub fn build<I, OT, S>(
         &mut self,
         observers: OT,
@@ -560,11 +573,23 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         };
 
         for item in &self.arguments {
+            // need special handling for @@
             if item == "@@" && use_stdin {
                 use_stdin = false;
                 args.push(out_filename.clone());
             } else {
-                args.push(item.clone());
+                // if the filename set by arg_input_file matches the item, then set use_stdin to false
+                if let Some(name) = &self.out_filename {
+                    if name == item && use_stdin {
+                        use_stdin = false;
+                        args.push(out_filename.clone());
+                    } else {
+                        args.push(item.clone());
+                    }
+                } else {
+                    // default case, just push item into the arguments.
+                    args.push(item.clone());
+                }
             }
         }
 
@@ -614,24 +639,65 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         println!("All right - fork server is up.");
         // If forkserver is responding, we then check if there's any option enabled.
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
-            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & map.is_some() {
-                println!("Using SHARED MEMORY FUZZING feature.");
-                let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
+            let mut send_status = FS_OPT_ENABLED;
 
-                let send_len = forkserver.write_ctl(send_status)?;
-                if send_len != 4 {
+            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
+                println!("Using SHARED MEMORY FUZZING feature.");
+                send_status = send_status | FS_OPT_SHDMEM_FUZZ;
+            }
+
+            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
+                println!("Using AUTODICT feature");
+                send_status = send_status | FS_OPT_AUTODICT;
+            }
+
+            let send_len = forkserver.write_ctl(send_status)?;
+            if send_len != 4 {
+                return Err(Error::Forkserver(
+                    "Writing to forkserver failed.".to_string(),
+                ));
+            }
+
+            if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
+                let (read_len, dict_size) = forkserver.read_st()?;
+                if read_len != 4 {
                     return Err(Error::Forkserver(
-                        "Writing to forkserver failed.".to_string(),
+                        "Reading from forkserver failed.".to_string(),
                     ));
+                }
+
+                if dict_size < 2 || dict_size > 0xffffff {
+                    return Err(Error::Forkserver(
+                        "Dictionary has an illegal size".to_string(),
+                    ));
+                }
+
+                println!("Autodict size {:x}", dict_size);
+
+                let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+
+                if rlen != dict_size as usize {
+                    return Err(Error::Forkserver(
+                        "Failed to load autodictionary".to_string(),
+                    ));
+                }
+
+                if let Some(t) = &mut self.autotokens {
+                    t.parse_autodict(&buf, dict_size as usize);
                 }
             }
         } else {
             println!("Forkserver Options are not available.");
         }
 
+        println!(
+            "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
+            target, args, use_stdin
+        );
+
         Ok(ForkserverExecutor {
             target,
-            args,
+            args: self.arguments.clone(),
             out_file,
             forkserver,
             observers,
@@ -654,19 +720,20 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             program: None,
             arguments: vec![],
             envs: vec![],
-            out_filename: None,
             debug_child: false,
+            autotokens: None,
+            out_filename: None,
             shmem_provider: None,
         }
     }
 
     /// The harness
     #[must_use]
-    pub fn program<O>(mut self, target: O) -> Self
+    pub fn program<O>(mut self, program: O) -> Self
     where
         O: AsRef<OsStr>,
     {
-        self.program = Some(target.as_ref().to_owned());
+        self.program = Some(program.as_ref().to_owned());
         self
     }
 
@@ -732,9 +799,23 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     #[must_use]
+    /// Place the input at this position and set the default filename for the input.
+    pub fn arg_input_file_std(self) -> Self {
+        let moved = self.arg_input_file(OUTFILE_STD);
+        moved
+    }
+
+    #[must_use]
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     pub fn debug_child(mut self, debug_child: bool) -> Self {
         self.debug_child = debug_child;
+        self
+    }
+
+    /// Use autodict?
+    #[must_use]
+    pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
+        self.autotokens = Some(tokens);
         self
     }
 
@@ -747,8 +828,9 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             program: self.program,
             arguments: self.arguments,
             envs: self.envs,
-            out_filename: self.out_filename,
             debug_child: self.debug_child,
+            autotokens: self.autotokens,
+            out_filename: self.out_filename,
             shmem_provider: Some(shmem_provider),
         }
     }
