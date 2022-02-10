@@ -912,9 +912,7 @@ mod windows_exception_handler {
             let data = unsafe { &mut GLOBAL_STATE };
             // Have we set a timer_before?
             unsafe {
-                if let Some(_) =
-                    (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
-                {
+                if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
                     /*
                         We want to prevent the timeout handler being run while the main thread is executing the crash handler
                         Timeout handler runs if it has access to the critical section or data.in_target == 0
@@ -1090,6 +1088,7 @@ mod windows_exception_handler {
         // println!("TIMER INVOKED!");
     }
 
+    #[allow(clippy::too_many_lines)]
     pub unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
@@ -1103,9 +1102,7 @@ mod windows_exception_handler {
         Z: HasObjective<I, OF, S>,
     {
         // Have we set a timer_before?
-        if let Some(_) =
-            (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
-        {
+        if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
             /*
                 We want to prevent the timeout handler being run while the main thread is executing the crash handler
                 Timeout handler runs if it has access to the critical section or data.in_target == 0

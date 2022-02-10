@@ -31,8 +31,7 @@ pub fn collect_backtrace() -> u64 {
     }
     let mut hash = 0;
     for frame in &b.frames()[1..] {
-        let pc: u64 = unsafe { core::mem::transmute(frame.ip()) };
-        hash ^= pc;
+        hash ^= frame.ip() as u64;
     }
     // will use symbols later
     // let trace = format!("{:?}", b);
