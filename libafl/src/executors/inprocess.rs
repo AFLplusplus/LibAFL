@@ -1001,7 +1001,9 @@ mod windows_exception_handler {
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -1115,7 +1117,9 @@ mod windows_exception_handler {
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -1205,7 +1209,7 @@ mod windows_exception_handler {
                 .objective_mut()
                 .is_interesting(
                     state,
-                    feedback_state,
+                    objective_state,
                     event_mgr,
                     input,
                     observers,
@@ -1219,7 +1223,7 @@ mod windows_exception_handler {
                 new_testcase.add_metadata(ExitKind::Crash);
                 fuzzer
                     .objective_mut()
-                    .append_metadata(state, feedback_state, &mut new_testcase)
+                    .append_metadata(state, objective_state, &mut new_testcase)
                     .expect("Failed adding metadata");
                 state
                     .solutions_mut()
