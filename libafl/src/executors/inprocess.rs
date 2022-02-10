@@ -16,7 +16,7 @@ use core::{
     sync::atomic::{compiler_fence, Ordering},
 };
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
 
 #[cfg(all(feature = "std", unix))]
@@ -28,9 +28,6 @@ use nix::{
     unistd::{fork, ForkResult},
 };
 
-#[cfg(all(feature = "std", windows))]
-use windows::Win32::System::Diagnostics::Debug::EXCEPTION_POINTERS;
-
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
 #[cfg(all(windows, feature = "std"))]
@@ -40,9 +37,6 @@ use crate::bolts::shmem::ShMemProvider;
 
 #[cfg(windows)]
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
-
-#[cfg(all(feature = "std", windows))]
-use crate::bolts::os::windows_exceptions::{ExceptionCode, Handler, CRASH_EXCEPTIONS};
 
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::os::unix_signals::{Handler, Signal};
@@ -915,7 +909,7 @@ mod windows_exception_handler {
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
-            let data = &mut GLOBAL_STATE;
+            let data = unsafe { &mut GLOBAL_STATE };
             // Have we set a timer_before?
             if let Some(_) =
                 (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
@@ -925,13 +919,15 @@ mod windows_exception_handler {
                     Timeout handler runs if it has access to the critical section or data.in_target == 0
                     Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
                 */
-                compiler_fence(Ordering::SeqCst);
-                EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
-                compiler_fence(Ordering::SeqCst);
-                data.in_target = 0;
-                compiler_fence(Ordering::SeqCst);
-                LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
-                compiler_fence(Ordering::SeqCst);
+                unsafe {
+                    compiler_fence(Ordering::SeqCst);
+                    EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+                    compiler_fence(Ordering::SeqCst);
+                    data.in_target = 0;
+                    compiler_fence(Ordering::SeqCst);
+                    LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+                    compiler_fence(Ordering::SeqCst);
+                }
             }
 
             if data.is_valid() {
@@ -984,7 +980,9 @@ mod windows_exception_handler {
 
                 event_mgr.await_restart_safe();
 
-                ExitProcess(1);
+                unsafe {
+                    ExitProcess(1);
+                }
             }
             old_hook(panic_info);
         }));
@@ -1018,7 +1016,7 @@ mod windows_exception_handler {
             let state = data.state_mut::<S>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers();
+            let observers = executor.observers_mut();
 
             if data.timeout_input_ptr.is_null() {
                 #[cfg(feature = "std")]
@@ -1174,7 +1172,7 @@ mod windows_exception_handler {
             let state = data.state_mut::<S>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers();
+            let observers = executor.observers_mut();
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
