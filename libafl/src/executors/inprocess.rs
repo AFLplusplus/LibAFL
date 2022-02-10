@@ -911,15 +911,15 @@ mod windows_exception_handler {
         panic::set_hook(Box::new(move |panic_info| {
             let data = unsafe { &mut GLOBAL_STATE };
             // Have we set a timer_before?
-            if let Some(_) =
-                (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
-            {
-                /*
-                    We want to prevent the timeout handler being run while the main thread is executing the crash handler
-                    Timeout handler runs if it has access to the critical section or data.in_target == 0
-                    Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
-                */
-                unsafe {
+            unsafe {
+                if let Some(_) =
+                    (data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).as_mut()
+                {
+                    /*
+                        We want to prevent the timeout handler being run while the main thread is executing the crash handler
+                        Timeout handler runs if it has access to the critical section or data.in_target == 0
+                        Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
+                    */
                     compiler_fence(Ordering::SeqCst);
                     EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
                     compiler_fence(Ordering::SeqCst);
