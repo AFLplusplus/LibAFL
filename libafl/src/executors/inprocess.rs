@@ -734,40 +734,7 @@ mod unix_signal_handler {
 
         #[cfg(feature = "std")]
         eprintln!("Crashed with {}", signal);
-        if !data.is_valid() {
-            #[cfg(feature = "std")]
-            {
-                eprintln!("Double crash\n");
-                #[cfg(target_os = "android")]
-                let si_addr = (_info._pad[0] as i64) | ((_info._pad[1] as i64) << 32);
-                #[cfg(not(target_os = "android"))]
-                let si_addr = { _info.si_addr() as usize };
-
-                eprintln!(
-                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
-                si_addr
-                );
-
-                #[cfg(all(feature = "std", unix))]
-                {
-                    let mut writer = std::io::BufWriter::new(std::io::stderr());
-                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
-                        .unwrap();
-                    writer.flush().unwrap();
-                }
-            }
-
-            #[cfg(feature = "std")]
-            {
-                eprintln!("Type QUIT to restart the child");
-                let mut line = String::new();
-                while line.trim() != "QUIT" {
-                    std::io::stdin().read_line(&mut line).unwrap();
-                }
-            }
-
-            // TODO tell the parent to not restart
-        } else {
+        if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
             executor.post_run_reset();
@@ -828,6 +795,39 @@ mod unix_signal_handler {
             event_mgr.await_restart_safe();
             #[cfg(feature = "std")]
             eprintln!("Bye!");
+        } else {
+            #[cfg(feature = "std")]
+            {
+                eprintln!("Double crash\n");
+                #[cfg(target_os = "android")]
+                let si_addr = (_info._pad[0] as i64) | ((_info._pad[1] as i64) << 32);
+                #[cfg(not(target_os = "android"))]
+                let si_addr = { _info.si_addr() as usize };
+
+                eprintln!(
+                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
+                si_addr
+                );
+
+                #[cfg(all(feature = "std", unix))]
+                {
+                    let mut writer = std::io::BufWriter::new(std::io::stderr());
+                    crate::bolts::minibsod::generate_minibsod(&mut writer, signal, _info, _context)
+                        .unwrap();
+                    writer.flush().unwrap();
+                }
+            }
+
+            #[cfg(feature = "std")]
+            {
+                eprintln!("Type QUIT to restart the child");
+                let mut line = String::new();
+                while line.trim() != "QUIT" {
+                    std::io::stdin().read_line(&mut line).unwrap();
+                }
+            }
+
+            // TODO tell the parent to not restart
         }
 
         libc::_exit(128 + (signal as i32));

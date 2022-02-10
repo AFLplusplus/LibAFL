@@ -173,6 +173,11 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
     }
 
     /// Convert to an owned object reference
+    ///
+    /// # Safety
+    /// This function is not safe as the object may be not initialized.
+    /// The user is responsible to initialize the object with something like
+    /// `*shmem.as_object_mut::<T>() = T::new();`
     unsafe fn as_object<T: Sized + 'static>(&self) -> &T {
         assert!(self.len() >= core::mem::size_of::<T>());
         (self.as_slice().as_ptr() as *const () as *const T)
@@ -181,6 +186,11 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
     }
 
     /// Convert to an owned object mutable reference
+    ///
+    /// # Safety
+    /// This function is not safe as the object may be not initialized.
+    /// The user is responsible to initialize the object with something like
+    /// `*shmem.as_object_mut::<T>() = T::new();`
     unsafe fn as_object_mut<T: Sized + 'static>(&mut self) -> &mut T {
         assert!(self.len() >= core::mem::size_of::<T>());
         (self.as_mut_slice().as_mut_ptr() as *mut () as *mut T)
