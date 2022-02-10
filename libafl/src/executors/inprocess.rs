@@ -398,24 +398,30 @@ unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
 impl InProcessExecutorHandlerData {
-    fn executor_mut<E>(&self) -> &mut E {
+    fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
-    fn state_mut<S>(&self) -> &mut S {
+    fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
-    fn event_mgr_mut<EM>(&self) -> &mut EM {
+    fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
         unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
     }
 
-    fn fuzzer_mut<Z>(&self) -> &mut Z {
+    fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
-    fn current_input<I>(&self) -> &I {
+    fn current_input<'a, I>(&self) -> &'a I {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
+    }
+
+    fn take_current_input<'a, I>(&mut self) -> &'a I {
+        let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
+        self.current_input_ptr = ptr::null();
+        r
     }
 
     #[cfg(windows)]
@@ -479,10 +485,16 @@ pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
     unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
 }
 
+/// Gets the inprocess [`Input`]
+#[must_use]
+pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
+    unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
+}
+
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
-    use core::{mem::transmute, ptr};
+    use core::mem::transmute;
     use libc::siginfo_t;
     #[cfg(feature = "std")]
     use std::{
@@ -647,19 +659,18 @@ mod unix_signal_handler {
             return;
         }
 
-        let state = (data.state_ptr as *mut S).as_mut().unwrap();
-        let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
-        let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-        let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+        let executor = data.executor_mut::<E>();
         let observers = executor.observers_mut();
+        let state = data.state_mut::<S>();
+        let fuzzer = data.fuzzer_mut::<Z>();
+        let event_mgr = data.event_mgr_mut::<EM>();
+
+        let input = data.take_current_input::<I>();
 
         #[cfg(feature = "std")]
         println!("Timeout in fuzz run.");
         #[cfg(feature = "std")]
         let _res = stdout().flush();
-
-        let input = (data.current_input_ptr as *const I).as_ref().unwrap();
-        data.current_input_ptr = ptr::null();
 
         observers
             .post_exec_all(state, input, &ExitKind::Timeout)
@@ -762,16 +773,15 @@ mod unix_signal_handler {
 
             // TODO tell the parent to not restart
         } else {
-            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+            let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
             executor.post_run_reset();
-            let state = (data.state_ptr as *mut S).as_mut().unwrap();
-            let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
-            let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
             let observers = executor.observers_mut();
+            let state = data.state_mut::<S>();
+            let fuzzer = data.fuzzer_mut::<Z>();
+            let event_mgr = data.event_mgr_mut::<EM>();
 
-            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
-            data.current_input_ptr = ptr::null();
+            let input = data.take_current_input::<I>();
 
             observers
                 .post_exec_all(state, input, &ExitKind::Crash)
@@ -928,9 +938,10 @@ mod windows_exception_handler {
                 let executor = data.executor_mut::<E>();
                 let observers = executor.observers_mut();
                 let state = data.state_mut::<S>();
-                let input = data.current_input::<I>();
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
+
+                let input = data.take_current_input::<I>();
 
                 observers
                     .post_exec_all(state, input, &ExitKind::Crash)
@@ -1002,10 +1013,10 @@ mod windows_exception_handler {
         compiler_fence(Ordering::SeqCst);
 
         if data.in_target == 1 {
-            let state = (data.state_ptr as *mut S).as_mut().unwrap();
-            let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
-            let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
-            let executor = (data.executor_ptr as *const E).as_ref().unwrap();
+            let executor = data.executor_mut::<E>();
+            let state = data.state_mut::<S>();
+            let fuzzer = data.fuzzer_mut::<Z>();
+            let event_mgr = data.event_mgr_mut::<EM>();
             let observers = executor.observers();
 
             if data.timeout_input_ptr.is_null() {
@@ -1152,16 +1163,16 @@ mod windows_exception_handler {
 
             // TODO tell the parent to not restart
         } else {
-            let executor = (data.executor_ptr as *mut E).as_mut().unwrap();
+            let executor = data.executor_mut::<E>();
             // reset timer
             if !data.tp_timer.is_null() {
                 executor.post_run_reset();
                 data.tp_timer = ptr::null_mut();
             }
 
-            let state = (data.state_ptr as *mut S).as_mut().unwrap();
-            let event_mgr = (data.event_mgr_ptr as *mut EM).as_mut().unwrap();
-            let fuzzer = (data.fuzzer_ptr as *mut Z).as_mut().unwrap();
+            let state = data.state_mut::<S>();
+            let fuzzer = data.fuzzer_mut::<Z>();
+            let event_mgr = data.event_mgr_mut::<EM>();
             let observers = executor.observers();
 
             #[cfg(feature = "std")]
@@ -1169,9 +1180,8 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
-            let input = (data.current_input_ptr as *const I).as_ref().unwrap();
             // Make sure we don't crash in the crash handler forever.
-            data.current_input_ptr = ptr::null();
+            let input = data.take_current_input::<I>();
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
@@ -1283,6 +1293,7 @@ impl InChildProcessHandlers {
 }
 
 /// The global state of the in-process-fork harness.
+#[cfg(all(feature = "std", unix))]
 #[derive(Debug)]
 pub struct InProcessForkExecutorGlobalData {
     /// Stores a pointer to the fork executor struct
@@ -1295,20 +1306,29 @@ pub struct InProcessForkExecutorGlobalData {
     pub crash_handler: *const c_void,
 }
 
+#[cfg(all(feature = "std", unix))]
 unsafe impl Sync for InProcessForkExecutorGlobalData {}
+#[cfg(all(feature = "std", unix))]
 unsafe impl Send for InProcessForkExecutorGlobalData {}
 
+#[cfg(all(feature = "std", unix))]
 impl InProcessForkExecutorGlobalData {
-    fn executor_mut<E>(&self) -> &mut E {
+    fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
-    fn state_mut<S>(&self) -> &mut S {
+    fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
-    fn current_input<I>(&self) -> &I {
+    /*fn current_input<'a, I>(&self) -> &'a I {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
+    }*/
+
+    fn take_current_input<'a, I>(&mut self) -> &'a I {
+        let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
+        self.current_input_ptr = ptr::null();
+        r
     }
 
     fn is_valid(&self) -> bool {
@@ -1317,6 +1337,7 @@ impl InProcessForkExecutorGlobalData {
 }
 
 /// a static variable storing the global state
+#[cfg(all(feature = "std", unix))]
 pub static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
     InProcessForkExecutorGlobalData {
         executor_ptr: ptr::null(),
@@ -1542,13 +1563,12 @@ pub mod child_signal_handlers {
                 let executor = data.executor_mut::<E>();
                 let observers = executor.observers_mut();
                 let state = data.state_mut::<S>();
-                let input = data.current_input::<I>();
+                // Invalidate data to not execute again the observer hooks in the crash handler
+                let input = data.take_current_input::<I>();
                 observers
                     .post_exec_child_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
 
-                // Invalidate data to not execute again the observer hooks in the crash handler
-                data.current_input_ptr = core::ptr::null();
                 std::process::abort();
             }
         }));
@@ -1560,7 +1580,7 @@ pub mod child_signal_handlers {
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
-        data: &InProcessForkExecutorGlobalData,
+        data: &mut InProcessForkExecutorGlobalData,
     ) where
         E: HasObservers<I, OT, S>,
         OT: ObserversTuple<I, S>,
@@ -1570,7 +1590,7 @@ pub mod child_signal_handlers {
             let executor = data.executor_mut::<E>();
             let observers = executor.observers_mut();
             let state = data.state_mut::<S>();
-            let input = data.current_input::<I>();
+            let input = data.take_current_input::<I>();
             observers
                 .post_exec_child_all(state, input, &ExitKind::Crash)
                 .expect("Failed to run post_exec on observers");
