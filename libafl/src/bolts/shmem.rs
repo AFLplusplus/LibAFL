@@ -172,6 +172,22 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
         self.len() == 0
     }
 
+    /// Convert to an owned object reference
+    unsafe fn as_object<T: Sized + 'static>(&self) -> &T {
+        assert!(self.len() >= core::mem::size_of::<T>());
+        (self.as_slice().as_ptr() as *const () as *const T)
+            .as_ref()
+            .unwrap()
+    }
+
+    /// Convert to an owned object mutable reference
+    unsafe fn as_object_mut<T: Sized + 'static>(&mut self) -> &mut T {
+        assert!(self.len() >= core::mem::size_of::<T>());
+        (self.as_mut_slice().as_mut_ptr() as *mut () as *mut T)
+            .as_mut()
+            .unwrap()
+    }
+
     /// Get the description of the shared memory mapping
     fn description(&self) -> ShMemDescription {
         ShMemDescription {
@@ -206,6 +222,19 @@ pub trait ShMemProvider: Clone + Default + Debug {
 
     /// Get a mapping given its id and size
     fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error>;
+
+    /// Create a new shared memory mapping to hold an object of the given type
+    fn new_shmem_object<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
+        self.new_shmem(core::mem::size_of::<T>())
+    }
+
+    /// Get a mapping given its id to hold an object of the given type
+    fn shmem_object_from_id<T: Sized + 'static>(
+        &mut self,
+        id: ShMemId,
+    ) -> Result<Self::ShMem, Error> {
+        self.shmem_from_id_and_size(id, core::mem::size_of::<T>())
+    }
 
     /// Get a mapping given a description
     fn shmem_from_description(
