@@ -560,23 +560,17 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         };
 
         for item in &self.arguments {
-            // need special handling for @@
-            if item == "@@" && use_stdin {
-                use_stdin = false;
-                args.push(out_filename.clone());
-            } else {
-                // if the filename set by arg_input_file matches the item, then set use_stdin to false
-                if let Some(name) = &self.out_filename {
-                    if name == item && use_stdin {
-                        use_stdin = false;
-                        args.push(out_filename.clone());
-                    } else {
-                        args.push(item.clone());
-                    }
+            // if the filename set by arg_input_file matches the item, then set use_stdin to false
+            if let Some(name) = &self.out_filename {
+                if name == item && use_stdin {
+                    use_stdin = false;
+                    args.push(out_filename.clone());
                 } else {
-                    // default case, just push item into the arguments.
                     args.push(item.clone());
                 }
+            } else {
+                // default case, just push item into the arguments.
+                args.push(item.clone());
             }
         }
 
