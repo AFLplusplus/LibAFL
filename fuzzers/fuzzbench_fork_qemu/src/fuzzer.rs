@@ -1,7 +1,7 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
 use clap::{App, Arg};
-use core::{cell::RefCell, time::Duration};
+use core::cell::RefCell;
 #[cfg(unix)]
 use nix::{self, unistd::dup};
 #[cfg(unix)]
@@ -27,7 +27,7 @@ use libafl::{
         Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
     },
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -92,12 +92,6 @@ pub fn main() {
                 .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
         )
-        .arg(
-            Arg::new("timeout")
-                .long("libafl-timeout")
-                .help("Timeout for each individual execution, in milliseconds")
-                .default_value("1000"),
-        )
         .try_get_matches_from(filter_qemu_args())
     {
         Ok(res) => res,
@@ -141,16 +135,7 @@ pub fn main() {
 
     let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
 
-    let timeout = Duration::from_millis(
-        res.value_of("timeout")
-            .unwrap()
-            .to_string()
-            .parse()
-            .expect("Could not parse timeout in milliseconds"),
-    );
-
-    fuzz(out_dir, crashes, in_dir, tokens, logfile, timeout)
-        .expect("An error occurred while fuzzing");
+    fuzz(out_dir, crashes, in_dir, tokens, logfile).expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
@@ -160,7 +145,6 @@ fn fuzz(
     seed_dir: PathBuf,
     tokenfile: Option<PathBuf>,
     logfile: PathBuf,
-    timeout: Duration,
 ) -> Result<(), Error> {
     env::remove_var("LD_LIBRARY_PATH");
 
@@ -345,8 +329,6 @@ fn fuzz(
         shmem_provider,
     )?;
 
-    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = TimeoutExecutor::new(executor, timeout);
     // Show the cmplog observer
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
