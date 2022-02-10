@@ -809,7 +809,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
                         res.push(item.as_ref().to_os_string());
                     }
                 } else {
-                    res.push(item.as_ref().to_os_string())
+                    res.push(item.as_ref().to_os_string());
                 }
             }
         }
