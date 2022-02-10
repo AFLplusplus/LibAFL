@@ -956,7 +956,7 @@ mod windows_exception_handler {
         fuzzer::HasObjective,
         inputs::Input,
         observers::ObserversTuple,
-        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasFeedbackObjectiveStates, HasMetadata, HasSolutions},
     };
 
     use core::sync::atomic::{compiler_fence, Ordering};
