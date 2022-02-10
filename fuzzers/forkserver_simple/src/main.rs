@@ -56,6 +56,12 @@ pub fn main() {
                 .short('d')
                 .long("debug-child"),
         )
+        .arg(
+            Arg::new("arguments")
+                .help("Arguments passed to the target")
+                .setting(clap::ArgSettings::MultipleValues)
+                .takes_value(true),
+        )
         .get_matches();
 
     let corpus_dirs = vec![PathBuf::from(res.value_of("in").unwrap().to_string())];
@@ -133,13 +139,19 @@ pub fn main() {
     // If we should debug the child
     let debug_child = res.is_present("debug_child");
 
+    // Create the executor for the forkserver
+    let args = match res.values_of("arguments") {
+        Some(vec) => vec.map(|s| s.to_string()).collect::<Vec<String>>().to_vec(),
+        None => [].to_vec(),
+    };
+
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
         .program(res.value_of("executable").unwrap().to_string())
-        .arg_input_file(".cur_input")
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
+        .parse_afl_cmdline(args)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
