@@ -548,7 +548,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
     debug_child: bool,
-    autodict_tokens: Option<&'a mut Tokens>,
+    autotokens: Option<&'a mut Tokens>,
     out_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
 }
@@ -646,7 +646,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 send_status = send_status | FS_OPT_SHDMEM_FUZZ;
             }
 
-            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autodict_tokens.is_some() {
+            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
                 println!("Using AUTODICT feature");
                 send_status = send_status | FS_OPT_AUTODICT;
             }
@@ -682,7 +682,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     ));
                 }
 
-                if let Some(t) = &mut self.autodict_tokens {
+                if let Some(t) = &mut self.autotokens {
                     t.parse_autodict(&buf, dict_size as usize);
                 }
             }
@@ -721,7 +721,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: vec![],
             envs: vec![],
             debug_child: false,
-            autodict_tokens: None,
+            autotokens: None,
             out_filename: None,
             shmem_provider: None,
         }
@@ -729,11 +729,11 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
 
     /// The harness
     #[must_use]
-    pub fn program<O>(mut self, target: O) -> Self
+    pub fn program<O>(mut self, program: O) -> Self
     where
         O: AsRef<OsStr>,
     {
-        self.program = Some(target.as_ref().to_owned());
+        self.program = Some(program.as_ref().to_owned());
         self
     }
 
@@ -814,8 +814,8 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
 
     /// Use autodict?
     #[must_use]
-    pub fn autodict_tokens(mut self, tokens: &'a mut Tokens) -> Self {
-        self.autodict_tokens = Some(tokens);
+    pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
+        self.autotokens = Some(tokens);
         self
     }
 
@@ -829,7 +829,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: self.arguments,
             envs: self.envs,
             debug_child: self.debug_child,
-            autodict_tokens: self.autodict_tokens,
+            autotokens: self.autotokens,
             out_filename: self.out_filename,
             shmem_provider: Some(shmem_provider),
         }
