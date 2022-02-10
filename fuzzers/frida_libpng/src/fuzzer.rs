@@ -29,7 +29,7 @@ use libafl::{
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,

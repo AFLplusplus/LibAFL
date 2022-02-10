@@ -15,7 +15,7 @@ use libafl::{
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,

@@ -9,7 +9,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::{GeneralizedInput, HasTargetBytes},
     monitors::SimpleMonitor,

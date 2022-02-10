@@ -24,7 +24,7 @@ use libafl::{
         command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, ShadowExecutor,
     },
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, Input},
     monitors::MultiMonitor,

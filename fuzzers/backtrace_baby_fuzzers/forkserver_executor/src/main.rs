@@ -11,7 +11,7 @@ use libafl::{
     executors::forkserver::ForkserverExecutor,
     feedback_and,
     feedbacks::{
-        CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
+        CrashFeedback, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
     },
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,

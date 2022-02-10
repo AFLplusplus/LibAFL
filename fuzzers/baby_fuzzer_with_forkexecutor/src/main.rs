@@ -14,7 +14,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessForkExecutor},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},

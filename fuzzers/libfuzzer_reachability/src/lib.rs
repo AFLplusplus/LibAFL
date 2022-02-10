@@ -11,7 +11,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{MapFeedbackState, MaxMapFeedback, ReachabilityFeedback},
+    feedbacks::{MaxMapFeedback, ReachabilityFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,

@@ -9,9 +9,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{
-        CrashFeedback, MapFeedbackState, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
-    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::NautilusInput,
