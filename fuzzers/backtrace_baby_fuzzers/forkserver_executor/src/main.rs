@@ -43,7 +43,6 @@ pub fn main() {
 
     let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
 
-    
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = MaxMapFeedback::new_tracking("MaxMapFeedback", &edges_observer, true, false);
@@ -69,7 +68,8 @@ pub fn main() {
         &mut feedback,
         // Same for objective feedbacks
         &mut objective,
-    ).unwrap();
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{}", s));

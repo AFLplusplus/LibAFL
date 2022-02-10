@@ -8,9 +8,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     feedback_and,
-    feedbacks::{
-        CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
-    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
@@ -43,17 +41,16 @@ pub fn main() {
     let bt_observer =
         BacktraceObserver::new("BacktraceObserver", libafl::observers::HarnessType::FFI);
 
-    
-    
-    let st_feedback_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
-
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new("MaxMapFeedback", &observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and!(
         CrashFeedback::new(),
-        NewHashFeedback::<BacktraceObserver>::new_with_observer("BacktraceObserver", &bt_observer)
+        NewHashFeedback::<BacktraceObserver, u64>::new_with_observer(
+            "BacktraceObserver",
+            &bt_observer
+        )
     );
 
     // create a State from scratch

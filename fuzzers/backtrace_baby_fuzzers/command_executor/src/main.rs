@@ -10,9 +10,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::command::CommandConfigurator,
     feedback_and,
-    feedbacks::{
-        CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
-    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{HasTargetBytes, Input},
@@ -42,17 +40,13 @@ pub fn main() {
     // Create a stacktrace observer
     let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
 
-    
-    
-    let bt_feedback_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
-
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new("MaxMapFeedback", &observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and!(
         CrashFeedback::new(),
-        NewHashFeedback::<ASANBacktraceObserver>::new_with_observer(
+        NewHashFeedback::<ASANBacktraceObserver, u64>::new_with_observer(
             "ASANBacktraceObserver",
             &bt_observer
         )
@@ -73,7 +67,8 @@ pub fn main() {
         &mut feedback,
         // Same for objective feedbacks
         &mut objective,
-    ).unwrap();
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     let mon = SimpleMonitor::new(|s| println!("{}", s));
