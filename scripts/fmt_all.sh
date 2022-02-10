@@ -13,8 +13,24 @@ cd fuzzers
 
 for fuzzer in *;
 do
-    cd $fuzzer
-    echo "[*] Running fmt for $fuzzer"
-    cargo fmt --all
-    cd ..
+    if [[ -d $fuzzer ]]
+    then
+        cd $fuzzer
+        echo "[*] Running fmt for $fuzzer"
+        cargo fmt --all
+        cd ..
+    fi
 done
+
+cd backtrace_baby_fuzzers
+for fuzzer in *;
+do
+    if [[ -d $fuzzer ]]
+    then
+        cd $fuzzer
+        echo "[*] Running fmt for backtrace_baby_fuzzers/$fuzzer"
+        cargo fmt --all
+        cd ..
+    fi
+done
+cd ..

@@ -15,9 +15,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{ExitKind, InProcessForkExecutor},
     feedback_and,
-    feedbacks::{
-        CrashFeedback, MaxMapFeedback, NewHashFeedback,
-    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},

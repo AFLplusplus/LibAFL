@@ -10,9 +10,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
     feedback_and,
-    feedbacks::{
-        CrashFeedback, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
-    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
