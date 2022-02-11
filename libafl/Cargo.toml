@@ -9,6 +9,7 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing", "security"]
 edition = "2021"
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
 default = ["std", "derive", "llmp_compression", "rand_trait", "fork"]
@@ -63,7 +64,7 @@ intervaltree = { version = "0.2.7", default-features = false, features = ["serde
 backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in StacktraceObserver
 
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] }
-miniz_oxide = { version = "0.5", optional = true}
+miniz_oxide = { version = "0.4.4", optional = true}
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs", rev = "6648a7a", optional = true }
 hostname = { version = "^0.3", optional = true } # Is there really no gethostname in the stdlib?
 rand_core = { version = "0.5.1", optional = true } # This dependency allows us to export our RomuRand as rand::Rng. We cannot update to the latest version because it breaks compatibility to microsoft lain.
