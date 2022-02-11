@@ -806,17 +806,15 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             if item.as_ref() == "@@" && use_stdin {
                 use_stdin = false;
                 res.push(OsString::from(".cur_input"));
-            } else {
-                if let Some(name) = &self.out_filename {
-                    if name == item.as_ref() && use_stdin {
-                        use_stdin = false;
-                        res.push(name.clone());
-                    } else {
-                        res.push(item.as_ref().to_os_string());
-                    }
+            } else if let Some(name) = &self.out_filename {
+                if name == item.as_ref() && use_stdin {
+                    use_stdin = false;
+                    res.push(name.clone());
                 } else {
                     res.push(item.as_ref().to_os_string());
                 }
+            } else {
+                res.push(item.as_ref().to_os_string());
             }
         }
 
