@@ -35,6 +35,6 @@ do
 
     # Save disk space
     cargo clean
-    cd $(libafl)
+    cd $libafl
     echo ""
 done
