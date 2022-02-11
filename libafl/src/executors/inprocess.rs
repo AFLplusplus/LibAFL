@@ -1690,7 +1690,8 @@ pub mod child_signal_handlers {
     /// invokes the `post_exec` hook on all observer in case the child process crashes
     ///
     /// # Safety
-    /// The crash handler should only be called from a signal handler during fuzzing.
+    /// The function should only be called from a child crash handler.
+    /// It will dereference the `data` pointer and assume it's valid.
     #[cfg(unix)]
     pub unsafe fn child_crash_handler<E, I, OT, S>(
         _signal: Signal,

@@ -9,7 +9,7 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "frida", "instrumentation"]
 edition = "2021"
-
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
 default = []

@@ -10,6 +10,7 @@ license = "MIT OR Apache-2.0"
 keywords = ["fuzzing"]
 edition = "2021"
 build = "build.rs"
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
 python = ["pyo3", "libafl_qemu/python", "pyo3-build-config"]

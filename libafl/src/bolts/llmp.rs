@@ -1854,7 +1854,7 @@ where
         let mut stream = TcpStream::connect(addr)?;
         println!("B2B: Connected to {:?}", stream);
 
-        match (recv_tcp_msg(&mut stream)?).try_into()? {
+        match recv_tcp_msg(&mut stream)?.try_into()? {
             TcpResponse::BrokerConnectHello {
                 broker_shmem_description: _,
                 hostname,
@@ -1873,7 +1873,7 @@ where
 
         send_tcp_msg(&mut stream, &TcpRequest::RemoteBrokerHello { hostname })?;
 
-        let broker_id = match (recv_tcp_msg(&mut stream)?).try_into()? {
+        let broker_id = match recv_tcp_msg(&mut stream)?.try_into()? {
             TcpResponse::RemoteBrokerAccepted { broker_id } => {
                 println!("B2B: Got Connection Ack, broker_id {}", broker_id);
                 broker_id

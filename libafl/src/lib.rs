@@ -8,10 +8,11 @@ Welcome to `LibAFL`
 #![cfg_attr(unstable_feature, feature(specialization))]
 // For `type_id` and owned things
 #![cfg_attr(unstable_feature, feature(intrinsics))]
+#![warn(clippy::cargo)]
+#![deny(clippy::cargo_common_metadata)]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
-#![warn(clippy::wrong_self_convention)] // for is_interesting
 #![allow(
     clippy::unreadable_literal,
     clippy::type_repetition_in_bounds,

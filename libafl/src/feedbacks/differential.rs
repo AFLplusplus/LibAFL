@@ -125,10 +125,10 @@ where
 {
     type FeedbackState = NopFeedbackState;
 
-    #[inline]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _: &mut S,
         _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,

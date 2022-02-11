@@ -104,7 +104,8 @@ impl Tokens {
     /// Reads from an autotokens section, returning the count of new entries read
     ///
     /// # Safety
-    /// The `token_start` and `token_end` pointers must be valid.
+    /// The caller must ensure that the region between `token_start` and `token_stop`
+    /// is a valid region, containing autotokens in the exepcted format.
     /// In subsequent use, the area between both pointers will be dereferenced
     /// and will be interpreted as token bytes, with minimal checks.
     #[cfg(target_os = "linux")]

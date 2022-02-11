@@ -1,7 +1,15 @@
 [package]
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 name = "libafl_benches"
 version = "0.7.1"
 edition = "2021"
+description = "LibAFL Benchmarks"
+documentation = "https://docs.rs/libafl"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "libafl", "benchmarks"]
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [dev-dependencies]
 criterion = "0.3" # Benchmarking

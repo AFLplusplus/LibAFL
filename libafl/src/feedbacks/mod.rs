@@ -55,6 +55,7 @@ where
     type FeedbackState: FeedbackState;
 
     /// `is_interesting` returns if the input last evaluated is worth adding to the corpus
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -72,6 +73,7 @@ where
     /// It also keeps track of introspection stats.
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
@@ -359,7 +361,7 @@ where
 {
     type FeedbackState = CombinedFeedbackState<A::FeedbackState, B::FeedbackState>;
 
-    #[inline]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -386,7 +388,7 @@ where
     }
 
     #[cfg(feature = "introspection")]
-    #[inline]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
@@ -912,6 +914,7 @@ where
     type FeedbackState = A::FeedbackState;
 
     #[inline]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -1051,6 +1054,7 @@ where
     type FeedbackState = NopFeedbackState;
 
     #[inline]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -1092,6 +1096,7 @@ where
     type FeedbackState = NopFeedbackState;
 
     #[inline]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -1151,6 +1156,7 @@ where
     type FeedbackState = NopFeedbackState;
 
     #[inline]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -1214,6 +1220,7 @@ where
 {
     type FeedbackState = NopFeedbackState;
 
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
