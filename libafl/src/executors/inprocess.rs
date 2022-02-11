@@ -1002,9 +1002,19 @@ mod windows_exception_handler {
                     .post_exec_all(state, input, &ExitKind::Crash)
                     .expect("Observers post_exec_all failed");
 
+                let mut feedback_state_box = state.feedback_state_mut().take().unwrap();
+                let objective_state = &mut feedback_state_box.1;
+
                 let interesting = fuzzer
                     .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                    .is_interesting(
+                        state,
+                        objective_state,
+                        event_mgr,
+                        input,
+                        observers,
+                        &ExitKind::Crash,
+                    )
                     .expect("In timeout handler objective failure.");
 
                 if interesting {
@@ -1012,7 +1022,7 @@ mod windows_exception_handler {
                     new_testcase.add_metadata(ExitKind::Timeout);
                     fuzzer
                         .objective_mut()
-                        .append_metadata(state, &mut new_testcase)
+                        .append_metadata(state, objective_state, &mut new_testcase)
                         .expect("Failed adding metadata");
                     state
                         .solutions_mut()
@@ -1026,7 +1036,14 @@ mod windows_exception_handler {
                             },
                         )
                         .expect("Could not send timeouting input");
+                } else {
+                    fuzzer
+                        .objective_mut()
+                        .discard_metadata(state, objective_state, input)
+                        .expect("Failed to discard metadata");
                 }
+
+                state.feedback_state_mut().replace(feedback_state_box);
 
                 event_mgr.on_restart(state).unwrap();
 

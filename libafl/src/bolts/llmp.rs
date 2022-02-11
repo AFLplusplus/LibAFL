@@ -206,6 +206,14 @@ impl TryFrom<&Vec<u8>> for TcpRequest {
     }
 }
 
+impl TryFrom<Vec<u8>> for TcpRequest {
+    type Error = Error;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Error> {
+        Ok(postcard::from_bytes(&bytes)?)
+    }
+}
+
 /// Messages for broker 2 broker connection.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TcpRemoteNewMessage {
@@ -224,6 +232,14 @@ impl TryFrom<&Vec<u8>> for TcpRemoteNewMessage {
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
         Ok(postcard::from_bytes(bytes)?)
+    }
+}
+
+impl TryFrom<Vec<u8>> for TcpRemoteNewMessage {
+    type Error = Error;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Error> {
+        Ok(postcard::from_bytes(&bytes)?)
     }
 }
 
@@ -260,6 +276,14 @@ impl TryFrom<&Vec<u8>> for TcpResponse {
 
     fn try_from(bytes: &Vec<u8>) -> Result<Self, Error> {
         Ok(postcard::from_bytes(bytes)?)
+    }
+}
+
+impl TryFrom<Vec<u8>> for TcpResponse {
+    type Error = Error;
+
+    fn try_from(bytes: Vec<u8>) -> Result<Self, Error> {
+        Ok(postcard::from_bytes(&bytes)?)
     }
 }
 
@@ -1830,7 +1854,7 @@ where
         let mut stream = TcpStream::connect(addr)?;
         println!("B2B: Connected to {:?}", stream);
 
-        match (&recv_tcp_msg(&mut stream)?).try_into()? {
+        match (recv_tcp_msg(&mut stream)?).try_into()? {
             TcpResponse::BrokerConnectHello {
                 broker_shmem_description: _,
                 hostname,
@@ -1849,7 +1873,7 @@ where
 
         send_tcp_msg(&mut stream, &TcpRequest::RemoteBrokerHello { hostname })?;
 
-        let broker_id = match (&recv_tcp_msg(&mut stream)?).try_into()? {
+        let broker_id = match (recv_tcp_msg(&mut stream)?).try_into()? {
             TcpResponse::RemoteBrokerAccepted { broker_id } => {
                 println!("B2B: Got Connection Ack, broker_id {}", broker_id);
                 broker_id
@@ -2106,7 +2130,7 @@ where
                 // We ignore errors completely as they may be timeout, or stream closings.
                 // Instead, we catch stream close when/if we next try to send.
                 if let Ok(val) = recv_tcp_msg(&mut stream) {
-                    let msg: TcpRemoteNewMessage = (&val).try_into().expect(
+                    let msg: TcpRemoteNewMessage = val.try_into().expect(
                         "Illegal message received from broker 2 broker connection - shutting down.",
                     );
 
@@ -2267,7 +2291,7 @@ where
                                 continue;
                             }
                         };
-                        let req = match (&buf).try_into() {
+                        let req = match buf.try_into() {
                             Ok(req) => req,
                             Err(e) => {
                                 eprintln!("Could not deserialize tcp message: {:?}", e);
@@ -2653,7 +2677,7 @@ where
         let broker_shmem_description = if let TcpResponse::BrokerConnectHello {
             broker_shmem_description,
             hostname: _,
-        } = (&recv_tcp_msg(&mut stream)?).try_into()?
+        } = recv_tcp_msg(&mut stream)?.try_into()?
         {
             broker_shmem_description
         } else {
@@ -2674,7 +2698,7 @@ where
         send_tcp_msg(&mut stream, &client_hello_req)?;
 
         let client_id = if let TcpResponse::LocalClientAccepted { client_id } =
-            (&recv_tcp_msg(&mut stream)?).try_into()?
+            recv_tcp_msg(&mut stream)?.try_into()?
         {
             client_id
         } else {

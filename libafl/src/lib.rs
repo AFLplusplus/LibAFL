@@ -11,6 +11,7 @@ Welcome to `LibAFL`
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
+#![warn(clippy::wrong_self_convention)] // for is_interesting
 #![allow(
     clippy::unreadable_literal,
     clippy::type_repetition_in_bounds,
