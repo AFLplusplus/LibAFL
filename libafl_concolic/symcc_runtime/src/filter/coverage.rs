@@ -70,6 +70,7 @@ impl<THasher: Hasher, THashBuilder: BuildHasher> CallStackCoverage<THasher, THas
         self.pending = true;
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn is_interesting(&self) -> bool {
         self.is_interesting
     }

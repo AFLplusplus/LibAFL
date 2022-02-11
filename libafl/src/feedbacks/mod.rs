@@ -52,6 +52,7 @@ where
     S: HasClientPerfMonitor,
 {
     /// `is_interesting ` return if an input is worth the addition to the corpus
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -205,6 +206,7 @@ where
     I: Input,
     S: HasClientPerfMonitor + Debug,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -229,6 +231,7 @@ where
     }
 
     #[cfg(feature = "introspection")]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
@@ -592,6 +595,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -707,6 +711,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -739,6 +744,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -789,6 +795,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -844,6 +851,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
