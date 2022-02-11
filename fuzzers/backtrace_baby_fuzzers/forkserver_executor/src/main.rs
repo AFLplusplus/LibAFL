@@ -87,7 +87,7 @@ pub fn main() {
 
     let mut executor = ForkserverExecutor::builder()
         .program("./target/release/program".to_string())
-        .parse_afl_cmdline(vec!["@@"])
+        .arg_input_file_std()
         .shmem_provider(&mut shmem_provider)
         .build(tuple_list!(bt_observer, edges_observer))
         .unwrap();
