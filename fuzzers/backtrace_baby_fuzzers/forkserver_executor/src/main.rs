@@ -85,15 +85,12 @@ pub fn main() {
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    // Create the executor for the forkserver
-    let mut executor = ForkserverExecutor::with_shmem_inputs(
-        "./target/release/program".to_string(),
-        &[],
-        tuple_list!(edges_observer, bt_observer),
-        true,
-        &mut shmem_provider,
-    )
-    .expect("Failed to create the executor.");
+    let mut executor = ForkserverExecutor::builder()
+        .program("./target/release/program".to_string())
+        .arg_input_file_std()
+        .shmem_provider(&mut shmem_provider)
+        .build(tuple_list!(bt_observer, edges_observer))
+        .unwrap();
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(3);
