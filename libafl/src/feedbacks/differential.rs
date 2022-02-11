@@ -177,7 +177,7 @@ mod tests {
         fn new(name: &str, value: bool) -> Self {
             Self {
                 name: name.to_string(),
-                value: value,
+                value,
             }
         }
     }
