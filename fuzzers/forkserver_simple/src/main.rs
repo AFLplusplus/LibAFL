@@ -148,10 +148,10 @@ pub fn main() {
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
         .program(res.value_of("executable").unwrap().to_string())
-        .args(&args)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
+        .parse_afl_cmdline(args)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
