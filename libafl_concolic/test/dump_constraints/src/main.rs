@@ -112,7 +112,7 @@ fn main() {
                 .enumerate()
                 .filter(|(_, &v)| v != 0)
             {
-                writeln!(&mut f, "{}\t{}", index, count).expect("failed to write coverage file");
+                writeln!(f, "{}\t{}", index, count).expect("failed to write coverage file");
             }
         }
 
@@ -125,7 +125,7 @@ fn main() {
         if opt.plain_text {
             while let Some(message) = reader.next_message() {
                 if let Ok((id, message)) = message {
-                    writeln!(&mut output_file, "{}\t{:?}", id, message)
+                    writeln!(output_file, "{}\t{:?}", id, message)
                         .expect("failed to write to output file");
                 } else {
                     break;
