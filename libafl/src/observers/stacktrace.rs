@@ -206,15 +206,10 @@ impl ASANBacktraceObserver {
     /// parse ASAN error output emited by the target command and compute the hash
     pub fn parse_asan_output(&mut self, output: &str) {
         let mut hash = 0;
-        let matcher = Regex::new("\\s*#[0-9]*\\s0x[0-9a-f]*\\sin\\s(.*)").unwrap();
+        let matcher = Regex::new("\\s*#[0-9]*\\s0x([0-9a-f]*)\\s.*").unwrap();
         matcher.captures_iter(output).for_each(|m| {
             let g = m.get(1).unwrap();
-            hash ^= g.as_str().parse::<u64>().unwrap();
-            println!(
-                ">> {} {:#x}",
-                g.as_str(),
-                g.as_str().parse::<u64>().unwrap()
-            );
+            hash ^= u64::from_str_radix(g.as_str(), 16).unwrap();
         });
         self.update_hash(hash);
     }
