@@ -373,6 +373,7 @@ where
     I: Input,
     S: HasFeedbackStates + HasClientPerfMonitor + Debug,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -599,6 +600,7 @@ where
     O: MapObserver<Entry = usize>,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,

@@ -1,6 +1,7 @@
 //! Sugar API to simplify the life of the naive user of `LibAFL`
 
 #![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![allow(
     clippy::unreadable_literal,
