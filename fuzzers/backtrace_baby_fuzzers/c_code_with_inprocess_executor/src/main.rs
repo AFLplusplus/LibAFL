@@ -38,8 +38,12 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { ConstMapObserver::<u8, 3>::new_from_ptr("signals", array_ptr) };
     // Create a stacktrace observer
-    let bt_observer =
-        BacktraceObserver::new("BacktraceObserver", libafl::observers::HarnessType::FFI);
+    let mut bt = None;
+    let bt_observer = BacktraceObserver::new(
+        "BacktraceObserver",
+        &mut bt,
+        libafl::observers::HarnessType::InProcess,
+    );
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new("MaxMapFeedback", &observer);

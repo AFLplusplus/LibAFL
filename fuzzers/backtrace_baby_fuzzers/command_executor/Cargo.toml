@@ -13,6 +13,9 @@ codegen-units = 1
 opt-level = 3
 debug = true
 
+[build-dependencies]
+cc = "*"
+
 [dependencies]
 libafl = { path = "../../../libafl/" }
 ahash = { version = "0.7"} # another hash
