@@ -963,7 +963,9 @@ mod windows_exception_handler {
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
