@@ -548,6 +548,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     arguments: Vec<OsString>,
     envs: Vec<(OsString, OsString)>,
     debug_child: bool,
+    use_stdin: bool,
     autotokens: Option<&'a mut Tokens>,
     out_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
@@ -565,33 +566,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         OT: ObserversTuple<I, S>,
         SP: ShMemProvider,
     {
-        let mut args = Vec::<OsString>::new();
-        let mut use_stdin = true;
         let out_filename = match &self.out_filename {
             Some(name) => name.clone(),
             None => OsString::from(".cur_input"),
         };
-
-        for item in &self.arguments {
-            // need special handling for @@
-            if item == "@@" && use_stdin {
-                use_stdin = false;
-                args.push(out_filename.clone());
-            } else {
-                // if the filename set by arg_input_file matches the item, then set use_stdin to false
-                if let Some(name) = &self.out_filename {
-                    if name == item && use_stdin {
-                        use_stdin = false;
-                        args.push(out_filename.clone());
-                    } else {
-                        args.push(item.clone());
-                    }
-                } else {
-                    // default case, just push item into the arguments.
-                    args.push(item.clone());
-                }
-            }
-        }
 
         let out_file = OutFile::create(&out_filename)?;
 
@@ -612,10 +590,10 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             Some(t) => {
                 let forkserver = Forkserver::new(
                     t.clone(),
-                    args.clone(),
+                    self.arguments.clone(),
                     self.envs.clone(),
                     out_file.as_raw_fd(),
-                    use_stdin,
+                    self.use_stdin,
                     0,
                     self.debug_child,
                 )?;
@@ -693,7 +671,9 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
         println!(
             "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
-            target, args, use_stdin
+            target,
+            self.arguments.clone(),
+            self.use_stdin
         );
 
         Ok(ForkserverExecutor {
@@ -728,6 +708,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: vec![],
             envs: vec![],
             debug_child: false,
+            use_stdin: true,
             autotokens: None,
             out_filename: None,
             shmem_provider: None,
@@ -812,6 +793,39 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     #[must_use]
+    /// Parse afl style command line
+    pub fn parse_afl_cmdline<IT, O>(mut self, args: IT) -> Self
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        let mut use_stdin = true;
+
+        for item in args {
+            if item.as_ref() == "@@" && use_stdin {
+                use_stdin = false;
+                res.push(OsString::from(".cur_input"));
+            } else {
+                if let Some(name) = &self.out_filename {
+                    if name == item.as_ref() && use_stdin {
+                        use_stdin = false;
+                        res.push(name.clone());
+                    } else {
+                        res.push(item.as_ref().to_os_string());
+                    }
+                } else {
+                    res.push(item.as_ref().to_os_string());
+                }
+            }
+        }
+
+        self.arguments = res;
+        self.use_stdin = use_stdin;
+        self
+    }
+
+    #[must_use]
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     pub fn debug_child(mut self, debug_child: bool) -> Self {
         self.debug_child = debug_child;
@@ -835,6 +849,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: self.arguments,
             envs: self.envs,
             debug_child: self.debug_child,
+            use_stdin: self.use_stdin,
             autotokens: self.autotokens,
             out_filename: self.out_filename,
             shmem_provider: Some(shmem_provider),
