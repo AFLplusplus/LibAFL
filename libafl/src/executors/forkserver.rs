@@ -6,20 +6,23 @@ use core::{
     time::Duration,
 };
 use std::{
+    ffi::{OsStr, OsString},
     io::{self, prelude::*, ErrorKind},
     os::unix::{io::RawFd, process::CommandExt},
+    path::Path,
     process::{Command, Stdio},
 };
 
 use crate::{
     bolts::{
-        fs::OutFile,
+        fs::{OutFile, OUTFILE_STD},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
+    mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     Error,
 };
@@ -38,6 +41,8 @@ const FORKSRV_FD: i32 = 198;
 const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
+const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
 
@@ -166,8 +171,9 @@ pub struct Forkserver {
 impl Forkserver {
     /// Create a new [`Forkserver`]
     pub fn new(
-        target: String,
-        args: Vec<String>,
+        target: OsString,
+        args: Vec<OsString>,
+        envs: Vec<(OsString, OsString)>,
         out_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
@@ -189,6 +195,7 @@ impl Forkserver {
             .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
             .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
+            .envs(envs)
             .setlimit(memlimit)
             .setsid()
             .setstdin(out_filefd, use_stdin)
@@ -262,6 +269,14 @@ impl Forkserver {
         let rlen = self.st_pipe.read(&mut buf)?;
         let val: i32 = i32::from_ne_bytes(buf);
         Ok((rlen, val))
+    }
+
+    /// Read bytes of any length from the st pipe
+    pub fn read_st_size(&mut self, size: usize) -> Result<(usize, Vec<u8>), Error> {
+        let mut buf = vec![0; size];
+
+        let rlen = self.st_pipe.read(&mut buf)?;
+        Ok((rlen, buf))
     }
 
     /// Write to the ctl pipe
@@ -460,12 +475,11 @@ where
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 pub struct ForkserverExecutor<I, OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: Debug,
     SP: ShMemProvider,
 {
-    target: String,
-    args: Vec<String>,
+    target: OsString,
+    args: Vec<OsString>,
     out_file: OutFile,
     forkserver: Forkserver,
     observers: OT,
@@ -477,8 +491,7 @@ where
 
 impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: Debug,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -493,21 +506,11 @@ where
     }
 }
 
-impl<I, OT, S> ForkserverExecutor<I, OT, S, StdShMemProvider>
-where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-{
-    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
-    /// This Forserver won't attempt to provide inputs over shared mem but write them to an iput file
-    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
-    pub fn new(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-    ) -> Result<Self, Error> {
-        Self::new_internal(target, arguments, observers, debug_child, None)
+impl ForkserverExecutor<(), (), (), StdShMemProvider> {
+    /// Builder for `ForkserverExecutor`
+    #[must_use]
+    pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
+        ForkserverExecutorBuilder::new()
     }
 }
 
@@ -517,47 +520,60 @@ where
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
-    /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers.
-    pub fn with_shmem_inputs(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-        shmem_provider: &mut SP,
-    ) -> Result<Self, Error> {
-        Self::new_internal(
-            target,
-            arguments,
-            observers,
-            debug_child,
-            Some(shmem_provider),
-        )
+    /// The `target` binary that's going to run.
+    pub fn target(&self) -> &OsString {
+        &self.target
     }
 
-    /// Creates a new [`ForkserverExecutor`] with the given target, arguments and observers, with debug mode
-    fn new_internal(
-        target: String,
-        arguments: &[String],
-        observers: OT,
-        debug_child: bool,
-        shmem_provider: Option<&mut SP>,
-    ) -> Result<Self, Error> {
-        let mut args = Vec::<String>::new();
-        let mut use_stdin = true;
-        let out_filename = ".cur_input".to_string();
+    /// The `args` used for the binary.
+    pub fn args(&self) -> &[OsString] {
+        &self.args
+    }
 
-        for item in arguments {
-            if item == "@@" && use_stdin {
-                use_stdin = false;
-                args.push(out_filename.clone());
-            } else {
-                args.push(item.to_string());
-            }
-        }
+    /// The [`Forkserver`] instance.
+    pub fn forkserver(&self) -> &Forkserver {
+        &self.forkserver
+    }
+
+    /// The [`OutFile`] used by this [`Executor`].
+    pub fn out_file(&self) -> &OutFile {
+        &self.out_file
+    }
+}
+
+/// The builder for `ForkserverExecutor`
+#[derive(Debug)]
+pub struct ForkserverExecutorBuilder<'a, SP> {
+    program: Option<OsString>,
+    arguments: Vec<OsString>,
+    envs: Vec<(OsString, OsString)>,
+    debug_child: bool,
+    use_stdin: bool,
+    autotokens: Option<&'a mut Tokens>,
+    out_filename: Option<OsString>,
+    shmem_provider: Option<&'a mut SP>,
+}
+
+impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
+    /// Builds `ForkserverExecutor`.
+    #[allow(clippy::pedantic)]
+    pub fn build<I, OT, S>(
+        &mut self,
+        observers: OT,
+    ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
+    where
+        I: Input + HasTargetBytes,
+        OT: ObserversTuple<I, S>,
+        SP: ShMemProvider,
+    {
+        let out_filename = match &self.out_filename {
+            Some(name) => name.clone(),
+            None => OsString::from(".cur_input"),
+        };
 
         let out_file = OutFile::create(&out_filename)?;
 
-        let map = match shmem_provider {
+        let map = match &mut self.shmem_provider {
             None => None,
             Some(provider) => {
                 // setup shared memory
@@ -570,14 +586,26 @@ where
             }
         };
 
-        let mut forkserver = Forkserver::new(
-            target.clone(),
-            args.clone(),
-            out_file.as_raw_fd(),
-            use_stdin,
-            0,
-            debug_child,
-        )?;
+        let (target, mut forkserver) = match &self.program {
+            Some(t) => {
+                let forkserver = Forkserver::new(
+                    t.clone(),
+                    self.arguments.clone(),
+                    self.envs.clone(),
+                    out_file.as_raw_fd(),
+                    self.use_stdin,
+                    0,
+                    self.debug_child,
+                )?;
+
+                (t.clone(), forkserver)
+            }
+            None => {
+                return Err(Error::IllegalArgument(
+                    "ForkserverExecutorBuilder::build: target file not found".to_string(),
+                ))
+            }
+        };
 
         let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
@@ -589,51 +617,237 @@ where
         println!("All right - fork server is up.");
         // If forkserver is responding, we then check if there's any option enabled.
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED {
-            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) & map.is_some() {
-                println!("Using SHARED MEMORY FUZZING feature.");
-                let send_status = FS_OPT_ENABLED | FS_OPT_SHDMEM_FUZZ;
+            let mut send_status = FS_OPT_ENABLED;
 
-                let send_len = forkserver.write_ctl(send_status)?;
-                if send_len != 4 {
+            if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
+                println!("Using SHARED MEMORY FUZZING feature.");
+                send_status = send_status | FS_OPT_SHDMEM_FUZZ;
+            }
+
+            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
+                println!("Using AUTODICT feature");
+                send_status = send_status | FS_OPT_AUTODICT;
+            }
+
+            let send_len = forkserver.write_ctl(send_status)?;
+            if send_len != 4 {
+                return Err(Error::Forkserver(
+                    "Writing to forkserver failed.".to_string(),
+                ));
+            }
+
+            if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
+                let (read_len, dict_size) = forkserver.read_st()?;
+                if read_len != 4 {
                     return Err(Error::Forkserver(
-                        "Writing to forkserver failed.".to_string(),
+                        "Reading from forkserver failed.".to_string(),
                     ));
+                }
+
+                if dict_size < 2 || dict_size > 0xffffff {
+                    return Err(Error::Forkserver(
+                        "Dictionary has an illegal size".to_string(),
+                    ));
+                }
+
+                println!("Autodict size {:x}", dict_size);
+
+                let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
+
+                if rlen != dict_size as usize {
+                    return Err(Error::Forkserver(
+                        "Failed to load autodictionary".to_string(),
+                    ));
+                }
+
+                if let Some(t) = &mut self.autotokens {
+                    t.parse_autodict(&buf, dict_size as usize);
                 }
             }
         } else {
             println!("Forkserver Options are not available.");
         }
 
-        Ok(Self {
-            has_asan_observer: None, // initialized on first use
+        println!(
+            "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
             target,
-            args,
+            self.arguments.clone(),
+            self.use_stdin
+        );
+
+        Ok(ForkserverExecutor {
+            target,
+            args: self.arguments.clone(),
             out_file,
             forkserver,
             observers,
             map,
             phantom: PhantomData,
+            has_asan_observer: None, // initialized on first use
         })
     }
+}
 
-    /// The `target` binary that's going to run.
-    pub fn target(&self) -> &String {
-        &self.target
+impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+    /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
+    /// This is the builder for `ForkserverExecutor`
+    /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
+    /// Else this forkserver will try to write the input to `.cur_input` file.
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    #[must_use]
+    pub fn new() -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+        ForkserverExecutorBuilder {
+            program: None,
+            arguments: vec![],
+            envs: vec![],
+            debug_child: false,
+            use_stdin: true,
+            autotokens: None,
+            out_filename: None,
+            shmem_provider: None,
+        }
     }
 
-    /// The `args` used for the binary.
-    pub fn args(&self) -> &[String] {
-        &self.args
+    /// The harness
+    #[must_use]
+    pub fn program<O>(mut self, program: O) -> Self
+    where
+        O: AsRef<OsStr>,
+    {
+        self.program = Some(program.as_ref().to_owned());
+        self
     }
 
-    /// The [`Forkserver`] instance.
-    pub fn forkserver(&self) -> &Forkserver {
-        &self.forkserver
+    /// Adds an argument to the harness's commandline
+    #[must_use]
+    pub fn arg<O>(mut self, arg: O) -> Self
+    where
+        O: AsRef<OsStr>,
+    {
+        self.arguments.push(arg.as_ref().to_owned());
+        self
     }
 
-    /// The [`OutFile`] used by this [`Executor`].
-    pub fn out_file(&self) -> &OutFile {
-        &self.out_file
+    /// Adds arguments to the harness's commandline
+    #[must_use]
+    pub fn args<IT, O>(mut self, args: IT) -> Self
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        for arg in args {
+            res.push(arg.as_ref().to_owned());
+        }
+        self.arguments.append(&mut res);
+        self
+    }
+
+    /// Adds an environmental var to the harness's commandline
+    #[must_use]
+    pub fn env<K, V>(mut self, key: K, val: V) -> Self
+    where
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        self.envs
+            .push((key.as_ref().to_owned(), val.as_ref().to_owned()));
+        self
+    }
+
+    /// Adds environmental vars to the harness's commandline
+    #[must_use]
+    pub fn envs<IT, K, V>(mut self, vars: IT) -> Self
+    where
+        IT: IntoIterator<Item = (K, V)>,
+        K: AsRef<OsStr>,
+        V: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        for (ref key, ref val) in vars {
+            res.push((key.as_ref().to_owned(), val.as_ref().to_owned()));
+        }
+        self.envs.append(&mut res);
+        self
+    }
+
+    #[must_use]
+    /// Place the input at this position and set the filename for the input.
+    pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
+        let mut moved = self.arg(path.as_ref());
+        moved.out_filename = Some(path.as_ref().as_os_str().to_os_string());
+        moved
+    }
+
+    #[must_use]
+    /// Place the input at this position and set the default filename for the input.
+    pub fn arg_input_file_std(self) -> Self {
+        let moved = self.arg_input_file(OUTFILE_STD);
+        moved
+    }
+
+    #[must_use]
+    /// Parse afl style command line
+    pub fn parse_afl_cmdline<IT, O>(mut self, args: IT) -> Self
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        let mut use_stdin = true;
+
+        for item in args {
+            if item.as_ref() == "@@" && use_stdin {
+                use_stdin = false;
+                res.push(OsString::from(".cur_input"));
+            } else {
+                if let Some(name) = &self.out_filename {
+                    if name == item.as_ref() && use_stdin {
+                        use_stdin = false;
+                        res.push(name.clone());
+                    } else {
+                        res.push(item.as_ref().to_os_string());
+                    }
+                } else {
+                    res.push(item.as_ref().to_os_string());
+                }
+            }
+        }
+
+        self.arguments = res;
+        self.use_stdin = use_stdin;
+        self
+    }
+
+    #[must_use]
+    /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
+    pub fn debug_child(mut self, debug_child: bool) -> Self {
+        self.debug_child = debug_child;
+        self
+    }
+
+    /// Use autodict?
+    #[must_use]
+    pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
+        self.autotokens = Some(tokens);
+        self
+    }
+
+    /// Shmem provider for forkserver's shared memory testcase feature.
+    pub fn shmem_provider<SP: ShMemProvider>(
+        self,
+        shmem_provider: &'a mut SP,
+    ) -> ForkserverExecutorBuilder<'a, SP> {
+        ForkserverExecutorBuilder {
+            program: self.program,
+            arguments: self.arguments,
+            envs: self.envs,
+            debug_child: self.debug_child,
+            use_stdin: self.use_stdin,
+            autotokens: self.autotokens,
+            out_filename: self.out_filename,
+            shmem_provider: Some(shmem_provider),
+        }
     }
 }
 
@@ -799,25 +1013,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use serial_test::serial;
-
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
             tuples::tuple_list,
             AsMutSlice,
         },
-        executors::ForkserverExecutor,
+        executors::forkserver::ForkserverExecutorBuilder,
         inputs::NopInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
+    use serial_test::serial;
+    use std::ffi::OsString;
     #[test]
     #[serial]
     fn test_forkserver() {
         const MAP_SIZE: usize = 65536;
-        let bin = "echo";
-        let args = vec![String::from("@@")];
+        let bin = OsString::from("echo");
+        let args = vec![OsString::from("@@")];
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
 
@@ -830,15 +1044,14 @@ mod tests {
             shmem_buf,
         ));
 
-        let executor = ForkserverExecutor::<NopInput, _, (), _>::with_shmem_inputs(
-            bin.to_string(),
-            &args,
-            tuple_list!(edges_observer),
-            false,
-            &mut shmem_provider,
-        );
-        // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
+        let executor = ForkserverExecutorBuilder::new()
+            .program(bin)
+            .args(&args)
+            .debug_child(false)
+            .shmem_provider(&mut shmem_provider)
+            .build::<NopInput, _, ()>(tuple_list!(edges_observer));
 
+        // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {
             Ok(_) => true,
             Err(e) => match e {
