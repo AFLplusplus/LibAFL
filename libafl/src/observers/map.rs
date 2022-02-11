@@ -658,7 +658,7 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver< Entry = u8> + Observer<I, S>,
+    M: MapObserver<Entry = u8> + Observer<I, S>,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -697,7 +697,7 @@ where
 
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
-    M: MapObserver< Entry = u8>,
+    M: MapObserver<Entry = u8>,
 {
     type Entry = u8;
 
