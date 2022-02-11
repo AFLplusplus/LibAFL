@@ -38,9 +38,14 @@ fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
 }
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
-pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug {
+///
+/// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
+pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
+// where
+//     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
+{
     /// Type of each entry in this map
-    type Entry: PrimInt + Default + Copy + Debug;
+    type Entry: PrimInt + Default + Copy + Debug + 'static;
 
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> &Self::Entry;
@@ -74,7 +79,9 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     fn initial_mut(&mut self) -> &mut Self::Entry;
 
     /// Set the initial value for reset()
-    fn set_initial(&mut self, initial: Self::Entry);
+    fn set_initial(&mut self, initial: Self::Entry) {
+        *self.initial_mut() = initial;
+    }
 
     /// Reset the map
     #[inline]
@@ -130,7 +137,6 @@ where
 impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -166,7 +172,8 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
     }
 }
 
@@ -178,7 +185,8 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
     }
 }
 
@@ -215,11 +223,6 @@ where
     #[inline]
     fn initial_mut(&mut self) -> &mut T {
         &mut self.initial
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
     }
 
     fn to_vec(&self) -> Vec<T> {
@@ -351,7 +354,8 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
     }
 }
 
@@ -363,7 +367,8 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
     }
 }
 
@@ -381,11 +386,6 @@ where
     #[inline]
     fn initial_mut(&mut self) -> &mut T {
         &mut self.initial
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
     }
 
     #[inline]
@@ -523,7 +523,8 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
     }
 }
 
@@ -535,7 +536,8 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
     }
 }
 
@@ -556,21 +558,16 @@ where
     }
 
     #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
-    }
-
-    #[inline]
     fn usable_count(&self) -> usize {
         *self.size.as_ref()
     }
 
     fn get(&self, idx: usize) -> &T {
-        &self.as_slice()[idx]
+        &self.map.as_slice()[idx]
     }
 
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.as_mut_slice()[idx]
+        &mut self.map.as_mut_slice()[idx]
     }
 
     fn hash(&self) -> u64 {
@@ -587,7 +584,8 @@ where
 {
     #[inline]
     fn as_slice(&self) -> &[T] {
-        self.map.as_slice()
+        let cnt = self.usable_count();
+        &self.map.as_slice()[..cnt]
     }
 }
 impl<'a, T> AsMutSlice<T> for VariableMapObserver<'a, T>
@@ -660,7 +658,7 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<I, S>,
+    M: MapObserver< Entry = u8> + Observer<I, S>,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -699,7 +697,7 @@ where
 
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8>,
+    M: MapObserver< Entry = u8>,
 {
     type Entry = u8;
 
@@ -711,11 +709,6 @@ where
     #[inline]
     fn initial_mut(&mut self) -> &mut u8 {
         self.base.initial_mut()
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: u8) {
-        self.base.set_initial(initial);
     }
 
     #[inline]
@@ -847,11 +840,6 @@ where
     #[inline]
     fn initial_mut(&mut self) -> &mut T {
         &mut self.initial
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
     }
 
     fn count_bytes(&self) -> u64 {

@@ -322,6 +322,7 @@ where
     pub fn with_observer<O>(map_observer: &O) -> Self
     where
         O: MapObserver<Entry = T>,
+        for<'it> &'it O: IntoIterator<Item = &'it T>,
         T: Debug,
     {
         Self {
@@ -348,7 +349,8 @@ pub struct MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver,
+    O: MapObserver<Entry = T>,
+    for<'it> &'it O: IntoIterator<Item = &'it T>,
     N: IsNovel<T>,
     S: HasFeedbackStates,
 {
@@ -369,6 +371,7 @@ where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
+    for<'it> &'it O: IntoIterator<Item = &'it T>,
     N: IsNovel<T>,
     I: Input,
     S: HasFeedbackStates + HasClientPerfMonitor + Debug,
@@ -402,10 +405,8 @@ where
         assert!(size <= observer.len());
 
         if self.novelties.is_some() {
-            for i in 0..size {
+            for (i, &item) in observer.into_iter().enumerate() {
                 let history = map_state.history_map[i];
-                let item = *observer.get(i);
-
                 let reduced = R::reduce(history, item);
                 if N::is_novel(history, reduced) {
                     map_state.history_map[i] = reduced;
@@ -414,10 +415,8 @@ where
                 }
             }
         } else {
-            for i in 0..size {
+            for (i, &item) in observer.into_iter().enumerate() {
                 let history = map_state.history_map[i];
-                let item = *observer.get(i);
-
                 let reduced = R::reduce(history, item);
                 if N::is_novel(history, reduced) {
                     map_state.history_map[i] = reduced;
@@ -478,7 +477,8 @@ where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
-    O: MapObserver,
+    O: MapObserver<Entry = T>,
+    for<'it> &'it O: IntoIterator<Item = &'it T>,
     S: HasFeedbackStates,
 {
     #[inline]
@@ -499,7 +499,8 @@ where
         + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
-    O: MapObserver,
+    O: MapObserver<Entry = T>,
+    for<'it> &'it O: IntoIterator<Item = &'it T>,
     S: HasFeedbackStates,
 {
     /// Create new `MapFeedback`
@@ -572,6 +573,7 @@ pub struct ReachabilityFeedback<O> {
 impl<O> ReachabilityFeedback<O>
 where
     O: MapObserver<Entry = usize>,
+    for<'it> &'it O: IntoIterator<Item = &'it usize>,
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
     #[must_use]
@@ -598,6 +600,7 @@ impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<Entry = usize>,
+    for<'it> &'it O: IntoIterator<Item = &'it usize>,
     S: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
@@ -648,6 +651,7 @@ where
 impl<O> Named for ReachabilityFeedback<O>
 where
     O: MapObserver<Entry = usize>,
+    for<'it> &'it O: IntoIterator<Item = &'it usize>,
 {
     #[inline]
     fn name(&self) -> &str {
