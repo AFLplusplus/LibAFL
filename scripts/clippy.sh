@@ -9,6 +9,7 @@ if [ "$1" != "--no-clean" ]; then
    cargo clean -p libafl
 fi
 RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --tests -- -Z macro-backtrace \
+   -D clippy::all \
    -D clippy::pedantic \
    -W clippy::similar_names \
    -A clippy::type_repetition_in_bounds \

@@ -643,12 +643,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
             if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
                 println!("Using SHARED MEMORY FUZZING feature.");
-                send_status = send_status | FS_OPT_SHDMEM_FUZZ;
+                send_status |= FS_OPT_SHDMEM_FUZZ;
             }
 
             if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
                 println!("Using AUTODICT feature");
-                send_status = send_status | FS_OPT_AUTODICT;
+                send_status |= FS_OPT_AUTODICT;
             }
 
             let send_len = forkserver.write_ctl(send_status)?;
@@ -666,10 +666,11 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     ));
                 }
 
-                if dict_size < 2 || dict_size > 0xffffff {
-                    return Err(Error::Forkserver(
-                        "Dictionary has an illegal size".to_string(),
-                    ));
+                if !(2..=0xffffff).contains(&dict_size) {
+                    return Err(Error::Forkserver(format!(
+                        "Dictionary has an illegal size of {} (should be in range 2 to 0xFFFFFF).",
+                        dict_size
+                    )));
                 }
 
                 println!("Autodict size {:x}", dict_size);
@@ -807,8 +808,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     #[must_use]
     /// Place the input at this position and set the default filename for the input.
     pub fn arg_input_file_std(self) -> Self {
-        let moved = self.arg_input_file(OUTFILE_STD);
-        moved
+        self.arg_input_file(OUTFILE_STD)
     }
 
     #[must_use]

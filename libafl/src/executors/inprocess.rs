@@ -573,7 +573,9 @@ mod unix_signal_handler {
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -590,13 +592,23 @@ mod unix_signal_handler {
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
+                let mut feedback_state_box = state.feedback_state_mut().take().unwrap();
+                let objective_state = &mut feedback_state_box.1;
+
                 observers
                     .post_exec_all(state, input, &ExitKind::Crash)
                     .expect("Observers post_exec_all failed");
 
                 let interesting = fuzzer
                     .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                    .is_interesting(
+                        state,
+                        objective_state,
+                        event_mgr,
+                        input,
+                        observers,
+                        &ExitKind::Crash,
+                    )
                     .expect("In timeout handler objective failure.");
 
                 if interesting {
@@ -604,7 +616,7 @@ mod unix_signal_handler {
                     new_testcase.add_metadata(ExitKind::Timeout);
                     fuzzer
                         .objective_mut()
-                        .append_metadata(state, &mut new_testcase)
+                        .append_metadata(state, objective_state, &mut new_testcase)
                         .expect("Failed adding metadata");
                     state
                         .solutions_mut()
@@ -618,9 +630,16 @@ mod unix_signal_handler {
                             },
                         )
                         .expect("Could not send timeouting input");
+                } else {
+                    fuzzer
+                        .objective_mut()
+                        .discard_metadata(state, objective_state, input)
+                        .unwrap();
                 }
 
                 event_mgr.on_restart(state).unwrap();
+
+                state.feedback_state_mut().replace(feedback_state_box);
 
                 #[cfg(feature = "std")]
                 println!("Waiting for broker...");
@@ -1650,6 +1669,9 @@ pub mod child_signal_handlers {
     }
 
     /// invokes the `post_exec` hook on all observer in case the child process crashes
+    ///
+    /// # Safety
+    /// The crash handler should only be called from a signal handler during fuzzing.
     #[cfg(unix)]
     pub unsafe fn child_crash_handler<E, I, OT, S>(
         _signal: Signal,
