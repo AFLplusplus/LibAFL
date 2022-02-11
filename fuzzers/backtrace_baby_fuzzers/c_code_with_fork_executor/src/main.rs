@@ -4,7 +4,12 @@ use libafl::bolts::shmem::ShMemProvider;
 use libafl::bolts::AsSlice;
 use libafl::observers::ConstMapObserver;
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, shmem::UnixShMemProvider, tuples::tuple_list},
+    bolts::{
+        current_nanos,
+        rands::StdRand,
+        shmem::{ShMem, StdShMemProvider},
+        tuples::tuple_list,
+    },
     corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
     events::SimpleEventManager,
     executors::InProcessForkExecutor,
@@ -34,7 +39,7 @@ extern "C" {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let shmem_provider = UnixShMemProvider::new().unwrap();
+    let mut shmem_provider = StdShMemProvider::new().unwrap();
     unsafe { create_shmem_array() };
     let map_ptr = unsafe { get_ptr() };
     let mut harness = |input: &BytesInput| {
@@ -46,8 +51,12 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = unsafe { ConstMapObserver::<u8, 3>::new_from_ptr("signals", map_ptr) };
     // Create a stacktrace observer
-    let bt_observer =
-        BacktraceObserver::new("BacktraceObserver", libafl::observers::HarnessType::FFI);
+    let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
+    let bt_observer = BacktraceObserver::new(
+        "BacktraceObserver",
+        unsafe { bt.as_object_mut::<Option<u64>>() },
+        libafl::observers::HarnessType::Child,
+    );
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);

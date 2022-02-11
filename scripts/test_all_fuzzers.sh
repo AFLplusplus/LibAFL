@@ -7,6 +7,7 @@ cd "$SCRIPT_DIR/.."
 
 fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
+libafl=$(pwd)
 
 for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
 do
@@ -34,6 +35,6 @@ do
 
     # Save disk space
     cargo clean
-    cd ..
+    cd $libafl
     echo ""
 done

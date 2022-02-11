@@ -7,7 +7,7 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{unix_shmem, ShMemProvider},
+        shmem::{unix_shmem, ShMem, ShMemProvider},
         tuples::tuple_list,
         AsMutSlice, AsSlice,
     },
@@ -33,6 +33,7 @@ pub fn main() {
     let mut shmem_provider = unix_shmem::UnixShMemProvider::new().unwrap();
     let mut signals = shmem_provider.new_shmem(16).unwrap();
     let mut signals_clone = signals.clone();
+    let mut bt = shmem_provider.new_shmem_object::<Option<u64>>().unwrap();
 
     let mut signals_set = |idx: usize| {
         let a = signals.as_mut_slice();
@@ -68,8 +69,11 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", signals_clone.as_mut_slice());
     // Create a stacktrace observer
-    let bt_observer =
-        BacktraceObserver::new("BacktraceObserver", libafl::observers::HarnessType::RUST);
+    let bt_observer = BacktraceObserver::new(
+        "BacktraceObserver",
+        unsafe { bt.as_object_mut::<Option<u64>>() },
+        libafl::observers::HarnessType::Child,
+    );
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&observer);
