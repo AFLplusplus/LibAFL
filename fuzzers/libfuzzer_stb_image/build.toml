@@ -1,0 +1,69 @@
+# Variables
+[env]
+FUZZER_NAME='libfuzzer_stb_image'
+
+[tasks.fuzzer]
+script_runner="@shell"
+script='''
+echo ${FUZZER} ${FUZZER_WIN}
+'''
+
+
+# Compilers
+[tasks.cxx]
+linux_alias = "unix_cxx"
+windows_alias = "windows_cxx"
+macos_alias = "unix_cxx"
+
+[tasks.cc]
+linux_alias = "unix_cc"
+windows_alias = "windows_cc"
+macos_alias = "unix_cc"
+
+[tasks.unix_cxx]
+condition = { files_not_exist = ["${PWD}/target/release/libafl_cxx"] }
+command = "cargo"
+args = ["build" , "--release"]
+
+[tasks.unix_cc]
+condition = { files_not_exist = ["${PWD}/target/release/libafl_cc"] }
+command = "cargo"
+args = ["build" , "--release"]
+
+[tasks.windows_cxx]
+condition = { files_not_exist = ["${PWD}\\target\\release\\libafl_cxx.exe"] }
+command = "cargo"
+args = ["build" , "--release"]
+
+[tasks.windows_cc]
+condition = { files_not_exist = ["${PWD}\\target\\release\\libafl_cc.exe"] }
+command = "cargo"
+args = ["build" , "--release"]
+
+
+# Fuzzer
+[tasks.fuzzer]
+linux_alias = "unix_fuzzer"
+windows_alias = "windows_fuzzer"
+macos_alias = "unix_fuzzer"
+
+[tasks.unix_fuzzer]
+script_runner="@shell"
+script='''
+cargo build --release
+cp ./target/release/${FUZZER_NAME}
+'''
+
+[tasks.windows_fuzzer]
+script_runner="@shell"
+script='''
+cargo build --release
+copy .\\target\\release\\${FUZZER_NAME}.exe
+'''
+
+[tasks.clean]
+script_runner="@shell"
+script='''
+rm ./${FUZZER_NAME}
+cargo clean
+'''
