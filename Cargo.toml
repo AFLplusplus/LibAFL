@@ -20,6 +20,7 @@ members = [
     "utils/deexit",
     "utils/gramatron/construct_automata",
     "utils/libafl_benches",
+    "utils/timeout",
 ]
 default-members = [
     "libafl",
