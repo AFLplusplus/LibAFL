@@ -446,6 +446,7 @@ pub mod pybind {
     impl QemuBytesCoverageSugar {
         /// Create a new [`QemuBytesCoverageSugar`]
         #[new]
+        #[allow(clippy::too_many_arguments)]
         fn new(
             input_dirs: Vec<PathBuf>,
             output_dir: PathBuf,
