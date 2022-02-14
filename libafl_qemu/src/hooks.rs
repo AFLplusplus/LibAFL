@@ -64,7 +64,7 @@ where
         let helpers = get_qemu_helpers::<QT>();
         let emulator = Emulator::new_empty();
         let func: fn(&Emulator, &mut QT, Option<&mut S>, u64) -> Option<u64> =
-            transmute(GEN_EDGE_HOOK_PTR);
+            transmute(GEN_BLOCK_HOOK_PTR);
         (func)(&emulator, helpers, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
     }
 }
