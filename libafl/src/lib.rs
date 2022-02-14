@@ -314,3 +314,32 @@ pub extern "C" fn external_current_millis() -> u64 {
     // TODO: use "real" time here
     1000
 }
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "python")]
+#[pymodule]
+#[pyo3(name = "libafl")]
+/// Register the classes to the python module
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+    observers::map::pybind::register(py, m)?;
+    feedbacks::map::pybind::register(py, m)?;
+    state::pybind::register(py, m)?;
+    monitors::pybind::register(py, m)?;
+    events::pybind::register(py, m)?;
+    events::simple::pybind::register(py, m)?;
+    fuzzer::pybind::register(py, m)?;
+    executors::pybind::register(py, m)?;
+    executors::inprocess::pybind::register(py, m)?;
+    generators::pybind::register(py, m)?;
+    corpus::pybind::register(py, m)?;
+    corpus::ondisk::pybind::register(py, m)?;
+    corpus::inmemory::pybind::register(py, m)?;
+    corpus::cached::pybind::register(py, m)?;
+    bolts::rands::pybind::register(py, m)?;
+    stages::pybind::register(py, m)?;
+    stages::owned::pybind::register(py, m)?;
+    stages::mutational::pybind::register(py, m)?;
+    Ok(())
+}
