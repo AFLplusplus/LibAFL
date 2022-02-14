@@ -23,9 +23,9 @@ do
         echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
     fi
 
-    if [ -e ./Makefile ]; then
+    if [ -e ./build.toml ]; then
         echo "[*] Testing $fuzzer"
-        make short_test || exit 1
+        cargo make --makefile ./build.toml test || exit 1
 	    echo "[+] Done testing $fuzzer"
     else
         echo "[*] Building $fuzzer"
