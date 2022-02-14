@@ -35,8 +35,6 @@ windows_alias = "windows_run"
 script_runner = "@shell"
 script='''
 ./${FUZZER_NAME} &
-sleep 0.2
-./${FUZZER_NAME}
 '''
 dependencies = [ "fuzzer" ]
 
@@ -58,8 +56,6 @@ windows_alias = "windows_test"
 script_runner = "@shell"
 script='''
 timeout 11s ./${FUZZER_NAME} &
-sleep 0.2
-timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null &
 '''
 dependencies = [ "fuzzer" ]
 
