@@ -769,7 +769,6 @@ where
         Self { base }
     }
 }
-
 /// The Multi Map Observer merge different maps into one observer
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
@@ -975,5 +974,410 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.maps.iter().flatten()
+    }
+}
+
+/// Exact copy of `StdMapObserver` that owns its map
+/// Used for python bindings
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(bound = "T: serde::de::DeserializeOwned")]
+#[allow(clippy::unsafe_derive_deserialize)]
+pub struct OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+{
+    map: Vec<T>,
+    initial: T,
+    name: String,
+}
+
+impl<I, S, T> Observer<I, S> for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    Self: MapObserver,
+{
+    #[inline]
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        self.reset_map()
+    }
+}
+
+impl<T> Named for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<T> HasLen for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.map.as_slice().len()
+    }
+}
+
+impl<'it, T> IntoIterator for &'it OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <Iter<'it, T> as Iterator>::Item;
+    type IntoIter = Iter<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'it, T> IntoIterator for &'it mut OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = IterMut<'it, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
+    }
+}
+
+impl<T> MapObserver for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Entry = T;
+
+    #[inline]
+    fn get(&self, pos: usize) -> &T {
+        &self.as_slice()[pos]
+    }
+
+    #[inline]
+    fn get_mut(&mut self, idx: usize) -> &mut T {
+        &mut self.as_mut_slice()[idx]
+    }
+
+    #[inline]
+    fn usable_count(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    fn hash(&self) -> u64 {
+        hash_slice(self.as_slice())
+    }
+
+    #[inline]
+    fn initial(&self) -> T {
+        self.initial
+    }
+
+    #[inline]
+    fn initial_mut(&mut self) -> &mut T {
+        &mut self.initial
+    }
+
+    #[inline]
+    fn set_initial(&mut self, initial: T) {
+        self.initial = initial;
+    }
+
+    fn to_vec(&self) -> Vec<T> {
+        self.as_slice().to_vec()
+    }
+}
+
+impl<T> AsSlice<T> for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[must_use]
+    #[inline]
+    fn as_slice(&self) -> &[T] {
+        self.map.as_slice()
+    }
+}
+impl<T> AsMutSlice<T> for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    #[must_use]
+    #[inline]
+    fn as_mut_slice(&mut self) -> &mut [T] {
+        self.map.as_mut_slice()
+    }
+}
+
+impl<T> OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`MapObserver`] with an owned map
+    #[must_use]
+    pub fn new(name: &'static str, map: Vec<T>) -> Self {
+        let initial = if map.is_empty() { T::default() } else { map[0] };
+        Self {
+            map: map,
+            name: name.to_string(),
+            initial,
+        }
+    }
+}
+/// `MapObserver` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::bolts::{tuples::Named, HasLen};
+    use crate::observers::{map::OwnedMapObserver, MapObserver, Observer};
+    use crate::Error;
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    macro_rules! define_python_map_observer {
+        ($struct_name:ident, $py_name:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
+            #[pyclass(unsendable, name = $py_name)]
+            #[derive(Serialize, Deserialize, Debug, Clone)]
+            /// Python class for OwnedMapObserver (i.e. StdMapObserver with owned map)
+            pub struct $struct_name {
+                /// Rust wrapped OwnedMapObserver object
+                pub owned_map_observer: OwnedMapObserver<$datatype>,
+            }
+
+            #[pymethods]
+            impl $struct_name {
+                #[new]
+                fn new(name: String, map: Vec<$datatype>) -> Self {
+                    Self {
+                        //TODO: Not leak memory
+                        owned_map_observer: OwnedMapObserver::new(
+                            Box::leak(name.into_boxed_str()),
+                            map,
+                        ),
+                    }
+                }
+            }
+
+            #[derive(Serialize, Deserialize, Debug, Clone)]
+            enum $wrapper_name {
+                Owned($struct_name),
+            }
+
+            // Should not be exposed to user
+            #[pyclass(unsendable, name = $py_name_trait)]
+            #[derive(Serialize, Deserialize, Debug, Clone)]
+            /// MapObserver + Observer Trait binding
+            pub struct $struct_name_trait {
+                map_observer: $wrapper_name,
+            }
+
+            #[pymethods]
+            impl $struct_name_trait {
+                #[staticmethod]
+                fn new_from_owned(owned_map_observer: $struct_name) -> Self {
+                    Self {
+                        map_observer: $wrapper_name::Owned(owned_map_observer),
+                    }
+                }
+            }
+
+            impl MapObserver for $struct_name_trait {
+                type Entry = $datatype;
+
+                #[inline]
+                fn get(&self, idx: usize) -> &$datatype {
+                    match &self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            &map_observer.owned_map_observer.get(idx)
+                        }
+                    }
+                }
+
+                #[inline]
+                fn get_mut(&mut self, idx: usize) -> &mut $datatype {
+                    match &mut self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.get_mut(idx)
+                        }
+                    }
+                }
+
+                #[inline]
+                fn usable_count(&self) -> usize {
+                    match &self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.usable_count()
+                        }
+                    }
+                }
+
+                fn hash(&self) -> u64 {
+                    match &self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.hash()
+                        }
+                    }
+                }
+
+                #[inline]
+                fn initial(&self) -> $datatype {
+                    match &self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.initial()
+                        }
+                    }
+                }
+
+                #[inline]
+                fn initial_mut(&mut self) -> &mut $datatype {
+                    match &mut self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.initial_mut()
+                        }
+                    }
+                }
+
+                #[inline]
+                fn set_initial(&mut self, initial: $datatype) {
+                    match &mut self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.set_initial(initial);
+                        }
+                    }
+                }
+
+                fn to_vec(&self) -> Vec<$datatype> {
+                    match &self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.to_vec()
+                        }
+                    }
+                }
+            }
+
+            impl Named for $struct_name_trait {
+                #[inline]
+                fn name(&self) -> &str {
+                    match &self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.name()
+                        }
+                    }
+                }
+            }
+
+            impl HasLen for $struct_name_trait {
+                #[inline]
+                fn len(&self) -> usize {
+                    match &self.map_observer {
+                        $wrapper_name::Owned(map_observer) => map_observer.owned_map_observer.len(),
+                    }
+                }
+            }
+
+            impl<I, S> Observer<I, S> for $struct_name_trait
+            where
+                Self: MapObserver,
+            {
+                #[inline]
+                fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+                    match &mut self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.pre_exec(_state, _input)
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    define_python_map_observer!(
+        PythonOwnedMapObserverI8,
+        "OwnedMapObserverI8",
+        PythonMapObserverI8,
+        "MapObserverI8",
+        i8,
+        PythonMapObserverWrapperI8
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverI16,
+        "OwnedMapObserverI16",
+        PythonMapObserverI16,
+        "MapObserverI16",
+        i16,
+        PythonMapObserverWrapperI16
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverI32,
+        "OwnedMapObserverI32",
+        PythonMapObserverI32,
+        "MapObserverI32",
+        i32,
+        PythonMapObserverWrapperI32
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverI64,
+        "OwnedMapObserverI64",
+        PythonMapObserverI64,
+        "MapObserverI64",
+        i64,
+        PythonMapObserverWrapperI64
+    );
+
+    define_python_map_observer!(
+        PythonOwnedMapObserverU8,
+        "OwnedMapObserverU8",
+        PythonMapObserverU8,
+        "MapObserverU8",
+        u8,
+        PythonMapObserverWrapperU8
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverU16,
+        "OwnedMapObserverU16",
+        PythonMapObserverU16,
+        "MapObserverU16",
+        u16,
+        PythonMapObserverWrapperU16
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverU32,
+        "OwnedMapObserverU32",
+        PythonMapObserverU32,
+        "MapObserverU32",
+        u32,
+        PythonMapObserverWrapperU32
+    );
+    define_python_map_observer!(
+        PythonOwnedMapObserverU64,
+        "OwnedMapObserverU64",
+        PythonMapObserverU64,
+        "MapObserverU64",
+        u64,
+        PythonMapObserverWrapperU64
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonOwnedMapObserverI8>()?;
+        m.add_class::<PythonMapObserverI8>()?;
+        m.add_class::<PythonOwnedMapObserverI16>()?;
+        m.add_class::<PythonMapObserverI16>()?;
+        m.add_class::<PythonOwnedMapObserverI32>()?;
+        m.add_class::<PythonMapObserverI32>()?;
+        m.add_class::<PythonOwnedMapObserverI64>()?;
+        m.add_class::<PythonMapObserverI64>()?;
+
+        m.add_class::<PythonOwnedMapObserverU8>()?;
+        m.add_class::<PythonMapObserverU8>()?;
+        m.add_class::<PythonOwnedMapObserverU16>()?;
+        m.add_class::<PythonMapObserverU16>()?;
+        m.add_class::<PythonOwnedMapObserverU32>()?;
+        m.add_class::<PythonMapObserverU32>()?;
+        m.add_class::<PythonOwnedMapObserverU64>()?;
+        m.add_class::<PythonMapObserverU64>()?;
+        Ok(())
     }
 }

@@ -125,3 +125,90 @@ where
         }
     }
 }
+
+/// `Generator` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::generators::RandPrintablesGenerator;
+    use pyo3::prelude::*;
+
+    macro_rules! define_python_event_manager {
+        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident) => {
+            use crate::state::pybind::$my_std_state_type_name;
+
+            #[pyclass(unsendable, name = $py_name)]
+            /// Python class for RandPrintablesGenerator
+            #[derive(Debug)]
+            pub struct $struct_name {
+                /// Rust wrapped SimpleEventManager object
+                pub rand_printable_generator: RandPrintablesGenerator<$my_std_state_type_name>,
+            }
+
+            #[pymethods]
+            impl $struct_name {
+                #[new]
+                fn new(max_size: usize) -> Self {
+                    Self {
+                        rand_printable_generator: RandPrintablesGenerator::new(max_size),
+                    }
+                }
+            }
+        };
+    }
+
+    define_python_event_manager!(
+        PythonRandPrintablesGeneratorI8,
+        "RandPrintablesGeneratorI8",
+        MyStdStateI8
+    );
+    define_python_event_manager!(
+        PythonRandPrintablesGeneratorI16,
+        "RandPrintablesGeneratorI16",
+        MyStdStateI16
+    );
+    define_python_event_manager!(
+        PythonRandPrintablesGeneratorI32,
+        "RandPrintablesGeneratorI32",
+        MyStdStateI32
+    );
+    define_python_event_manager!(
+        PythonRandPrintablesGeneratorI64,
+        "RandPrintablesGeneratorI64",
+        MyStdStateI64
+    );
+
+    define_python_event_manager!(
+        PythonRandPrintablesGeneratorU8,
+        "RandPrintablesGeneratorU8",
+        MyStdStateU8
+    );
+    define_python_event_manager!(
+        PythonRandPrintablesGeneratorU16,
+        "RandPrintablesGeneratorU16",
+        MyStdStateU16
+    );
+    define_python_event_manager!(
+        PythonRandPrintablesGeneratorU32,
+        "RandPrintablesGeneratorU32",
+        MyStdStateU32
+    );
+    define_python_event_manager!(
+        PythonRandPrintablesGeneratorU64,
+        "RandPrintablesGeneratorU64",
+        MyStdStateU64
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonRandPrintablesGeneratorI8>()?;
+        m.add_class::<PythonRandPrintablesGeneratorI16>()?;
+        m.add_class::<PythonRandPrintablesGeneratorI32>()?;
+        m.add_class::<PythonRandPrintablesGeneratorI64>()?;
+
+        m.add_class::<PythonRandPrintablesGeneratorU8>()?;
+        m.add_class::<PythonRandPrintablesGeneratorU16>()?;
+        m.add_class::<PythonRandPrintablesGeneratorU32>()?;
+        m.add_class::<PythonRandPrintablesGeneratorU64>()?;
+        Ok(())
+    }
+}

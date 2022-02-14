@@ -133,3 +133,38 @@ where
         })
     }
 }
+
+/// ``CachedOnDiskCorpus`` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use std::path::PathBuf;
+
+    use crate::corpus::CachedOnDiskCorpus;
+    use crate::inputs::BytesInput;
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    #[pyclass(unsendable, name = "CachedOnDiskCorpus")]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for CachedOnDiskCorpus
+    pub struct PythonCachedOnDiskCorpus {
+        /// Rust wrapped CachedOnDiskCorpus object
+        pub cached_on_disk_corpus: CachedOnDiskCorpus<BytesInput>,
+    }
+
+    #[pymethods]
+    impl PythonCachedOnDiskCorpus {
+        #[new]
+        fn new(path: String, cache_max_len: usize) -> Self {
+            Self {
+                cached_on_disk_corpus: CachedOnDiskCorpus::new(PathBuf::from(path), cache_max_len)
+                    .unwrap(),
+            }
+        }
+    }
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonCachedOnDiskCorpus>()?;
+        Ok(())
+    }
+}

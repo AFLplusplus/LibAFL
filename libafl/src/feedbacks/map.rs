@@ -654,7 +654,6 @@ where
         self.name.as_str()
     }
 }
-
 #[cfg(test)]
 mod tests {
     use crate::feedbacks::{AllIsNovel, IsNovel, NextPow2IsNovel};
@@ -677,5 +676,164 @@ mod tests {
         assert!(!NextPow2IsNovel::is_novel(255_u8, 128));
         assert!(NextPow2IsNovel::is_novel(254_u8, 255));
         assert!(!NextPow2IsNovel::is_novel(255_u8, 255));
+    }
+}
+
+#[cfg(feature = "python")]
+/// Map Feedback Python bindings
+pub mod pybind {
+    use crate::feedbacks::map::{MapFeedbackState, MaxMapFeedback};
+    use crate::inputs::BytesInput;
+    use pyo3::prelude::*;
+
+    macro_rules! define_python_map_feedback {
+        ($map_feedback_state_struct_name:ident, $map_feedback_state_py_name:tt, $max_map_feedback_struct_name:ident,
+            $max_map_feedback_py_name:tt, $datatype:ty, $map_observer_name: ident, $std_state_name: ident) => {
+            use crate::observers::map::pybind::$map_observer_name;
+            use crate::state::pybind::$std_state_name;
+
+            #[pyclass(unsendable, name = $map_feedback_state_py_name)]
+            #[derive(Clone, Debug)]
+            /// Python class for MapFeedbackState
+            pub struct $map_feedback_state_struct_name {
+                /// Rust wrapped MapFeedbackState object
+                pub map_feedback_state: MapFeedbackState<$datatype>,
+            }
+
+            #[pymethods]
+            impl $map_feedback_state_struct_name {
+                #[staticmethod]
+                fn with_observer(py_observer: &$map_observer_name) -> Self {
+                    Self {
+                        map_feedback_state: MapFeedbackState::with_observer(py_observer),
+                    }
+                }
+            }
+
+            #[pyclass(unsendable, name = $max_map_feedback_py_name)]
+            #[derive(Clone, Debug)]
+            /// Python class for MaxMapFeedback
+            pub struct $max_map_feedback_struct_name {
+                /// Rust wrapped MaxMapFeedback object
+                pub max_map_feedback:
+                    MaxMapFeedback<BytesInput, $map_observer_name, $std_state_name, $datatype>,
+            }
+
+            #[pymethods]
+            impl $max_map_feedback_struct_name {
+                #[new]
+                fn new(
+                    py_feedback_state: &$map_feedback_state_struct_name,
+                    py_observer: &$map_observer_name,
+                ) -> Self {
+                    Self {
+                        max_map_feedback: MaxMapFeedback::new(
+                            &py_feedback_state.map_feedback_state,
+                            py_observer,
+                        ),
+                    }
+                }
+            }
+        };
+    }
+
+    define_python_map_feedback!(
+        PythonMapFeedbackStateI8,
+        "MapFeedbackStateI8",
+        PythonMaxMapFeedbackI8,
+        "MaxMapFeedbackI8",
+        i8,
+        PythonMapObserverI8,
+        MyStdStateI8
+    );
+
+    define_python_map_feedback!(
+        PythonMapFeedbackStateI16,
+        "MapFeedbackStateI16",
+        PythonMaxMapFeedbackI16,
+        "MaxMapFeedbackI16",
+        i16,
+        PythonMapObserverI16,
+        MyStdStateI16
+    );
+    define_python_map_feedback!(
+        PythonMapFeedbackStateI32,
+        "MapFeedbackStateI32",
+        PythonMaxMapFeedbackI32,
+        "MaxMapFeedbackI32",
+        i32,
+        PythonMapObserverI32,
+        MyStdStateI32
+    );
+    define_python_map_feedback!(
+        PythonMapFeedbackStateI64,
+        "MapFeedbackStateI64",
+        PythonMaxMapFeedbackI64,
+        "MaxMapFeedbackI64",
+        i64,
+        PythonMapObserverI64,
+        MyStdStateI64
+    );
+
+    define_python_map_feedback!(
+        PythonMapFeedbackStateU8,
+        "MapFeedbackStateU8",
+        PythonMaxMapFeedbackU8,
+        "MaxMapFeedbackU8",
+        u8,
+        PythonMapObserverU8,
+        MyStdStateU8
+    );
+
+    define_python_map_feedback!(
+        PythonMapFeedbackStateU16,
+        "MapFeedbackStateU16",
+        PythonMaxMapFeedbackU16,
+        "MaxMapFeedbackU16",
+        u16,
+        PythonMapObserverU16,
+        MyStdStateU16
+    );
+    define_python_map_feedback!(
+        PythonMapFeedbackStateU32,
+        "MapFeedbackStateU32",
+        PythonMaxMapFeedbackU32,
+        "MaxMapFeedbackU32",
+        u32,
+        PythonMapObserverU32,
+        MyStdStateU32
+    );
+    define_python_map_feedback!(
+        PythonMapFeedbackStateU64,
+        "MapFeedbackStateU64",
+        PythonMaxMapFeedbackU64,
+        "MaxMapFeedbackU64",
+        u64,
+        PythonMapObserverU64,
+        MyStdStateU64
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonMapFeedbackStateI8>()?;
+        m.add_class::<PythonMapFeedbackStateI16>()?;
+        m.add_class::<PythonMapFeedbackStateI32>()?;
+        m.add_class::<PythonMapFeedbackStateI64>()?;
+
+        m.add_class::<PythonMapFeedbackStateU8>()?;
+        m.add_class::<PythonMapFeedbackStateU16>()?;
+        m.add_class::<PythonMapFeedbackStateU32>()?;
+        m.add_class::<PythonMapFeedbackStateU64>()?;
+
+        m.add_class::<PythonMaxMapFeedbackI8>()?;
+        m.add_class::<PythonMaxMapFeedbackI16>()?;
+        m.add_class::<PythonMaxMapFeedbackI32>()?;
+        m.add_class::<PythonMaxMapFeedbackI64>()?;
+
+        m.add_class::<PythonMaxMapFeedbackU8>()?;
+        m.add_class::<PythonMaxMapFeedbackU16>()?;
+        m.add_class::<PythonMaxMapFeedbackU32>()?;
+        m.add_class::<PythonMaxMapFeedbackU64>()?;
+        Ok(())
     }
 }
