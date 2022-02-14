@@ -763,6 +763,32 @@ where
     }
 }
 
+impl<'it, M> IntoIterator for &'it HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned,
+    &'it M: IntoIterator<Item = &'it u8, IntoIter = Iter<'it, u8>>,
+{
+    type Item = &'it u8;
+    type IntoIter = Iter<'it, u8>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unimplemented!()
+    }
+}
+
+impl<'it, M> IntoIterator for &'it mut HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned,
+    &'it mut M: IntoIterator<Item = &'it mut u8, IntoIter = IterMut<'it, u8>>,
+{
+    type Item = &'it mut u8;
+    type IntoIter = IterMut<'it, u8>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        unimplemented!()
+    }
+}
+
 /// The Multi Map Observer merge different maps into one observer
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]

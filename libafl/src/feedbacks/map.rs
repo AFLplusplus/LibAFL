@@ -41,21 +41,21 @@ pub type MaxMapOneOrFilledFeedback<I, O, S, T> =
     MapFeedback<I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
-pub trait Reducer<T>: Serialize + serde::de::DeserializeOwned + 'static + Debug
+pub trait Reducer<T>: 'static + Debug
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static,
 {
     /// Reduce two values to one value, with the current [`Reducer`].
     fn reduce(first: T, second: T) -> T;
 }
 
 /// A [`OrReducer`] reduces the values returning the bitwise OR with the old value
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct OrReducer {}
 
 impl<T> Reducer<T> for OrReducer
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialOrd,
+    T: PrimInt + Default + Copy + 'static + PartialOrd,
 {
     #[inline]
     fn reduce(history: T, new: T) -> T {
@@ -64,12 +64,12 @@ where
 }
 
 /// A [`AndReducer`] reduces the values returning the bitwise AND with the old value
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct AndReducer {}
 
 impl<T> Reducer<T> for AndReducer
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialOrd,
+    T: PrimInt + Default + Copy + 'static + PartialOrd,
 {
     #[inline]
     fn reduce(history: T, new: T) -> T {
@@ -78,12 +78,12 @@ where
 }
 
 /// A [`MaxReducer`] reduces int values and returns their maximum.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct MaxReducer {}
 
 impl<T> Reducer<T> for MaxReducer
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialOrd,
+    T: PrimInt + Default + Copy + 'static + PartialOrd,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -96,12 +96,12 @@ where
 }
 
 /// A [`MinReducer`] reduces int values and returns their minimum.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct MinReducer {}
 
 impl<T> Reducer<T> for MinReducer
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + PartialOrd,
+    T: PrimInt + Default + Copy + 'static + PartialOrd,
 {
     #[inline]
     fn reduce(first: T, second: T) -> T {
@@ -114,9 +114,9 @@ where
 }
 
 /// A `IsNovel` function is used to discriminate if a reduced value is considered novel.
-pub trait IsNovel<T>: Serialize + serde::de::DeserializeOwned + 'static + Debug
+pub trait IsNovel<T>: 'static + Debug
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static,
 {
     /// If a new value in the [`MapFeedback`] was found,
     /// this filter can decide if the result is considered novel or not.
@@ -124,12 +124,12 @@ where
 }
 
 /// [`AllIsNovel`] consider everything a novelty. Here mostly just for debugging.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct AllIsNovel {}
 
 impl<T> IsNovel<T> for AllIsNovel
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static,
 {
     #[inline]
     fn is_novel(_old: T, _new: T) -> bool {
@@ -152,11 +152,11 @@ fn saturating_next_power_of_two<T: PrimInt>(n: T) -> T {
 }
 
 /// Consider as novelty if the reduced value is different from the old value.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct DifferentIsNovel {}
 impl<T> IsNovel<T> for DifferentIsNovel
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static,
 {
     #[inline]
     fn is_novel(old: T, new: T) -> bool {
@@ -165,11 +165,11 @@ where
 }
 
 /// Only consider as novel the values which are at least the next pow2 class of the old value
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct NextPow2IsNovel {}
 impl<T> IsNovel<T> for NextPow2IsNovel
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static,
 {
     #[inline]
     fn is_novel(old: T, new: T) -> bool {
@@ -185,11 +185,11 @@ where
 }
 
 /// A filter that only saves values which are at least the next pow2 class
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct OneOrFilledIsNovel {}
 impl<T> IsNovel<T> for OneOrFilledIsNovel
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static,
 {
     #[inline]
     fn is_novel(old: T, new: T) -> bool {
@@ -343,8 +343,7 @@ where
 }
 
 /// The most common AFL-like feedback type
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
+#[derive(Debug)]
 pub struct MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -563,7 +562,7 @@ where
 }
 
 /// A [`ReachabilityFeedback`] reports if a target has been reached.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Debug)]
 pub struct ReachabilityFeedback<O> {
     name: String,
     target_idx: Vec<usize>,
