@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{
         tuples::{MatchName, Named},
-        AsMutSlice, AsSlice, HasRefCnt, IntoRefIterator,
+        AsMutSlice, AsRefIterator, AsSlice, HasRefCnt,
     },
     corpus::Testcase,
     events::{Event, EventFirer},
@@ -348,7 +348,7 @@ where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: IntoRefIterator<'it, Item = T>,
+    for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     S: HasFeedbackStates,
 {
@@ -369,7 +369,7 @@ where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: IntoRefIterator<'it, Item = T>,
+    for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
     S: HasFeedbackStates + HasClientPerfMonitor + Debug,
@@ -403,7 +403,7 @@ where
         assert!(size <= observer.len());
 
         if self.novelties.is_some() {
-            for (i, &item) in observer.into_ref_iter().enumerate() {
+            for (i, &item) in observer.as_ref_iter().enumerate() {
                 let history = map_state.history_map[i];
                 let reduced = R::reduce(history, item);
                 if N::is_novel(history, reduced) {
@@ -413,7 +413,7 @@ where
                 }
             }
         } else {
-            for (i, &item) in observer.into_ref_iter().enumerate() {
+            for (i, &item) in observer.as_ref_iter().enumerate() {
                 let history = map_state.history_map[i];
                 let reduced = R::reduce(history, item);
                 if N::is_novel(history, reduced) {
@@ -476,7 +476,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: IntoRefIterator<'it, Item = T>,
+    for<'it> O: AsRefIterator<'it, Item = T>,
     S: HasFeedbackStates,
 {
     #[inline]
@@ -498,7 +498,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: IntoRefIterator<'it, Item = T>,
+    for<'it> O: AsRefIterator<'it, Item = T>,
     S: HasFeedbackStates,
 {
     /// Create new `MapFeedback`
@@ -571,7 +571,7 @@ pub struct ReachabilityFeedback<O> {
 impl<O> ReachabilityFeedback<O>
 where
     O: MapObserver<Entry = usize>,
-    for<'it> O: IntoRefIterator<'it, Item = usize>,
+    for<'it> O: AsRefIterator<'it, Item = usize>,
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
     #[must_use]
@@ -598,7 +598,7 @@ impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<Entry = usize>,
-    for<'it> O: IntoRefIterator<'it, Item = usize>,
+    for<'it> O: AsRefIterator<'it, Item = usize>,
     S: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
@@ -618,7 +618,7 @@ where
         let observer = observers.match_name::<O>(&self.name).unwrap();
         let mut hit_target: bool = false;
         //check if we've hit any targets.
-        for (i, &elem) in observer.into_ref_iter().enumerate() {
+        for (i, &elem) in observer.as_ref_iter().enumerate() {
             if elem > 0 {
                 self.target_idx.push(i);
                 hit_target = true;
@@ -648,7 +648,7 @@ where
 impl<O> Named for ReachabilityFeedback<O>
 where
     O: MapObserver<Entry = usize>,
-    for<'it> O: IntoRefIterator<'it, Item = usize>,
+    for<'it> O: AsRefIterator<'it, Item = usize>,
 {
     #[inline]
     fn name(&self) -> &str {
