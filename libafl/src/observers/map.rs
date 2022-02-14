@@ -9,6 +9,7 @@ use core::{
     fmt::Debug,
     hash::Hasher,
     iter::Flatten,
+    marker::PhantomData,
     slice::{from_raw_parts, Iter, IterMut},
 };
 use intervaltree::IntervalTree;
@@ -19,7 +20,7 @@ use crate::{
     bolts::{
         ownedref::{OwnedRefMut, OwnedSliceMut},
         tuples::Named,
-        AsMutSlice, AsSlice, HasLen,
+        AsMutIterator, AsMutSlice, AsRefIterator, AsSlice, HasLen,
     },
     executors::ExitKind,
     observers::Observer,
@@ -38,9 +39,14 @@ fn hash_slice<T: PrimInt>(slice: &[T]) -> u64 {
 }
 
 /// A [`MapObserver`] observes the static map, as oftentimes used for AFL-like coverage information
-pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug {
+///
+/// TODO: enforce `iter() -> AssociatedTypeIter` when generic associated types stabilize
+pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned + Debug
+// where
+//     for<'it> &'it Self: IntoIterator<Item = &'it Self::Entry>
+{
     /// Type of each entry in this map
-    type Entry: PrimInt + Default + Copy + Debug;
+    type Entry: PrimInt + Default + Copy + Debug + 'static;
 
     /// Get the value at `idx`
     fn get(&self, idx: usize) -> &Self::Entry;
@@ -74,7 +80,9 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     fn initial_mut(&mut self) -> &mut Self::Entry;
 
     /// Set the initial value for reset()
-    fn set_initial(&mut self, initial: Self::Entry);
+    fn set_initial(&mut self, initial: Self::Entry) {
+        *self.initial_mut() = initial;
+    }
 
     /// Reset the map
     #[inline]
@@ -112,6 +120,64 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     }
 }
 
+/// A Simple iterator calling `MapObserver::get`
+#[derive(Debug)]
+pub struct MapObserverSimpleIterator<'a, O>
+where
+    O: 'a + MapObserver,
+{
+    index: usize,
+    observer: *const O,
+    phantom: PhantomData<&'a u8>,
+}
+
+impl<'a, O> Iterator for MapObserverSimpleIterator<'a, O>
+where
+    O: 'a + MapObserver,
+{
+    type Item = &'a O::Entry;
+    fn next(&mut self) -> Option<Self::Item> {
+        unsafe {
+            if self.index >= self.observer.as_ref().unwrap().usable_count() {
+                None
+            } else {
+                let i = self.index;
+                self.index += 1;
+                Some(self.observer.as_ref().unwrap().get(i))
+            }
+        }
+    }
+}
+
+/// A Simple iterator calling `MapObserver::get_mut`
+#[derive(Debug)]
+pub struct MapObserverSimpleIteratoMut<'a, O>
+where
+    O: 'a + MapObserver,
+{
+    index: usize,
+    observer: *mut O,
+    phantom: PhantomData<&'a u8>,
+}
+
+impl<'a, O> Iterator for MapObserverSimpleIteratoMut<'a, O>
+where
+    O: 'a + MapObserver,
+{
+    type Item = &'a O::Entry;
+    fn next(&mut self) -> Option<Self::Item> {
+        unsafe {
+            if self.index >= self.observer.as_ref().unwrap().usable_count() {
+                None
+            } else {
+                let i = self.index;
+                self.index += 1;
+                Some(self.observer.as_mut().unwrap().get_mut(i))
+            }
+        }
+    }
+}
+
 /// The Map Observer retrieves the state of a map,
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
@@ -130,7 +196,6 @@ where
 impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-    Self: MapObserver,
 {
     #[inline]
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
@@ -158,6 +223,32 @@ where
     }
 }
 
+impl<'a, 'it, T> AsRefIterator<'it> for StdMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = T;
+    type IntoIter = Iter<'it, T>;
+
+    fn as_ref_iter(&'it self) -> Self::IntoIter {
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
+    }
+}
+
+impl<'a, 'it, T> AsMutIterator<'it> for StdMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = T;
+    type IntoIter = IterMut<'it, T>;
+
+    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
+    }
+}
+
 impl<'a, 'it, T> IntoIterator for &'it StdMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -166,7 +257,8 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
     }
 }
 
@@ -178,7 +270,8 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
     }
 }
 
@@ -215,11 +308,6 @@ where
     #[inline]
     fn initial_mut(&mut self) -> &mut T {
         &mut self.initial
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
     }
 
     fn to_vec(&self) -> Vec<T> {
@@ -343,6 +431,32 @@ where
     }
 }
 
+impl<'a, 'it, T, const N: usize> AsRefIterator<'it> for ConstMapObserver<'a, T, N>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = T;
+    type IntoIter = Iter<'it, T>;
+
+    fn as_ref_iter(&'it self) -> Self::IntoIter {
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
+    }
+}
+
+impl<'a, 'it, T, const N: usize> AsMutIterator<'it> for ConstMapObserver<'a, T, N>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = T;
+    type IntoIter = IterMut<'it, T>;
+
+    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
+    }
+}
+
 impl<'a, 'it, T, const N: usize> IntoIterator for &'it ConstMapObserver<'a, T, N>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -351,7 +465,8 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
     }
 }
 
@@ -363,7 +478,8 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
     }
 }
 
@@ -381,11 +497,6 @@ where
     #[inline]
     fn initial_mut(&mut self) -> &mut T {
         &mut self.initial
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
     }
 
     #[inline]
@@ -515,6 +626,32 @@ where
     }
 }
 
+impl<'a, 'it, T> AsRefIterator<'it> for VariableMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = T;
+    type IntoIter = Iter<'it, T>;
+
+    fn as_ref_iter(&'it self) -> Self::IntoIter {
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
+    }
+}
+
+impl<'a, 'it, T> AsMutIterator<'it> for VariableMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = T;
+    type IntoIter = IterMut<'it, T>;
+
+    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
+    }
+}
+
 impl<'a, 'it, T> IntoIterator for &'it VariableMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -523,7 +660,8 @@ where
     type IntoIter = Iter<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_slice().iter()
+        let cnt = self.usable_count();
+        self.as_slice()[..cnt].iter()
     }
 }
 
@@ -535,7 +673,8 @@ where
     type IntoIter = IterMut<'it, T>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.as_mut_slice().iter_mut()
+        let cnt = self.usable_count();
+        self.as_mut_slice()[..cnt].iter_mut()
     }
 }
 
@@ -556,21 +695,16 @@ where
     }
 
     #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
-    }
-
-    #[inline]
     fn usable_count(&self) -> usize {
         *self.size.as_ref()
     }
 
     fn get(&self, idx: usize) -> &T {
-        &self.as_slice()[idx]
+        &self.map.as_slice()[idx]
     }
 
     fn get_mut(&mut self, idx: usize) -> &mut T {
-        &mut self.as_mut_slice()[idx]
+        &mut self.map.as_mut_slice()[idx]
     }
 
     fn hash(&self) -> u64 {
@@ -587,7 +721,8 @@ where
 {
     #[inline]
     fn as_slice(&self) -> &[T] {
-        self.map.as_slice()
+        let cnt = self.usable_count();
+        &self.map.as_slice()[..cnt]
     }
 }
 impl<'a, T> AsMutSlice<T> for VariableMapObserver<'a, T>
@@ -661,6 +796,7 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<I, S>,
+    for<'it> M: AsMutIterator<'it, Item = u8>,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -669,9 +805,8 @@ where
 
     #[inline]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        let cnt = self.usable_count();
-        for i in 0..cnt {
-            *self.get_mut(i) = COUNT_CLASS_LOOKUP[*self.get(i) as usize];
+        for elem in self.as_mut_iter() {
+            *elem = COUNT_CLASS_LOOKUP[*elem as usize];
         }
         self.base.post_exec(state, input, exit_kind)
     }
@@ -700,6 +835,7 @@ where
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
+    for<'it> M: AsMutIterator<'it, Item = u8>,
 {
     type Entry = u8;
 
@@ -711,11 +847,6 @@ where
     #[inline]
     fn initial_mut(&mut self) -> &mut u8 {
         self.base.initial_mut()
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: u8) {
-        self.base.set_initial(initial);
     }
 
     #[inline]
@@ -769,6 +900,57 @@ where
         Self { base }
     }
 }
+
+impl<'it, M> AsRefIterator<'it> for HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned + AsRefIterator<'it, Item = u8>,
+{
+    type Item = u8;
+    type IntoIter = <M as AsRefIterator<'it>>::IntoIter;
+
+    fn as_ref_iter(&'it self) -> Self::IntoIter {
+        self.base.as_ref_iter()
+    }
+}
+
+impl<'it, M> AsMutIterator<'it> for HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned + AsMutIterator<'it, Item = u8>,
+{
+    type Item = u8;
+    type IntoIter = <M as AsMutIterator<'it>>::IntoIter;
+
+    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+        self.base.as_mut_iter()
+    }
+}
+
+impl<'it, M> IntoIterator for &'it HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned,
+    &'it M: IntoIterator<Item = &'it u8>,
+{
+    type Item = &'it u8;
+    type IntoIter = <&'it M as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.base.into_iter()
+    }
+}
+
+impl<'it, M> IntoIterator for &'it mut HitcountsMapObserver<M>
+where
+    M: Named + Serialize + serde::de::DeserializeOwned,
+    &'it mut M: IntoIterator<Item = &'it mut u8>,
+{
+    type Item = &'it mut u8;
+    type IntoIter = <&'it mut M as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.base.into_iter()
+    }
+}
+
 /// The Multi Map Observer merge different maps into one observer
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
@@ -846,11 +1028,6 @@ where
     #[inline]
     fn initial_mut(&mut self) -> &mut T {
         &mut self.initial
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
     }
 
     fn count_bytes(&self) -> u64 {
@@ -953,14 +1130,28 @@ where
     }
 }
 
-impl<'a, 'it, T> IntoIterator for &'it mut MultiMapObserver<'a, T>
+impl<'a, 'it, T> AsRefIterator<'it> for MultiMapObserver<'a, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    'a: 'it,
 {
-    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type Item = T;
+    type IntoIter = Flatten<Iter<'it, OwnedSliceMut<'a, T>>>;
+
+    fn as_ref_iter(&'it self) -> Self::IntoIter {
+        self.maps.iter().flatten()
+    }
+}
+
+impl<'a, 'it, T> AsMutIterator<'it> for MultiMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    'a: 'it,
+{
+    type Item = T;
     type IntoIter = Flatten<IterMut<'it, OwnedSliceMut<'a, T>>>;
 
-    fn into_iter(self) -> Self::IntoIter {
+    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
         self.maps.iter_mut().flatten()
     }
 }
@@ -974,6 +1165,18 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         self.maps.iter().flatten()
+    }
+}
+
+impl<'a, 'it, T> IntoIterator for &'it mut MultiMapObserver<'a, T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = <IterMut<'it, T> as Iterator>::Item;
+    type IntoIter = Flatten<IterMut<'it, OwnedSliceMut<'a, T>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.maps.iter_mut().flatten()
     }
 }
 
@@ -1019,6 +1222,30 @@ where
     #[inline]
     fn len(&self) -> usize {
         self.map.as_slice().len()
+    }
+}
+
+impl<'a, 'it, T> AsRefIterator<'it> for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = T;
+    type IntoIter = Iter<'it, T>;
+
+    fn as_ref_iter(&'it self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'a, 'it, T> AsMutIterator<'it> for OwnedMapObserver<T>
+where
+    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{
+    type Item = T;
+    type IntoIter = IterMut<'it, T>;
+
+    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
     }
 }
 
@@ -1121,7 +1348,7 @@ where
     pub fn new(name: &'static str, map: Vec<T>) -> Self {
         let initial = if map.is_empty() { T::default() } else { map[0] };
         Self {
-            map: map,
+            map,
             name: name.to_string(),
             initial,
         }
@@ -1130,11 +1357,12 @@ where
 /// `MapObserver` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::bolts::{tuples::Named, HasLen};
+    use crate::bolts::{tuples::Named, AsMutIterator, AsRefIterator, HasLen};
     use crate::observers::{map::OwnedMapObserver, MapObserver, Observer};
     use crate::Error;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
+    use std::slice::{Iter, IterMut};
 
     macro_rules! define_python_map_observer {
         ($struct_name:ident, $py_name:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
@@ -1179,6 +1407,32 @@ pub mod pybind {
                 fn new_from_owned(owned_map_observer: $struct_name) -> Self {
                     Self {
                         map_observer: $wrapper_name::Owned(owned_map_observer),
+                    }
+                }
+            }
+
+            impl<'it> AsRefIterator<'it> for $struct_name_trait {
+                type Item = $datatype;
+                type IntoIter = Iter<'it, $datatype>;
+
+                fn as_ref_iter(&'it self) -> Self::IntoIter {
+                    match &self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.as_ref_iter()
+                        }
+                    }
+                }
+            }
+
+            impl<'it> AsMutIterator<'it> for $struct_name_trait {
+                type Item = $datatype;
+                type IntoIter = IterMut<'it, $datatype>;
+
+                fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+                    match &mut self.map_observer {
+                        $wrapper_name::Owned(map_observer) => {
+                            map_observer.owned_map_observer.as_mut_iter()
+                        }
                     }
                 }
             }
