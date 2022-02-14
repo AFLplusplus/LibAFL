@@ -23,6 +23,8 @@ jobs:
       - uses: Swatinem/rust-cache@v1
       - name: install mdbook
         run: cargo install mdbook
+      - name: install cargo-make
+        run: cargo install --force cargo-make
       - name: install linkcheck
         run: cargo install mdbook-linkcheck
       - uses: actions/checkout@v2
