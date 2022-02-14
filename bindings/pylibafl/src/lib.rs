@@ -1,6 +1,6 @@
+use libafl;
 use libafl_qemu;
 use libafl_sugar;
-use libafl;
 use pyo3::prelude::*;
 
 #[pymodule]

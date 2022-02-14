@@ -26,7 +26,7 @@ pub mod staterestore;
 pub mod tuples;
 
 use alloc::string::String;
-use core::time;
+use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -40,6 +40,28 @@ pub trait AsSlice<T> {
 pub trait AsMutSlice<T> {
     /// Convert to a slice
     fn as_mut_slice(&mut self) -> &mut [T];
+}
+
+/// Create an `Iterator` from a reference
+pub trait IntoRefIterator<'it> {
+    /// The item type
+    type Item: 'it;
+    /// The iterator type
+    type IntoIter: Iterator<Item = &'it Self::Item>;
+
+    /// Create an interator from &self
+    fn into_ref_iter(&'it self) -> Self::IntoIter;
+}
+
+/// Create an `Iterator` from a mutable reference
+pub trait IntoMutIterator<'it> {
+    /// The item type
+    type Item: 'it;
+    /// The iterator type
+    type IntoIter: Iterator<Item = &'it mut Self::Item>;
+
+    /// Create an interator from &mut self
+    fn into_mut_iter(&'it mut self) -> Self::IntoIter;
 }
 
 /// Has a length field
