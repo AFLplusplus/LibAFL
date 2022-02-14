@@ -256,3 +256,190 @@ where
             .deinit(fuzzer, state, event_mgr, executor.observers_mut())
     }
 }
+
+/// `Stage` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::impl_asany;
+    use crate::stages::Stage;
+    use crate::Error;
+    use pyo3::prelude::*;
+
+    use super::owned::AnyStage;
+
+    macro_rules! define_python_stage {
+        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $std_havoc_mutations_stage_name: ident, $my_std_state_type_name: ident,
+            $my_std_fuzzer_type_name: ident, $executor_name: ident, $event_manager_name: ident) => {
+            use crate::events::pybind::$event_manager_name;
+            use crate::executors::pybind::$executor_name;
+            use crate::fuzzer::pybind::$my_std_fuzzer_type_name;
+            use crate::stages::mutational::pybind::$std_havoc_mutations_stage_name;
+            use crate::state::pybind::$my_std_state_type_name;
+
+            #[derive(Debug)]
+            enum $wrapper_name {
+                StdHavocMutations(*mut $std_havoc_mutations_stage_name),
+            }
+
+            /// Stage Trait binding
+            #[pyclass(unsendable, name = $py_name_trait)]
+            #[derive(Debug)]
+            pub struct $struct_name_trait {
+                stage: $wrapper_name,
+            }
+
+            #[pymethods]
+            impl $struct_name_trait {
+                #[staticmethod]
+                fn new_from_std_scheduled(
+                    py_std_havoc_mutations_stage: &mut $std_havoc_mutations_stage_name,
+                ) -> Self {
+                    Self {
+                        stage: $wrapper_name::StdHavocMutations(py_std_havoc_mutations_stage),
+                    }
+                }
+            }
+
+            impl
+                Stage<
+                    $executor_name,
+                    $event_manager_name,
+                    $my_std_state_type_name,
+                    $my_std_fuzzer_type_name,
+                > for $struct_name_trait
+            {
+                #[inline]
+                #[allow(clippy::let_and_return)]
+                fn perform(
+                    &mut self,
+                    fuzzer: &mut $my_std_fuzzer_type_name,
+                    executor: &mut $executor_name,
+                    state: &mut $my_std_state_type_name,
+                    manager: &mut $event_manager_name,
+                    corpus_idx: usize,
+                ) -> Result<(), Error> {
+                    unsafe {
+                        match self.stage {
+                            $wrapper_name::StdHavocMutations(py_std_havoc_mutations_stage) => {
+                                (*py_std_havoc_mutations_stage)
+                                    .std_mutational_stage
+                                    .perform(fuzzer, executor, state, manager, corpus_idx)
+                            }
+                        }
+                    }
+                }
+            }
+
+            impl_asany!($struct_name_trait);
+
+            impl
+                AnyStage<
+                    $executor_name,
+                    $event_manager_name,
+                    $my_std_state_type_name,
+                    $my_std_fuzzer_type_name,
+                > for $struct_name_trait
+            {
+            }
+        };
+    }
+
+    define_python_stage!(
+        PythonStageI8,
+        "StageI8",
+        PythonStageWrapperI8,
+        PythonStdScheduledHavocMutationsStageI8,
+        MyStdStateI8,
+        MyStdFuzzerI8,
+        PythonExecutorI8,
+        PythonEventManagerI8
+    );
+
+    define_python_stage!(
+        PythonStageI16,
+        "StageI16",
+        PythonStageWrapperI16,
+        PythonStdScheduledHavocMutationsStageI16,
+        MyStdStateI16,
+        MyStdFuzzerI16,
+        PythonExecutorI16,
+        PythonEventManagerI16
+    );
+
+    define_python_stage!(
+        PythonStageI32,
+        "StageI32",
+        PythonStageWrapperI32,
+        PythonStdScheduledHavocMutationsStageI32,
+        MyStdStateI32,
+        MyStdFuzzerI32,
+        PythonExecutorI32,
+        PythonEventManagerI32
+    );
+
+    define_python_stage!(
+        PythonStageI64,
+        "StageI64",
+        PythonStageWrapperI64,
+        PythonStdScheduledHavocMutationsStageI64,
+        MyStdStateI64,
+        MyStdFuzzerI64,
+        PythonExecutorI64,
+        PythonEventManagerI64
+    );
+
+    define_python_stage!(
+        PythonStageU8,
+        "StageU8",
+        PythonStageWrapperU8,
+        PythonStdScheduledHavocMutationsStageU8,
+        MyStdStateU8,
+        MyStdFuzzerU8,
+        PythonExecutorU8,
+        PythonEventManagerU8
+    );
+    define_python_stage!(
+        PythonStageU16,
+        "StageU16",
+        PythonStageWrapperU16,
+        PythonStdScheduledHavocMutationsStageU16,
+        MyStdStateU16,
+        MyStdFuzzerU16,
+        PythonExecutorU16,
+        PythonEventManagerU16
+    );
+    define_python_stage!(
+        PythonStageU32,
+        "StageU32",
+        PythonStageWrapperU32,
+        PythonStdScheduledHavocMutationsStageU32,
+        MyStdStateU32,
+        MyStdFuzzerU32,
+        PythonExecutorU32,
+        PythonEventManagerU32
+    );
+    define_python_stage!(
+        PythonStageU64,
+        "StageU64",
+        PythonStageWrapperU64,
+        PythonStdScheduledHavocMutationsStageU64,
+        MyStdStateU64,
+        MyStdFuzzerU64,
+        PythonExecutorU64,
+        PythonEventManagerU64
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStageI8>()?;
+        m.add_class::<PythonStageI16>()?;
+        m.add_class::<PythonStageI32>()?;
+        m.add_class::<PythonStageI64>()?;
+
+        m.add_class::<PythonStageU8>()?;
+        m.add_class::<PythonStageU16>()?;
+        m.add_class::<PythonStageU32>()?;
+        m.add_class::<PythonStageU64>()?;
+        Ok(())
+    }
+}

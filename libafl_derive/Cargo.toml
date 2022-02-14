@@ -9,6 +9,7 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "testing"]
 edition = "2021"
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [lib]
 proc-macro = true

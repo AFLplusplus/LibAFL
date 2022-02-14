@@ -621,12 +621,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
             if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
                 println!("Using SHARED MEMORY FUZZING feature.");
-                send_status = send_status | FS_OPT_SHDMEM_FUZZ;
+                send_status |= FS_OPT_SHDMEM_FUZZ;
             }
 
             if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
                 println!("Using AUTODICT feature");
-                send_status = send_status | FS_OPT_AUTODICT;
+                send_status |= FS_OPT_AUTODICT;
             }
 
             let send_len = forkserver.write_ctl(send_status)?;
@@ -644,7 +644,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     ));
                 }
 
-                if dict_size < 2 || dict_size > 0xffffff {
+                if !(2..=0xffffff).contains(&dict_size) {
                     return Err(Error::Forkserver(
                         "Dictionary has an illegal size".to_string(),
                     ));
@@ -782,8 +782,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     #[must_use]
     /// Place the input at this position and set the default filename for the input.
     pub fn arg_input_file_std(self) -> Self {
-        let moved = self.arg_input_file(OUTFILE_STD);
-        moved
+        self.arg_input_file(OUTFILE_STD)
     }
 
     #[must_use]
@@ -800,17 +799,15 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             if item.as_ref() == "@@" && use_stdin {
                 use_stdin = false;
                 res.push(OsString::from(".cur_input"));
-            } else {
-                if let Some(name) = &self.out_filename {
-                    if name == item.as_ref() && use_stdin {
-                        use_stdin = false;
-                        res.push(name.clone());
-                    } else {
-                        res.push(item.as_ref().to_os_string());
-                    }
+            } else if let Some(name) = &self.out_filename {
+                if name == item.as_ref() && use_stdin {
+                    use_stdin = false;
+                    res.push(name.clone());
                 } else {
                     res.push(item.as_ref().to_os_string());
                 }
+            } else {
+                res.push(item.as_ref().to_os_string());
             }
         }
 
@@ -848,6 +845,12 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             out_filename: self.out_filename,
             shmem_provider: Some(shmem_provider),
         }
+    }
+}
+
+impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

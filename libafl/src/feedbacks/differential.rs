@@ -123,6 +123,7 @@ where
     O1: Observer<I, S> + PartialEq<O2>,
     O2: Observer<I, S>,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -176,7 +177,7 @@ mod tests {
         fn new(name: &str, value: bool) -> Self {
             Self {
                 name: name.to_string(),
-                value: value,
+                value,
             }
         }
     }
