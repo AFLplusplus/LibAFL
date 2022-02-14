@@ -617,11 +617,10 @@ where
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();
-        let size = observer.usable_count();
         let mut hit_target: bool = false;
         //check if we've hit any targets.
-        for i in 0..size {
-            if *observer.get(i) > 0 {
+        for (i, &elem) in observer.into_iter().enumerate() {
+            if elem > 0 {
                 self.target_idx.push(i);
                 hit_target = true;
             }

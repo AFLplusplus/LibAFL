@@ -659,6 +659,7 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<I, S>,
+    for<'it> &'it mut M: IntoIterator<Item = &'it mut u8, IntoIter = IterMut<'it, u8>>,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -667,9 +668,8 @@ where
 
     #[inline]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        let cnt = self.usable_count();
-        for i in 0..cnt {
-            *self.get_mut(i) = COUNT_CLASS_LOOKUP[*self.get(i) as usize];
+        for elem in self.into_iter() {
+            *elem = COUNT_CLASS_LOOKUP[*elem as usize];
         }
         self.base.post_exec(state, input, exit_kind)
     }
