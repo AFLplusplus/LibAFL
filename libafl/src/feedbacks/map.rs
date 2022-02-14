@@ -342,7 +342,7 @@ where
 }
 
 /// The most common AFL-like feedback type
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -485,33 +485,6 @@ where
     }
 }
 
-impl<I, N, O, R, S, T> Clone for MapFeedback<I, N, O, R, S, T>
-where
-    T: PrimInt
-        + Default
-        + Copy
-        + 'static
-        + Serialize
-        + serde::de::DeserializeOwned
-        + PartialOrd
-        + Debug,
-    R: Reducer<T>,
-    N: IsNovel<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: IntoRefIterator<'it, Item = T>,
-    S: HasFeedbackStates,
-{
-    fn clone(&self) -> Self {
-        Self {
-            indexes: self.indexes.clone(),
-            novelties: self.novelties.clone(),
-            name: self.name.clone(),
-            observer_name: self.observer_name.clone(),
-            phantom: PhantomData,
-        }
-    }
-}
-
 impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PrimInt
@@ -588,7 +561,7 @@ where
 }
 
 /// A [`ReachabilityFeedback`] reports if a target has been reached.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ReachabilityFeedback<O> {
     name: String,
     target_idx: Vec<usize>,
