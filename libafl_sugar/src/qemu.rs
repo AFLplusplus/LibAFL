@@ -214,7 +214,7 @@ where
 
             if self.use_cmplog.unwrap_or(false) {
                 let hooks = QemuHooks::new(
-                    &emulator,
+                    emulator,
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
                         QemuCmpLogHelper::default(),
@@ -323,7 +323,7 @@ where
                 }
             } else {
                 let hooks =
-                    QemuHooks::new(&emulator, tuple_list!(QemuEdgeCoverageHelper::default()));
+                    QemuHooks::new(emulator, tuple_list!(QemuEdgeCoverageHelper::default()));
 
                 let executor = QemuExecutor::new(
                     hooks,
