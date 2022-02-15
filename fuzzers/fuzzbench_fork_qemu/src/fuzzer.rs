@@ -1,7 +1,7 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
 use clap::{App, Arg};
-use core::{cell::RefCell, time::Duration};
+use core::cell::RefCell;
 #[cfg(unix)]
 use nix::{self, unistd::dup};
 #[cfg(unix)]
@@ -21,13 +21,13 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
-        AsSlice,
+        AsMutSlice, AsSlice,
     },
     corpus::{
         Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
     },
     events::SimpleRestartingEventManager,
-    executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
+    executors::{ExitKind, ShadowExecutor},
     feedback_or,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -37,7 +37,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     stages::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
@@ -47,19 +47,13 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    //asan::QemuAsanHelper,
-    cmplog,
-    cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    edges,
-    edges::QemuEdgeCoverageHelper,
+    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper, CMPLOG_MAP_PTR},
+    edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
     elf::EasyElf,
     emu::Emulator,
     filter_qemu_args,
     hooks::QemuHooks,
-    //snapshot::QemuSnapshotHelper,
-    MmapPerms,
-    QemuExecutor,
-    Regs,
+    MmapPerms, QemuForkExecutor, Regs,
 };
 
 /// The fuzzer main
@@ -97,12 +91,6 @@ pub fn main() {
                 .long("libafl-logfile")
                 .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
-        )
-        .arg(
-            Arg::new("timeout")
-                .long("libafl-timeout")
-                .help("Timeout for each individual execution, in milliseconds")
-                .default_value("1000"),
         )
         .try_get_matches_from(filter_qemu_args())
     {
@@ -147,16 +135,7 @@ pub fn main() {
 
     let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
 
-    let timeout = Duration::from_millis(
-        res.value_of("timeout")
-            .unwrap()
-            .to_string()
-            .parse()
-            .expect("Could not parse timeout in milliseconds"),
-    );
-
-    fuzz(out_dir, crashes, in_dir, tokens, logfile, timeout)
-        .expect("An error occurred while fuzzing");
+    fuzz(out_dir, crashes, in_dir, tokens, logfile).expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
@@ -166,7 +145,6 @@ fn fuzz(
     seed_dir: PathBuf,
     tokenfile: Option<PathBuf>,
     logfile: PathBuf,
-    timeout: Duration,
 ) -> Result<(), Error> {
     env::remove_var("LD_LIBRARY_PATH");
 
@@ -227,6 +205,16 @@ fn fuzz(
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
+    let mut edges_shmem = shmem_provider.new_shmem(EDGES_MAP_SIZE).unwrap();
+    let edges = edges_shmem.as_mut_slice();
+    unsafe { EDGES_MAP_PTR = edges.as_mut_ptr() };
+
+    let mut cmp_shmem = shmem_provider
+        .new_shmem(core::mem::size_of::<CmpLogMap>())
+        .unwrap();
+    let cmplog = cmp_shmem.as_mut_slice();
+    unsafe { CMPLOG_MAP_PTR = cmplog.as_mut_ptr() as *mut CmpLogMap };
+
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
@@ -242,16 +230,15 @@ fn fuzz(
     };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut edges::EDGES_MAP };
-    let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
     let edges_observer =
-        HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+        HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::new("edges", edges));
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
+    let cmplog_observer =
+        CmpLogObserver::new("cmplog", unsafe { CMPLOG_MAP_PTR.as_mut().unwrap() }, true);
 
     // The state of the edges feedback.
     let feedback_state = MapFeedbackState::with_observer(&edges_observer);
@@ -327,24 +314,21 @@ fn fuzz(
     let hooks = QemuHooks::new(
         &emu,
         tuple_list!(
-            QemuEdgeCoverageHelper::default(),
-            QemuCmpLogHelper::default(),
-            //QemuAsanHelper::new(),
-            //QemuSnapshotHelper::new()
+            QemuEdgeCoverageChildHelper::default(),
+            QemuCmpLogChildHelper::default(),
         ),
     );
 
-    let executor = QemuExecutor::new(
+    let executor = QemuForkExecutor::new(
         hooks,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
+        shmem_provider,
     )?;
 
-    // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
-    let executor = TimeoutExecutor::new(executor, timeout);
     // Show the cmplog observer
     let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 

@@ -1,9 +1,10 @@
 // This lint triggers too often on the current GuestAddr type when emulating 64-bit targets because
 // u64::from(GuestAddr) is a no-op, but the .into() call is needed when GuestAddr is u32.
 #![cfg_attr(
-    any(feature = "x86_64", feature = "aarch64"),
+    any(cpu_target = "x86_64", cpu_target = "aarch64"),
     allow(clippy::useless_conversion)
 )]
+#![allow(clippy::needless_pass_by_value)]
 
 use std::env;
 
@@ -33,6 +34,10 @@ pub mod elf;
 pub mod helper;
 #[cfg(target_os = "linux")]
 pub use helper::*;
+#[cfg(target_os = "linux")]
+pub mod hooks;
+#[cfg(target_os = "linux")]
+pub use hooks::*;
 
 #[cfg(target_os = "linux")]
 pub mod edges;
@@ -54,7 +59,7 @@ pub use asan::{init_with_asan, QemuAsanHelper};
 #[cfg(target_os = "linux")]
 pub mod executor;
 #[cfg(target_os = "linux")]
-pub use executor::QemuExecutor;
+pub use executor::{QemuExecutor, QemuForkExecutor};
 
 #[cfg(target_os = "linux")]
 pub mod emu;

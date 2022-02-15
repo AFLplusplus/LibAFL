@@ -34,7 +34,9 @@ use libafl::{
 };
 
 pub use libafl_qemu::emu::Emulator;
-use libafl_qemu::{cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
+use libafl_qemu::{
+    cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks,
+};
 use libafl_targets::CmpLogObserver;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -211,10 +213,17 @@ where
             };
 
             if self.use_cmplog.unwrap_or(false) {
-                let executor = QemuExecutor::new(
-                    &mut harness,
+                let hooks = QemuHooks::new(
                     emulator,
-                    tuple_list!(QemuEdgeCoverageHelper::new(), QemuCmpLogHelper::new()),
+                    tuple_list!(
+                        QemuEdgeCoverageHelper::default(),
+                        QemuCmpLogHelper::default(),
+                    ),
+                );
+
+                let executor = QemuExecutor::new(
+                    hooks,
+                    &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
                     &mut state,
@@ -313,10 +322,12 @@ where
                     }
                 }
             } else {
+                let hooks =
+                    QemuHooks::new(emulator, tuple_list!(QemuEdgeCoverageHelper::default()));
+
                 let executor = QemuExecutor::new(
+                    hooks,
                     &mut harness,
-                    emulator,
-                    tuple_list!(QemuEdgeCoverageHelper::new()),
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
                     &mut state,
