@@ -146,7 +146,7 @@ const _LLMP_BIND_ADDR: &str = "0.0.0.0";
 const _LLMP_BIND_ADDR: &str = "127.0.0.1";
 
 /// LLMP Client connects to this address
-const _LLMP_CONNECT_ADDR: &str = "localhost";
+const _LLMP_CONNECT_ADDR: &str = "127.0.0.1";
 
 /// An env var of this value indicates that the set value was a NULL PTR
 const _NULL_ENV_STR: &str = "_NULL";
