@@ -1,7 +1,6 @@
 # Variables
 [env]
 FUZZER_NAME='qemu_launcher'
-FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/${FUZZER_NAME}'}
 PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.do_nothing]
@@ -63,7 +62,7 @@ windows_alias = "do_nothing"
 [tasks.unix_run]
 command = "cargo"
 args = ["run", "--release", "./{FUZZER_NAME}"]
-dependencies = [ "harness", "fuzer" ]
+dependencies = [ "harness", "fuzzer" ]
 
 # Run the fuzzer
 [tasks.test]

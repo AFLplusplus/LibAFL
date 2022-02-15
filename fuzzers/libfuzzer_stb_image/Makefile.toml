@@ -7,12 +7,12 @@ FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/re
 
 # Compilers
 [tasks.cxx]
-condition = { files_exist = ["${LIBAFL_CXX}"] }
+condition = { files_not_exist = ["${LIBAFL_CXX}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
 [tasks.cc]
-condition = { files_exist = ["${LIBAFL_CC}"] }
+condition = { files_not_exist = ["${LIBAFL_CC}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
@@ -57,6 +57,7 @@ windows_alias = "windows_test"
 [tasks.unix_test]
 script_runner = "@shell"
 script='''
+rm -rf libafl_unix_shmem_server || true
 timeout 11s ./${FUZZER_NAME} &
 sleep 0.2
 timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null &

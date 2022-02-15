@@ -1,0 +1,130 @@
+# Variables
+[env]
+FUZZER_NAME='fuzzer_libpng'
+LIBAFL_CC = './target/release/libafl_cc'
+LIBAFL_CXX = './target/release/libafl_cxx'
+FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/${FUZZER_NAME}' }
+PROJECT_DIR = { script = ["pwd"] }
+
+[tasks.do_nothing]
+script_runner="@shell"
+script='''
+echo "Qemu fuzzer not supported on windows"
+'''
+
+# libpng
+[tasks.libpng]
+linux_alias = "unix_libpng"
+mac_alias = "unix_libpng"
+windows_alias = "do_nothing"
+
+[tasks.unix_libpng]
+condition = { files_not_exist = ["./libpng-1.6.37"]}
+script_runner="@shell"
+script='''
+wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
+tar -xvf libpng-1.6.37.tar.xz
+'''
+
+# Compilers
+[tasks.cxx]
+linux_alias = "unix_cxx"
+mac_alias = "unix_cxx"
+windows_alias = "do_nothing"
+
+[tasks.unix_cxx]
+condition = { files_not_exist = ["${LIBAFL_CXX}"] }
+command = "cargo"
+args = ["build" , "--release"]
+
+[tasks.cc]
+linux_alias = "unix_cc"
+mac_alias = "unix_cc"
+windows_alias = "do_nothing"
+
+[tasks.unix_cc]
+condition = { files_not_exist = ["${LIBAFL_CC}"] }
+command = "cargo"
+args = ["build" , "--release"]
+
+# Library
+[tasks.lib]
+linux_alias = "unix_lib"
+mac_alias = "unix_lib"
+windows_alias = "do_nothing"
+
+[tasks.unix_lib]
+script_runner="@shell"
+script='''
+cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+cd ${PROJECT_DIR}
+make -C libpng-1.6.37 CC="${PROJECT_DIR}/target/release/libafl_cc" CXX="${PROJECT_DIR}/target/release/libafl_cxx"
+'''
+dependencies = [ "libpng", "cxx", "cc" ]
+
+
+# Harness
+[tasks.fuzzer]
+linux_alias = "unix_fuzzer"
+mac_alias = "unix_fuzzer"
+windows_alias = "do_nothing"
+
+[tasks.unix_fuzzer]
+script_runner="@shell"
+script='''
+cargo build --release
+target/release/libafl_cxx \
+	${PROJECT_DIR}/harness.cc \
+	${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a \
+	-I${PROJECT_DIR}/libpng-1.6.37/ \
+	-o ${FUZZER_NAME} \
+	-lm -lz
+'''
+dependencies = [ "lib", "cxx", "cc" ]
+
+# Run the fuzzer
+[tasks.run]
+linux_alias = "unix_run"
+mac_alias = "unix_run"
+windows_alias = "do_nothing"
+
+[tasks.unix_run]
+script_runner = "@shell"
+script='''
+./${FUZZER_NAME} &
+sleep 0.2
+./${FUZZER_NAME}
+'''
+dependencies = [ "fuzzer" ]
+
+# Test
+[tasks.test]
+linux_alias = "unix_test"
+mac_alias = "unix_test"
+windows_alias = "do_nothing"
+
+[tasks.unix_test]
+script_runner = "@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+timeout 11s ./${FUZZER_NAME} &
+sleep 0.2
+timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null &
+'''
+dependencies = [ "fuzzer" ]
+
+# Clean up
+[tasks.clean]
+linux_alias = "unix_clean"
+mac_alias = "unix_clean"
+windows_alias = "do_nothing"
+
+[tasks.unix_clean]
+# Disable default `clean` definition
+clear = true
+script_runner="@shell"
+script='''
+rm -f ./${FUZZER_NAME}
+make -C libpng-1.6.37 clean
+cargo clean
+'''

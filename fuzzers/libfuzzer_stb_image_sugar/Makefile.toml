@@ -7,12 +7,12 @@ FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/re
 
 # Compilers
 [tasks.cxx]
-condition = { files_exist = ["${LIBAFL_CXX}"] }
+condition = { files_not_exist = ["${LIBAFL_CXX}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
 [tasks.cc]
-condition = { files_exist = ["${LIBAFL_CC}"] }
+condition = { files_not_exist = ["${LIBAFL_CC}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
