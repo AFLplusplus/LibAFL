@@ -91,9 +91,7 @@ windows_alias = "do_nothing"
 [tasks.unix_run]
 script_runner = "@shell"
 script='''
-./${FUZZER_NAME} &
-sleep 0.2
-./${FUZZER_NAME}
+./${FUZZER_NAME} --cores 0 --input ./corpus &
 '''
 dependencies = [ "fuzzer" ]
 
@@ -107,9 +105,7 @@ windows_alias = "do_nothing"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} &
-sleep 0.2
-timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null &
+timeout 11s ./${FUZZER_NAME} --cores 0 --input ./corpus &
 '''
 dependencies = [ "fuzzer" ]
 
