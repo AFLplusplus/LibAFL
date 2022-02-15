@@ -3,13 +3,13 @@
 FUZZER_NAME='fuzzer_libpng'
 LIBAFL_CC = './target/release/libafl_cc'
 LIBAFL_CXX = './target/release/libafl_cxx'
-FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/${FUZZER_NAME}' }
+FUZZER = './target/release/${FUZZER_NAME}'
 PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.do_nothing]
 script_runner="@shell"
 script='''
-echo "Qemu fuzzer not supported on windows"
+echo "Cargo-make not integrated yet on this platform"
 '''
 
 # libpng

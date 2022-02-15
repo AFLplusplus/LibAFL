@@ -1,6 +1,6 @@
 # Variables
 [env]
-FUZZER_NAME='fuzzer_libpng'
+FUZZER_NAME='fuzzer_mozjpeg'
 LIBAFL_CC = './target/release/libafl_cc'
 LIBAFL_CXX = './target/release/libafl_cxx'
 FUZZER = './target/release/${FUZZER_NAME}'
@@ -9,21 +9,21 @@ PROJECT_DIR = { script = ["pwd"] }
 [tasks.do_nothing]
 script_runner="@shell"
 script='''
-echo "Cargo-make not integrated yet on this"
+echo "Cargo-make not integrated yet on this platform"
 '''
 
 # libpng
-[tasks.libpng]
-linux_alias = "unix_libpng"
-mac_alias = "unix_libpng"
+[tasks.mozjpeg]
+linux_alias = "unix_mozjpeg"
+mac_alias = "unix_mozjpeg"
 windows_alias = "do_nothing"
 
-[tasks.unix_libpng]
-condition = { files_not_exist = ["./libpng-1.6.37"]}
+[tasks.unix_mozjpeg]
+condition = { files_not_exist = ["./mozjpeg-4.0.3"]}
 script_runner="@shell"
 script='''
-wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
-tar -xvf libpng-1.6.37.tar.xz
+wget https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz
+tar -xzvf v4.0.3.tar.gz
 '''
 
 # Compilers
@@ -54,13 +54,12 @@ mac_alias = "unix_lib"
 windows_alias = "do_nothing"
 
 [tasks.unix_lib]
-script_runner="@shell"
 script='''
-cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DCMAKE_C_COMPILER=${PROJECT_DIR}/${LIBAFL_CC} -DCMAKE_CXX_COMPILER=${PROJECT_DIR}/${LIBAFL_CXX} -G "Unix Makefiles"
 cd ${PROJECT_DIR}
-make -C libpng-1.6.37 CC="${PROJECT_DIR}/target/release/libafl_cc" CXX="${PROJECT_DIR}/target/release/libafl_cxx"
+make -C mozjpeg-4.0.3
 '''
-dependencies = [ "libpng", "cxx", "cc" ]
+dependencies = [ "mozjpeg", "cxx", "cc" ]
 
 
 # Harness
@@ -73,12 +72,12 @@ windows_alias = "do_nothing"
 script_runner="@shell"
 script='''
 cargo build --release
-target/release/libafl_cxx \
-	${PROJECT_DIR}/harness.cc \
-	${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a \
-	-I${PROJECT_DIR}/libpng-1.6.37/ \
-	-o ${FUZZER_NAME} \
-	-lm -lz
+	target/release/libafl_cxx \
+		${PROJECT_DIR}/harness.cc \
+		${PROJECT_DIR}/mozjpeg-4.0.3/*.a \
+		-I${PROJECT_DIR}/mozjpeg-4.0.3/ \
+		-o ${FUZZER_NAME} \
+		-lm -lz
 '''
 dependencies = [ "lib", "cxx", "cc" ]
 
@@ -99,11 +98,11 @@ dependencies = [ "fuzzer" ]
 
 # Test
 [tasks.test]
-linux_alias = "unix_test"
-mac_alias = "unix_test"
+linux_alias = "linux_test"
+mac_alias = "mac_test"
 windows_alias = "do_nothing"
 
-[tasks.unix_test]
+[tasks.linux_test]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
@@ -112,6 +111,11 @@ sleep 0.2
 timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null &
 '''
 dependencies = [ "fuzzer" ]
+
+[tasks.mac_test]
+script='''
+echo "Skipping build on MacOS as libpng in Github is ancient, see LibAFL GH issue #254"
+'''
 
 # Clean up
 [tasks.clean]
@@ -125,6 +129,6 @@ clear = true
 script_runner="@shell"
 script='''
 rm -f ./${FUZZER_NAME}
-make -C libpng-1.6.37 clean
+make -C mozjpeg-4.0.3 clean
 cargo clean
 '''
