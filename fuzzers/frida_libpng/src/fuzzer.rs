@@ -91,19 +91,21 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
         };
 
         if options.asan && options.asan_cores.contains(core_id) {
-            #[cfg(windows)]
-            panic!("frida-asan does not work yet on window");
-            #[cfg(unix)]
             (|state: Option<StdState<_, _, _, _, _>>,
               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _core_id| {
                 let gum = unsafe { Gum::obtain() };
 
                 let coverage = CoverageRuntime::new();
+                #[cfg(unix)]
                 let asan = AsanRuntime::new(options.clone());
 
+                #[cfg(unix)]
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage, asan));
+                #[cfg(windows)]
+                let mut frida_helper =
+                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
                 let edges_observer = HitcountsMapObserver::new(unsafe {
@@ -132,6 +134,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
+                    #[cfg(unix)]
                     AsanErrorsFeedback::new()
                 );
 
@@ -186,6 +189,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         tuple_list!(
                             edges_observer,
                             time_observer,
+                            #[cfg(unix)]
                             AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
                         ),
                         &mut fuzzer,
