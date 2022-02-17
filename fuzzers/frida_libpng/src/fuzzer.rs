@@ -91,6 +91,9 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
         };
 
         if options.asan && options.asan_cores.contains(core_id) {
+            #[cfg(windows)]
+            panic!("frida-asan does not work yet on window");
+            #[cfg(unix)]
             (|state: Option<StdState<_, _, _, _, _>>,
               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _core_id| {
@@ -244,11 +247,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 );
 
                 // Feedbacks to recognize an input as solution
-                let objective = feedback_or_fast!(
-                    CrashFeedback::new(),
-                    TimeoutFeedback::new(),
-                    AsanErrorsFeedback::new()
-                );
+                let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
@@ -301,6 +300,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         tuple_list!(
                             edges_observer,
                             time_observer,
+                            #[cfg(unix)]
                             AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
                         ),
                         &mut fuzzer,
@@ -431,6 +431,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                         tuple_list!(
                             edges_observer,
                             time_observer,
+                            #[cfg(unix)]
                             AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
                         ),
                         &mut fuzzer,
