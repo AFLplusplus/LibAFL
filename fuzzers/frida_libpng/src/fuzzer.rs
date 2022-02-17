@@ -130,11 +130,16 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 );
 
                 // Feedbacks to recognize an input as solution
+                #[cfg(unix)]
                 let objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-                    #[cfg(unix)]
                     AsanErrorsFeedback::new()
+                );
+                #[cfg(windows)]
+                let objective = feedback_or_fast!(
+                    CrashFeedback::new(),
+                    TimeoutFeedback::new(),
                 );
 
                 // If not restarting, create a State from scratch
