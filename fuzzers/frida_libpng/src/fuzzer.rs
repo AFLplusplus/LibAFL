@@ -50,7 +50,6 @@ use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 #[cfg(unix)]
 use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
-#[cfg(unix)]
 use libafl_frida::cmplog_rt::CmpLogRuntime;
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
@@ -181,17 +180,24 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+                #[cfg(unix)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
+                );
+                #[cfg(windows)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                );
+
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
                     InProcessExecutor::new(
                         &mut frida_harness,
-                        tuple_list!(
-                            edges_observer,
-                            time_observer,
-                            #[cfg(unix)]
-                            AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
-                        ),
+                        observers,
                         &mut fuzzer,
                         &mut state,
                         &mut mgr,
@@ -296,17 +302,24 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+                #[cfg(unix)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
+                );
+                #[cfg(windows)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                );
+
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
                     InProcessExecutor::new(
                         &mut frida_harness,
-                        tuple_list!(
-                            edges_observer,
-                            time_observer,
-                            #[cfg(unix)]
-                            AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
-                        ),
+                        observers,
                         &mut fuzzer,
                         &mut state,
                         &mut mgr,
@@ -427,17 +440,24 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+                #[cfg(unix)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
+                );
+                #[cfg(windows)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                );
+
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
                     &gum,
                     InProcessExecutor::new(
                         &mut frida_harness,
-                        tuple_list!(
-                            edges_observer,
-                            time_observer,
-                            #[cfg(unix)]
-                            AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
-                        ),
+                        observers,
                         &mut fuzzer,
                         &mut state,
                         &mut mgr,
