@@ -220,7 +220,8 @@ impl Cores {
         })
     }
 
-    /// Checks if this [`Cores`] instance contains a given core_id
+    /// Checks if this [`Cores`] instance contains a given ``core_id``
+    #[must_use]
     pub fn contains(&self, core_id: usize) -> bool {
         let core_id = CoreId::from(core_id);
         self.ids.contains(&core_id)
