@@ -139,7 +139,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 #[cfg(windows)]
                 let objective = feedback_or_fast!(
                     CrashFeedback::new(),
-                    TimeoutFeedback::new(),
+                    TimeoutFeedback::new()
                 );
 
                 // If not restarting, create a State from scratch
@@ -194,7 +194,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 #[cfg(windows)]
                 let observers = tuple_list!(
                     edges_observer,
-                    time_observer,
+                    time_observer
                 );
 
                 // Create the executor for an in-process function with just one observer for edge coverage
