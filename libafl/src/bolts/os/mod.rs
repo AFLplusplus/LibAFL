@@ -5,6 +5,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use serde::{Deserialize, Serialize};
 
 #[cfg(any(unix, all(windows, feature = "std")))]
 use crate::Error;
@@ -106,7 +107,7 @@ pub fn dup2(fd: i32, device: i32) -> Result<(), Error> {
 }
 
 /// Core ID
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CoreId {
     /// The id of this core
     pub id: usize,
@@ -155,7 +156,7 @@ impl From<core_affinity::CoreId> for CoreId {
 }
 
 /// A list of [`CoreId`] to use for fuzzing
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Cores {
     /// The original commandline used during parsing
     pub cmdline: String,
@@ -217,6 +218,12 @@ impl Cores {
             cmdline: args.to_string(),
             ids: cores,
         })
+    }
+
+    /// Checks if this [`Cores`] instance contains a given core_id
+    pub fn contains(&self, core_id: usize) -> bool {
+        let core_id = CoreId::from(core_id);
+        self.ids.contains(&core_id)
     }
 }
 

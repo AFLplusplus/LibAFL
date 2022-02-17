@@ -1,5 +1,6 @@
 use frida_gum::{PageProtection, RangeDetails};
 use hashbrown::HashMap;
+use libafl::bolts::cli::FuzzerOptions;
 use nix::{
     libc::memset,
     sys::mman::{mmap, MapFlags, ProtFlags},
@@ -22,17 +23,14 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::{collections::BTreeMap, ffi::c_void};
 
-use crate::{
-    asan::errors::{AsanError, AsanErrors},
-    FridaOptions,
-};
+use crate::asan::errors::{AsanError, AsanErrors};
 
 /// An allocator wrapper with binary-only address sanitization
 #[derive(Debug)]
 #[allow(missing_docs)]
 pub struct Allocator {
     #[allow(dead_code)]
-    options: FridaOptions,
+    options: FuzzerOptions,
     page_size: usize,
     shadow_offset: usize,
     shadow_bit: usize,
@@ -78,7 +76,7 @@ impl Allocator {
         all(target_arch = "aarch64", target_os = "android")
     )))]
     #[must_use]
-    pub fn new(_: FridaOptions) -> Self {
+    pub fn new(_: FuzzerOptions) -> Self {
         todo!("Shadow region not yet supported for this platform!");
     }
 
@@ -90,7 +88,7 @@ impl Allocator {
     ))]
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn new(options: FridaOptions) -> Self {
+    pub fn new(options: FuzzerOptions) -> Self {
         let ret = unsafe { sysconf(_SC_PAGESIZE) };
         assert!(
             ret >= 0,
@@ -259,9 +257,9 @@ impl Allocator {
         } else {
             size
         };
-        if size > self.options.asan_max_allocation() {
+        if size > self.options.max_allocation {
             #[allow(clippy::manual_assert)]
-            if self.options.asan_max_allocation_panics() {
+            if self.options.max_allocation_panics {
                 panic!("ASAN: Allocation is too large: 0x{:x}", size);
             }
 
@@ -269,7 +267,7 @@ impl Allocator {
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;
 
-        if self.total_allocation_size + rounded_up_size > self.options.asan_max_total_allocation() {
+        if self.total_allocation_size + rounded_up_size > self.options.max_total_allocation {
             return std::ptr::null_mut();
         }
         self.total_allocation_size += rounded_up_size;
@@ -278,7 +276,7 @@ impl Allocator {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
-            if self.options.enable_asan_allocation_backtraces {
+            if self.options.allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
             metadata
@@ -311,7 +309,7 @@ impl Allocator {
                 actual_size: rounded_up_size,
                 ..AllocationMetadata::default()
             };
-            if self.options.enable_asan_allocation_backtraces {
+            if self.options.allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
 
@@ -356,7 +354,7 @@ impl Allocator {
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
         metadata.freed = true;
-        if self.options.enable_asan_allocation_backtraces {
+        if self.options.allocation_backtraces {
             metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
         }
 

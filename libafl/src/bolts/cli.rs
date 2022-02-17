@@ -15,7 +15,7 @@
 //! fn main() {
 //!     // make sure to add `features = ["cli"]` to the `libafl` crate in `Cargo.toml`
 //!     let parsed = parse_args();
-//!     
+//!
 //!     // call appropriate logic, passing in parsed options
 //!     if parsed.replay.is_some() {
 //!         replay(parsed);
@@ -64,6 +64,7 @@
 //!```
 
 use clap::{App, AppSettings, IntoApp, Parser};
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "frida_cli")]
 use std::error;
 use std::net::SocketAddr;
@@ -102,7 +103,7 @@ fn parse_instrumentation_location(
 }
 
 /// Top-level container for cli options/arguments/subcommands
-#[derive(Parser, Debug)]
+#[derive(Parser, Clone, Debug, Serialize, Deserialize)]
 #[clap(
     setting(AppSettings::ArgRequiredElseHelp),
     setting(AppSettings::SubcommandPrecedenceOverArg),
@@ -122,9 +123,20 @@ pub struct FuzzerOptions {
     #[clap(short, long, default_value = "/dev/null")]
     pub stdout: String,
 
+    /// the name of the configuration to use
+    #[clap(short, long, default_value = "default configuration")]
+    pub configuration: String,
+
     /// enable Address Sanitizer (ASAN)
     #[clap(short = 'A', long, help_heading = "Fuzz Options")]
     pub asan: bool,
+
+    /// Enable ASAN on each of the provided cores. Use 'all' to select all available
+    /// cores. 'none' to run a client without binding to any core.
+    /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
+    #[cfg(feature = "frida_cli")]
+    #[clap(short, long, default_value = "0", parse(try_from_str = Cores::from_cmdline), help_heading = "ASAN Options")]
+    pub asan_cores: Cores,
 
     /// number of fuzz iterations to perform
     #[clap(short = 'I', long, help_heading = "Fuzz Options", default_value = "0")]
@@ -139,6 +151,21 @@ pub struct FuzzerOptions {
     #[clap(last = true, name = "HARNESS_ARGS")]
     pub harness_args: Vec<String>,
 
+    /// harness function to call
+    #[cfg(feature = "frida_cli")]
+    #[clap(
+        short = 'F',
+        long,
+        default_value = "LLVMFuzzerTestOneInput",
+        help_heading = "Frida Options"
+    )]
+    pub harness_function: String,
+
+    /// additional libraries to instrument
+    #[cfg(feature = "frida_cli")]
+    #[clap(short, long, help_heading = "Frida Options")]
+    pub libs_to_instrument: Vec<String>,
+
     /// enable CmpLog instrumentation
     #[cfg_attr(
         feature = "frida_cli",
@@ -149,6 +176,13 @@ pub struct FuzzerOptions {
         clap(short = 'C', long, help_heading = "Fuzz Options")
     )]
     pub cmplog: bool,
+
+    /// Enable CmpLog on each of the provided cores. Use 'all' to select all available
+    /// cores. 'none' to run a client without binding to any core.
+    /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
+    #[cfg(feature = "frida_cli")]
+    #[clap(short, long, default_value = "0", parse(try_from_str = Cores::from_cmdline), help_heading = "Frida Options")]
+    pub cmplog_cores: Cores,
 
     /// enable ASAN leak detection
     #[cfg(feature = "frida_cli")]
@@ -293,7 +327,7 @@ impl FuzzerOptions {
     /// fn main() {
     ///     // example command line invocation:
     ///     // ./path-to-bin custom --bar stuff
-    ///     
+    ///
     ///     // clap's builder syntax to define the parser would be fine as well, but here we
     ///     // show the derive option
     ///     let cmd: App = CustomFooParser::into_app();
