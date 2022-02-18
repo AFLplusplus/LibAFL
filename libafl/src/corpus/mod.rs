@@ -26,9 +26,7 @@ pub mod accounting;
 pub use accounting::*;
 
 pub mod fav_factor;
-pub use fav_factor::{
-    FavFactor, LenTimeMulFavFactor
-};
+pub use fav_factor::{FavFactor, LenTimeMulFavFactor};
 
 pub mod minimizer;
 pub use minimizer::{
