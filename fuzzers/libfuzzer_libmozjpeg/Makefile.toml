@@ -68,7 +68,7 @@ windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
 command = "target/release/libafl_cxx"
-args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/mozjpeg-4.0.3/*.a", "-I", "${PROJECT_DIR}/mozjpeg-4.0.3/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/mozjpeg-4.0.3/libjpeg.a", "${PROJECT_DIR}/mozjpeg-4.0.3/libturbojpeg.a", "-I", "${PROJECT_DIR}/mozjpeg-4.0.3/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = [ "lib", "cxx", "cc" ]
 
 # Run the fuzzer
