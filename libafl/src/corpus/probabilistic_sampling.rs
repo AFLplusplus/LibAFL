@@ -70,10 +70,6 @@ where
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
     pub fn store_probability(&self, state: &mut S, idx: usize) -> Result<(), Error> {
-        // Create a new top rated meta if not existing
-        if state.metadata().get::<ProbabilityMetadata>().is_none() {
-            state.add_metadata(ProbabilityMetadata::new());
-        }
         let factor = F::compute(&mut *state.corpus().get(idx)?.borrow_mut())?;
         if factor == 0 {
             return Err(Error::DivByZero(
@@ -98,9 +94,13 @@ where
     F: FavFactor<I>,
 {
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+        if state.metadata().get::<ProbabilityMetadata>().is_none() {
+            state.add_metadata(ProbabilityMetadata::new());
+        }
         self.store_probability(state, idx)
     }
-    /// Gets the next entry in the queue
+
+    /// Gets the next entry
     #[allow(clippy::cast_precision_loss)]
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {

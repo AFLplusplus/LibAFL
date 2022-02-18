@@ -34,6 +34,9 @@ pub use minimizer::{
     MinimizerCorpusScheduler, TopRatedsMetadata,
 };
 
+pub mod powersched;
+pub use powersched::PowerQueueCorpusScheduler;
+
 use alloc::borrow::ToOwned;
 use core::cell::RefCell;
 
