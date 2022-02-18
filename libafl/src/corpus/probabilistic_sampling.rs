@@ -8,6 +8,7 @@ use crate::{
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
+use alloc::string::String;
 use core::marker::PhantomData;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -103,7 +104,7 @@ where
     #[allow(clippy::cast_precision_loss)]
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_owned()))
+            Err(Error::Empty(String::from("No entries in corpus")))
         } else {
             let rand_prob: f64 = (state.rand_mut().below(100) as f64) / 100.0;
             let meta = state.metadata().get::<ProbabilityMetadata>().unwrap();
