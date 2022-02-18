@@ -240,6 +240,8 @@ extern "C" {
     static mut libafl_exec_cmp_hook8: unsafe extern "C" fn(u64, u64, u64);
     static mut libafl_gen_cmp_hook: unsafe extern "C" fn(u64, u32) -> u64;
 
+    static mut libafl_on_thread_hook: unsafe extern "C" fn(u32);
+
     static mut libafl_pre_syscall_hook:
         unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
     static mut libafl_post_syscall_hook:
@@ -659,6 +661,12 @@ impl Emulator {
     pub fn set_gen_cmp_hook(&self, hook: extern "C" fn(pc: u64, size: u32) -> u64) {
         unsafe {
             libafl_gen_cmp_hook = hook;
+        }
+    }
+
+    pub fn set_on_thread_hook(&self, hook: extern "C" fn(tid: u32)) {
+        unsafe {
+            libafl_on_thread_hook = hook;
         }
     }
 
