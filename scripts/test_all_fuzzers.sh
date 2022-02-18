@@ -25,7 +25,7 @@ do
 
     if [ -e ./build.toml ]; then
         echo "[*] Testing $fuzzer"
-        cargo make --makefile ./build.toml test || exit 1
+        cargo make --makefile ./Makefile.toml test || exit 1
 	    echo "[+] Done testing $fuzzer"
     else
         echo "[*] Building $fuzzer"
