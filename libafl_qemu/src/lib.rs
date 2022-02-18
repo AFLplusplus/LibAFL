@@ -1,9 +1,12 @@
+// libafl_qemu only supports Linux currently
+#![cfg(target_os = "linux")]
 // This lint triggers too often on the current GuestAddr type when emulating 64-bit targets because
 // u64::from(GuestAddr) is a no-op, but the .into() call is needed when GuestAddr is u32.
 #![cfg_attr(
-    any(feature = "x86_64", feature = "aarch64"),
+    any(cpu_target = "x86_64", cpu_target = "aarch64"),
     allow(clippy::useless_conversion)
 )]
+#![allow(clippy::needless_pass_by_value)]
 
 use std::env;
 
@@ -29,36 +32,24 @@ pub use x86_64::*;
 
 pub mod elf;
 
-#[cfg(target_os = "linux")]
 pub mod helper;
-#[cfg(target_os = "linux")]
 pub use helper::*;
+pub mod hooks;
+pub use hooks::*;
 
-#[cfg(target_os = "linux")]
 pub mod edges;
-#[cfg(target_os = "linux")]
 pub use edges::QemuEdgeCoverageHelper;
-#[cfg(target_os = "linux")]
 pub mod cmplog;
-#[cfg(target_os = "linux")]
 pub use cmplog::QemuCmpLogHelper;
-#[cfg(target_os = "linux")]
 pub mod snapshot;
-#[cfg(target_os = "linux")]
 pub use snapshot::QemuSnapshotHelper;
-#[cfg(target_os = "linux")]
 pub mod asan;
-#[cfg(target_os = "linux")]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
-#[cfg(target_os = "linux")]
 pub mod executor;
-#[cfg(target_os = "linux")]
-pub use executor::QemuExecutor;
+pub use executor::{QemuExecutor, QemuForkExecutor};
 
-#[cfg(target_os = "linux")]
 pub mod emu;
-#[cfg(target_os = "linux")]
 pub use emu::*;
 
 #[must_use]
@@ -78,10 +69,10 @@ pub fn filter_qemu_args() -> Vec<String> {
     args
 }
 
-#[cfg(all(target_os = "linux", feature = "python"))]
+#[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-#[cfg(all(target_os = "linux", feature = "python"))]
+#[cfg(feature = "python")]
 #[pymodule]
 #[pyo3(name = "libafl_qemu")]
 #[allow(clippy::items_after_statements, clippy::too_many_lines)]

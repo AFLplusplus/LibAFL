@@ -19,6 +19,7 @@ fork = [] # uses the fork() syscall to spawn children, instead of launching a ne
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
 introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
+python = ["pyo3"]
 tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
 cli = ["clap"]  # expose bolts::cli
 qemu_cli = ["cli"]
@@ -80,6 +81,8 @@ clap = {version = "3.0", features = ["derive", "wrap_help"], optional = true}
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
 z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for concolic mutation
+
+pyo3 = { version = "0.15", optional = true }
 
 # AGPL
 # !!! this create requires nightly

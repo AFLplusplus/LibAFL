@@ -42,6 +42,7 @@ use libafl_qemu::{
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
     QemuExecutor,
+    QemuHooks,
     Regs,
 };
 
@@ -158,12 +159,12 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+        let hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default(),));
+
         // Create a QEMU in-process executor
         let executor = QemuExecutor::new(
+            hooks,
             &mut harness,
-            &emu,
-            // The QEMU helpers define common hooks like coverage tracking hooks
-            tuple_list!(QemuEdgeCoverageHelper::new()),
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,
             &mut state,

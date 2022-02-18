@@ -5,6 +5,8 @@ use std::{convert::AsRef, fs::File, io::Read, path::Path, str};
 
 use libafl::Error;
 
+use crate::GuestAddr;
+
 pub struct EasyElf<'a> {
     elf: Elf<'a>,
 }
@@ -38,16 +40,16 @@ impl<'a> EasyElf<'a> {
     }
 
     #[must_use]
-    pub fn resolve_symbol(&self, name: &str, load_addr: u64) -> Option<u64> {
+    pub fn resolve_symbol(&self, name: &str, load_addr: GuestAddr) -> Option<GuestAddr> {
         for sym in self.elf.syms.iter() {
             if let Some(sym_name) = self.elf.strtab.get_at(sym.st_name) {
                 if sym_name == name {
                     return if sym.st_value == 0 {
                         None
                     } else if self.is_pic() {
-                        Some(sym.st_value + load_addr)
+                        Some(sym.st_value as GuestAddr + load_addr)
                     } else {
-                        Some(sym.st_value)
+                        Some(sym.st_value as GuestAddr)
                     };
                 }
             }

@@ -121,10 +121,8 @@ impl Allocator {
                 let base: usize = 2;
                 // On x64, if end > 2**48, then that's in vsyscall or something.
                 #[cfg(target_arch = "x86_64")]
-                if end <= base.pow(48) {
-                    if end > userspace_max {
-                        userspace_max = end;
-                    }
+                if end <= base.pow(48) && end > userspace_max {
+                    userspace_max = end;
                 }
 
                 // On x64, if end > 2**52, then range is not in userspace

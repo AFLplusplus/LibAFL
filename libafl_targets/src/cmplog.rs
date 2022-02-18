@@ -33,7 +33,12 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 extern "C" {
     /// Logs an instruction for feedback during fuzzing
     pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
+
+    /// Pointer to the `CmpLog` map
+    pub static mut libafl_cmplog_map_ptr: *mut CmpLogMap;
 }
+
+pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 
 /// The header for `CmpLog` hits.
 #[repr(C)]
