@@ -6,7 +6,7 @@ LIBAFL_CXX = './target/release/libafl_cxx'
 FUZZER = './target/release/${FUZZER_NAME}'
 PROJECT_DIR = { script = ["pwd"] }
 
-[tasks.do_nothing]
+[tasks.unsupported]
 script_runner="@shell"
 script='''
 echo "Cargo-make not integrated yet on this platform"
@@ -16,7 +16,7 @@ echo "Cargo-make not integrated yet on this platform"
 [tasks.libpng]
 linux_alias = "unix_libpng"
 mac_alias = "unix_libpng"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_libpng]
 condition = { files_not_exist = ["./libpng-1.6.37"]}
@@ -30,7 +30,7 @@ tar -xvf libpng-1.6.37.tar.xz
 [tasks.cxx]
 linux_alias = "unix_cxx"
 mac_alias = "unix_cxx"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_cxx]
 condition = { files_not_exist = ["${LIBAFL_CXX}"] }
@@ -40,7 +40,7 @@ args = ["build" , "--release"]
 [tasks.cc]
 linux_alias = "unix_cc"
 mac_alias = "unix_cc"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_cc]
 condition = { files_not_exist = ["${LIBAFL_CC}"] }
@@ -51,7 +51,7 @@ args = ["build" , "--release"]
 [tasks.lib]
 linux_alias = "unix_lib"
 mac_alias = "unix_lib"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_lib]
 script_runner="@shell"
@@ -67,7 +67,7 @@ dependencies = [ "libpng", "cxx", "cc" ]
 [tasks.fuzzer]
 linux_alias = "unix_fuzzer"
 mac_alias = "unix_fuzzer"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_fuzzer]
 script_runner="@shell"
@@ -86,7 +86,7 @@ dependencies = [ "lib", "cxx", "cc" ]
 [tasks.run]
 linux_alias = "unix_run"
 mac_alias = "unix_run"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_run]
 script_runner = "@shell"
@@ -99,7 +99,7 @@ dependencies = [ "fuzzer" ]
 [tasks.test]
 linux_alias = "unix_test"
 mac_alias = "unix_test"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_test]
 script_runner = "@shell"
@@ -113,7 +113,7 @@ dependencies = [ "fuzzer" ]
 [tasks.clean]
 linux_alias = "unix_clean"
 mac_alias = "unix_clean"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_clean]
 # Disable default `clean` definition

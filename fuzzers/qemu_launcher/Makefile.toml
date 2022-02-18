@@ -3,7 +3,7 @@
 FUZZER_NAME='qemu_launcher'
 PROJECT_DIR = { script = ["pwd"] }
 
-[tasks.do_nothing]
+[tasks.unsupported]
 script_runner="@shell"
 script='''
 echo "Qemu fuzzer not supported on windows"
@@ -13,7 +13,7 @@ echo "Qemu fuzzer not supported on windows"
 [tasks.libpng]
 linux_alias = "unix_libpng"
 mac_alias = "unix_libpng"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_libpng]
 script_runner="@shell"
@@ -26,7 +26,7 @@ tar -xvf libpng-1.6.37.tar.xz
 [tasks.fuzzer]
 linux_alias = "unix_fuzzer"
 mac_alias = "unix_fuzzer"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_fuzzer]
 command = "cargo"
@@ -36,7 +36,7 @@ args = ["build", "--release"]
 [tasks.harness]
 linux_alias = "unix_harness"
 mac_alias = "unix_harness"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_harness]
 script_runner="@shell"
@@ -57,7 +57,7 @@ c++ \
 [tasks.run]
 linux_alias = "unix_run"
 mac_alias = "unix_run"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_run]
 command = "cargo"
@@ -68,7 +68,7 @@ dependencies = [ "harness", "fuzzer" ]
 [tasks.test]
 linux_alias = "unix_test"
 mac_alias = "unix_test"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 # Short test
 [tasks.unix_test]
@@ -83,7 +83,7 @@ dependencies = [ "harness", "fuzzer" ]
 [tasks.clean]
 linux_alias = "unix_clean"
 mac_alias = "unix_clean"
-windows_alias = "do_nothing"
+windows_alias = "unsupported"
 
 [tasks.unix_clean]
 # Disable default `clean` definition
