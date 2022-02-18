@@ -33,7 +33,6 @@ mac_alias = "cxx_unix"
 windows_alias = "unsupported"
 
 [tasks.cxx_unix]
-condition = { files_not_exist = ["${LIBAFL_CXX}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
@@ -43,7 +42,6 @@ mac_alias = "cc_unix"
 windows_alias = "unsupported"
 
 [tasks.cc_unix]
-condition = { files_not_exist = ["${LIBAFL_CC}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
@@ -70,16 +68,8 @@ mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
 [tasks.fuzzer_unix]
-script_runner="@shell"
-script='''
-cargo build --release
-target/release/libafl_cxx \
-	${PROJECT_DIR}/harness.cc \
-	${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a \
-	-I${PROJECT_DIR}/libpng-1.6.37/ \
-	-o ${FUZZER_NAME} \
-	-lm -lz
-'''
+command = "target/release/libafl_cxx"
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/libpng-1.6.37/.libs/libpng16.a", "-I", "${PROJECT_DIR}/libpng-1.6.37/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
 dependencies = [ "lib", "cxx", "cc" ]
 
 # Run the fuzzer
