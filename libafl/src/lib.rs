@@ -133,6 +133,8 @@ pub enum Error {
     Forkserver(String),
     /// MOpt related Error
     MOpt(String),
+    /// Negative probability
+    DivByZero(String),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
@@ -158,6 +160,7 @@ impl fmt::Display for Error {
             Self::IllegalArgument(s) => write!(f, "Illegal argument: {0}", &s),
             Self::Forkserver(s) => write!(f, "Forkserver : {0}", &s),
             Self::MOpt(s) => write!(f, "MOpt: {0}", &s),
+            Self::DivByZero(s) => write!(f, "DivByZero: {0}", &s),
             Self::ShuttingDown => write!(f, "Shutting down!"),
             Self::Unknown(s) => write!(f, "Unknown error: {0}", &s),
         }

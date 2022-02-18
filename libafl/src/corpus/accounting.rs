@@ -4,10 +4,10 @@ use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
     corpus::{
         minimizer::{
-            IsFavoredMetadata, LenTimeMulFavFactor, MinimizerCorpusScheduler,
+            IsFavoredMetadata, MinimizerCorpusScheduler,
             DEFAULT_SKIP_NON_FAVORED_PROB,
         },
-        Corpus, CorpusScheduler, Testcase,
+        LenTimeMulFavFactor, Corpus, CorpusScheduler, Testcase,
     },
     feedbacks::MapIndexesMetadata,
     inputs::Input,
