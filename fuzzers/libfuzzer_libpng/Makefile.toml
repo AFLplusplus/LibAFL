@@ -14,11 +14,11 @@ echo "Cargo-make not integrated yet on this"
 
 # libpng
 [tasks.libpng]
-linux_alias = "unix_libpng"
-mac_alias = "unix_libpng"
+linux_alias = "libpng_unix"
+mac_alias = "libpng_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_libpng]
+[tasks.libpng_unix]
 condition = { files_not_exist = ["./libpng-1.6.37"]}
 script_runner="@shell"
 script='''
@@ -28,32 +28,32 @@ tar -xvf libpng-1.6.37.tar.xz
 
 # Compilers
 [tasks.cxx]
-linux_alias = "unix_cxx"
-mac_alias = "unix_cxx"
+linux_alias = "cxx_unix"
+mac_alias = "cxx_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_cxx]
+[tasks.cxx_unix]
 condition = { files_not_exist = ["${LIBAFL_CXX}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
 [tasks.cc]
-linux_alias = "unix_cc"
-mac_alias = "unix_cc"
+linux_alias = "cc_unix"
+mac_alias = "cc_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_cc]
+[tasks.cc_unix]
 condition = { files_not_exist = ["${LIBAFL_CC}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
 # Library
 [tasks.lib]
-linux_alias = "unix_lib"
-mac_alias = "unix_lib"
+linux_alias = "lib_unix"
+mac_alias = "lib_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_lib]
+[tasks.lib_unix]
 script_runner="@shell"
 script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
@@ -65,11 +65,11 @@ dependencies = [ "libpng", "cxx", "cc" ]
 
 # Harness
 [tasks.fuzzer]
-linux_alias = "unix_fuzzer"
-mac_alias = "unix_fuzzer"
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_fuzzer]
+[tasks.fuzzer_unix]
 script_runner="@shell"
 script='''
 cargo build --release
@@ -84,11 +84,11 @@ dependencies = [ "lib", "cxx", "cc" ]
 
 # Run the fuzzer
 [tasks.run]
-linux_alias = "unix_run"
-mac_alias = "unix_run"
+linux_alias = "run_unix"
+mac_alias = "run_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_run]
+[tasks.run_unix]
 script_runner = "@shell"
 script='''
 ./${FUZZER_NAME} &
@@ -99,11 +99,11 @@ dependencies = [ "fuzzer" ]
 
 # Test
 [tasks.test]
-linux_alias = "unix_test"
-mac_alias = "unix_test"
+linux_alias = "test_unix"
+mac_alias = "test_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_test]
+[tasks.test_unix]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
@@ -115,11 +115,11 @@ dependencies = [ "fuzzer" ]
 
 # Clean up
 [tasks.clean]
-linux_alias = "unix_clean"
-mac_alias = "unix_clean"
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_clean]
+[tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
 script_runner="@shell"

@@ -14,11 +14,11 @@ echo "Cargo-make not integrated yet on this platform"
 
 # libpng
 [tasks.mozjpeg]
-linux_alias = "unix_mozjpeg"
-mac_alias = "unix_mozjpeg"
+linux_alias = "mozjpeg_unix"
+mac_alias = "mozjpeg_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_mozjpeg]
+[tasks.mozjpeg_unix]
 condition = { files_not_exist = ["./mozjpeg-4.0.3"]}
 script_runner="@shell"
 script='''
@@ -28,32 +28,32 @@ tar -xzvf v4.0.3.tar.gz
 
 # Compilers
 [tasks.cxx]
-linux_alias = "unix_cxx"
-mac_alias = "unix_cxx"
+linux_alias = "cxx_unix"
+mac_alias = "cxx_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_cxx]
+[tasks.cxx_unix]
 condition = { files_not_exist = ["${LIBAFL_CXX}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
 [tasks.cc]
-linux_alias = "unix_cc"
-mac_alias = "unix_cc"
+linux_alias = "cc_unix"
+mac_alias = "cc_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_cc]
+[tasks.cc_unix]
 condition = { files_not_exist = ["${LIBAFL_CC}"] }
 command = "cargo"
 args = ["build" , "--release"]
 
 # Library
 [tasks.lib]
-linux_alias = "unix_lib"
-mac_alias = "unix_lib"
+linux_alias = "lib_unix"
+mac_alias = "lib_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_lib]
+[tasks.lib_unix]
 script='''
 cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DCMAKE_C_COMPILER=${PROJECT_DIR}/${LIBAFL_CC} -DCMAKE_CXX_COMPILER=${PROJECT_DIR}/${LIBAFL_CXX} -G "Unix Makefiles"
 cd ${PROJECT_DIR}
@@ -64,11 +64,11 @@ dependencies = [ "mozjpeg", "cxx", "cc" ]
 
 # Harness
 [tasks.fuzzer]
-linux_alias = "unix_fuzzer"
-mac_alias = "unix_fuzzer"
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_fuzzer]
+[tasks.fuzzer_unix]
 script_runner="@shell"
 script='''
 cargo build --release
@@ -83,11 +83,11 @@ dependencies = [ "lib", "cxx", "cc" ]
 
 # Run the fuzzer
 [tasks.run]
-linux_alias = "unix_run"
-mac_alias = "unix_run"
+linux_alias = "run_unix"
+mac_alias = "run_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_run]
+[tasks.run_unix]
 script_runner = "@shell"
 script='''
 ./${FUZZER_NAME} &
@@ -98,11 +98,11 @@ dependencies = [ "fuzzer" ]
 
 # Test
 [tasks.test]
-linux_alias = "linux_test"
-mac_alias = "mac_test"
+linux_alias = "test_linux"
+mac_alias = "test_mac"
 windows_alias = "unsupported"
 
-[tasks.linux_test]
+[tasks.test_linux]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
@@ -112,18 +112,18 @@ timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null &
 '''
 dependencies = [ "fuzzer" ]
 
-[tasks.mac_test]
+[tasks.test_mac]
 script='''
 echo "Skipping build on MacOS as libpng in Github is ancient, see LibAFL GH issue #254"
 '''
 
 # Clean up
 [tasks.clean]
-linux_alias = "unix_clean"
-mac_alias = "unix_clean"
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_clean]
+[tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
 script_runner="@shell"

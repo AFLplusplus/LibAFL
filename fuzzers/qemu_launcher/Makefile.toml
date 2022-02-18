@@ -15,7 +15,7 @@ linux_alias = "unix_libpng"
 mac_alias = "unix_libpng"
 windows_alias = "unsupported"
 
-[tasks.unix_libpng]
+[tasks.libpng_unix]
 script_runner="@shell"
 script='''
 wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
@@ -24,21 +24,21 @@ tar -xvf libpng-1.6.37.tar.xz
 
 # fuzzer
 [tasks.fuzzer]
-linux_alias = "unix_fuzzer"
-mac_alias = "unix_fuzzer"
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_fuzzer]
+[tasks.fuzzer_unix]
 command = "cargo"
 args = ["build", "--release"]
 
 # Harness
 [tasks.harness]
-linux_alias = "unix_harness"
-mac_alias = "unix_harness"
+linux_alias = "harness_unix"
+mac_alias = "harness_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_harness]
+[tasks.harness_unix]
 script_runner="@shell"
 script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
@@ -55,23 +55,23 @@ c++ \
 
 # Run the fuzzer
 [tasks.run]
-linux_alias = "unix_run"
-mac_alias = "unix_run"
+linux_alias = "run_unix"
+mac_alias = "run_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_run]
+[tasks.run_unix]
 command = "cargo"
 args = ["run", "--release", "./{FUZZER_NAME}"]
 dependencies = [ "harness", "fuzzer" ]
 
 # Run the fuzzer
 [tasks.test]
-linux_alias = "unix_test"
-mac_alias = "unix_test"
+linux_alias = "test_unix"
+mac_alias = "test_unix"
 windows_alias = "unsupported"
 
 # Short test
-[tasks.unix_test]
+[tasks.test_unix]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
@@ -81,11 +81,11 @@ dependencies = [ "harness", "fuzzer" ]
 
 # Clean up
 [tasks.clean]
-linux_alias = "unix_clean"
-mac_alias = "unix_clean"
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_clean]
+[tasks.clean_unix]
 # Disable default `clean` definition
 clear = true
 script_runner="@shell"

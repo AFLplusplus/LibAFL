@@ -27,11 +27,11 @@ cp ${FUZZER} .
 dependencies = ["cc", "cxx"]
 
 [tasks.run]
-linux_alias = "unix_run"
-mac_alias = "unix_run"
-windows_alias = "windows_run"
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "run_windows"
 
-[tasks.unix_run]
+[tasks.run_unix]
 script_runner = "@shell"
 script='''
 ./${FUZZER_NAME} &
@@ -40,7 +40,7 @@ sleep 0.2
 '''
 dependencies = [ "fuzzer" ]
 
-[tasks.windows_run]
+[tasks.run_windows]
 # Do nothing
 script_runner = "@shell"
 script='''
@@ -50,11 +50,11 @@ dependencies = [ "fuzzer" ]
 
 
 [tasks.test]
-linux_alias = "unix_test"
-mac_alias = "unix_test"
-windows_alias = "windows_test"
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "test_windows"
 
-[tasks.unix_test]
+[tasks.test_unix]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
@@ -64,7 +64,7 @@ timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null &
 '''
 dependencies = [ "fuzzer" ]
 
-[tasks.windows_test]
+[tasks.test_windows]
 # Do nothing
 script_runner = "@shell"
 script='''
