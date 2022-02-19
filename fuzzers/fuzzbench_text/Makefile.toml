@@ -28,12 +28,12 @@ command = "cargo"
 args = ["build" , "--release"]
 
 # fuzz.o File
-[tasks.object]
-linux_alias = "object_unix"
-mac_alias = "object_unix"
+[tasks.fuzz_o]
+linux_alias = "fuzz_o_unix"
+mac_alias = "fuzz_o_unix"
 windows_alias = "unsupported"
 
-[tasks.object_unix]
+[tasks.fuzz_o_unix]
 command = "target/release/libafl_cc"
 args = ["--libafl-no-link", "-O3", "-c", "fuzz.c", "-o", "fuzz.o"]
 dependencies = ["cc", "cxx"]
@@ -47,7 +47,7 @@ windows_alias = "unsupported"
 [tasks.fuzzer_unix]
 command = "target/release/libafl_cxx"
 args = ["--libafl", "fuzz.o", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
-dependencies = ["cc", "cxx", "object"]
+dependencies = ["cc", "cxx", "fuzz_o"]
 
 # Run
 [tasks.run]
