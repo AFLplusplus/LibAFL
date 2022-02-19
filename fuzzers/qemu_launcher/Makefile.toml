@@ -42,7 +42,7 @@ windows_alias = "unsupported"
 script_runner="@shell"
 script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-cd ${PROJECT_DIR}
+cd "${PROJECT_DIR}"
 make -C libpng-1.6.37
 # Build the libpng harness	
 c++ \

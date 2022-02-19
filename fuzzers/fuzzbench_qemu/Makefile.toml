@@ -42,9 +42,9 @@ windows_alias = "unsupported"
 script_runner="@shell"
 script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-cd ${PROJECT_DIR}
+cd "${PROJECT_DIR}"
 make -C libpng-1.6.37
-cc -c ${PROJECT_DIR}/libfuzzer_main.c
+cc -c "${PROJECT_DIR}/libfuzzer_main.c"
 # Build the libpng harness	
 c++ \
 	../libfuzzer_libpng/harness.cc \
