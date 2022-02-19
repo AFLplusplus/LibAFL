@@ -56,7 +56,7 @@ windows_alias = "test_windows"
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
-timeout 11s ./${FUZZER_NAME} &
+timeout 11s ./${FUZZER_NAME} 2>/dev/null &
 '''
 dependencies = [ "fuzzer" ]
 
