@@ -16,6 +16,7 @@ mac_alias = "libpng_unix"
 windows_alias = "unsupported"
 
 [tasks.libpng_unix]
+condition = { files_not_exist = [ "./libpng-1.6.37" ] }
 script_runner="@shell"
 script='''
 wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz

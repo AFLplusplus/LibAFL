@@ -16,6 +16,7 @@ mac_alias = "unix_libpng"
 windows_alias = "unsupported"
 
 [tasks.libpng_unix]
+condition = { files_not_exist = [ "./libpng-1.6.37" ] }
 script_runner="@shell"
 script='''
 wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
@@ -49,7 +50,7 @@ cc -c "${PROJECT_DIR}/libfuzzer_main.c"
 c++ \
 	../libfuzzer_libpng/harness.cc \
 	./libpng-1.6.37/.libs/libpng16.a \
-	./libfuzzer_main.o
+	./libfuzzer_main.o \
 	-I./libpng-1.6.37/ \
 	-o ${FUZZER_NAME} \
 	-lm -lz
