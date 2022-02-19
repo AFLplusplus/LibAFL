@@ -11,8 +11,8 @@ echo "Qemu fuzzer not supported on windows"
 
 # libpng
 [tasks.libpng]
-linux_alias = "unix_libpng"
-mac_alias = "unix_libpng"
+linux_alias = "libpng_unix"
+mac_alias = "libpng_unix"
 windows_alias = "unsupported"
 
 [tasks.libpng_unix]
@@ -54,6 +54,7 @@ c++ \
 	-o ${FUZZER_NAME} \
 	-lm -lz
 '''
+dependencies = ["libpng"]
 
 # Run the fuzzer
 [tasks.run]

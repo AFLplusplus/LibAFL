@@ -11,11 +11,11 @@ echo "Qemu fuzzer not supported on windows"
 
 # libpng
 [tasks.libpng]
-linux_alias = "unix_libpng"
-mac_alias = "unix_libpng"
+linux_alias = "libpng_unix"
+mac_alias = "libpng_unix"
 windows_alias = "unsupported"
 
-[tasks.unix_libpng]
+[tasks.libpng_unix]
 script_runner="@shell"
 script='''
 wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
