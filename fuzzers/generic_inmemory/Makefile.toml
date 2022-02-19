@@ -61,7 +61,7 @@ windows_alias = "unsupported"
 [tasks.test_unix]
 script_runner="@shell"
 script='''
-timeout 10s ./${FUZZER_NAME} --cores 0 --broker-port 31337
+timeout 10s ./${FUZZER_NAME} --cores 0 --broker-port 31337 || [ $? -eq 124 ]
 '''
 dependencies = ["fuzzer"]
 
