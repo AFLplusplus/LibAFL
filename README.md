@@ -37,9 +37,20 @@ LibAFL offers integrations with popular instrumentation frameworks. At the momen
 
 ## Getting started
 
-1. Install the Rust development language. We highly recommend *not* to use e.g.
-your Linux distribution package as this is likely outdated. So rather install
+1. Install the Dependecies
+- The Rust development language.  
+We highly recommend *not* to use e.g. your Linux distribition package as this is likely outdated. So rather install
 Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
+
+- LLVM tools  
+We recommend to install the llvm tools (newer than 12. 0)
+
+- Cargo-make  
+We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
+
+```
+cargo install cargo-make
+```
 
 2. Clone the LibAFL repository with
 
@@ -47,7 +58,7 @@ Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
-Build the library using
+3. Build the library using
 
 ```
 cargo build --release
