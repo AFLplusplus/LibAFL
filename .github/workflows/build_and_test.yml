@@ -106,6 +106,8 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
+    - name: install cargo-make
+      run: cargo install --force cargo-make
     - uses: actions/checkout@v2
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
@@ -192,6 +194,8 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
+    - name: install cargo-make
+      run: cargo install --force cargo-make
     - uses: actions/checkout@v2
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh

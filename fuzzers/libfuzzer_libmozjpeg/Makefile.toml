@@ -1,0 +1,124 @@
+# Variables
+[env]
+FUZZER_NAME='fuzzer_mozjpeg'
+LIBAFL_CC = './target/release/libafl_cc'
+LIBAFL_CXX = './target/release/libafl_cxx'
+FUZZER = './target/release/${FUZZER_NAME}'
+PROJECT_DIR = { script = ["pwd"] }
+
+[tasks.unsupported]
+script_runner="@shell"
+script='''
+echo "Cargo-make not integrated yet on this platform"
+'''
+
+# libpng
+[tasks.mozjpeg]
+linux_alias = "mozjpeg_unix"
+mac_alias = "mozjpeg_unix"
+windows_alias = "unsupported"
+
+[tasks.mozjpeg_unix]
+condition = { files_not_exist = ["./mozjpeg-4.0.3"]}
+script_runner="@shell"
+script='''
+wget https://github.com/mozilla/mozjpeg/archive/v4.0.3.tar.gz
+tar -xzvf v4.0.3.tar.gz
+'''
+
+# Compilers
+[tasks.cxx]
+linux_alias = "cxx_unix"
+mac_alias = "cxx_unix"
+windows_alias = "unsupported"
+
+[tasks.cxx_unix]
+command = "cargo"
+args = ["build" , "--release"]
+
+[tasks.cc]
+linux_alias = "cc_unix"
+mac_alias = "cc_unix"
+windows_alias = "unsupported"
+
+[tasks.cc_unix]
+command = "cargo"
+args = ["build" , "--release"]
+
+# Library
+[tasks.lib]
+linux_alias = "lib_unix"
+mac_alias = "lib_unix"
+windows_alias = "unsupported"
+
+[tasks.lib_unix]
+script='''
+cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DCMAKE_C_COMPILER="${PROJECT_DIR}/${LIBAFL_CC}" -DCMAKE_CXX_COMPILER="${PROJECT_DIR}/${LIBAFL_CXX}" -G "Unix Makefiles"
+cd "${PROJECT_DIR}"
+make -C mozjpeg-4.0.3
+'''
+dependencies = [ "mozjpeg", "cxx", "cc" ]
+
+
+# Harness
+[tasks.fuzzer]
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
+windows_alias = "unsupported"
+
+[tasks.fuzzer_unix]
+command = "target/release/libafl_cxx"
+args = ["${PROJECT_DIR}/harness.cc", "${PROJECT_DIR}/mozjpeg-4.0.3/libjpeg.a", "${PROJECT_DIR}/mozjpeg-4.0.3/libturbojpeg.a", "-I", "${PROJECT_DIR}/mozjpeg-4.0.3/", "-o", "${FUZZER_NAME}", "-lm", "-lz"]
+dependencies = [ "lib", "cxx", "cc" ]
+
+# Run the fuzzer
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+script_runner = "@shell"
+script='''
+./${FUZZER_NAME} &
+sleep 0.2
+./${FUZZER_NAME}
+'''
+dependencies = [ "fuzzer" ]
+
+# Test
+[tasks.test]
+linux_alias = "test_linux"
+mac_alias = "test_mac"
+windows_alias = "unsupported"
+
+[tasks.test_linux]
+script_runner = "@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+timeout 11s ./${FUZZER_NAME} &
+sleep 0.2
+timeout 10s ./${FUZZER_NAME} >/dev/null 2>/dev/null &
+'''
+dependencies = [ "fuzzer" ]
+
+[tasks.test_mac]
+script='''
+echo "Skipping build on MacOS as libpng in Github is ancient, see LibAFL GH issue #254"
+'''
+
+# Clean up
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+# Disable default `clean` definition
+clear = true
+script_runner="@shell"
+script='''
+rm -f ./${FUZZER_NAME}
+make -C mozjpeg-4.0.3 clean
+cargo clean
+'''
