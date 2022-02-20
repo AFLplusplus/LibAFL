@@ -63,7 +63,7 @@ windows_alias = "unsupported"
 
 [tasks.run_unix]
 command = "cargo"
-args = ["run", "--release", "./{FUZZER_NAME}"]
+args = ["run", "--release", "./${FUZZER_NAME}"]
 dependencies = [ "harness", "fuzzer" ]
 
 # Run the fuzzer
