@@ -1,4 +1,6 @@
 //! The high-level hooks
+#![allow(clippy::type_complexity)]
+
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
@@ -1106,7 +1108,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, src: u64, dest: u64) -> Option<u64>,
     ) {
         unsafe {
-            GEN_EDGE_HOOK = Hook::Function(transmute(hook));
+            GEN_EDGE_HOOK = Hook::Function(hook as *const libc::c_void);
         }
         self.emulator
             .set_gen_edge_hook(gen_edge_hook_wrapper::<I, QT, S>);
@@ -1125,7 +1127,7 @@ where
 
     pub fn edge_execution(&self, hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64)) {
         unsafe {
-            EDGE_HOOKS.push(Hook::Function(transmute(hook)));
+            EDGE_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_edge_hook(edge_hooks_wrapper::<I, QT, S>);
@@ -1147,7 +1149,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, pc: u64) -> Option<u64>,
     ) {
         unsafe {
-            GEN_BLOCK_HOOK = Hook::Function(transmute(hook));
+            GEN_BLOCK_HOOK = Hook::Function(hook as *const libc::c_void);
         }
         self.emulator
             .set_gen_block_hook(gen_block_hook_wrapper::<I, QT, S>);
@@ -1166,7 +1168,7 @@ where
 
     pub fn block_execution(&self, hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64)) {
         unsafe {
-            BLOCK_HOOKS.push(Hook::Function(transmute(hook)));
+            BLOCK_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_block_hook(block_hooks_wrapper::<I, QT, S>);
@@ -1188,7 +1190,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, size: usize) -> Option<u64>,
     ) {
         unsafe {
-            GEN_READ_HOOK = Hook::Function(transmute(hook));
+            GEN_READ_HOOK = Hook::Function(hook as *const libc::c_void);
         }
         self.emulator
             .set_gen_read_hook(gen_read_hook_wrapper::<I, QT, S>);
@@ -1207,7 +1209,7 @@ where
 
     pub fn read1_execution(&self, hook: FixedLenHookFn<QT, S>) {
         unsafe {
-            READ1_HOOKS.push(Hook::Function(transmute(hook)));
+            READ1_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_read1_hook(read1_hooks_wrapper::<I, QT, S>);
@@ -1223,7 +1225,7 @@ where
 
     pub fn read2_execution(&self, hook: FixedLenHookFn<QT, S>) {
         unsafe {
-            READ2_HOOKS.push(Hook::Function(transmute(hook)));
+            READ2_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_read2_hook(read2_hooks_wrapper::<I, QT, S>);
@@ -1239,7 +1241,7 @@ where
 
     pub fn read4_execution(&self, hook: FixedLenHookFn<QT, S>) {
         unsafe {
-            READ4_HOOKS.push(Hook::Function(transmute(hook)));
+            READ4_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_read4_hook(read4_hooks_wrapper::<I, QT, S>);
@@ -1255,7 +1257,7 @@ where
 
     pub fn read8_execution(&self, hook: FixedLenHookFn<QT, S>) {
         unsafe {
-            READ8_HOOKS.push(Hook::Function(transmute(hook)));
+            READ8_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_read8_hook(read8_hooks_wrapper::<I, QT, S>);
@@ -1271,7 +1273,7 @@ where
 
     pub fn read_n_execution(&self, hook: DynamicLenHookFn<QT, S>) {
         unsafe {
-            READ_N_HOOKS.push(Hook::Function(transmute(hook)));
+            READ_N_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_read_n_hook(read_n_hooks_wrapper::<I, QT, S>);
@@ -1290,7 +1292,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, size: usize) -> Option<u64>,
     ) {
         unsafe {
-            GEN_WRITE_HOOK = Hook::Function(transmute(hook));
+            GEN_WRITE_HOOK = Hook::Function(hook as *const libc::c_void);
         }
         self.emulator
             .set_gen_write_hook(gen_write_hook_wrapper::<I, QT, S>);
@@ -1309,7 +1311,7 @@ where
 
     pub fn write1_execution(&self, hook: FixedLenHookFn<QT, S>) {
         unsafe {
-            WRITE1_HOOKS.push(Hook::Function(transmute(hook)));
+            WRITE1_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_write1_hook(write1_hooks_wrapper::<I, QT, S>);
@@ -1325,7 +1327,7 @@ where
 
     pub fn write2_execution(&self, hook: FixedLenHookFn<QT, S>) {
         unsafe {
-            WRITE2_HOOKS.push(Hook::Function(transmute(hook)));
+            WRITE2_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_write2_hook(write2_hooks_wrapper::<I, QT, S>);
@@ -1341,7 +1343,7 @@ where
 
     pub fn write4_execution(&self, hook: FixedLenHookFn<QT, S>) {
         unsafe {
-            WRITE4_HOOKS.push(Hook::Function(transmute(hook)));
+            WRITE4_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_write4_hook(write4_hooks_wrapper::<I, QT, S>);
@@ -1357,7 +1359,7 @@ where
 
     pub fn write8_execution(&self, hook: FixedLenHookFn<QT, S>) {
         unsafe {
-            WRITE8_HOOKS.push(Hook::Function(transmute(hook)));
+            WRITE8_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_write8_hook(write8_hooks_wrapper::<I, QT, S>);
@@ -1373,7 +1375,7 @@ where
 
     pub fn write_n_execution(&self, hook: DynamicLenHookFn<QT, S>) {
         unsafe {
-            WRITE_N_HOOKS.push(Hook::Function(transmute(hook)));
+            WRITE_N_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_write_n_hook(write_n_hooks_wrapper::<I, QT, S>);
@@ -1392,7 +1394,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, pc: u64, size: usize) -> Option<u64>,
     ) {
         unsafe {
-            GEN_CMP_HOOK = Hook::Function(transmute(hook));
+            GEN_CMP_HOOK = Hook::Function(hook as *const libc::c_void);
         }
         self.emulator
             .set_gen_cmp_hook(gen_cmp_hook_wrapper::<I, QT, S>);
@@ -1414,7 +1416,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64, v0: u8, v1: u8),
     ) {
         unsafe {
-            CMP1_HOOKS.push(Hook::Function(transmute(hook)));
+            CMP1_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_cmp1_hook(cmp1_hooks_wrapper::<I, QT, S>);
@@ -1436,7 +1438,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64, v0: u16, v1: u16),
     ) {
         unsafe {
-            CMP2_HOOKS.push(Hook::Function(transmute(hook)));
+            CMP2_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_cmp2_hook(cmp2_hooks_wrapper::<I, QT, S>);
@@ -1458,7 +1460,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64, v0: u32, v1: u32),
     ) {
         unsafe {
-            CMP4_HOOKS.push(Hook::Function(transmute(hook)));
+            CMP4_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_cmp4_hook(cmp4_hooks_wrapper::<I, QT, S>);
@@ -1480,7 +1482,7 @@ where
         hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64, v0: u64, v1: u64),
     ) {
         unsafe {
-            CMP8_HOOKS.push(Hook::Function(transmute(hook)));
+            CMP8_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_exec_cmp8_hook(cmp8_hooks_wrapper::<I, QT, S>);
@@ -1499,7 +1501,7 @@ where
 
     pub fn thread_creation(&self, hook: fn(&Emulator, Pin<&mut Self>, Option<&mut S>, tid: u32)) {
         unsafe {
-            ON_THREAD_HOOKS.push(Hook::Function(transmute(hook)));
+            ON_THREAD_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
@@ -1546,7 +1548,7 @@ where
         ) -> SyscallHookResult,
     ) {
         unsafe {
-            SYSCALL_HOOKS.push(Hook::Function(transmute(hook)));
+            SYSCALL_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_pre_syscall_hook(syscall_hooks_wrapper::<I, QT, S>);
@@ -1599,7 +1601,7 @@ where
         ) -> u64,
     ) {
         unsafe {
-            SYSCALL_POST_HOOKS.push(Hook::Function(transmute(hook)));
+            SYSCALL_POST_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
             .set_post_syscall_hook(syscall_after_hooks_wrapper::<I, QT, S>);
