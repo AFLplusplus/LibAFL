@@ -1,13 +1,21 @@
-mod host_specific {
-    #[cfg(target_os = "linux")]
-    include!("build_linux.rs");
-
-    #[cfg(not(target_os = "linux"))]
-    pub fn build() {
-        println!("cargo:warning=libafl_qemu_fullsystem only builds on Linux hosts");
-    }
-}
+use std::{env, path::Path};
 
 fn main() {
-    host_specific::build();
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let out_dir = out_dir.to_string_lossy().to_string();
+    let src_dir = Path::new("src");
+
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+
+    if target_os == "linux" {
+        println!("cargo:rerun-if-changed=src/weaks.c");
+
+        cc::Build::new()
+            .file(src_dir.join("weaks.c"))
+            .compile("weaks");
+
+        println!("cargo:rustc-link-search=native={}", &out_dir);
+    }
+
+    println!("cargo:rerun-if-changed=build.rs");
 }

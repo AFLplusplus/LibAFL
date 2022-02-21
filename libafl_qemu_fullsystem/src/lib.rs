@@ -41,10 +41,6 @@ pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
 pub mod cmplog;
 pub use cmplog::QemuCmpLogHelper;
-pub mod snapshot;
-pub use snapshot::QemuSnapshotHelper;
-pub mod asan;
-pub use asan::{init_with_asan, QemuAsanHelper};
 
 pub mod executor;
 pub use executor::{QemuExecutor, QemuForkExecutor};

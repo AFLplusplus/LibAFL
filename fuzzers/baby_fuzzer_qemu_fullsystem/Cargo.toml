@@ -1,7 +1,7 @@
 [package]
-name = "fuzzbench_qemu"
+name = "baby_fuzzer_qemu_fullsystem"
 version = "0.7.1"
-authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+authors = ["Moritz Lummerzheim <libafl@oomlu.de>"]
 edition = "2021"
 
 [features]
@@ -13,6 +13,13 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_qemu = { path = "../../libafl_qemu/", features = ["x86_64"] }
-clap = { version = "3.0", features = ["default"] }
-nix = "0.23"
+libafl_qemu_fullsystem = { path = "../../libafl_qemu_fullsystem/", features = ["aarch64"] }
+klo-routines = { version = "0.1.0", git = "https://github.com/andreafioraldi/klo-routines.git" }
+lazy_static = "1.4"
+libc = "0.2"
+serde = "1.0"
+chrono = "0.4"
+
+[lib]
+name = "baby_fuzzer_qemu_fullsystem"
+crate-type = ["staticlib"]
