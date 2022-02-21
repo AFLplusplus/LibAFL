@@ -1,3 +1,4 @@
+use clap::{App, Arg};
 use core::time::Duration;
 use libafl::{
     bolts::{
@@ -23,9 +24,8 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
 };
+use nix::sys::signal::Signal;
 use std::path::PathBuf;
-
-use clap::{App, Arg};
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -61,6 +61,13 @@ pub fn main() {
                 .help("Arguments passed to the target")
                 .setting(clap::ArgSettings::MultipleValues)
                 .takes_value(true),
+        )
+        .arg(
+            Arg::new("signal")
+                .help("Signal used to stop child")
+                .short('s')
+                .long("signal")
+                .default_value("SIGKILL"),
         )
         .get_matches();
 
@@ -155,7 +162,7 @@ pub fn main() {
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
-    let mut executor = TimeoutForkserverExecutor::new(
+    let mut executor = TimeoutForkserverExecutor::with_signal(
         forkserver,
         Duration::from_millis(
             res.value_of("timeout")
@@ -164,6 +171,7 @@ pub fn main() {
                 .parse()
                 .expect("Could not parse timeout in milliseconds"),
         ),
+        res.value_of("signal").unwrap().parse::<Signal>().unwrap(),
     )
     .expect("Failed to create the executor.");
 
