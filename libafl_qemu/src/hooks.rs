@@ -812,7 +812,7 @@ where
                     (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
                     *hook = Hook::Empty;
                 }
-                _ => (),
+                Hook::Empty => (),
             }
         }
     }
