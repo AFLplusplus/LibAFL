@@ -1,0 +1,52 @@
+[package]
+name = "libafl_qemu_fullsystem"
+version = "0.0.1"
+authors = ["Moritz Lummerzheim <libafl@oomlu.de>"]
+description = "QEMU full system backend library for LibAFL"
+documentation = "https://docs.rs/libafl_qemu_fullsystem"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "qemu", "instrumentation"]
+edition = "2021"
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+
+[features]
+python = ["pyo3", "pyo3-build-config"]
+default = []
+
+# The following architecture features are mutually exclusive.
+# TODO: remove unsupported archs
+#x86_64 = [] # build qemu for x86_64 (default)
+#i386 = [] # build qemu for i386
+#arm = [] # build qemu for arm
+aarch64 = [] # build qemu for aarch64
+
+clippy = [] # special feature for clippy, don't use in normal projects§
+
+[dependencies]
+libafl = { path = "../libafl", version = "0.7.1" }
+libafl_targets = { path = "../libafl_targets", version = "0.7.1" }
+
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+hashbrown =  { version = "0.11", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
+num-traits = "0.2"
+num_enum = "0.5.4"
+goblin = "0.4.2"
+libc = "0.2"
+strum = "0.21"
+strum_macros = "0.21"
+syscall-numbers = "2.0"
+bio = "0.39"
+thread_local = "1.1.3"
+#pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
+pyo3 = { version = "0.15", optional = true }
+
+[build-dependencies]
+cc = { version = "1.0" }
+which = "4.1"
+pyo3-build-config = { version = "0.15", optional = true }
+
+[lib]
+name = "libafl_qemu"
+crate-type = ["cdylib", "rlib"]
