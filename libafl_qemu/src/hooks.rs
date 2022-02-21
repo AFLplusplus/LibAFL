@@ -26,6 +26,7 @@ struct FatPtr(*const c_void, *const c_void);
 enum Hook {
     Function(*const c_void),
     Closure(FatPtr),
+    Once(FatPtr),
     Empty,
 }
 
@@ -43,6 +44,19 @@ unsafe fn get_qemu_helpers<'a, QT>() -> &'a mut QT {
     (QEMU_HELPERS_PTR as *mut QT)
         .as_mut()
         .expect("A high-level hook is installed but QemuHooks is not initialized")
+}
+
+static mut QEMU_HOOKS_PTR: *const c_void = ptr::null();
+unsafe fn get_qemu_hooks<'a, I, QT, S>() -> Pin<&'a mut QemuHooks<'a, I, QT, S>>
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    Pin::new_unchecked(
+        (QEMU_HOOKS_PTR as *mut QemuHooks<'a, I, QT, S>)
+            .as_mut()
+            .expect("A high-level hook is installed but QemuHooks is not initialized"),
+    )
 }
 
 static mut GEN_EDGE_HOOK: Hook = Hook::Empty;
@@ -68,7 +82,7 @@ where
                 (func)(&emulator, helpers, inprocess_get_state::<S>(), src, dst)
                     .map_or(SKIP_EXEC_HOOK, |id| id)
             }
-            Hook::Empty => SKIP_EXEC_HOOK,
+            _ => SKIP_EXEC_HOOK,
         }
     }
 }
@@ -93,7 +107,7 @@ where
                         transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id);
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -122,7 +136,7 @@ where
                 (func)(&emulator, helpers, inprocess_get_state::<S>(), pc)
                     .map_or(SKIP_EXEC_HOOK, |id| id)
             }
-            Hook::Empty => SKIP_EXEC_HOOK,
+            _ => SKIP_EXEC_HOOK,
         }
     }
 }
@@ -147,7 +161,7 @@ where
                         transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id);
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -186,7 +200,7 @@ where
                 )
                 .map_or(SKIP_EXEC_HOOK, |id| id)
             }
-            Hook::Empty => SKIP_EXEC_HOOK,
+            _ => SKIP_EXEC_HOOK,
         }
     }
 }
@@ -224,7 +238,7 @@ where
                 )
                 .map_or(SKIP_EXEC_HOOK, |id| id)
             }
-            Hook::Empty => SKIP_EXEC_HOOK,
+            _ => SKIP_EXEC_HOOK,
         }
     }
 }
@@ -260,7 +274,7 @@ where
                         addr as GuestAddr,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -297,7 +311,7 @@ where
                         addr as GuestAddr,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -334,7 +348,7 @@ where
                         addr as GuestAddr,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -371,7 +385,7 @@ where
                         addr as GuestAddr,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -410,7 +424,7 @@ where
                         size as usize,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -447,7 +461,7 @@ where
                         addr as GuestAddr,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -484,7 +498,7 @@ where
                         addr as GuestAddr,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -521,7 +535,7 @@ where
                         addr as GuestAddr,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -558,7 +572,7 @@ where
                         addr as GuestAddr,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -597,7 +611,7 @@ where
                         size as usize,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -638,7 +652,7 @@ where
                 )
                 .map_or(SKIP_EXEC_HOOK, |id| id)
             }
-            Hook::Empty => SKIP_EXEC_HOOK,
+            _ => SKIP_EXEC_HOOK,
         }
     }
 }
@@ -663,7 +677,7 @@ where
                         transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -691,7 +705,7 @@ where
                     > = transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -719,7 +733,7 @@ where
                     > = transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -747,7 +761,7 @@ where
                     > = transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
     }
@@ -760,20 +774,43 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &ON_THREAD_HOOKS {
+        let emu = Emulator::new_empty();
+        for hook in &mut ON_THREAD_HOOKS {
+            let hooks = get_qemu_hooks::<I, QT, S>();
             match hook {
                 Hook::Function(ptr) => {
-                    let func: fn(&Emulator, &mut QT, Option<&mut S>, u32) = transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), tid);
+                    let func: fn(
+                        &Emulator,
+                        Pin<&mut QemuHooks<'_, I, QT, S>>,
+                        Option<&mut S>,
+                        u32,
+                    ) = transmute(*ptr);
+                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
                 }
                 Hook::Closure(ptr) => {
-                    let mut func: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u32)> =
-                        transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), tid);
+                    let mut func: Box<
+                        dyn FnMut(
+                            &Emulator,
+                            Pin<&mut QemuHooks<'_, I, QT, S>>,
+                            Option<&mut S>,
+                            u32,
+                        ),
+                    > = transmute(*ptr);
+                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
                 }
-                Hook::Empty => (),
+                Hook::Once(ptr) => {
+                    let func: Box<
+                        dyn FnOnce(
+                            &Emulator,
+                            Pin<&mut QemuHooks<'_, I, QT, S>>,
+                            Option<&mut S>,
+                            u32,
+                        ),
+                    > = transmute(*ptr);
+                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
+                    *hook = Hook::Empty;
+                }
+                _ => (),
             }
         }
     }
@@ -873,7 +910,7 @@ where
                         res.retval = r.retval;
                     }
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
         res
@@ -971,7 +1008,7 @@ where
                         a7,
                     );
                 }
-                Hook::Empty => (),
+                _ => (),
             }
         }
         res
@@ -1026,6 +1063,7 @@ where
         slf.helpers.init_hooks_all(slf.as_ref());
         unsafe {
             QEMU_HELPERS_PTR = addr_of!(slf.helpers) as *const c_void;
+            QEMU_HOOKS_PTR = addr_of!(*slf) as *const c_void;
         }
         slf
     }
@@ -1459,7 +1497,7 @@ where
             .set_exec_cmp8_hook(cmp8_hooks_wrapper::<I, QT, S>);
     }
 
-    pub fn thread_creation(&self, hook: fn(&Emulator, &mut QT, Option<&mut S>, tid: u32)) {
+    pub fn thread_creation(&self, hook: fn(&Emulator, Pin<&mut Self>, Option<&mut S>, tid: u32)) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Function(transmute(hook)));
         }
@@ -1469,10 +1507,21 @@ where
 
     pub fn thread_creation_closure(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u32)>,
+        hook: Box<dyn FnMut(&Emulator, Pin<&mut Self>, Option<&mut S>, u32) + 'a>,
     ) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Closure(transmute(hook)));
+        }
+        self.emulator
+            .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
+    }
+
+    pub fn thread_creation_once(
+        &self,
+        hook: Box<dyn FnOnce(&Emulator, Pin<&mut Self>, Option<&mut S>, u32) + 'a>,
+    ) {
+        unsafe {
+            ON_THREAD_HOOKS.push(Hook::Once(transmute(hook)));
         }
         self.emulator
             .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
