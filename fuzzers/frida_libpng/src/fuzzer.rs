@@ -137,10 +137,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     AsanErrorsFeedback::new()
                 );
                 #[cfg(windows)]
-                let objective = feedback_or_fast!(
-                    CrashFeedback::new(),
-                    TimeoutFeedback::new()
-                );
+                let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
@@ -192,10 +189,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
                 );
                 #[cfg(windows)]
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer
-                );
+                let observers = tuple_list!(edges_observer, time_observer);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -314,10 +308,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
                 );
                 #[cfg(windows)]
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                );
+                let observers = tuple_list!(edges_observer, time_observer,);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
@@ -452,10 +443,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
                 );
                 #[cfg(windows)]
-                let observers = tuple_list!(
-                    edges_observer,
-                    time_observer,
-                );
+                let observers = tuple_list!(edges_observer, time_observer,);
 
                 // Create the executor for an in-process function with just one observer for edge coverage
                 let mut executor = FridaInProcessExecutor::new(
