@@ -43,7 +43,7 @@ We highly recommend *not* to use e.g. your Linux distribition package as this is
 Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
 
 - LLVM tools  
-We recommend to install the llvm tools (newer than 12. 0)
+The LLVM tools are needed (newer than LLVM 11.0.0 but older than LLVM 15.0.0)
 
 - Cargo-make  
 We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
