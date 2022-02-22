@@ -72,7 +72,7 @@ where
     pub fn store_probability(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         let factor = F::compute(&mut *state.corpus().get(idx)?.borrow_mut())?;
         if factor == 0 {
-            return Err(Error::DivByZero(
+            return Err(Error::IllegalState(
                 "Infinity probability calculated for probabilistic sampling scheduler".into(),
             ));
         }
