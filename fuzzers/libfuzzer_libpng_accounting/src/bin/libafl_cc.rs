@@ -1,6 +1,8 @@
 use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 use std::env;
 
+const GRANULARITY: &str = "FUNC";
+
 pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
@@ -25,6 +27,7 @@ pub fn main() {
             .link_staticlib(&dir, "libfuzzer_libpng")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             .add_pass(LLVMPasses::CoverageAccounting)
+            .add_passes_arg(format!("-granularity={}", GRANULARITY))
             .run()
             .expect("Failed to run the wrapped compiler")
         {
