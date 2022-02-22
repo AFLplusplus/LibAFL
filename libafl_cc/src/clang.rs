@@ -77,7 +77,7 @@ pub struct ClangWrapper {
     cc_args: Vec<String>,
     link_args: Vec<String>,
     passes: Vec<LLVMPasses>,
-    passes_args: Vec<String>
+    passes_args: Vec<String>,
 }
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
@@ -367,8 +367,8 @@ impl ClangWrapper {
 
     /// Add LLVM pass arguments
     pub fn add_passes_arg<S>(&mut self, arg: S) -> &'_ mut Self
-        where
-            S: AsRef<str>,
+    where
+        S: AsRef<str>,
     {
         self.passes_args.push(arg.as_ref().to_string());
         self
