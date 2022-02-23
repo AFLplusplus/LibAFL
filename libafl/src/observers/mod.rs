@@ -23,7 +23,10 @@ pub mod owned;
 #[cfg(unstable_feature)]
 pub use owned::*;
 
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt::Debug, time::Duration};
 use serde::{Deserialize, Serialize};
 
@@ -256,11 +259,13 @@ where
     }
 
     /// Get a list ref
+    #[must_use]
     pub fn list(&self) -> &Vec<T> {
         self.list.as_ref()
     }
 
     /// Get a list mut
+    #[must_use]
     pub fn list_mut(&mut self) -> &mut Vec<T> {
         self.list.as_mut()
     }
