@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{
         current_time,
+        ownedref::OwnedRefMut,
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
@@ -224,6 +225,61 @@ impl<I, S> Observer<I, S> for TimeObserver {
 }
 
 impl Named for TimeObserver {
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+/// A simple observer with a list of things.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(bound = "T: serde::de::DeserializeOwned")]
+pub struct ListObserver<'a, T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    name: String,
+    /// The list
+    list: OwnedRefMut<'a, Vec<T>>,
+}
+
+impl<'a, T> ListObserver<'a, T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`ListObserver`] with the given name.
+    #[must_use]
+    pub fn new(name: &'static str, list: &'a mut Vec<T>) -> Self {
+        Self {
+            name: name.to_string(),
+            list: OwnedRefMut::Ref(list),
+        }
+    }
+
+    /// Get a list ref
+    pub fn list(&self) -> &Vec<T> {
+        self.list.as_ref()
+    }
+
+    /// Get a list mut
+    pub fn list_mut(&mut self) -> &mut Vec<T> {
+        self.list.as_mut()
+    }
+}
+
+impl<'a, I, S, T> Observer<I, S> for ListObserver<'a, T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        self.list.as_mut().clear();
+        Ok(())
+    }
+}
+
+impl<'a, T> Named for ListObserver<'a, T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
     fn name(&self) -> &str {
         &self.name
     }
