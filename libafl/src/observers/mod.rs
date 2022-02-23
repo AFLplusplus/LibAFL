@@ -23,7 +23,10 @@ pub mod owned;
 #[cfg(unstable_feature)]
 pub use owned::*;
 
-use alloc::string::{String, ToString};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{fmt::Debug, time::Duration};
 use serde::{Deserialize, Serialize};
 
