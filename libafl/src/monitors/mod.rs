@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::bolts::{current_time, format_duration_hms};
 
+#[cfg(feature = "afl_exec_sec")]
 const CLIENT_STATS_TIME_WINDOW_SECS: u64 = 5; // 5 seconds
 
 /// User-defined stat types
@@ -62,11 +63,13 @@ pub struct ClientStats {
     /// The size of the objectives corpus for this client
     pub objective_size: u64,
     /// The last reported executions for this client
+    #[cfg(feature = "afl_exec_sec")]
     pub last_window_executions: u64,
+    /// The last executions per sec
+    #[cfg(feature = "afl_exec_sec")]
+    pub last_execs_per_sec: f64,
     /// The last time we got this information
     pub last_window_time: Duration,
-    /// The last executions per sec
-    pub last_execs_per_sec: f32,
     /// User-defined monitor
     pub user_monitor: HashMap<String, UserStats>,
     /// Client performance statistics
@@ -76,6 +79,7 @@ pub struct ClientStats {
 
 impl ClientStats {
     /// We got a new information about executions for this client, insert them.
+    #[cfg(feature = "afl_exec_sec")]
     pub fn update_executions(&mut self, executions: u64, cur_time: Duration) {
         let diff = cur_time
             .checked_sub(self.last_window_time)
@@ -85,6 +89,12 @@ impl ClientStats {
             self.last_window_time = cur_time;
             self.last_window_executions = self.executions;
         }
+        self.executions = executions;
+    }
+
+    /// We got a new information about executions for this client, insert them.
+    #[cfg(not(feature = "afl_exec_sec"))]
+    pub fn update_executions(&mut self, executions: u64, _cur_time: Duration) {
         self.executions = executions;
     }
 
@@ -100,6 +110,7 @@ impl ClientStats {
 
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[cfg(feature = "afl_exec_sec")]
     pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
         if self.executions == 0 {
             return 0;
@@ -107,12 +118,12 @@ impl ClientStats {
 
         let elapsed = cur_time
             .checked_sub(self.last_window_time)
-            .map_or(0, |d| d.as_secs());
-        if elapsed == 0 {
+            .map_or(0.0, |d| d.as_secs_f64());
+        if elapsed as u64 == 0 {
             return self.last_execs_per_sec as u64;
         }
 
-        let cur_avg = ((self.executions - self.last_window_executions) as f32) / (elapsed as f32);
+        let cur_avg = ((self.executions - self.last_window_executions) as f64) / elapsed;
         if self.last_window_executions == 0 {
             self.last_execs_per_sec = cur_avg;
             return self.last_execs_per_sec as u64;
@@ -126,6 +137,24 @@ impl ClientStats {
         self.last_execs_per_sec =
             self.last_execs_per_sec * (1.0 - 1.0 / 16.0) + cur_avg * (1.0 / 16.0);
         self.last_execs_per_sec as u64
+    }
+
+    /// Get the calculated executions per second for this client
+    #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[cfg(not(feature = "afl_exec_sec"))]
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
+        if self.executions == 0 {
+            return 0;
+        }
+
+        let elapsed = cur_time
+            .checked_sub(self.last_window_time)
+            .map_or(0.0, |d| d.as_secs_f64());
+        if elapsed as u64 == 0 {
+            return 0;
+        }
+
+        ((self.executions as f64) / elapsed) as u64
     }
 
     /// Update the user-defined stat with name and value

@@ -24,6 +24,7 @@ tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
 cli = ["clap"]  # expose bolts::cli
 qemu_cli = ["cli"]
 frida_cli = ["cli"]
+afl_exec_sec = [] # calculate exec/sec like AFL
 
 # features hiding dependencies licensed under GPL
 gpl = []
