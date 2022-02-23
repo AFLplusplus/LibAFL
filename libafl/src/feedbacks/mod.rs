@@ -32,7 +32,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     inputs::Input,
-    observers::{ObserversTuple, TimeObserver},
+    observers::{ListObserver, ObserversTuple, TimeObserver},
     state::HasClientPerfMonitor,
     Error,
 };
@@ -910,6 +910,77 @@ impl TimeFeedback {
         Self {
             exec_time: None,
             name: observer.name().to_string(),
+        }
+    }
+}
+
+/// Consider interesting a testcase if the list in ListObserver is not empty.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ListFeedback<T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    name: String,
+    phantom: PhantomData<T>,
+}
+
+impl<I, S, T> Feedback<I, S> for ListFeedback<T>
+where
+    I: Input,
+    S: HasClientPerfMonitor,
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        // TODO Replace with match_name_type when stable
+        let observer = observers
+            .match_name::<ListObserver<T>>(self.name())
+            .unwrap();
+        // TODO register the list content in a testcase metadata
+        Ok(!observer.list().is_empty())
+    }
+}
+
+impl<T> Named for ListFeedback<T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<T> ListFeedback<T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`ListFeedback`], deciding if the value of a [`ListObserver`] with the given `name` of a run is interesting.
+    #[must_use]
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: name.to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creates a new [`TimeFeedback`], deciding if the given [`ListObserver`] value of a run is interesting.
+    #[must_use]
+    pub fn new_with_observer(observer: &ListObserver<T>) -> Self {
+        Self {
+            name: observer.name().to_string(),
+            phantom: PhantomData,
         }
     }
 }
