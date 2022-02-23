@@ -259,11 +259,13 @@ where
     }
 
     /// Get a list ref
+    #[must_use]
     pub fn list(&self) -> &Vec<T> {
         self.list.as_ref()
     }
 
     /// Get a list mut
+    #[must_use]
     pub fn list_mut(&mut self) -> &mut Vec<T> {
         self.list.as_mut()
     }

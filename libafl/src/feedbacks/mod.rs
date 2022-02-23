@@ -914,7 +914,7 @@ impl TimeFeedback {
     }
 }
 
-/// Consider interesting a testcase if the list in ListObserver is not empty.
+/// Consider interesting a testcase if the list in `ListObserver` is not empty.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ListFeedback<T>
 where
