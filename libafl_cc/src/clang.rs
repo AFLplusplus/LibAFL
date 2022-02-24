@@ -77,6 +77,7 @@ pub struct ClangWrapper {
     cc_args: Vec<String>,
     link_args: Vec<String>,
     passes: Vec<LLVMPasses>,
+    passes_args: Vec<String>,
 }
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
@@ -264,6 +265,10 @@ impl CompilerWrapper for ClangWrapper {
             args.push("-Xclang".into());
             args.push(pass.path().into_os_string().into_string().unwrap());
         }
+        for passes_arg in &self.passes_args {
+            args.push("-mllvm".into());
+            args.push(passes_arg.into());
+        }
         if self.linking {
             if self.x_set {
                 args.push("-x".into());
@@ -325,6 +330,7 @@ impl ClangWrapper {
             cc_args: vec![],
             link_args: vec![],
             passes: vec![],
+            passes_args: vec![],
             is_silent: false,
         }
     }
@@ -356,6 +362,15 @@ impl ClangWrapper {
     /// Add LLVM pass
     pub fn add_pass(&mut self, pass: LLVMPasses) -> &'_ mut Self {
         self.passes.push(pass);
+        self
+    }
+
+    /// Add LLVM pass arguments
+    pub fn add_passes_arg<S>(&mut self, arg: S) -> &'_ mut Self
+    where
+        S: AsRef<str>,
+    {
+        self.passes_args.push(arg.as_ref().to_string());
         self
     }
 
