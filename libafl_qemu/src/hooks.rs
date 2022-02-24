@@ -108,6 +108,9 @@ where
                     let mut func: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64)> =
                         transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id);
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
                 }
                 _ => (),
             }
@@ -135,8 +138,13 @@ where
                 let mut func: Box<
                     dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64) -> Option<u64>,
                 > = transmute(*ptr);
-                (func)(&emulator, helpers, inprocess_get_state::<S>(), pc)
-                    .map_or(SKIP_EXEC_HOOK, |id| id)
+                let ret = (func)(&emulator, helpers, inprocess_get_state::<S>(), pc)
+                    .map_or(SKIP_EXEC_HOOK, |id| id);
+
+                // Forget the closure so that drop is not called on captured variables.
+                core::mem::forget(func);
+
+                ret
             }
             _ => SKIP_EXEC_HOOK,
         }
@@ -162,6 +170,9 @@ where
                     let mut func: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64)> =
                         transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id);
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
                 }
                 _ => (),
             }
@@ -194,13 +205,18 @@ where
                 let mut func: Box<
                     dyn FnMut(&Emulator, &mut QT, Option<&mut S>, usize) -> Option<u64>,
                 > = transmute(*ptr);
-                (func)(
+                let ret = (func)(
                     &emulator,
                     helpers,
                     inprocess_get_state::<S>(),
                     size as usize,
                 )
-                .map_or(SKIP_EXEC_HOOK, |id| id)
+                .map_or(SKIP_EXEC_HOOK, |id| id);
+
+                // Forget the closure so that drop is not called on captured variables.
+                core::mem::forget(func);
+
+                ret
             }
             _ => SKIP_EXEC_HOOK,
         }
@@ -232,13 +248,18 @@ where
                 let mut func: Box<
                     dyn FnMut(&Emulator, &mut QT, Option<&mut S>, usize) -> Option<u64>,
                 > = transmute(*ptr);
-                (func)(
+                let ret = (func)(
                     &emulator,
                     helpers,
                     inprocess_get_state::<S>(),
                     size as usize,
                 )
-                .map_or(SKIP_EXEC_HOOK, |id| id)
+                .map_or(SKIP_EXEC_HOOK, |id| id);
+
+                // Forget the closure so that drop is not called on captured variables.
+                core::mem::forget(func);
+
+                ret
             }
             _ => SKIP_EXEC_HOOK,
         }
@@ -645,14 +666,19 @@ where
                 let mut func: Box<
                     dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, usize) -> Option<u64>,
                 > = transmute(*ptr);
-                (func)(
+                let ret = (func)(
                     &emulator,
                     helpers,
                     inprocess_get_state::<S>(),
                     pc,
                     size as usize,
                 )
-                .map_or(SKIP_EXEC_HOOK, |id| id)
+                .map_or(SKIP_EXEC_HOOK, |id| id);
+
+                // Forget the closure so that drop is not called on captured variables.
+                core::mem::forget(func);
+
+                ret
             }
             _ => SKIP_EXEC_HOOK,
         }
@@ -678,6 +704,9 @@ where
                     let mut func: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u8, u8)> =
                         transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
                 }
                 _ => (),
             }
@@ -706,6 +735,9 @@ where
                         dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u16, u16),
                     > = transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
                 }
                 _ => (),
             }
@@ -734,6 +766,9 @@ where
                         dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u32, u32),
                     > = transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
                 }
                 _ => (),
             }
@@ -762,6 +797,9 @@ where
                         dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u64, u64),
                     > = transmute(*ptr);
                     (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
                 }
                 _ => (),
             }
@@ -799,6 +837,9 @@ where
                         ),
                     > = transmute(*ptr);
                     (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
                 }
                 Hook::Once(ptr) => {
                     let func: Box<
@@ -907,6 +948,10 @@ where
                         a6,
                         a7,
                     );
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
+
                     if r.skip_syscall {
                         res.skip_syscall = true;
                         res.retval = r.retval;
@@ -1009,6 +1054,9 @@ where
                         a6,
                         a7,
                     );
+
+                    // Forget the closure so that drop is not called on captured variables.
+                    core::mem::forget(func);
                 }
                 _ => (),
             }
