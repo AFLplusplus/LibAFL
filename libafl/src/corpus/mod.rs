@@ -19,14 +19,19 @@ pub use cached::CachedOnDiskCorpus;
 pub mod queue;
 pub use queue::QueueCorpusScheduler;
 
+pub mod probabilistic_sampling;
+pub use probabilistic_sampling::ProbabilitySamplingCorpusScheduler;
+
 pub mod accounting;
 pub use accounting::*;
 
+pub mod fav_factor;
+pub use fav_factor::{FavFactor, LenTimeMulFavFactor};
+
 pub mod minimizer;
 pub use minimizer::{
-    FavFactor, IndexesLenTimeMinimizerCorpusScheduler, IsFavoredMetadata,
-    LenTimeMinimizerCorpusScheduler, LenTimeMulFavFactor, MinimizerCorpusScheduler,
-    TopRatedsMetadata,
+    IndexesLenTimeMinimizerCorpusScheduler, IsFavoredMetadata, LenTimeMinimizerCorpusScheduler,
+    MinimizerCorpusScheduler, TopRatedsMetadata,
 };
 
 pub mod powersched;

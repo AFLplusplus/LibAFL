@@ -2,8 +2,8 @@
 // with testcases only from a subset of the total corpus.
 
 use crate::{
-    bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasLen, HasRefCnt},
-    corpus::{Corpus, CorpusScheduler, Testcase},
+    bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
+    corpus::{Corpus, CorpusScheduler, FavFactor, LenTimeMulFavFactor, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
     state::{HasCorpus, HasMetadata, HasRand},
@@ -45,35 +45,6 @@ impl TopRatedsMetadata {
 impl Default for TopRatedsMetadata {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Compute the favor factor of a [`Testcase`]. Lower is better.
-pub trait FavFactor<I>
-where
-    I: Input,
-{
-    /// Computes the favor factor of a [`Testcase`]. Lower is better.
-    fn compute(testcase: &mut Testcase<I>) -> Result<u64, Error>;
-}
-
-/// Multiply the testcase size with the execution time.
-/// This favors small and quick testcases.
-#[derive(Debug, Clone)]
-pub struct LenTimeMulFavFactor<I>
-where
-    I: Input + HasLen,
-{
-    phantom: PhantomData<I>,
-}
-
-impl<I> FavFactor<I> for LenTimeMulFavFactor<I>
-where
-    I: Input + HasLen,
-{
-    fn compute(entry: &mut Testcase<I>) -> Result<u64, Error> {
-        // TODO maybe enforce entry.exec_time().is_some()
-        Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as u64 * entry.cached_len()? as u64)
     }
 }
 
