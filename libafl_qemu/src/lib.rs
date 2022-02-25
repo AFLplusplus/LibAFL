@@ -10,6 +10,8 @@
 
 use std::env;
 
+pub use strum::IntoEnumIterator;
+
 #[cfg(cpu_target = "aarch64")]
 pub mod aarch64;
 #[cfg(all(cpu_target = "aarch64", not(feature = "clippy")))]
@@ -77,8 +79,6 @@ use pyo3::prelude::*;
 #[pyo3(name = "libafl_qemu")]
 #[allow(clippy::items_after_statements, clippy::too_many_lines)]
 pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-    use strum::IntoEnumIterator;
-
     let regsm = PyModule::new(py, "regs")?;
     for r in Regs::iter() {
         let v: i32 = r.into();
