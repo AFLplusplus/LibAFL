@@ -188,6 +188,7 @@ extern "C" {
     fn libafl_qemu_num_regs() -> i32;
     fn libafl_qemu_set_breakpoint(addr: u64) -> i32;
     fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
+    fn libafl_flush_jit();
     fn libafl_qemu_set_hook(addr: u64, callback: extern "C" fn(u64), val: u64) -> i32;
     fn libafl_qemu_remove_hook(addr: u64) -> i32;
     fn libafl_qemu_run() -> i32;
@@ -535,6 +536,12 @@ impl Emulator {
         }
     }
 
+    pub fn flush_jit(&self) {
+        unsafe {
+            libafl_flush_jit();
+        }
+    }
+
     // TODO add has_X_hook() and panic when setting a hook for the second time
 
     pub fn set_exec_edge_hook(&self, hook: extern "C" fn(id: u64)) {
@@ -812,6 +819,10 @@ pub mod pybind {
 
         fn load_addr(&self) -> GuestAddr {
             self.emu.load_addr()
+        }
+
+        fn flush_jit(&self) {
+            self.emu.flush_jit();
         }
 
         fn map_private(&self, addr: GuestAddr, size: usize, perms: i32) -> PyResult<GuestAddr> {
