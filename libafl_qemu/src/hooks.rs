@@ -1056,6 +1056,8 @@ where
             );
             HOOKS_IS_INITIALIZED = true;
         }
+        // re-translate blocks with hooks
+        emulator.flush_jit();
         let slf = Box::pin(Self {
             emulator,
             helpers,

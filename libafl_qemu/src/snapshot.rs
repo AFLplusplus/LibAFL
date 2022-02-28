@@ -117,23 +117,7 @@ impl QemuSnapshotHelper {
     }
 
     pub fn reset(&mut self, emulator: &Emulator) {
-        eprintln!("RESET");
         self.reset_maps(emulator);
-
-        /*let mut changed = HashSet::<GuestAddr>::default();
-        let mut scratch = vec![0; SNAPSHOT_PAGE_SIZE];
-
-        for (page, info) in self.pages.iter() {
-            if let Some(data) = info.data.as_ref() {
-                unsafe { emulator.read_mem(*page, &mut scratch); }
-                for i in 0..SNAPSHOT_PAGE_SIZE {
-                    if data[i] != scratch[i] {
-                        changed.insert(*page);
-                        break;
-                    }
-                }
-            }
-        }*/
 
         for acc in self.accesses.iter_mut() {
             for page in unsafe { &(*acc.get()).dirty } {
@@ -141,16 +125,11 @@ impl QemuSnapshotHelper {
                     // TODO avoid duplicated memcpy
                     if let Some(data) = info.data.as_ref() {
                         unsafe { emulator.write_mem(*page, &data[..]) };
-                        //changed.remove(page);
                     }
                 }
             }
             unsafe { (*acc.get()).clear() };
         }
-
-        /*for page in changed {
-            eprintln!("unstable {:#x}", page);
-        }*/
 
         emulator.set_brk(self.brk);
     }
@@ -335,7 +314,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
-    match sys_num as i64 {
+    match i64::from(sys_num) {
         SYS_read => {
             let h = helpers
                 .match_first_type_mut::<QemuSnapshotHelper>()

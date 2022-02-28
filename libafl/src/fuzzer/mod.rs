@@ -591,11 +591,11 @@ where
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
+        *state.executions_mut() += 1;
+
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        *state.executions_mut() += 1;
 
         start_timer!(state);
         executor
@@ -651,11 +651,11 @@ where
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
+        *state.executions_mut() += 1;
+
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        *state.executions_mut() += 1;
 
         start_timer!(state);
         executor
