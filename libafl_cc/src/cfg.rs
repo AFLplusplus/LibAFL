@@ -64,11 +64,13 @@ pub struct EntryBasicBlockInfo {
 impl EntryBasicBlockInfo {
     /// Add a successor for an edge.
     pub fn add_successor(&mut self, successor_loc: usize) {
-        self.successor_edges.push((self.node_loc >> 1) ^ successor_loc);
+        self.successor_edges
+            .push((self.node_loc >> 1) ^ successor_loc);
     }
 }
 
 /// An LLVM style control flow graph.
+/// Note: This does not track across functions.
 #[derive(Debug)]
 pub struct ControlFlowGraph<T>
 where
@@ -185,7 +187,9 @@ where
     /// Convert current state to a [`ControlFlowGraph`].
     pub fn to_cfg(&self) -> ControlFlowGraph<T> {
         let mut cfg = ControlFlowGraph::new();
+        let mut entry_bb_locs: Vec<usize> = vec![];
         for (func_name, entry_bb) in &self.func_to_entry_bb {
+            entry_bb_locs.push(*entry_bb);
             let mut entry = EntryBasicBlockInfo {
                 calling_func: func_name.to_string(),
                 node_loc: *entry_bb,
@@ -198,8 +202,18 @@ where
             }
             cfg.create_func_entry(func_name, entry);
         }
-        for (bb_loc, successor_locs) in &self.bb_to_successors {
-            let current_func = self.bb_to_func.get(bb_loc).unwrap();
+
+        // Insert edges from zero to entry basic blocks.
+        let mut bb_to_successors_with_zero = self.bb_to_successors.clone();
+        if !entry_bb_locs.is_empty() {
+            bb_to_successors_with_zero.insert(0, entry_bb_locs);
+        }
+
+        for (bb_loc, successor_locs) in &bb_to_successors_with_zero {
+            let current_func = match bb_loc {
+                0 => self.bb_to_func.get(&successor_locs[0]).unwrap(),
+                _ => self.bb_to_func.get(bb_loc).unwrap(),
+            };
             for successor_loc in successor_locs {
                 let xored_loc = (*bb_loc >> 1) ^ (*successor_loc);
                 let mut edge = CfgEdge {
@@ -366,6 +380,9 @@ mod tests {
         assert_eq!(edge.calling_func, "main");
         assert_eq!(edge.successor_edges.len(), 2);
         assert_eq!(*edge.successor_edges.get(0).unwrap(), (26911 >> 1) ^ 52706);
+
+        assert!(cfg.get_edge(0 ^ 26911).is_none());
+        assert!(cfg.get_edge(0 ^ 41864).is_some());
     }
 
     #[test]
