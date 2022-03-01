@@ -8,7 +8,7 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
 use libafl::{
-    bolts::{ownedref::OwnedPtr, tuples::Named},
+    bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
-use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
+use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -94,14 +94,14 @@ impl AsanError {
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
-    options: FridaOptions,
+    options: FuzzerOptions,
     errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
     /// Creates a new `AsanErrors` struct
     #[must_use]
-    pub fn new(options: FridaOptions) -> Self {
+    pub fn new(options: FuzzerOptions) -> Self {
         Self {
             options,
             errors: Vec::new(),
@@ -534,7 +534,7 @@ impl AsanErrors {
         };
 
         #[allow(clippy::manual_assert)]
-        if !self.options.asan_continue_after_error() {
+        if !self.options.continue_on_error {
             panic!("ASAN: Crashing target!");
         }
     }

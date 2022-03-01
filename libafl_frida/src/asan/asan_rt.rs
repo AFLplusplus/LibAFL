@@ -13,7 +13,7 @@ use core::{
 };
 use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
 use hashbrown::HashMap;
-use libafl::bolts::AsSlice;
+use libafl::bolts::{cli::FuzzerOptions, AsSlice};
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
 
@@ -58,7 +58,6 @@ use crate::{
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::FridaRuntime,
     utils::writer_register,
-    FridaOptions,
 };
 
 #[cfg(target_arch = "aarch64")]
@@ -135,7 +134,7 @@ pub struct AsanRuntime {
     blob_check_mem_48bytes: Option<Box<[u8]>>,
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
-    options: FridaOptions,
+    options: FuzzerOptions,
     module_map: Option<ModuleMap>,
     suppressed_addresses: Vec<usize>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
@@ -172,8 +171,8 @@ impl FridaRuntime for AsanRuntime {
         self.unpoison_all_existing_memory();
 
         self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
-        if let Some(suppressed_specifiers) = self.options.dont_instrument_locations() {
-            for (module_name, offset) in suppressed_specifiers {
+        if !self.options.dont_instrument.is_empty() {
+            for (module_name, offset) in self.options.dont_instrument.clone() {
                 let module_details = ModuleDetails::with_name(module_name).unwrap();
                 let lib_start = module_details.range().base_address().0 as usize;
                 self.suppressed_addresses.push(lib_start + offset);
@@ -288,9 +287,9 @@ impl FridaRuntime for AsanRuntime {
 impl AsanRuntime {
     /// Create a new `AsanRuntime`
     #[must_use]
-    pub fn new(options: FridaOptions) -> AsanRuntime {
+    pub fn new(options: FuzzerOptions) -> AsanRuntime {
         Self {
-            check_for_leaks_enabled: options.asan_detect_leaks(),
+            check_for_leaks_enabled: options.detect_leaks,
             current_report_impl: 0,
             allocator: Allocator::new(options.clone()),
             regs: [0; ASAN_SAVE_REGISTER_COUNT],
