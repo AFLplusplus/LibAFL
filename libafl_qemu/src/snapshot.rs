@@ -12,8 +12,8 @@ use crate::{
     emu::{Emulator, MmapPerms},
     helper::{QemuHelper, QemuHelperTuple},
     hooks::QemuHooks,
-    GuestAddr, SYS_getrandom, SYS_mmap, SYS_mprotect, SYS_mremap, SYS_newfstatat, SYS_read,
-    SYS_readlinkat,
+    GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mmap, SYS_mprotect,
+    SYS_mremap, SYS_newfstatat, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
 
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
@@ -48,6 +48,7 @@ pub struct QemuSnapshotHelper {
     pub new_maps: Mutex<IntervalTree<GuestAddr, Option<MmapPerms>>>,
     pub pages: HashMap<GuestAddr, SnapshotPageInfo>,
     pub brk: GuestAddr,
+    pub mmap_start: GuestAddr,
     pub empty: bool,
 }
 
@@ -59,6 +60,7 @@ impl QemuSnapshotHelper {
             new_maps: Mutex::new(IntervalTree::new()),
             pages: HashMap::default(),
             brk: 0,
+            mmap_start: 0,
             empty: true,
         }
     }
@@ -66,6 +68,7 @@ impl QemuSnapshotHelper {
     #[allow(clippy::uninit_assumed_init)]
     pub fn snapshot(&mut self, emulator: &Emulator) {
         self.brk = emulator.get_brk();
+        self.mmap_start = emulator.get_mmap_start();
         self.pages.clear();
         for map in emulator.mappings() {
             let mut addr = map.start();
@@ -132,6 +135,7 @@ impl QemuSnapshotHelper {
         }
 
         emulator.set_brk(self.brk);
+        emulator.set_mmap_start(self.mmap_start);
     }
 
     pub fn add_mapped(&mut self, start: GuestAddr, mut size: usize, perms: Option<MmapPerms>) {
@@ -315,7 +319,7 @@ where
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {
-        SYS_read => {
+        SYS_read | SYS_pread64 => {
             let h = helpers
                 .match_first_type_mut::<QemuSnapshotHelper>()
                 .unwrap();
@@ -327,6 +331,12 @@ where
                 .unwrap();
             h.access(a2 as GuestAddr, a3 as usize);
         }
+        SYS_futex => {
+            let h = helpers
+                .match_first_type_mut::<QemuSnapshotHelper>()
+                .unwrap();
+            h.access(a0 as GuestAddr, a3 as usize);
+        }
         SYS_newfstatat => {
             if a2 != 0 {
                 let h = helpers
@@ -334,6 +344,12 @@ where
                     .unwrap();
                 h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
             }
+        }
+        SYS_statfs | SYS_fstatfs | SYS_fstat => {
+            let h = helpers
+                .match_first_type_mut::<QemuSnapshotHelper>()
+                .unwrap();
+            h.access(a1 as GuestAddr, 4096); // stat is not greater than a page
         }
         SYS_getrandom => {
             let h = helpers
