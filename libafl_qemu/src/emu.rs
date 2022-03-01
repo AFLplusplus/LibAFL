@@ -215,6 +215,7 @@ extern "C" {
 
     static exec_path: *const u8;
     static guest_base: usize;
+    static mut mmap_next_start: GuestAddr;
 
     static mut libafl_exec_edge_hook: unsafe extern "C" fn(u64);
     static mut libafl_gen_edge_hook: unsafe extern "C" fn(u64, u64) -> u64;
@@ -475,6 +476,15 @@ impl Emulator {
 
     pub fn set_brk(&self, brk: GuestAddr) {
         unsafe { libafl_set_brk(brk.into()) };
+    }
+
+    #[must_use]
+    pub fn get_mmap_start(&self) -> GuestAddr {
+        unsafe { mmap_next_start }
+    }
+
+    pub fn set_mmap_start(&self, start: GuestAddr) {
+        unsafe { mmap_next_start = start };
     }
 
     fn mmap(
