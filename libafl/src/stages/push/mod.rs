@@ -17,13 +17,13 @@ use core::{
 
 use crate::{
     bolts::current_time,
-    corpus::CorpusScheduler,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::Input,
     observers::ObserversTuple,
+    schedulers::Scheduler,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasCorpusScheduler,
+    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
 /// Send a monitor update all 15 (or more) seconds
@@ -34,12 +34,12 @@ const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 #[derive(Clone, Debug)]
 pub struct PushStageSharedState<CS, EM, I, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// The [`crate::state::State`]
     pub state: S,
@@ -54,12 +54,12 @@ where
 
 impl<CS, EM, I, OT, S, Z> PushStageSharedState<CS, EM, I, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
@@ -78,12 +78,12 @@ where
 #[derive(Clone, Debug)]
 pub struct PushStageHelper<CS, EM, I, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
@@ -109,12 +109,12 @@ where
 
 impl<CS, EM, I, OT, S, Z> PushStageHelper<CS, EM, I, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageHelper`]
     #[must_use]
@@ -182,12 +182,12 @@ where
 /// After it has finished once, we will call it agan for the next fuzzer round.
 pub trait PushStage<CS, EM, I, OT, S, Z>: Iterator
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Gets the [`PushStageHelper`]
     fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, I, OT, S, Z>;

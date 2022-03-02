@@ -2,18 +2,13 @@
 
 use alloc::borrow::ToOwned;
 
-use crate::{
-    corpus::{Corpus, CorpusScheduler},
-    inputs::Input,
-    state::HasCorpus,
-    Error,
-};
+use crate::{corpus::Corpus, inputs::Input, schedulers::Scheduler, state::HasCorpus, Error};
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueCorpusScheduler;
+pub struct QueueScheduler;
 
-impl<I, S> CorpusScheduler<I, S> for QueueCorpusScheduler
+impl<I, S> Scheduler<I, S> for QueueScheduler
 where
     S: HasCorpus<I>,
     I: Input,
@@ -39,15 +34,15 @@ where
     }
 }
 
-impl QueueCorpusScheduler {
-    /// Creates a new `QueueCorpusScheduler`
+impl QueueScheduler {
+    /// Creates a new `QueueScheduler`
     #[must_use]
     pub fn new() -> Self {
         Self
     }
 }
 
-impl Default for QueueCorpusScheduler {
+impl Default for QueueScheduler {
     fn default() -> Self {
         Self::new()
     }
@@ -61,7 +56,7 @@ mod tests {
 
     use crate::{
         bolts::rands::StdRand,
-        corpus::{Corpus, CorpusScheduler, OnDiskCorpus, QueueCorpusScheduler, Testcase},
+        corpus::{Corpus, OnDiskCorpus, QueueScheduler, Scheduler, Testcase},
         inputs::bytes::BytesInput,
         state::{HasCorpus, StdState},
     };
@@ -69,7 +64,7 @@ mod tests {
     #[test]
     fn test_queuecorpus() {
         let rand = StdRand::with_seed(4);
-        let scheduler = QueueCorpusScheduler::new();
+        let scheduler = QueueScheduler::new();
 
         let mut q =
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/path")).unwrap();

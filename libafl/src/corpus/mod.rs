@@ -16,36 +16,9 @@ pub mod cached;
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
 
-pub mod queue;
-pub use queue::QueueCorpusScheduler;
-
-pub mod probabilistic_sampling;
-pub use probabilistic_sampling::ProbabilitySamplingCorpusScheduler;
-
-pub mod accounting;
-pub use accounting::*;
-
-pub mod fav_factor;
-pub use fav_factor::{FavFactor, LenTimeMulFavFactor};
-
-pub mod minimizer;
-pub use minimizer::{
-    IndexesLenTimeMinimizerCorpusScheduler, IsFavoredMetadata, LenTimeMinimizerCorpusScheduler,
-    MinimizerCorpusScheduler, TopRatedsMetadata,
-};
-
-pub mod powersched;
-pub use powersched::PowerQueueCorpusScheduler;
-
-use alloc::borrow::ToOwned;
 use core::cell::RefCell;
 
-use crate::{
-    bolts::rands::Rand,
-    inputs::Input,
-    state::{HasCorpus, HasRand},
-    Error,
-};
+use crate::{inputs::Input, Error};
 
 /// Corpus with all current testcases
 pub trait Corpus<I>: serde::Serialize + serde::de::DeserializeOwned
@@ -78,81 +51,6 @@ where
     /// Current testcase scheduled (mutable)
     fn current_mut(&mut self) -> &mut Option<usize>;
 }
-
-/// The scheduler define how the fuzzer requests a testcase from the corpus.
-/// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait CorpusScheduler<I, S>
-where
-    I: Input,
-{
-    /// Add an entry to the corpus and return its index
-    fn on_add(&self, _state: &mut S, _idx: usize) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Replaces the testcase at the given idx
-    fn on_replace(
-        &self,
-        _state: &mut S,
-        _idx: usize,
-        _testcase: &Testcase<I>,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Removes an entry from the corpus, returning it if it was present.
-    fn on_remove(
-        &self,
-        _state: &mut S,
-        _idx: usize,
-        _testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
-        Ok(())
-    }
-
-    /// Gets the next entry
-    fn next(&self, state: &mut S) -> Result<usize, Error>;
-}
-
-/// Feed the fuzzer simpply with a random testcase on request
-#[derive(Debug, Clone)]
-pub struct RandCorpusScheduler;
-
-impl<I, S> CorpusScheduler<I, S> for RandCorpusScheduler
-where
-    S: HasCorpus<I> + HasRand,
-    I: Input,
-{
-    /// Gets the next entry at random
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        if state.corpus().count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_owned()))
-        } else {
-            let len = state.corpus().count();
-            let id = state.rand_mut().below(len as u64) as usize;
-            *state.corpus_mut().current_mut() = Some(id);
-            Ok(id)
-        }
-    }
-}
-
-impl RandCorpusScheduler {
-    /// Create a new [`RandCorpusScheduler`] that just schedules randomly.
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for RandCorpusScheduler {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// A [`StdCorpusScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s.
-/// The current `Std` is a [`RandCorpusScheduler`], although this may change in the future, if another [`CorpusScheduler`] delivers better results.
-pub type StdCorpusScheduler = RandCorpusScheduler;
 
 /// `Corpus` Python bindings
 #[cfg(feature = "python")]

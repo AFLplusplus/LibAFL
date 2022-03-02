@@ -3,9 +3,10 @@
 
 use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
-    corpus::{Corpus, CorpusScheduler, FavFactor, LenTimeMulFavFactor, Testcase},
+    corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
+    schedulers::{FavFactor, LenTimeMulFavFactor, Scheduler},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -48,13 +49,13 @@ impl Default for TopRatedsMetadata {
     }
 }
 
-/// The [`MinimizerCorpusScheduler`] employs a genetic algorithm to compute a subset of the
+/// The [`MinimizerScheduler`] employs a genetic algorithm to compute a subset of the
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
 /// prioritizing [`Testcase`]`s` using [`FavFactor`]
 #[derive(Debug, Clone)]
-pub struct MinimizerCorpusScheduler<CS, F, I, M, S>
+pub struct MinimizerScheduler<CS, F, I, M, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
@@ -65,9 +66,9 @@ where
     phantom: PhantomData<(F, I, M, S)>,
 }
 
-impl<CS, F, I, M, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<CS, F, I, M, S>
+impl<CS, F, I, M, S> Scheduler<I, S> for MinimizerScheduler<CS, F, I, M, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
@@ -113,15 +114,15 @@ where
     }
 }
 
-impl<CS, F, I, M, S> MinimizerCorpusScheduler<CS, F, I, M, S>
+impl<CS, F, I, M, S> MinimizerScheduler<CS, F, I, M, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: FavFactor<I>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
-    /// Update the `Corpus` score using the `MinimizerCorpusScheduler`
+    /// Update the `Corpus` score using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
@@ -136,7 +137,7 @@ where
             let factor = F::compute(&mut *entry)?;
             let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
                 Error::KeyNotFound(format!(
-                    "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
+                    "Metadata needed for MinimizerScheduler not found in testcase #{}",
                     idx
                 ))
             })?;
@@ -156,7 +157,7 @@ where
                     let must_remove = {
                         let old_meta = old.metadata_mut().get_mut::<M>().ok_or_else(|| {
                             Error::KeyNotFound(format!(
-                                "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
+                                "Metadata needed for MinimizerScheduler not found in testcase #{}",
                                 old_idx
                             ))
                         })?;
@@ -198,7 +199,7 @@ where
         Ok(())
     }
 
-    /// Cull the `Corpus` using the `MinimizerCorpusScheduler`
+    /// Cull the `Corpus` using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &mut S) -> Result<(), Error> {
         let top_rated = match state.metadata().get::<TopRatedsMetadata>() {
@@ -213,7 +214,7 @@ where
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
                 let meta = entry.metadata().get::<M>().ok_or_else(|| {
                     Error::KeyNotFound(format!(
-                        "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
+                        "Metadata needed for MinimizerScheduler not found in testcase #{}",
                         idx
                     ))
                 })?;
@@ -233,7 +234,7 @@ where
         &self.base
     }
 
-    /// Creates a new [`MinimizerCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
+    /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(base: CS) -> Self {
         Self {
@@ -243,7 +244,7 @@ where
         }
     }
 
-    /// Creates a new [`MinimizerCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
+    /// Creates a new [`MinimizerScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
     pub fn with_skip_prob(base: CS, skip_non_favored_prob: u64) -> Self {
         Self {
@@ -254,11 +255,11 @@ where
     }
 }
 
-/// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`.
-pub type LenTimeMinimizerCorpusScheduler<CS, I, M, S> =
-    MinimizerCorpusScheduler<CS, LenTimeMulFavFactor<I>, I, M, S>;
+/// A [`MinimizerScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`.
+pub type LenTimeMinimizerScheduler<CS, I, M, S> =
+    MinimizerScheduler<CS, LenTimeMulFavFactor<I>, I, M, S>;
 
-/// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`
+/// A [`MinimizerScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
-pub type IndexesLenTimeMinimizerCorpusScheduler<CS, I, S> =
-    MinimizerCorpusScheduler<CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, S>;
+pub type IndexesLenTimeMinimizerScheduler<CS, I, S> =
+    MinimizerScheduler<CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, S>;

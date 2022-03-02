@@ -2,13 +2,14 @@
 
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, CorpusScheduler, Testcase},
+    corpus::{Corpus, Testcase},
     events::{Event, EventConfig, EventFirer, EventManager, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
+    schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
@@ -25,9 +26,9 @@ use core::{marker::PhantomData, time::Duration};
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
-pub trait HasCorpusScheduler<CS, I, S>
+pub trait HasScheduler<CS, I, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     I: Input,
 {
     /// The scheduler
@@ -235,7 +236,7 @@ pub enum ExecuteInputResult {
 #[derive(Debug)]
 pub struct StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -247,9 +248,9 @@ where
     phantom: PhantomData<(I, OT, S)>,
 }
 
-impl<CS, F, I, OF, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, F, I, OF, OT, S> HasScheduler<CS, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -266,7 +267,7 @@ where
 
 impl<CS, F, I, OF, OT, S> HasFeedback<F, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -283,7 +284,7 @@ where
 
 impl<CS, F, I, OF, OT, S> HasObjective<I, OF, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -300,7 +301,7 @@ where
 
 impl<CS, F, I, OF, OT, S> ExecutionProcessor<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -414,7 +415,7 @@ where
 
 impl<CS, F, I, OF, OT, S> EvaluatorObservers<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     F: Feedback<I, S>,
     I: Input,
@@ -443,7 +444,7 @@ where
 
 impl<CS, E, EM, F, I, OF, OT, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     EM: EventManager<E, I, S, Self>,
@@ -509,7 +510,7 @@ where
 
 impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
@@ -559,7 +560,7 @@ where
 
 impl<CS, F, I, OF, OT, S> StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -628,7 +629,7 @@ where
 
 impl<CS, F, I, OF, OT, S> ExecutesInput<I, OT, S, Self> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -670,7 +671,7 @@ where
 #[cfg(feature = "python")]
 /// `Fuzzer` Python bindings
 pub mod pybind {
-    use crate::corpus::QueueCorpusScheduler;
+    use crate::corpus::QueueScheduler;
     use crate::feedbacks::{CrashFeedback, MaxMapFeedback};
     use crate::fuzzer::{Fuzzer, StdFuzzer};
     use crate::inputs::BytesInput;
@@ -688,7 +689,7 @@ pub mod pybind {
 
             /// `StdFuzzer` with fixed generics
             pub type $type_name = StdFuzzer<
-                QueueCorpusScheduler,
+                QueueScheduler,
                 MaxMapFeedback<BytesInput, $map_observer_name, $my_std_state_type_name, $datatype>,
                 BytesInput,
                 CrashFeedback,
@@ -709,7 +710,7 @@ pub mod pybind {
                 fn new(py_max_map_feedback: $max_map_feedback_py_name) -> Self {
                     Self {
                         std_fuzzer: StdFuzzer::new(
-                            QueueCorpusScheduler::new(),
+                            QueueScheduler::new(),
                             py_max_map_feedback.max_map_feedback,
                             CrashFeedback::new(),
                         ),

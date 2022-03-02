@@ -3,8 +3,9 @@
 use alloc::string::{String, ToString};
 
 use crate::{
-    corpus::{Corpus, CorpusScheduler, PowerScheduleTestcaseMetaData},
+    corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
+    schedulers::Scheduler,
     stages::PowerScheduleMetadata,
     state::{HasCorpus, HasMetadata},
     Error,
@@ -12,15 +13,15 @@ use crate::{
 
 /// A corpus scheduler using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerQueueCorpusScheduler;
+pub struct PowerQueueScheduler;
 
-impl Default for PowerQueueCorpusScheduler {
+impl Default for PowerQueueScheduler {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<I, S> CorpusScheduler<I, S> for PowerQueueCorpusScheduler
+impl<I, S> Scheduler<I, S> for PowerQueueScheduler
 where
     S: HasCorpus<I> + HasMetadata,
     I: Input,
@@ -78,8 +79,8 @@ where
     }
 }
 
-impl PowerQueueCorpusScheduler {
-    /// Create a new [`PowerQueueCorpusScheduler`]
+impl PowerQueueScheduler {
+    /// Create a new [`PowerQueueScheduler`]
     #[must_use]
     pub fn new() -> Self {
         Self

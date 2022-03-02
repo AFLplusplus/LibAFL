@@ -4,12 +4,13 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, IsFavoredMetadata, PowerScheduleTestcaseMetaData, Testcase},
+    corpus::{Corpus, PowerScheduleTestcaseMetaData, Testcase},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
+    schedulers::minimizer::IsFavoredMetadata,
     stages::{MutationalStage, PowerScheduleMetadata, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,

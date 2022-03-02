@@ -3,8 +3,9 @@
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusScheduler, FavFactor},
+    corpus::Corpus,
     inputs::Input,
+    schedulers::{FavFactor, Scheduler},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -15,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
 #[derive(Debug, Clone)]
-pub struct ProbabilitySamplingCorpusScheduler<I, S, F>
+pub struct ProbabilitySamplingScheduler<I, S, F>
 where
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -52,13 +53,13 @@ impl Default for ProbabilityMetadata {
     }
 }
 
-impl<I, S, F> ProbabilitySamplingCorpusScheduler<I, S, F>
+impl<I, S, F> ProbabilitySamplingScheduler<I, S, F>
 where
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
     F: FavFactor<I>,
 {
-    /// Creates a new [`struct@ProbabilitySamplingCorpusScheduler`]
+    /// Creates a new [`struct@ProbabilitySamplingScheduler`]
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -87,7 +88,7 @@ where
     }
 }
 
-impl<I, S, F> CorpusScheduler<I, S> for ProbabilitySamplingCorpusScheduler<I, S, F>
+impl<I, S, F> Scheduler<I, S> for ProbabilitySamplingScheduler<I, S, F>
 where
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -121,7 +122,7 @@ where
     }
 }
 
-impl<I, S, F> Default for ProbabilitySamplingCorpusScheduler<I, S, F>
+impl<I, S, F> Default for ProbabilitySamplingScheduler<I, S, F>
 where
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -140,8 +141,7 @@ mod tests {
     use crate::{
         bolts::rands::StdRand,
         corpus::{
-            Corpus, CorpusScheduler, FavFactor, InMemoryCorpus, ProbabilitySamplingCorpusScheduler,
-            Testcase,
+            Corpus, FavFactor, InMemoryCorpus, ProbabilitySamplingScheduler, Scheduler, Testcase,
         },
         inputs::{bytes::BytesInput, Input},
         state::StdState,
@@ -168,15 +168,15 @@ mod tests {
         }
     }
 
-    pub type UniformProbabilitySamplingCorpusScheduler<I, S> =
-        ProbabilitySamplingCorpusScheduler<I, S, UniformDistribution<I>>;
+    pub type UniformProbabilitySamplingScheduler<I, S> =
+        ProbabilitySamplingScheduler<I, S, UniformDistribution<I>>;
 
     #[test]
     fn test_prob_sampling() {
         // the first 3 probabilities will be .69, .86, .44
         let rand = StdRand::with_seed(12);
 
-        let scheduler = UniformProbabilitySamplingCorpusScheduler::new();
+        let scheduler = UniformProbabilitySamplingScheduler::new();
 
         let mut corpus = InMemoryCorpus::new();
         let t1 = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "1".into());
