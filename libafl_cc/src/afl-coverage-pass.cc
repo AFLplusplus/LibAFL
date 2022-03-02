@@ -29,6 +29,14 @@
 #include "common-llvm.h"
 
 #include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <ctype.h>
 
 #include <list>
 #include <string>
@@ -40,6 +48,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #if LLVM_VERSION_MAJOR > 3 || \
     (LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 4)
@@ -69,6 +79,8 @@ static cl::opt<uint32_t> Ngram("ngram", cl::desc("Size of the Ngram instrumentat
 static cl::opt<uint32_t> CtxK("ctx_k", cl::desc("Size of the context for K-Ctx context sensitivity (0 to disable)"), cl::init(0), cl::NotHidden);
 static cl::opt<bool> Ctx("ctx", cl::desc("Enable full context sensitive coverage"), cl::init(false), cl::NotHidden);
 static cl::opt<bool> ThreadSafe("thread_safe", cl::desc("Use the thread safe instrumentation"), cl::init(false), cl::NotHidden);
+static cl::opt<bool> DumpCFG("dump_afl_cfg", cl::desc("Dump CFG containing AFL-style edge index"), cl::init(false), cl::NotHidden);
+static cl::opt<std::string> DumpCFGPath("dump_afl_cfg_path", cl::desc("Path to dump CFG containing AFL-style edge index"), cl::init(".cfg"), cl::NotHidden);
 
 namespace {
 
@@ -94,8 +106,10 @@ class AFLCoverage : public ModulePass {
 #endif
 
  protected:
-  uint32_t    map_size = MAP_SIZE;
-  uint32_t    function_minimum_size = 1;
+  uint32_t                           map_size = MAP_SIZE;
+  uint32_t                           function_minimum_size = 1;
+  DenseMap<BasicBlock *, int32_t>    bb_to_cur_loc;
+  DenseMap<StringRef, BasicBlock *>  entry_bb;
 
 };
 
@@ -142,7 +156,7 @@ PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
 bool AFLCoverage::runOnModule(Module &M) {
 #endif
-
+  if (Ctx && DumpCFG) FATAL("Does not support dumping CFG with full context sensitive coverage enabled.");
   LLVMContext &C = M.getContext();
 
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
@@ -395,6 +409,7 @@ bool AFLCoverage::runOnModule(Module &M) {
     // if (!isInInstrumentList(&F)) { continue; }
 
     if (F.size() < function_minimum_size) { continue; }
+    if (DumpCFG) entry_bb[F.getName()] = &F.getEntryBlock();
 
     std::list<Value *> todo;
     for (auto &BB : F) {
@@ -494,7 +509,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       // cur_loc++;
       cur_loc = RandBelow(map_size);
-
+      if (DumpCFG) bb_to_cur_loc[&BB] = cur_loc;
 /* There is a problem with Ubuntu 18.04 and llvm 6.0 (see issue #63).
    The inline function successors() is not inlined and also not found at runtime
    :-( As I am unable to detect Ubuntu18.04 heree, the next best thing is to
@@ -736,6 +751,36 @@ bool AFLCoverage::runOnModule(Module &M) {
 
     }
 
+  }
+  if (DumpCFG) {
+    int fd;
+    if ((fd = open(DumpCFGPath.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644)) < 0)
+      FATAL("Could not open/create CFG dump file.");
+    std::string cfg = "";
+    for (auto record = entry_bb.begin(); record != entry_bb.end(); record++) {
+      // Dump function BB entry points
+      cfg += formatv("$${0}+{1}\n", record->getFirst(), bb_to_cur_loc[record->getSecond()]);
+    }
+    for (auto record = bb_to_cur_loc.begin(); record != bb_to_cur_loc.end(); record++) {
+      // Dump CFG information
+      auto current_bb = record->getFirst();
+      Function* calling_func = current_bb->getParent();
+      if (calling_func) {
+        auto function_name = calling_func->getName().str();
+        cfg += formatv("%%{0}", function_name);
+      }
+      else
+        cfg += "%%__";
+      auto current_cur_loc = record->getSecond();
+      cfg += formatv("+{0}\n", current_cur_loc);
+      for (auto bb_successor = succ_begin(current_bb);
+            bb_successor != succ_end(current_bb); bb_successor++) {
+        cfg += formatv("->{0}\n", bb_to_cur_loc[*bb_successor]).str();
+      }
+    }
+    if (Debug) errs() << "CFG: \n" << cfg;
+    if (cfg.size() > 0 && write(fd, cfg.c_str(), cfg.length()) <= 0)
+      FATAL("Failed to dump CFG.\n");
   }
 
   /* Say something nice. */
