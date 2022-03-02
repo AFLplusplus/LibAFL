@@ -76,7 +76,7 @@ pub fn main() {
         1337,
         opt.concolic,
     )
-        .expect("An error occurred while fuzzing");
+    .expect("An error occurred while fuzzing");
 }
 
 /// The actual fuzzer
