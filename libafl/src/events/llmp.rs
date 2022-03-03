@@ -948,11 +948,12 @@ mod tests {
             staterestore::StateRestorer,
             tuples::tuple_list,
         },
-        corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
+        corpus::{Corpus, InMemoryCorpus, Testcase},
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
         mutators::BitFlipMutator,
+        schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::StdState,
         Fuzzer, StdFuzzer,
@@ -988,7 +989,7 @@ mod tests {
         let mut llmp_mgr =
             LlmpEventManager::<BytesInput, (), _, _>::new(llmp_client, "fuzzer".into()).unwrap();
 
-        let scheduler = RandCorpusScheduler::new();
+        let scheduler = RandScheduler::new();
 
         let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 

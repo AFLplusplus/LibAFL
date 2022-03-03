@@ -56,8 +56,9 @@ mod tests {
 
     use crate::{
         bolts::rands::StdRand,
-        corpus::{Corpus, OnDiskCorpus, QueueScheduler, Scheduler, Testcase},
+        corpus::{Corpus, OnDiskCorpus, Testcase},
         inputs::bytes::BytesInput,
+        schedulers::{QueueScheduler, Scheduler},
         state::{HasCorpus, StdState},
     };
 

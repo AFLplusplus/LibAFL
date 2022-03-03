@@ -235,11 +235,12 @@ impl std::error::Error for Error {}
 mod tests {
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
-        corpus::{Corpus, InMemoryCorpus, RandScheduler, Testcase},
+        corpus::{Corpus, InMemoryCorpus, Testcase},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
+        schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
         Fuzzer, StdFuzzer,

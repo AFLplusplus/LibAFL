@@ -140,10 +140,9 @@ mod tests {
 
     use crate::{
         bolts::rands::StdRand,
-        corpus::{
-            Corpus, FavFactor, InMemoryCorpus, ProbabilitySamplingScheduler, Scheduler, Testcase,
-        },
+        corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::{bytes::BytesInput, Input},
+        schedulers::{FavFactor, ProbabilitySamplingScheduler, Scheduler},
         state::StdState,
         Error,
     };
