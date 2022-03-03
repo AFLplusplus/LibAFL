@@ -8,7 +8,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsMutSlice,
     },
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, QueueScheduler},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_and_fast, feedback_or,
