@@ -671,7 +671,7 @@ where
 #[cfg(feature = "python")]
 /// `Fuzzer` Python bindings
 pub mod pybind {
-    use crate::corpus::QueueScheduler;
+    use crate::schedulers::QueueScheduler;
     use crate::feedbacks::{CrashFeedback, MaxMapFeedback};
     use crate::fuzzer::{Fuzzer, StdFuzzer};
     use crate::inputs::BytesInput;
