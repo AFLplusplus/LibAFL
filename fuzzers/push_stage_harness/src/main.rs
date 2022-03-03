@@ -18,7 +18,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
-    schedulers::{Scheduler, QueueScheduler},
+    schedulers::{QueueScheduler, Scheduler},
     stages::push::{PushStageSharedState, StdMutationalPushStage},
     state::{HasCorpus, StdState},
 };
