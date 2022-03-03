@@ -500,6 +500,7 @@ where
                     start = end;
                 }
                 end -= 1;
+                index += 1;
             }
         }
 
