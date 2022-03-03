@@ -200,11 +200,10 @@ pub fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = CoverageAccountingScheduler::new(
-            &mut state,
-            QueueScheduler::new(),
-            unsafe { &ACCOUNTING_MEMOP_MAP },
-        );
+        let scheduler =
+            CoverageAccountingScheduler::new(&mut state, QueueScheduler::new(), unsafe {
+                &ACCOUNTING_MEMOP_MAP
+            });
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

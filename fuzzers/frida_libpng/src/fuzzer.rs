@@ -174,8 +174,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -293,8 +292,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -428,8 +426,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
