@@ -2,12 +2,13 @@
 
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
-    corpus::{
-        minimizer::{IsFavoredMetadata, MinimizerCorpusScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
-        Corpus, CorpusScheduler, LenTimeMulFavFactor, Testcase,
-    },
+    corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
+    schedulers::{
+        minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
+        LenTimeMulFavFactor, Scheduler,
+    },
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -91,20 +92,20 @@ impl TopAccountingMetadata {
 
 /// A minimizer scheduler using coverage accounting
 #[derive(Debug)]
-pub struct CoverageAccountingCorpusScheduler<'a, CS, I, S>
+pub struct CoverageAccountingScheduler<'a, CS, I, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
-    inner: MinimizerCorpusScheduler<CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, S>,
+    inner: MinimizerScheduler<CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, S>,
 }
 
-impl<'a, CS, I, S> CorpusScheduler<I, S> for CoverageAccountingCorpusScheduler<'a, CS, I, S>
+impl<'a, CS, I, S> Scheduler<I, S> for CoverageAccountingScheduler<'a, CS, I, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -152,9 +153,9 @@ where
     }
 }
 
-impl<'a, CS, I, S> CoverageAccountingCorpusScheduler<'a, CS, I, S>
+impl<'a, CS, I, S> CoverageAccountingScheduler<'a, CS, I, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -188,7 +189,7 @@ where
                         let must_remove = {
                             let old_meta = old.metadata_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
                                 Error::KeyNotFound(format!(
-                                    "AccountingIndexesMetadata, needed by CoverageAccountingCorpusScheduler, not found in testcase #{}",
+                                    "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{}",
                                     old_idx
                                 ))
                             })?;
@@ -259,18 +260,18 @@ where
         Ok(())
     }
 
-    /// Creates a new [`CoverageAccountingCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
+    /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self {
         state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
         Self {
             accounting_map,
-            inner: MinimizerCorpusScheduler::new(base),
+            inner: MinimizerScheduler::new(base),
             skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
         }
     }
 
-    /// Creates a new [`CoverageAccountingCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
+    /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
     pub fn with_skip_prob(
         state: &mut S,
@@ -281,7 +282,7 @@ where
         state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
         Self {
             accounting_map,
-            inner: MinimizerCorpusScheduler::with_skip_prob(base, skip_non_favored_prob),
+            inner: MinimizerScheduler::with_skip_prob(base, skip_non_favored_prob),
             skip_non_favored_prob,
         }
     }

@@ -8,7 +8,7 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{MapFeedbackState, MaxMapFeedback, ReachabilityFeedback},
@@ -17,6 +17,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{HitcountsMapObserver, StdMapObserver},
+    schedulers::RandScheduler,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error,
@@ -106,7 +107,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // A random policy to get testcasess from the corpus
-    let scheduler = RandCorpusScheduler::new();
+    let scheduler = RandScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

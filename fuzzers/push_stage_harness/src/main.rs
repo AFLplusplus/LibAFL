@@ -9,9 +9,7 @@ use std::{path::PathBuf, rc::Rc};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
-    corpus::{
-        Corpus, CorpusScheduler, InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler, Testcase,
-    },
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
     executors::ExitKind,
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
@@ -20,6 +18,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
+    schedulers::{QueueScheduler, Scheduler},
     stages::push::{PushStageSharedState, StdMutationalPushStage},
     state::{HasCorpus, StdState},
 };
@@ -68,7 +67,7 @@ pub fn main() {
     let mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
-    let scheduler = QueueCorpusScheduler::new();
+    let scheduler = QueueScheduler::new();
 
     // Create the executor for an in-process function with just one observer
     //let mut executor = InProcessExecutor::new(&mut harness, &mut fuzzer, &mut state, &mut mgr)

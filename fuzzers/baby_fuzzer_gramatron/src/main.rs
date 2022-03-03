@@ -10,7 +10,7 @@ use std::ptr::write_volatile;
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
@@ -23,6 +23,7 @@ use libafl::{
         StdScheduledMutator,
     },
     observers::StdMapObserver,
+    schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -91,7 +92,7 @@ pub fn main() {
     let mut mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
-    let scheduler = QueueCorpusScheduler::new();
+    let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

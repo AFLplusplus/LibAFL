@@ -15,10 +15,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{
-        CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
+    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
@@ -30,6 +27,7 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::{I2SRandReplace, Tokens},
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -192,8 +190,7 @@ where
             }
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler =
-                IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

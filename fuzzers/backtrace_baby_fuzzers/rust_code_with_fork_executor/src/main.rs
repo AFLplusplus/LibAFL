@@ -11,7 +11,7 @@ use libafl::{
         tuples::tuple_list,
         AsMutSlice, AsSlice,
     },
-    corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessForkExecutor},
     feedback_and,
@@ -24,6 +24,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{BacktraceObserver, StdMapObserver},
+    schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -110,7 +111,7 @@ pub fn main() {
     let mut mgr = SimpleEventManager::new(mon);
 
     // A queue policy to get testcasess from the corpus
-    let scheduler = QueueCorpusScheduler::new();
+    let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

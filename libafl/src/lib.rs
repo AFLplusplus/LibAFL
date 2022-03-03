@@ -93,6 +93,7 @@ pub mod inputs;
 pub mod monitors;
 pub mod mutators;
 pub mod observers;
+pub mod schedulers;
 pub mod stages;
 pub mod state;
 
@@ -234,11 +235,12 @@ impl std::error::Error for Error {}
 mod tests {
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
-        corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
+        corpus::{Corpus, InMemoryCorpus, Testcase},
         executors::{ExitKind, InProcessExecutor},
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
+        schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
         Fuzzer, StdFuzzer,
@@ -268,7 +270,7 @@ mod tests {
         });
         let mut event_manager = SimpleEventManager::new(monitor);
 
-        let scheduler = RandCorpusScheduler::new();
+        let scheduler = RandScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;

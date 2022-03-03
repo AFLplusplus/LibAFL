@@ -17,10 +17,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{
-        ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus,
-        IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler,
-    },
+    corpus::{ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
     feedback_or, feedback_or_fast,
@@ -34,6 +31,7 @@ use libafl::{
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -176,8 +174,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -295,8 +292,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -430,8 +426,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
                 // A minimization+queue policy to get testcasess from the corpus
-                let scheduler =
-                    IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+                let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

@@ -38,15 +38,15 @@ pub mod sync;
 pub use sync::*;
 
 use crate::{
-    corpus::CorpusScheduler,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
+    schedulers::Scheduler,
     state::{
         HasExecutions, HasRand, {HasClientPerfMonitor, HasCorpus},
     },
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasCorpusScheduler,
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 use core::{convert::From, marker::PhantomData};
 
@@ -171,13 +171,13 @@ where
 #[derive(Debug)]
 pub struct PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     push_stage: PS,
     phantom: PhantomData<(CS, EM, I, OT, S, Z)>,
@@ -185,13 +185,13 @@ where
 
 impl<CS, EM, I, OT, PS, S, Z> PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
@@ -206,7 +206,7 @@ where
 
 impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
@@ -216,7 +216,7 @@ where
     Z: ExecutesInput<I, OT, S, Z>
         + ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>
-        + HasCorpusScheduler<CS, I, S>,
+        + HasScheduler<CS, I, S>,
 {
     fn perform(
         &mut self,

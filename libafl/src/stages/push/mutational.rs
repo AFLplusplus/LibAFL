@@ -6,16 +6,17 @@ use core::cell::{Cell, RefCell};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusScheduler},
+    corpus::Corpus,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::Input,
     mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
+    schedulers::Scheduler,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasCorpusScheduler,
+    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
 #[cfg(feature = "introspection")]
@@ -37,13 +38,13 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 #[derive(Clone, Debug)]
 pub struct StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     current_corpus_idx: Option<usize>,
     testcases_to_do: usize,
@@ -58,13 +59,13 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
@@ -81,13 +82,13 @@ where
 impl<CS, EM, I, M, OT, S, Z> PushStage<CS, EM, I, OT, S, Z>
     for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
     fn init(
@@ -192,13 +193,13 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> Iterator for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     type Item = Result<I, Error>;
 
@@ -209,13 +210,13 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
     #[must_use]

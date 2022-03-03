@@ -23,9 +23,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsMutSlice, AsSlice,
     },
-    corpus::{
-        Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
-    },
+    corpus::{Corpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor},
     feedback_or,
@@ -38,6 +36,7 @@ use libafl::{
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    schedulers::{IndexesLenTimeMinimizerScheduler, PowerQueueScheduler},
     stages::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
@@ -282,7 +281,7 @@ fn fuzz(
     let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
