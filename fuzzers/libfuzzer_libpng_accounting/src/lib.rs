@@ -20,10 +20,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{
-        Corpus, CoverageAccountingCorpusScheduler, InMemoryCorpus, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::EventConfig,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
@@ -34,6 +31,7 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{CoverageAccountingScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -202,9 +200,9 @@ pub fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = CoverageAccountingCorpusScheduler::new(
+        let scheduler = CoverageAccountingScheduler::new(
             &mut state,
-            QueueCorpusScheduler::new(),
+            QueueScheduler::new(),
             unsafe { &ACCOUNTING_MEMOP_MAP },
         );
 

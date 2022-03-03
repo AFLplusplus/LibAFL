@@ -8,7 +8,7 @@ use std::{env, path::PathBuf};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, PowerQueueCorpusScheduler},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
@@ -17,6 +17,7 @@ use libafl::{
     inputs::HasTargetBytes,
     monitors::MultiMonitor,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    schedulers::PowerQueueScheduler,
     stages::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
@@ -133,7 +134,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = PacketLenMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
+    let scheduler = PacketLenMinimizerScheduler::new(PowerQueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
