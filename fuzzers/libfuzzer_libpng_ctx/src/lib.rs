@@ -33,7 +33,7 @@ use libafl::{
         token_mutations::Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, PowerQueueScheduler},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     Error,
