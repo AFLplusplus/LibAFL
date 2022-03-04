@@ -91,10 +91,10 @@ pub fn current_time() -> time::Duration {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap()
 }
 
-/// external defined function in case of `no_std`
-///
-/// Define your own `external_current_millis()` function via `extern "C"`
-/// which is linked into the binary and called from here.
+// external defined function in case of `no_std`
+//
+// Define your own `external_current_millis()` function via `extern "C"`
+// which is linked into the binary and called from here.
 #[cfg(not(feature = "std"))]
 extern "C" {
     //#[no_mangle]
