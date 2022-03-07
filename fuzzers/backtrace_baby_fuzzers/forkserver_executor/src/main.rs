@@ -6,7 +6,7 @@ use libafl::{
         tuples::tuple_list,
         AsMutSlice,
     },
-    corpus::{InMemoryCorpus, OnDiskCorpus, QueueScheduler},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
     feedback_and,
