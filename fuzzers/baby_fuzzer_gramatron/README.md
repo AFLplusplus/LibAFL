@@ -1,8 +1,15 @@
-# Baby fuzzer
+# Baby Gramatron
 
-This is a minimalistic example about how to create a libafl based fuzzer.
+This fuzzer shows how to implement grammar-aware fuzzing. [Gramatron](https://github.com/HexHive/Gramatron) uses grammar automatons in conjunction with aggressive mutation operators to synthesize complex bug triggers. `auto.json` records grammar automaton of php,which is corresponding to `libafl::generators::Automaton`and serialized into `auto.postcard`. `libafl::generators::gramatron` will generate valid grammar sequences using `Automaton` and then pass them into `harness`. The function of `harness` is to print the original input.
 
-It runs on a single core until a crash occurs and then exits.
-
-The tested program is a simple Rust function without any instrumentation.
-For real fuzzing, you will want to add some sort to add coverage or other feedback.
+When you use `cargo run`, You may see output as follows:
+```
+b=mlhs_node.isz(c,c, )
+d=false.keyword__FILE__(c,b,a,b)
+a=select.Jan(d)
+a=first.literal( )
+b=[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,nil].DomainError(c)
+next a
+b=Oo.gsub(a,d,b)
+d=0.hex( )
+```
