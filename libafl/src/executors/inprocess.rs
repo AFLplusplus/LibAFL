@@ -493,7 +493,7 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
-    use core::mem::transmute;
+    use core::{borrow::BorrowMut, mem::transmute, ops::DerefMut};
     use libc::siginfo_t;
     #[cfg(feature = "std")]
     use std::{
@@ -592,54 +592,57 @@ mod unix_signal_handler {
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
-                let mut feedback_state_box = state.feedback_state_mut().take().unwrap();
-                let objective_state = &mut feedback_state_box.1;
+                // Extra bracket to drop the borrow on state before serialization
+                {
+                    let feedback_objective_states = state.feedback_objective_states();
+                    let test = (feedback_objective_states.borrow_mut()).deref_mut();
 
-                observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
-                    .expect("Observers post_exec_all failed");
+                    let (_, objective_state) = feedback_objective_states.borrow_mut();
 
-                let interesting = fuzzer
-                    .objective_mut()
-                    .is_interesting(
-                        state,
-                        objective_state,
-                        event_mgr,
-                        input,
-                        observers,
-                        &ExitKind::Crash,
-                    )
-                    .expect("In timeout handler objective failure.");
+                    observers
+                        .post_exec_all(state, input, &ExitKind::Crash)
+                        .expect("Observers post_exec_all failed");
 
-                if interesting {
-                    let mut new_testcase = Testcase::new(input.clone());
-                    new_testcase.add_metadata(ExitKind::Timeout);
-                    fuzzer
+                    let interesting = fuzzer
                         .objective_mut()
-                        .append_metadata(state, objective_state, &mut new_testcase)
-                        .expect("Failed adding metadata");
-                    state
-                        .solutions_mut()
-                        .add(new_testcase)
-                        .expect("In timeout handler solutions failure.");
-                    event_mgr
-                        .fire(
+                        .is_interesting(
                             state,
-                            Event::Objective {
-                                objective_size: state.solutions().count(),
-                            },
+                            objective_state,
+                            event_mgr,
+                            input,
+                            observers,
+                            &ExitKind::Crash,
                         )
-                        .expect("Could not send timeouting input");
-                } else {
-                    fuzzer
-                        .objective_mut()
-                        .discard_metadata(state, objective_state, input)
-                        .unwrap();
+                        .expect("In timeout handler objective failure.");
+
+                    if interesting {
+                        let mut new_testcase = Testcase::new(input.clone());
+                        new_testcase.add_metadata(ExitKind::Timeout);
+                        fuzzer
+                            .objective_mut()
+                            .append_metadata(state, objective_state, &mut new_testcase)
+                            .expect("Failed adding metadata");
+                        state
+                            .solutions_mut()
+                            .add(new_testcase)
+                            .expect("In timeout handler solutions failure.");
+                        event_mgr
+                            .fire(
+                                state,
+                                Event::Objective {
+                                    objective_size: state.solutions().count(),
+                                },
+                            )
+                            .expect("Could not send timeouting input");
+                    } else {
+                        fuzzer
+                            .objective_mut()
+                            .discard_metadata(state, objective_state, input)
+                            .unwrap();
+                    }
                 }
 
                 event_mgr.on_restart(state).unwrap();
-
-                state.feedback_state_mut().replace(feedback_state_box);
 
                 #[cfg(feature = "std")]
                 println!("Waiting for broker...");
@@ -696,47 +699,50 @@ mod unix_signal_handler {
             .post_exec_all(state, input, &ExitKind::Timeout)
             .expect("Observers post_exec_all failed");
 
-        let mut feedback_state_box = state.feedback_state_mut().take().unwrap_unchecked();
-        let objective_state = &mut feedback_state_box.1;
+        // Extra bracket to drop the borrow on state before serialization
+        {
+            let feedback_objective_states = state.feedback_objective_states();
+            let mut feedback_objective_states = feedback_objective_states.borrow_mut();
+            let (_, objective_state) = feedback_objective_states.deref_mut();
 
-        let interesting = fuzzer
-            .objective_mut()
-            .is_interesting(
-                state,
-                objective_state,
-                event_mgr,
-                input,
-                observers,
-                &ExitKind::Timeout,
-            )
-            .expect("In timeout handler objective failure.");
-
-        if interesting {
-            let mut new_testcase = Testcase::new(input.clone());
-            new_testcase.add_metadata(ExitKind::Timeout);
-            fuzzer
+            let interesting = fuzzer
                 .objective_mut()
-                .append_metadata(state, objective_state, &mut new_testcase)
-                .expect("Failed adding metadata");
-            state
-                .solutions_mut()
-                .add(new_testcase)
-                .expect("In timeout handler solutions failure.");
-            event_mgr
-                .fire(
+                .is_interesting(
                     state,
-                    Event::Objective {
-                        objective_size: state.solutions().count(),
-                    },
+                    objective_state,
+                    event_mgr,
+                    input,
+                    observers,
+                    &ExitKind::Timeout,
                 )
-                .expect("Could not send timeouting input");
-        } else {
-            fuzzer
-                .objective_mut()
-                .discard_metadata(state, objective_state, input)
-                .expect("Failed to discard metadata");
+                .expect("In timeout handler objective failure.");
+
+            if interesting {
+                let mut new_testcase = Testcase::new(input.clone());
+                new_testcase.add_metadata(ExitKind::Timeout);
+                fuzzer
+                    .objective_mut()
+                    .append_metadata(state, objective_state, &mut new_testcase)
+                    .expect("Failed adding metadata");
+                state
+                    .solutions_mut()
+                    .add(new_testcase)
+                    .expect("In timeout handler solutions failure.");
+                event_mgr
+                    .fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )
+                    .expect("Could not send timeouting input");
+            } else {
+                fuzzer
+                    .objective_mut()
+                    .discard_metadata(state, objective_state, input)
+                    .expect("Failed to discard metadata");
+            }
         }
-        state.feedback_state_mut().replace(feedback_state_box);
 
         event_mgr.on_restart(state).unwrap();
 
@@ -804,49 +810,51 @@ mod unix_signal_handler {
                 writer.flush().unwrap();
             }
 
-            let mut feedback_state_box = state.feedback_state_mut().take().unwrap_unchecked();
-            let objective_state = &mut feedback_state_box.1;
+            // Extra bracket to drop the borrow on state before serialization
+            {
+                let feedback_objective_states = state.feedback_objective_states();
+                let mut feedback_objective_states = feedback_objective_states.borrow_mut();
+                let (_, objective_state) = feedback_objective_states.deref_mut();
 
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(
-                    state,
-                    objective_state,
-                    event_mgr,
-                    input,
-                    observers,
-                    &ExitKind::Crash,
-                )
-                .expect("In crash handler objective failure.");
-
-            if interesting {
-                let new_input = input.clone();
-                let mut new_testcase = Testcase::new(new_input);
-                new_testcase.add_metadata(ExitKind::Crash);
-                fuzzer
+                let interesting = fuzzer
                     .objective_mut()
-                    .append_metadata(state, objective_state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("In crash handler solutions failure.");
-                event_mgr
-                    .fire(
+                    .is_interesting(
                         state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
+                        objective_state,
+                        event_mgr,
+                        input,
+                        observers,
+                        &ExitKind::Crash,
                     )
-                    .expect("Could not send crashing input");
-            } else {
-                fuzzer
-                    .objective_mut()
-                    .discard_metadata(state, objective_state, input)
-                    .expect("Failed to discard metadata");
-            }
+                    .expect("In crash handler objective failure.");
 
-            state.feedback_state_mut().replace(feedback_state_box);
+                if interesting {
+                    let new_input = input.clone();
+                    let mut new_testcase = Testcase::new(new_input);
+                    new_testcase.add_metadata(ExitKind::Crash);
+                    fuzzer
+                        .objective_mut()
+                        .append_metadata(state, objective_state, &mut new_testcase)
+                        .expect("Failed adding metadata");
+                    state
+                        .solutions_mut()
+                        .add(new_testcase)
+                        .expect("In crash handler solutions failure.");
+                    event_mgr
+                        .fire(
+                            state,
+                            Event::Objective {
+                                objective_size: state.solutions().count(),
+                            },
+                        )
+                        .expect("Could not send crashing input");
+                } else {
+                    fuzzer
+                        .objective_mut()
+                        .discard_metadata(state, objective_state, input)
+                        .expect("Failed to discard metadata");
+                }
+            }
 
             event_mgr.on_restart(state).unwrap();
 
@@ -897,8 +905,7 @@ mod unix_signal_handler {
 #[cfg(all(windows, feature = "std"))]
 mod windows_exception_handler {
     use alloc::vec::Vec;
-    use core::ffi::c_void;
-    use core::{mem::transmute, ptr};
+    use core::{borrow::BorrowMut, ffi::c_void, mem::transmute, ops::DerefMut, ptr};
     #[cfg(feature = "std")]
     use std::{
         io::{stdout, Write},
@@ -1004,48 +1011,50 @@ mod windows_exception_handler {
                     .post_exec_all(state, input, &ExitKind::Crash)
                     .expect("Observers post_exec_all failed");
 
-                let mut feedback_state_box = state.feedback_state_mut().take().unwrap();
-                let objective_state = &mut feedback_state_box.1;
+                // Extra bracket to drop th feedback state before serialization
+                {
+                    let feedback_objective_states = state.feedback_objective_states();
+                    let mut feedback_objective_states = feedback_objective_states.borrow_mut();
+                    let (_, objective_state) = feedback_objective_states.deref_mut();
 
-                let interesting = fuzzer
-                    .objective_mut()
-                    .is_interesting(
-                        state,
-                        objective_state,
-                        event_mgr,
-                        input,
-                        observers,
-                        &ExitKind::Crash,
-                    )
-                    .expect("In timeout handler objective failure.");
-
-                if interesting {
-                    let mut new_testcase = Testcase::new(input.clone());
-                    new_testcase.add_metadata(ExitKind::Timeout);
-                    fuzzer
+                    let interesting = fuzzer
                         .objective_mut()
-                        .append_metadata(state, objective_state, &mut new_testcase)
-                        .expect("Failed adding metadata");
-                    state
-                        .solutions_mut()
-                        .add(new_testcase)
-                        .expect("In timeout handler solutions failure.");
-                    event_mgr
-                        .fire(
+                        .is_interesting(
                             state,
-                            Event::Objective {
-                                objective_size: state.solutions().count(),
-                            },
+                            objective_state,
+                            event_mgr,
+                            input,
+                            observers,
+                            &ExitKind::Crash,
                         )
-                        .expect("Could not send timeouting input");
-                } else {
-                    fuzzer
-                        .objective_mut()
-                        .discard_metadata(state, objective_state, input)
-                        .expect("Failed to discard metadata");
-                }
+                        .expect("In timeout handler objective failure.");
 
-                state.feedback_state_mut().replace(feedback_state_box);
+                    if interesting {
+                        let mut new_testcase = Testcase::new(input.clone());
+                        new_testcase.add_metadata(ExitKind::Timeout);
+                        fuzzer
+                            .objective_mut()
+                            .append_metadata(state, objective_state, &mut new_testcase)
+                            .expect("Failed adding metadata");
+                        state
+                            .solutions_mut()
+                            .add(new_testcase)
+                            .expect("In timeout handler solutions failure.");
+                        event_mgr
+                            .fire(
+                                state,
+                                Event::Objective {
+                                    objective_size: state.solutions().count(),
+                                },
+                            )
+                            .expect("Could not send timeouting input");
+                    } else {
+                        fuzzer
+                            .objective_mut()
+                            .discard_metadata(state, objective_state, input)
+                            .expect("Failed to discard metadata");
+                    }
+                }
 
                 event_mgr.on_restart(state).unwrap();
 
@@ -1113,48 +1122,50 @@ mod windows_exception_handler {
                     .post_exec_all(state, input, &ExitKind::Timeout)
                     .expect("Observers post_exec_all failed");
 
-                let mut feedback_state_box = state.feedback_state_mut().take().unwrap_unchecked();
-                let objective_state = &mut feedback_state_box.1;
+                // Extra bracket to drop th feedback state before serialization
+                {
+                    let feedback_objective_states = state.feedback_objective_states();
+                    let mut feedback_objective_states = feedback_objective_states.borrow_mut();
+                    let (_, objective_state) = feedback_objective_states.deref_mut();
 
-                let interesting = fuzzer
-                    .objective_mut()
-                    .is_interesting(
-                        state,
-                        objective_state,
-                        event_mgr,
-                        input,
-                        observers,
-                        &ExitKind::Timeout,
-                    )
-                    .expect("In timeout handler objective failure.");
-
-                if interesting {
-                    let mut new_testcase = Testcase::new(input.clone());
-                    new_testcase.add_metadata(ExitKind::Timeout);
-                    fuzzer
+                    let interesting = fuzzer
                         .objective_mut()
-                        .append_metadata(state, objective_state, &mut new_testcase)
-                        .expect("Failed adding metadata");
-                    state
-                        .solutions_mut()
-                        .add(new_testcase)
-                        .expect("In timeout handler solutions failure.");
-                    event_mgr
-                        .fire(
+                        .is_interesting(
                             state,
-                            Event::Objective {
-                                objective_size: state.solutions().count(),
-                            },
+                            objective_state,
+                            event_mgr,
+                            input,
+                            observers,
+                            &ExitKind::Timeout,
                         )
-                        .expect("Could not send timeouting input");
-                } else {
-                    fuzzer
-                        .objective_mut()
-                        .discard_metadata(state, objective_state, input)
-                        .expect("Failed to discard metadata");
-                }
+                        .expect("In timeout handler objective failure.");
 
-                state.feedback_state_mut().replace(feedback_state_box);
+                    if interesting {
+                        let mut new_testcase = Testcase::new(input.clone());
+                        new_testcase.add_metadata(ExitKind::Timeout);
+                        fuzzer
+                            .objective_mut()
+                            .append_metadata(state, objective_state, &mut new_testcase)
+                            .expect("Failed adding metadata");
+                        state
+                            .solutions_mut()
+                            .add(new_testcase)
+                            .expect("In timeout handler solutions failure.");
+                        event_mgr
+                            .fire(
+                                state,
+                                Event::Objective {
+                                    objective_size: state.solutions().count(),
+                                },
+                            )
+                            .expect("Could not send timeouting input");
+                    } else {
+                        fuzzer
+                            .objective_mut()
+                            .discard_metadata(state, objective_state, input)
+                            .expect("Failed to discard metadata");
+                    }
+                }
 
                 event_mgr.on_restart(state).unwrap();
 
@@ -1288,49 +1299,51 @@ mod windows_exception_handler {
                 .post_exec_all(state, input, &ExitKind::Crash)
                 .expect("Observers post_exec_all failed");
 
-            let mut feedback_state_box = state.feedback_state_mut().take().unwrap_unchecked();
-            let objective_state = &mut feedback_state_box.1;
+            // Extra bracket to drop the state ref before serializing
+            {
+                let feedback_objective_states = state.feedback_objective_states();
+                let mut feedback_objective_states = feedback_objective_states.borrow_mut();
+                let (_, objective_state) = feedback_objective_states.deref_mut();
 
-            let interesting = fuzzer
-                .objective_mut()
-                .is_interesting(
-                    state,
-                    objective_state,
-                    event_mgr,
-                    input,
-                    observers,
-                    &ExitKind::Crash,
-                )
-                .expect("In crash handler objective failure.");
-
-            if interesting {
-                let new_input = input.clone();
-                let mut new_testcase = Testcase::new(new_input);
-                new_testcase.add_metadata(ExitKind::Crash);
-                fuzzer
+                let interesting = fuzzer
                     .objective_mut()
-                    .append_metadata(state, objective_state, &mut new_testcase)
-                    .expect("Failed adding metadata");
-                state
-                    .solutions_mut()
-                    .add(new_testcase)
-                    .expect("In crash handler solutions failure.");
-                event_mgr
-                    .fire(
+                    .is_interesting(
                         state,
-                        Event::Objective {
-                            objective_size: state.solutions().count(),
-                        },
+                        objective_state,
+                        event_mgr,
+                        input,
+                        observers,
+                        &ExitKind::Crash,
                     )
-                    .expect("Could not send crashing input");
-            } else {
-                fuzzer
-                    .objective_mut()
-                    .discard_metadata(state, objective_state, input)
-                    .expect("Failed to discard metadata");
-            }
+                    .expect("In crash handler objective failure.");
 
-            state.feedback_state_mut().replace(feedback_state_box);
+                if interesting {
+                    let new_input = input.clone();
+                    let mut new_testcase = Testcase::new(new_input);
+                    new_testcase.add_metadata(ExitKind::Crash);
+                    fuzzer
+                        .objective_mut()
+                        .append_metadata(state, objective_state, &mut new_testcase)
+                        .expect("Failed adding metadata");
+                    state
+                        .solutions_mut()
+                        .add(new_testcase)
+                        .expect("In crash handler solutions failure.");
+                    event_mgr
+                        .fire(
+                            state,
+                            Event::Objective {
+                                objective_size: state.solutions().count(),
+                            },
+                        )
+                        .expect("Could not send crashing input");
+                } else {
+                    fuzzer
+                        .objective_mut()
+                        .discard_metadata(state, objective_state, input)
+                        .expect("Failed to discard metadata");
+                }
+            }
 
             event_mgr.on_restart(state).unwrap();
 

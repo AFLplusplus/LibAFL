@@ -17,7 +17,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use core::{borrow::BorrowMut, fmt::Debug, marker::PhantomData, ops::DerefMut, time::Duration};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -135,10 +135,12 @@ where
                 .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
                 .to_vec();
 
-            let feedbacks_and_observers = state.feedback_state_mut().as_mut().unwrap();
+            let feedback_objective_states = state.feedback_objective_states();
+            let mut feedback_objective_states = feedback_objective_states.borrow_mut();
 
-            let history_map = &mut feedbacks_and_observers
-                .0
+            let (feedback_state, _) = feedback_objective_states.borrow_mut().deref_mut();
+
+            let history_map = &mut feedback_state
                 .match_name_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name)
                 .unwrap()
                 .history_map;
