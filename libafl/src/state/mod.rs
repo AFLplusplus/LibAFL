@@ -1,7 +1,7 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
-use alloc::boxed::Box;
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use alloc::rc::Rc;
+use core::{cell::RefCell, fmt::Debug, marker::PhantomData, ops::Deref, time::Duration};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
@@ -118,13 +118,10 @@ pub trait HasFeedbackObjectiveStates {
     /// The state tree for objective feedbacks (2nd part of the tuple)
     type ObjectiveState: FeedbackState;
 
-    /// The feedback states and objective state tuple
-    fn feedback_state(&self) -> &Option<Box<(Self::FeedbackState, Self::ObjectiveState)>>;
-
-    /// The feedback states and objective states tuple (mutable)
-    fn feedback_state_mut(
-        &mut self,
-    ) -> &mut Option<Box<(Self::FeedbackState, Self::ObjectiveState)>>;
+    /// The feedback states and objective state tuple, as borrow-able [`Rc`]
+    /// Using `Rc` allows us to keep the actual data in the [`State`], so it can be serialized in one go.
+    fn feedback_objective_states(&self)
+        -> Rc<RefCell<(Self::FeedbackState, Self::ObjectiveState)>>;
 }
 
 /// Trait for the execution counter
@@ -146,7 +143,7 @@ pub trait HasStartTime {
 }
 
 /// The state a fuzz run.
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "FS: serde::de::DeserializeOwned, OS: serde::de::DeserializeOwned")]
 pub struct StdState<C, FS, I, OS, R, SC>
 where
@@ -166,7 +163,8 @@ where
     /// The corpus
     corpus: C,
     /// States of the feedback, and objectives used to evaluate an input
-    feedback_state: Option<Box<(FS, OS)>>,
+    /// This is a [`Rc`] type to allow feedback states to be passed fo functons
+    feedback_objective_states: Rc<RefCell<(FS, OS)>>,
     // Solutions corpus
     solutions: SC,
     /// Metadata stored for this state by one of the components
@@ -181,6 +179,38 @@ where
     introspection_monitor: ClientPerfMonitor,
 
     phantom: PhantomData<I>,
+}
+
+impl<C, FS, I, OS, R, SC> Clone for StdState<C, FS, I, OS, R, SC>
+where
+    C: Corpus<I> + Clone,
+    I: Input,
+    R: Rand + Clone,
+    FS: FeedbackState + Clone,
+    OS: FeedbackState + Clone,
+    SC: Corpus<I> + Clone,
+{
+    fn clone(&self) -> Self {
+        let (feedback_state, objective_state) = self.feedback_objective_states.borrow().deref();
+        Self {
+            rand: self.rand.clone(),
+            executions: self.executions,
+            start_time: self.start_time.clone(),
+            corpus: self.corpus.clone(),
+            // make sure we clone the actual state instead of just the reference
+            feedback_objective_states: Rc::new(RefCell::new((
+                feedback_state.clone(),
+                objective_state.clone(),
+            ))),
+            solutions: self.solutions.clone(),
+            metadata: self.metadata.clone(),
+            max_size: self.max_size,
+            stability: self.stability.clone(),
+            #[cfg(feature = "introspection")]
+            introspection_monitor: self.introspection_monitor.clone(),
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<C, FS, I, OS, R, SC> State for StdState<C, FS, I, OS, R, SC>
@@ -301,16 +331,10 @@ where
 
     type ObjectiveState = OS;
 
-    /// The feedback states
+    /// The feedback and objective states
     #[inline]
-    fn feedback_state(&self) -> &Option<Box<(FS, OS)>> {
-        &self.feedback_state
-    }
-
-    /// The feedback states (mutable)
-    #[inline]
-    fn feedback_state_mut(&mut self) -> &mut Option<Box<(FS, OS)>> {
-        &mut self.feedback_state
+    fn feedback_objective_states(&self) -> Rc<RefCell<(FS, OS)>> {
+        self.feedback_objective_states.clone()
     }
 }
 
@@ -599,7 +623,7 @@ where
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             corpus,
-            feedback_state: Some(Box::new((
+            feedback_objective_states: Rc::new(RefCell::new((
                 feedbacks.init_state()?,
                 objectives.init_state()?,
             ))),

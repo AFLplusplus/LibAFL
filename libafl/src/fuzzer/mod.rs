@@ -22,7 +22,7 @@ use crate::{
 use crate::monitors::PerfFeature;
 
 use alloc::string::ToString;
-use core::{marker::PhantomData, time::Duration};
+use core::{borrow::BorrowMut, marker::PhantomData, ops::DerefMut, time::Duration};
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
@@ -334,14 +334,9 @@ where
     {
         let mut res = ExecuteInputResult::None;
 
-        // since this is the hot path, we use unsafe to optimize away a jump on feedback unwrap (should never happen)
-        // but we want to get around programming errors at development time by using the debug assert here.
-        debug_assert!(state.feedback_state_mut().is_some());
-
-        let mut feedback_state_box =
-            unsafe { state.feedback_state_mut().take().unwrap_unchecked() };
-        let feedback_state = &mut feedback_state_box.0;
-        let objective_state = &mut feedback_state_box.1;
+        let feedback_objective_states = state.feedback_objective_states();
+        let mut feedback_objective_states = feedback_objective_states.borrow_mut();
+        let (feedback_state, objective_state) = feedback_objective_states.borrow_mut().deref_mut();
 
         #[cfg(not(feature = "introspection"))]
         let is_solution = self.objective_mut().is_interesting(
@@ -457,10 +452,6 @@ where
             }
         };
 
-        // store the temporal moved out feedback states back into the state
-        // so we can potentially serialize them to disk on crash
-        state.feedback_state_mut().replace(feedback_state_box);
-
         ret_tuple
     }
 }
@@ -543,10 +534,10 @@ where
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
 
-        // Not on the hot path, we can use normal /safe unwrap here.
-        let mut feedback_state_box = state.feedback_state_mut().take().unwrap();
-        let feedback_state = &mut feedback_state_box.0;
-        let objective_state = &mut feedback_state_box.1;
+        let feedback_objective_states = state.feedback_objective_states();
+        let mut feedback_objective_states = feedback_objective_states.borrow_mut();
+
+        let (feedback_state, objective_state) = feedback_objective_states.borrow_mut().deref_mut();
 
         // Always consider this to be "interesting"
 
@@ -578,9 +569,6 @@ where
                 executions: *state.executions(),
             },
         )?;
-
-        // store feedback states back into the general state
-        state.feedback_state_mut().replace(feedback_state_box);
 
         Ok(idx)
     }
