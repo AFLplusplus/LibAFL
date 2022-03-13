@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        tuples::{MatchName, Named},
+        tuples::Named,
         AsMutSlice, AsRefIterator, AsSlice, HasRefCnt,
     },
     corpus::Testcase,
@@ -505,7 +505,6 @@ where
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasFeedbackStates,
     S: HasFeedbackObjectiveStates,
 {
     /// Create new `MapFeedback`

@@ -1314,10 +1314,13 @@ where
     S: HasClientPerfMonitor,
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
+    type FeedbackState = NopFeedbackState;
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
@@ -1333,6 +1336,11 @@ where
             .unwrap();
         // TODO register the list content in a testcase metadata
         Ok(!observer.list().is_empty())
+    }
+
+    #[inline]
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 
