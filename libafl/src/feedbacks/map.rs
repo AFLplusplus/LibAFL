@@ -9,10 +9,7 @@ use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{
-        tuples::Named,
-        AsMutSlice, AsRefIterator, AsSlice, HasRefCnt,
-    },
+    bolts::{tuples::Named, AsMutSlice, AsRefIterator, AsSlice, HasRefCnt},
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
