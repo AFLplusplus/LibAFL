@@ -93,6 +93,7 @@ pub mod inputs;
 pub mod monitors;
 pub mod mutators;
 pub mod observers;
+pub mod schedulers;
 pub mod stages;
 pub mod state;
 
@@ -182,7 +183,7 @@ impl From<serde_json::Error> for Error {
 #[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
-        Self::Unknown(format!("{:?}", err))
+        Self::Unknown(format!("Unix error: {:?}", err))
     }
 }
 
@@ -234,12 +235,13 @@ impl std::error::Error for Error {}
 mod tests {
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
-        corpus::{Corpus, InMemoryCorpus, RandCorpusScheduler, Testcase},
+        corpus::{Corpus, InMemoryCorpus, Testcase},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::{NopFeedback, NopFeedbackState},
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
+        schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
         Fuzzer, StdFuzzer,
@@ -271,7 +273,7 @@ mod tests {
         });
         let mut event_manager = SimpleEventManager::new(monitor);
 
-        let scheduler = RandCorpusScheduler::new();
+        let scheduler = RandScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
@@ -317,4 +319,33 @@ mod tests {
 pub extern "C" fn external_current_millis() -> u64 {
     // TODO: use "real" time here
     1000
+}
+
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
+#[cfg(feature = "python")]
+#[pymodule]
+#[pyo3(name = "libafl")]
+/// Register the classes to the python module
+pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+    observers::map::pybind::register(py, m)?;
+    feedbacks::map::pybind::register(py, m)?;
+    state::pybind::register(py, m)?;
+    monitors::pybind::register(py, m)?;
+    events::pybind::register(py, m)?;
+    events::simple::pybind::register(py, m)?;
+    fuzzer::pybind::register(py, m)?;
+    executors::pybind::register(py, m)?;
+    executors::inprocess::pybind::register(py, m)?;
+    generators::pybind::register(py, m)?;
+    corpus::pybind::register(py, m)?;
+    corpus::ondisk::pybind::register(py, m)?;
+    corpus::inmemory::pybind::register(py, m)?;
+    corpus::cached::pybind::register(py, m)?;
+    bolts::rands::pybind::register(py, m)?;
+    stages::pybind::register(py, m)?;
+    stages::owned::pybind::register(py, m)?;
+    stages::mutational::pybind::register(py, m)?;
+    Ok(())
 }

@@ -59,6 +59,8 @@
 
 use std::{convert::Into, path::Path, process::Command, string::String, vec::Vec};
 
+pub mod cfg;
+pub use cfg::{CfgEdge, ControlFlowGraph, EntryBasicBlockInfo, HasWeight};
 pub mod clang;
 pub use clang::{ClangWrapper, LLVMPasses};
 

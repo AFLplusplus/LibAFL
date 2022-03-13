@@ -42,6 +42,7 @@ typedef struct CmpLogMap {
 } CmpLogMap;
 
 extern CmpLogMap libafl_cmplog_map;
+extern CmpLogMap* libafl_cmplog_map_ptr;
 
 extern uint8_t libafl_cmplog_enabled;
 
@@ -54,21 +55,21 @@ static inline void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t 
   if (!libafl_cmplog_enabled) return;
   
   uint16_t hits;
-  if (libafl_cmplog_map.headers[k].kind != CMPLOG_KIND_INS) {
-    libafl_cmplog_map.headers[k].kind = CMPLOG_KIND_INS;
-    libafl_cmplog_map.headers[k].hits = 1;
-    libafl_cmplog_map.headers[k].shape = shape;
+  if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {
+    libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_INS;
+    libafl_cmplog_map_ptr->headers[k].hits = 1;
+    libafl_cmplog_map_ptr->headers[k].shape = shape;
     hits = 0;
   } else {
-    hits = libafl_cmplog_map.headers[k].hits++;
-    if (libafl_cmplog_map.headers[k].shape < shape) {
-      libafl_cmplog_map.headers[k].shape = shape;
+    hits = libafl_cmplog_map_ptr->headers[k].hits++;
+    if (libafl_cmplog_map_ptr->headers[k].shape < shape) {
+      libafl_cmplog_map_ptr->headers[k].shape = shape;
     }
   }
 
   hits &= CMPLOG_MAP_H - 1;
-  libafl_cmplog_map.vals.operands[k][hits].v0 = arg1;
-  libafl_cmplog_map.vals.operands[k][hits].v1 = arg2;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v0 = arg1;
+  libafl_cmplog_map_ptr->vals.operands[k][hits].v1 = arg2;
   
 }
 

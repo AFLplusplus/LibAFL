@@ -1,0 +1,80 @@
+# Variables
+[env]
+FUZZER_NAME='libfuzzer_stb_image'
+LIBAFL_CC = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/libafl_cc', mapping = {"windows" = '.\\target\\release\\libafl_cc.exe'} }
+LIBAFL_CXX = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/libafl_cxx', mapping = {"windows" = '.\\target\\release\\libafl_cxx.exe'} }
+FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/${FUZZER_NAME}', mapping = {"windows" = '.\\target\\release\\${FUZZER_NAME}.exe'} }
+
+# Compilers
+[tasks.cxx]
+condition = { files_not_exist = ["${LIBAFL_CXX}"] }
+command = "cargo"
+args = ["build" , "--release"]
+
+[tasks.cc]
+condition = { files_not_exist = ["${LIBAFL_CC}"] }
+command = "cargo"
+args = ["build" , "--release"]
+
+
+# Build the fuzzer
+[tasks.fuzzer]
+script_runner="@shell"
+script='''
+cargo build --release
+cp ${FUZZER} .
+'''
+dependencies = ["cc", "cxx"]
+
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "run_windows"
+
+[tasks.run_unix]
+script_runner = "@shell"
+script='''
+./${FUZZER_NAME} &
+'''
+dependencies = [ "fuzzer" ]
+
+[tasks.run_windows]
+# Do nothing
+script_runner = "@shell"
+script='''
+echo "Not integrated into cargo-make yet."
+'''
+dependencies = [ "fuzzer" ]
+
+
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "test_windows"
+
+[tasks.test_unix]
+script_runner = "@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+timeout 11s ./${FUZZER_NAME} 2>/dev/null &
+'''
+dependencies = [ "fuzzer" ]
+
+[tasks.test_windows]
+# Do nothing
+script_runner = "@shell"
+script='''
+echo "Not integrated into cargo-make yet."
+'''
+dependencies = [ "fuzzer" ]
+
+
+# Clean up
+[tasks.clean]
+# Disable default `clean` definition
+clear = true
+script_runner="@shell"
+script='''
+rm -f ./${FUZZER_NAME}
+cargo clean
+'''

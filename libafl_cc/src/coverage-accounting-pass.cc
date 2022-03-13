@@ -54,13 +54,60 @@ typedef uint32_t prev_loc_t;
 
 #define MAP_SIZE LIBAFL_ACCOUNTING_MAP_SIZE
 
+
+#define SECURITY_SENSITIVE_FUNCS(CF) static CF securitySensitiveFunctions[] = {\
+  CF("memcpy"), \
+  CF("strlen"), \
+  CF("ReadImage"), \
+  CF("memmove"), \
+  CF("free"), \
+  CF("memset"), \
+  CF("delete"), \
+  CF("memcmp"), \
+  CF("getString"), \
+  CF("vsprintf"), \
+  CF("GET_COLOR"), \
+  CF("read"), \
+  CF("load_bmp"), \
+  CF("huffcode"), \
+  CF("strcmp"), \
+  CF("new"), \
+  CF("getName"), \
+  CF("strncat"), \
+  CF("png_load"), \
+};
+
+
 using namespace llvm;
 
+enum AccountingGranularity {
+    BB_GRAN,
+    FUNC_GRAN,
+    // LOOP,
+    UKNOWN_GRAN
+};
+
 static cl::opt<bool> Debug("debug", cl::desc("Debug prints"), cl::init(false), cl::NotHidden);
+static cl::opt<std::string> GranularityStr("granularity", cl::desc("Granularity of accounting (BB, FUNC)"), cl::init(std::string("BB")), cl::NotHidden);
 static cl::opt<uint32_t> InstRatio("inst_ratio", cl::desc("Instrumentation ratio in percentage"), cl::init(100), cl::NotHidden);
 static cl::opt<bool> ThreadSafe("thread_safe", cl::desc("Use the thread safe instrumentation"), cl::init(false), cl::NotHidden);
 
 namespace {
+
+SECURITY_SENSITIVE_FUNCS(StringRef)
+
+bool isSecuritySensitiveFunction(Function* F) {
+    if (!F) return 0;
+    auto func_name = F->getName();
+    for (auto name : securitySensitiveFunctions) {
+        if (func_name.contains(name)) {
+            if (Debug)
+                fprintf(stderr, "Counted %s as security sensitive", func_name.str().c_str());
+            return 1;
+        }
+    }
+    return 0;
+}
 
 #ifdef USE_NEW_PM
 class AFLCoverage : public PassInfoMixin<AFLCoverage> {
@@ -72,7 +119,10 @@ class AFLCoverage : public ModulePass {
   static char ID;
   AFLCoverage() : ModulePass(ID) {
 #endif
-
+    granularity = StringSwitch<AccountingGranularity>(GranularityStr)
+        .Case("BB", BB_GRAN)
+        .Case("FUNC", FUNC_GRAN)
+        .Default(UKNOWN_GRAN);
     // initInstrumentList();
 
   }
@@ -86,6 +136,7 @@ class AFLCoverage : public ModulePass {
  protected:
   uint32_t    map_size = MAP_SIZE;
   uint32_t    function_minimum_size = 1;
+  AccountingGranularity granularity;
 
 };
 
@@ -196,12 +247,20 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       // Start with 1 to implicitly track edge coverage too
       uint32_t MemCnt = 1;
-
       for (auto &I : BB) {
-          if (I.mayReadFromMemory() || I.mayWriteToMemory())
+        switch (granularity) {
+          case BB_GRAN:
+            if (I.mayReadFromMemory() || I.mayWriteToMemory())
               ++MemCnt;
+            break;
+          case FUNC_GRAN:
+            if (auto *C = dyn_cast<CallInst>(&I)) {
+              auto F = C->getCalledFunction();
+              MemCnt += isSecuritySensitiveFunction(F);
+            }
+            break;
+        }
       }
-      
       /* Make up cur_loc */
 
       cur_loc = RandBelow(map_size);

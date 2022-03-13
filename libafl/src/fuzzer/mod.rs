@@ -2,13 +2,14 @@
 
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, CorpusScheduler, Testcase},
+    corpus::{Corpus, Testcase},
     events::{Event, EventConfig, EventFirer, EventManager, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
+    schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
     state::{
@@ -27,9 +28,9 @@ use core::{marker::PhantomData, time::Duration};
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
-pub trait HasCorpusScheduler<CS, I, S>
+pub trait HasScheduler<CS, I, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     I: Input,
 {
     /// The scheduler
@@ -237,7 +238,7 @@ pub enum ExecuteInputResult {
 #[derive(Debug)]
 pub struct StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -249,9 +250,9 @@ where
     phantom: PhantomData<(I, OT, S)>,
 }
 
-impl<CS, F, I, OF, OT, S> HasCorpusScheduler<CS, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, F, I, OF, OT, S> HasScheduler<CS, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -268,7 +269,7 @@ where
 
 impl<CS, F, I, OF, OT, S> HasFeedback<F, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -285,7 +286,7 @@ where
 
 impl<CS, F, I, OF, OT, S> HasObjective<I, OF, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -302,7 +303,7 @@ where
 
 impl<CS, F, I, OF, OT, S> ExecutionProcessor<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -466,7 +467,7 @@ where
 
 impl<CS, F, I, OF, OT, S> EvaluatorObservers<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     F: Feedback<I, S>,
     I: Input,
@@ -502,7 +503,7 @@ where
 
 impl<CS, E, EM, F, I, OF, OT, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     EM: EventManager<E, I, S, Self>,
@@ -587,7 +588,7 @@ where
 
 impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
@@ -637,7 +638,7 @@ where
 
 impl<CS, F, I, OF, OT, S> StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -669,11 +670,11 @@ where
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
+        *state.executions_mut() += 1;
+
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        *state.executions_mut() += 1;
 
         start_timer!(state);
         executor
@@ -706,7 +707,7 @@ where
 
 impl<CS, F, I, OF, OT, S> ExecutesInput<I, OT, S, Self> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -729,11 +730,11 @@ where
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
+        *state.executions_mut() += 1;
+
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        *state.executions_mut() += 1;
 
         start_timer!(state);
         executor
@@ -742,5 +743,201 @@ where
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(exit_kind)
+    }
+}
+
+#[cfg(feature = "python")]
+/// `Fuzzer` Python bindings
+pub mod pybind {
+    use crate::feedbacks::{CrashFeedback, MaxMapFeedback};
+    use crate::fuzzer::{Fuzzer, StdFuzzer};
+    use crate::inputs::BytesInput;
+    use crate::schedulers::QueueScheduler;
+    use pyo3::prelude::*;
+
+    macro_rules! define_python_fuzzer {
+        ($type_name:ident, $struct_name:ident, $py_name:tt, $datatype:ty, $my_std_state_type_name: ident, $std_state_name: ident,
+            $event_manager_name: ident, $map_observer_name: ident, $max_map_feedback_py_name: ident, $executor_name: ident, $stage_tuple_name: ident) => {
+            use crate::events::pybind::$event_manager_name;
+            use crate::executors::pybind::$executor_name;
+            use crate::feedbacks::map::pybind::$max_map_feedback_py_name;
+            use crate::observers::map::pybind::$map_observer_name;
+            use crate::stages::owned::pybind::$stage_tuple_name;
+            use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
+
+            /// `StdFuzzer` with fixed generics
+            pub type $type_name = StdFuzzer<
+                QueueScheduler,
+                MaxMapFeedback<BytesInput, $map_observer_name, $my_std_state_type_name, $datatype>,
+                BytesInput,
+                CrashFeedback,
+                ($map_observer_name, ()),
+                $my_std_state_type_name,
+            >;
+            /// Python class for StdFuzzer
+            #[pyclass(unsendable, name = $py_name)]
+            #[derive(Debug)]
+            pub struct $struct_name {
+                /// Rust wrapped StdFuzzer object
+                pub std_fuzzer: $type_name,
+            }
+
+            #[pymethods]
+            impl $struct_name {
+                #[new]
+                fn new(py_max_map_feedback: $max_map_feedback_py_name) -> Self {
+                    Self {
+                        std_fuzzer: StdFuzzer::new(
+                            QueueScheduler::new(),
+                            py_max_map_feedback.max_map_feedback,
+                            CrashFeedback::new(),
+                        ),
+                    }
+                }
+
+                fn fuzz_loop(
+                    &mut self,
+                    py_executor: &mut $executor_name,
+                    py_state: &mut $std_state_name,
+                    py_mgr: &mut $event_manager_name,
+                    stage_tuple: &mut $stage_tuple_name,
+                ) {
+                    self.std_fuzzer
+                        .fuzz_loop(
+                            &mut stage_tuple.stages_owned_list,
+                            py_executor,
+                            &mut py_state.std_state,
+                            py_mgr,
+                        )
+                        .expect("Failed to generate the initial corpus".into());
+                }
+            }
+        };
+    }
+
+    define_python_fuzzer!(
+        MyStdFuzzerI8,
+        PythonStdFuzzerI8,
+        "StdFuzzerI8",
+        i8,
+        MyStdStateI8,
+        PythonStdStateI8,
+        PythonEventManagerI8,
+        PythonMapObserverI8,
+        PythonMaxMapFeedbackI8,
+        PythonExecutorI8,
+        PythonStagesOwnedListI8
+    );
+
+    define_python_fuzzer!(
+        MyStdFuzzerI16,
+        PythonStdFuzzerI16,
+        "StdFuzzerI16",
+        i16,
+        MyStdStateI16,
+        PythonStdStateI16,
+        PythonEventManagerI16,
+        PythonMapObserverI16,
+        PythonMaxMapFeedbackI16,
+        PythonExecutorI16,
+        PythonStagesOwnedListI16
+    );
+
+    define_python_fuzzer!(
+        MyStdFuzzerI32,
+        PythonStdFuzzerI32,
+        "StdFuzzerI32",
+        i32,
+        MyStdStateI32,
+        PythonStdStateI32,
+        PythonEventManagerI32,
+        PythonMapObserverI32,
+        PythonMaxMapFeedbackI32,
+        PythonExecutorI32,
+        PythonStagesOwnedListI32
+    );
+
+    define_python_fuzzer!(
+        MyStdFuzzerI64,
+        PythonStdFuzzerI64,
+        "StdFuzzerI64",
+        i64,
+        MyStdStateI64,
+        PythonStdStateI64,
+        PythonEventManagerI64,
+        PythonMapObserverI64,
+        PythonMaxMapFeedbackI64,
+        PythonExecutorI64,
+        PythonStagesOwnedListI64
+    );
+
+    define_python_fuzzer!(
+        MyStdFuzzerU8,
+        PythonStdFuzzerU8,
+        "StdFuzzerU8",
+        u8,
+        MyStdStateU8,
+        PythonStdStateU8,
+        PythonEventManagerU8,
+        PythonMapObserverU8,
+        PythonMaxMapFeedbackU8,
+        PythonExecutorU8,
+        PythonStagesOwnedListU8
+    );
+
+    define_python_fuzzer!(
+        MyStdFuzzerU16,
+        PythonStdFuzzerU16,
+        "StdFuzzerU16",
+        u16,
+        MyStdStateU16,
+        PythonStdStateU16,
+        PythonEventManagerU16,
+        PythonMapObserverU16,
+        PythonMaxMapFeedbackU16,
+        PythonExecutorU16,
+        PythonStagesOwnedListU16
+    );
+
+    define_python_fuzzer!(
+        MyStdFuzzerU32,
+        PythonStdFuzzerU32,
+        "StdFuzzerU32",
+        u32,
+        MyStdStateU32,
+        PythonStdStateU32,
+        PythonEventManagerU32,
+        PythonMapObserverU32,
+        PythonMaxMapFeedbackU32,
+        PythonExecutorU32,
+        PythonStagesOwnedListU32
+    );
+
+    define_python_fuzzer!(
+        MyStdFuzzerU64,
+        PythonStdFuzzerU64,
+        "StdFuzzerU64",
+        u64,
+        MyStdStateU64,
+        PythonStdStateU64,
+        PythonEventManagerU64,
+        PythonMapObserverU64,
+        PythonMaxMapFeedbackU64,
+        PythonExecutorU64,
+        PythonStagesOwnedListU64
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdFuzzerI8>()?;
+        m.add_class::<PythonStdFuzzerI16>()?;
+        m.add_class::<PythonStdFuzzerI32>()?;
+        m.add_class::<PythonStdFuzzerI64>()?;
+
+        m.add_class::<PythonStdFuzzerU8>()?;
+        m.add_class::<PythonStdFuzzerU16>()?;
+        m.add_class::<PythonStdFuzzerU32>()?;
+        m.add_class::<PythonStdFuzzerU64>()?;
+        Ok(())
     }
 }

@@ -14,10 +14,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsSlice,
     },
-    corpus::{
-        CachedOnDiskCorpus, Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
+    corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{EventConfig, EventRestarter, LlmpRestartingEventManager},
     executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or, feedback_or_fast,
@@ -29,12 +26,15 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::{token_mutations::Tokens, I2SRandReplace},
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
 };
 
 pub use libafl_qemu::emu::Emulator;
-use libafl_qemu::{cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor};
+use libafl_qemu::{
+    cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks,
+};
 use libafl_targets::CmpLogObserver;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -193,8 +193,7 @@ where
             }
 
             // A minimization+queue policy to get testcasess from the corpus
-            let scheduler =
-                IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+            let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
             // A fuzzer with feedbacks and a corpus scheduler
             let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -208,10 +207,17 @@ where
             };
 
             if self.use_cmplog.unwrap_or(false) {
-                let executor = QemuExecutor::new(
-                    &mut harness,
+                let hooks = QemuHooks::new(
                     emulator,
-                    tuple_list!(QemuEdgeCoverageHelper::new(), QemuCmpLogHelper::new()),
+                    tuple_list!(
+                        QemuEdgeCoverageHelper::default(),
+                        QemuCmpLogHelper::default(),
+                    ),
+                );
+
+                let executor = QemuExecutor::new(
+                    hooks,
+                    &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
                     &mut state,
@@ -310,10 +316,12 @@ where
                     }
                 }
             } else {
+                let hooks =
+                    QemuHooks::new(emulator, tuple_list!(QemuEdgeCoverageHelper::default()));
+
                 let executor = QemuExecutor::new(
+                    hooks,
                     &mut harness,
-                    emulator,
-                    tuple_list!(QemuEdgeCoverageHelper::new()),
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
                     &mut state,

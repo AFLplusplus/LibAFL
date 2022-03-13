@@ -19,7 +19,7 @@ cmplog = []
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.7.1", features = ["std", "libafl_derive"] }
+libafl = { path = "../libafl", version = "0.7.1", features = ["std", "libafl_derive", "frida_cli"] }
 libafl_targets = { path = "../libafl_targets", version = "0.7.1", features = ["std", "sancov_cmplog"] }
 
 nix = "0.23"

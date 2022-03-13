@@ -425,3 +425,35 @@ where
         Ok((state, mgr))
     }
 }
+/// `SimpleEventManager` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::events::SimpleEventManager;
+    use crate::inputs::BytesInput;
+    use crate::monitors::pybind::PythonMonitor;
+    use pyo3::prelude::*;
+
+    #[pyclass(unsendable, name = "SimpleEventManager")]
+    #[derive(Debug, Clone)]
+    /// Python class for SimpleEventManager
+    pub struct PythonSimpleEventManager {
+        /// Rust wrapped SimpleEventManager object
+        pub simple_event_manager: SimpleEventManager<BytesInput, PythonMonitor>,
+    }
+
+    #[pymethods]
+    impl PythonSimpleEventManager {
+        #[new]
+        fn new(py_monitor: PythonMonitor) -> Self {
+            Self {
+                simple_event_manager: SimpleEventManager::new(py_monitor),
+            }
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonSimpleEventManager>()?;
+        Ok(())
+    }
+}

@@ -1,5 +1,5 @@
 use libafl::{
-    bolts::tuples::MatchFirstType,
+    bolts::{cli::FuzzerOptions, tuples::MatchFirstType},
     inputs::{HasTargetBytes, Input},
     Error,
 };
@@ -10,10 +10,8 @@ use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 use crate::cmplog_rt::CmpLogRuntime;
 use crate::coverage_rt::CoverageRuntime;
-#[cfg(windows)]
-use crate::FridaOptions;
 #[cfg(unix)]
-use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime, FridaOptions};
+use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, BuildsCapstone},
@@ -124,7 +122,7 @@ pub struct FridaInstrumentationHelper<'a, RT> {
     capstone: Capstone,
     ranges: RangeMap<usize, (u16, String)>,
     module_map: ModuleMap,
-    options: &'a FridaOptions,
+    options: &'a FuzzerOptions,
     runtimes: RT,
 }
 
@@ -170,13 +168,7 @@ where
     /// Constructor function to create a new [`FridaInstrumentationHelper`], given a `module_name`.
     #[allow(clippy::too_many_lines)]
     #[must_use]
-    pub fn new(
-        gum: &'a Gum,
-        options: &'a FridaOptions,
-        _harness_module_name: &str,
-        modules_to_instrument: &'a [&str],
-        runtimes: RT,
-    ) -> Self {
+    pub fn new(gum: &'a Gum, options: &'a FuzzerOptions, runtimes: RT) -> Self {
         // workaround frida's frida-gum-allocate-near bug:
         #[cfg(unix)]
         unsafe {
@@ -202,6 +194,16 @@ where
             }
         }
 
+        let mut modules_to_instrument = vec![options
+            .harness
+            .as_ref()
+            .unwrap()
+            .to_string_lossy()
+            .to_string()];
+        modules_to_instrument.append(&mut options.libs_to_instrument.clone());
+        let modules_to_instrument: Vec<&str> =
+            modules_to_instrument.iter().map(AsRef::as_ref).collect();
+
         let mut helper = Self {
             transformer: None,
             #[cfg(target_arch = "aarch64")]
@@ -219,12 +221,12 @@ where
                 .build()
                 .expect("Failed to create Capstone object"),
             ranges: RangeMap::new(),
-            module_map: ModuleMap::new_from_names(modules_to_instrument),
+            module_map: ModuleMap::new_from_names(&modules_to_instrument),
             options,
             runtimes,
         };
 
-        if helper.options().stalker_enabled() {
+        if options.cmplog || options.asan || !options.disable_coverage {
             for (i, module) in helper.module_map.values().iter().enumerate() {
                 let range = module.range();
                 let start = range.base_address().0 as usize;
@@ -233,8 +235,8 @@ where
                     .ranges
                     .insert(start..(start + range.size()), (i as u16, module.path()));
             }
-            if let Some(suppressed_specifiers) = helper.options().dont_instrument_locations() {
-                for (module_name, offset) in suppressed_specifiers {
+            if !options.dont_instrument.is_empty() {
+                for (module_name, offset) in options.dont_instrument.clone() {
                     let module_details = ModuleDetails::with_name(module_name).unwrap();
                     let lib_start = module_details.range().base_address().0 as usize;
                     // println!("removing address: {:#x}", lib_start + offset);
@@ -354,7 +356,7 @@ where
             helper.transformer = Some(transformer);
             helper
                 .runtimes
-                .init_all(gum, &helper.ranges, modules_to_instrument);
+                .init_all(gum, &helper.ranges, &modules_to_instrument);
         }
         helper
     }
@@ -403,7 +405,7 @@ where
     /// If stalker is enabled
     #[inline]
     pub fn stalker_enabled(&self) -> bool {
-        self.options.stalker_enabled()
+        self.options.cmplog || self.options.asan || !self.options.disable_coverage
     }
 
     /// Pointer to coverage map
@@ -425,7 +427,7 @@ where
 
     /// Return the ref to options
     #[inline]
-    pub fn options(&self) -> &FridaOptions {
+    pub fn options(&self) -> &FuzzerOptions {
         self.options
     }
 }

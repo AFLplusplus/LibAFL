@@ -5,7 +5,7 @@ use libafl::executors::InProcessExecutor;
 use libafl::observers::ConstMapObserver;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     feedback_and,
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
@@ -15,6 +15,7 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::BacktraceObserver,
+    schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -81,7 +82,7 @@ pub fn main() {
     let mut mgr = SimpleEventManager::new(mon);
 
     // A queue policy to get testcasess from the corpus
-    let scheduler = QueueCorpusScheduler::new();
+    let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

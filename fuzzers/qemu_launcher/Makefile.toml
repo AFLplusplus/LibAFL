@@ -1,0 +1,98 @@
+# Variables
+[env]
+FUZZER_NAME='libpng_harness'
+PROJECT_DIR = { script = ["pwd"] }
+
+[tasks.unsupported]
+script_runner="@shell"
+script='''
+echo "Qemu fuzzer not supported on windows"
+'''
+
+# libpng
+[tasks.libpng]
+linux_alias = "libpng_unix"
+mac_alias = "libpng_unix"
+windows_alias = "unsupported"
+
+[tasks.libpng_unix]
+condition = { files_not_exist = [ "./libpng-1.6.37" ] }
+script_runner="@shell"
+script='''
+wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
+tar -xvf libpng-1.6.37.tar.xz
+'''
+
+# fuzzer
+[tasks.fuzzer]
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
+windows_alias = "unsupported"
+
+[tasks.fuzzer_unix]
+command = "cargo"
+args = ["build", "--release"]
+
+# Harness
+[tasks.harness]
+linux_alias = "harness_unix"
+mac_alias = "harness_unix"
+windows_alias = "unsupported"
+
+[tasks.harness_unix]
+script_runner="@shell"
+script='''
+cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+cd "${PROJECT_DIR}"
+make -C libpng-1.6.37
+# Build the libpng harness	
+c++ \
+	./harness.cc \
+	./libpng-1.6.37/.libs/libpng16.a \
+	-I./libpng-1.6.37/ \
+	-o ${FUZZER_NAME} \
+	-lm -lz
+'''
+dependencies = [ "libpng" ]
+
+# Run the fuzzer
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+command = "cargo"
+args = ["run", "--release", "./${FUZZER_NAME}"]
+dependencies = [ "harness", "fuzzer" ]
+
+# Run the fuzzer
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+# Short test
+[tasks.test_unix]
+script_runner = "@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+timeout 11s cargo run --release ./${FUZZER_NAME} 2>/dev/null &
+'''
+dependencies = [ "harness", "fuzzer" ]
+
+# Clean up
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+# Disable default `clean` definition
+clear = true
+script_runner="@shell"
+script='''
+rm -f ./${FUZZER_NAME}
+make -C libpng-1.6.37 clean
+cargo clean
+'''

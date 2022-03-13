@@ -1,10 +1,11 @@
 use libafl::{
     bolts::tuples::Named,
-    corpus::{FavFactor, MinimizerCorpusScheduler, Testcase},
+    corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata, NopFeedbackState},
     observers::ObserversTuple,
+    schedulers::{FavFactor, MinimizerScheduler},
     state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
 };
@@ -29,8 +30,8 @@ impl FavFactor<PacketData> for PacketLenFavFactor {
     }
 }
 
-pub type PacketLenMinimizerCorpusScheduler<CS, S> =
-    MinimizerCorpusScheduler<CS, PacketLenFavFactor, PacketData, MapIndexesMetadata, S>;
+pub type PacketLenMinimizerScheduler<CS, S> =
+    MinimizerScheduler<CS, PacketLenFavFactor, PacketData, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {

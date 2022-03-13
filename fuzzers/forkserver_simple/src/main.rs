@@ -1,3 +1,4 @@
+use clap::{App, Arg};
 use core::time::Duration;
 use libafl::{
     bolts::{
@@ -7,10 +8,7 @@ use libafl::{
         tuples::{tuple_list, Merge},
         AsMutSlice,
     },
-    corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_and_fast, feedback_or,
@@ -20,12 +18,12 @@ use libafl::{
     monitors::SimpleMonitor,
     mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
 };
+use nix::sys::signal::Signal;
 use std::path::PathBuf;
-
-use clap::{App, Arg};
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -61,6 +59,13 @@ pub fn main() {
                 .help("Arguments passed to the target")
                 .setting(clap::ArgSettings::MultipleValues)
                 .takes_value(true),
+        )
+        .arg(
+            Arg::new("signal")
+                .help("Signal used to stop child")
+                .short('s')
+                .long("signal")
+                .default_value("SIGKILL"),
         )
         .get_matches();
 
@@ -128,7 +133,7 @@ pub fn main() {
     let mut mgr = SimpleEventManager::new(monitor);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -152,7 +157,7 @@ pub fn main() {
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
-    let mut executor = TimeoutForkserverExecutor::new(
+    let mut executor = TimeoutForkserverExecutor::with_signal(
         forkserver,
         Duration::from_millis(
             res.value_of("timeout")
@@ -161,6 +166,7 @@ pub fn main() {
                 .parse()
                 .expect("Could not parse timeout in milliseconds"),
         ),
+        res.value_of("signal").unwrap().parse::<Signal>().unwrap(),
     )
     .expect("Failed to create the executor.");
 

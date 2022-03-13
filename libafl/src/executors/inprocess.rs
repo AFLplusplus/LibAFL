@@ -4,6 +4,7 @@
 //! Needs the `fork` feature flag.
 
 use core::{
+    borrow::BorrowMut,
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -15,6 +16,8 @@ use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+
+use alloc::boxed::Box;
 
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
@@ -52,40 +55,50 @@ use crate::{
     Error,
 };
 
+/// The process executor simply calls a target function, as mutable reference to a closure
+pub type InProcessExecutor<'a, H, I, OT, S> = GenericInProcessExecutor<H, &'a mut H, I, OT, S>;
+
+/// The process executor simply calls a target function, as boxed `FnMut` trait object
+pub type OwnedInProcessExecutor<I, OT, S> =
+    GenericInProcessExecutor<dyn FnMut(&I) -> ExitKind, Box<dyn FnMut(&I) -> ExitKind>, I, OT, S>;
+
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
-pub struct InProcessExecutor<'a, H, I, OT, S>
+pub struct GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
     /// The harness function, being executed for each fuzzing loop execution
-    harness_fn: &'a mut H,
+    harness_fn: HB,
     /// The observers, observing each run
     observers: OT,
     // Crash and timeout hah
     handlers: InProcessHandlers,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<(I, S, *const H)>,
 }
 
-impl<'a, H, I, OT, S> Debug for InProcessExecutor<'a, H, I, OT, S>
+impl<H, HB, I, OT, S> Debug for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.debug_struct("InProcessExecutor")
+        f.debug_struct("GenericInProcessExecutor")
             .field("harness_fn", &"<fn>")
             .field("observers", &self.observers)
             .finish_non_exhaustive()
     }
 }
 
-impl<'a, EM, H, I, OT, S, Z> Executor<EM, I, S, Z> for InProcessExecutor<'a, H, I, OT, S>
+impl<EM, H, HB, I, OT, S, Z> Executor<EM, I, S, Z> for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -99,16 +112,17 @@ where
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
 
-        let ret = (self.harness_fn)(input);
+        let ret = (self.harness_fn.borrow_mut())(input);
 
         self.handlers.post_run_target();
         Ok(ret)
     }
 }
 
-impl<'a, H, I, OT, S> HasObservers<I, OT, S> for InProcessExecutor<'a, H, I, OT, S>
+impl<H, HB, I, OT, S> HasObservers<I, OT, S> for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -123,9 +137,10 @@ where
     }
 }
 
-impl<'a, H, I, OT, S> InProcessExecutor<'a, H, I, OT, S>
+impl<H, HB, I, OT, S> GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -136,7 +151,7 @@ where
     /// * `observers` - the observers observing the target during execution
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OF, Z>(
-        harness_fn: &'a mut H,
+        harness_fn: HB,
         observers: OT,
         _fuzzer: &mut Z,
         _state: &mut S,
@@ -177,13 +192,13 @@ where
     /// Retrieve the harness function.
     #[inline]
     pub fn harness(&self) -> &H {
-        self.harness_fn
+        self.harness_fn.borrow()
     }
 
     /// Retrieve the harness function for a mutable reference.
     #[inline]
     pub fn harness_mut(&mut self) -> &mut H {
-        self.harness_fn
+        self.harness_fn.borrow_mut()
     }
 
     /// The inprocess handlers
@@ -309,7 +324,7 @@ impl InProcessHandlers {
             + HasClientPerfMonitor
             + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         Z: HasObjective<I, OF, S>,
-        H: FnMut(&I) -> ExitKind,
+        H: FnMut(&I) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {
@@ -1493,7 +1508,7 @@ impl Handler for InProcessForkExecutorGlobalData {
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1508,7 +1523,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1525,7 +1540,7 @@ where
 impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
     for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1583,7 +1598,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1629,7 +1644,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1767,5 +1782,157 @@ mod tests {
         assert!(in_process_fork_executor
             .run_target(&mut (), &mut (), &mut (), &input)
             .is_ok());
+    }
+}
+
+#[cfg(feature = "python")]
+/// `InProcess` Python bindings
+pub mod pybind {
+    use crate::bolts::tuples::tuple_list;
+    use crate::executors::{inprocess::OwnedInProcessExecutor, ExitKind};
+    use crate::inputs::{BytesInput, HasBytesVec};
+    use pyo3::prelude::*;
+    use pyo3::types::PyBytes;
+
+    macro_rules! define_python_in_process_executor {
+        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $std_state_name: ident, $event_manager_name: ident, $map_observer_name: ident, $std_fuzzer_name: ident) => {
+            use crate::events::pybind::$event_manager_name;
+            use crate::fuzzer::pybind::$std_fuzzer_name;
+            use crate::observers::pybind::$map_observer_name;
+            use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
+
+            #[pyclass(unsendable, name = $py_name)]
+            #[derive(Debug)]
+            /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
+            pub struct $struct_name {
+                /// Rust wrapped OwnedInProcessExecutor object
+                pub owned_in_process_executor: OwnedInProcessExecutor<
+                    BytesInput,
+                    ($map_observer_name, ()),
+                    $my_std_state_type_name,
+                >,
+            }
+
+            #[pymethods]
+            impl $struct_name {
+                #[new]
+                fn new(
+                    harness: PyObject,
+                    py_observer: $map_observer_name,
+                    py_fuzzer: &mut $std_fuzzer_name,
+                    py_state: &mut $std_state_name,
+                    py_event_manager: &mut $event_manager_name,
+                ) -> Self {
+                    Self {
+                        owned_in_process_executor: OwnedInProcessExecutor::new(
+                            Box::new(move |input: &BytesInput| {
+                                Python::with_gil(|py| -> PyResult<()> {
+                                    let args = (PyBytes::new(py, input.bytes()),);
+                                    harness.call1(py, args)?;
+                                    Ok(())
+                                })
+                                .unwrap();
+                                ExitKind::Ok
+                            }),
+                            tuple_list!(py_observer),
+                            &mut py_fuzzer.std_fuzzer,
+                            &mut py_state.std_state,
+                            py_event_manager,
+                        )
+                        .expect("Failed to create the Executor".into()),
+                    }
+                }
+            }
+        };
+    }
+
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorI8,
+        "OwnedInProcessExecutorI8",
+        MyStdStateI8,
+        PythonStdStateI8,
+        PythonEventManagerI8,
+        PythonMapObserverI8,
+        PythonStdFuzzerI8
+    );
+
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorI16,
+        "OwnedInProcessExecutorI16",
+        MyStdStateI16,
+        PythonStdStateI16,
+        PythonEventManagerI16,
+        PythonMapObserverI16,
+        PythonStdFuzzerI16
+    );
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorI32,
+        "OwnedInProcessExecutorI32",
+        MyStdStateI32,
+        PythonStdStateI32,
+        PythonEventManagerI32,
+        PythonMapObserverI32,
+        PythonStdFuzzerI32
+    );
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorI64,
+        "OwnedInProcessExecutorI64",
+        MyStdStateI64,
+        PythonStdStateI64,
+        PythonEventManagerI64,
+        PythonMapObserverI64,
+        PythonStdFuzzerI64
+    );
+
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorU8,
+        "OwnedInProcessExecutorU8",
+        MyStdStateU8,
+        PythonStdStateU8,
+        PythonEventManagerU8,
+        PythonMapObserverU8,
+        PythonStdFuzzerU8
+    );
+
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorU16,
+        "OwnedInProcessExecutorU16",
+        MyStdStateU16,
+        PythonStdStateU16,
+        PythonEventManagerU16,
+        PythonMapObserverU16,
+        PythonStdFuzzerU16
+    );
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorU32,
+        "OwnedInProcessExecutorU32",
+        MyStdStateU32,
+        PythonStdStateU32,
+        PythonEventManagerU32,
+        PythonMapObserverU32,
+        PythonStdFuzzerU32
+    );
+    define_python_in_process_executor!(
+        PythonOwnedInProcessExecutorU64,
+        "OwnedInProcessExecutorU64",
+        MyStdStateU64,
+        PythonStdStateU64,
+        PythonEventManagerU64,
+        PythonMapObserverU64,
+        PythonStdFuzzerU64
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonOwnedInProcessExecutorI8>()?;
+        m.add_class::<PythonOwnedInProcessExecutorI16>()?;
+        m.add_class::<PythonOwnedInProcessExecutorI32>()?;
+        m.add_class::<PythonOwnedInProcessExecutorI64>()?;
+
+        m.add_class::<PythonOwnedInProcessExecutorU8>()?;
+        m.add_class::<PythonOwnedInProcessExecutorU16>()?;
+        m.add_class::<PythonOwnedInProcessExecutorU32>()?;
+        m.add_class::<PythonOwnedInProcessExecutorU64>()?;
+        Ok(())
     }
 }

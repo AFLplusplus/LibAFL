@@ -136,12 +136,12 @@ let mon = SimpleMonitor::new(|s| println!("{}", s));
 let mut mgr = SimpleEventManager::new(mon);
 ```
 
-In addition, we have the Fuzzer, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a CorpusScheduler.
-We create it as QueueCorpusScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
+In addition, we have the Fuzzer, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a Scheduler.
+We create it as QueueScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
 
 ```rust,ignore
 // A queue policy to get testcasess from the corpus
-let scheduler = QueueCorpusScheduler::new();
+let scheduler = QueueScheduler::new();
 
 // A fuzzer with feedbacks and a corpus scheduler
 let mut fuzzer = StdFuzzer::new(scheduler, (), ());
@@ -188,13 +188,14 @@ extern crate libafl;
 use std::path::PathBuf;
 use libafl::{
     bolts::{current_nanos, rands::StdRand},
-    corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     fuzzer::StdFuzzer,
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
+    schedulers::QueueScheduler,
     state::StdState,
 };
 ```
