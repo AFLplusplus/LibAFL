@@ -22,7 +22,7 @@ use crate::{
 use crate::monitors::PerfFeature;
 
 use alloc::string::ToString;
-use core::{borrow::BorrowMut, marker::PhantomData, ops::DerefMut, time::Duration};
+use core::{marker::PhantomData, time::Duration};
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
@@ -335,28 +335,30 @@ where
         let mut res = ExecuteInputResult::None;
 
         let feedback_objective_states = state.feedback_objective_states();
-        let mut feedback_objective_states = feedback_objective_states.borrow_mut();
-        let (feedback_state, objective_state) = feedback_objective_states.borrow_mut().deref_mut();
+        let mut feedback_objective_states = (*feedback_objective_states).borrow_mut();
 
-        #[cfg(not(feature = "introspection"))]
-        let is_solution = self.objective_mut().is_interesting(
-            state,
-            objective_state,
-            manager,
-            &input,
-            observers,
-            exit_kind,
-        )?;
+        let is_solution = {
+            #[cfg(not(feature = "introspection"))]
+            let is_solution = self.objective_mut().is_interesting(
+                state,
+                &mut feedback_objective_states.1,
+                manager,
+                &input,
+                observers,
+                exit_kind,
+            )?;
 
-        #[cfg(feature = "introspection")]
-        let is_solution = self.objective_mut().is_interesting_introspection(
-            state,
-            objective_state,
-            manager,
-            &input,
-            observers,
-            exit_kind,
-        )?;
+            #[cfg(feature = "introspection")]
+            let is_solution = self.objective_mut().is_interesting_introspection(
+                state,
+                &mut feedback_objective_states.1,
+                manager,
+                &input,
+                observers,
+                exit_kind,
+            )?;
+            is_solution
+        };
 
         if is_solution {
             res = ExecuteInputResult::Solution;
@@ -364,7 +366,7 @@ where
             #[cfg(not(feature = "introspection"))]
             let is_corpus = self.feedback_mut().is_interesting(
                 state,
-                feedback_state,
+                &mut feedback_objective_states.0,
                 manager,
                 &input,
                 observers,
@@ -374,7 +376,7 @@ where
             #[cfg(feature = "introspection")]
             let is_corpus = self.feedback_mut().is_interesting_introspection(
                 state,
-                feedback_state,
+                &mut feedback_objective_statei.0,
                 manager,
                 &input,
                 observers,
@@ -388,21 +390,41 @@ where
 
         let ret_tuple = match res {
             ExecuteInputResult::None => {
-                self.feedback_mut()
-                    .discard_metadata(state, feedback_state, &input)?;
-                self.objective_mut()
-                    .discard_metadata(state, objective_state, &input)?;
+                {
+                    self.feedback_mut().discard_metadata(
+                        state,
+                        &mut feedback_objective_states.0,
+                        &input,
+                    )?;
+                }
+                {
+                    self.objective_mut().discard_metadata(
+                        state,
+                        &mut feedback_objective_states.1,
+                        &input,
+                    )?;
+                }
                 Ok((res, None))
             }
             ExecuteInputResult::Corpus => {
-                // Not a solution
-                self.objective_mut()
-                    .discard_metadata(state, objective_state, &input)?;
+                {
+                    // Not a solution
+                    self.objective_mut().discard_metadata(
+                        state,
+                        &mut feedback_objective_states.1,
+                        &input,
+                    )?;
+                }
 
                 // Add the input to the main corpus
                 let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-                self.feedback_mut()
-                    .append_metadata(state, feedback_state, &mut testcase)?;
+                {
+                    self.feedback_mut().append_metadata(
+                        state,
+                        &mut feedback_objective_states.0,
+                        &mut testcase,
+                    )?;
+                }
                 let idx = state.corpus_mut().add(testcase)?;
                 self.scheduler_mut().on_add(state, idx)?;
 
@@ -429,14 +451,24 @@ where
                 Ok((res, Some(idx)))
             }
             ExecuteInputResult::Solution => {
-                // Not interesting
-                self.feedback_mut()
-                    .discard_metadata(state, feedback_state, &input)?;
+                {
+                    // Not interesting
+                    self.feedback_mut().discard_metadata(
+                        state,
+                        &mut feedback_objective_states.0,
+                        &input,
+                    )?;
+                }
 
                 // The input is a solution, add it to the respective corpus
                 let mut testcase = Testcase::with_executions(input, *state.executions());
-                self.objective_mut()
-                    .append_metadata(state, objective_state, &mut testcase)?;
+                {
+                    self.objective_mut().append_metadata(
+                        state,
+                        &mut feedback_objective_states.1,
+                        &mut testcase,
+                    )?;
+                }
                 state.solutions_mut().add(testcase)?;
 
                 if send_events {
@@ -535,20 +567,28 @@ where
         let observers = executor.observers();
 
         let feedback_objective_states = state.feedback_objective_states();
-        let mut feedback_objective_states = feedback_objective_states.borrow_mut();
-
-        let (feedback_state, objective_state) = feedback_objective_states.borrow_mut().deref_mut();
+        let mut feedback_objective_states = (*feedback_objective_states).borrow_mut();
 
         // Always consider this to be "interesting"
 
-        // Not a solution
-        self.objective_mut()
-            .discard_metadata(state, objective_state, &input)?;
+        {
+            // Not a solution
+            self.objective_mut().discard_metadata(
+                state,
+                &mut feedback_objective_states.1,
+                &input,
+            )?;
+        }
 
         // Add the input to the main corpus
         let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-        self.feedback_mut()
-            .append_metadata(state, feedback_state, &mut testcase)?;
+        {
+            self.feedback_mut().append_metadata(
+                state,
+                &mut feedback_objective_states.0,
+                &mut testcase,
+            )?;
+        }
         let idx = state.corpus_mut().add(testcase)?;
         self.scheduler_mut().on_add(state, idx)?;
 

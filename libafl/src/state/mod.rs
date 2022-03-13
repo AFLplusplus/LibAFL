@@ -1,7 +1,7 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
 use alloc::rc::Rc;
-use core::{cell::RefCell, fmt::Debug, marker::PhantomData, ops::Deref, time::Duration};
+use core::{cell::RefCell, fmt::Debug, marker::PhantomData, time::Duration};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
@@ -191,21 +191,23 @@ where
     SC: Corpus<I> + Clone,
 {
     fn clone(&self) -> Self {
-        let (feedback_state, objective_state) = self.feedback_objective_states.borrow().deref();
+        let feedback_objective_states = self.feedback_objective_states();
+        let feedback_objective_states = (*feedback_objective_states).borrow_mut();
+
         Self {
             rand: self.rand.clone(),
             executions: self.executions,
-            start_time: self.start_time.clone(),
+            start_time: self.start_time,
             corpus: self.corpus.clone(),
             // make sure we clone the actual state instead of just the reference
             feedback_objective_states: Rc::new(RefCell::new((
-                feedback_state.clone(),
-                objective_state.clone(),
+                feedback_objective_states.0.clone(),
+                feedback_objective_states.1.clone(),
             ))),
             solutions: self.solutions.clone(),
             metadata: self.metadata.clone(),
             max_size: self.max_size,
-            stability: self.stability.clone(),
+            stability: self.stability,
             #[cfg(feature = "introspection")]
             introspection_monitor: self.introspection_monitor.clone(),
             phantom: PhantomData,

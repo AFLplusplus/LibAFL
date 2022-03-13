@@ -508,7 +508,7 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
-    use core::{borrow::BorrowMut, mem::transmute, ops::DerefMut};
+    use core::mem::transmute;
     use libc::siginfo_t;
     #[cfg(feature = "std")]
     use std::{
@@ -610,9 +610,8 @@ mod unix_signal_handler {
                 // Extra bracket to drop the borrow on state before serialization
                 {
                     let feedback_objective_states = state.feedback_objective_states();
-                    let test = (feedback_objective_states.borrow_mut()).deref_mut();
-
-                    let (_, objective_state) = feedback_objective_states.borrow_mut();
+                    let mut feedback_objective_states = (*feedback_objective_states).borrow_mut();
+                    let objective_state = &mut feedback_objective_states.1;
 
                     observers
                         .post_exec_all(state, input, &ExitKind::Crash)
@@ -717,8 +716,8 @@ mod unix_signal_handler {
         // Extra bracket to drop the borrow on state before serialization
         {
             let feedback_objective_states = state.feedback_objective_states();
-            let mut feedback_objective_states = feedback_objective_states.borrow_mut();
-            let (_, objective_state) = feedback_objective_states.deref_mut();
+            let mut feedback_objective_states = (*feedback_objective_states).borrow_mut();
+            let objective_state = &mut feedback_objective_states.1;
 
             let interesting = fuzzer
                 .objective_mut()
@@ -828,8 +827,8 @@ mod unix_signal_handler {
             // Extra bracket to drop the borrow on state before serialization
             {
                 let feedback_objective_states = state.feedback_objective_states();
-                let mut feedback_objective_states = feedback_objective_states.borrow_mut();
-                let (_, objective_state) = feedback_objective_states.deref_mut();
+                let mut feedback_objective_states = (*feedback_objective_states).borrow_mut();
+                let objective_state = &mut feedback_objective_states.1;
 
                 let interesting = fuzzer
                     .objective_mut()
