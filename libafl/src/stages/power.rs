@@ -142,10 +142,6 @@ pub enum PowerSchedule {
     EXPLOIT,
 }
 
-const POWER_BETA: f64 = 1.0;
-const MAX_FACTOR: f64 = POWER_BETA * 32.0;
-const HAVOC_MAX_MULT: f64 = 64.0;
-
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
@@ -201,7 +197,7 @@ where
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        self.calculate_score(&mut testcase, psmeta, fuzz_mu)
+        testcase.calculate_score(psmeta, fuzz_mu)
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -332,171 +328,5 @@ where
 
         fuzz_mu /= f64::from(n_paths);
         Ok(fuzz_mu)
-    }
-
-    /// Compute the `power` we assign to each corpus entry
-    #[inline]
-    #[allow(
-        clippy::cast_precision_loss,
-        clippy::too_many_lines,
-        clippy::cast_sign_loss
-    )]
-    fn calculate_score(
-        &self,
-        testcase: &mut Testcase<I>,
-        psmeta: &PowerScheduleMetadata,
-        fuzz_mu: f64,
-    ) -> Result<usize, Error> {
-        let mut perf_score = 100.0;
-        let q_exec_us = testcase
-            .exec_time()
-            .ok_or_else(|| Error::KeyNotFound("exec_time not set".to_string()))?
-            .as_nanos() as f64;
-
-        let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
-        let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
-
-        let favored = testcase.has_metadata::<IsFavoredMetadata>();
-        let tcmeta = testcase
-            .metadata_mut()
-            .get_mut::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
-
-        if q_exec_us * 0.1 > avg_exec_us {
-            perf_score = 10.0;
-        } else if q_exec_us * 0.2 > avg_exec_us {
-            perf_score = 25.0;
-        } else if q_exec_us * 0.5 > avg_exec_us {
-            perf_score = 50.0;
-        } else if q_exec_us * 0.75 > avg_exec_us {
-            perf_score = 75.0;
-        } else if q_exec_us * 4.0 < avg_exec_us {
-            perf_score = 300.0;
-        } else if q_exec_us * 3.0 < avg_exec_us {
-            perf_score = 200.0;
-        } else if q_exec_us * 2.0 < avg_exec_us {
-            perf_score = 150.0;
-        }
-
-        let q_bitmap_size = tcmeta.bitmap_size() as f64;
-        if q_bitmap_size * 0.3 > avg_bitmap_size as f64 {
-            perf_score *= 3.0;
-        } else if q_bitmap_size * 0.5 > avg_bitmap_size as f64 {
-            perf_score *= 2.0;
-        } else if q_bitmap_size * 0.75 > avg_bitmap_size as f64 {
-            perf_score *= 1.5;
-        } else if q_bitmap_size * 3.0 < avg_bitmap_size as f64 {
-            perf_score *= 0.25;
-        } else if q_bitmap_size * 2.0 < avg_bitmap_size as f64 {
-            perf_score *= 0.5;
-        } else if q_bitmap_size * 1.5 < avg_bitmap_size as f64 {
-            perf_score *= 0.75;
-        }
-
-        if tcmeta.handicap() >= 4 {
-            perf_score *= 4.0;
-            tcmeta.set_handicap(tcmeta.handicap() - 4);
-        } else if tcmeta.handicap() > 0 {
-            perf_score *= 2.0;
-            tcmeta.set_handicap(tcmeta.handicap() - 1);
-        }
-
-        if tcmeta.depth() >= 4 && tcmeta.depth() < 8 {
-            perf_score *= 2.0;
-        } else if tcmeta.depth() >= 8 && tcmeta.depth() < 14 {
-            perf_score *= 3.0;
-        } else if tcmeta.depth() >= 14 && tcmeta.depth() < 25 {
-            perf_score *= 4.0;
-        } else if tcmeta.depth() >= 25 {
-            perf_score *= 5.0;
-        }
-
-        let mut factor: f64 = 1.0;
-
-        // COE and Fast schedule are fairly different from what are described in the original thesis,
-        // This implementation follows the changes made in this pull request https://github.com/AFLplusplus/AFLplusplus/pull/568
-        match psmeta.strat {
-            PowerSchedule::EXPLORE => {
-                // Nothing happens in EXPLORE
-            }
-            PowerSchedule::EXPLOIT => {
-                factor = MAX_FACTOR;
-            }
-            PowerSchedule::COE => {
-                if libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()])) > fuzz_mu
-                    && !favored
-                {
-                    // Never skip favorites.
-                    factor = 0.0;
-                }
-            }
-            PowerSchedule::FAST => {
-                if tcmeta.fuzz_level() != 0 {
-                    let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
-
-                    match lg {
-                        f if f < 2.0 => {
-                            factor = 4.0;
-                        }
-                        f if (2.0..4.0).contains(&f) => {
-                            factor = 3.0;
-                        }
-                        f if (4.0..5.0).contains(&f) => {
-                            factor = 2.0;
-                        }
-                        f if (6.0..7.0).contains(&f) => {
-                            if !favored {
-                                factor = 0.8;
-                            }
-                        }
-                        f if (7.0..8.0).contains(&f) => {
-                            if !favored {
-                                factor = 0.6;
-                            }
-                        }
-                        f if f >= 8.0 => {
-                            if !favored {
-                                factor = 0.4;
-                            }
-                        }
-                        _ => {
-                            factor = 1.0;
-                        }
-                    }
-
-                    if favored {
-                        factor *= 1.15;
-                    }
-                }
-            }
-            PowerSchedule::LIN => {
-                factor = (tcmeta.fuzz_level() as f64)
-                    / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
-            }
-            PowerSchedule::QUAD => {
-                factor = ((tcmeta.fuzz_level() * tcmeta.fuzz_level()) as f64)
-                    / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
-            }
-        }
-
-        if psmeta.strat != PowerSchedule::EXPLORE {
-            if factor > MAX_FACTOR {
-                factor = MAX_FACTOR;
-            }
-
-            perf_score *= factor / POWER_BETA;
-        }
-
-        // Lower bound if the strat is not COE.
-        if psmeta.strat == PowerSchedule::COE && perf_score < 1.0 {
-            perf_score = 1.0;
-        }
-
-        // Upper bound
-        if perf_score > HAVOC_MAX_MULT * 100.0 {
-            perf_score = HAVOC_MAX_MULT * 100.0;
-        }
-
-        Ok(perf_score as usize)
     }
 }

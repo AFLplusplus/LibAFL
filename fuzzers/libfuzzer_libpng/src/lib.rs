@@ -29,6 +29,7 @@ use libafl::{
     stages::{
         calibrate::CalibrationStage,
         power::{PowerMutationalStage, PowerSchedule},
+        PowerScheduleMetadata,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -130,8 +131,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
-    let calibration = CalibrationStage::new(&mut state, &edges_observer);
-    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+    let calibration = CalibrationStage::new(&edges_observer);
+    let power = PowerMutationalStage::new(mutator, &edges_observer);
+    state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new(PowerSchedule::FAST));
 
     let mut stages = tuple_list!(calibration, power);
 

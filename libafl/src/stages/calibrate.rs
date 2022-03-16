@@ -16,7 +16,6 @@ use crate::{
 };
 use alloc::{
     string::{String, ToString},
-    vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use num_traits::Bounded;
