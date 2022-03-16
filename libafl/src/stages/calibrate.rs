@@ -10,7 +10,7 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    stages::Stage,
+    stages::{power::PowerScheduleMetadata, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata},
     Error,
 };
@@ -65,7 +65,7 @@ where
             .metadata()
             .get::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
-            .queue_cycles;
+            .queue_cycles();
         let input = state
             .corpus()
             .get(corpus_idx)?
@@ -196,109 +196,6 @@ where
     }
 }
 
-/// The n fuzz size
-pub const N_FUZZ_SIZE: usize = 1 << 21;
-
-/// The metadata used for power schedules
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PowerScheduleMetadata {
-    /// Measured exec time during calibration
-    exec_time: Duration,
-    /// Calibration cycles
-    cycles: u64,
-    /// Size of the observer map
-    bitmap_size: u64,
-    /// Number of filled map entries
-    bitmap_entries: u64,
-    /// Queue cycles
-    queue_cycles: u64,
-    /// The vector to contain the frequency of each execution path.
-    n_fuzz: Vec<u32>,
-}
-
-/// The metadata for runs in the calibration stage.
-impl PowerScheduleMetadata {
-    /// Creates a new [`struct@PowerScheduleMetadata`]
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            exec_time: Duration::from_millis(0),
-            cycles: 0,
-            bitmap_size: 0,
-            bitmap_entries: 0,
-            queue_cycles: 0,
-            n_fuzz: vec![0; N_FUZZ_SIZE],
-        }
-    }
-
-    /// The measured exec time during calibration
-    #[must_use]
-    pub fn exec_time(&self) -> Duration {
-        self.exec_time
-    }
-
-    /// Set the measured exec
-    pub fn set_exec_time(&mut self, time: Duration) {
-        self.exec_time = time;
-    }
-
-    /// The cycles
-    #[must_use]
-    pub fn cycles(&self) -> u64 {
-        self.cycles
-    }
-
-    /// Sets the cycles
-    pub fn set_cycles(&mut self, val: u64) {
-        self.cycles = val;
-    }
-
-    /// The bitmap size
-    #[must_use]
-    pub fn bitmap_size(&self) -> u64 {
-        self.bitmap_size
-    }
-
-    /// Sets the bitmap size
-    pub fn set_bitmap_size(&mut self, val: u64) {
-        self.bitmap_size = val;
-    }
-
-    /// The number of filled map entries
-    #[must_use]
-    pub fn bitmap_entries(&self) -> u64 {
-        self.bitmap_entries
-    }
-
-    /// Sets the number of filled map entries
-    pub fn set_bitmap_entries(&mut self, val: u64) {
-        self.bitmap_entries = val;
-    }
-
-    /// The amount of queue cycles
-    #[must_use]
-    pub fn queue_cycles(&self) -> u64 {
-        self.queue_cycles
-    }
-
-    /// Sets the amount of queue cycles
-    pub fn set_queue_cycles(&mut self, val: u64) {
-        self.queue_cycles = val;
-    }
-
-    /// Gets the `n_fuzz`.
-    #[must_use]
-    pub fn n_fuzz(&self) -> &[u32] {
-        &self.n_fuzz
-    }
-
-    /// Sets the `n_fuzz`.
-    #[must_use]
-    pub fn n_fuzz_mut(&mut self) -> &mut [u32] {
-        &mut self.n_fuzz
-    }
-}
-
 crate::impl_serdeany!(PowerScheduleMetadata);
 
 impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
@@ -309,18 +206,11 @@ where
     S: HasCorpus<I> + HasMetadata,
 {
     /// Create a new [`CalibrationStage`].
-    pub fn new(state: &mut S, map_observer_name: &O) -> Self {
-        state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new());
+    pub fn new(map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             stage_max: CAL_STAGE_START,
             phantom: PhantomData,
         }
-    }
-}
-
-impl Default for PowerScheduleMetadata {
-    fn default() -> Self {
-        Self::new()
     }
 }

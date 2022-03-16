@@ -11,14 +11,128 @@ use crate::{
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     schedulers::minimizer::IsFavoredMetadata,
-    stages::{MutationalStage, PowerScheduleMetadata, Stage},
+    stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,
 };
+use core::time::Duration;
+use serde::{Deserialize, Serialize};
+
+/// The n fuzz size
+pub const N_FUZZ_SIZE: usize = 1 << 21;
+
+/// The metadata used for power schedules
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PowerScheduleMetadata {
+    /// Powerschedule strategy
+    strat: PowerSchedule,
+    /// Measured exec time during calibration
+    exec_time: Duration,
+    /// Calibration cycles
+    cycles: u64,
+    /// Size of the observer map
+    bitmap_size: u64,
+    /// Number of filled map entries
+    bitmap_entries: u64,
+    /// Queue cycles
+    queue_cycles: u64,
+    /// The vector to contain the frequency of each execution path.
+    n_fuzz: Vec<u32>,
+}
+
+/// The metadata for runs in the calibration stage.
+impl PowerScheduleMetadata {
+    /// Creates a new [`struct@PowerScheduleMetadata`]
+    #[must_use]
+    pub fn new(strat: PowerSchedule) -> Self {
+        Self {
+            strat: strat,
+            exec_time: Duration::from_millis(0),
+            cycles: 0,
+            bitmap_size: 0,
+            bitmap_entries: 0,
+            queue_cycles: 0,
+            n_fuzz: vec![0; N_FUZZ_SIZE],
+        }
+    }
+
+    /// The powerschedule strategy
+    #[must_use]
+    pub fn strat(&self) -> PowerSchedule {
+        self.strat
+    }
+
+    /// The measured exec time during calibration
+    #[must_use]
+    pub fn exec_time(&self) -> Duration {
+        self.exec_time
+    }
+
+    /// Set the measured exec
+    pub fn set_exec_time(&mut self, time: Duration) {
+        self.exec_time = time;
+    }
+
+    /// The cycles
+    #[must_use]
+    pub fn cycles(&self) -> u64 {
+        self.cycles
+    }
+
+    /// Sets the cycles
+    pub fn set_cycles(&mut self, val: u64) {
+        self.cycles = val;
+    }
+
+    /// The bitmap size
+    #[must_use]
+    pub fn bitmap_size(&self) -> u64 {
+        self.bitmap_size
+    }
+
+    /// Sets the bitmap size
+    pub fn set_bitmap_size(&mut self, val: u64) {
+        self.bitmap_size = val;
+    }
+
+    /// The number of filled map entries
+    #[must_use]
+    pub fn bitmap_entries(&self) -> u64 {
+        self.bitmap_entries
+    }
+
+    /// Sets the number of filled map entries
+    pub fn set_bitmap_entries(&mut self, val: u64) {
+        self.bitmap_entries = val;
+    }
+
+    /// The amount of queue cycles
+    #[must_use]
+    pub fn queue_cycles(&self) -> u64 {
+        self.queue_cycles
+    }
+
+    /// Sets the amount of queue cycles
+    pub fn set_queue_cycles(&mut self, val: u64) {
+        self.queue_cycles = val;
+    }
+
+    /// Gets the `n_fuzz`.
+    #[must_use]
+    pub fn n_fuzz(&self) -> &[u32] {
+        &self.n_fuzz
+    }
+
+    /// Sets the `n_fuzz`.
+    #[must_use]
+    pub fn n_fuzz_mut(&mut self) -> &mut [u32] {
+        &mut self.n_fuzz
+    }
+}
 
 /// The power schedule to use
 #[allow(missing_docs)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum PowerSchedule {
     EXPLORE,
     FAST,
@@ -46,8 +160,6 @@ where
 {
     map_observer_name: String,
     mutator: M,
-    /// The employed power schedule strategy
-    strat: PowerSchedule,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, O, OT, S, Z)>,
 }
@@ -83,7 +195,7 @@ where
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
         let mut fuzz_mu = 0.0;
-        if self.strat == PowerSchedule::COE {
+        if psmeta.strat == PowerSchedule::COE {
             fuzz_mu = self.fuzz_mu(state, psmeta)?;
         }
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
@@ -187,11 +299,10 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn new(mutator: M, strat: PowerSchedule, map_observer_name: &O) -> Self {
+    pub fn new(mutator: M, map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator,
-            strat,
             phantom: PhantomData,
         }
     }
@@ -304,7 +415,7 @@ where
 
         // COE and Fast schedule are fairly different from what are described in the original thesis,
         // This implementation follows the changes made in this pull request https://github.com/AFLplusplus/AFLplusplus/pull/568
-        match &self.strat {
+        match psmeta.strat {
             PowerSchedule::EXPLORE => {
                 // Nothing happens in EXPLORE
             }
@@ -368,7 +479,7 @@ where
             }
         }
 
-        if self.strat != PowerSchedule::EXPLORE {
+        if psmeta.strat != PowerSchedule::EXPLORE {
             if factor > MAX_FACTOR {
                 factor = MAX_FACTOR;
             }
@@ -377,7 +488,7 @@ where
         }
 
         // Lower bound if the strat is not COE.
-        if self.strat == PowerSchedule::COE && perf_score < 1.0 {
+        if psmeta.strat == PowerSchedule::COE && perf_score < 1.0 {
             perf_score = 1.0;
         }
 

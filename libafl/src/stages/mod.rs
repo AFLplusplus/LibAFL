@@ -14,10 +14,10 @@ pub mod tracing;
 pub use tracing::{ShadowTracingStage, TracingStage};
 
 pub mod calibrate;
-pub use calibrate::{CalibrationStage, PowerScheduleMetadata};
+pub use calibrate::CalibrationStage;
 
 pub mod power;
-pub use power::PowerMutationalStage;
+pub use power::{PowerMutationalStage, PowerScheduleMetadata};
 
 pub mod generalization;
 pub use generalization::GeneralizationStage;
