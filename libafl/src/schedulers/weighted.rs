@@ -29,6 +29,7 @@ pub struct WeightedScheduleMetadata {
 }
 
 impl WeightedScheduleMetadata {
+    /// Constructor for `WeightedScheduleMetadata`
     pub fn new() -> Self {
         Self {
             runs_in_current_cycle: 0,
@@ -38,34 +39,42 @@ impl WeightedScheduleMetadata {
         }
     }
 
+    /// The getter for `runs_in_current_cycle`
     pub fn runs_in_current_cycle(&self) -> usize {
         self.runs_in_current_cycle
     }
 
+    /// The setter for `runs_in_current_cycle`
     pub fn set_runs_current_cycle(&mut self, cycles: usize) {
         self.runs_in_current_cycle = cycles;
     }
 
+    /// The getter for `alias_table`
     pub fn alias_table(&self) -> &[usize] {
         &self.alias_table
     }
 
+    /// The setter for `alias_table`
     pub fn set_alias_table(&mut self, table: Vec<usize>) {
         self.alias_table = table;
     }
 
+    /// The getter for `alias_probability`
     pub fn alias_probability(&self) -> &[f64] {
         &self.alias_probability
     }
 
+    /// The setter for `alias_probability`
     pub fn set_alias_probability(&mut self, probability: Vec<f64>) {
         self.alias_probability = probability;
     }
 
+    /// The getter for `perf_scores`
     pub fn perf_scores(&self) -> &[f64] {
         &self.perf_scores
     }
 
+    /// The setter for `perf_scores`
     pub fn set_perf_scores(&mut self, perf_scores: Vec<f64>) {
         self.perf_scores = perf_scores
     }
@@ -103,23 +112,24 @@ where
         }
     }
 
+    /// Create a new alias table when the fuzzer finds a new corpus entry
     pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> 
     {
         let n = state.corpus().count();
 
         let alias_table : Vec<usize> = vec![0; n];
         let alias_probability: Vec<f64> = vec![0.0; n];
-        let perf_scores: Vec<f64> = vec![0.0; n];
+        let mut perf_scores: Vec<f64> = vec![0.0; n];
 
-        let P : Vec<f64> = vec![0.0; n];
+        let mut P : Vec<f64> = vec![0.0; n];
         let S : Vec<u32> = vec![0; n];
         let L : Vec<u32> = vec![0; n];
 
-        let sum : f64 = 0.0;
+        let mut sum : f64 = 0.0;
 
         let psmeta = state
-            .metadata_mut()
-            .get_mut::<PowerScheduleMetadata>()
+            .metadata()
+            .get::<PowerScheduleMetadata>()
             .ok_or_else(|| {
                 Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
             })?;
@@ -152,7 +162,7 @@ where
         };
 
         for i in 0..n {
-            let testcase = state.corpus().get(i)?.borrow_mut();
+            let mut testcase = state.corpus().get(i)?.borrow_mut();
             let perf_score = testcase.calculate_score(psmeta, fuzz_mu)? as f64;
             perf_scores[i] = perf_score;
             sum += perf_score;
@@ -161,11 +171,6 @@ where
         for i in 0..n {
             P[i] = perf_scores[i] * (n as f64) / sum;
         }
-
-        let nS: usize = 0;
-        let nL: usize = 0;
-
-
         Ok(())
     }
 }
@@ -202,7 +207,7 @@ where
             .add_metadata(PowerScheduleTestcaseMetaData::new(depth));
 
         // Recrate the alias table
-        self.create_alias_table(state);
+        self.create_alias_table(state)?;
         Ok(())
     }
 
@@ -210,6 +215,8 @@ where
         if state.corpus().count() == 0 {
             Err(Error::Empty(String::from("No entries in corpus")))
         } else {
+            let corpus_counts = state.corpus().count();
+            let random_value = state.rand_mut().below(u64::MAX) as usize;
 
             let wsmeta = state
                 .metadata_mut()
@@ -217,10 +224,27 @@ where
                 .ok_or_else(|| {
                     Error::KeyNotFound("WeigthedScheduleMetadata not found".to_string())
                 })?;
+            
+            let current_cycles = wsmeta.runs_in_current_cycle();
 
-            if wsmeta.runs_in_current_cycle() > state.corpus().count() {
-                // update depth
+            if current_cycles > corpus_counts {
+                wsmeta.set_runs_current_cycle(0);
+            }
+            else{
+                wsmeta.set_runs_current_cycle(current_cycles + 1);
+            }
 
+            let s = random_value % corpus_counts;
+
+            let idx = if (random_value as f64) < wsmeta.alias_probability()[s] {
+                s
+            }
+            else{
+                wsmeta.alias_table()[s]
+            };
+
+            // Update depth
+            if current_cycles > corpus_counts {
                 let psmeta = state
                     .metadata_mut()
                     .get_mut::<PowerScheduleMetadata>()
@@ -228,23 +252,7 @@ where
                         Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
                     })?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
-                wsmeta.set_runs_current_cycle(0);
             }
-            else{
-                wsmeta.set_runs_current_cycle(wsmeta.runs_in_current_cycle());
-            }
-
-
-
-            let r = state.rand_mut().below(u64::MAX) as usize;
-            let s = r % state.corpus().count();
-
-            let idx = if (r as f64) < wsmeta.alias_probability()[s] {
-                s
-            }
-            else{
-                wsmeta.alias_table()[s]
-            };
 
             Ok(idx)
         }

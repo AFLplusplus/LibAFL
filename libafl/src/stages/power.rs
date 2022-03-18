@@ -95,11 +95,11 @@ where
 
         // if we have the `WeightedScheduleMetadata`, then just use the cached perf_score
         let wsmeta = state
-            .metadata_mut()
-            .get_mut::<WeightedScheduleMetadata>();
+            .metadata()
+            .get::<WeightedScheduleMetadata>();
         match wsmeta {
-            Some() => {
-                
+            Some(metadata) => {
+                Ok(metadata.perf_scores()[corpus_idx] as usize)
             },
             None => {
                 // Calculate the score on the fly
