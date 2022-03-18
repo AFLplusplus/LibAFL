@@ -10,14 +10,12 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    stages::Stage,
     schedulers::powersched::PowerScheduleMetadata,
+    stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata},
     Error,
 };
-use alloc::{
-    string::{String, ToString},
-};
+use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};

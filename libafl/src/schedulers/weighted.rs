@@ -7,7 +7,10 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
-    schedulers::{Scheduler, powersched::{PowerScheduleMetadata, PowerSchedule}},
+    schedulers::{
+        powersched::{PowerSchedule, PowerScheduleMetadata},
+        Scheduler,
+    },
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -80,13 +83,12 @@ impl WeightedScheduleMetadata {
     }
 }
 
-
 crate::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
 pub struct WeightedScheduler<I, S> {
-    phantom: PhantomData<(I, S)>
+    phantom: PhantomData<(I, S)>,
 }
 
 impl<I, S> Default for WeightedScheduler<I, S>
@@ -99,7 +101,7 @@ where
     }
 }
 
-impl<I, S> WeightedScheduler<I, S> 
+impl<I, S> WeightedScheduler<I, S>
 where
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -113,27 +115,24 @@ where
     }
 
     /// Create a new alias table when the fuzzer finds a new corpus entry
-    pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> 
-    {
+    pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
         let n = state.corpus().count();
 
-        let mut alias_table : Vec<usize> = vec![0; n];
+        let mut alias_table: Vec<usize> = vec![0; n];
         let mut alias_probability: Vec<f64> = vec![0.0; n];
         let mut perf_scores: Vec<f64> = vec![0.0; n];
-        let mut weights : Vec<f64> = vec![0.0; n];
+        let mut weights: Vec<f64> = vec![0.0; n];
 
-        let mut P : Vec<f64> = vec![0.0; n];
-        let mut S : Vec<usize> = vec![0; n];
-        let mut L : Vec<usize> = vec![0; n];
+        let mut P: Vec<f64> = vec![0.0; n];
+        let mut S: Vec<usize> = vec![0; n];
+        let mut L: Vec<usize> = vec![0; n];
 
-        let mut sum : f64 = 0.0;
+        let mut sum: f64 = 0.0;
 
         let psmeta = state
             .metadata()
             .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| {
-                Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
-            })?;
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
         let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
             let corpus = state.corpus();
@@ -145,20 +144,21 @@ where
                     .borrow()
                     .metadata()
                     .get::<PowerScheduleTestcaseMetaData>()
-                    .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
+                    .ok_or_else(|| {
+                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                    })?
                     .n_fuzz_entry();
                 v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
                 n_paths += 1;
             }
-    
+
             if n_paths == 0 {
                 return Err(Error::Unknown(String::from("Queue state corrput")));
             }
-    
+
             v /= f64::from(n_paths);
             v
-        }
-        else{
+        } else {
             0.0
         };
 
@@ -185,8 +185,7 @@ where
             if P[s] < 1.0 {
                 S[nS] = s;
                 nS += 1;
-            }
-            else{
+            } else {
                 L[nL] = s;
                 nL += 1
             }
@@ -198,15 +197,14 @@ where
             let a = S[nS];
             let g = L[nL];
 
-            alias_probability[a]= P[a];
+            alias_probability[a] = P[a];
             alias_table[a] = g;
             P[g] = P[a] + P[a] - 1.0;
 
             if P[g] < 1.0 {
                 S[nS] = g;
                 nS += 1;
-            }
-            else {
+            } else {
                 L[nL] = g;
                 nL += 1;
             }
@@ -222,14 +220,10 @@ where
             alias_probability[S[nS]] = 1.0;
         }
 
-
         let wsmeta = state
             .metadata_mut()
             .get_mut::<WeightedScheduleMetadata>()
-            .ok_or_else(|| {
-                Error::KeyNotFound("WeigthedScheduleMetadata not found".to_string())
-            })?;
-
+            .ok_or_else(|| Error::KeyNotFound("WeigthedScheduleMetadata not found".to_string()))?;
 
         // Update metadata
         wsmeta.set_alias_probability(alias_probability);
@@ -238,8 +232,6 @@ where
         Ok(())
     }
 }
-
-
 
 impl<I, S> Scheduler<I, S> for WeightedScheduler<I, S>
 where
@@ -282,7 +274,7 @@ where
             let corpus_counts = state.corpus().count();
             let s = state.rand().below(corpus_counts as u64) as usize;
             // Choose a random value between 0.000000000 and 1.000000000
-            let probability = state.rand().between(0, 1000000000 ) as f64 / 1000000000 as f64;
+            let probability = state.rand().between(0, 1000000000) as f64 / 1000000000 as f64;
 
             let wsmeta = state
                 .metadata_mut()
@@ -290,20 +282,18 @@ where
                 .ok_or_else(|| {
                     Error::KeyNotFound("WeigthedScheduleMetadata not found".to_string())
                 })?;
-            
+
             let current_cycles = wsmeta.runs_in_current_cycle();
 
             if current_cycles > corpus_counts {
                 wsmeta.set_runs_current_cycle(0);
-            }
-            else{
+            } else {
                 wsmeta.set_runs_current_cycle(current_cycles + 1);
             }
 
             let idx = if probability < wsmeta.alias_probability()[s] {
                 s
-            }
-            else{
+            } else {
                 wsmeta.alias_table()[s]
             };
 

@@ -8,8 +8,11 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{serdeany::SerdeAnyMap, HasLen},
     inputs::Input,
+    schedulers::{
+        minimizer::IsFavoredMetadata,
+        powersched::{PowerSchedule, PowerScheduleMetadata},
+    },
     state::HasMetadata,
-    schedulers::{minimizer::IsFavoredMetadata, powersched::{PowerSchedule, PowerScheduleMetadata}},
     Error,
 };
 
@@ -52,7 +55,6 @@ where
         &mut self.metadata
     }
 }
-
 
 /// Constants for powerschedules
 const POWER_BETA: f64 = 1.0;
@@ -219,7 +221,6 @@ where
             .as_nanos() as f64;
         let favored = self.has_metadata::<IsFavoredMetadata>();
 
-
         let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
         let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
 
@@ -236,17 +237,14 @@ where
                 if hits > 0 {
                     weight *= libm::log10(hits as f64) + 1.0;
                 }
-            },
-            _ => {
-            },
+            }
+            _ => {}
         }
-
 
         weight *= avg_exec_us / q_exec_us;
         weight *= libm::log2(q_bitmap_size) / (avg_bitmap_size as f64);
         // TODO: update_bitmap_score is not in libafl yet.
         // weight *= (1 + (q_tc_ref / avg_top_size));
-
 
         if favored {
             weight *= 5.0;
@@ -257,10 +255,8 @@ where
             weight *= 2.0;
         }
 
-
         Ok(weight)
     }
-
 
     /// Compute the `power` we assign to each corpus entry
     #[inline]
@@ -426,7 +422,6 @@ where
 
         Ok(perf_score as usize)
     }
-
 }
 
 impl<I> Default for Testcase<I>

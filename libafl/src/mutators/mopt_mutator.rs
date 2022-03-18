@@ -2,7 +2,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
-    bolts::{rands::Rand, rands::StdRand, current_nanos},
+    bolts::{current_nanos, rands::Rand, rands::StdRand},
     corpus::Corpus,
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},

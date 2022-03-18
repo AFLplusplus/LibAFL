@@ -10,7 +10,10 @@ use crate::{
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    schedulers::{powersched::{PowerSchedule, PowerScheduleMetadata}, weighted::WeightedScheduleMetadata},
+    schedulers::{
+        powersched::{PowerSchedule, PowerScheduleMetadata},
+        weighted::WeightedScheduleMetadata,
+    },
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,
@@ -63,7 +66,6 @@ where
             .get::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
-
         let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
             let corpus = state.corpus();
             let mut n_paths = 0;
@@ -74,33 +76,30 @@ where
                     .borrow()
                     .metadata()
                     .get::<PowerScheduleTestcaseMetaData>()
-                    .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
+                    .ok_or_else(|| {
+                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                    })?
                     .n_fuzz_entry();
                 v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
                 n_paths += 1;
             }
-    
+
             if n_paths == 0 {
                 return Err(Error::Unknown(String::from("Queue state corrput")));
             }
-    
+
             v /= f64::from(n_paths);
             v
-        }
-        else{
+        } else {
             0.0
         };
 
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
         // if we have the `WeightedScheduleMetadata`, then just use the cached perf_score
-        let wsmeta = state
-            .metadata()
-            .get::<WeightedScheduleMetadata>();
+        let wsmeta = state.metadata().get::<WeightedScheduleMetadata>();
         match wsmeta {
-            Some(metadata) => {
-                Ok(metadata.perf_scores()[corpus_idx] as usize)
-            },
+            Some(metadata) => Ok(metadata.perf_scores()[corpus_idx] as usize),
             None => {
                 // Calculate the score on the fly
                 testcase.calculate_score(psmeta, fuzz_mu)
