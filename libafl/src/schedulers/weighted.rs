@@ -117,14 +117,14 @@ where
     {
         let n = state.corpus().count();
 
-        let alias_table : Vec<usize> = vec![0; n];
-        let alias_probability: Vec<f64> = vec![0.0; n];
+        let mut alias_table : Vec<usize> = vec![0; n];
+        let mut alias_probability: Vec<f64> = vec![0.0; n];
         let mut perf_scores: Vec<f64> = vec![0.0; n];
         let mut weights : Vec<f64> = vec![0.0; n];
 
         let mut P : Vec<f64> = vec![0.0; n];
-        let S : Vec<u32> = vec![0; n];
-        let L : Vec<u32> = vec![0; n];
+        let mut S : Vec<usize> = vec![0; n];
+        let mut L : Vec<usize> = vec![0; n];
 
         let mut sum : f64 = 0.0;
 
@@ -175,6 +175,66 @@ where
             P[i] = weights[i] * (n as f64) / sum;
         }
 
+        // # of items in queue S
+        let mut nS = 0;
+
+        // # of items in queue L
+        let mut nL = 0;
+        // Divide P into two queues, S and L
+        for s in (0..n).rev() {
+            if P[s] < 1.0 {
+                S[nS] = s;
+                nS += 1;
+            }
+            else{
+                L[nL] = s;
+                nL += 1
+            }
+        }
+
+        while (nS > 0 && nL > 0) {
+            nS -= 1;
+            nL -= 1;
+            let a = S[nS];
+            let g = L[nL];
+
+            alias_probability[a]= P[a];
+            alias_table[a] = g;
+            P[g] = P[a] + P[a] - 1.0;
+
+            if P[g] < 1.0 {
+                S[nS] = g;
+                nS += 1;
+            }
+            else {
+                L[nL] = g;
+                nL += 1;
+            }
+        }
+
+        while nL > 0 {
+            nL -= 1;
+            alias_probability[L[nL]] = 1.0;
+        }
+
+        while nS > 0 {
+            nS -= 1;
+            alias_probability[S[nS]] = 1.0;
+        }
+
+
+        let wsmeta = state
+            .metadata_mut()
+            .get_mut::<WeightedScheduleMetadata>()
+            .ok_or_else(|| {
+                Error::KeyNotFound("WeigthedScheduleMetadata not found".to_string())
+            })?;
+
+
+        // Update metadata
+        wsmeta.set_alias_probability(alias_probability);
+        wsmeta.set_alias_table(alias_table);
+        wsmeta.set_perf_scores(perf_scores);
         Ok(())
     }
 }
