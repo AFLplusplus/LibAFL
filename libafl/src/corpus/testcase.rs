@@ -7,11 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{serdeany::SerdeAnyMap, HasLen},
-    corpus::Corpus,
     inputs::Input,
-    state::{HasMetadata, HasCorpus},
-    stages::{PowerScheduleMetadata, power::PowerSchedule},
-    schedulers::minimizer::IsFavoredMetadata,
+    state::HasMetadata,
+    schedulers::{minimizer::IsFavoredMetadata, powersched::{PowerSchedule, PowerScheduleMetadata}},
     Error,
 };
 

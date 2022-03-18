@@ -2,7 +2,7 @@
 use alloc::{string::ToString, vec::Vec};
 
 use crate::{
-    bolts::{rands::Rand, rands::StdRand},
+    bolts::{rands::Rand, rands::StdRand, current_nanos},
     corpus::Corpus,
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
@@ -140,7 +140,7 @@ impl MOpt {
     /// Creates a new [`struct@MOpt`] instance.
     pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
         let mut mopt = Self {
-            rand: StdRand::with_seed(0),
+            rand: StdRand::with_seed(current_nanos()),
             total_finds: 0,
             finds_until_last_swarm: 0,
             w_init: 0.9,

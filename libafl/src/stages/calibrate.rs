@@ -10,7 +10,8 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    stages::{power::PowerScheduleMetadata, Stage},
+    stages::Stage,
+    schedulers::powersched::PowerScheduleMetadata,
     state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata},
     Error,
 };

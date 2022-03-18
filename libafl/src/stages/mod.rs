@@ -17,7 +17,7 @@ pub mod calibrate;
 pub use calibrate::CalibrationStage;
 
 pub mod power;
-pub use power::{PowerMutationalStage, PowerScheduleMetadata};
+pub use power::PowerMutationalStage;
 
 pub mod generalization;
 pub use generalization::GeneralizationStage;

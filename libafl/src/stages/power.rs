@@ -4,144 +4,17 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, PowerScheduleTestcaseMetaData, Testcase},
+    corpus::{Corpus, PowerScheduleTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    schedulers::minimizer::IsFavoredMetadata,
+    schedulers::{powersched::{PowerSchedule, PowerScheduleMetadata}, weighted::WeightedScheduleMetadata},
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,
 };
-use core::time::Duration;
-use serde::{Deserialize, Serialize};
-
-/// The n fuzz size
-pub const N_FUZZ_SIZE: usize = 1 << 21;
-
-/// The metadata used for power schedules
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PowerScheduleMetadata {
-    /// Powerschedule strategy
-    strat: PowerSchedule,
-    /// Measured exec time during calibration
-    exec_time: Duration,
-    /// Calibration cycles
-    cycles: u64,
-    /// Size of the observer map
-    bitmap_size: u64,
-    /// Number of filled map entries
-    bitmap_entries: u64,
-    /// Queue cycles
-    queue_cycles: u64,
-    /// The vector to contain the frequency of each execution path.
-    n_fuzz: Vec<u32>,
-}
-
-/// The metadata for runs in the calibration stage.
-impl PowerScheduleMetadata {
-    /// Creates a new [`struct@PowerScheduleMetadata`]
-    #[must_use]
-    pub fn new(strat: PowerSchedule) -> Self {
-        Self {
-            strat: strat,
-            exec_time: Duration::from_millis(0),
-            cycles: 0,
-            bitmap_size: 0,
-            bitmap_entries: 0,
-            queue_cycles: 0,
-            n_fuzz: vec![0; N_FUZZ_SIZE],
-        }
-    }
-
-    /// The powerschedule strategy
-    #[must_use]
-    pub fn strat(&self) -> PowerSchedule {
-        self.strat
-    }
-
-    /// The measured exec time during calibration
-    #[must_use]
-    pub fn exec_time(&self) -> Duration {
-        self.exec_time
-    }
-
-    /// Set the measured exec
-    pub fn set_exec_time(&mut self, time: Duration) {
-        self.exec_time = time;
-    }
-
-    /// The cycles
-    #[must_use]
-    pub fn cycles(&self) -> u64 {
-        self.cycles
-    }
-
-    /// Sets the cycles
-    pub fn set_cycles(&mut self, val: u64) {
-        self.cycles = val;
-    }
-
-    /// The bitmap size
-    #[must_use]
-    pub fn bitmap_size(&self) -> u64 {
-        self.bitmap_size
-    }
-
-    /// Sets the bitmap size
-    pub fn set_bitmap_size(&mut self, val: u64) {
-        self.bitmap_size = val;
-    }
-
-    /// The number of filled map entries
-    #[must_use]
-    pub fn bitmap_entries(&self) -> u64 {
-        self.bitmap_entries
-    }
-
-    /// Sets the number of filled map entries
-    pub fn set_bitmap_entries(&mut self, val: u64) {
-        self.bitmap_entries = val;
-    }
-
-    /// The amount of queue cycles
-    #[must_use]
-    pub fn queue_cycles(&self) -> u64 {
-        self.queue_cycles
-    }
-
-    /// Sets the amount of queue cycles
-    pub fn set_queue_cycles(&mut self, val: u64) {
-        self.queue_cycles = val;
-    }
-
-    /// Gets the `n_fuzz`.
-    #[must_use]
-    pub fn n_fuzz(&self) -> &[u32] {
-        &self.n_fuzz
-    }
-
-    /// Sets the `n_fuzz`.
-    #[must_use]
-    pub fn n_fuzz_mut(&mut self) -> &mut [u32] {
-        &mut self.n_fuzz
-    }
-}
-
-/// The power schedule to use
-#[allow(missing_docs)]
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
-pub enum PowerSchedule {
-    EXPLORE,
-    FAST,
-    COE,
-    LIN,
-    QUAD,
-    EXPLOIT,
-}
-
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
@@ -191,7 +64,7 @@ where
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
 
-        let fuzz_mu = if psmeta.strat == PowerSchedule::COE {
+        let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
             let corpus = state.corpus();
             let mut n_paths = 0;
             let mut v = 0.0;
@@ -220,8 +93,19 @@ where
 
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
-        // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
-        testcase.calculate_score(psmeta, fuzz_mu)
+        // if we have the `WeightedScheduleMetadata`, then just use the cached perf_score
+        let wsmeta = state
+            .metadata_mut()
+            .get_mut::<WeightedScheduleMetadata>();
+        match wsmeta {
+            Some() => {
+                
+            },
+            None => {
+                // Calculate the score on the fly
+                testcase.calculate_score(psmeta, fuzz_mu)
+            }
+        }
     }
 
     #[allow(clippy::cast_possible_wrap)]
