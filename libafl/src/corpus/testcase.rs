@@ -209,6 +209,58 @@ where
         }
     }
 
+    /// Compute the `weight` used in weighted corpus entry selection algo
+    pub fn compute_weight(&self, psmeta: &PowerScheduleMetadata) -> Result<f64, Error> {
+        let mut weight = 0.0;
+
+        let q_exec_us = self
+            .exec_time()
+            .ok_or_else(|| Error::KeyNotFound("exec_time not set".to_string()))?
+            .as_nanos() as f64;
+        let favored = self.has_metadata::<IsFavoredMetadata>();
+
+
+        let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
+        let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
+
+        let tcmeta = self
+            .metadata()
+            .get::<PowerScheduleTestcaseMetaData>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+
+        let q_bitmap_size = tcmeta.bitmap_size() as f64;
+
+        match psmeta.strat() {
+            PowerSchedule::FAST | PowerSchedule::COE | PowerSchedule::LIN | PowerSchedule::QUAD => {
+                let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
+                if hits > 0 {
+                    weight *= libm::log10(hits as f64) + 1.0;
+                }
+            },
+            _ => {
+            },
+        }
+
+
+        weight *= avg_exec_us / q_exec_us;
+        weight *= libm::log2(q_bitmap_size) / (avg_bitmap_size as f64);
+        // TODO: update_bitmap_score is not in libafl yet.
+        // weight *= (1 + (q_tc_ref / avg_top_size));
+
+
+        if favored {
+            weight *= 5.0;
+        }
+
+        // was it fuzzed before?
+        if tcmeta.fuzz_level() == 0 {
+            weight *= 2.0;
+        }
+
+
+        Ok(weight)
+    }
+
 
     /// Compute the `power` we assign to each corpus entry
     #[inline]

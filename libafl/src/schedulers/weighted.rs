@@ -120,6 +120,7 @@ where
         let alias_table : Vec<usize> = vec![0; n];
         let alias_probability: Vec<f64> = vec![0.0; n];
         let mut perf_scores: Vec<f64> = vec![0.0; n];
+        let mut weights : Vec<f64> = vec![0.0; n];
 
         let mut P : Vec<f64> = vec![0.0; n];
         let S : Vec<u32> = vec![0; n];
@@ -163,14 +164,17 @@ where
 
         for i in 0..n {
             let mut testcase = state.corpus().get(i)?.borrow_mut();
+            let weight = testcase.compute_weight(psmeta)?;
             let perf_score = testcase.calculate_score(psmeta, fuzz_mu)? as f64;
             perf_scores[i] = perf_score;
+            weights[i] = weight;
             sum += perf_score;
         }
 
         for i in 0..n {
-            P[i] = perf_scores[i] * (n as f64) / sum;
+            P[i] = weights[i] * (n as f64) / sum;
         }
+
         Ok(())
     }
 }
@@ -216,7 +220,9 @@ where
             Err(Error::Empty(String::from("No entries in corpus")))
         } else {
             let corpus_counts = state.corpus().count();
-            let random_value = state.rand_mut().below(u64::MAX) as usize;
+            let s = state.rand().below(corpus_counts as u64) as usize;
+            // Choose a random value between 0.000000000 and 1.000000000
+            let probability = state.rand().between(0, 1000000000 ) as f64 / 1000000000 as f64;
 
             let wsmeta = state
                 .metadata_mut()
@@ -234,9 +240,7 @@ where
                 wsmeta.set_runs_current_cycle(current_cycles + 1);
             }
 
-            let s = random_value % corpus_counts;
-
-            let idx = if (random_value as f64) < wsmeta.alias_probability()[s] {
+            let idx = if probability < wsmeta.alias_probability()[s] {
                 s
             }
             else{

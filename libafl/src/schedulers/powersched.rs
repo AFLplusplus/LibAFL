@@ -130,11 +130,11 @@ impl PowerScheduleMetadata {
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum PowerSchedule {
     EXPLORE,
+    EXPLOIT,
     FAST,
     COE,
     LIN,
     QUAD,
-    EXPLOIT,
 }
 
 /// A corpus scheduler using power schedules
