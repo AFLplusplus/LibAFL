@@ -190,10 +190,34 @@ where
             .get::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
-        let mut fuzz_mu = 0.0;
-        if psmeta.strat == PowerSchedule::COE {
-            fuzz_mu = self.fuzz_mu(state, psmeta)?;
+
+        let fuzz_mu = if psmeta.strat == PowerSchedule::COE {
+            let corpus = state.corpus();
+            let mut n_paths = 0;
+            let mut v = 0.0;
+            for idx in 0..corpus.count() {
+                let n_fuzz_entry = corpus
+                    .get(idx)?
+                    .borrow()
+                    .metadata()
+                    .get::<PowerScheduleTestcaseMetaData>()
+                    .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
+                    .n_fuzz_entry();
+                v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
+                n_paths += 1;
+            }
+    
+            if n_paths == 0 {
+                return Err(Error::Unknown(String::from("Queue state corrput")));
+            }
+    
+            v /= f64::from(n_paths);
+            v
         }
+        else{
+            0.0
+        };
+
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
         // 1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
@@ -301,32 +325,5 @@ where
             mutator,
             phantom: PhantomData,
         }
-    }
-
-    /// Compute the parameter `μ` used in the COE schedule.
-    #[inline]
-    #[allow(clippy::unused_self)]
-    pub fn fuzz_mu(&self, state: &S, psmeta: &PowerScheduleMetadata) -> Result<f64, Error> {
-        let corpus = state.corpus();
-        let mut n_paths = 0;
-        let mut fuzz_mu = 0.0;
-        for idx in 0..corpus.count() {
-            let n_fuzz_entry = corpus
-                .get(idx)?
-                .borrow()
-                .metadata()
-                .get::<PowerScheduleTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
-                .n_fuzz_entry();
-            fuzz_mu += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
-            n_paths += 1;
-        }
-
-        if n_paths == 0 {
-            return Err(Error::Unknown(String::from("Queue state corrput")));
-        }
-
-        fuzz_mu /= f64::from(n_paths);
-        Ok(fuzz_mu)
     }
 }
