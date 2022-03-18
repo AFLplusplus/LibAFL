@@ -196,8 +196,6 @@ where
     }
 }
 
-crate::impl_serdeany!(PowerScheduleMetadata);
-
 impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
 where
     I: Input,

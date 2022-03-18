@@ -12,15 +12,16 @@ use crate::{
     Error,
 };
 use core::marker::PhantomData;
+use serde::{Deserialize, Serialize};
 
-crate::impl_serdeany!(WeightedScheduleMetadata);
+#[derive(Serialize, Deserialize, Clone, Debug)]
 
 /// The Metadata for `WeightedScheduler`
 pub struct WeightedScheduleMetadata {
     /// The fuzzer execution spent in the current cycles
-    runs_in_current_cycle: u64,
+    runs_in_current_cycle: usize,
     /// Alias table for weighted queue entry selection
-    alias_table: Vec<u32>,
+    alias_table: Vec<usize>,
     /// Probability for which queue entry is selected
     alias_probability: Vec<f64>,
     /// Cache the perf_score
@@ -32,24 +33,24 @@ impl WeightedScheduleMetadata {
         Self {
             runs_in_current_cycle: 0,
             alias_table: vec![0],
-            alias_probability: vec![0],
-            perf_scores: vec![0],
+            alias_probability: vec![0.0],
+            perf_scores: vec![0.0],
         }
     }
 
-    pub fn runs_in_current_cycle(&self) -> u64 {
+    pub fn runs_in_current_cycle(&self) -> usize {
         self.runs_in_current_cycle
     }
 
-    pub fn set_runs_current_cycle(&mut self, cycles: u64) {
+    pub fn set_runs_current_cycle(&mut self, cycles: usize) {
         self.runs_in_current_cycle = cycles;
     }
 
-    pub fn alias_table(&self) -> &[u32] {
+    pub fn alias_table(&self) -> &[usize] {
         &self.alias_table
     }
 
-    pub fn set_alias_table(&mut self, table: Vec<u32>) {
+    pub fn set_alias_table(&mut self, table: Vec<usize>) {
         self.alias_table = table;
     }
 
@@ -69,6 +70,9 @@ impl WeightedScheduleMetadata {
         self.perf_scores = perf_scores
     }
 }
+
+
+crate::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
@@ -103,13 +107,13 @@ where
     {
         let n = state.corpus().count();
 
-        let alias_table : Vec<u32> = vec![0, n];
-        let alias_probability: Vec<f64> = vec![0.0, n];
-        let perf_scores: Vec<f64> = vec![0.0, n];
+        let alias_table : Vec<usize> = vec![0; n];
+        let alias_probability: Vec<f64> = vec![0.0; n];
+        let perf_scores: Vec<f64> = vec![0.0; n];
 
-        let P : Vec<f64> = vec![0, n];
-        let S : Vec<u32> = vec![0, n];
-        let L : Vec<u32> = vec![0, n];
+        let P : Vec<f64> = vec![0.0; n];
+        let S : Vec<u32> = vec![0; n];
+        let L : Vec<u32> = vec![0; n];
 
         let sum : f64 = 0.0;
 
@@ -149,20 +153,20 @@ where
 
         for i in 0..n {
             let testcase = state.corpus().get(i)?.borrow_mut();
-            let perf_score = testcase.calculate_score(psmeta, fuzz_mu);
+            let perf_score = testcase.calculate_score(psmeta, fuzz_mu)? as f64;
             perf_scores[i] = perf_score;
             sum += perf_score;
         }
 
         for i in 0..n {
-            P[i] = perf_scores[i] / n;
+            P[i] = perf_scores[i] * (n as f64) / sum;
         }
 
         let nS: usize = 0;
         let nL: usize = 0;
 
 
-        Ok()
+        Ok(())
     }
 }
 
@@ -235,7 +239,7 @@ where
             let r = state.rand_mut().below(u64::MAX) as usize;
             let s = r % state.corpus().count();
 
-            let idx = if r < wsmeta.alias_probability()[s] {
+            let idx = if (r as f64) < wsmeta.alias_probability()[s] {
                 s
             }
             else{
