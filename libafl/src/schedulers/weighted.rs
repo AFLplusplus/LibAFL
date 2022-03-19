@@ -1,7 +1,7 @@
 //! The queue corpus scheduler with weighted queue item selection from aflpp (https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32)
 //! This queue corpus scheduler needs calibration stage and the power schedule stage.
 
-use alloc::string::{String, ToString};
+use alloc::{string::{String, ToString}, vec::Vec};
 
 use crate::{
     bolts::rands::Rand,
