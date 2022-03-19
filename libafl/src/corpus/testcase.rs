@@ -213,7 +213,7 @@ where
 
     /// Compute the `weight` used in weighted corpus entry selection algo
     pub fn compute_weight(&self, psmeta: &PowerScheduleMetadata) -> Result<f64, Error> {
-        let mut weight = 0.0;
+        let mut weight = 1.0;
 
         let q_exec_us = self
             .exec_time()
@@ -238,6 +238,7 @@ where
                     weight *= libm::log10(hits as f64) + 1.0;
                 }
             }
+            // EXPLORE and EXPLOIT fall into this
             _ => {}
         }
 

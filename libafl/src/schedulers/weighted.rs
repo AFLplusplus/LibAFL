@@ -121,7 +121,7 @@ where
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
         for i in 0..n {
-            let testcase = state.corpus().get(i)?.borrow_mut();
+            let testcase = state.corpus().get(i)?.borrow();
             let weight = testcase.compute_weight(psmeta)?;
             weights[i] = weight;
             sum += weight;
@@ -155,7 +155,7 @@ where
 
             alias_probability[a] = p_arr[a];
             alias_table[a] = g;
-            p_arr[g] = p_arr[a] + p_arr[a] - 1.0;
+            p_arr[g] = p_arr[g] + p_arr[a] - 1.0;
 
             if p_arr[g] < 1.0 {
                 s_arr[n_s] = g;
