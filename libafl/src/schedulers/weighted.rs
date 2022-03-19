@@ -8,7 +8,7 @@ use crate::{
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
     schedulers::{
-        powersched::{PowerSchedule, PowerScheduleMetadata},
+        powersched::PowerScheduleMetadata,
         Scheduler,
     },
     state::{HasCorpus, HasMetadata, HasRand},
@@ -27,8 +27,6 @@ pub struct WeightedScheduleMetadata {
     alias_table: Vec<usize>,
     /// Probability for which queue entry is selected
     alias_probability: Vec<f64>,
-    /// Cache the perf_score
-    perf_scores: Vec<f64>,
 }
 
 impl WeightedScheduleMetadata {
@@ -38,7 +36,6 @@ impl WeightedScheduleMetadata {
             runs_in_current_cycle: 0,
             alias_table: vec![0],
             alias_probability: vec![0.0],
-            perf_scores: vec![0.0],
         }
     }
 
@@ -70,16 +67,6 @@ impl WeightedScheduleMetadata {
     /// The setter for `alias_probability`
     pub fn set_alias_probability(&mut self, probability: Vec<f64>) {
         self.alias_probability = probability;
-    }
-
-    /// The getter for `perf_scores`
-    pub fn perf_scores(&self) -> &[f64] {
-        &self.perf_scores
-    }
-
-    /// The setter for `perf_scores`
-    pub fn set_perf_scores(&mut self, perf_scores: Vec<f64>) {
-        self.perf_scores = perf_scores
     }
 }
 
@@ -120,12 +107,11 @@ where
 
         let mut alias_table: Vec<usize> = vec![0; n];
         let mut alias_probability: Vec<f64> = vec![0.0; n];
-        let mut perf_scores: Vec<f64> = vec![0.0; n];
         let mut weights: Vec<f64> = vec![0.0; n];
 
-        let mut P: Vec<f64> = vec![0.0; n];
-        let mut S: Vec<usize> = vec![0; n];
-        let mut L: Vec<usize> = vec![0; n];
+        let mut p_arr: Vec<f64> = vec![0.0; n];
+        let mut s_arr: Vec<usize> = vec![0; n];
+        let mut l_arr: Vec<usize> = vec![0; n];
 
         let mut sum: f64 = 0.0;
 
@@ -134,90 +120,60 @@ where
             .get::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
-        let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
-            let corpus = state.corpus();
-            let mut n_paths = 0;
-            let mut v = 0.0;
-            for idx in 0..corpus.count() {
-                let n_fuzz_entry = corpus
-                    .get(idx)?
-                    .borrow()
-                    .metadata()
-                    .get::<PowerScheduleTestcaseMetaData>()
-                    .ok_or_else(|| {
-                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
-                    })?
-                    .n_fuzz_entry();
-                v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
-                n_paths += 1;
-            }
-
-            if n_paths == 0 {
-                return Err(Error::Unknown(String::from("Queue state corrput")));
-            }
-
-            v /= f64::from(n_paths);
-            v
-        } else {
-            0.0
-        };
-
         for i in 0..n {
-            let mut testcase = state.corpus().get(i)?.borrow_mut();
+            let testcase = state.corpus().get(i)?.borrow_mut();
             let weight = testcase.compute_weight(psmeta)?;
-            let perf_score = testcase.calculate_score(psmeta, fuzz_mu)? as f64;
-            perf_scores[i] = perf_score;
             weights[i] = weight;
-            sum += perf_score;
+            sum += weight;
         }
 
         for i in 0..n {
-            P[i] = weights[i] * (n as f64) / sum;
+            p_arr[i] = weights[i] * (n as f64) / sum;
         }
 
         // # of items in queue S
-        let mut nS = 0;
+        let mut n_s = 0;
 
         // # of items in queue L
-        let mut nL = 0;
+        let mut n_l = 0;
         // Divide P into two queues, S and L
         for s in (0..n).rev() {
-            if P[s] < 1.0 {
-                S[nS] = s;
-                nS += 1;
+            if p_arr[s] < 1.0 {
+                s_arr[n_s] = s;
+                n_s += 1;
             } else {
-                L[nL] = s;
-                nL += 1
+                l_arr[n_l] = s;
+                n_l += 1
             }
         }
 
-        while (nS > 0 && nL > 0) {
-            nS -= 1;
-            nL -= 1;
-            let a = S[nS];
-            let g = L[nL];
+        while n_s > 0 && n_l > 0 {
+            n_s -= 1;
+            n_l -= 1;
+            let a = s_arr[n_s];
+            let g = l_arr[n_l];
 
-            alias_probability[a] = P[a];
+            alias_probability[a] = p_arr[a];
             alias_table[a] = g;
-            P[g] = P[a] + P[a] - 1.0;
+            p_arr[g] = p_arr[a] + p_arr[a] - 1.0;
 
-            if P[g] < 1.0 {
-                S[nS] = g;
-                nS += 1;
+            if p_arr[g] < 1.0 {
+                s_arr[n_s] = g;
+                n_s += 1;
             } else {
-                L[nL] = g;
-                nL += 1;
+                l_arr[n_l] = g;
+                n_l += 1;
             }
         }
 
-        while nL > 0 {
-            nL -= 1;
-            alias_probability[L[nL]] = 1.0;
+        while n_l > 0 {
+            n_l -= 1;
+            alias_probability[l_arr[n_l]] = 1.0;
         }
 
-        while nS > 0 {
-            nS -= 1;
-            alias_probability[S[nS]] = 1.0;
+        while n_s > 0 {
+            n_s -= 1;
+            alias_probability[s_arr[n_s]] = 1.0;
         }
 
         let wsmeta = state
@@ -228,7 +184,6 @@ where
         // Update metadata
         wsmeta.set_alias_probability(alias_probability);
         wsmeta.set_alias_table(alias_table);
-        wsmeta.set_perf_scores(perf_scores);
         Ok(())
     }
 }
@@ -272,9 +227,9 @@ where
             Err(Error::Empty(String::from("No entries in corpus")))
         } else {
             let corpus_counts = state.corpus().count();
-            let s = state.rand().below(corpus_counts as u64) as usize;
+            let s = state.rand_mut().below(corpus_counts as u64) as usize;
             // Choose a random value between 0.000000000 and 1.000000000
-            let probability = state.rand().between(0, 1000000000) as f64 / 1000000000 as f64;
+            let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000 as f64;
 
             let wsmeta = state
                 .metadata_mut()

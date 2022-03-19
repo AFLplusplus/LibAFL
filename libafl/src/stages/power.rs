@@ -12,7 +12,6 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     schedulers::{
         powersched::{PowerSchedule, PowerScheduleMetadata},
-        weighted::WeightedScheduleMetadata,
     },
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
@@ -96,15 +95,7 @@ where
 
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
 
-        // if we have the `WeightedScheduleMetadata`, then just use the cached perf_score
-        let wsmeta = state.metadata().get::<WeightedScheduleMetadata>();
-        match wsmeta {
-            Some(metadata) => Ok(metadata.perf_scores()[corpus_idx] as usize),
-            None => {
-                // Calculate the score on the fly
-                testcase.calculate_score(psmeta, fuzz_mu)
-            }
-        }
+        testcase.calculate_score(psmeta, fuzz_mu)
     }
 
     #[allow(clippy::cast_possible_wrap)]
