@@ -212,6 +212,7 @@ where
     }
 
     /// Compute the `weight` used in weighted corpus entry selection algo
+    #[allow(clippy::cast_precision_loss)]
     pub fn compute_weight(&self, psmeta: &PowerScheduleMetadata) -> Result<f64, Error> {
         let mut weight = 1.0;
 
@@ -235,7 +236,7 @@ where
             PowerSchedule::FAST | PowerSchedule::COE | PowerSchedule::LIN | PowerSchedule::QUAD => {
                 let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
                 if hits > 0 {
-                    weight *= libm::log10(hits as f64) + 1.0;
+                    weight *= libm::log10(f64::from(hits)) + 1.0;
                 }
             }
             // EXPLORE and EXPLOIT fall into this

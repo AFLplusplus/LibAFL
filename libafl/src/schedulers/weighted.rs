@@ -1,16 +1,16 @@
-//! The queue corpus scheduler with weighted queue item selection from aflpp (https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32)
+//! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
 //! This queue corpus scheduler needs calibration stage and the power schedule stage.
 
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
-    schedulers::{
-        powersched::PowerScheduleMetadata,
-        Scheduler,
-    },
+    schedulers::{powersched::PowerScheduleMetadata, Scheduler},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -29,8 +29,15 @@ pub struct WeightedScheduleMetadata {
     alias_probability: Vec<f64>,
 }
 
+impl Default for WeightedScheduleMetadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WeightedScheduleMetadata {
     /// Constructor for `WeightedScheduleMetadata`
+    #[must_use]
     pub fn new() -> Self {
         Self {
             runs_in_current_cycle: 0,
@@ -40,6 +47,7 @@ impl WeightedScheduleMetadata {
     }
 
     /// The getter for `runs_in_current_cycle`
+    #[must_use]
     pub fn runs_in_current_cycle(&self) -> usize {
         self.runs_in_current_cycle
     }
@@ -50,6 +58,7 @@ impl WeightedScheduleMetadata {
     }
 
     /// The getter for `alias_table`
+    #[must_use]
     pub fn alias_table(&self) -> &[usize] {
         &self.alias_table
     }
@@ -60,6 +69,7 @@ impl WeightedScheduleMetadata {
     }
 
     /// The getter for `alias_probability`
+    #[must_use]
     pub fn alias_probability(&self) -> &[f64] {
         &self.alias_probability
     }
@@ -102,6 +112,11 @@ where
     }
 
     /// Create a new alias table when the fuzzer finds a new corpus entry
+    #[allow(
+        clippy::unused_self,
+        clippy::similar_names,
+        clippy::cast_precision_loss
+    )]
     pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
         let n = state.corpus().count();
 
@@ -120,10 +135,10 @@ where
             .get::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
-        for i in 0..n {
+        for (i, item) in weights.iter_mut().enumerate().take(n) {
             let testcase = state.corpus().get(i)?.borrow();
             let weight = testcase.compute_weight(psmeta)?;
-            weights[i] = weight;
+            *item = weight;
             sum += weight;
         }
 
@@ -143,7 +158,7 @@ where
                 n_s += 1;
             } else {
                 l_arr[n_l] = s;
-                n_l += 1
+                n_l += 1;
             }
         }
 
@@ -222,6 +237,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::Empty(String::from("No entries in corpus")))
@@ -229,7 +245,7 @@ where
             let corpus_counts = state.corpus().count();
             let s = state.rand_mut().below(corpus_counts as u64) as usize;
             // Choose a random value between 0.000000000 and 1.000000000
-            let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000 as f64;
+            let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
 
             let wsmeta = state
                 .metadata_mut()

@@ -1,6 +1,9 @@
 //! The queue corpus scheduler for power schedules.
 
-use alloc::{string::{String, ToString}, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 
 use crate::{
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
@@ -41,7 +44,7 @@ impl PowerScheduleMetadata {
     #[must_use]
     pub fn new(strat: PowerSchedule) -> Self {
         Self {
-            strat: strat,
+            strat,
             exec_time: Duration::from_millis(0),
             cycles: 0,
             bitmap_size: 0,
