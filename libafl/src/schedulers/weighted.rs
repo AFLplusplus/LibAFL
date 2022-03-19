@@ -115,7 +115,8 @@ where
     #[allow(
         clippy::unused_self,
         clippy::similar_names,
-        clippy::cast_precision_loss
+        clippy::cast_precision_loss,
+        clippy::cast_lossless
     )]
     pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
         let n = state.corpus().count();
