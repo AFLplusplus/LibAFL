@@ -1,6 +1,6 @@
 //! The queue corpus scheduler for power schedules.
 
-use alloc::string::{String, ToString};
+use alloc::{string::{String, ToString}, vec::Vec};
 
 use crate::{
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
