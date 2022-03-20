@@ -482,7 +482,7 @@ where
             events.push((client_id, event));
         }
         let count = events.len();
-        events.drain(..).try_for_each(|(client_id, event)| {
+        events.into_iter().try_for_each(|(client_id, event)| {
             self.handle_in_client(fuzzer, executor, state, client_id, event)
         })?;
         Ok(count)
