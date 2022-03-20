@@ -230,12 +230,11 @@ where
             .get::<PowerScheduleTestcaseMetaData>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
 
-        // This means that this testcase has never gone through the calibration stage before1, 
+        // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
-        if tcmeta.fuzz_level() <= 0 || psmeta.cycles() <= 0 {
-            return Ok(weight)
+        if tcmeta.fuzz_level() == 0 || psmeta.cycles() == 0 {
+            return Ok(weight);
         }
-
 
         let q_exec_us = self
             .exec_time()
@@ -263,12 +262,8 @@ where
         weight *= libm::log2(q_bitmap_size) / (avg_bitmap_size as f64);
 
         let tc_ref = match self.metadata().get::<MapIndexesMetadata>() {
-            Some(meta) => {
-                meta.refcnt() as f64
-            }
-            None => {
-                0.0
-            },
+            Some(meta) => meta.refcnt() as f64,
+            None => 0.0,
         };
 
         let avg_top_size = state

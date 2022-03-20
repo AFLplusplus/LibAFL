@@ -103,7 +103,7 @@ where
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
-    /// Create a new [`PowerQueueScheduler`]
+    /// Create a new [`WeightedScheduler`]
     #[must_use]
     pub fn new() -> Self {
         Self {

@@ -25,11 +25,8 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, powersched::PowerSchedule, WeightedScheduler},
-    stages::{
-        calibrate::CalibrationStage,
-        power::PowerMutationalStage,
-    },
+    schedulers::{powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, WeightedScheduler},
+    stages::{calibrate::CalibrationStage, power::PowerMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
@@ -131,7 +128,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
     let calibration = CalibrationStage::new(&edges_observer);
-    let power = PowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
+    let power =
+        PowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
     let mut stages = tuple_list!(calibration, power);
 
