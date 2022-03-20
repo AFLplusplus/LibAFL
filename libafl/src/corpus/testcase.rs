@@ -261,13 +261,12 @@ where
             .get::<MapIndexesMetadata>()
             .ok_or_else(|| Error::KeyNotFound("MapIndexesMetadata not found".to_string()))?
             .refcnt() as f64;
-        let avg_top_size = f64::from(
-            self.metadata()
-                .get::<TopRatedsMetadata>()
-                .ok_or_else(|| Error::KeyNotFound("TopRatedsMetadata not found".to_string()))?
-                .map()
-                .len(),
-        );
+        let avg_top_size = self
+            .metadata()
+            .get::<TopRatedsMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("TopRatedsMetadata not found".to_string()))?
+            .map()
+            .len() as f64;
         weight *= 1.0 + (tc_ref / avg_top_size);
 
         if favored {
