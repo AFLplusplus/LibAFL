@@ -10,7 +10,7 @@ use crate::{
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    schedulers::powersched::{PowerSchedule, PowerScheduleMetadata},
+    schedulers::powersched::PowerScheduleMetadata,
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,
