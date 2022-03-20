@@ -131,7 +131,6 @@ where
 
         let mut sum: f64 = 0.0;
 
-
         for (i, item) in weights.iter_mut().enumerate().take(n) {
             let testcase = state.corpus().get(i)?.borrow();
             let weight = testcase.compute_weight(state)?;
@@ -207,6 +206,10 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+        if !state.has_metadata::<WeightedScheduleMetadata>() {
+            state.add_metadata(WeightedScheduleMetadata::new());
+        }
+
         let current_idx = *state.corpus().current();
 
         let mut depth = match current_idx {

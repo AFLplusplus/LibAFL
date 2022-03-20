@@ -10,7 +10,7 @@ use crate::{
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    schedulers::powersched::PowerScheduleMetadata,
+    schedulers::powersched::{PowerSchedule, PowerScheduleMetadata},
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,
@@ -66,10 +66,7 @@ where
             .calculate_score(state);
 
         // Update handicap
-        let mut testcase = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut();
+        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let tcmeta = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestcaseMetaData>()
@@ -180,7 +177,8 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn new(mutator: M, map_observer_name: &O) -> Self {
+    pub fn new(state: &mut S, mutator: M, map_observer_name: &O, strat: PowerSchedule) -> Self {
+        state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new(strat));
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator,

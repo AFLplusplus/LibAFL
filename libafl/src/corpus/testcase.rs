@@ -214,7 +214,7 @@ where
     }
 
     /// Compute the `weight` used in weighted corpus entry selection algo
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
     pub fn compute_weight<S>(&self, state: &S) -> Result<f64, Error>
     where
         S: HasCorpus<I> + HasMetadata,
@@ -261,14 +261,14 @@ where
             .get::<MapIndexesMetadata>()
             .ok_or_else(|| Error::KeyNotFound("MapIndexesMetadata not found".to_string()))?
             .refcnt() as f64;
-        let avg_top_size = self
-            .metadata()
-            .get::<TopRatedsMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("TopRatedsMetadata not found".to_string()))?
-            .map()
-            .len() as f64;
+        let avg_top_size = f64::from(
+            self.metadata()
+                .get::<TopRatedsMetadata>()
+                .ok_or_else(|| Error::KeyNotFound("TopRatedsMetadata not found".to_string()))?
+                .map()
+                .len(),
+        );
         weight *= 1.0 + (tc_ref / avg_top_size);
-
 
         if favored {
             weight *= 5.0;
