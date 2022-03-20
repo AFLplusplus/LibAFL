@@ -25,11 +25,10 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, PowerQueueScheduler},
+    schedulers::{IndexesLenTimeMinimizerScheduler, powersched::PowerSchedule, WeightedScheduler},
     stages::{
         calibrate::CalibrationStage,
-        power::{PowerMutationalStage, PowerSchedule},
-        PowerScheduleMetadata,
+        power::PowerMutationalStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -132,13 +131,12 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
     let calibration = CalibrationStage::new(&edges_observer);
-    let power = PowerMutationalStage::new(mutator, &edges_observer);
-    state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new(PowerSchedule::FAST));
+    let power = PowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(WeightedScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

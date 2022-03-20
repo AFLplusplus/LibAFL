@@ -226,6 +226,13 @@ where
             .get::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
+        // This means that this testcase has never gone through the calibration stage before1, 
+        // In this case we'll just return the default weight
+        if psmeta.cycles() <= 0 {
+            return Ok(weight);
+        }
+
+
         let q_exec_us = self
             .exec_time()
             .ok_or_else(|| Error::KeyNotFound("exec_time not set".to_string()))?
@@ -256,12 +263,16 @@ where
         weight *= avg_exec_us / q_exec_us;
         weight *= libm::log2(q_bitmap_size) / (avg_bitmap_size as f64);
 
-        let tc_ref = self
-            .metadata()
-            .get::<MapIndexesMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("MapIndexesMetadata not found".to_string()))?
-            .refcnt() as f64;
-        let avg_top_size = self
+        let tc_ref = match self.metadata().get::<MapIndexesMetadata>() {
+            Some(meta) => {
+                meta.refcnt() as f64
+            }
+            None => {
+                0.0
+            },
+        };
+
+        let avg_top_size = state
             .metadata()
             .get::<TopRatedsMetadata>()
             .ok_or_else(|| Error::KeyNotFound("TopRatedsMetadata not found".to_string()))?
