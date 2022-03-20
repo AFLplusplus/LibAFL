@@ -220,16 +220,20 @@ where
         S: HasCorpus<I> + HasMetadata,
     {
         let mut weight = 1.0;
-
         let psmeta = state
             .metadata()
             .get::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
+        let tcmeta = self
+            .metadata()
+            .get::<PowerScheduleTestcaseMetaData>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+
         // This means that this testcase has never gone through the calibration stage before1, 
         // In this case we'll just return the default weight
-        if psmeta.cycles() <= 0 {
-            return Ok(weight);
+        if tcmeta.fuzz_level() <= 0 || psmeta.cycles() <= 0 {
+            return Ok(weight)
         }
 
 
@@ -241,11 +245,6 @@ where
 
         let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
         let avg_bitmap_size = psmeta.bitmap_size() / psmeta.bitmap_entries();
-
-        let tcmeta = self
-            .metadata()
-            .get::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
 
         let q_bitmap_size = tcmeta.bitmap_size() as f64;
 
@@ -288,6 +287,8 @@ where
         if tcmeta.fuzz_level() == 0 {
             weight *= 2.0;
         }
+
+        assert!(weight.is_normal());
 
         Ok(weight)
     }
