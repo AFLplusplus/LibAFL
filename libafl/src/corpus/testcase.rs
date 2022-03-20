@@ -6,13 +6,15 @@ use core::{convert::Into, default::Default, option::Option, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{serdeany::SerdeAnyMap, HasLen},
+    bolts::{serdeany::SerdeAnyMap, HasLen, HasRefCnt},
+    corpus::Corpus,
+    feedbacks::MapIndexesMetadata,
     inputs::Input,
     schedulers::{
-        minimizer::IsFavoredMetadata,
+        minimizer::{IsFavoredMetadata, TopRatedsMetadata},
         powersched::{PowerSchedule, PowerScheduleMetadata},
     },
-    state::HasMetadata,
+    state::{HasCorpus, HasMetadata},
     Error,
 };
 
@@ -213,8 +215,16 @@ where
 
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[allow(clippy::cast_precision_loss)]
-    pub fn compute_weight(&self, psmeta: &PowerScheduleMetadata) -> Result<f64, Error> {
+    pub fn compute_weight<S>(&self, state: &S) -> Result<f64, Error>
+    where
+        S: HasCorpus<I> + HasMetadata,
+    {
         let mut weight = 1.0;
+
+        let psmeta = state
+            .metadata()
+            .get::<PowerScheduleMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
         let q_exec_us = self
             .exec_time()
@@ -245,8 +255,20 @@ where
 
         weight *= avg_exec_us / q_exec_us;
         weight *= libm::log2(q_bitmap_size) / (avg_bitmap_size as f64);
-        // TODO: update_bitmap_score is not in libafl yet.
-        // weight *= (1 + (q_tc_ref / avg_top_size));
+
+        let tc_ref = self
+            .metadata()
+            .get::<MapIndexesMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("MapIndexesMetadata not found".to_string()))?
+            .refcnt() as f64;
+        let avg_top_size = self
+            .metadata()
+            .get::<TopRatedsMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("TopRatedsMetadata not found".to_string()))?
+            .map()
+            .len() as f64;
+        weight *= 1.0 + (tc_ref / avg_top_size);
+
 
         if favored {
             weight *= 5.0;
@@ -267,11 +289,43 @@ where
         clippy::too_many_lines,
         clippy::cast_sign_loss
     )]
-    pub fn calculate_score(
-        &mut self,
-        psmeta: &PowerScheduleMetadata,
-        fuzz_mu: f64,
-    ) -> Result<usize, Error> {
+    pub fn calculate_score<S>(&self, state: &S) -> Result<usize, Error>
+    where
+        S: HasCorpus<I> + HasMetadata,
+    {
+        let psmeta = state
+            .metadata()
+            .get::<PowerScheduleMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+
+        let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
+            let corpus = state.corpus();
+            let mut n_paths = 0;
+            let mut v = 0.0;
+            for idx in 0..corpus.count() {
+                let n_fuzz_entry = corpus
+                    .get(idx)?
+                    .borrow()
+                    .metadata()
+                    .get::<PowerScheduleTestcaseMetaData>()
+                    .ok_or_else(|| {
+                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                    })?
+                    .n_fuzz_entry();
+                v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
+                n_paths += 1;
+            }
+
+            if n_paths == 0 {
+                return Err(Error::Unknown(String::from("Queue state corrput")));
+            }
+
+            v /= f64::from(n_paths);
+            v
+        } else {
+            0.0
+        };
+
         let mut perf_score = 100.0;
         let q_exec_us = self
             .exec_time()
@@ -283,9 +337,11 @@ where
 
         let favored = self.has_metadata::<IsFavoredMetadata>();
         let tcmeta = self
-            .metadata_mut()
-            .get_mut::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+            .metadata()
+            .get::<PowerScheduleTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
+            })?;
 
         if q_exec_us * 0.1 > avg_exec_us {
             perf_score = 10.0;
@@ -320,10 +376,10 @@ where
 
         if tcmeta.handicap() >= 4 {
             perf_score *= 4.0;
-            tcmeta.set_handicap(tcmeta.handicap() - 4);
+            // tcmeta.set_handicap(tcmeta.handicap() - 4);
         } else if tcmeta.handicap() > 0 {
             perf_score *= 2.0;
-            tcmeta.set_handicap(tcmeta.handicap() - 1);
+            // tcmeta.set_handicap(tcmeta.handicap() - 1);
         }
 
         if tcmeta.depth() >= 4 && tcmeta.depth() < 8 {

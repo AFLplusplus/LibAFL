@@ -131,14 +131,10 @@ where
 
         let mut sum: f64 = 0.0;
 
-        let psmeta = state
-            .metadata()
-            .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
 
         for (i, item) in weights.iter_mut().enumerate().take(n) {
             let testcase = state.corpus().get(i)?.borrow();
-            let weight = testcase.compute_weight(psmeta)?;
+            let weight = testcase.compute_weight(state)?;
             *item = weight;
             sum += weight;
         }

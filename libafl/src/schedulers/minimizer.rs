@@ -41,6 +41,12 @@ impl TopRatedsMetadata {
             map: HashMap::default(),
         }
     }
+
+    /// Getter for map
+    #[must_use]
+    pub fn map(&self) -> &HashMap<usize, usize> {
+        &self.map
+    }
 }
 
 impl Default for TopRatedsMetadata {

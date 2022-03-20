@@ -58,42 +58,31 @@ where
 
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
-        let psmeta = state
-            .metadata()
-            .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+        // Calculate score
+        let score = state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow()
+            .calculate_score(state);
 
-        let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
-            let corpus = state.corpus();
-            let mut n_paths = 0;
-            let mut v = 0.0;
-            for idx in 0..corpus.count() {
-                let n_fuzz_entry = corpus
-                    .get(idx)?
-                    .borrow()
-                    .metadata()
-                    .get::<PowerScheduleTestcaseMetaData>()
-                    .ok_or_else(|| {
-                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
-                    })?
-                    .n_fuzz_entry();
-                v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
-                n_paths += 1;
-            }
+        // Update handicap
+        let mut testcase = state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut();
+        let tcmeta = testcase
+            .metadata_mut()
+            .get_mut::<PowerScheduleTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
+            })?;
+        if tcmeta.handicap() >= 4 {
+            tcmeta.set_handicap(tcmeta.handicap() - 4);
+        } else if tcmeta.handicap() > 0 {
+            tcmeta.set_handicap(tcmeta.handicap() - 1);
+        }
 
-            if n_paths == 0 {
-                return Err(Error::Unknown(String::from("Queue state corrput")));
-            }
-
-            v /= f64::from(n_paths);
-            v
-        } else {
-            0.0
-        };
-
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
-
-        testcase.calculate_score(psmeta, fuzz_mu)
+        score
     }
 
     #[allow(clippy::cast_possible_wrap)]
