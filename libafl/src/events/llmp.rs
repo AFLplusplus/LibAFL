@@ -456,8 +456,8 @@ where
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
-        let mut events = vec![];
         let self_id = self.llmp.sender.id;
+        let mut count = 0;
         while let Some((client_id, tag, _flags, msg)) = self.llmp.recv_buf_with_flags()? {
             assert!(
                 tag != _LLMP_TAG_EVENT_TO_BROKER,
@@ -479,12 +479,9 @@ where
                 msg
             };
             let event: Event<I> = postcard::from_bytes(event_bytes)?;
-            events.push((client_id, event));
+            self.handle_in_client(fuzzer, executor, state, client_id, event)?;
+            count += 1;
         }
-        let count = events.len();
-        events.into_iter().try_for_each(|(client_id, event)| {
-            self.handle_in_client(fuzzer, executor, state, client_id, event)
-        })?;
         Ok(count)
     }
 }
