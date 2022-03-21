@@ -143,7 +143,7 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::{bytes::BytesInput, Input},
         schedulers::{FavFactor, ProbabilitySamplingScheduler, Scheduler},
-        state::{StdState, HasMetadata},
+        state::{StdState, HasMetadata, HasCorpus},
         Error,
     };
     use core::marker::PhantomData;
@@ -161,7 +161,7 @@ mod tests {
     impl<I, S> FavFactor<I, S> for UniformDistribution<I>
     where
         I: Input,
-        S: HasMetadata,
+        S: HasMetadata + HasCorpus<I>,
     {
         fn compute(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
             Ok(FACTOR)

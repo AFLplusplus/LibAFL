@@ -10,12 +10,14 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
-    schedulers::{powersched::PowerScheduleMetadata, Scheduler},
+    schedulers::{fav_factor::CorpusWeightFavFactor, powersched::PowerScheduleMetadata, Scheduler},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
+
+use super::FavFactor;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 
@@ -84,12 +86,13 @@ crate::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<I, S> {
-    phantom: PhantomData<(I, S)>,
+pub struct WeightedScheduler<F, I, S> {
+    phantom: PhantomData<(F, I, S)>,
 }
 
-impl<I, S> Default for WeightedScheduler<I, S>
+impl<F, I, S> Default for WeightedScheduler<F, I, S>
 where
+    F: FavFactor<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -98,8 +101,9 @@ where
     }
 }
 
-impl<I, S> WeightedScheduler<I, S>
+impl<F, I, S> WeightedScheduler<F, I, S>
 where
+    F: FavFactor<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -132,8 +136,8 @@ where
         let mut sum: f64 = 0.0;
 
         for (i, item) in weights.iter_mut().enumerate().take(n) {
-            let testcase = state.corpus().get(i)?.borrow();
-            let weight = testcase.compute_weight(state)?;
+            let mut testcase = state.corpus().get(i)?.borrow_mut();
+            let weight = F::compute(&mut *testcase, state)?;
             *item = weight;
             sum += weight;
         }
@@ -199,8 +203,9 @@ where
     }
 }
 
-impl<I, S> Scheduler<I, S> for WeightedScheduler<I, S>
+impl<F, I, S> Scheduler<I, S> for WeightedScheduler<F, I, S>
 where
+    F: FavFactor<I, S>,
     S: HasCorpus<I> + HasMetadata + HasRand,
     I: Input,
 {
@@ -283,3 +288,6 @@ where
         }
     }
 }
+
+/// The standard corpus weight, same as aflpp
+pub type StdWeightedScheduler<I, S> = WeightedScheduler<CorpusWeightFavFactor<I, S>, I, S>;

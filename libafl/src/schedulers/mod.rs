@@ -18,7 +18,7 @@ pub use minimizer::{
 };
 
 pub mod weighted;
-pub use weighted::WeightedScheduler;
+pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod powersched;
 pub use powersched::PowerQueueScheduler;
