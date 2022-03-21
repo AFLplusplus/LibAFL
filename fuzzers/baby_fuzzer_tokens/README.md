@@ -1,8 +1,17 @@
-# Baby fuzzer
-
-This is a minimalistic example about how to create a libafl based fuzzer.
-
-It runs on a single core until a crash occurs and then exits.
-
-The tested program is a simple Rust function without any instrumentation.
-For real fuzzing, you will want to add some sort to add coverage or other feedback.
+# Baby tokens fuzzer
+1. `tokenizer` are used to split inputs into tokens 
+2. `encoder_decoder` will give every new token a new id and record the mapping relation. Then it can convert tokens to `EncodedInput`, vice versa.
+3. `encoded_mutations` are used to deal with token level mutation, following is the definition:
+'''
+pub fn encoded_mutations() -> tuple_list_type!(
+    EncodedRandMutator,
+    EncodedIncMutator,
+    EncodedDecMutator,
+    EncodedAddMutator,
+    EncodedDeleteMutator,
+    EncodedInsertCopyMutator,
+    EncodedCopyMutator,
+    EncodedCrossoverInsertMutator,
+    EncodedCrossoverReplaceMutator,
+)
+'''
