@@ -17,11 +17,8 @@ use libafl::{
     inputs::HasTargetBytes,
     monitors::MultiMonitor,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::PowerQueueScheduler,
-    stages::{
-        calibrate::CalibrationStage,
-        power::{PowerMutationalStage, PowerSchedule},
-    },
+    schedulers::{powersched::PowerSchedule, PowerQueueScheduler},
+    stages::{calibrate::CalibrationStage, power::PowerMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
@@ -128,8 +125,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Setup a lain mutator with a mutational stage
     let mutator = LainMutator::new();
 
-    let calibration = CalibrationStage::new(&mut state, &edges_observer);
-    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+    let calibration = CalibrationStage::new(&edges_observer);
+    let power =
+        PowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
     let mut stages = tuple_list!(calibration, power);
 
