@@ -100,7 +100,7 @@ where
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
-    inner: MinimizerScheduler<CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, S>,
+    inner: MinimizerScheduler<CS, LenTimeMulFavFactor<I, S>, I, MapIndexesMetadata, S>,
 }
 
 impl<'a, CS, I, S> Scheduler<I, S> for CoverageAccountingScheduler<'a, CS, I, S>

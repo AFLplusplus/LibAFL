@@ -62,7 +62,7 @@ impl Default for TopRatedsMetadata {
 pub struct MinimizerScheduler<CS, F, I, M, S>
 where
     CS: Scheduler<I, S>,
-    F: FavFactor<I>,
+    F: FavFactor<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata,
@@ -75,7 +75,7 @@ where
 impl<CS, F, I, M, S> Scheduler<I, S> for MinimizerScheduler<CS, F, I, M, S>
 where
     CS: Scheduler<I, S>,
-    F: FavFactor<I>,
+    F: FavFactor<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -123,7 +123,7 @@ where
 impl<CS, F, I, M, S> MinimizerScheduler<CS, F, I, M, S>
 where
     CS: Scheduler<I, S>,
-    F: FavFactor<I>,
+    F: FavFactor<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -140,7 +140,7 @@ where
         let mut new_favoreds = vec![];
         {
             let mut entry = state.corpus().get(idx)?.borrow_mut();
-            let factor = F::compute(&mut *entry)?;
+            let factor = F::compute(&mut *entry, state)?;
             let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
                 Error::KeyNotFound(format!(
                     "Metadata needed for MinimizerScheduler not found in testcase #{}",
@@ -156,7 +156,7 @@ where
                     .get(elem)
                 {
                     let mut old = state.corpus().get(*old_idx)?.borrow_mut();
-                    if factor > F::compute(&mut *old)? {
+                    if factor > F::compute(&mut *old, state)? {
                         continue;
                     }
 
@@ -263,9 +263,9 @@ where
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`.
 pub type LenTimeMinimizerScheduler<CS, I, M, S> =
-    MinimizerScheduler<CS, LenTimeMulFavFactor<I>, I, M, S>;
+    MinimizerScheduler<CS, LenTimeMulFavFactor<I, S>, I, M, S>;
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
 pub type IndexesLenTimeMinimizerScheduler<CS, I, S> =
-    MinimizerScheduler<CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, S>;
+    MinimizerScheduler<CS, LenTimeMulFavFactor<I, S>, I, MapIndexesMetadata, S>;
