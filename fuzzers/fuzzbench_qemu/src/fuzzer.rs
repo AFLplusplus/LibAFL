@@ -36,11 +36,12 @@ use libafl::{
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
-    schedulers::{IndexesLenTimeMinimizerScheduler, PowerQueueScheduler},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+    },
     stages::{
-        calibrate::CalibrationStage,
-        power::{PowerMutationalStage, PowerSchedule},
-        ShadowTracingStage, StdMutationalStage,
+        calibrate::CalibrationStage, power::PowerMutationalStage, ShadowTracingStage,
+        StdMutationalStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -283,7 +284,7 @@ fn fuzz(
         )
     });
 
-    let calibration = CalibrationStage::new(&mut state, &edges_observer);
+    let calibration = CalibrationStage::new(&edges_observer);
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
@@ -291,7 +292,8 @@ fn fuzz(
     // Setup a MOPT mutator
     let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
 
-    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+    let power =
+        PowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new());

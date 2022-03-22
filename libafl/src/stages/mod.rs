@@ -14,7 +14,7 @@ pub mod tracing;
 pub use tracing::{ShadowTracingStage, TracingStage};
 
 pub mod calibrate;
-pub use calibrate::{CalibrationStage, PowerScheduleMetadata};
+pub use calibrate::CalibrationStage;
 
 pub mod power;
 pub use power::PowerMutationalStage;
