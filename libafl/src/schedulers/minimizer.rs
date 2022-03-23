@@ -6,7 +6,7 @@ use crate::{
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
-    schedulers::{FavFactor, LenTimeMulFavFactor, Scheduler},
+    schedulers::{TestcaseScore, LenTimeMulTestcaseScore, Scheduler},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -57,12 +57,12 @@ impl Default for TopRatedsMetadata {
 
 /// The [`MinimizerScheduler`] employs a genetic algorithm to compute a subset of the
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
-/// prioritizing [`Testcase`]`s` using [`FavFactor`]
+/// prioritizing [`Testcase`]`s` using [`TestcaseScore`]
 #[derive(Debug, Clone)]
 pub struct MinimizerScheduler<CS, F, I, M, S>
 where
     CS: Scheduler<I, S>,
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata,
@@ -75,7 +75,7 @@ where
 impl<CS, F, I, M, S> Scheduler<I, S> for MinimizerScheduler<CS, F, I, M, S>
 where
     CS: Scheduler<I, S>,
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -123,7 +123,7 @@ where
 impl<CS, F, I, M, S> MinimizerScheduler<CS, F, I, M, S>
 where
     CS: Scheduler<I, S>,
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -261,11 +261,11 @@ where
     }
 }
 
-/// A [`MinimizerScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`.
+/// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`.
 pub type LenTimeMinimizerScheduler<CS, I, M, S> =
-    MinimizerScheduler<CS, LenTimeMulFavFactor<I, S>, I, M, S>;
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<I, S>, I, M, S>;
 
-/// A [`MinimizerScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`
+/// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
 pub type IndexesLenTimeMinimizerScheduler<CS, I, S> =
-    MinimizerScheduler<CS, LenTimeMulFavFactor<I, S>, I, MapIndexesMetadata, S>;
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<I, S>, I, MapIndexesMetadata, S>;

@@ -1,4 +1,4 @@
-//! The `FavFactor` is an evaluator providing scores of corpus items.
+//! The `TestcaseScore` is an evaluator providing scores of corpus items.
 
 use crate::{
     bolts::{HasLen, HasRefCnt},
@@ -13,7 +13,7 @@ use crate::{
 use core::marker::PhantomData;
 
 /// Compute the favor factor of a [`Testcase`]. Lower is better.
-pub trait FavFactor<I, S>
+pub trait TestcaseScore<I, S>
 where
     I: Input,
     S: HasMetadata + HasCorpus<I>,
@@ -25,7 +25,7 @@ where
 /// Multiply the testcase size with the execution time.
 /// This favors small and quick testcases.
 #[derive(Debug, Clone)]
-pub struct LenTimeMulFavFactor<I, S>
+pub struct LenTimeMulTestcaseScore<I, S>
 where
     I: Input + HasLen,
     S: HasMetadata + HasCorpus<I>,
@@ -33,7 +33,7 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
-impl<I, S> FavFactor<I, S> for LenTimeMulFavFactor<I, S>
+impl<I, S> TestcaseScore<I, S> for LenTimeMulTestcaseScore<I, S>
 where
     I: Input + HasLen,
     S: HasMetadata + HasCorpus<I>,
@@ -53,7 +53,7 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 /// The power assigned to each corpus entry
 /// This result is used for power scheduling
 #[derive(Debug, Clone)]
-pub struct CorpusPowerFavFactor<I, S>
+pub struct CorpusPowerTestcaseScore<I, S>
 where
     I: Input + HasLen,
     S: HasMetadata + HasCorpus<I>,
@@ -61,7 +61,7 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
-impl<I, S> FavFactor<I, S> for CorpusPowerFavFactor<I, S>
+impl<I, S> TestcaseScore<I, S> for CorpusPowerTestcaseScore<I, S>
 where
     I: Input + HasLen,
     S: HasMetadata + HasCorpus<I>,
@@ -268,7 +268,7 @@ where
 /// The weight for each corpus entry
 /// This result is used for corpus scheduling
 #[derive(Debug, Clone)]
-pub struct CorpusWeightFavFactor<I, S>
+pub struct CorpusWeightTestcaseScore<I, S>
 where
     I: Input + HasLen,
     S: HasMetadata + HasCorpus<I>,
@@ -276,7 +276,7 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
-impl<I, S> FavFactor<I, S> for CorpusWeightFavFactor<I, S>
+impl<I, S> TestcaseScore<I, S> for CorpusWeightTestcaseScore<I, S>
 where
     I: Input + HasLen,
     S: HasMetadata + HasCorpus<I>,

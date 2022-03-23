@@ -11,9 +11,9 @@ use crate::{
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     schedulers::{
-        fav_factor::CorpusPowerFavFactor,
+        fav_factor::CorpusPowerTestcaseScore,
         powersched::{PowerSchedule, PowerScheduleMetadata},
-        FavFactor,
+        TestcaseScore,
     },
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
@@ -24,7 +24,7 @@ use crate::{
 pub struct PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
@@ -42,7 +42,7 @@ impl<E, F, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
     for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
@@ -145,7 +145,7 @@ impl<E, F, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z>
     for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
@@ -171,7 +171,7 @@ where
 impl<E, F, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
@@ -192,4 +192,4 @@ where
 
 /// The standard powerscheduling stage
 pub type StdPowerMutationalStage<E, EM, I, M, O, OT, S, Z> =
-    PowerMutationalStage<E, CorpusPowerFavFactor<I, S>, EM, I, M, O, OT, S, Z>;
+    PowerMutationalStage<E, CorpusPowerTestcaseScore<I, S>, EM, I, M, O, OT, S, Z>;

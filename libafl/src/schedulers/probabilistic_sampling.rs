@@ -5,7 +5,7 @@ use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
     inputs::Input,
-    schedulers::{FavFactor, Scheduler},
+    schedulers::{TestcaseScore, Scheduler},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub struct ProbabilitySamplingScheduler<F, I, S>
 where
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -55,7 +55,7 @@ impl Default for ProbabilityMetadata {
 
 impl<F, I, S> ProbabilitySamplingScheduler<F, I, S>
 where
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -90,7 +90,7 @@ where
 
 impl<F, I, S> Scheduler<I, S> for ProbabilitySamplingScheduler<F, I, S>
 where
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -124,7 +124,7 @@ where
 
 impl<F, I, S> Default for ProbabilitySamplingScheduler<F, I, S>
 where
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -142,7 +142,7 @@ mod tests {
         bolts::rands::StdRand,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::{bytes::BytesInput, Input},
-        schedulers::{FavFactor, ProbabilitySamplingScheduler, Scheduler},
+        schedulers::{TestcaseScore, ProbabilitySamplingScheduler, Scheduler},
         state::{StdState, HasMetadata, HasCorpus},
         Error,
     };
@@ -158,7 +158,7 @@ mod tests {
         phantom: PhantomData<I>,
     }
 
-    impl<I, S> FavFactor<I, S> for UniformDistribution<I>
+    impl<I, S> TestcaseScore<I, S> for UniformDistribution<I>
     where
         I: Input,
         S: HasMetadata + HasCorpus<I>,

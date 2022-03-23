@@ -10,7 +10,7 @@ pub mod accounting;
 pub use accounting::CoverageAccountingScheduler;
 
 pub mod fav_factor;
-pub use fav_factor::{FavFactor, LenTimeMulFavFactor};
+pub use fav_factor::{TestcaseScore, LenTimeMulTestcaseScore};
 
 pub mod minimizer;
 pub use minimizer::{

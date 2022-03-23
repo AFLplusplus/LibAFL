@@ -10,7 +10,7 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
-    schedulers::{fav_factor::{CorpusWeightFavFactor, FavFactor}, powersched::PowerScheduleMetadata, Scheduler},
+    schedulers::{fav_factor::{CorpusWeightTestcaseScore, TestcaseScore}, powersched::PowerScheduleMetadata, Scheduler},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -90,7 +90,7 @@ pub struct WeightedScheduler<F, I, S> {
 
 impl<F, I, S> Default for WeightedScheduler<F, I, S>
 where
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -101,7 +101,7 @@ where
 
 impl<F, I, S> WeightedScheduler<F, I, S>
 where
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -203,7 +203,7 @@ where
 
 impl<F, I, S> Scheduler<I, S> for WeightedScheduler<F, I, S>
 where
-    F: FavFactor<I, S>,
+    F: TestcaseScore<I, S>,
     S: HasCorpus<I> + HasMetadata + HasRand,
     I: Input,
 {
@@ -288,4 +288,4 @@ where
 }
 
 /// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler<I, S> = WeightedScheduler<CorpusWeightFavFactor<I, S>, I, S>;
+pub type StdWeightedScheduler<I, S> = WeightedScheduler<CorpusWeightTestcaseScore<I, S>, I, S>;
