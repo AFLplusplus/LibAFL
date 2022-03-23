@@ -10,14 +10,12 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
-    schedulers::{fav_factor::CorpusWeightFavFactor, powersched::PowerScheduleMetadata, Scheduler},
+    schedulers::{fav_factor::{CorpusWeightFavFactor, FavFactor}, powersched::PowerScheduleMetadata, Scheduler},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
-
-use super::FavFactor;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 
