@@ -63,6 +63,7 @@ where
     }
 
     /// Gets the number of iterations as a random number
+    #[allow(clippy::cast_sign_loss)]
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
         // Update handicap
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();

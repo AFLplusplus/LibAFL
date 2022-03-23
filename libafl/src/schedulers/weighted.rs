@@ -10,7 +10,11 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
-    schedulers::{fav_factor::{CorpusWeightTestcaseScore, TestcaseScore}, powersched::PowerScheduleMetadata, Scheduler},
+    schedulers::{
+        fav_factor::{CorpusWeightTestcaseScore, TestcaseScore},
+        powersched::PowerScheduleMetadata,
+        Scheduler,
+    },
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };

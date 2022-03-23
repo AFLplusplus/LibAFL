@@ -2,11 +2,14 @@
 
 use crate::{
     bolts::{HasLen, HasRefCnt},
-    corpus::{PowerScheduleTestcaseMetaData, Testcase, Corpus},
+    corpus::{Corpus, PowerScheduleTestcaseMetaData, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
-    schedulers::{powersched::{PowerSchedule, PowerScheduleMetadata}, minimizer::{IsFavoredMetadata, TopRatedsMetadata}},
-    state::{HasMetadata, HasCorpus},
+    schedulers::{
+        minimizer::{IsFavoredMetadata, TopRatedsMetadata},
+        powersched::{PowerSchedule, PowerScheduleMetadata},
+    },
+    state::{HasCorpus, HasMetadata},
     Error,
 };
 
@@ -38,12 +41,12 @@ where
     I: Input + HasLen,
     S: HasMetadata + HasCorpus<I>,
 {
+    #[allow(clippy::cast_precision_loss)]
     fn compute(entry: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
         // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as f64 * entry.cached_len()? as f64)
     }
 }
-
 
 /// Constants for powerschedules
 const POWER_BETA: f64 = 1.0;
@@ -72,8 +75,7 @@ where
         clippy::too_many_lines,
         clippy::cast_sign_loss
     )]
-    fn compute(entry: &mut Testcase<I>, state: &S) -> Result<f64, Error>
-    {
+    fn compute(entry: &mut Testcase<I>, state: &S) -> Result<f64, Error> {
         let psmeta = state
             .metadata()
             .get::<PowerScheduleMetadata>()
@@ -262,8 +264,6 @@ where
         Ok(perf_score)
     }
 }
-
-
 
 /// The weight for each corpus entry
 /// This result is used for corpus scheduling

@@ -6,7 +6,7 @@ use crate::{
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
-    schedulers::{TestcaseScore, LenTimeMulTestcaseScore, Scheduler},
+    schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };

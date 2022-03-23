@@ -5,7 +5,7 @@ use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
     inputs::Input,
-    schedulers::{TestcaseScore, Scheduler},
+    schedulers::{Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -142,8 +142,8 @@ mod tests {
         bolts::rands::StdRand,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         inputs::{bytes::BytesInput, Input},
-        schedulers::{TestcaseScore, ProbabilitySamplingScheduler, Scheduler},
-        state::{StdState, HasMetadata, HasCorpus},
+        schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
+        state::{HasCorpus, HasMetadata, StdState},
         Error,
     };
     use core::marker::PhantomData;
