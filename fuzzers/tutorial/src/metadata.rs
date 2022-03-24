@@ -5,7 +5,7 @@ use libafl::{
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
-    schedulers::{TestcaseScore, MinimizerScheduler},
+    schedulers::{MinimizerScheduler, TestcaseScore},
     state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
 };
