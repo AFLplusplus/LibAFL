@@ -9,8 +9,8 @@ pub use probabilistic_sampling::ProbabilitySamplingScheduler;
 pub mod accounting;
 pub use accounting::CoverageAccountingScheduler;
 
-pub mod fav_factor;
-pub use fav_factor::{LenTimeMulTestcaseScore, TestcaseScore};
+pub mod testcase_score;
+pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
 
 pub mod minimizer;
 pub use minimizer::{
