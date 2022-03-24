@@ -5,7 +5,7 @@ use libafl::{
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
-    schedulers::{FavFactor, MinimizerScheduler},
+    schedulers::{TestcaseScore, MinimizerScheduler},
     state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
 };
@@ -19,9 +19,9 @@ pub struct PacketLenMetadata {
     pub length: u64,
 }
 
-pub struct PacketLenFavFactor {}
+pub struct PacketLenTestcaseScore {}
 
-impl FavFactor<PacketData> for PacketLenFavFactor {
+impl TestcaseScore<PacketData> for PacketLenTestcaseScore {
     fn compute(entry: &mut Testcase<PacketData>) -> Result<u64, Error> {
         Ok(entry
             .metadata()
@@ -31,7 +31,7 @@ impl FavFactor<PacketData> for PacketLenFavFactor {
 }
 
 pub type PacketLenMinimizerScheduler<CS, S> =
-    MinimizerScheduler<CS, PacketLenFavFactor, PacketData, MapIndexesMetadata, S>;
+    MinimizerScheduler<CS, PacketLenTestcaseScore, PacketData, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {
