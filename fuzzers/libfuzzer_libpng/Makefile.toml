@@ -4,7 +4,11 @@ FUZZER_NAME='fuzzer_libpng'
 LIBAFL_CC = './target/release/libafl_cc'
 LIBAFL_CXX = './target/release/libafl_cxx'
 FUZZER = './target/release/${FUZZER_NAME}'
-PROJECT_DIR = { script = ["pwd"] }
+PROJECT_DIR = { script = ["pwd"],platforms = ["linux","macos"] }
+PROJECT_DIR = { script = ["echo %cd%"],platforms = ["windows"] }
+
+[env.windows]
+PROJECT_DIR = { script = ["echo","%cd%"] }
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -16,7 +20,7 @@ echo "Cargo-make not integrated yet on this"
 [tasks.libpng]
 linux_alias = "libpng_unix"
 mac_alias = "libpng_unix"
-windows_alias = "unsupported"
+windows_alias = "libpng_windows"
 
 [tasks.libpng_unix]
 condition = { files_not_exist = ["./libpng-1.6.37"]}
@@ -26,11 +30,33 @@ wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1
 tar -xvf libpng-1.6.37.tar.xz
 '''
 
+# cmd doesn't support file download, "`" means continue to read next line
+# tar has poor performance in powershell,use 7z instead
+[tasks.libpng_windows]
+condition = { files_not_exist = ["./libpng-1.6.37"]}
+script_runner="powershell" 
+script_extension = "ps1"
+script='''
+Expand-Archive lpng1637.zip  -DestinationPath ./ -Force
+move ./lpng1637 ./libpng-1.6.37
+'''
+dependencies = ["libpng_download_windows"]
+
+
+# use .zip contains source code of windows version.
+[tasks.libpng_download_windows]
+condition = { files_not_exist = ["./lpng1637.zip"]}
+script_runner="powershell" 
+script_extension = "ps1"
+script='''
+Invoke-WebRequest https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/lpng1637.zip
+'''
+
 # Compilers
 [tasks.cxx]
 linux_alias = "cxx_unix"
 mac_alias = "cxx_unix"
-windows_alias = "unsupported"
+windows_alias = "cxx_unix"
 
 [tasks.cxx_unix]
 command = "cargo"
@@ -39,7 +65,7 @@ args = ["build" , "--release"]
 [tasks.cc]
 linux_alias = "cc_unix"
 mac_alias = "cc_unix"
-windows_alias = "unsupported"
+windows_alias = "cc_unix"
 
 [tasks.cc_unix]
 command = "cargo"
@@ -49,7 +75,7 @@ args = ["build" , "--release"]
 [tasks.lib]
 linux_alias = "lib_unix"
 mac_alias = "lib_unix"
-windows_alias = "unsupported"
+windows_alias = "lib_windows"
 
 [tasks.lib_unix]
 script_runner="@shell"
@@ -60,6 +86,15 @@ make -C libpng-1.6.37 CC="${PROJECT_DIR}/target/release/libafl_cc" CXX="${PROJEC
 '''
 dependencies = [ "libpng", "cxx", "cc" ]
 
+[tasks.lib_windows]
+script_runner="powershell"
+script_extension = "ps1"
+script='''
+cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
+cd "${PROJECT_DIR}"
+make -C libpng-1.6.37 CC="${PROJECT_DIR}/target/release/libafl_cc" CXX="${PROJECT_DIR}/target/release/libafl_cxx"
+'''
+dependencies = [ "libpng", "cxx", "cc" ]
 
 # Harness
 [tasks.fuzzer]
