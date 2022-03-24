@@ -41,7 +41,7 @@ where
     I: Input + HasLen,
     S: HasMetadata + HasCorpus<I>,
 {
-    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
     fn compute(entry: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
         // TODO maybe enforce entry.exec_time().is_some()
         Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as f64 * entry.cached_len()? as f64)
