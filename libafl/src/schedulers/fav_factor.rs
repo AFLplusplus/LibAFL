@@ -1,5 +1,4 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
-use alloc::string::{String, ToString};
 use crate::{
     bolts::{HasLen, HasRefCnt},
     corpus::{Corpus, PowerScheduleTestcaseMetaData, Testcase},
@@ -12,6 +11,7 @@ use crate::{
     state::{HasCorpus, HasMetadata},
     Error,
 };
+use alloc::string::{String, ToString};
 
 use core::marker::PhantomData;
 
