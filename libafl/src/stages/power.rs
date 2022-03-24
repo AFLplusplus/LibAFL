@@ -11,8 +11,8 @@ use crate::{
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     schedulers::{
-        testcase_score::CorpusPowerTestcaseScore,
         powersched::{PowerSchedule, PowerScheduleMetadata},
+        testcase_score::CorpusPowerTestcaseScore,
         TestcaseScore,
     },
     stages::{MutationalStage, Stage},
