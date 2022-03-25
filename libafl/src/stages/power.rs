@@ -58,7 +58,6 @@ where
 
     /// Gets the number of iterations as a random number
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
-        println!("power {:?}", corpus_idx);
         // Calculate score
         let score = state
             .corpus()
