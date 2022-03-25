@@ -122,10 +122,10 @@ jobs:
         apt: llvm llvm-dev clang nasm ninja-build snapd # snapd for sscache
 
     - name: Install ubuntu deps(sscache)
-      if: matrix.os == ubuntu-latest
+      if: matrix.os == 'ubuntu-latest'
       run: snap install sscache
     - name: Install macos deps
-      if: matrix.os == macos-latest
+      if: matrix.os == 'macos-latest'
       run: brew link --force llvm
       
     - name: Build and run example fuzzers
