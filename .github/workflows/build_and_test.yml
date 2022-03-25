@@ -123,7 +123,7 @@ jobs:
 
     - name: Install ubuntu deps(sscache)
       if: matrix.os == 'ubuntu-latest'
-      run: snap install sscache
+      run: sudo snap install sscache
     - name: Install macos deps
       if: matrix.os == 'macos-latest'
       run: brew link --force llvm
