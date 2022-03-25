@@ -96,23 +96,40 @@ jobs:
       run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
       run: ./libafl_concolic/test/smoke_test.sh 
-  ubuntu-fuzzers:
-    runs-on: ubuntu-latest
+  example-fuzzer:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macOS-latest]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
+    # common dep
     - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-    - name: set sccache for rust compile
-      uses: visvirial/sccache-action@v1
-    - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
     - name: install cargo-make
-      run: cargo install --force cargo-make
+      uses: davidB/rust-cargo-make@v1.6.0
     - uses: actions/checkout@v2
+    
+    # system dep
+    - name: Install linux deps and sscache
+
+    - name: Install common Package(sscache for macos,snapd for ubuntu)
+      uses: ConorMacBride/install-package@v1.0.0
+      with:
+        brew: llvm libpng nasm coreutils z3 sccache
+        apt: llvm llvm-dev clang nasm ninja-build snapd # snapd for sscache
+
+    - name: Install ubuntu deps(sscache)
+      if: matrix.os == ubuntu.latest
+      run: snap install sscache
+    - name: Install macos deps
+      if: matrix.os == macos.latest
+      run: brew link --force llvm
+      
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
   nostd-build:
@@ -186,25 +203,6 @@ jobs:
       run: ./scripts/shmem_limits_macos.sh
     - name: Run Tests
       run: cargo test
-  macos-fuzzers:
-    runs-on: macOS-latest
-    steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: Swatinem/rust-cache@v1
-    - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-    - name: Install deps
-      run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
-    - name: install cargo-make
-      run: cargo install --force cargo-make
-    - uses: actions/checkout@v2
-    - name: Increase map sizes
-      run: ./scripts/shmem_limits_macos.sh
-    - name: Build and run example fuzzers
-      run: ./scripts/test_all_fuzzers.sh
   other_targets:
     runs-on: macOS-latest
     steps:
