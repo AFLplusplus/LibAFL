@@ -21,8 +21,6 @@ jobs:
           profile: minimal
           toolchain: nightly
       - uses: Swatinem/rust-cache@v1
-      - name: set sccache for rust compile
-        uses: visvirial/sccache-action@v1
       - name: install mdbook
         run: cargo install mdbook
       - name: install linkcheck
@@ -123,7 +121,7 @@ jobs:
 
     - name: Install ubuntu deps(sccache)
       if: matrix.os == 'ubuntu-latest'
-      run: sudo snap install sccache
+      run: sudo snap install --candidate sccache
     - name: Install macos deps
       if: matrix.os == 'macos-latest'
       run: brew link --force llvm
