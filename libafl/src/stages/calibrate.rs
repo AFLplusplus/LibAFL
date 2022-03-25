@@ -65,7 +65,9 @@ where
             .borrow_mut()
             .metadata()
             .get::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTescaseMetatdata not found".to_string()))?
+            .ok_or_else(|| {
+                Error::KeyNotFound("PowerScheduleTescaseMetatdata not found".to_string())
+            })?
             .fuzz_level()
             > 0
         {
