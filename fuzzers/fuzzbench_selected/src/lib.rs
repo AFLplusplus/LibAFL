@@ -39,7 +39,9 @@ use libafl::{
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, WeightedScheduler},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+    },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
         TracingStage,
@@ -310,7 +312,7 @@ fn fuzz(
         StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(WeightedScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
