@@ -121,7 +121,7 @@ jobs:
 
     - name: Install ubuntu deps(sccache)
       if: matrix.os == 'ubuntu-latest'
-      run: sudo snap install --candidate sccache
+      run: sudo snap install --candidate --classic sccache
     - name: Install macos deps
       if: matrix.os == 'macos-latest'
       run: brew link --force llvm
