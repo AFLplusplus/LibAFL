@@ -115,15 +115,15 @@ jobs:
     - uses: actions/checkout@v2
     
     # system dep
-    - name: Install common Package(sscache for macos,snapd for ubuntu)
+    - name: Install common Package(sccache for macos,snapd for ubuntu)
       uses: ConorMacBride/install-package@v1.0.0
       with:
         brew: llvm libpng nasm coreutils z3 sccache
-        apt: llvm llvm-dev clang nasm ninja-build snapd # snapd for sscache
+        apt: llvm llvm-dev clang nasm ninja-build snapd # snapd for sccache
 
-    - name: Install ubuntu deps(sscache)
+    - name: Install ubuntu deps(sccache)
       if: matrix.os == 'ubuntu-latest'
-      run: sudo snap install sscache
+      run: sudo snap install sccache
     - name: Install macos deps
       if: matrix.os == 'macos-latest'
       run: brew link --force llvm
