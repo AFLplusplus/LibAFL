@@ -6,7 +6,7 @@ use libafl::{
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata, HasCorpus},
     Error, SerdeAny,
 };
 
@@ -21,12 +21,15 @@ pub struct PacketLenMetadata {
 
 pub struct PacketLenTestcaseScore {}
 
-impl TestcaseScore<PacketData> for PacketLenTestcaseScore {
-    fn compute(entry: &mut Testcase<PacketData>) -> Result<u64, Error> {
+impl<S> TestcaseScore<PacketData, S> for PacketLenTestcaseScore 
+where
+    S: HasCorpus<PacketData> + HasMetadata,
+{
+    fn compute(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
         Ok(entry
             .metadata()
             .get::<PacketLenMetadata>()
-            .map_or(1, |m| m.length))
+            .map_or(1, |m| m.length) as f64)
     }
 }
 
