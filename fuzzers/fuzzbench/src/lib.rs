@@ -43,7 +43,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage, TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
+        TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,

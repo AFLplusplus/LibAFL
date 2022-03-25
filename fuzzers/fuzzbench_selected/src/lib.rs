@@ -41,7 +41,8 @@ use libafl::{
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, WeightedScheduler},
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage, TracingStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
+        TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
