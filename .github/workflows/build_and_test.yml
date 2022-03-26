@@ -174,7 +174,7 @@ jobs:
       run: sccache --start-server
       
     - name: Build and run example fuzzers
-      run: ./scripts/test_all_fuzzers.sh
+      run: ../test_fuzzer.sh
 
     - name: Print sccache stats
       run: sccache --show-stats
