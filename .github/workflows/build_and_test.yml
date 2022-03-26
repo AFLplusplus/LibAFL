@@ -113,15 +113,15 @@ jobs:
     - uses: actions/checkout@v2
     
     # system dep
-    - name: Install common Package(sccache for macos,snapd for ubuntu)
+    - name: Install common Package(sccache for macos)
       uses: ConorMacBride/install-package@v1.0.0
       with:
         brew: llvm libpng nasm coreutils z3 sccache
-        apt: llvm llvm-dev clang nasm ninja-build snapd # snapd for sccache
+        apt: llvm llvm-dev clang nasm ninja-build
 
-    - name: Install ubuntu deps(sccache)
+    - name: sccache action - speedup Rust GitHub actions
       if: matrix.os == 'ubuntu-latest'
-      run: sudo snap install --candidate --classic sccache
+      uses: visvirial/sccache-action@v1
     - name: Install macos deps
       if: matrix.os == 'macos-latest'
       run: brew link --force llvm
