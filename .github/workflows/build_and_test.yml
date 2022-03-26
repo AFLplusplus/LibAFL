@@ -98,6 +98,18 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macOS-latest]
+        
+        include: # different sccache path for different OS
+          - os: ubuntu-latest
+            sccache-path: /home/runner/.cache/sccache
+          - os: macos-latest
+            sccache-path: /Users/runner/Library/Caches/Mozilla.sccache
+            
+    env:
+      # RUST_BACKTRACE: full # used for debug
+      RUSTC_WRAPPER: sccache # rust will use `sccache cargo <cmd>` instead of `cargo <cmd>`
+      SCCACHE_CACHE_SIZE: 2G # too small cache will result in bad performance
+      SCCACHE_DIR: ${{ matrix.sccache-path }} # cache dir
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions-rs/toolchain@v1
@@ -112,6 +124,16 @@ jobs:
       uses: davidB/rust-cargo-make@v1.6.0
     - uses: actions/checkout@v2
     
+      # set cache dir for new run
+    - name: Save sccache
+      uses: actions/cache@v2
+      continue-on-error: false
+      with:
+        path: ${{ matrix.sccache-path }}
+        key: ${{ runner.os }}-sccache-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-sccache-
+
     # system dep
     - name: Install common Package(sccache for macos)
       uses: ConorMacBride/install-package@v1.0.0
@@ -125,9 +147,20 @@ jobs:
     - name: Install macos deps
       if: matrix.os == 'macos-latest'
       run: brew link --force llvm
+
+    - name: Start sccache server
+      run: sccache --start-server
       
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
+
+    - name: Print sccache stats
+      run: sccache --show-stats
+      
+    - name: Stop sccache server
+      run: sccache --stop-server || true
+      
+
   nostd-build:
     runs-on: ubuntu-latest
     steps:
