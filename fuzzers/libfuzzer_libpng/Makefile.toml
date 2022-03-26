@@ -56,7 +56,7 @@ Invoke-WebRequest https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.
 [tasks.cxx]
 linux_alias = "cxx_unix"
 mac_alias = "cxx_unix"
-windows_alias = "cxx_unix"
+windows_alias = "unsupported"
 
 [tasks.cxx_unix]
 command = "cargo"
@@ -65,7 +65,7 @@ args = ["build" , "--release"]
 [tasks.cc]
 linux_alias = "cc_unix"
 mac_alias = "cc_unix"
-windows_alias = "cc_unix"
+windows_alias = "unsupported"
 
 [tasks.cc_unix]
 command = "cargo"
@@ -75,7 +75,7 @@ args = ["build" , "--release"]
 [tasks.lib]
 linux_alias = "lib_unix"
 mac_alias = "lib_unix"
-windows_alias = "lib_windows"
+windows_alias = "unsupported"
 
 [tasks.lib_unix]
 script_runner="@shell"
@@ -86,15 +86,6 @@ make -C libpng-1.6.37 CC="${PROJECT_DIR}/target/release/libafl_cc" CXX="${PROJEC
 '''
 dependencies = [ "libpng", "cxx", "cc" ]
 
-[tasks.lib_windows]
-script_runner="powershell"
-script_extension = "ps1"
-script='''
-cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-cd "${PROJECT_DIR}"
-make -C libpng-1.6.37 CC="${PROJECT_DIR}/target/release/libafl_cc" CXX="${PROJECT_DIR}/target/release/libafl_cxx"
-'''
-dependencies = [ "libpng", "cxx", "cc" ]
 
 # Harness
 [tasks.fuzzer]
