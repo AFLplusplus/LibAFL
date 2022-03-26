@@ -96,6 +96,7 @@ jobs:
       run: ./libafl_concolic/test/smoke_test.sh 
   example-fuzzer:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macOS-latest]
         
@@ -145,7 +146,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       env:
         LINK: https://github.com/mozilla/sccache/releases/download
-        SCCACHE_VERSION: 0.2.13
+        SCCACHE_VERSION: 0.2.15
       run: |
         SCCACHE_FILE=sccache-$SCCACHE_VERSION-x86_64-unknown-linux-musl
         mkdir -p $HOME/.local/bin
