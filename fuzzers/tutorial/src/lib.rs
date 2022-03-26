@@ -18,7 +18,7 @@ use libafl::{
     monitors::MultiMonitor,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{powersched::PowerSchedule, PowerQueueScheduler},
-    stages::{calibrate::CalibrationStage, power::PowerMutationalStage},
+    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
@@ -127,7 +127,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let calibration = CalibrationStage::new(&edges_observer);
     let power =
-        PowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
+        StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
     let mut stages = tuple_list!(calibration, power);
 

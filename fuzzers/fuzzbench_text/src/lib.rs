@@ -49,7 +49,7 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::PowerMutationalStage, GeneralizationStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
         StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
@@ -370,7 +370,7 @@ fn fuzz_binary(
     let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
 
     let power =
-        PowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
+        StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new());
@@ -575,7 +575,7 @@ fn fuzz_text(
     let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
 
     let power =
-        PowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
+        StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
     let grimoire_mutator = StdScheduledMutator::with_max_iterations(
         tuple_list!(
