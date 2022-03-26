@@ -94,11 +94,24 @@ jobs:
       run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
       run: ./libafl_concolic/test/smoke_test.sh 
-  example-fuzzer:
+      
+  list-fuzzer-dir: # Job that list subdirectories
+    runs-on: ubuntu-latest
+    outputs:
+      dir: ${{ steps.set-dirs.outputs.dir }} # generate output name dir by using inner step output
+    steps:
+      - uses: actions/checkout@v2
+      - id: set-dirs # Give it an id to handle to get step outputs in the outputs key above
+        run: echo "::set-output name=dir::$(ls -d fuzzers/*/ | jq -R -s -c 'split("\n")[:-1]')"
+        # Define step output named dir base on ls command transformed to JSON thanks to jq
+        
+  loop-example-fuzzer:
+    needs: [list-fuzzer-dir]
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macOS-latest]
+        dir: ${{fromJson(needs.list-fuzzer-dir.outputs.dir)}}
         
         include: # different sccache path for different OS
           - os: ubuntu-latest
