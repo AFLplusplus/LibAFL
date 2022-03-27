@@ -16,7 +16,7 @@ if [ ! -d "symcc" ]; then
     echo "cloning symcc"
     git clone https://github.com/AFLplusplus/symcc.git symcc
     cd symcc
-    git checkout 3133c0b37d3c498db9addf2331378c7c9cadbf10
+    git checkout 8f87bbaef599ac33871295650367c81d577f2630
     cd ..
 fi
 
