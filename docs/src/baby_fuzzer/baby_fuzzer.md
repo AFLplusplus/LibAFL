@@ -11,7 +11,7 @@ You can find a complete version of this tutorial as an example fuzzer in [`fuzze
 > ### Warning
 >
 > This example fuzzer is too naive for any real-world usage.
-> Its purpose is solely to show the main components of the library, for a more in-depth walkthrough on building a custom fuzzer go to the [Tutorial chapter](./tutorial/intro.md) directly.
+> Its purpose is solely to show the main components of the library, for a more in-depth walkthrough on building a custom fuzzer go to the [Tutorial chapter](../tutorial/intro.md) directly.
 
 ## Creating a project
 

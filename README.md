@@ -97,8 +97,6 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 
 ## Contributing
 
-Check the [TODO.md](./TODO.md) file for features that we plan to support.
-
 For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
 
 Even though we will gladly assist you in finishing up your PR, try to

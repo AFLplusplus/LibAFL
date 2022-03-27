@@ -1,8 +1,7 @@
-# Baby fuzzer
+# baby grimoire fuzzer
+This fuzzer shows how to implement [Grimoire fuzzer](https://www.usenix.org/system/files/sec19-blazytko.pdf), a fully automated coverage-guided fuzzer which works without any form of human interaction or pre-configuration. `libafl::mutators::grimoire` provides four mutators :
+`GrimoireExtensionMutator`,`GrimoireRecursiveReplacementMutator`,
+`GrimoireStringReplacementMutator`,`GrimoireRandomDeleteMutator`.
 
-This is a minimalistic example about how to create a libafl based fuzzer.
-
-It runs on a single core until a crash occurs and then exits.
-
-The tested program is a simple Rust function without any instrumentation.
-For real fuzzing, you will want to add some sort to add coverage or other feedback.
+The fuzzer will regard all files in `./corpus` as inputs. Inputs will be mutated by `mutator`(havoc_mutations) and `grimoire_mutator`. `harness` will firstly check if `input` contains substring `fn` or `pippopippo` then print the input mutated by `grimoire_mutator`.
+> **_NOTE:_**  This harness is not designed for a crash, so `cargo run` will not terminate.

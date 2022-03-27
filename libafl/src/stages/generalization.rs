@@ -481,9 +481,11 @@ where
             }
             let mut start = index;
             let mut end = payload.len() - 1;
+            let mut endings = 0;
             // Process every ending
             while end > start {
                 if payload[end] == Some(closing_char) {
+                    endings += 1;
                     let mut candidate = GeneralizedInput::new(vec![]);
                     candidate
                         .bytes_mut()
@@ -501,6 +503,10 @@ where
                 }
                 end -= 1;
                 index += 1;
+            }
+
+            if endings == 0 {
+                break;
             }
         }
 

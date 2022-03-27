@@ -41,7 +41,7 @@ crate::create_anymap_for_trait!(
 pub use observers_anymap::{AnyMap as ObserversAnyMap, NamedAnyMap as NamedObserversAnyMap};
 
 /// An owned list of `Observer` trait objects
-/// This is not really serializable, using this struct needs [`EventConfig::AlwaysUnique`] as configuration
+/// This is not really serializable, using this struct needs [`crate::events::EventConfig::AlwaysUnique`] as configuration
 #[derive(Debug, Default)]
 pub struct ObserversOwnedMap<I: 'static + Debug, S: 'static + Debug> {
     /// The named trait objects map

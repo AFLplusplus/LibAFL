@@ -17,6 +17,9 @@ pub use minimizer::{
     IndexesLenTimeMinimizerScheduler, LenTimeMinimizerScheduler, MinimizerScheduler,
 };
 
+pub mod weighted;
+pub use weighted::WeightedScheduler;
+
 pub mod powersched;
 pub use powersched::PowerQueueScheduler;
 
