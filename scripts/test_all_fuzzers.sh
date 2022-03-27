@@ -10,6 +10,8 @@ backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 
 libafl=$(pwd)
 
+git submodule init && git submodule update
+
 for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
 do
     cd $fuzzer
