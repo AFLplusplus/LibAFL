@@ -1,0 +1,41 @@
+# Variables
+[env]
+FUZZER_NAME='libfuzzer_stb_image_concolic'
+
+# Compilers
+[tasks.runtime]
+condition = { files_not_exist = ["runtime/target/libSymRuntime.so"] }
+script_runner = "@shell"
+script = '''
+cd runtime
+cargo build --release
+'''
+
+# Build the fuzzer
+[tasks.fuzzer]
+script_runner = "@shell"
+script = '''
+cd fuzzer
+cargo build --release
+'''
+
+[tasks.test]
+alias = "fuzzer"
+
+[tasks.unsupported]
+# Do nothing
+script_runner = "@shell"
+script='''
+echo "Not supported on this platform."
+'''
+
+# Clean up
+[tasks.clean]
+# Disable default `clean` definition
+clear = true
+script='''
+cd fuzzer 
+cargo clean
+cd ../runtime
+cargo clean
+'''
