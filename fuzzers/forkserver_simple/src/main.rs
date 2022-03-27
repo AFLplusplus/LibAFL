@@ -149,7 +149,7 @@ pub fn main() {
 
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
-        .program(res.value_of("executable").unwrap().to_string())
+        .program(res.value_of("executable").unwrap())
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
