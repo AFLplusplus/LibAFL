@@ -3,7 +3,7 @@
 //! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
 //! for python instrumentation and fuzzing.
 
-use clap::{App, AppSettings, Arg};
+use clap::{AppSettings, Arg, Command};
 use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
 use std::{
     env,
@@ -124,7 +124,7 @@ pub fn LLVMFuzzerRunDriver(
 
     println!("Args: {:?}", std::env::args());
 
-    let matches = App::new("libafl_atheris")
+    let matches = Command::new("libafl_atheris")
         .version("0.1.0")
         .setting(AppSettings::AllowExternalSubcommands)
         .arg(Arg::new("script")) // The python script is the first arg

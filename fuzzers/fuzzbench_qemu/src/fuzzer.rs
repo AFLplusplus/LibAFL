@@ -1,6 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -68,7 +68,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match App::new("libafl_qemu_fuzzbench")
+    let res = match Command::new("libafl_qemu_fuzzbench")
         .version("0.4.0")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
@@ -113,7 +113,7 @@ pub fn main() {
                 env::current_exe()
                     .unwrap_or_else(|_| "fuzzer".into())
                     .to_string_lossy(),
-                err.info,
+                err,
             );
             return;
         }

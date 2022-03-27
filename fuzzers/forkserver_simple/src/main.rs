@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use core::time::Duration;
 use libafl::{
     bolts::{
@@ -27,7 +27,7 @@ use std::path::PathBuf;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let res = App::new("forkserver_simple")
+    let res = Command::new("forkserver_simple")
         .about("Example Forkserver fuzer")
         .arg(
             Arg::new("executable")
@@ -57,7 +57,7 @@ pub fn main() {
         .arg(
             Arg::new("arguments")
                 .help("Arguments passed to the target")
-                .setting(clap::ArgSettings::MultipleValues)
+                .multiple_values(true)
                 .takes_value(true),
         )
         .arg(

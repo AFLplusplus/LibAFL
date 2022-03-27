@@ -3,7 +3,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use content_inspector::inspect;
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
@@ -70,7 +70,7 @@ pub fn libafl_main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match App::new("libafl_fuzzbench")
+    let res = match Command::new("libafl_fuzzbench")
         .version("0.7.1")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
@@ -119,7 +119,7 @@ pub fn libafl_main() {
                 env::current_exe()
                     .unwrap_or_else(|_| "fuzzer".into())
                     .to_string_lossy(),
-                err.info,
+                err,
             );
             return;
         }

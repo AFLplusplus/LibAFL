@@ -63,7 +63,9 @@ where
     where
         EM: EventFirer<I> + EventRestarter<S>,
         OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions<I>
+            + HasClientPerfMonitor
+            + HasFeedbackObjectiveStates<ObjectiveState = OF::FeedbackState>,
         Z: HasObjective<I, OF, S>,
     {
         Ok(Self {
