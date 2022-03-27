@@ -58,6 +58,22 @@ where
         mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
+        // Run this stage only once for each corpus entry
+        if state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut()
+            .metadata()
+            .get::<PowerScheduleTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::KeyNotFound("PowerScheduleTescaseMetatdata not found".to_string())
+            })?
+            .fuzz_level()
+            > 0
+        {
+            return Ok(());
+        }
+
         let mut iter = self.stage_max;
         let handicap = state
             .metadata()

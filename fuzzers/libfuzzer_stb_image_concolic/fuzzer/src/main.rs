@@ -211,7 +211,7 @@ fn fuzz(
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer =
-            ConcolicObserver::new("concolic".to_string(), concolic_shmem.as_slice_mut());
+            ConcolicObserver::new("concolic".to_string(), concolic_shmem.as_mut_slice());
 
         let concolic_observer_name = concolic_observer.name().to_string();
 
@@ -242,16 +242,13 @@ fn fuzz(
 
 use std::process::{Child, Command, Stdio};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MyCommandConfigurator {
     command: Option<Command>,
 }
 
-impl<I> CommandConfigurator<I> for MyCommandConfigurator
-where
-    I: HasTargetBytes + Input,
-{
-    fn spawn_child(&mut self, input: &I) -> Result<Child, Error> {
+impl CommandConfigurator for MyCommandConfigurator {
+    fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")
