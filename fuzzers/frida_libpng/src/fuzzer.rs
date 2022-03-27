@@ -20,8 +20,8 @@ use libafl::{
     corpus::{ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
-    feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedback_and_fast, feedback_or, feedback_or_fast,
+    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -74,7 +74,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
 
     let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>,
                           mut mgr: LlmpRestartingEventManager<_, _, _, _>,
-                          _core_id| {
+                          core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
         // println!("{:?}", mgr.mgr_id());
@@ -92,7 +92,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
         };
 
         if options.asan && options.asan_cores.contains(core_id) {
-            (|state: Option<StdState<_, _, _, _, _>>,
+            (|state: Option<StdState<_, _, _, _, _, _>>,
               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _core_id| {
                 let gum = unsafe { Gum::obtain() };
@@ -120,26 +120,25 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
-                let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
-                let feedback = feedback_or!(
+                let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+                    MaxMapFeedback::new_tracking(&"mapfeedback", &edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::new_with_observer(&time_observer)
                 );
 
                 // Feedbacks to recognize an input as solution
                 #[cfg(unix)]
-                let objective = feedback_or_fast!(
+                let mut objective = feedback_or_fast!(
                     CrashFeedback::new(),
                     TimeoutFeedback::new(),
-                    AsanErrorsFeedback::new()
+                    // true enables the AsanErrorFeedback
+                    feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
                 );
                 #[cfg(windows)]
-                let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
@@ -155,10 +154,10 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                             Some(OnDiskMetadataFormat::JsonPretty),
                         )
                         .unwrap(),
-                        // States of the feedbacks.
-                        // They are the data related to the feedbacks that you want to persist in the State.
-                        tuple_list!(feedback_state),
+                        &mut feedback,
+                        &mut objective,
                     )
+                    .unwrap()
                 });
 
                 println!("We're a client, let's fuzz :)");
@@ -222,7 +221,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else if options.cmplog && options.cmplog_cores.contains(core_id) {
-            (|state: Option<StdState<_, _, _, _, _>>,
+            (|state: Option<StdState<_, _, _, _, _, _>>,
               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _core_id| {
                 let gum = unsafe { Gum::obtain() };
@@ -245,19 +244,23 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
-                let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
-                let feedback = feedback_or!(
+                let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+                    MaxMapFeedback::new_tracking(&"mapfeedback", &edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::new_with_observer(&time_observer)
                 );
 
-                // Feedbacks to recognize an input as solution
-                let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+                #[cfg(unix)]
+                let mut objective = feedback_or_fast!(
+                    CrashFeedback::new(),
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                );
+                #[cfg(windows)]
+                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
@@ -273,10 +276,10 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                             Some(OnDiskMetadataFormat::JsonPretty),
                         )
                         .unwrap(),
-                        // States of the feedbacks.
-                        // They are the data related to the feedbacks that you want to persist in the State.
-                        tuple_list!(feedback_state),
+                        &mut feedback,
+                        &mut objective,
                     )
+                    .unwrap()
                 });
 
                 println!("We're a client, let's fuzz :)");
@@ -357,7 +360,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else {
-            (|state: Option<StdState<_, _, _, _, _>>,
+            (|state: Option<StdState<_, _, _, _, _, _>>,
               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _core_id| {
                 let gum = unsafe { Gum::obtain() };
@@ -379,19 +382,23 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
 
-                let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
                 // Feedback to rate the interestingness of an input
                 // This one is composed by two Feedbacks in OR
-                let feedback = feedback_or!(
+                let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+                    MaxMapFeedback::new_tracking(&"map_feedback", &edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::new_with_observer(&time_observer)
                 );
 
-                // Feedbacks to recognize an input as solution
-                let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+                #[cfg(unix)]
+                let mut objective = feedback_or_fast!(
+                    CrashFeedback::new(),
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                );
+                #[cfg(windows)]
+                let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
                 // If not restarting, create a State from scratch
                 let mut state = state.unwrap_or_else(|| {
@@ -407,10 +414,10 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                             Some(OnDiskMetadataFormat::JsonPretty),
                         )
                         .unwrap(),
-                        // States of the feedbacks.
-                        // They are the data related to the feedbacks that you want to persist in the State.
-                        tuple_list!(feedback_state),
+                        &mut feedback,
+                        &mut objective,
                     )
+                    .unwrap()
                 });
 
                 println!("We're a client, let's fuzz :)");

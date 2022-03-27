@@ -1376,3 +1376,72 @@ where
         }
     }
 }
+
+/// The [`ConstFeedback`] reports the same value, always.
+/// It can be used to enable or disable feedback results through composition.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConstFeedback {
+    /// Always returns `true`
+    True,
+    /// Alsways returns `false`
+    False,
+}
+
+impl<I, S> Feedback<I, S> for ConstFeedback
+where
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    type FeedbackState = NopFeedbackState;
+
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        _manager: &mut EM,
+        _input: &I,
+        _observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        Ok(match self {
+            ConstFeedback::True => true,
+            ConstFeedback::False => false,
+        })
+    }
+
+    #[inline]
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
+    }
+}
+
+impl Named for ConstFeedback {
+    #[inline]
+    fn name(&self) -> &str {
+        "ConstFeedback"
+    }
+}
+
+impl ConstFeedback {
+    /// Creates a new [`ConstFeedback`] from the given boolean
+    #[must_use]
+    pub fn new(val: bool) -> Self {
+        Self::from(val)
+    }
+}
+
+impl From<bool> for ConstFeedback {
+    fn from(val: bool) -> Self {
+        if val {
+            Self::True
+        } else {
+            Self::False
+        }
+    }
+}
