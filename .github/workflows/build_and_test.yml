@@ -39,7 +39,26 @@ jobs:
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
      
-
+  test-doc:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - name: Install deps
+      run: sudo apt-get install -y llvm llvm-dev clang ninja-build
+    - name: get clang version
+      run: command -v llvm-config && clang -v
+    - name: Add nightly rustfmt and clippy
+      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+    - uses: actions/checkout@v2
+    - name: Build Docs
+      run: cargo doc
+    - name: Test Docs
+      run: cargo +nightly test --doc --all-features
+      
   ubuntu:
     runs-on: ubuntu-latest
     steps:
@@ -75,10 +94,6 @@ jobs:
     - name: Format
       run: cargo fmt -- --check
     - uses: actions/checkout@v2
-    - name: Build Docs
-      run: cargo doc
-    - name: Test Docs
-      run: cargo +nightly test --doc --all-features
     - name: Run clippy
       run: ./scripts/clippy.sh
   ubuntu-concolic:
