@@ -13,6 +13,7 @@ cargo build --release
 
 # Build the fuzzer
 [tasks.fuzzer]
+dependencies = ["runtime"]
 script_runner = "@shell"
 script = '''
 cd fuzzer
