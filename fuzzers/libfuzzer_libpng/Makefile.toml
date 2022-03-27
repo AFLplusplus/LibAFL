@@ -4,11 +4,12 @@ FUZZER_NAME='fuzzer_libpng'
 LIBAFL_CC = './target/release/libafl_cc'
 LIBAFL_CXX = './target/release/libafl_cxx'
 FUZZER = './target/release/${FUZZER_NAME}'
-PROJECT_DIR = { script = ["pwd"],platforms = ["linux","macos"] }
-PROJECT_DIR = { script = ["echo %cd%"],platforms = ["windows"] }
+PROJECT_DIR = { script = ["pwd"] }
+# PROJECT_DIR = { script = ["echo %cd%"],platforms = ["windows"] } # 'platforms' condition seems to be useless
 
-[env.windows]
-PROJECT_DIR = { script = ["echo","%cd%"] }
+# '.windows' doesn't specify the work under linux
+# [env.windows]
+# PROJECT_DIR = { script = ["echo","%cd%"] }
 
 [tasks.unsupported]
 script_runner="@shell"
