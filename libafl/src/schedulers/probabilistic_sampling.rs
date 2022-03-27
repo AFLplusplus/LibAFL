@@ -184,7 +184,8 @@ mod tests {
         let idx1 = corpus.add(t1).unwrap();
         let idx2 = corpus.add(t2).unwrap();
 
-        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ());
+        let mut state =
+            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
         scheduler.on_add(state.borrow_mut(), idx1).unwrap();
         scheduler.on_add(state.borrow_mut(), idx2).unwrap();
         let next_idx1 = scheduler.next(&mut state).unwrap();

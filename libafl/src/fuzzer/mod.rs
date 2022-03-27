@@ -376,7 +376,7 @@ where
             #[cfg(feature = "introspection")]
             let is_corpus = self.feedback_mut().is_interesting_introspection(
                 state,
-                &mut feedback_objective_statei.0,
+                &mut feedback_objective_states.0,
                 manager,
                 &input,
                 observers,
