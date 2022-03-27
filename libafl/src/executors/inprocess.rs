@@ -1028,8 +1028,8 @@ mod windows_exception_handler {
                 // Extra bracket to drop th feedback state before serialization
                 {
                     let feedback_objective_states = state.feedback_objective_states();
-                    let mut feedback_objective_states = feedback_objective_states.borrow_mut();
-                    let (_, objective_state) = feedback_objective_states.deref_mut();
+                    let mut feedback_objective_states = (*feedback_objective_states).borrow_mut();
+                    let objective_state = &mut feedback_objective_states.1;
 
                     let interesting = fuzzer
                         .objective_mut()
@@ -1139,8 +1139,8 @@ mod windows_exception_handler {
                 // Extra bracket to drop th feedback state before serialization
                 {
                     let feedback_objective_states = state.feedback_objective_states();
-                    let mut feedback_objective_states = feedback_objective_states.borrow_mut();
-                    let (_, objective_state) = feedback_objective_states.deref_mut();
+                    let mut feedback_objective_states = (*feedback_objective_states).borrow_mut();
+                    let objective_state = &mut feedback_objective_states.1;
 
                     let interesting = fuzzer
                         .objective_mut()
@@ -1316,8 +1316,8 @@ mod windows_exception_handler {
             // Extra bracket to drop the state ref before serializing
             {
                 let feedback_objective_states = state.feedback_objective_states();
-                let mut feedback_objective_states = feedback_objective_states.borrow_mut();
-                let (_, objective_state) = feedback_objective_states.deref_mut();
+                let mut feedback_objective_states = (*feedback_objective_states).borrow_mut();
+                let objective_state = &mut feedback_objective_states.1;
 
                 let interesting = fuzzer
                     .objective_mut()

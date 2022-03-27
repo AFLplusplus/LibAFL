@@ -723,7 +723,7 @@ pub mod pybind {
             /// `StdState` with fixed generics
             pub type $type_name = StdState<
                 PythonCorpus,
-                (MapFeedbackState<$datatype>, ()),
+                MapFeedbackState<$datatype>,
                 BytesInput,
                 PythonRand,
                 PythonCorpus,
