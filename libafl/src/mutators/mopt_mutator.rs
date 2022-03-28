@@ -532,7 +532,7 @@ where
 {
     /// Create a new [`StdMOptMutator`].
     pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
-        if state.has_metadata::<MOpt>() {
+        if !state.has_metadata::<MOpt>() {
             state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
         }
         Ok(Self {
