@@ -88,6 +88,23 @@ impl TopAccountingMetadata {
             max_accounting: vec![0; acc_len],
         }
     }
+    /// Getter
+    #[must_use]
+    pub fn map(&self) -> &HashMap<usize, usize> {
+        &self.map
+    }
+
+    /// Getter
+    #[must_use]
+    pub fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// Getter
+    #[must_use]
+    pub fn max_accounting(&self) -> &[u32] {
+        &self.max_accounting
+    }
 }
 
 /// A minimizer scheduler using coverage accounting
@@ -263,7 +280,16 @@ where
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self {
-        state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+        match state.metadata().get::<TopAccountingMetadata>() {
+            Some(meta) => {
+                if meta.max_accounting.len() != accounting_map.len() {
+                    state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+                }
+            }
+            None => {
+                state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+            }
+        }
         Self {
             accounting_map,
             inner: MinimizerScheduler::new(base),
