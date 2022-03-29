@@ -15,16 +15,13 @@ done
 # list fuzzers by time
 fuzzers=$(ls -dt fuzzers/*/)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
-extra_fuzzer_and_runtime="
-./fuzzers/libfuzzer_stb_image_concolic/runtime
-./fuzzers/libfuzzer_stb_image_concolic/fuzzer
-"
 
 libafl=$(pwd)
 
 echo -e "[*] test starts from latest modified fuzzer,here is the order:\n${fuzzers}"
 echo "[*] start testing"
-for fuzzer in $(echo $fuzzers $backtrace_fuzzers $extra_fuzzer_and_runtime);
+git submodule init && git submodule update
+for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
 do
     cd $fuzzer
     # Clippy checks
