@@ -31,6 +31,9 @@ test.dict
 # Ignore all built fuzzers
 fuzzer_*
 AFLplusplus
+test_*
+*_fuzzer
+*_harness
 
 # Ignore common dummy and logfiles
 *.log
