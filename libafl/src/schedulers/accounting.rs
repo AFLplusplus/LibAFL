@@ -88,23 +88,6 @@ impl TopAccountingMetadata {
             max_accounting: vec![0; acc_len],
         }
     }
-    /// Getter
-    #[must_use]
-    pub fn map(&self) -> &HashMap<usize, usize> {
-        &self.map
-    }
-
-    /// Getter
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Getter
-    #[must_use]
-    pub fn max_accounting(&self) -> &[u32] {
-        &self.max_accounting
-    }
 }
 
 /// A minimizer scheduler using coverage accounting
