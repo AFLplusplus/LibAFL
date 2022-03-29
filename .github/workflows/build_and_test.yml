@@ -116,13 +116,10 @@ jobs:
       dir: ${{ steps.set-dirs.outputs.dir }} # generate output name dir by using inner step output
     steps:
       - uses: actions/checkout@v2
-      - name: set commit time
-        run: git ls-tree -r --name-only HEAD | while read filename; do
-              unixtime=$(git log -1 --format="%at" -- "${filename}")
-              touchtime=$(date -d @$unixtime +'%Y%m%d%H%M.%S')
-              touch -t ${touchtime} "${filename}"
-            done
-
+      - name: install git-restore-mtime
+        run: sudo apt install -y git-restore-mtime
+      - name: restore file commit time
+        run: git restore-mtime
       - id: set-dirs # Give it an id to handle to get step outputs in the outputs key above, sorted by time
         run: echo "::set-output name=dir::$(ls -dt fuzzers/*/ | jq -R -s -c 'split("\n")[:-1]')"
         # Define step output named dir base on ls command transformed to JSON thanks to jq
@@ -130,7 +127,8 @@ jobs:
   test-fuzzer:
     needs: [list-fuzzer-dir]
     strategy:
-      fail-fast: false
+#       fail-fast: false
+
       matrix:
         os: [ubuntu-latest, macOS-latest]
         dir: ${{fromJson(needs.list-fuzzer-dir.outputs.dir)}}
