@@ -5,7 +5,15 @@ cd "$SCRIPT_DIR/.."
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
-fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
+# restore file timestamp by git history
+git ls-tree -r --name-only HEAD | while read filename; do
+    unixtime=$(git log -1 --format="%at" -- "${filename}")
+    touchtime=$(date -d @$unixtime +'%Y%m%d%H%M.%S')
+    touch -t ${touchtime} "${filename}"
+done
+
+# list fuzzers by time
+fuzzers=$(ls -dt fuzzers/*/)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 extra_fuzzer_and_runtime="
 ./fuzzers/libfuzzer_stb_image_concolic/runtime
