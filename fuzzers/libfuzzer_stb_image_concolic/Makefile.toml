@@ -4,6 +4,11 @@ FUZZER_NAME='libfuzzer_stb_image_concolic'
 
 # Compilers
 [tasks.runtime]
+linux_alias = "runtime_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.runtime_unix]
 condition = { files_not_exist = ["runtime/target/libSymRuntime.so"] }
 script_runner = "@shell"
 script = '''
@@ -13,6 +18,11 @@ cargo build --release
 
 # Build the fuzzer
 [tasks.fuzzer]
+linux_alias = "fuzzer_unix"
+mac_alias = "unsupported"
+windows_alias = "unsupported"
+
+[tasks.fuzzer_unix]
 dependencies = ["runtime"]
 script_runner = "@shell"
 script = '''
