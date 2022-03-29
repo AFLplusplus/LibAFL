@@ -101,7 +101,7 @@ jobs:
       with:
         path: |
           ./fuzzers
-        key: "constant" # cache everything
+        key: ${{ runner.os }} # cache everything
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
@@ -173,7 +173,7 @@ jobs:
       with:
         path: |
           ./fuzzers
-        key: "constant" # cache everything
+        key: ${{ runner.os }} # cache everything
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
