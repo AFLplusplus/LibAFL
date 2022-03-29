@@ -5,11 +5,10 @@ cd "$SCRIPT_DIR/.."
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
-# restore file timestamp by git history
-git ls-tree -r --name-only HEAD | while read filename; do
-    unixtime=$(git log -1 --format="%at" -- "${filename}")
-    touchtime=$(date -d @$unixtime +'%Y%m%d%H%M.%S')
-    touch -t ${touchtime} "${filename}"
+# restore timestamp of file and dir by git history
+rev=HEAD
+for f in $(git ls-tree -r -t --full-name --name-only "$rev") ; do
+     touch -t $(git log --pretty=format:%cd --date=format:%Y%m%d%H%M.%S -1 "$rev" -- "$f") "$f"; 
 done
 
 # list fuzzers by time
