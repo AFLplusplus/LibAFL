@@ -6,6 +6,7 @@ cd "$SCRIPT_DIR/.."
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
 # restore timestamp of file and dir by git history
+echo -e "[*] restore timestamp of file and dir by git history"
 rev=HEAD
 for f in $(git ls-tree -r -t --full-name --name-only "$rev") ; do
      touch -t $(git log --pretty=format:%cd --date=format:%Y%m%d%H%M.%S -1 "$rev" -- "$f") "$f"; 
@@ -21,6 +22,8 @@ extra_fuzzer_and_runtime="
 
 libafl=$(pwd)
 
+echo -e "[*] test starts from latest modified fuzzer,here is the order:\n${fuzzers}"
+echo "[*] start testing"
 for fuzzer in $(echo $fuzzers $backtrace_fuzzers $extra_fuzzer_and_runtime);
 do
     cd $fuzzer
