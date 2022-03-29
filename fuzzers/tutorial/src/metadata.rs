@@ -5,8 +5,8 @@ use libafl::{
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata, NopFeedbackState},
     observers::ObserversTuple,
-    schedulers::{FavFactor, MinimizerScheduler},
-    state::{HasClientPerfMonitor, HasMetadata},
+    schedulers::{MinimizerScheduler, TestcaseScore},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error, SerdeAny,
 };
 
@@ -19,19 +19,22 @@ pub struct PacketLenMetadata {
     pub length: u64,
 }
 
-pub struct PacketLenFavFactor {}
+pub struct PacketLenTestcaseScore {}
 
-impl FavFactor<PacketData> for PacketLenFavFactor {
-    fn compute(entry: &mut Testcase<PacketData>) -> Result<u64, Error> {
+impl<S> TestcaseScore<PacketData, S> for PacketLenTestcaseScore
+where
+    S: HasCorpus<PacketData> + HasMetadata,
+{
+    fn compute(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
         Ok(entry
             .metadata()
             .get::<PacketLenMetadata>()
-            .map_or(1, |m| m.length))
+            .map_or(1, |m| m.length) as f64)
     }
 }
 
 pub type PacketLenMinimizerScheduler<CS, S> =
-    MinimizerScheduler<CS, PacketLenFavFactor, PacketData, MapIndexesMetadata, S>;
+    MinimizerScheduler<CS, PacketLenTestcaseScore, PacketData, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {

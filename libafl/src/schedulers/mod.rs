@@ -9,8 +9,8 @@ pub use probabilistic_sampling::ProbabilitySamplingScheduler;
 pub mod accounting;
 pub use accounting::CoverageAccountingScheduler;
 
-pub mod fav_factor;
-pub use fav_factor::{FavFactor, LenTimeMulFavFactor};
+pub mod testcase_score;
+pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
 
 pub mod minimizer;
 pub use minimizer::{
@@ -18,7 +18,7 @@ pub use minimizer::{
 };
 
 pub mod weighted;
-pub use weighted::WeightedScheduler;
+pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod powersched;
 pub use powersched::PowerQueueScheduler;

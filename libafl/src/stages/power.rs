@@ -10,16 +10,21 @@ use crate::{
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
-    schedulers::powersched::{PowerSchedule, PowerScheduleMetadata},
+    schedulers::{
+        powersched::{PowerSchedule, PowerScheduleMetadata},
+        testcase_score::CorpusPowerTestcaseScore,
+        TestcaseScore,
+    },
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error,
 };
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
+pub struct PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
@@ -30,13 +35,14 @@ where
     map_observer_name: String,
     mutator: M,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, I, O, OT, S, Z)>,
+    phantom: PhantomData<(E, F, EM, I, O, OT, S, Z)>,
 }
 
-impl<E, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
-    for PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
+impl<E, F, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
+    for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
@@ -57,16 +63,11 @@ where
     }
 
     /// Gets the number of iterations as a random number
+    #[allow(clippy::cast_sign_loss)]
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
-        // Calculate score
-        let score = state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow()
-            .calculate_score(state);
-
         // Update handicap
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+        let score = F::compute(&mut *testcase, state)? as usize;
         let tcmeta = testcase
             .metadata_mut()
             .get_mut::<PowerScheduleTestcaseMetaData>()
@@ -79,7 +80,7 @@ where
             tcmeta.set_handicap(tcmeta.handicap() - 1);
         }
 
-        score
+        Ok(score)
     }
 
     #[allow(clippy::cast_possible_wrap)]
@@ -141,9 +142,11 @@ where
     }
 }
 
-impl<E, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z> for PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
+impl<E, F, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z>
+    for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
@@ -166,9 +169,10 @@ where
     }
 }
 
-impl<E, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, EM, I, M, O, OT, S, Z>
+impl<E, F, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
@@ -186,3 +190,7 @@ where
         }
     }
 }
+
+/// The standard powerscheduling stage
+pub type StdPowerMutationalStage<E, EM, I, M, O, OT, S, Z> =
+    PowerMutationalStage<E, CorpusPowerTestcaseScore<I, S>, EM, I, M, O, OT, S, Z>;

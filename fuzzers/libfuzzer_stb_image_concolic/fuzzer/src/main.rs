@@ -5,7 +5,11 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 use clap::{self, StructOpt};
-use std::{env, path::PathBuf};
+use std::{
+    env,
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+};
 
 use libafl::{
     bolts::{
@@ -146,7 +150,7 @@ fn fuzz(
     println!("We're a client, let's fuzz :)");
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -240,12 +244,8 @@ fn fuzz(
     Ok(())
 }
 
-use std::process::{Child, Command, Stdio};
-
 #[derive(Default, Debug)]
-pub struct MyCommandConfigurator {
-    command: Option<Command>,
-}
+pub struct MyCommandConfigurator;
 
 impl CommandConfigurator for MyCommandConfigurator {
     fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
