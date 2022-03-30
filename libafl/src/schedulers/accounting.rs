@@ -263,7 +263,16 @@ where
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
     pub fn new(state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self {
-        state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+        match state.metadata().get::<TopAccountingMetadata>() {
+            Some(meta) => {
+                if meta.max_accounting.len() != accounting_map.len() {
+                    state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+                }
+            }
+            None => {
+                state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+            }
+        }
         Self {
             accounting_map,
             inner: MinimizerScheduler::new(base),
@@ -279,7 +288,16 @@ where
         skip_non_favored_prob: u64,
         accounting_map: &'a [u32],
     ) -> Self {
-        state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+        match state.metadata().get::<TopAccountingMetadata>() {
+            Some(meta) => {
+                if meta.max_accounting.len() != accounting_map.len() {
+                    state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+                }
+            }
+            None => {
+                state.add_metadata(TopAccountingMetadata::new(accounting_map.len()));
+            }
+        }
         Self {
             accounting_map,
             inner: MinimizerScheduler::with_skip_prob(base, skip_non_favored_prob),

@@ -182,7 +182,9 @@ where
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(state: &mut S, mutator: M, map_observer_name: &O, strat: PowerSchedule) -> Self {
-        state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new(strat));
+        if !state.has_metadata::<PowerScheduleMetadata>() {
+            state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new(strat));
+        }
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator,
