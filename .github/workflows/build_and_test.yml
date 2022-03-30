@@ -114,7 +114,7 @@ jobs:
     - name: Install deps
       run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
     - name: install Cachepot
-      run: cargo install --git https://github.com/paritytech/cachepot
+      run: RUSTC_WRAPPER="" cargo install --git https://github.com/paritytech/cachepot
     - name: install cargo-make and cargo-sweep
       run: cargo install --force cargo-make cargo-sweep
     - uses: actions/checkout@v2
@@ -215,7 +215,7 @@ jobs:
     - name: Install deps
       run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
     - name: install Cachepot
-      run: cargo install --git https://github.com/paritytech/cachepot
+      run: RUSTC_WRAPPER="" cargo install --git https://github.com/paritytech/cachepot
     - name: install cargo-make
       run: cargo install --force cargo-make cargo-sweep
     - uses: actions/checkout@v2
