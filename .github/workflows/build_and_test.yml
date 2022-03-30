@@ -113,10 +113,10 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
-    - name: install cargo-make and cargo-sweep
-      run: cargo install --force cargo-make cargo-sweep
     - name: install Cachepot
       run: cargo install --git https://github.com/paritytech/cachepot
+    - name: install cargo-make and cargo-sweep
+      run: cargo install --force cargo-make cargo-sweep
     - uses: actions/checkout@v2
     - name: restore git commit timestamps
       uses: chetan/git-restore-mtime-action@v1
@@ -214,10 +214,10 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
       run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
-    - name: install cargo-make
-      run: cargo install --force cargo-make cargo-sweep
     - name: install Cachepot
       run: cargo install --git https://github.com/paritytech/cachepot
+    - name: install cargo-make
+      run: cargo install --force cargo-make cargo-sweep
     - uses: actions/checkout@v2
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh
