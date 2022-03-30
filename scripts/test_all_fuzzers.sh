@@ -45,7 +45,9 @@ do
 	    echo "[+] Done testing $fuzzer"
     else
         echo "[*] Building $fuzzer"
+        cargo sweep -s # record cargo action and then clean output
         cargo build || exit 1
+        cargo sweep -f
         echo "[+] Done building $fuzzer"
     fi
 
