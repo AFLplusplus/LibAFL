@@ -114,8 +114,10 @@ jobs:
     - name: install cargo-make
       run: cargo install --force cargo-make
     - uses: actions/checkout@v2
+    - name: restore git commit timestamps
+      uses: chetan/git-restore-mtime-action@v1
     - name: Build and run example fuzzers
-      run: ./scripts/test_all_fuzzers.sh
+      run: ./scripts/test_all_fuzzers.sh --no-clean
   nostd-build:
     runs-on: ubuntu-latest
     steps:
@@ -209,8 +211,10 @@ jobs:
     - uses: actions/checkout@v2
     - name: Increase map sizes
       run: ./scripts/shmem_limits_macos.sh
+    - name: restore git commit timestamps
+      uses: chetan/git-restore-mtime-action@v1
     - name: Build and run example fuzzers
-      run: ./scripts/test_all_fuzzers.sh
+      run: ./scripts/test_all_fuzzers.sh --no-clean
   other_targets:
     runs-on: macOS-latest
     steps:

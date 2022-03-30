@@ -9,7 +9,11 @@ cd "$SCRIPT_DIR/.."
 echo -e "[*] restore timestamp of file and dir by git history"
 rev=HEAD
 for f in $(git ls-tree -r -t --full-name --name-only "$rev") ; do
-     touch -t $(git log --pretty=format:%cd --date=format:%Y%m%d%H%M.%S -1 "$rev" -- "$f") "$f"; 
+    if [ -e $f ]; then
+        touch -t $(git log --pretty=format:%cd --date=format:%Y%m%d%H%M.%S -1 "$rev" -- "$f") "$f"; 
+    else
+        echo \""$f\" in git ls-tree but not exist"
+    fi
 done
 
 # list fuzzers by time
@@ -46,7 +50,9 @@ do
     fi
 
     # Save disk space
-    cargo clean
+    if [ "$1" != "--no-clean" ]; then
+        cargo clean
+    fi
     cd $libafl
     echo ""
 done
