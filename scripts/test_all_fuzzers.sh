@@ -28,6 +28,7 @@ git submodule init && git submodule update
 for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
 do
     cd $fuzzer
+    cargo sweep -s # record cargo action and then clean output
     # Clippy checks
     if [ "$1" != "--no-fmt" ]; then
         
@@ -45,12 +46,10 @@ do
 	    echo "[+] Done testing $fuzzer"
     else
         echo "[*] Building $fuzzer"
-        cargo sweep -s # record cargo action and then clean output
         cargo build || exit 1
-        cargo sweep -f
         echo "[+] Done building $fuzzer"
     fi
-
+    cargo sweep -f # clear cargo
     # Save disk space
     if [ "$1" != "--no-clean" ]; then
         cargo clean
