@@ -99,10 +99,13 @@ jobs:
     env:
       RUSTC_WRAPPER: cachepot
     steps:
+    # cache 
     - uses: actions/cache@v3
-      with:
+      with: 
         path: |
-          ./fuzzers
+          ./fuzzers/**/libpng-1.6.37
+          ./fuzzers/**.tar.xz
+          ./fuzzers/**.tar.gz
           ~/.cache/cachepot
         key: ${{ runner.os }} # cache everything
     - uses: actions-rs/toolchain@v1
@@ -204,7 +207,9 @@ jobs:
     - uses: actions/cache@v3
       with:
         path: |
-          ./fuzzers
+          ./fuzzers/**/libpng-1.6.37
+          ./fuzzers/**.tar.xz
+          ./fuzzers/**.tar.gz
           ~/Library/Caches/Parity.cachepot
         key: ${{ runner.os }} # cache everything
     - uses: actions-rs/toolchain@v1
