@@ -99,7 +99,7 @@ jobs:
     env:
       RUSTC_WRAPPER: cachepot
     steps:
-    # cache 
+    - uses: actions/checkout@v2
     - name: cache cachepot
       uses: actions/cache@v3
       with: 
@@ -127,7 +127,6 @@ jobs:
       run: RUSTC_WRAPPER="" cargo install --git https://github.com/paritytech/cachepot
     - name: install cargo-make and cargo-sweep
       run: cargo install --force cargo-make cargo-sweep
-    - uses: actions/checkout@v2
     - name: restore git commit timestamps
       uses: chetan/git-restore-mtime-action@v1
     - name: Build and run example fuzzers
