@@ -193,7 +193,7 @@ where
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
             mutations,
-            max_stack_pow: 128,
+            max_stack_pow: 7,
             phantom: PhantomData,
         }
     }
