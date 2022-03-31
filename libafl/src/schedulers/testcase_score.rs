@@ -73,7 +73,8 @@ where
     #[allow(
         clippy::cast_precision_loss,
         clippy::too_many_lines,
-        clippy::cast_sign_loss
+        clippy::cast_sign_loss,
+        clippy::cast_lossless
     )]
     fn compute(entry: &mut Testcase<I>, state: &S) -> Result<f64, Error> {
         let psmeta = state

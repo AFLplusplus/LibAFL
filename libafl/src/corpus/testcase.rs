@@ -156,16 +156,16 @@ where
         &mut self.executions
     }
 
-    /// Get the fuzz_level
+    /// Get the `fuzz_level`
     #[inline]
     pub fn fuzz_level(&self) -> usize {
         self.fuzz_level
     }
 
-    /// Set the fuzz_level
+    /// Set the `fuzz_level`
     #[inline]
     pub fn set_fuzz_leve(&mut self, fuzz_level: usize) {
-        self.fuzz_level = fuzz_level
+        self.fuzz_level = fuzz_level;
     }
 
     /// Get if it was fuzzed
