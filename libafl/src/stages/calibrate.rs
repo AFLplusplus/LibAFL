@@ -59,27 +59,12 @@ where
         corpus_idx: usize,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry
-        if state
-            .corpus()
-            .get(corpus_idx)?
-            .borrow_mut()
-            .metadata()
-            .get::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| {
-                Error::KeyNotFound("PowerScheduleTescaseMetatdata not found".to_string())
-            })?
-            .fuzz_level()
-            > 0
-        {
+        if state.corpus().get(corpus_idx)?.borrow_mut().fuzz_level() > 0 {
             return Ok(());
         }
 
         let mut iter = self.stage_max;
-        let handicap = state
-            .metadata()
-            .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
-            .queue_cycles();
+
         let input = state
             .corpus()
             .get(corpus_idx)?
@@ -175,36 +160,48 @@ where
             }
         };
 
-        let psmeta = state
-            .metadata_mut()
-            .get_mut::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+        // If power schedule is used, update it
+        let use_powerschedule = state.has_metadata::<PowerScheduleMetadata>()
+            && state
+                .corpus()
+                .get(corpus_idx)?
+                .borrow()
+                .has_metadata::<PowerScheduleTestcaseMetaData>();
 
-        let map = executor
-            .observers()
-            .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+        if use_powerschedule {
+            let map = executor
+                .observers()
+                .match_name::<O>(&self.map_observer_name)
+                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
 
-        let bitmap_size = map.count_bytes();
+            let bitmap_size = map.count_bytes();
 
-        psmeta.set_exec_time(psmeta.exec_time() + total_time);
-        psmeta.set_cycles(psmeta.cycles() + (iter as u64));
-        psmeta.set_bitmap_size(psmeta.bitmap_size() + bitmap_size);
-        psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
+            let psmeta = state
+                .metadata_mut()
+                .get_mut::<PowerScheduleMetadata>()
+                .unwrap();
+            let handicap = psmeta.queue_cycles();
 
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+            psmeta.set_exec_time(psmeta.exec_time() + total_time);
+            psmeta.set_cycles(psmeta.cycles() + (iter as u64));
+            psmeta.set_bitmap_size(psmeta.bitmap_size() + bitmap_size);
+            psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
-        testcase.set_exec_time(total_time / (iter as u32));
-        // println!("time: {:#?}", testcase.exec_time());
-        let data = testcase
-            .metadata_mut()
-            .get_mut::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+            let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+            let fuzz_level = testcase.fuzz_level();
 
-        data.set_bitmap_size(bitmap_size);
-        data.set_handicap(handicap);
-        data.set_fuzz_level(data.fuzz_level() + 1);
-        // println!("data: {:#?}", data);
+            testcase.set_exec_time(total_time / (iter as u32));
+            testcase.set_fuzz_leve(fuzz_level + 1);
+            // println!("time: {:#?}", testcase.exec_time());
+
+            let data = testcase
+                .metadata_mut()
+                .get_mut::<PowerScheduleTestcaseMetaData>()
+                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+
+            data.set_bitmap_size(bitmap_size);
+            data.set_handicap(handicap);
+        }
 
         Ok(())
     }
