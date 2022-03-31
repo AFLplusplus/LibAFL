@@ -369,7 +369,7 @@ where
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
-    max_stack_pow: usize,
+    max_stack_pow: u64,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -535,7 +535,7 @@ where
     pub fn new(
         state: &mut S,
         mutations: MT,
-        max_stack_pow: usize,
+        max_stack_pow: u64,
         swarm_num: usize,
     ) -> Result<Self, Error> {
         if !state.has_metadata::<MOpt>() {
@@ -644,7 +644,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        state.rand_mut().below(self.max_stack_pow)
+        1 << (1 + state.rand_mut().below(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
