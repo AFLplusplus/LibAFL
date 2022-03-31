@@ -116,7 +116,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_iterations(encoded_mutations(), 2);
+    let mutator = StdScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     println!("Decoder {:?} ...", &encoder_decoder);

@@ -587,7 +587,7 @@ fn fuzz_text(
     let power =
         StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
 
-    let grimoire_mutator = StdScheduledMutator::with_max_iterations(
+    let grimoire_mutator = StdScheduledMutator::with_max_stack_pow(
         tuple_list!(
             GrimoireExtensionMutator::new(),
             GrimoireRecursiveReplacementMutator::new(),
