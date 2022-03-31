@@ -100,14 +100,19 @@ jobs:
       RUSTC_WRAPPER: cachepot
     steps:
     # cache 
-    - uses: actions/cache@v3
+    - name: cache cachepot
+      uses: actions/cache@v3
+      with: 
+        path: |
+        key: ${{ runner.os }}-cachepot-${{ hashFiles('./fuzzers/**/Cargo.toml') }}
+    - name: cache fuzzer stuff
+      uses: actions/cache@v3
       with: 
         path: |
           ./fuzzers/**/libpng-1.6.37
           ./fuzzers/**.tar.xz
           ./fuzzers/**.tar.gz
-          ~/.cache/cachepot
-        key: ${{ runner.os }} # cache everything
+        key: ${{ runner.os }}-${{ hashFiles('./fuzzers/**') }}
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
