@@ -184,6 +184,7 @@ jobs:
     - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly && rustup target add --toolchain nightly aarch64-unknown-none && rustup component add --toolchain nightly rust-src && rustup target add thumbv6m-none-eabi
+    - uses: actions/checkout@v2
     - name: Build aarch64-unknown-none
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
