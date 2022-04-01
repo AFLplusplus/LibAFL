@@ -50,7 +50,7 @@ jobs:
       uses: actions/cache@v3
       with: 
         path: |
-          ${{ matrix.cachepot-path }}
+          ~/.cache/cachepot
         key: ${{ runner.os }}-cachepot-${{ hashFiles('./fuzzers/**/Cargo.toml') }}
     - name: install Cachepot #set RUSTC_WRAPPER="" to avoid using cachepot before installed
       run: RUSTC_WRAPPER="" cargo install --git https://github.com/paritytech/cachepot
