@@ -94,18 +94,29 @@ jobs:
       run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
       run: ./libafl_concolic/test/smoke_test.sh 
-  ubuntu-fuzzers:
-    runs-on: ubuntu-latest
+  fuzzers:
+    strategy:
+      matrix:
+          os: [ubuntu-latest, macOS-latest]
+
+        include: # different cachepot path for different OS
+          - os: ubuntu-latest
+            cachepot-path: ~/.cache/cachepot
+          - os: macos-latest
+            cachepot-path: ~/Library/Caches/Parity.cachepot
+    runs-on: ${{ matrix.os }}
     env:
       RUSTC_WRAPPER: cachepot
     steps:
+    # checkout first to support hashFiles check
     - uses: actions/checkout@v2
     - name: cache cachepot
       uses: actions/cache@v3
       with: 
         path: |
-          ~/.cache/cachepot
+          ${{ matrix.cachepot-path }}
         key: ${{ runner.os }}-cachepot-${{ hashFiles('./fuzzers/**/Cargo.toml') }}
+
     - name: cache fuzzer stuff
       uses: actions/cache@v3
       with: 
@@ -114,25 +125,43 @@ jobs:
           ./fuzzers/**.tar.xz
           ./fuzzers/**.tar.gz
         key: ${{ runner.os }}-${{ hashFiles('./fuzzers/**') }}
+
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
+
     - uses: Swatinem/rust-cache@v1
+
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
+
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
+      uses: lyricwulf/abc@v1
+      with: 
+        linux: llvm llvm-dev clang nasm ninja-build
+        macos: llvm libpng nasm coreutils z3
+
+    - if: matrix.os == 'macos-latest'
+      name: Increase map sizes
+      run: ./scripts/shmem_limits_macos.sh
+      
     - name: install Cachepot
       run: RUSTC_WRAPPER="" cargo install --git https://github.com/paritytech/cachepot
+
     - name: install cargo-make and cargo-sweep
       run: cargo install --force cargo-make cargo-sweep
+
     - name: restore git commit timestamps
       uses: chetan/git-restore-mtime-action@v1
+
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh 
+
     - name: print cache stats
       run: cachepot --show-stats
+
+
   nostd-build:
     runs-on: ubuntu-latest
     steps:
@@ -204,41 +233,6 @@ jobs:
       run: ./scripts/shmem_limits_macos.sh
     - name: Run Tests
       run: cargo test
-  macos-fuzzers:
-    runs-on: macOS-latest
-    env:
-      RUSTC_WRAPPER: cachepot
-    steps:
-    # - uses: actions/cache@v3
-    #   with:
-    #     path: |
-    #       ./fuzzers/**/libpng-1.6.37
-    #       ./fuzzers/**.tar.xz
-    #       ./fuzzers/**.tar.gz
-    #       ~/Library/Caches/Parity.cachepot
-    #     key: ${{ runner.os }} # cache everything
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: Swatinem/rust-cache@v1
-    - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-    - name: Install deps
-      run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
-    - name: install Cachepot
-      run: RUSTC_WRAPPER="" cargo install --git https://github.com/paritytech/cachepot
-    - name: install cargo-make
-      run: cargo install --force cargo-make cargo-sweep
-    - uses: actions/checkout@v2
-    - name: Increase map sizes
-      run: ./scripts/shmem_limits_macos.sh
-    - name: restore git commit timestamps
-      uses: chetan/git-restore-mtime-action@v1
-    - name: Build and run example fuzzers
-      run: ./scripts/test_all_fuzzers.sh --no-clean
-    - name: print cache stats
-      run: cachepot --show-stats
   other_targets:
     runs-on: macOS-latest
     steps:
