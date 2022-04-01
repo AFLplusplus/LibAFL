@@ -93,11 +93,12 @@ jobs:
     - name: Install smoke test deps
       run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
-      run: ./libafl_concolic/test/smoke_test.sh 
+      run: ./libafl_concolic/test/smoke_test.sh
+
   fuzzers:
     strategy:
       matrix:
-          os: [ubuntu-latest, macOS-latest]
+        os: [ubuntu-latest, macOS-latest]
 
         include: # different cachepot path for different OS
           - os: ubuntu-latest
