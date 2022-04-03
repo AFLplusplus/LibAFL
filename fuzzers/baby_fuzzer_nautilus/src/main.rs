@@ -141,7 +141,7 @@ pub fn main() {
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_iterations(
+    let mutator = StdScheduledMutator::with_max_stack_pow(
         tuple_list!(
             NautilusRandomMutator::new(&context),
             NautilusRandomMutator::new(&context),

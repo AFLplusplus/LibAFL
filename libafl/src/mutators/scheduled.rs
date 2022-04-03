@@ -109,7 +109,7 @@ where
     S: HasRand,
 {
     mutations: MT,
-    max_iterations: u64,
+    max_stack_pow: u64,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -173,7 +173,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(self.max_iterations))
+        1 << (1 + state.rand_mut().below(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
@@ -193,16 +193,16 @@ where
     pub fn new(mutations: MT) -> Self {
         StdScheduledMutator {
             mutations,
-            max_iterations: 6,
+            max_stack_pow: 7,
             phantom: PhantomData,
         }
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    pub fn with_max_iterations(mutations: MT, max_iterations: u64) -> Self {
+    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: u64) -> Self {
         StdScheduledMutator {
             mutations,
-            max_iterations,
+            max_stack_pow,
             phantom: PhantomData,
         }
     }

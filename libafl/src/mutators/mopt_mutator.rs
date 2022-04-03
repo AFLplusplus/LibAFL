@@ -369,6 +369,7 @@ where
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
+    max_stack_pow: u64,
     phantom: PhantomData<(I, S)>,
 }
 
@@ -531,7 +532,12 @@ where
     S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     /// Create a new [`StdMOptMutator`].
-    pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
+    pub fn new(
+        state: &mut S,
+        mutations: MT,
+        max_stack_pow: u64,
+        swarm_num: usize,
+    ) -> Result<Self, Error> {
         if !state.has_metadata::<MOpt>() {
             state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
         }
@@ -539,6 +545,7 @@ where
             mode: MOptMode::Pilotfuzzing,
             finds_before: 0,
             mutations,
+            max_stack_pow,
             phantom: PhantomData,
         })
     }
@@ -637,7 +644,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(6))
+        1 << (1 + state.rand_mut().below(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
