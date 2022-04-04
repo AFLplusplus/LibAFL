@@ -91,7 +91,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
             (|state: Option<StdState<_, _, _, _, _>>,
               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _core_id| {
-                let gum = unsafe { Gum::obtain() };
+                let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
                 #[cfg(unix)]
@@ -105,13 +105,11 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(unsafe {
-                    StdMapObserver::new_from_ptr(
-                        "edges",
-                        frida_helper.map_ptr_mut().unwrap(),
-                        MAP_SIZE,
-                    )
-                });
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                    "edges",
+                    frida_helper.map_ptr_mut().unwrap(),
+                    MAP_SIZE,
+                ));
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -183,7 +181,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
                 );
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
@@ -221,7 +219,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
             (|state: Option<StdState<_, _, _, _, _>>,
               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _core_id| {
-                let gum = unsafe { Gum::obtain() };
+                let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
                 let cmplog = CmpLogRuntime::new();
@@ -230,13 +228,11 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage, cmplog));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(unsafe {
-                    StdMapObserver::new_from_ptr(
-                        "edges",
-                        frida_helper.map_ptr_mut().unwrap(),
-                        MAP_SIZE,
-                    )
-                });
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                    "edges",
+                    frida_helper.map_ptr_mut().unwrap(),
+                    MAP_SIZE,
+                ));
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -301,7 +297,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
                 );
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
@@ -330,8 +326,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 }
 
                 // Create an observation channel using cmplog map
-                let cmplog_observer =
-                    CmpLogObserver::new("cmplog", unsafe { &mut CMPLOG_MAP }, true);
+                let cmplog_observer = CmpLogObserver::new("cmplog", &mut CMPLOG_MAP, true);
 
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 
@@ -356,7 +351,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
             (|state: Option<StdState<_, _, _, _, _>>,
               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
               _core_id| {
-                let gum = unsafe { Gum::obtain() };
+                let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
 
@@ -364,13 +359,11 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
 
                 // Create an observation channel using the coverage map
-                let edges_observer = HitcountsMapObserver::new(unsafe {
-                    StdMapObserver::new_from_ptr(
-                        "edges",
-                        frida_helper.map_ptr_mut().unwrap(),
-                        MAP_SIZE,
-                    )
-                });
+                let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
+                    "edges",
+                    frida_helper.map_ptr_mut().unwrap(),
+                    MAP_SIZE,
+                ));
 
                 // Create an observation channel to keep track of the execution time
                 let time_observer = TimeObserver::new("time");
@@ -435,7 +428,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let observers = tuple_list!(
                     edges_observer,
                     time_observer,
-                    AsanErrorsObserver::new(unsafe { &ASAN_ERRORS })
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
                 );
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
