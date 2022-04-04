@@ -87,10 +87,8 @@ where
             let mut v = 0.0;
             let cur_index = state.corpus().current().unwrap();
             for idx in 0..corpus.count() {
-                let n_fuzz_entry = if cur_index != idx {
-                    corpus
-                        .get(idx)?
-                        .borrow()
+                let n_fuzz_entry = if cur_index == idx {
+                    entry
                         .metadata()
                         .get::<PowerScheduleTestcaseMetaData>()
                         .ok_or_else(|| {
@@ -98,7 +96,9 @@ where
                         })?
                         .n_fuzz_entry()
                 } else {
-                    entry
+                    corpus
+                        .get(idx)?
+                        .borrow()
                         .metadata()
                         .get::<PowerScheduleTestcaseMetaData>()
                         .ok_or_else(|| {
