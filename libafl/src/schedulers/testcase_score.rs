@@ -73,7 +73,8 @@ where
     #[allow(
         clippy::cast_precision_loss,
         clippy::too_many_lines,
-        clippy::cast_sign_loss
+        clippy::cast_sign_loss,
+        clippy::cast_lossless
     )]
     fn compute(entry: &mut Testcase<I>, state: &S) -> Result<f64, Error> {
         let psmeta = state
@@ -195,7 +196,7 @@ where
                 }
             }
             PowerSchedule::FAST => {
-                if tcmeta.fuzz_level() != 0 {
+                if entry.fuzz_level() != 0 {
                     let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
 
                     match lg {
@@ -234,11 +235,11 @@ where
                 }
             }
             PowerSchedule::LIN => {
-                factor = (tcmeta.fuzz_level() as f64)
+                factor = (entry.fuzz_level() as f64)
                     / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
             }
             PowerSchedule::QUAD => {
-                factor = ((tcmeta.fuzz_level() * tcmeta.fuzz_level()) as f64)
+                factor = ((entry.fuzz_level() * entry.fuzz_level()) as f64)
                     / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
             }
         }
@@ -297,7 +298,7 @@ where
 
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
-        if tcmeta.fuzz_level() == 0 || psmeta.cycles() == 0 {
+        if entry.fuzz_level() == 0 || psmeta.cycles() == 0 {
             return Ok(weight);
         }
 
@@ -344,7 +345,7 @@ where
         }
 
         // was it fuzzed before?
-        if tcmeta.fuzz_level() == 0 {
+        if entry.fuzz_level() == 0 {
             weight *= 2.0;
         }
 
