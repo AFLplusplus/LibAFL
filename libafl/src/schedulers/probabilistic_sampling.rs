@@ -111,13 +111,16 @@ where
             let meta = state.metadata().get::<ProbabilityMetadata>().unwrap();
             let threshold = meta.total_probability * rand_prob;
             let mut k: f64 = 0.0;
+            let mut ret = *meta.map.keys().last().unwrap();
             for (idx, prob) in meta.map.iter() {
                 k += prob;
                 if k >= threshold {
-                    return Ok(*idx);
+                    ret = *idx;
+                    break;
                 }
             }
-            Ok(*meta.map.keys().last().unwrap())
+            *state.corpus_mut().current_mut() = Some(ret);
+            Ok(ret)
         }
     }
 }

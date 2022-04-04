@@ -85,16 +85,27 @@ where
             let corpus = state.corpus();
             let mut n_paths = 0;
             let mut v = 0.0;
+            let cur_index = state.corpus().current().unwrap();
             for idx in 0..corpus.count() {
-                let n_fuzz_entry = corpus
-                    .get(idx)?
-                    .borrow()
-                    .metadata()
-                    .get::<PowerScheduleTestcaseMetaData>()
-                    .ok_or_else(|| {
-                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
-                    })?
-                    .n_fuzz_entry();
+                let n_fuzz_entry = if cur_index != idx {
+                    corpus
+                        .get(idx)?
+                        .borrow()
+                        .metadata()
+                        .get::<PowerScheduleTestcaseMetaData>()
+                        .ok_or_else(|| {
+                            Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                        })?
+                        .n_fuzz_entry()
+                } else {
+                    entry
+                        .metadata()
+                        .get::<PowerScheduleTestcaseMetaData>()
+                        .ok_or_else(|| {
+                            Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                        })?
+                        .n_fuzz_entry()
+                };
                 v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
                 n_paths += 1;
             }
