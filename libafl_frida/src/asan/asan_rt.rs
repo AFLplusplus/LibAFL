@@ -67,7 +67,6 @@ extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
 
-/// Get the current thread's TLS address
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }

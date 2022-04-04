@@ -63,7 +63,7 @@
 //! }
 //!```
 
-use clap::{App, AppSettings, IntoApp, Parser};
+use clap::{Command, CommandFactory, Parser};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "frida_cli")]
 use std::error;
@@ -105,9 +105,9 @@ fn parse_instrumentation_location(
 /// Top-level container for cli options/arguments/subcommands
 #[derive(Parser, Clone, Debug, Serialize, Deserialize)]
 #[clap(
-    setting(AppSettings::ArgRequiredElseHelp),
-    setting(AppSettings::SubcommandPrecedenceOverArg),
-    setting(AppSettings::ArgsNegateSubcommands)
+    arg_required_else_help(true),
+    subcommand_precedence_over_arg(true),
+    args_conflicts_with_subcommands(true)
 )]
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
@@ -347,9 +347,9 @@ impl FuzzerOptions {
     /// }
     /// ```
     #[must_use]
-    pub fn with_subcommand(mode: App) -> App {
-        let app: App = Self::into_app();
-        app.subcommand(mode)
+    pub fn with_subcommand(mode: Command) -> Command {
+        let command: Command = Self::command();
+        command.subcommand(mode)
     }
 }
 
