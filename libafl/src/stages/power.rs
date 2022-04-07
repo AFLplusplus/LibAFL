@@ -71,9 +71,10 @@ where
             .metadata_mut()
             .get_mut::<PowerScheduleMetadata>()
             .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
-            .strat() == PowerSchedule::RAND;
+            .strat()
+            == PowerSchedule::RAND;
         if use_random {
-            return Ok(1 + state.rand_mut().below(128) as usize)
+            return Ok(1 + state.rand_mut().below(128) as usize);
         }
 
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
