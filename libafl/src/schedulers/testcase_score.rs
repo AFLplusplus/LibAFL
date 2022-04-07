@@ -192,7 +192,7 @@ where
         // COE and Fast schedule are fairly different from what are described in the original thesis,
         // This implementation follows the changes made in this pull request https://github.com/AFLplusplus/AFLplusplus/pull/568
         match psmeta.strat() {
-            PowerSchedule::EXPLORE => {
+            PowerSchedule::EXPLORE | PowerSchedule::RAND => {
                 // Nothing happens in EXPLORE
             }
             PowerSchedule::EXPLOIT => {

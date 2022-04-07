@@ -132,6 +132,7 @@ impl PowerScheduleMetadata {
 #[allow(missing_docs)]
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum PowerSchedule {
+    RAND,
     EXPLORE,
     EXPLOIT,
     FAST,
