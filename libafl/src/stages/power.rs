@@ -4,6 +4,7 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
+    bolts::rands::Rand,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
@@ -16,7 +17,7 @@ use crate::{
         TestcaseScore,
     },
     stages::{MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
     Error,
 };
 /// The mutational stage using power schedules
@@ -47,7 +48,7 @@ where
     M: Mutator<I, S>,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -66,6 +67,15 @@ where
     #[allow(clippy::cast_sign_loss)]
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
         // Update handicap
+        let use_random = state
+            .metadata_mut()
+            .get_mut::<PowerScheduleMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
+            .strat() == PowerSchedule::RAND;
+        if use_random {
+            return Ok(1 + state.rand_mut().below(128) as usize)
+        }
+
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let score = F::compute(&mut *testcase, state)? as usize;
         let tcmeta = testcase
@@ -151,7 +161,7 @@ where
     M: Mutator<I, S>,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
