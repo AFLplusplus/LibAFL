@@ -110,35 +110,36 @@ impl CmpMap for CmpLogMap {
         }
     }
 
-    fn values_of(&self, idx: usize, execution: usize) -> CmpValues {
+    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
         if self.headers[idx].kind == CMPLOG_KIND_INS {
             unsafe {
                 match self.headers[idx].shape {
-                    1 => CmpValues::U8((
+                    1 => Some(CmpValues::U8((
                         self.vals.operands[idx][execution].0 as u8,
                         self.vals.operands[idx][execution].1 as u8,
-                    )),
-                    2 => CmpValues::U16((
+                    ))),
+                    2 => Some(CmpValues::U16((
                         self.vals.operands[idx][execution].0 as u16,
                         self.vals.operands[idx][execution].1 as u16,
-                    )),
-                    4 => CmpValues::U32((
+                    ))),
+                    4 => Some(CmpValues::U32((
                         self.vals.operands[idx][execution].0 as u32,
                         self.vals.operands[idx][execution].1 as u32,
-                    )),
-                    8 => CmpValues::U64((
+                    ))),
+                    8 => Some(CmpValues::U64((
                         self.vals.operands[idx][execution].0,
                         self.vals.operands[idx][execution].1,
-                    )),
-                    other => panic!("Invalid CmpLog shape {}", other),
+                    ))),
+                    // other => panic!("Invalid CmpLog shape {}", other),
+                    _ => None,
                 }
             }
         } else {
             unsafe {
-                CmpValues::Bytes((
+                Some(CmpValues::Bytes((
                     self.vals.routines[idx][execution].0.to_vec(),
                     self.vals.routines[idx][execution].1.to_vec(),
-                ))
+                )))
             }
         }
     }
