@@ -16,7 +16,7 @@ use crate::{
         Scheduler,
     },
     state::{HasCorpus, HasMetadata, HasRand},
-    Error, mutators::ScheduledMutator,
+    Error,
 };
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
@@ -243,7 +243,7 @@ where
             .borrow_mut()
             .add_metadata(SchedulerTestcaseMetaData::new(depth));
 
-        // Recrate the alias table
+        // Recreate the alias table
         self.create_alias_table(state)?;
         Ok(())
     }
