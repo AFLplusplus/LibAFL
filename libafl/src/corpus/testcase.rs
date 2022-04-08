@@ -276,7 +276,7 @@ where
 
 /// The Metadata for each testcase used in power schedules.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PowerScheduleTestcaseMetaData {
+pub struct SchedulerTestcaseMetaData {
     /// Number of bits set in bitmap, updated in calibrate_case
     bitmap_size: u64,
     /// Number of queue cycles behind
@@ -287,7 +287,7 @@ pub struct PowerScheduleTestcaseMetaData {
     n_fuzz_entry: usize,
 }
 
-impl PowerScheduleTestcaseMetaData {
+impl SchedulerTestcaseMetaData {
     /// Create new [`struct@PowerScheduleTestcaseMetaData`]
     #[must_use]
     pub fn new(depth: u64) -> Self {
@@ -344,4 +344,4 @@ impl PowerScheduleTestcaseMetaData {
     }
 }
 
-crate::impl_serdeany!(PowerScheduleTestcaseMetaData);
+crate::impl_serdeany!(SchedulerTestcaseMetaData);

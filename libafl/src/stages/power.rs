@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, PowerScheduleTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -70,7 +70,7 @@ where
         let score = F::compute(&mut *testcase, state)? as usize;
         let tcmeta = testcase
             .metadata_mut()
-            .get_mut::<PowerScheduleTestcaseMetaData>()
+            .get_mut::<SchedulerTestcaseMetaData>()
             .ok_or_else(|| {
                 Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
             })?;
@@ -128,9 +128,9 @@ where
                     .get(idx)?
                     .borrow_mut()
                     .metadata_mut()
-                    .get_mut::<PowerScheduleTestcaseMetaData>()
+                    .get_mut::<SchedulerTestcaseMetaData>()
                     .ok_or_else(|| {
-                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                        Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
                     })?
                     .set_n_fuzz_entry(hash);
             }

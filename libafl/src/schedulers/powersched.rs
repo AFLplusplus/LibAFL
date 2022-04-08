@@ -6,7 +6,7 @@ use alloc::{
 };
 
 use crate::{
-    corpus::{Corpus, PowerScheduleTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData},
     inputs::Input,
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata},
@@ -165,19 +165,19 @@ where
                 .get(parent_idx)?
                 .borrow_mut()
                 .metadata_mut()
-                .get_mut::<PowerScheduleTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
+                .get_mut::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string()))?
                 .depth(),
             None => 0,
         };
 
-        // Attach a `PowerScheduleTestData` to the queue entry.
+        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
         state
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(PowerScheduleTestcaseMetaData::new(depth));
+            .add_metadata(SchedulerTestcaseMetaData::new(depth));
         Ok(())
     }
 

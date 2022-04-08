@@ -3,7 +3,7 @@
 use crate::{
     bolts::current_time,
     bolts::tuples::MatchName,
-    corpus::{Corpus, PowerScheduleTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::MapFeedbackState,
@@ -160,13 +160,13 @@ where
             }
         };
 
-        // If power schedule is used, update it
+        // If weighted scheduler or powerscheduler is used, update it
         let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
             && state
                 .corpus()
                 .get(corpus_idx)?
                 .borrow()
-                .has_metadata::<PowerScheduleTestcaseMetaData>();
+                .has_metadata::<SchedulerTestcaseMetaData>();
 
         if use_powerschedule {
             let map = executor
@@ -196,8 +196,8 @@ where
 
             let data = testcase
                 .metadata_mut()
-                .get_mut::<PowerScheduleTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+                .get_mut::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string()))?;
 
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);

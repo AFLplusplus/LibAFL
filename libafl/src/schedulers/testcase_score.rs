@@ -1,7 +1,7 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
 use crate::{
     bolts::{HasLen, HasRefCnt},
-    corpus::{Corpus, PowerScheduleTestcaseMetaData, Testcase},
+    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
     schedulers::{
@@ -92,9 +92,9 @@ where
                     let n_fuzz_entry = if cur_index == idx {
                         entry
                             .metadata()
-                            .get::<PowerScheduleTestcaseMetaData>()
+                            .get::<SchedulerTestcaseMetaData>()
                             .ok_or_else(|| {
-                                Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                                Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
                             })?
                             .n_fuzz_entry()
                     } else {
@@ -102,9 +102,9 @@ where
                             .get(idx)?
                             .borrow()
                             .metadata()
-                            .get::<PowerScheduleTestcaseMetaData>()
+                            .get::<SchedulerTestcaseMetaData>()
                             .ok_or_else(|| {
-                                Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                                Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
                             })?
                             .n_fuzz_entry()
                     };
@@ -137,7 +137,7 @@ where
         let favored = entry.has_metadata::<IsFavoredMetadata>();
         let tcmeta = entry
             .metadata()
-            .get::<PowerScheduleTestcaseMetaData>()
+            .get::<SchedulerTestcaseMetaData>()
             .ok_or_else(|| {
                 Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
             })?;
@@ -314,8 +314,8 @@ where
 
         let tcmeta = entry
             .metadata()
-            .get::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+            .get::<SchedulerTestcaseMetaData>()
+            .ok_or_else(|| Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string()))?;
 
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
