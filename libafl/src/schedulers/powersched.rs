@@ -23,7 +23,7 @@ crate::impl_serdeany!(SchedulerMetadata);
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SchedulerMetadata {
     /// Powerschedule strategy
-    strat: PowerSchedule,
+    strat: Option<PowerSchedule>,
     /// Measured exec time during calibration
     exec_time: Duration,
     /// Calibration cycles
@@ -42,7 +42,7 @@ pub struct SchedulerMetadata {
 impl SchedulerMetadata {
     /// Creates a new [`struct@SchedulerMetadata`]
     #[must_use]
-    pub fn new(strat: PowerSchedule) -> Self {
+    pub fn new(strat: Option<PowerSchedule>) -> Self {
         Self {
             strat,
             exec_time: Duration::from_millis(0),
@@ -56,7 +56,7 @@ impl SchedulerMetadata {
 
     /// The powerschedule strategy
     #[must_use]
-    pub fn strat(&self) -> PowerSchedule {
+    pub fn strat(&self) -> Option<PowerSchedule> {
         self.strat
     }
 
@@ -132,7 +132,6 @@ impl SchedulerMetadata {
 #[allow(missing_docs)]
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub enum PowerSchedule {
-    RAND,
     EXPLORE,
     EXPLOIT,
     FAST,
@@ -155,7 +154,7 @@ where
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(self.strat));
+            state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(self.strat)));
         }
 
         let current_idx = *state.corpus().current();

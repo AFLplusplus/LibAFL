@@ -16,7 +16,7 @@ use crate::{
         Scheduler,
     },
     state::{HasCorpus, HasMetadata, HasRand},
-    Error,
+    Error, mutators::ScheduledMutator,
 };
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
@@ -213,6 +213,10 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+        if !state.has_metadata::<SchedulerMetadata>() {
+            state.add_metadata(SchedulerMetadata::new(None));
+        }
+
         if !state.has_metadata::<WeightedScheduleMetadata>() {
             state.add_metadata(WeightedScheduleMetadata::new());
         }

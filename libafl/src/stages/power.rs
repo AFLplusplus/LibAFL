@@ -4,7 +4,6 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    bolts::rands::Rand,
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
@@ -12,7 +11,7 @@ use crate::{
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     schedulers::{
-        powersched::{PowerSchedule, SchedulerMetadata},
+        powersched::SchedulerMetadata,
         testcase_score::CorpusPowerTestcaseScore,
         TestcaseScore,
     },
@@ -67,16 +66,6 @@ where
     #[allow(clippy::cast_sign_loss)]
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
         // Update handicap
-        let use_random = state
-            .metadata_mut()
-            .get_mut::<SchedulerMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("SchedulerMetadata not found".to_string()))?
-            .strat()
-            == PowerSchedule::RAND;
-        if use_random {
-            return Ok(1 + state.rand_mut().below(128) as usize);
-        }
-
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let score = F::compute(&mut *testcase, state)? as usize;
         let tcmeta = testcase
