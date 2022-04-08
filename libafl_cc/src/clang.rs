@@ -115,6 +115,7 @@ impl CompilerWrapper for ClangWrapper {
         // new_args.push("-fsanitize-coverage=trace-pc-guard".into());
 
         let mut linking = true;
+        let mut shared = false;
         // Detect stray -v calls from ./configure scripts.
         if args.len() > 1 && args[1].as_ref() == "-v" {
             linking = false;
@@ -147,13 +148,16 @@ impl CompilerWrapper for ClangWrapper {
                 "-m32" => self.bit_mode = 32,
                 "-m64" => self.bit_mode = 64,
                 "-c" | "-S" | "-E" => linking = false,
-                "-shared" => linking = false, // TODO dynamic list?
+                "-shared" => {
+                    linking = false;
+                    shared = true;
+                } // TODO dynamic list?
                 "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => continue,
                 _ => (),
             };
             new_args.push(arg.as_ref().to_string());
         }
-        if linking && suppress_linking > 0 && suppress_linking < 1337 {
+        if (linking || shared) && suppress_linking >= 0 && suppress_linking < 1337 {
             linking = false;
             new_args.push(
                 PathBuf::from(env!("OUT_DIR"))
