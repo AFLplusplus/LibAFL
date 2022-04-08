@@ -17,11 +17,11 @@ use serde::{Deserialize, Serialize};
 /// The n fuzz size
 pub const N_FUZZ_SIZE: usize = 1 << 21;
 
-crate::impl_serdeany!(PowerScheduleMetadata);
+crate::impl_serdeany!(SchedulerMetadata);
 
 /// The metadata used for power schedules
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PowerScheduleMetadata {
+pub struct SchedulerMetadata {
     /// Powerschedule strategy
     strat: PowerSchedule,
     /// Measured exec time during calibration
@@ -39,8 +39,8 @@ pub struct PowerScheduleMetadata {
 }
 
 /// The metadata for runs in the calibration stage.
-impl PowerScheduleMetadata {
-    /// Creates a new [`struct@PowerScheduleMetadata`]
+impl SchedulerMetadata {
+    /// Creates a new [`struct@SchedulerMetadata`]
     #[must_use]
     pub fn new(strat: PowerSchedule) -> Self {
         Self {
@@ -143,12 +143,8 @@ pub enum PowerSchedule {
 
 /// A corpus scheduler using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler;
-
-impl Default for PowerQueueScheduler {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct PowerQueueScheduler {
+    strat: PowerSchedule,
 }
 
 impl<I, S> Scheduler<I, S> for PowerQueueScheduler
@@ -158,6 +154,10 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+        if !state.has_metadata::<SchedulerMetadata>() {
+            state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(self.strat));
+        }
+
         let current_idx = *state.corpus().current();
 
         let mut depth = match current_idx {
@@ -191,9 +191,9 @@ where
                     if *cur + 1 >= state.corpus().count() {
                         let psmeta = state
                             .metadata_mut()
-                            .get_mut::<PowerScheduleMetadata>()
+                            .get_mut::<SchedulerMetadata>()
                             .ok_or_else(|| {
-                                Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
+                                Error::KeyNotFound("SchedulerMetadata not found".to_string())
                             })?;
                         psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
                         0
@@ -212,7 +212,7 @@ where
 impl PowerQueueScheduler {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
-    pub fn new() -> Self {
-        Self
+    pub fn new(strat: PowerSchedule) -> Self {
+        PowerQueueScheduler { strat }
     }
 }

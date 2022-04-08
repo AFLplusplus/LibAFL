@@ -12,7 +12,7 @@ use crate::{
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     schedulers::{
-        powersched::{PowerSchedule, PowerScheduleMetadata},
+        powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::CorpusPowerTestcaseScore,
         TestcaseScore,
     },
@@ -69,8 +69,8 @@ where
         // Update handicap
         let use_random = state
             .metadata_mut()
-            .get_mut::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
+            .get_mut::<SchedulerMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("SchedulerMetadata not found".to_string()))?
             .strat()
             == PowerSchedule::RAND;
         if use_random {
@@ -126,8 +126,8 @@ where
 
             let psmeta = state
                 .metadata_mut()
-                .get_mut::<PowerScheduleMetadata>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+                .get_mut::<SchedulerMetadata>()
+                .ok_or_else(|| Error::KeyNotFound("SchedulerMetadata not found".to_string()))?;
 
             hash %= psmeta.n_fuzz().len();
             // Update the path frequency
@@ -192,10 +192,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn new(state: &mut S, mutator: M, map_observer_name: &O, strat: PowerSchedule) -> Self {
-        if !state.has_metadata::<PowerScheduleMetadata>() {
-            state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new(strat));
-        }
+    pub fn new(mutator: M, map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator,

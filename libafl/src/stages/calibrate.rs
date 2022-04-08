@@ -10,7 +10,7 @@ use crate::{
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    schedulers::powersched::PowerScheduleMetadata,
+    schedulers::powersched::SchedulerMetadata,
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata},
     Error,
@@ -161,7 +161,7 @@ where
         };
 
         // If power schedule is used, update it
-        let use_powerschedule = state.has_metadata::<PowerScheduleMetadata>()
+        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
             && state
                 .corpus()
                 .get(corpus_idx)?
@@ -178,7 +178,7 @@ where
 
             let psmeta = state
                 .metadata_mut()
-                .get_mut::<PowerScheduleMetadata>()
+                .get_mut::<SchedulerMetadata>()
                 .unwrap();
             let handicap = psmeta.queue_cycles();
 

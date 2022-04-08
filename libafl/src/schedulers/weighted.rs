@@ -11,7 +11,7 @@ use crate::{
     corpus::{Corpus, PowerScheduleTestcaseMetaData},
     inputs::Input,
     schedulers::{
-        powersched::PowerScheduleMetadata,
+        powersched::SchedulerMetadata,
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
@@ -279,9 +279,9 @@ where
             if current_cycles > corpus_counts {
                 let psmeta = state
                     .metadata_mut()
-                    .get_mut::<PowerScheduleMetadata>()
+                    .get_mut::<SchedulerMetadata>()
                     .ok_or_else(|| {
-                        Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
+                        Error::KeyNotFound("SchedulerMetadata not found".to_string())
                     })?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }

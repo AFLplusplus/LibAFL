@@ -6,7 +6,7 @@ use crate::{
     inputs::Input,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
-        powersched::{PowerSchedule, PowerScheduleMetadata},
+        powersched::{PowerSchedule, SchedulerMetadata},
     },
     state::{HasCorpus, HasMetadata},
     Error,
@@ -79,8 +79,8 @@ where
     fn compute(entry: &mut Testcase<I>, state: &S) -> Result<f64, Error> {
         let psmeta = state
             .metadata()
-            .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+            .get::<SchedulerMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("SchedulerMetadata not found".to_string()))?;
 
         let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
             let corpus = state.corpus();
@@ -299,8 +299,8 @@ where
         let mut weight = 1.0;
         let psmeta = state
             .metadata()
-            .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+            .get::<SchedulerMetadata>()
+            .ok_or_else(|| Error::KeyNotFound("SchedulerMetadata not found".to_string()))?;
 
         let tcmeta = entry
             .metadata()
