@@ -124,7 +124,7 @@ impl CompilerWrapper for ClangWrapper {
         }
 
         let mut suppress_linking = 0;
-        let mut i = 0;
+        let mut i = 1;
         while i < args.len() {
             match args[i].as_ref() {
                 "--libafl-no-link" => {
