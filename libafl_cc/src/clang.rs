@@ -155,7 +155,7 @@ impl CompilerWrapper for ClangWrapper {
                     continue;
                 }
                 "-z" => {
-                    if i + 1 < args.len() && args[i + 1] == "defs" {
+                    if i + 1 < args.len() && args[i + 1].as_ref() == "defs" {
                         i += 2;
                         continue;
                     }
