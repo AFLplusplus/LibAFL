@@ -166,7 +166,9 @@ where
                 .borrow_mut()
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string()))?
+                .ok_or_else(|| {
+                    Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                })?
                 .depth(),
             None => 0,
         };
@@ -203,6 +205,25 @@ where
                 None => 0,
             };
             *state.corpus_mut().current_mut() = Some(id);
+
+            // Update the handicap
+            let mut testcase = state
+                .corpus()
+                .get(id)?
+                .borrow_mut();
+            let tcmeta = testcase
+                .metadata_mut()
+                .get_mut::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| {
+                    Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
+                })?;
+
+            if tcmeta.handicap() >= 4 {
+                tcmeta.set_handicap(tcmeta.handicap() - 4);
+            } else if tcmeta.handicap() > 0 {
+                tcmeta.set_handicap(tcmeta.handicap() - 1);
+            }
+
             Ok(id)
         }
     }

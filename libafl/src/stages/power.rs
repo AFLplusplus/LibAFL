@@ -68,17 +68,6 @@ where
         // Update handicap
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let score = F::compute(&mut *testcase, state)? as usize;
-        let tcmeta = testcase
-            .metadata_mut()
-            .get_mut::<SchedulerTestcaseMetaData>()
-            .ok_or_else(|| {
-                Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
-            })?;
-        if tcmeta.handicap() >= 4 {
-            tcmeta.set_handicap(tcmeta.handicap() - 4);
-        } else if tcmeta.handicap() > 0 {
-            tcmeta.set_handicap(tcmeta.handicap() - 1);
-        }
 
         Ok(score)
     }
