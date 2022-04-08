@@ -31,6 +31,8 @@ where
     cached_len: Option<usize>,
     /// Number of executions done at discovery time
     executions: usize,
+    /// Number of fuzzing iterations of this particular input updated in perform_mutational
+    fuzz_level: usize,
     /// If it has been fuzzed
     fuzzed: bool,
 }
@@ -154,6 +156,18 @@ where
         &mut self.executions
     }
 
+    /// Get the `fuzz_level`
+    #[inline]
+    pub fn fuzz_level(&self) -> usize {
+        self.fuzz_level
+    }
+
+    /// Set the `fuzz_level`
+    #[inline]
+    pub fn set_fuzz_leve(&mut self, fuzz_level: usize) {
+        self.fuzz_level = fuzz_level;
+    }
+
     /// Get if it was fuzzed
     #[inline]
     pub fn fuzzed(&self) -> bool {
@@ -216,6 +230,7 @@ where
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
+            fuzz_level: 0,
             executions: 0,
             fuzzed: false,
         }
@@ -264,8 +279,6 @@ where
 pub struct PowerScheduleTestcaseMetaData {
     /// Number of bits set in bitmap, updated in calibrate_case
     bitmap_size: u64,
-    /// Number of fuzzing iterations, updated in perform_mutational
-    fuzz_level: u64,
     /// Number of queue cycles behind
     handicap: u64,
     /// Path depth, initialized in on_add
@@ -280,7 +293,6 @@ impl PowerScheduleTestcaseMetaData {
     pub fn new(depth: u64) -> Self {
         Self {
             bitmap_size: 0,
-            fuzz_level: 0,
             handicap: 0,
             depth,
             n_fuzz_entry: 0,
@@ -296,17 +308,6 @@ impl PowerScheduleTestcaseMetaData {
     /// Set the bitmap size
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
-    }
-
-    /// Get the fuzz level
-    #[must_use]
-    pub fn fuzz_level(&self) -> u64 {
-        self.fuzz_level
-    }
-
-    /// Set the fuzz level
-    pub fn set_fuzz_level(&mut self, val: u64) {
-        self.fuzz_level = val;
     }
 
     /// Get the handicap

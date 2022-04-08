@@ -306,10 +306,15 @@ fn fuzz(
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
+    let mutator = StdMOptMutator::new(
+        &mut state,
+        havoc_mutations().merge(tokens_mutations()),
+        7,
+        5,
+    )?;
 
     let power =
-        StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
+        StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::RAND);
 
     // A minimization+queue policy to get testcasess from the corpus
     let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::new());

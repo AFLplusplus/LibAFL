@@ -131,7 +131,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let calibration = CalibrationStage::new(&edges_observer);
     let power =
-        StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
+        StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::COE);
 
     let mut stages = tuple_list!(calibration, power);
 

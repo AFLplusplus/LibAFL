@@ -285,7 +285,7 @@ where
                     })?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
-
+            *state.corpus_mut().current_mut() = Some(idx);
             Ok(idx)
         }
     }

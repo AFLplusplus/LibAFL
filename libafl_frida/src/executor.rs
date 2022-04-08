@@ -83,9 +83,9 @@ where
             self.stalker.deactivate();
         }
         #[cfg(unix)]
-        if unsafe { ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() } {
-            println!("Crashing target as it had ASAN errors");
-            unsafe {
+        unsafe {
+            if ASAN_ERRORS.is_some() && !ASAN_ERRORS.as_ref().unwrap().is_empty() {
+                println!("Crashing target as it had ASAN errors");
                 libc::raise(libc::SIGABRT);
             }
         }
