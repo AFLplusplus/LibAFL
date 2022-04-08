@@ -1234,7 +1234,7 @@ pub mod win32_shmem {
                 let handle = OpenFileMappingA(
                     FILE_MAP_ALL_ACCESS,
                     BOOL(0),
-                    PSTR(core::ptr::addr_of!(map_str_bytes)),
+                    PSTR(map_str_bytes.as_ptr() as *mut _),
                 );
                 if handle == HANDLE(0) {
                     return Err(Error::Unknown(format!(
