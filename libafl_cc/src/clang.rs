@@ -123,27 +123,42 @@ impl CompilerWrapper for ClangWrapper {
         }
 
         let mut suppress_linking = 0;
-        for arg in &args[1..] {
-            match arg.as_ref() {
+        let mut i = 0;
+        while i < args.len() {
+            match args[i].as_ref() {
                 "--libafl-no-link" => {
                     suppress_linking += 1;
                     self.has_libafl_arg = true;
+                    i += 1;
                     continue;
                 }
                 "--libafl" => {
                     suppress_linking += 1337;
                     self.has_libafl_arg = true;
+                    i += 1;
                     continue;
                 }
                 "-fsanitize=fuzzer-no-link" => {
                     suppress_linking += 1;
                     self.has_libafl_arg = true;
+                    i += 1;
                     continue;
                 }
                 "-fsanitize=fuzzer" => {
                     suppress_linking += 1337;
                     self.has_libafl_arg = true;
+                    i += 1;
                     continue;
+                }
+                "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => {
+                    i += 1;
+                    continue;
+                }
+                "-z" => {
+                    if i + 1 < args.len() && args[i + 1] == "defs" {
+                        i += 2;
+                        continue;
+                    }
                 }
                 "-x" => self.x_set = true,
                 "-m32" => self.bit_mode = 32,
@@ -153,10 +168,10 @@ impl CompilerWrapper for ClangWrapper {
                     linking = false;
                     shared = true;
                 } // TODO dynamic list?
-                "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => continue,
                 _ => (),
             };
-            new_args.push(arg.as_ref().to_string());
+            new_args.push(args[i].as_ref().to_string());
+            i += 1;
         }
         if linking && suppress_linking >= 0 && suppress_linking < 1337 {
             linking = false;
