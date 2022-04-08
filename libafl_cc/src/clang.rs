@@ -67,6 +67,7 @@ pub struct ClangWrapper {
     name: String,
     is_cpp: bool,
     linking: bool,
+    shared: bool,
     x_set: bool,
     bit_mode: u32,
     need_libafl_arg: bool,
@@ -157,7 +158,7 @@ impl CompilerWrapper for ClangWrapper {
             };
             new_args.push(arg.as_ref().to_string());
         }
-        if (linking || shared) && suppress_linking >= 0 && suppress_linking < 1337 {
+        if linking && suppress_linking >= 0 && suppress_linking < 1337 {
             linking = false;
             new_args.push(
                 PathBuf::from(env!("OUT_DIR"))
@@ -169,6 +170,7 @@ impl CompilerWrapper for ClangWrapper {
         }
 
         self.linking = linking;
+        self.shared = shared;
 
         if self.optimize {
             new_args.push("-g".into());
@@ -193,7 +195,7 @@ impl CompilerWrapper for ClangWrapper {
         }
         // MacOS has odd linker behavior sometimes
         #[cfg(target_vendor = "apple")]
-        if linking {
+        if linking || shared {
             new_args.push("-undefined".into());
             new_args.push("dynamic_lookup".into());
         }
@@ -325,6 +327,7 @@ impl ClangWrapper {
             name: "".into(),
             is_cpp: false,
             linking: false,
+            shared: false,
             x_set: false,
             bit_mode: 0,
             need_libafl_arg: false,
