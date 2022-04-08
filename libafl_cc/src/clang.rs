@@ -83,6 +83,7 @@ pub struct ClangWrapper {
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
 impl CompilerWrapper for ClangWrapper {
+    #[allow(clippy::too_many_lines)]
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>,
