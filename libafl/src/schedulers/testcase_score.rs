@@ -94,7 +94,9 @@ where
                             .metadata()
                             .get::<SchedulerTestcaseMetaData>()
                             .ok_or_else(|| {
-                                Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                                Error::KeyNotFound(
+                                    "SchedulerTestcaseMetaData not found".to_string(),
+                                )
                             })?
                             .n_fuzz_entry()
                     } else {
@@ -104,7 +106,9 @@ where
                             .metadata()
                             .get::<SchedulerTestcaseMetaData>()
                             .ok_or_else(|| {
-                                Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                                Error::KeyNotFound(
+                                    "SchedulerTestcaseMetaData not found".to_string(),
+                                )
                             })?
                             .n_fuzz_entry()
                     };

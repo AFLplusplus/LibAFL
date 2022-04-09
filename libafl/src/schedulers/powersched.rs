@@ -207,10 +207,7 @@ where
             *state.corpus_mut().current_mut() = Some(id);
 
             // Update the handicap
-            let mut testcase = state
-                .corpus()
-                .get(id)?
-                .borrow_mut();
+            let mut testcase = state.corpus().get(id)?.borrow_mut();
             let tcmeta = testcase
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()

@@ -176,10 +176,7 @@ where
 
             let bitmap_size = map.count_bytes();
 
-            let psmeta = state
-                .metadata_mut()
-                .get_mut::<SchedulerMetadata>()
-                .unwrap();
+            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>().unwrap();
             let handicap = psmeta.queue_cycles();
 
             psmeta.set_exec_time(psmeta.exec_time() + total_time);
@@ -197,7 +194,9 @@ where
             let data = testcase
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string()))?;
+                .ok_or_else(|| {
+                    Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                })?;
 
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);

@@ -230,7 +230,9 @@ where
                 .borrow_mut()
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string()))?
+                .ok_or_else(|| {
+                    Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                })?
                 .depth(),
             None => 0,
         };
@@ -284,9 +286,7 @@ where
                 let psmeta = state
                     .metadata_mut()
                     .get_mut::<SchedulerMetadata>()
-                    .ok_or_else(|| {
-                        Error::KeyNotFound("SchedulerMetadata not found".to_string())
-                    })?;
+                    .ok_or_else(|| Error::KeyNotFound("SchedulerMetadata not found".to_string()))?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
             *state.corpus_mut().current_mut() = Some(idx);
