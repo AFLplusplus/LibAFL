@@ -74,7 +74,7 @@ where
 
         // Run once to get the initial calibration map
         executor
-            .observers()
+            .observers_mut()
             .match_name::<O>(&self.map_observer_name)
             .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
             .reset_map();
@@ -114,7 +114,7 @@ where
                 .clone();
 
             executor
-                .observers()
+                .observers_mut()
                 .match_name::<O>(&self.map_observer_name)
                 .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
                 .reset_map();
