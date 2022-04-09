@@ -75,9 +75,9 @@ where
         // Run once to get the initial calibration map
         executor
             .observers_mut()
-            .match_name::<O>(&self.map_observer_name)
+            .match_name_mut::<O>(&self.map_observer_name)
             .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-            .reset_map();
+            .reset_map()?;
 
         let mut start = current_time();
 
@@ -115,9 +115,9 @@ where
 
             executor
                 .observers_mut()
-                .match_name::<O>(&self.map_observer_name)
+                .match_name_mut::<O>(&self.map_observer_name)
                 .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-                .reset_map();
+                .reset_map()?;
             start = current_time();
 
             if executor.run_target(fuzzer, state, mgr, &input)? != ExitKind::Ok {
