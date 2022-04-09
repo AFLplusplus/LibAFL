@@ -73,7 +73,12 @@ where
             .clone();
 
         // Run once to get the initial calibration map
-        executor.observers_mut().pre_exec_all(state, &input)?;
+        executor
+            .observers()
+            .match_name::<O>(&self.map_observer_name)
+            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+            .reset_map();
+
         let mut start = current_time();
 
         let mut total_time = if executor.run_target(fuzzer, state, mgr, &input)? == ExitKind::Ok {
@@ -108,7 +113,11 @@ where
                 .load_input()?
                 .clone();
 
-            executor.observers_mut().pre_exec_all(state, &input)?;
+            executor
+                .observers()
+                .match_name::<O>(&self.map_observer_name)
+                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+                .reset_map();
             start = current_time();
 
             if executor.run_target(fuzzer, state, mgr, &input)? != ExitKind::Ok {
