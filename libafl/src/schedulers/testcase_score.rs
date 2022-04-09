@@ -323,7 +323,7 @@ where
 
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
-        // This methoud is called in corpus's on_add() method. Fuzz_level is zero at that time. 
+        // This methoud is called in corpus's on_add() method. Fuzz_level is zero at that time.
         if entry.fuzz_level() == 0 || psmeta.cycles() == 0 {
             return Ok(weight);
         }
