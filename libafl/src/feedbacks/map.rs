@@ -4,10 +4,10 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::ops::{BitAnd, BitOr};
 use core::{fmt::Debug, marker::PhantomData};
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};
-use std::ops::{BitAnd, BitOr};
 
 use crate::{
     bolts::{
