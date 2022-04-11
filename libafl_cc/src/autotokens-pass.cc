@@ -35,9 +35,17 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
 
-#include "llvm/IR/LegacyPassManager.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 
+#if LLVM_VERSION_MAJOR >= 11
+  #include "llvm/Passes/PassPlugin.h"
+  #include "llvm/Passes/PassBuilder.h"
+  #include "llvm/IR/PassManager.h"
+#else
+  #include "llvm/IR/LegacyPassManager.h"
+#endif
+
+
+#include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DebugInfo.h"
@@ -141,17 +149,28 @@ bool isIgnoreFunction(const llvm::Function *F) {
 
 }
 
+#if USE_NEW_PM
+class AutoTokensPass : public PassInfoMixin<AutoTokensPass>{
+  public:
+    AutoTokensPass() {
+
+
+#else
 class AutoTokensPass : public ModulePass {
 
  public:
   static char ID;
 
   AutoTokensPass() : ModulePass(ID) {
-
+#endif
 
   }
 
+#if USE_NEW_PM
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
+#else
   bool runOnModule(Module &M) override;
+#endif
 
   protected:
 
@@ -162,8 +181,30 @@ class AutoTokensPass : public ModulePass {
 
 }  // namespace
 
-char AutoTokensPass::ID = 0;
+#if USE_NEW_PM
+extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
+llvmGetPassPluginInfo() {
 
+  return {LLVM_PLUGIN_API_VERSION, "AutoTokensPass", "v0.1",
+          /* lambda to insert our pass into the pass pipeline. */
+          [](PassBuilder &PB) {
+
+  #if LLVM_VERSION_MAJOR <= 13
+            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
+  #endif
+            PB.registerOptimizerLastEPCallback(
+                [](ModulePassManager &MPM, OptimizationLevel OL) {
+
+                  MPM.addPass(AutoTokensPass());
+
+                });
+
+          }};
+
+}
+#else
+char AutoTokensPass::ID = 0;
+#endif
 
 void dict2file(int fd, uint8_t *mem, uint32_t len) {
   uint32_t  i, j, binary = 0;
@@ -197,12 +238,18 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
   line[j] = 0;
   strcat(line, "\"\n");
   if (write(fd, line, strlen(line)) <= 0)
-    FATAL("Could not write to dictionary file");
+    FATAL("Could not write to the dictionary file");
   fsync(fd);
 
 }
 
+# if USE_NEW_PM
+PreservedAnalyses AutoTokensPass::run(Module &M, ModuleAnalysisManager &MAM) {
+
+#else
 bool AutoTokensPass::runOnModule(Module &M) {
+
+#endif
 
   DenseMap<Value *, std::string *> valueMap;
   char *                           ptr;
@@ -668,7 +715,12 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
   if(use_file){
     close(fd);
+  #if USE_NEW_PM
+    auto PA = PreservedAnalyses::all();
+    return PA;
+  #else
     return true;
+  #endif
   }
 
   LLVMContext &Ctx = M.getContext();
@@ -715,10 +767,18 @@ bool AutoTokensPass::runOnModule(Module &M) {
     }
   }
 
-  return true;
+
+  #if USE_NEW_PM
+    auto PA = PreservedAnalyses::all();
+    return PA;
+  #else
+    return true;
+  #endif
 }
 
+#if USE_NEW_PM
 
+#else
 static void registerAutoTokensPass(const PassManagerBuilder &,
                                      legacy::PassManagerBase &PM) {
 
@@ -735,3 +795,4 @@ static RegisterStandardPasses RegisterAutoTokensPass(
 
 static RegisterStandardPasses RegisterAutoTokensPass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerAutoTokensPass);
+#endif
