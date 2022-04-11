@@ -152,11 +152,13 @@ impl CompilerWrapper for ClangWrapper {
                     continue;
                 }
                 "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => {
+                    suppress_linking += 1;
                     i += 1;
                     continue;
                 }
                 "-z" => {
                     if i + 1 < args.len() && args[i + 1].as_ref() == "defs" {
+                        suppress_linking += 1;
                         i += 2;
                         continue;
                     }
@@ -174,7 +176,7 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push(args[i].as_ref().to_string());
             i += 1;
         }
-        if linking && suppress_linking >= 0 && suppress_linking < 1337 {
+        if linking && suppress_linking > 0 && suppress_linking < 1337 {
             linking = false;
             new_args.push(
                 PathBuf::from(env!("OUT_DIR"))
