@@ -212,7 +212,7 @@ where
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
                 .ok_or_else(|| {
-                    Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
+                    Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
                 })?;
 
             if tcmeta.handicap() >= 4 {
