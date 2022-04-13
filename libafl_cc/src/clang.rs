@@ -282,17 +282,17 @@ impl CompilerWrapper for ClangWrapper {
             return Ok(args);
         }
 
-        if !self.use_new_pm {
-            args.push("-fno-experimental-new-pass-manager".into());
+        if self.use_new_pm {
+            args.push("-fexperimental-new-pass-manager".into());
         } else {
-            args.push("-fexperimental-new-pass-manager".into())
+            args.push("-fno-experimental-new-pass-manager".into());
         }
         for pass in &self.passes {
             if self.use_new_pm {
                 args.push(format!(
                     "-fpass-plugin={}",
                     pass.path().into_os_string().into_string().unwrap()
-                ))
+                ));
             } else {
                 args.push("-Xclang".into());
                 args.push("-load".into());
