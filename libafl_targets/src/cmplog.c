@@ -111,12 +111,12 @@ void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2)
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_RTN) {
     libafl_cmplog_map_ptr->headers[k].kind = CMPLOG_KIND_RTN;
     libafl_cmplog_map_ptr->headers[k].hits = 1;
-    libafl_cmplog_map_ptr->headers[k].shape = len - 1;
+    libafl_cmplog_map_ptr->headers[k].shape = len;
     hits = 0;
   } else {
     hits = libafl_cmplog_map_ptr->headers[k].hits++;
     if (libafl_cmplog_map_ptr->headers[k].shape < len)
-      libafl_cmplog_map_ptr->headers[k].shape = len - 1;
+      libafl_cmplog_map_ptr->headers[k].shape = len;
   }
 
   hits &= CMPLOG_MAP_RTN_H - 1;

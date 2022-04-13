@@ -235,7 +235,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         let tp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),
-                &mut GLOBAL_STATE as *mut _ as *mut c_void,
+                core::ptr::addr_of_mut!(GLOBAL_STATE) as *mut c_void,
                 &TP_CALLBACK_ENVIRON_V3::default(),
             )
         };
@@ -284,11 +284,11 @@ where
             write_volatile(&mut data.tp_timer, self.tp_timer as *mut _ as *mut c_void);
             write_volatile(
                 &mut data.critical,
-                &mut self.critical as *mut _ as *mut c_void,
+                core::ptr::addr_of_mut!(self.critical) as *mut c_void,
             );
             write_volatile(
                 &mut data.timeout_input_ptr,
-                &mut data.current_input_ptr as *mut _ as *mut c_void,
+                data.current_input_ptr as *mut c_void,
             );
             let tm: i64 = -self.milli_sec * 10 * 1000;
             let ft = FILETIME {
