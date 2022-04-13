@@ -67,6 +67,7 @@ pub struct ClangWrapper {
     name: String,
     is_cpp: bool,
     linking: bool,
+    shared: bool,
     x_set: bool,
     bit_mode: u32,
     need_libafl_arg: bool,
@@ -82,6 +83,7 @@ pub struct ClangWrapper {
 
 #[allow(clippy::match_same_arms)] // for the linking = false wip for "shared"
 impl CompilerWrapper for ClangWrapper {
+    #[allow(clippy::too_many_lines)]
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>,
@@ -115,45 +117,67 @@ impl CompilerWrapper for ClangWrapper {
         // new_args.push("-fsanitize-coverage=trace-pc-guard".into());
 
         let mut linking = true;
+        let mut shared = false;
         // Detect stray -v calls from ./configure scripts.
         if args.len() > 1 && args[1].as_ref() == "-v" {
             linking = false;
         }
 
         let mut suppress_linking = 0;
-        for arg in &args[1..] {
-            match arg.as_ref() {
+        let mut i = 1;
+        while i < args.len() {
+            match args[i].as_ref() {
                 "--libafl-no-link" => {
                     suppress_linking += 1;
                     self.has_libafl_arg = true;
+                    i += 1;
                     continue;
                 }
                 "--libafl" => {
                     suppress_linking += 1337;
                     self.has_libafl_arg = true;
+                    i += 1;
                     continue;
                 }
                 "-fsanitize=fuzzer-no-link" => {
                     suppress_linking += 1;
                     self.has_libafl_arg = true;
+                    i += 1;
                     continue;
                 }
                 "-fsanitize=fuzzer" => {
                     suppress_linking += 1337;
                     self.has_libafl_arg = true;
+                    i += 1;
                     continue;
+                }
+                "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => {
+                    i += 1;
+                    continue;
+                }
+                "-z" => {
+                    if i + 1 < args.len() && args[i + 1].as_ref() == "defs" {
+                        i += 2;
+                        continue;
+                    }
                 }
                 "-x" => self.x_set = true,
                 "-m32" => self.bit_mode = 32,
                 "-m64" => self.bit_mode = 64,
                 "-c" | "-S" | "-E" => linking = false,
-                "-shared" => linking = false, // TODO dynamic list?
-                "-Wl,-z,defs" | "-Wl,--no-undefined" | "--no-undefined" => continue,
+                "-shared" => {
+                    linking = false;
+                    shared = true;
+                } // TODO dynamic list?
                 _ => (),
             };
-            new_args.push(arg.as_ref().to_string());
+            new_args.push(args[i].as_ref().to_string());
+            i += 1;
         }
-        if linking && suppress_linking > 0 && suppress_linking < 1337 {
+        if linking
+            && (suppress_linking > 0 || (self.has_libafl_arg && suppress_linking == 0))
+            && suppress_linking < 1337
+        {
             linking = false;
             new_args.push(
                 PathBuf::from(env!("OUT_DIR"))
@@ -165,6 +189,7 @@ impl CompilerWrapper for ClangWrapper {
         }
 
         self.linking = linking;
+        self.shared = shared;
 
         if self.optimize {
             new_args.push("-g".into());
@@ -189,7 +214,7 @@ impl CompilerWrapper for ClangWrapper {
         }
         // MacOS has odd linker behavior sometimes
         #[cfg(target_vendor = "apple")]
-        if linking {
+        if linking || shared {
             new_args.push("-undefined".into());
             new_args.push("dynamic_lookup".into());
         }
@@ -321,6 +346,7 @@ impl ClangWrapper {
             name: "".into(),
             is_cpp: false,
             linking: false,
+            shared: false,
             x_set: false,
             bit_mode: 0,
             need_libafl_arg: false,

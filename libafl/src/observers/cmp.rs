@@ -103,7 +103,7 @@ pub trait CmpMap: Debug {
     fn usable_executions_for(&self, idx: usize) -> usize;
 
     /// Get the logged values for a cmp
-    fn values_of(&self, idx: usize, execution: usize) -> CmpValues;
+    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues>;
 
     /// Reset the state
     fn reset(&mut self) -> Result<(), Error>;
@@ -150,24 +150,25 @@ where
 
                     let mut last: Option<CmpValues> = None;
                     for j in 0..execs {
-                        let val = self.cmp_map().values_of(i, j);
-                        if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
-                            if let Some(v) = val.to_u64_tuple() {
-                                if l.0.wrapping_add(1) == v.0 {
-                                    increasing_v0 += 1;
-                                }
-                                if l.1.wrapping_add(1) == v.1 {
-                                    increasing_v1 += 1;
-                                }
-                                if l.0.wrapping_sub(1) == v.0 {
-                                    decreasing_v0 += 1;
-                                }
-                                if l.1.wrapping_sub(1) == v.1 {
-                                    decreasing_v1 += 1;
+                        if let Some(val) = self.cmp_map().values_of(i, j) {
+                            if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
+                                if let Some(v) = val.to_u64_tuple() {
+                                    if l.0.wrapping_add(1) == v.0 {
+                                        increasing_v0 += 1;
+                                    }
+                                    if l.1.wrapping_add(1) == v.1 {
+                                        increasing_v1 += 1;
+                                    }
+                                    if l.0.wrapping_sub(1) == v.0 {
+                                        decreasing_v0 += 1;
+                                    }
+                                    if l.1.wrapping_sub(1) == v.1 {
+                                        decreasing_v1 += 1;
+                                    }
                                 }
                             }
+                            last = Some(val);
                         }
-                        last = Some(val);
                     }
                     // We check for execs-2 because the logged execs may wrap and have something like
                     // 8 9 10 3 4 5 6 7
@@ -180,7 +181,9 @@ where
                     }
                 }
                 for j in 0..execs {
-                    meta.list.push(self.cmp_map().values_of(i, j));
+                    if let Some(val) = self.cmp_map().values_of(i, j) {
+                        meta.list.push(val);
+                    }
                 }
             }
         }
