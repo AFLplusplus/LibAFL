@@ -175,7 +175,10 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push(args[i].as_ref().to_string());
             i += 1;
         }
-        if linking && suppress_linking >= 0 && suppress_linking < 1337 {
+        if linking
+            && (suppress_linking > 0 || (self.has_libafl_arg && suppress_linking == 0))
+            && suppress_linking < 1337
+        {
             linking = false;
             new_args.push(
                 PathBuf::from(env!("OUT_DIR"))
