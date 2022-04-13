@@ -143,7 +143,7 @@ where
             .metadata()
             .get::<SchedulerTestcaseMetaData>()
             .ok_or_else(|| {
-                Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
+                Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
             })?;
 
         if q_exec_us * 0.1 > avg_exec_us {

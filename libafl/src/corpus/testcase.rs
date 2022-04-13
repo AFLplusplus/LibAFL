@@ -288,7 +288,7 @@ pub struct SchedulerTestcaseMetaData {
 }
 
 impl SchedulerTestcaseMetaData {
-    /// Create new [`struct@PowerScheduleTestcaseMetaData`]
+    /// Create new [`struct@SchedulerTestcaseMetaData`]
     #[must_use]
     pub fn new(depth: u64) -> Self {
         Self {
