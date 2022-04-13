@@ -142,9 +142,7 @@ where
         let tcmeta = entry
             .metadata()
             .get::<SchedulerTestcaseMetaData>()
-            .ok_or_else(|| {
-                Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
-            })?;
+            .ok_or_else(|| Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string()))?;
 
         if q_exec_us * 0.1 > avg_exec_us {
             perf_score = 10.0;
