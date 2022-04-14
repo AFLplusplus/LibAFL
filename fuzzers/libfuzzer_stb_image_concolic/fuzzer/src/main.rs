@@ -40,7 +40,7 @@ use libafl::{
         },
         StdMapObserver, TimeObserver,
     },
-    schedulers::{IndexesLenTimeMinimizerScheduler, PowerQueueScheduler},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
         ConcolicTracingStage, ShadowTracingStage, SimpleConcolicMutationalStage,
         StdMutationalStage, TracingStage,
