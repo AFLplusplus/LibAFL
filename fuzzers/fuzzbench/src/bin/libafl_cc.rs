@@ -2,7 +2,7 @@ use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 use std::env;
 
 pub fn main() {
-    let args: Vec<String> = env::args().collect();
+    let mut args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let mut dir = env::current_exe().unwrap();
         let wrapper_name = dir.file_name().unwrap().to_str().unwrap();
@@ -14,6 +14,9 @@ pub fn main() {
         };
 
         dir.pop();
+
+        // Must be always present, even without --libafl
+        args.push("-fsanitize-coverage=trace-pc-guard,trace-cmp".into());
 
         let mut cc = ClangWrapper::new();
 
@@ -29,7 +32,6 @@ pub fn main() {
             .parse_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "fuzzbench")
-            .add_arg("-fsanitize-coverage=trace-pc-guard,trace-cmp")
             .add_pass(LLVMPasses::CmpLogRtn)
             .run()
             .expect("Failed to run the wrapped compiler")
