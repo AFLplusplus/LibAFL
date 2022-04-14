@@ -1073,7 +1073,7 @@ where
         );
         // A client gets the sender id assigned to by the broker during the initial handshake.
         if dbg!(overwrite_client_id) {
-            dbg!((*msg).sender = self.id);
+            (*msg).sender = dbg!(self.id);
         }
         let page = self.out_shmems.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {

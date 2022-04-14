@@ -340,7 +340,7 @@ where
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                dbg!("Spawning next client (id {})", ctr);
+                println!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
                 #[cfg(all(unix, feature = "fork"))]
