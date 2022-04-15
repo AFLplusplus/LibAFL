@@ -7,6 +7,8 @@ edition = "2021"
 [features]
 default = ["std"]
 std = []
+# Forces a crash
+crash = []
 
 [profile.release]
 lto = true

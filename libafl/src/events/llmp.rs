@@ -839,7 +839,7 @@ where
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                dbg!("Spawning next client (id {})", ctr);
+                println!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
                 #[cfg(all(unix, feature = "fork"))]
@@ -983,6 +983,7 @@ mod tests {
         let mut llmp_client = LlmpClient::new(
             shmem_provider.clone(),
             LlmpSharedMap::new(0, shmem_provider.new_shmem(1024).unwrap()),
+            0,
         )
         .unwrap();
 
