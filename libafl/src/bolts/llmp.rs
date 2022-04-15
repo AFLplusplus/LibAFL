@@ -1072,8 +1072,8 @@ where
             (*msg).message_id
         );
         // A client gets the sender id assigned to by the broker during the initial handshake.
-        if dbg!(overwrite_client_id) {
-            (*msg).sender = dbg!(self.id);
+        if overwrite_client_id {
+            (*msg).sender = self.id;
         }
         let page = self.out_shmems.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
@@ -2652,7 +2652,7 @@ where
     /// Creates a new [`LlmpClient`], reading the map id and len from env
     pub fn create_using_env(mut shmem_provider: SP, env_var: &str) -> Result<Self, Error> {
         let map = LlmpSharedMap::existing(shmem_provider.existing_from_env(env_var)?);
-        let client_id = dbg!(unsafe { (*map.page()).sender_id });
+        let client_id = unsafe { (*map.page()).sender_id };
         Self::new(shmem_provider, map, client_id)
     }
 
@@ -2708,7 +2708,7 @@ where
         let client_id = if let TcpResponse::LocalClientAccepted { client_id } =
             recv_tcp_msg(&mut stream)?.try_into()?
         {
-            dbg!(client_id)
+            client_id
         } else {
             return Err(Error::IllegalState(
                 "Unexpected Response from Broker".to_string(),

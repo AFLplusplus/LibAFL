@@ -464,7 +464,7 @@ where
                 "EVENT_TO_BROKER parcel should not have arrived in the client!"
             );
 
-            if dbg!(client_id) == dbg!(self_id) {
+            if client_id == self_id {
                 continue;
             }
             #[cfg(not(feature = "llmp_compression"))]
