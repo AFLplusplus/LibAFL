@@ -2,11 +2,13 @@
 //! The executor must explicitely support these observers.
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].
 
+use serde::{Deserialize, Serialize};
+
 use crate::{bolts::tuples::Named, observers::Observer};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct StdOutObserver {
     /// The name of the observer.
     pub name: String,
