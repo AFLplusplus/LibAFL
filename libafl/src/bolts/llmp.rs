@@ -451,7 +451,7 @@ fn next_shmem_size(max_alloc: usize) -> usize {
 
 /// Initialize a new `llmp_page`. The size should be relative to
 /// `llmp_page->messages`
-unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit: bool) {
+unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allow_reinit: bool) {
     #[cfg(all(feature = "llmp_debug", feature = "std"))]
     println!("_llmp_page_init: shmem {:?}", &shmem);
     let map_size = shmem.len();
@@ -469,7 +469,7 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender: u32, allow_reinit
     }
 
     (*page).magic = PAGE_INITIALIZED_MAGIC;
-    (*page).sender = sender;
+    (*page).sender_id = sender_id;
     (*page).current_msg_id.store(0, Ordering::Relaxed);
     (*page).max_alloc_size = 0;
     // Don't forget to subtract our own header size
@@ -707,7 +707,7 @@ pub struct LlmpPage {
     /// to check if this page got initialized properly
     pub magic: u64,
     /// The id of the sender
-    pub sender: u32,
+    pub sender_id: ClientId,
     /// Set to != 1 by the receiver, once it got mapped.
     /// It's not safe for the sender to unmap this page before
     /// (The os may have tidied up the memory when the receiver starts to map)
@@ -750,7 +750,7 @@ where
     SP: ShMemProvider,
 {
     /// ID of this sender.
-    pub id: u32,
+    pub id: ClientId,
     /// Ref to the last message this sender sent on the last page.
     /// If null, a new page (just) started.
     pub last_msg_sent: *const LlmpMsg,
@@ -775,12 +775,16 @@ where
     /// Create a new [`LlmpSender`] using a given [`ShMemProvider`], and `id`.
     /// If `keep_pages_forever` is `true`, `ShMem` will never be freed.
     /// If it is `false`, the pages will be unmapped once they are full, and have been mapped by at least one `LlmpReceiver`.
-    pub fn new(mut shmem_provider: SP, id: u32, keep_pages_forever: bool) -> Result<Self, Error> {
+    pub fn new(
+        mut shmem_provider: SP,
+        id: ClientId,
+        keep_pages_forever: bool,
+    ) -> Result<Self, Error> {
         Ok(Self {
             id,
             last_msg_sent: ptr::null_mut(),
             out_shmems: vec![LlmpSharedMap::new(
-                0,
+                id,
                 shmem_provider.new_shmem(LLMP_CFG_INITIAL_MAP_SIZE)?,
             )],
             // drop pages to the broker if it already read them
@@ -795,6 +799,7 @@ where
     /// This is only useful if all connected llmp parties start over, for example after a crash.
     /// # Safety
     /// Only safe if you really really restart the page on everything connected
+    /// No receiver should read from this page at a different location.
     pub unsafe fn reset(&mut self) {
         _llmp_page_init(
             &mut self.out_shmems.last_mut().unwrap().shmem,
@@ -903,7 +908,7 @@ where
         };
 
         Ok(Self {
-            id: 0,
+            id: unsafe { (*out_shmem.page()).sender_id },
             last_msg_sent,
             out_shmems: vec![out_shmem],
             // drop pages to the broker if it already read them
@@ -1117,7 +1122,7 @@ where
 
         // Create a new shard page.
         let mut new_map_shmem = LlmpSharedMap::new(
-            (*old_map).sender,
+            (*old_map).sender_id,
             self.shmem_provider
                 .new_shmem(next_shmem_size((*old_map).max_alloc_size))?,
         );
@@ -1135,7 +1140,6 @@ where
         println!("Setting max alloc size: {:?}", (*old_map).max_alloc_size);
 
         (*new_map).max_alloc_size = (*old_map).max_alloc_size;
-        (*new_map).sender = self.id;
 
         /* On the old map, place a last message linking to the new map for the clients
          * to consume */
@@ -2536,12 +2540,13 @@ where
     pub fn new(
         mut shmem_provider: SP,
         initial_broker_shmem: LlmpSharedMap<SP::ShMem>,
+        sender_id: ClientId,
     ) -> Result<Self, Error> {
         Ok(Self {
             sender: LlmpSender {
-                id: 0,
+                id: sender_id,
                 last_msg_sent: ptr::null_mut(),
-                out_shmems: vec![LlmpSharedMap::new(0, {
+                out_shmems: vec![LlmpSharedMap::new(sender_id, {
                     shmem_provider.new_shmem(LLMP_CFG_INITIAL_MAP_SIZE)?
                 })],
                 // drop pages to the broker if it already read them
@@ -2647,7 +2652,8 @@ where
     /// Creates a new [`LlmpClient`], reading the map id and len from env
     pub fn create_using_env(mut shmem_provider: SP, env_var: &str) -> Result<Self, Error> {
         let map = LlmpSharedMap::existing(shmem_provider.existing_from_env(env_var)?);
-        Self::new(shmem_provider, map)
+        let client_id = unsafe { (*map.page()).sender_id };
+        Self::new(shmem_provider, map, client_id)
     }
 
     #[cfg(feature = "std")]
@@ -2689,7 +2695,9 @@ where
         let map = LlmpSharedMap::existing(
             shmem_provider.shmem_from_description(broker_shmem_description)?,
         );
-        let mut ret = Self::new(shmem_provider, map)?;
+
+        // We'll set `sender_id` later
+        let mut ret = Self::new(shmem_provider, map, 0)?;
 
         let client_hello_req = TcpRequest::LocalClientHello {
             shmem_description: ret.sender.out_shmems.first().unwrap().shmem.description(),
@@ -2712,7 +2720,7 @@ where
         ret.sender.id = client_id;
         // Also set the sender on our initial llmp map correctly.
         unsafe {
-            (*ret.sender.out_shmems.first_mut().unwrap().page_mut()).sender = client_id;
+            (*ret.sender.out_shmems.first_mut().unwrap().page_mut()).sender_id = client_id;
         }
 
         Ok(ret)
