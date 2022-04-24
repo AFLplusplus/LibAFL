@@ -64,12 +64,11 @@
 
 #include <iostream>
 
-#define FATAL(x...)                                                      \
-  do {                                                                   \
-                                                                         \
-    fprintf(stderr, "FATAL: " x);                                        \
-    exit(1);                                                             \
-                                                                         \
+#define FATAL(x...)               \
+  do {                            \
+    fprintf(stderr, "FATAL: " x); \
+    exit(1);                      \
+                                  \
   } while (0)
 
 using namespace llvm;
@@ -79,7 +78,6 @@ namespace {
 /* Function that we never instrument or analyze */
 /* Note: this ignore check is also called in isInInstrumentList() */
 bool isIgnoreFunction(const llvm::Function *F) {
-
   // Starting from "LLVMFuzzer" these are functions used in libfuzzer based
   // fuzzing campaign installations, e.g. oss-fuzz
 
@@ -117,9 +115,7 @@ bool isIgnoreFunction(const llvm::Function *F) {
   };
 
   for (auto const &ignoreListFunc : ignoreList) {
-
     if (F->getName().startswith(ignoreListFunc)) { return true; }
-
   }
 
   static constexpr const char *ignoreSubstringList[] = {
@@ -131,67 +127,51 @@ bool isIgnoreFunction(const llvm::Function *F) {
   };
 
   for (auto const &ignoreListFunc : ignoreSubstringList) {
-
     // hexcoder: F->getName().contains() not avaiilable in llvm 3.8.0
     if (StringRef::npos != F->getName().find(ignoreListFunc)) { return true; }
-
   }
 
   return false;
-
 }
 
 class AutoTokensPass : public ModulePass {
-
  public:
   static char ID;
 
   AutoTokensPass() : ModulePass(ID) {
-
-
   }
 
   bool runOnModule(Module &M) override;
 
-  protected:
-
-  private:
-    std::vector<std::string>  dictionary;
-
+ protected:
+ private:
+  std::vector<std::string> dictionary;
 };
 
 }  // namespace
 
 char AutoTokensPass::ID = 0;
 
-
 void dict2file(int fd, uint8_t *mem, uint32_t len) {
-  uint32_t  i, j, binary = 0;
-  char line[MAX_AUTO_EXTRA * 8], tmp[8];
+  uint32_t i, j, binary = 0;
+  char     line[MAX_AUTO_EXTRA * 8], tmp[8];
 
   strcpy(line, "\"");
   j = 1;
   for (i = 0; i < len; i++) {
-
     if (isprint(mem[i]) && mem[i] != '\\' && mem[i] != '"') {
-
       line[j++] = mem[i];
 
     } else {
-
       if (i + 1 != len || mem[i] != 0 || binary || len == 4 || len == 8) {
-
         line[j] = 0;
         sprintf(tmp, "\\x%02x", (uint8_t)mem[i]);
         strcat(line, tmp);
         j = strlen(line);
-
       }
 
       binary = 1;
-
     }
-
   }
 
   line[j] = 0;
@@ -199,15 +179,13 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
   if (write(fd, line, strlen(line)) <= 0)
     FATAL("Could not write to dictionary file");
   fsync(fd);
-
 }
 
 bool AutoTokensPass::runOnModule(Module &M) {
-
   DenseMap<Value *, std::string *> valueMap;
-  char *                           ptr;
+  char                            *ptr;
   int                              fd, found = 0;
-  bool use_file = true;
+  bool                             use_file = true;
 
   /* Show a banner */
   setvbuf(stdout, NULL, _IONBF, 0);
@@ -215,22 +193,21 @@ bool AutoTokensPass::runOnModule(Module &M) {
   ptr = getenv("AFL_LLVM_DICT2FILE");
 
   if (!ptr || *ptr != '/') {
-    // fprintf(stderr, "AFL_LLVM_DICT2FILE is not set to an absolute path: %s\n", ptr);
-    // fprintf(stderr, "Writing tokens into libafl_tokens section\n");
+    // fprintf(stderr, "AFL_LLVM_DICT2FILE is not set to an absolute path:
+    // %s\n", ptr); fprintf(stderr, "Writing tokens into libafl_tokens
+    // section\n");
 
     use_file = false;
   }
 
-  if(use_file) {
+  if (use_file) {
     if ((fd = open(ptr, O_WRONLY | O_APPEND | O_CREAT | O_DSYNC, 0644)) < 0)
       FATAL("Could not open/create %s.", ptr);
   }
 
-
   /* Instrument all the things! */
 
   for (auto &F : M) {
-
     if (isIgnoreFunction(&F)) continue;
 
     /*  Some implementation notes.
@@ -262,15 +239,12 @@ bool AutoTokensPass::runOnModule(Module &M) {
      */
 
     for (auto &BB : F) {
-
       for (auto &IN : BB) {
-
         CallInst *callInst = nullptr;
-        CmpInst * cmpInst = nullptr;
+        CmpInst  *cmpInst = nullptr;
 
         if ((cmpInst = dyn_cast<CmpInst>(&IN))) {
-
-          Value *      op = cmpInst->getOperand(1);
+          Value       *op = cmpInst->getOperand(1);
           ConstantInt *ilen = dyn_cast<ConstantInt>(op);
 
           /* We skip > 64 bit integers. why? first because their value is
@@ -278,18 +252,15 @@ bool AutoTokensPass::runOnModule(Module &M) {
              literals > 64 bit (as of llvm 12) */
 
           if (ilen && ilen->uge(0xffffffffffffffff) == false) {
-
             uint64_t val2 = 0, val = ilen->getZExtValue();
             uint32_t len = 0;
             if (val > 0x10000 && val < 0xffffffff) len = 4;
             if (val > 0x100000001 && val < 0xffffffffffffffff) len = 8;
 
             if (len) {
-
               auto c = cmpInst->getPredicate();
 
               switch (c) {
-
                 case CmpInst::FCMP_OGT:  // fall through
                 case CmpInst::FCMP_OLE:  // fall through
                 case CmpInst::ICMP_SLE:  // fall through
@@ -298,10 +269,8 @@ bool AutoTokensPass::runOnModule(Module &M) {
                   // signed comparison and it is a negative constant
                   if ((len == 4 && (val & 80000000)) ||
                       (len == 8 && (val & 8000000000000000))) {
-
                     if ((val & 0xffff) != 1) val2 = val - 1;
                     break;
-
                   }
 
                   // fall through
@@ -321,10 +290,8 @@ bool AutoTokensPass::runOnModule(Module &M) {
                   // signed comparison and it is a negative constant
                   if ((len == 4 && (val & 80000000)) ||
                       (len == 8 && (val & 8000000000000000))) {
-
                     if ((val & 0xffff) != 1) val2 = val - 1;
                     break;
-
                   }
 
                   // fall through
@@ -338,37 +305,28 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
                 default:
                   val2 = 0;
-
               }
 
-              if(use_file) {
+              if (use_file) {
                 dict2file(fd, (uint8_t *)&val, len);
-              }
-              else{
+              } else {
                 dictionary.push_back(std::string((char *)&val, len));
               }
 
               found++;
               if (val2) {
-
-                if(use_file) {
+                if (use_file) {
                   dict2file(fd, (uint8_t *)&val2, len);
-                }
-                else{
+                } else {
                   dictionary.push_back(std::string((char *)&val2, len));
                 }
                 found++;
-
               }
-
             }
-
           }
-
         }
 
         if ((callInst = dyn_cast<CallInst>(&IN))) {
-
           bool   isStrcmp = true;
           bool   isMemcmp = true;
           bool   isStrncmp = true;
@@ -448,138 +406,96 @@ bool AutoTokensPass::runOnModule(Module &M) {
           getConstantStringInfo(Str1P, TmpStr);
 
           if (TmpStr.empty()) {
-
             HasStr1 = false;
 
           } else {
-
             HasStr1 = true;
             Str1 = TmpStr.str();
-
           }
 
           bool HasStr2;
           getConstantStringInfo(Str2P, TmpStr);
           if (TmpStr.empty()) {
-
             HasStr2 = false;
 
           } else {
-
             HasStr2 = true;
             Str2 = TmpStr.str();
-
           }
 
           // we handle the 2nd parameter first because of llvm memcpy
           if (!HasStr2) {
-
             auto *Ptr = dyn_cast<ConstantExpr>(Str2P);
             if (Ptr && Ptr->isGEPWithNoNotionalOverIndexing()) {
-
               if (auto *Var = dyn_cast<GlobalVariable>(Ptr->getOperand(0))) {
-
                 if (Var->hasInitializer()) {
-
                   if (auto *Array =
                           dyn_cast<ConstantDataArray>(Var->getInitializer())) {
-
                     HasStr2 = true;
                     Str2 = Array->getRawDataValues().str();
-
                   }
-
                 }
-
               }
-
             }
-
           }
 
           // for the internal memcpy routine we only care for the second
           // parameter and are not reporting anything.
           if (isIntMemcpy == true) {
-
             if (HasStr2 == true) {
-
-              Value *      op2 = callInst->getArgOperand(2);
+              Value       *op2 = callInst->getArgOperand(2);
               ConstantInt *ilen = dyn_cast<ConstantInt>(op2);
               if (ilen) {
-
                 uint64_t literalLength = Str2.length();
                 uint64_t optLength = ilen->getZExtValue();
                 if (literalLength + 1 == optLength) {
-
                   Str2.append("\0", 1);  // add null byte
-
                 }
 
                 if (optLength > Str2.length()) { optLength = Str2.length(); }
-
               }
 
               valueMap[Str1P] = new std::string(Str2);
               continue;
-
             }
 
             continue;
-
           }
 
           // Neither a literal nor a global variable?
           // maybe it is a local variable that we saved
           if (!HasStr2) {
-
             std::string *strng = valueMap[Str2P];
             if (strng && !strng->empty()) {
-
               Str2 = *strng;
               HasStr2 = true;
-
             }
-
           }
 
           if (!HasStr1) {
-
             auto Ptr = dyn_cast<ConstantExpr>(Str1P);
 
             if (Ptr && Ptr->isGEPWithNoNotionalOverIndexing()) {
-
               if (auto *Var = dyn_cast<GlobalVariable>(Ptr->getOperand(0))) {
-
                 if (Var->hasInitializer()) {
-
                   if (auto *Array =
                           dyn_cast<ConstantDataArray>(Var->getInitializer())) {
-
                     HasStr1 = true;
                     Str1 = Array->getRawDataValues().str();
-
                   }
-
                 }
-
               }
-
             }
-
           }
 
           // Neither a literal nor a global variable?
           // maybe it is a local variable that we saved
           if (!HasStr1) {
-
             std::string *strng = valueMap[Str1P];
             if (strng && !strng->empty()) {
-
               Str1 = *strng;
               HasStr1 = true;
-
             }
-
           }
 
           /* handle cases of one string is const, one string is variable */
@@ -597,12 +513,10 @@ bool AutoTokensPass::runOnModule(Module &M) {
           if (optLen < 2 || (optLen == 2 && !thestring[1])) { continue; }
 
           if (isMemcmp || isStrncmp || isStrncasecmp) {
-
-            Value *      op2 = callInst->getArgOperand(2);
+            Value       *op2 = callInst->getArgOperand(2);
             ConstantInt *ilen = dyn_cast<ConstantInt>(op2);
 
             if (ilen) {
-
               uint64_t literalLength = optLen;
               optLen = ilen->getZExtValue();
               if (optLen > thestring.length()) { optLen = thestring.length(); }
@@ -610,33 +524,24 @@ bool AutoTokensPass::runOnModule(Module &M) {
               if (literalLength + 1 == optLen) {  // add null byte
                 thestring.append("\0", 1);
                 addedNull = true;
-
               }
-
             }
-
           }
 
           // add null byte if this is a string compare function and a null
           // was not already added
           if (!isMemcmp) {
-
             if (addedNull == false && thestring[optLen - 1] != '\0') {
-
               thestring.append("\0", 1);  // add null byte
               optLen++;
-
             }
 
             if (!isStdString) {
-
               // ensure we do not have garbage
               size_t offset = thestring.find('\0', 0);
               if (offset + 1 < optLen) optLen = offset + 1;
               thestring = thestring.substr(0, optLen);
-
             }
-
           }
 
           // we take the longer string, even if the compare was to a
@@ -650,29 +555,23 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
           ptr = (char *)thestring.c_str();
 
-          if(use_file){
+          if (use_file) {
             dict2file(fd, (uint8_t *)ptr, optLen);
-          }
-          else{
+          } else {
             dictionary.push_back(thestring.substr(0, optLen));
           }
           found++;
-
         }
-
       }
-
     }
-
   }
 
-  if(use_file){
+  if (use_file) {
     close(fd);
     return true;
   }
 
   LLVMContext &Ctx = M.getContext();
-
 
   size_t memlen = 0, count = 0, offset = 0;
 
@@ -682,10 +581,8 @@ bool AutoTokensPass::runOnModule(Module &M) {
   dictionary.erase(last, dictionary.end());
 
   for (auto token : dictionary) {
-
     memlen += token.length();
     count++;
-
   }
 
   auto ptrhld = std::unique_ptr<char[]>(new char[memlen + count]);
@@ -693,9 +590,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
   count = 0;
 
   for (auto token : dictionary) {
-
     if (offset + token.length() < 0xfffff0 && count < MAX_AUTO_EXTRAS) {
-
       // This lenght is guranteed to be < MAX_AUTO_EXTRA
       ptrhld.get()[offset++] = (uint8_t)token.length();
       memcpy(ptrhld.get() + offset, token.c_str(), token.length());
@@ -705,25 +600,25 @@ bool AutoTokensPass::runOnModule(Module &M) {
   }
 
   // Type
-  ArrayType* arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
+  ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
   // The actual dict
-  GlobalVariable *dict = new GlobalVariable(M, arrayTy, true, GlobalVariable::ExternalLinkage, ConstantDataArray::get(Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))), "libafl_dictionary_" + M.getName());
+  GlobalVariable *dict = new GlobalVariable(
+      M, arrayTy, true, GlobalVariable::ExternalLinkage,
+      ConstantDataArray::get(Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))),
+      "libafl_dictionary_" + M.getName());
   dict->setSection("libafl_token");
 
   return true;
 }
 
-
 static void registerAutoTokensPass(const PassManagerBuilder &,
-                                     legacy::PassManagerBase &PM) {
-
+                                   legacy::PassManagerBase &PM) {
   PM.add(new AutoTokensPass());
-
 }
 
 static RegisterPass<AutoTokensPass> X("autotokens",
-                                        "autotokens instrumentation pass",
-                                        false, false);
+                                      "autotokens instrumentation pass", false,
+                                      false);
 
 static RegisterStandardPasses RegisterAutoTokensPass(
     PassManagerBuilder::EP_OptimizerLast, registerAutoTokensPass);
