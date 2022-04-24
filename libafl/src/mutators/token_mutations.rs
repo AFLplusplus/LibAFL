@@ -110,7 +110,7 @@ impl Tokens {
         if token_start.is_null() || token_stop.is_null() {
             return Ok(Self::new());
         }
-        if token_stop <= token_start {
+        if token_stop < token_start {
             return Err(Error::IllegalArgument(format!(
                 "Tried to create tokens from illegal section: stop < start ({:?} < {:?})",
                 token_stop, token_start
