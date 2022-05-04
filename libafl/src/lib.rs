@@ -105,62 +105,217 @@ pub use fuzzer::*;
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
 
-/// Main error struct for AFL
+#[cfg(feature = "errors_backtrace")]
+pub type ErrorBacktrace = backtrace::Backtrace;
+
+#[cfg(not(feature = "errors_backtrace"))]
+#[derive(Debug)]
+/// Empty struct to use when errors_backtrace is disabled
+pub struct ErrorBacktrace {}
+#[cfg(not(feature = "errors_backtrace"))]
+impl ErrorBacktrace {
+    /// Nop
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[cfg(feature = "errors_backtrace")]
+fn display_error_backtrace(f: &mut fmt::Formatter, err: &ErrorBacktrace) -> fmt::Result {
+    write!("\nBacktrace: {}", err)
+}
+#[cfg(not(feature = "errors_backtrace"))]
+fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fmt::Result {
+    fmt::Result::Ok(())
+}
+
+/// Main error struct for LibAFL
 #[derive(Debug)]
 pub enum Error {
     /// Serialization error
-    Serialize(String),
+    Serialize(String, ErrorBacktrace),
     /// Compression error
     #[cfg(feature = "llmp_compression")]
-    Compression,
+    Compression(ErrorBacktrace),
     /// File related error
     #[cfg(feature = "std")]
-    File(io::Error),
+    File(io::Error, ErrorBacktrace),
     /// Optional val was supposed to be set, but isn't.
-    EmptyOptional(String),
+    EmptyOptional(String, ErrorBacktrace),
     /// Key not in Map
-    KeyNotFound(String),
+    KeyNotFound(String, ErrorBacktrace),
     /// No elements in the current item
-    Empty(String),
+    Empty(String, ErrorBacktrace),
     /// End of iteration
-    IteratorEnd(String),
+    IteratorEnd(String, ErrorBacktrace),
     /// This is not supported (yet)
-    NotImplemented(String),
+    NotImplemented(String, ErrorBacktrace),
     /// You're holding it wrong
-    IllegalState(String),
+    IllegalState(String, ErrorBacktrace),
     /// The argument passed to this method or function is not valid
-    IllegalArgument(String),
+    IllegalArgument(String, ErrorBacktrace),
     /// Forkserver related Error
-    Forkserver(String),
+    Forkserver(String, ErrorBacktrace),
     /// MOpt related Error
-    MOpt(String),
+    MOpt(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
-    Unknown(String),
+    Unknown(String, ErrorBacktrace),
+}
+
+impl Error {
+    /// Serialization error
+    pub fn serialize<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Serialize(arg.into(), ErrorBacktrace::new())
+    }
+    #[cfg(feature = "llmp_compression")]
+    /// Compression error
+    pub fn compression() -> Self {
+        Error::Compression(ErrorBacktrace::new())
+    }
+    #[cfg(feature = "std")]
+    /// File related error
+    pub fn file(arg: io::Error) -> Self {
+        Error::File(arg.into(), ErrorBacktrace::new())
+    }
+    /// Optional val was supposed to be set, but isn't.
+    pub fn empty_optional<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::EmptyOptional(arg.into(), ErrorBacktrace::new())
+    }
+    /// Key not in Map
+    pub fn key_not_found<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
+    }
+    /// No elements in the current item
+    pub fn empty<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Empty(arg.into(), ErrorBacktrace::new())
+    }
+    /// End of iteration
+    pub fn iterator_end<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::IteratorEnd(arg.into(), ErrorBacktrace::new())
+    }
+    /// This is not supported (yet)
+    pub fn not_implemented<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::NotImplemented(arg.into(), ErrorBacktrace::new())
+    }
+    /// You're holding it wrong
+    pub fn illegal_state<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::IllegalState(arg.into(), ErrorBacktrace::new())
+    }
+    /// The argument passed to this method or function is not valid
+    pub fn illegal_argument<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::IllegalArgument(arg.into(), ErrorBacktrace::new())
+    }
+    /// Forkserver related Error
+    pub fn forkserver<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Forkserver(arg.into(), ErrorBacktrace::new())
+    }
+    /// MOpt related Error
+    pub fn mopt<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::MOpt(arg.into(), ErrorBacktrace::new())
+    }
+    /// Shutting down, not really an error.
+    pub fn shuttingdown() -> Self {
+        Error::ShuttingDown
+    }
+    /// Something else happened
+    pub fn unknown<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Unknown(arg.into(), ErrorBacktrace::new())
+    }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Serialize(s) => write!(f, "Error in Serialization: `{0}`", &s),
-            #[cfg(feature = "llmp_compression")]
-            Self::Compression => write!(f, "Error in decompression"),
-            #[cfg(feature = "std")]
-            Self::File(err) => write!(f, "File IO failed: {:?}", &err),
-            Self::EmptyOptional(s) => write!(f, "Optional value `{0}` was not set", &s),
-            Self::KeyNotFound(s) => write!(f, "Key `{0}` not in Corpus", &s),
-            Self::Empty(s) => write!(f, "No items in {0}", &s),
-            Self::IteratorEnd(s) => {
-                write!(f, "All elements have been processed in {0} iterator", &s)
+            Self::Serialize(s, b) => {
+                write!(f, "Error in Serialization: `{0}`", &s)?;
+                display_error_backtrace(f, b)
             }
-            Self::NotImplemented(s) => write!(f, "Not implemented: {0}", &s),
-            Self::IllegalState(s) => write!(f, "Illegal state: {0}", &s),
-            Self::IllegalArgument(s) => write!(f, "Illegal argument: {0}", &s),
-            Self::Forkserver(s) => write!(f, "Forkserver : {0}", &s),
-            Self::MOpt(s) => write!(f, "MOpt: {0}", &s),
+            #[cfg(feature = "llmp_compression")]
+            Self::Compression(b) => {
+                write!(f, "Error in decompression")?;
+                display_error_backtrace(f, b)
+            }
+            #[cfg(feature = "std")]
+            Self::File(err, b) => {
+                write!(f, "File IO failed: {:?}", &err)?;
+                display_error_backtrace(f, b)
+            }
+            Self::EmptyOptional(s, b) => {
+                write!(f, "Optional value `{0}` was not set", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::KeyNotFound(s, b) => {
+                write!(f, "Key `{0}` not in Corpus", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::Empty(s, b) => {
+                write!(f, "No items in {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::IteratorEnd(s, b) => {
+                write!(f, "All elements have been processed in {0} iterator", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::NotImplemented(s, b) => {
+                write!(f, "Not implemented: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::IllegalState(s, b) => {
+                write!(f, "Illegal state: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::IllegalArgument(s, b) => {
+                write!(f, "Illegal argument: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::Forkserver(s, b) => {
+                write!(f, "Forkserver : {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::MOpt(s, b) => {
+                write!(f, "MOpt: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
             Self::ShuttingDown => write!(f, "Shutting down!"),
-            Self::Unknown(s) => write!(f, "Unknown error: {0}", &s),
+            Self::Unknown(s, b) => {
+                write!(f, "Unknown error: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
         }
     }
 }
@@ -168,7 +323,7 @@ impl fmt::Display for Error {
 /// Stringify the postcard serializer error
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
-        Self::Serialize(format!("{:?}", err))
+        Self::serialize(format!("{:?}", err))
     }
 }
 
@@ -176,14 +331,14 @@ impl From<postcard::Error> for Error {
 #[cfg(feature = "std")]
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
-        Self::Serialize(format!("{:?}", err))
+        Self::serialize(format!("{:?}", err))
     }
 }
 
 #[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
-        Self::Unknown(format!("Unix error: {:?}", err))
+        Self::unknown(format!("Unix error: {:?}", err))
     }
 }
 
@@ -191,38 +346,38 @@ impl From<nix::Error> for Error {
 #[cfg(feature = "std")]
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
-        Self::File(err)
+        Self::file(err)
     }
 }
 
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
-        Self::Unknown(format!("Could not convert byte / utf-8: {:?}", err))
+        Self::unknown(format!("Could not convert byte / utf-8: {:?}", err))
     }
 }
 
 #[cfg(feature = "std")]
 impl From<VarError> for Error {
     fn from(err: VarError) -> Self {
-        Self::Empty(format!("Could not get env var: {:?}", err))
+        Self::empty(format!("Could not get env var: {:?}", err))
     }
 }
 
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
-        Self::Unknown(format!("Failed to parse Int: {:?}", err))
+        Self::unknown(format!("Failed to parse Int: {:?}", err))
     }
 }
 
 impl From<TryFromIntError> for Error {
     fn from(err: TryFromIntError) -> Self {
-        Self::IllegalState(format!("Expected conversion failed: {:?}", err))
+        Self::illegal_state(format!("Expected conversion failed: {:?}", err))
     }
 }
 
 impl From<TryFromSliceError> for Error {
     fn from(err: TryFromSliceError) -> Self {
-        Self::IllegalArgument(format!("Could not convert slice: {:?}", err))
+        Self::illegal_argument(format!("Could not convert slice: {:?}", err))
     }
 }
 

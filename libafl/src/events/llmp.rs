@@ -384,7 +384,7 @@ where
                 }
                 Ok(())
             }
-            _ => Err(Error::Unknown(format!(
+            _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event.name()
             ))),
@@ -790,7 +790,7 @@ where
 
                             broker_things(event_broker, self.remote_broker_addr)?;
 
-                            return Err(Error::ShuttingDown);
+                            return Err(Error::shuttingdown());
                         }
                         LlmpConnection::IsClient { client } => {
                             let mgr =
@@ -808,7 +808,7 @@ where
 
                     broker_things(event_broker, self.remote_broker_addr)?;
 
-                    return Err(Error::ShuttingDown);
+                    return Err(Error::shuttingdown());
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client

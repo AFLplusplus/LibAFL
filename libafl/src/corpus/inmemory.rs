@@ -38,7 +38,7 @@ where
     #[inline]
     fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
         if idx >= self.entries.len() {
-            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
+            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
         }
         self.entries[idx] = RefCell::new(testcase);
         Ok(())

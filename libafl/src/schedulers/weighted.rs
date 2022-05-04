@@ -196,7 +196,9 @@ where
         let wsmeta = state
             .metadata_mut()
             .get_mut::<WeightedScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("WeigthedScheduleMetadata not found".to_string()))?;
+            .ok_or_else(|| {
+                Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
+            })?;
 
         // Update metadata
         wsmeta.set_alias_probability(alias_probability);
@@ -226,7 +228,7 @@ where
                 .borrow_mut()
                 .metadata_mut()
                 .get_mut::<PowerScheduleTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
+                .ok_or_else(|| Error::key_not_found("PowerScheduleTestData not found".to_string()))?
                 .depth(),
             None => 0,
         };
@@ -247,7 +249,7 @@ where
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::Empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from("No entries in corpus")))
         } else {
             let corpus_counts = state.corpus().count();
             let s = state.rand_mut().below(corpus_counts as u64) as usize;
@@ -258,7 +260,7 @@ where
                 .metadata_mut()
                 .get_mut::<WeightedScheduleMetadata>()
                 .ok_or_else(|| {
-                    Error::KeyNotFound("WeigthedScheduleMetadata not found".to_string())
+                    Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
                 })?;
 
             let current_cycles = wsmeta.runs_in_current_cycle();
@@ -281,7 +283,7 @@ where
                     .metadata_mut()
                     .get_mut::<PowerScheduleMetadata>()
                     .ok_or_else(|| {
-                        Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
+                        Error::key_not_found("PowerScheduleMetadata not found".to_string())
                     })?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }

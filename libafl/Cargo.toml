@@ -25,6 +25,7 @@ cli = ["clap"]  # expose bolts::cli
 qemu_cli = ["cli"]
 frida_cli = ["cli"]
 afl_exec_sec = [] # calculate exec/sec like AFL
+errors_backtrace = ["backtrace"]
 
 # features hiding dependencies licensed under GPL
 gpl = []
