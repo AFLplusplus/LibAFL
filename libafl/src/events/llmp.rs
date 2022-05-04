@@ -694,7 +694,6 @@ pub fn setup_restarting_mgr_std<I, MT, OT, S>(
 >
 where
     I: Input,
-    S: DeserializeOwned,
     MT: Monitor + Clone,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
