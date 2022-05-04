@@ -275,7 +275,7 @@ impl MapNoveltiesMetadata {
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct MapFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: PrimInt + Default + Copy + 'static + Serialize,
 {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,

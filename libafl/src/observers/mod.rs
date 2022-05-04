@@ -238,7 +238,7 @@ impl Named for TimeObserver {
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct ListObserver<'a, T>
 where
-    T: Debug + Serialize + serde::de::DeserializeOwned,
+    T: Debug + Serialize,
 {
     name: String,
     /// The list
