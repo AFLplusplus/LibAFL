@@ -155,8 +155,6 @@ pub enum Error {
     IllegalState(String, ErrorBacktrace),
     /// The argument passed to this method or function is not valid
     IllegalArgument(String, ErrorBacktrace),
-    /// Forkserver related Error
-    Forkserver(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
@@ -240,14 +238,6 @@ impl Error {
     {
         Error::IllegalArgument(arg.into(), ErrorBacktrace::new())
     }
-    /// Forkserver related Error
-    #[must_use]
-    pub fn forkserver<S>(arg: S) -> Self
-    where
-        S: Into<String>,
-    {
-        Error::Forkserver(arg.into(), ErrorBacktrace::new())
-    }
     /// Shutting down, not really an error.
     #[must_use]
     pub fn shuttingdown() -> Self {
@@ -306,10 +296,6 @@ impl fmt::Display for Error {
             }
             Self::IllegalArgument(s, b) => {
                 write!(f, "Illegal argument: {0}", &s)?;
-                display_error_backtrace(f, b)
-            }
-            Self::Forkserver(s, b) => {
-                write!(f, "Forkserver : {0}", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),
