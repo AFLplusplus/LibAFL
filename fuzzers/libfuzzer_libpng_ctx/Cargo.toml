@@ -24,7 +24,7 @@ libafl = { path = "../../libafl/", features = ["std", "derive", "llmp_compressio
 libafl_targets = { path = "../../libafl_targets/", features = ["libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
-clap = { version = "3.0", features = ["derive"] }
+clap = { version = "3.1", features = ["derive"] }
 mimalloc = { version = "*", default-features = false }
 
 [lib]
