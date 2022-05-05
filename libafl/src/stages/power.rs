@@ -70,7 +70,7 @@ where
         let use_random = state
             .metadata_mut()
             .get_mut::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
+            .ok_or_else(|| Error::key_not_found("PowerScheduleMetadata not found".to_string()))?
             .strat()
             == PowerSchedule::RAND;
         if use_random {
@@ -83,7 +83,7 @@ where
             .metadata_mut()
             .get_mut::<PowerScheduleTestcaseMetaData>()
             .ok_or_else(|| {
-                Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
+                Error::key_not_found("PowerScheduleTestcaseMetaData not found".to_string())
             })?;
         if tcmeta.handicap() >= 4 {
             tcmeta.set_handicap(tcmeta.handicap() - 4);
@@ -120,14 +120,16 @@ where
             let observer = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
             let mut hash = observer.hash() as usize;
 
             let psmeta = state
                 .metadata_mut()
                 .get_mut::<PowerScheduleMetadata>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+                .ok_or_else(|| {
+                    Error::key_not_found("PowerScheduleMetadata not found".to_string())
+                })?;
 
             hash %= psmeta.n_fuzz().len();
             // Update the path frequency
@@ -141,7 +143,7 @@ where
                     .metadata_mut()
                     .get_mut::<PowerScheduleTestcaseMetaData>()
                     .ok_or_else(|| {
-                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                        Error::key_not_found("PowerScheduleTestData not found".to_string())
                     })?
                     .set_n_fuzz_entry(hash);
             }

@@ -117,7 +117,7 @@ where
             let payload: Vec<_> = input.bytes().iter().map(|&x| Some(x)).collect();
             let original = input.clone();
             let meta = entry.metadata().get::<MapNoveltiesMetadata>().ok_or_else(|| {
-                    Error::KeyNotFound(format!(
+                    Error::key_not_found(format!(
                         "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{} (check the arguments of MapFeedback::new(...))",
                         corpus_idx
                     ))
@@ -402,7 +402,7 @@ where
         let cnt = executor
             .observers()
             .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .how_many_set(novelties);
 
         Ok(cnt == novelties.len())

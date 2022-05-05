@@ -111,7 +111,7 @@ impl Tokens {
             return Ok(Self::new());
         }
         if token_stop < token_start {
-            return Err(Error::IllegalArgument(format!(
+            return Err(Error::illegal_argument(format!(
                 "Tried to create tokens from illegal section: stop < start ({:?} < {:?})",
                 token_stop, token_start
             )));
@@ -170,16 +170,16 @@ impl Tokens {
             }
             let pos_quote = match line.find('\"') {
                 Some(x) => x,
-                None => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::illegal_argument("Illegal line: ".to_owned() + line)),
             };
             if line.chars().nth(line.len() - 1) != Some('"') {
-                return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line));
+                return Err(Error::illegal_argument("Illegal line: ".to_owned() + line));
             }
 
             // extract item
             let item = match line.get(pos_quote + 1..line.len() - 1) {
                 Some(x) => x,
-                None => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::illegal_argument("Illegal line: ".to_owned() + line)),
             };
             if item.is_empty() {
                 continue;
@@ -189,7 +189,7 @@ impl Tokens {
             let token: Vec<u8> = match str_decode(item) {
                 Ok(val) => val,
                 Err(_) => {
-                    return Err(Error::IllegalArgument(
+                    return Err(Error::illegal_argument(
                         "Illegal line (hex decoding): ".to_owned() + line,
                     ))
                 }
