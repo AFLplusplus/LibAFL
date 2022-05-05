@@ -122,7 +122,7 @@ impl ErrorBacktrace {
 
 #[cfg(feature = "errors_backtrace")]
 fn display_error_backtrace(f: &mut fmt::Formatter, err: &ErrorBacktrace) -> fmt::Result {
-    write!("\nBacktrace: {}", err)
+    write!(f, "\nBacktrace: {}", err)
 }
 #[cfg(not(feature = "errors_backtrace"))]
 fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fmt::Result {
