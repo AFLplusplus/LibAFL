@@ -182,7 +182,7 @@ impl Error {
     /// File related error
     #[must_use]
     pub fn file(arg: io::Error) -> Self {
-        Error::File(arg.into(), ErrorBacktrace::new())
+        Error::File(arg, ErrorBacktrace::new())
     }
     /// Optional val was supposed to be set, but isn't.
     #[must_use]
