@@ -1058,7 +1058,7 @@ mod tests {
         let result = match executor {
             Ok(_) => true,
             Err(e) => match e {
-                Error::forkserver(s) => s == "Failed to start a forkserver",
+                Error::Forkserver(s, _) => s == "Failed to start a forkserver",
                 _ => false,
             },
         };
