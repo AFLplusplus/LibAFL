@@ -186,7 +186,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize,
 {
     map: OwnedSliceMut<'a, T>,
     initial: T,
@@ -435,7 +435,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct ConstMapObserver<'a, T, const N: usize>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize,
 {
     map: OwnedSliceMut<'a, T>,
     initial: T,
@@ -664,7 +664,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct VariableMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize,
 {
     map: OwnedSliceMut<'a, T>,
     size: OwnedRefMut<'a, usize>,
@@ -892,7 +892,7 @@ where
 #[serde(bound = "M: serde::de::DeserializeOwned")]
 pub struct HitcountsMapObserver<M>
 where
-    M: Serialize + serde::de::DeserializeOwned,
+    M: Serialize,
 {
     base: M,
 }
@@ -1076,7 +1076,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct MultiMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: Default + Copy + 'static + Serialize + Debug,
 {
     maps: Vec<OwnedSliceMut<'a, T>>,
     intervals: IntervalTree<usize, usize>,
@@ -1313,7 +1313,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct OwnedMapObserver<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize,
 {
     map: Vec<T>,
     initial: T,

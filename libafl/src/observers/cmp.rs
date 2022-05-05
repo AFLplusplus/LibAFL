@@ -195,7 +195,7 @@ where
 #[serde(bound = "CM: serde::de::DeserializeOwned")]
 pub struct StdCmpObserver<'a, CM>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
+    CM: CmpMap + Serialize,
 {
     cmp_map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,

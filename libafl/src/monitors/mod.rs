@@ -906,7 +906,6 @@ pub mod pybind {
             self.get_mut_monitor().display(event_msg, sender_id);
         }
     }
-
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonSimpleMonitor>()?;

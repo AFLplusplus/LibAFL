@@ -122,7 +122,7 @@ where
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
         if self.run_client.is_none() {
-            return Err(Error::IllegalArgument(
+            return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
             ));
         }

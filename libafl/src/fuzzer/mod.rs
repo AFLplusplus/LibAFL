@@ -198,7 +198,7 @@ where
         iters: u64,
     ) -> Result<usize, Error> {
         if iters == 0 {
-            return Err(Error::IllegalArgument(
+            return Err(Error::illegal_argument(
                 "Cannot fuzz for 0 iterations!".to_string(),
             ));
         }

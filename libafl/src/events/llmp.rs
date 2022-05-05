@@ -384,7 +384,7 @@ where
                 }
                 Ok(())
             }
-            _ => Err(Error::Unknown(format!(
+            _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event.name()
             ))),
@@ -694,7 +694,6 @@ pub fn setup_restarting_mgr_std<I, MT, OT, S>(
 >
 where
     I: Input,
-    S: DeserializeOwned,
     MT: Monitor + Clone,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
@@ -790,7 +789,7 @@ where
 
                             broker_things(event_broker, self.remote_broker_addr)?;
 
-                            return Err(Error::ShuttingDown);
+                            return Err(Error::shuttingdown());
                         }
                         LlmpConnection::IsClient { client } => {
                             let mgr =
@@ -808,7 +807,7 @@ where
 
                     broker_things(event_broker, self.remote_broker_addr)?;
 
-                    return Err(Error::ShuttingDown);
+                    return Err(Error::shuttingdown());
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
@@ -839,7 +838,7 @@ where
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                dbg!("Spawning next client (id {})", ctr);
+                println!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
                 #[cfg(all(unix, feature = "fork"))]
@@ -975,6 +974,7 @@ mod tests {
         let mut llmp_client = LlmpClient::new(
             shmem_provider.clone(),
             LlmpSharedMap::new(0, shmem_provider.new_shmem(1024).unwrap()),
+            0,
         )
         .unwrap();
 
