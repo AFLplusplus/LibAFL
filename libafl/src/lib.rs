@@ -156,8 +156,6 @@ pub enum Error {
     IllegalArgument(String, ErrorBacktrace),
     /// Forkserver related Error
     Forkserver(String, ErrorBacktrace),
-    /// MOpt related Error
-    MOpt(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
@@ -238,13 +236,6 @@ impl Error {
     {
         Error::Forkserver(arg.into(), ErrorBacktrace::new())
     }
-    /// MOpt related Error
-    pub fn mopt<S>(arg: S) -> Self
-    where
-        S: Into<String>,
-    {
-        Error::MOpt(arg.into(), ErrorBacktrace::new())
-    }
     /// Shutting down, not really an error.
     pub fn shuttingdown() -> Self {
         Error::ShuttingDown
@@ -305,10 +296,6 @@ impl fmt::Display for Error {
             }
             Self::Forkserver(s, b) => {
                 write!(f, "Forkserver : {0}", &s)?;
-                display_error_backtrace(f, b)
-            }
-            Self::MOpt(s, b) => {
-                write!(f, "MOpt: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),
