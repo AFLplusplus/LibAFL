@@ -109,12 +109,13 @@ use std::{env::VarError, io};
 pub type ErrorBacktrace = backtrace::Backtrace;
 
 #[cfg(not(feature = "errors_backtrace"))]
-#[derive(Debug)]
-/// Empty struct to use when errors_backtrace is disabled
+#[derive(Debug, Default)]
+/// Empty struct to use when `errors_backtrace` is disabled
 pub struct ErrorBacktrace {}
 #[cfg(not(feature = "errors_backtrace"))]
 impl ErrorBacktrace {
     /// Nop
+    #[must_use]
     pub fn new() -> Self {
         Self {}
     }
@@ -129,7 +130,7 @@ fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fm
     fmt::Result::Ok(())
 }
 
-/// Main error struct for LibAFL
+/// Main error struct for `LibAFL`
 #[derive(Debug)]
 pub enum Error {
     /// Serialization error
