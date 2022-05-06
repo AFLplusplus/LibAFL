@@ -678,6 +678,44 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             has_asan_observer: None, // initialized on first use
         })
     }
+
+    /// Use autodict?
+    #[must_use]
+    pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
+        self.autotokens = Some(tokens);
+        self
+    }
+
+    #[must_use]
+    /// Parse afl style command line
+    pub fn parse_afl_cmdline<IT, O>(mut self, args: IT) -> Self
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        let mut use_stdin = true;
+
+        for item in args {
+            if item.as_ref() == "@@" && use_stdin {
+                use_stdin = false;
+                res.push(OsString::from(".cur_input"));
+            } else if let Some(name) = &self.out_filename {
+                if name == item.as_ref() && use_stdin {
+                    use_stdin = false;
+                    res.push(name.clone());
+                } else {
+                    res.push(item.as_ref().to_os_string());
+                }
+            } else {
+                res.push(item.as_ref().to_os_string());
+            }
+        }
+
+        self.arguments = res;
+        self.use_stdin = use_stdin;
+        self
+    }
 }
 
 impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
@@ -778,49 +816,13 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     #[must_use]
-    /// Parse afl style command line
-    pub fn parse_afl_cmdline<IT, O>(mut self, args: IT) -> Self
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        let mut res = vec![];
-        let mut use_stdin = true;
-
-        for item in args {
-            if item.as_ref() == "@@" && use_stdin {
-                use_stdin = false;
-                res.push(OsString::from(".cur_input"));
-            } else if let Some(name) = &self.out_filename {
-                if name == item.as_ref() && use_stdin {
-                    use_stdin = false;
-                    res.push(name.clone());
-                } else {
-                    res.push(item.as_ref().to_os_string());
-                }
-            } else {
-                res.push(item.as_ref().to_os_string());
-            }
-        }
-
-        self.arguments = res;
-        self.use_stdin = use_stdin;
-        self
-    }
-
-    #[must_use]
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     pub fn debug_child(mut self, debug_child: bool) -> Self {
         self.debug_child = debug_child;
         self
     }
 
-    /// Use autodict?
-    #[must_use]
-    pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
-        self.autotokens = Some(tokens);
-        self
-    }
+
 
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
