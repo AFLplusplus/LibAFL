@@ -822,8 +822,6 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
-
-
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
