@@ -307,7 +307,7 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<'a, I, MT, SP> SimpleRestartingEventManager<I, MT, SP>
+impl<I, MT, SP> SimpleRestartingEventManager<I, MT, SP>
 where
     I: Input,
     SP: ShMemProvider,

@@ -280,7 +280,7 @@ impl Add for &Tokens {
     }
 }
 
-impl<'a, 'it> IntoIterator for &'it Tokens {
+impl<'it> IntoIterator for &'it Tokens {
     type Item = <Iter<'it, Vec<u8>> as Iterator>::Item;
     type IntoIter = Iter<'it, Vec<u8>>;
 
