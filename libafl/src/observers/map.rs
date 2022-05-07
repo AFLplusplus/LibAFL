@@ -1351,7 +1351,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsRefIterator<'it> for OwnedMapObserver<T>
+impl<'it, T> AsRefIterator<'it> for OwnedMapObserver<T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
@@ -1363,7 +1363,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsMutIterator<'it> for OwnedMapObserver<T>
+impl<'it, T> AsMutIterator<'it> for OwnedMapObserver<T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
