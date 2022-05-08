@@ -4,7 +4,7 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider},
         tuples::{tuple_list, Merge},
         AsMutSlice,
     },
@@ -24,6 +24,12 @@ use libafl::{
 };
 use nix::sys::signal::Signal;
 use std::path::PathBuf;
+
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
+
+#[cfg(not(target_vendor = "apple"))]
+use libafl::bolts::shmem::StdShMemProvider;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -74,7 +80,12 @@ pub fn main() {
     const MAP_SIZE: usize = 65536;
 
     // The default, OS-specific privider for shared memory
+    #[cfg(target_vendor = "apple")]
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+
+    #[cfg(not(target_vendor = "apple"))]
     let mut shmem_provider = StdShMemProvider::new().unwrap();
+
     // The coverage map shared between observer and executor
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     // let the forkserver know the shmid
