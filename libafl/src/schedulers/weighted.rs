@@ -1,5 +1,5 @@
 //! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
-//! This queue corpus scheduler needs calibration stage and the power schedule stage.
+//! This queue corpus scheduler needs calibration stage.
 
 use alloc::{
     string::{String, ToString},
@@ -8,10 +8,10 @@ use alloc::{
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, PowerScheduleTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData},
     inputs::Input,
     schedulers::{
-        powersched::PowerScheduleMetadata,
+        powersched::SchedulerMetadata,
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
@@ -215,6 +215,10 @@ where
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+        if !state.has_metadata::<SchedulerMetadata>() {
+            state.add_metadata(SchedulerMetadata::new(None));
+        }
+
         if !state.has_metadata::<WeightedScheduleMetadata>() {
             state.add_metadata(WeightedScheduleMetadata::new());
         }
@@ -227,21 +231,23 @@ where
                 .get(parent_idx)?
                 .borrow_mut()
                 .metadata_mut()
-                .get_mut::<PowerScheduleTestcaseMetaData>()
-                .ok_or_else(|| Error::key_not_found("PowerScheduleTestData not found".to_string()))?
+                .get_mut::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| {
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                })?
                 .depth(),
             None => 0,
         };
 
-        // Attach a `PowerScheduleTestData` to the queue entry.
+        // Attach a `SchedulerTestcaseMetaData` to the queue entry.
         depth += 1;
         state
             .corpus()
             .get(idx)?
             .borrow_mut()
-            .add_metadata(PowerScheduleTestcaseMetaData::new(depth));
+            .add_metadata(SchedulerTestcaseMetaData::new(depth));
 
-        // Recrate the alias table
+        // Recreate the alias table
         self.create_alias_table(state)?;
         Ok(())
     }
@@ -281,9 +287,9 @@ where
             if current_cycles > corpus_counts {
                 let psmeta = state
                     .metadata_mut()
-                    .get_mut::<PowerScheduleMetadata>()
+                    .get_mut::<SchedulerMetadata>()
                     .ok_or_else(|| {
-                        Error::key_not_found("PowerScheduleMetadata not found".to_string())
+                        Error::key_not_found("SchedulerMetadata not found".to_string())
                     })?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }

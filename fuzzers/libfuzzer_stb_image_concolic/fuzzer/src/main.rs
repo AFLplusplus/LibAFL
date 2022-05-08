@@ -40,7 +40,7 @@ use libafl::{
         },
         StdMapObserver, TimeObserver,
     },
-    schedulers::{IndexesLenTimeMinimizerScheduler, PowerQueueScheduler},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
         ConcolicTracingStage, ShadowTracingStage, SimpleConcolicMutationalStage,
         StdMutationalStage, TracingStage,
@@ -150,7 +150,7 @@ fn fuzz(
     println!("We're a client, let's fuzz :)");
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
