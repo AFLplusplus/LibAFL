@@ -73,7 +73,7 @@ where
         let o1_name = o1.name().to_string();
         let o2_name = o2.name().to_string();
         if o1_name == o2_name {
-            Err(Error::IllegalArgument(format!(
+            Err(Error::illegal_argument(format!(
                 "DiffFeedback: observer names must be different (both were {})",
                 o1_name
             )))
@@ -137,7 +137,7 @@ where
         OT: ObserversTuple<I, S> + MatchName,
     {
         fn err(name: &str) -> Error {
-            Error::IllegalArgument(format!("DiffFeedback: observer {} not found", name))
+            Error::illegal_argument(format!("DiffFeedback: observer {} not found", name))
         }
 
         let o1: &O1 = observers

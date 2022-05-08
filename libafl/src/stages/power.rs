@@ -96,14 +96,14 @@ where
             let observer = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
             let mut hash = observer.hash() as usize;
 
             let psmeta = state
                 .metadata_mut()
                 .get_mut::<SchedulerMetadata>()
-                .ok_or_else(|| Error::KeyNotFound("SchedulerMetadata not found".to_string()))?;
+                .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
             hash %= psmeta.n_fuzz().len();
             // Update the path frequency
@@ -117,7 +117,7 @@ where
                     .metadata_mut()
                     .get_mut::<SchedulerTestcaseMetaData>()
                     .ok_or_else(|| {
-                        Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                        Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                     })?
                     .set_n_fuzz_entry(hash);
             }

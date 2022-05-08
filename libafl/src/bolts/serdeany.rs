@@ -560,7 +560,7 @@ macro_rules! create_serde_registry_for_trait {
         }
 
         #[allow(unused_qualifications)]
-        impl<'a> Serialize for dyn $trait_name {
+        impl Serialize for dyn $trait_name {
             fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
             where
                 S: Serializer,

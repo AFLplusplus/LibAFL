@@ -73,8 +73,8 @@ where
     pub fn store_probability(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         let factor = F::compute(&mut *state.corpus().get(idx)?.borrow_mut(), state)?;
         if factor == 0.0 {
-            return Err(Error::IllegalState(
-                "Infinity probability calculated for probabilistic sampling scheduler".into(),
+            return Err(Error::illegal_state(
+                "Infinity probability calculated for probabilistic sampling scheduler",
             ));
         }
         let meta = state
@@ -105,7 +105,7 @@ where
     #[allow(clippy::cast_precision_loss)]
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::Empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from("No entries in corpus")))
         } else {
             let rand_prob: f64 = (state.rand_mut().below(100) as f64) / 100.0;
             let meta = state.metadata().get::<ProbabilityMetadata>().unwrap();

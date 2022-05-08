@@ -5,6 +5,8 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
+#[cfg(feature = "crash")]
+use std::ptr;
 use std::{env, path::PathBuf};
 
 use libafl::{
@@ -144,6 +146,14 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
+        #[cfg(feature = "crash")]
+        if buf.len() > 4 && buf[4] == 0 {
+            unsafe {
+                eprintln!("Crashing (for testing purposes)");
+                let addr = ptr::null_mut();
+                *addr = 1;
+            }
+        }
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };

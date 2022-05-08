@@ -450,7 +450,7 @@ where
                 pipe.write_all(&ok)?;
                 Ok(())
             }
-            None => Err(Error::IllegalState(
+            None => Err(Error::illegal_state(
                 "Unexpected `None` Pipe in RcShMemProvider! Missing post_fork()?".to_string(),
             )),
         }
@@ -466,13 +466,13 @@ where
                 if ret == ok {
                     Ok(())
                 } else {
-                    Err(Error::Unknown(format!(
+                    Err(Error::unknown(format!(
                         "Wrong result read from pipe! Expected 0, got {:?}",
                         ret
                     )))
                 }
             }
-            None => Err(Error::IllegalState(
+            None => Err(Error::illegal_state(
                 "Unexpected `None` Pipe in RcShMemProvider! Missing post_fork()?".to_string(),
             )),
         }
@@ -626,7 +626,7 @@ pub mod unix_shmem {
                     );
                     if shm_fd == -1 {
                         perror(b"shm_open\0".as_ptr() as *const _);
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "Failed to shm_open map with id {:?}",
                             shmem_ctr
                         )));
@@ -636,7 +636,7 @@ pub mod unix_shmem {
                     if ftruncate(shm_fd, map_size.try_into()?) != 0 {
                         perror(b"ftruncate\0".as_ptr() as *const _);
                         shm_unlink(filename_path.as_ptr() as *const _);
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "setup_shm(): ftruncate() failed for map with id {:?}",
                             shmem_ctr
                         )));
@@ -655,7 +655,7 @@ pub mod unix_shmem {
                         perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "mmap() failed for map with id {:?}",
                             shmem_ctr
                         )));
@@ -687,7 +687,7 @@ pub mod unix_shmem {
                     if map == libc::MAP_FAILED || map.is_null() {
                         perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "mmap() failed for map with fd {:?}",
                             shm_fd
                         )));
@@ -809,14 +809,14 @@ pub mod unix_shmem {
                     );
 
                     if os_id < 0_i32 {
-                        return Err(Error::Unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
+                        return Err(Error::unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
                     }
 
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map as c_int == -1 || map.is_null() {
                         shmctl(os_id, libc::IPC_RMID, ptr::null_mut());
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to map the shared mapping".to_string(),
                         ));
                     }
@@ -836,7 +836,7 @@ pub mod unix_shmem {
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
                     if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to map the shared mapping".to_string(),
                         ));
                     }
@@ -978,7 +978,7 @@ pub mod unix_shmem {
 
                     let fd = open(device_path.as_ptr(), O_RDWR);
                     if fd == -1 {
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "Failed to open the ashmem device at {:?}",
                             device_path
                         )));
@@ -986,13 +986,13 @@ pub mod unix_shmem {
 
                     //if ioctl(fd, ASHMEM_SET_NAME, name) != 0 {
                     //close(fd);
-                    //return Err(Error::Unknown("Failed to set the ashmem mapping's name".to_string()));
+                    //return Err(Error::unknown("Failed to set the ashmem mapping's name".to_string()));
                     //};
 
                     #[allow(trivial_numeric_casts)]
                     if ioctl(fd, ASHMEM_SET_SIZE as _, map_size) != 0 {
                         close(fd);
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to set the ashmem mapping's size".to_string(),
                         ));
                     };
@@ -1007,7 +1007,7 @@ pub mod unix_shmem {
                     );
                     if map == usize::MAX as *mut c_void {
                         close(fd);
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to map the ashmem mapping".to_string(),
                         ));
                     }
@@ -1026,7 +1026,7 @@ pub mod unix_shmem {
                     let fd: i32 = id.to_string().parse().unwrap();
                     #[allow(trivial_numeric_casts, clippy::cast_sign_loss)]
                     if ioctl(fd, ASHMEM_GET_SIZE as _) as u32 as usize != map_size {
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "The mapping's size differs from the requested size".to_string(),
                         ));
                     };
@@ -1041,7 +1041,7 @@ pub mod unix_shmem {
                     );
                     if map == usize::MAX as *mut c_void {
                         close(fd);
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to map the ashmem mapping".to_string(),
                         ));
                     }
@@ -1205,14 +1205,14 @@ pub mod win32_shmem {
                     PSTR(map_str_bytes.as_mut_ptr()),
                 );
                 if handle == HANDLE(0) {
-                    return Err(Error::Unknown(format!(
+                    return Err(Error::unknown(format!(
                         "Cannot create shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
-                    return Err(Error::Unknown(format!(
+                    return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
                     )));
@@ -1237,14 +1237,14 @@ pub mod win32_shmem {
                     PSTR(map_str_bytes.as_ptr() as *mut _),
                 );
                 if handle == HANDLE(0) {
-                    return Err(Error::Unknown(format!(
+                    return Err(Error::unknown(format!(
                         "Cannot open shared memory {}",
                         String::from_utf8_lossy(&map_str_bytes)
                     )));
                 }
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
-                    return Err(Error::Unknown(format!(
+                    return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(&map_str_bytes)
                     )));

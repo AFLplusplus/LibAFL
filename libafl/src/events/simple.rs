@@ -208,7 +208,7 @@ where
     // Handle arriving events in the client
     #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
     fn handle_in_client<S>(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        Err(Error::Unknown(format!(
+        Err(Error::unknown(format!(
             "Received illegal message that message should not have arrived: {:?}.",
             event
         )))
@@ -307,7 +307,7 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<'a, I, MT, SP> SimpleRestartingEventManager<I, MT, SP>
+impl<I, MT, SP> SimpleRestartingEventManager<I, MT, SP>
 where
     I: Input,
     SP: ShMemProvider,
@@ -340,7 +340,7 @@ where
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                dbg!("Spawning next client (id {})", ctr);
+                println!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
                 #[cfg(all(unix, feature = "fork"))]

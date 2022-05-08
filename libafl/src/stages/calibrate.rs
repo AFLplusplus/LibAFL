@@ -91,7 +91,7 @@ where
         let map_first = &executor
             .observers()
             .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .to_vec();
 
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
@@ -132,7 +132,7 @@ where
             let map = &executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
                 .to_vec();
 
             let history_map = &mut state
@@ -172,7 +172,7 @@ where
             let map = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
             let bitmap_size = map.count_bytes();
 
@@ -195,7 +195,7 @@ where
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
                 .ok_or_else(|| {
-                    Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?;
 
             data.set_bitmap_size(bitmap_size);

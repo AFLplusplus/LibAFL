@@ -167,7 +167,7 @@ where
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
                 .ok_or_else(|| {
-                    Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?
                 .depth(),
             None => 0,
@@ -185,7 +185,7 @@ where
 
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::Empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from("No entries in corpus")))
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {
@@ -194,7 +194,7 @@ where
                             .metadata_mut()
                             .get_mut::<SchedulerMetadata>()
                             .ok_or_else(|| {
-                                Error::KeyNotFound("SchedulerMetadata not found".to_string())
+                                Error::key_not_found("SchedulerMetadata not found".to_string())
                             })?;
                         psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
                         0
@@ -212,7 +212,7 @@ where
                 .metadata_mut()
                 .get_mut::<SchedulerTestcaseMetaData>()
                 .ok_or_else(|| {
-                    Error::KeyNotFound("SchedulerTestcaseMetaData not found".to_string())
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                 })?;
 
             if tcmeta.handicap() >= 4 {

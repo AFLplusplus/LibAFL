@@ -35,12 +35,12 @@ use crate::{bolts::ownedref::OwnedSlice, Error};
 pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     /// Write this input to the file
     fn to_file<P>(&self, _path: P) -> Result<(), Error> {
-        Err(Error::NotImplemented("Not supported in no_std".into()))
+        Err(Error::not_implemented("Not supported in no_std"))
     }
 
     /// Write this input to the file
     fn from_file<P>(_path: P) -> Result<Self, Error> {
-        Err(Error::NotImplemented("Not supprted in no_std".into()))
+        Err(Error::not_implemented("Not supprted in no_std"))
     }
 
     /// Generate a name for this input
