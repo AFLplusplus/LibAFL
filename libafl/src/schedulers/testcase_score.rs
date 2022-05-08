@@ -142,7 +142,9 @@ where
         let tcmeta = entry
             .metadata()
             .get::<SchedulerTestcaseMetaData>()
-            .ok_or_else(|| Error::key_not_found("SchedulerTestcaseMetaData not found".to_string()))?;
+            .ok_or_else(|| {
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+            })?;
 
         if q_exec_us * 0.1 > avg_exec_us {
             perf_score = 10.0;
@@ -317,7 +319,9 @@ where
         let tcmeta = entry
             .metadata()
             .get::<SchedulerTestcaseMetaData>()
-            .ok_or_else(|| Error::key_not_found("SchedulerTestcaseMetaData not found".to_string()))?;
+            .ok_or_else(|| {
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+            })?;
 
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight

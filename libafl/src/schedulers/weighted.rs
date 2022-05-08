@@ -288,7 +288,9 @@ where
                 let psmeta = state
                     .metadata_mut()
                     .get_mut::<SchedulerMetadata>()
-                    .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
+                    .ok_or_else(|| {
+                        Error::key_not_found("SchedulerMetadata not found".to_string())
+                    })?;
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
             *state.corpus_mut().current_mut() = Some(idx);
