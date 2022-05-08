@@ -55,7 +55,6 @@ namespace {
 /* Function that we never instrument or analyze */
 /* Note: this ignore check is also called in isInInstrumentList() */
 bool isIgnoreFunction(const llvm::Function *F) {
-
   // Starting from "LLVMFuzzer" these are functions used in libfuzzer based
   // fuzzing campaign installations, e.g. oss-fuzz
 
@@ -93,9 +92,7 @@ bool isIgnoreFunction(const llvm::Function *F) {
   };
 
   for (auto const &ignoreListFunc : ignoreList) {
-
     if (F->getName().startswith(ignoreListFunc)) { return true; }
-
   }
 
   static constexpr const char *ignoreSubstringList[] = {
@@ -107,38 +104,32 @@ bool isIgnoreFunction(const llvm::Function *F) {
   };
 
   for (auto const &ignoreListFunc : ignoreSubstringList) {
-
     // hexcoder: F->getName().contains() not avaiilable in llvm 3.8.0
     if (StringRef::npos != F->getName().find(ignoreListFunc)) { return true; }
-
   }
 
   return false;
-
 }
 
 class CmpLogRoutines : public ModulePass {
-
  public:
   static char ID;
-  CmpLogRoutines() : ModulePass(ID) {}
+  CmpLogRoutines() : ModulePass(ID) {
+  }
 
   bool runOnModule(Module &M) override;
 
 #if LLVM_VERSION_MAJOR < 4
   const char *getPassName() const override {
-
 #else
   StringRef getPassName() const override {
 
 #endif
     return "cmplog routines";
-
   }
 
  private:
   bool hookRtns(Module &M);
-
 };
 
 }  // namespace
@@ -146,9 +137,8 @@ class CmpLogRoutines : public ModulePass {
 char CmpLogRoutines::ID = 0;
 
 bool CmpLogRoutines::hookRtns(Module &M) {
-
   std::vector<CallInst *> calls, llvmStdStd, llvmStdC, gccStdStd, gccStdC;
-  LLVMContext &           C = M.getContext();
+  LLVMContext            &C = M.getContext();
 
   Type *VoidTy = Type::getVoidTy(C);
   // PointerType *VoidPtrTy = PointerType::get(VoidTy, 0);
@@ -246,17 +236,13 @@ bool CmpLogRoutines::hookRtns(Module &M) {
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
-
     if (isIgnoreFunction(&F)) continue;
 
     for (auto &BB : F) {
-
       for (auto &IN : BB) {
-
         CallInst *callInst = nullptr;
 
         if ((callInst = dyn_cast<CallInst>(&IN))) {
-
           Function *Callee = callInst->getCalledFunction();
           if (!Callee) continue;
           if (callInst->getCallingConv() != llvm::CallingConv::C) continue;
@@ -316,9 +302,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
 
           if (isGccStdStringCString || isGccStdStringStdString ||
               isLlvmStdStringStdString || isLlvmStdStringCString) {
-
             isPtrRtn = false;
-
           }
 
           if (isPtrRtn) { calls.push_back(callInst); }
@@ -326,13 +310,9 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           if (isGccStdStringCString) { gccStdC.push_back(callInst); }
           if (isLlvmStdStringStdString) { llvmStdStd.push_back(callInst); }
           if (isLlvmStdStringCString) { llvmStdC.push_back(callInst); }
-
         }
-
       }
-
     }
-
   }
 
   if (!calls.size() && !gccStdStd.size() && !gccStdC.size() &&
@@ -340,119 +320,104 @@ bool CmpLogRoutines::hookRtns(Module &M) {
     return false;
 
   for (auto &callInst : calls) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogHookFn, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   for (auto &callInst : gccStdStd) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogGccStdStd, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   for (auto &callInst : gccStdC) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogGccStdC, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   for (auto &callInst : llvmStdStd) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogLlvmStdStd, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   for (auto &callInst : llvmStdC) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogLlvmStdC, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   return true;
-
 }
 
 bool CmpLogRoutines::runOnModule(Module &M) {
-
   hookRtns(M);
   verifyModule(M);
 
   return true;
-
 }
 
 static void registerCmpLogRoutinesPass(const PassManagerBuilder &,
                                        legacy::PassManagerBase &PM) {
-
   auto p = new CmpLogRoutines();
   PM.add(p);
-
 }
 
 static RegisterStandardPasses RegisterCmpLogRoutinesPass(
@@ -466,4 +431,3 @@ static RegisterStandardPasses RegisterCmpLogRoutinesPassLTO(
     PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
     registerCmpLogRoutinesPass);
 #endif
-

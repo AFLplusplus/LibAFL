@@ -46,7 +46,7 @@ impl GzipCompressor {
 
         match decompressed {
             Ok(buf) => Ok(buf),
-            Err(_) => Err(Error::Compression),
+            Err(_) => Err(Error::compression()),
         }
     }
 }

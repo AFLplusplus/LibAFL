@@ -2,7 +2,7 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider},
         tuples::tuple_list,
         AsMutSlice,
     },
@@ -25,12 +25,22 @@ use libafl::{
 };
 use std::path::PathBuf;
 
+#[cfg(not(target_vendor = "apple"))]
+use libafl::bolts::shmem::StdShMemProvider;
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
+
 #[allow(clippy::similar_names)]
 pub fn main() {
     const MAP_SIZE: usize = 65536;
 
     //Coverage map shared between observer and executor
+    #[cfg(target_vendor = "apple")]
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+
+    #[cfg(not(target_vendor = "apple"))]
     let mut shmem_provider = StdShMemProvider::new().unwrap();
+
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
@@ -87,7 +97,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let mut executor = ForkserverExecutor::builder()
-        .program("./target/release/program".to_string())
+        .program("./target/release/program")
         .arg_input_file_std()
         .shmem_provider(&mut shmem_provider)
         .build(tuple_list!(bt_observer, edges_observer))

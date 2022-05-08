@@ -80,7 +80,7 @@ where
         let psmeta = state
             .metadata()
             .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+            .ok_or_else(|| Error::key_not_found("PowerScheduleMetadata not found".to_string()))?;
 
         let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
             let corpus = state.corpus();
@@ -93,7 +93,7 @@ where
                         .metadata()
                         .get::<PowerScheduleTestcaseMetaData>()
                         .ok_or_else(|| {
-                            Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                            Error::key_not_found("PowerScheduleTestData not found".to_string())
                         })?
                         .n_fuzz_entry()
                 } else {
@@ -103,7 +103,7 @@ where
                         .metadata()
                         .get::<PowerScheduleTestcaseMetaData>()
                         .ok_or_else(|| {
-                            Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                            Error::key_not_found("PowerScheduleTestData not found".to_string())
                         })?
                         .n_fuzz_entry()
                 };
@@ -112,7 +112,7 @@ where
             }
 
             if n_paths == 0 {
-                return Err(Error::Unknown(String::from("Queue state corrput")));
+                return Err(Error::unknown(String::from("Queue state corrput")));
             }
 
             v /= f64::from(n_paths);
@@ -124,7 +124,7 @@ where
         let mut perf_score = 100.0;
         let q_exec_us = entry
             .exec_time()
-            .ok_or_else(|| Error::KeyNotFound("exec_time not set".to_string()))?
+            .ok_or_else(|| Error::key_not_found("exec_time not set".to_string()))?
             .as_nanos() as f64;
 
         let avg_exec_us = psmeta.exec_time().as_nanos() as f64 / psmeta.cycles() as f64;
@@ -135,7 +135,7 @@ where
             .metadata()
             .get::<PowerScheduleTestcaseMetaData>()
             .ok_or_else(|| {
-                Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
+                Error::key_not_found("PowerScheduleTestcaseMetaData not found".to_string())
             })?;
 
         if q_exec_us * 0.1 > avg_exec_us {
@@ -300,12 +300,12 @@ where
         let psmeta = state
             .metadata()
             .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+            .ok_or_else(|| Error::key_not_found("PowerScheduleMetadata not found".to_string()))?;
 
         let tcmeta = entry
             .metadata()
             .get::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+            .ok_or_else(|| Error::key_not_found("PowerScheduleTestData not found".to_string()))?;
 
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
@@ -315,7 +315,7 @@ where
 
         let q_exec_us = entry
             .exec_time()
-            .ok_or_else(|| Error::KeyNotFound("exec_time not set".to_string()))?
+            .ok_or_else(|| Error::key_not_found("exec_time not set".to_string()))?
             .as_nanos() as f64;
         let favored = entry.has_metadata::<IsFavoredMetadata>();
 
@@ -346,7 +346,7 @@ where
         let avg_top_size = state
             .metadata()
             .get::<TopRatedsMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("TopRatedsMetadata not found".to_string()))?
+            .ok_or_else(|| Error::key_not_found("TopRatedsMetadata not found".to_string()))?
             .map()
             .len() as f64;
         weight *= 1.0 + (tc_ref / avg_top_size);

@@ -167,7 +167,7 @@ where
                 .borrow_mut()
                 .metadata_mut()
                 .get_mut::<PowerScheduleTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?
+                .ok_or_else(|| Error::key_not_found("PowerScheduleTestData not found".to_string()))?
                 .depth(),
             None => 0,
         };
@@ -184,7 +184,7 @@ where
 
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::Empty(String::from("No entries in corpus")))
+            Err(Error::empty(String::from("No entries in corpus")))
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {
@@ -193,7 +193,7 @@ where
                             .metadata_mut()
                             .get_mut::<PowerScheduleMetadata>()
                             .ok_or_else(|| {
-                                Error::KeyNotFound("PowerScheduleMetadata not found".to_string())
+                                Error::key_not_found("PowerScheduleMetadata not found".to_string())
                             })?;
                         psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
                         0
