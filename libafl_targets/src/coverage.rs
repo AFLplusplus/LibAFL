@@ -47,8 +47,8 @@ pub fn autotokens() -> Result<Tokens, Error> {
     unsafe {
         if __token_start.is_null() || __token_stop.is_null() {
             return Err(Error::illegal_state(
-                "AutoTokens section not found, likely the target is not compiled with AutoTokens"
-            ))
+                "AutoTokens section not found, likely the target is not compiled with AutoTokens",
+            ));
         } else {
             // we can safely unwrap
             Tokens::from_ptrs(__token_start, __token_stop)
