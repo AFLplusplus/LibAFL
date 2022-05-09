@@ -285,7 +285,7 @@ impl CompilerWrapper for ClangWrapper {
         if self.use_new_pm {
             args.push("-fexperimental-new-pass-manager".into());
         } else {
-            args.push("-fno-experimental-new-pass-manager".into());
+            args.push("-flegacy-pass-manager".into());
         }
         for pass in &self.passes {
             if self.use_new_pm {

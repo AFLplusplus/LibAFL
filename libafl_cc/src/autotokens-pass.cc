@@ -466,7 +466,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
           // we handle the 2nd parameter first because of llvm memcpy
           if (!HasStr2) {
             auto *Ptr = dyn_cast<ConstantExpr>(Str2P);
-            if (Ptr && Ptr->isGEPWithNoNotionalOverIndexing()) {
+            if (Ptr && Ptr->getOpcode() == Instruction::GetElementPtr) {
               if (auto *Var = dyn_cast<GlobalVariable>(Ptr->getOperand(0))) {
                 if (Var->hasInitializer()) {
                   if (auto *Array =
@@ -515,7 +515,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
           if (!HasStr1) {
             auto Ptr = dyn_cast<ConstantExpr>(Str1P);
 
-            if (Ptr && Ptr->isGEPWithNoNotionalOverIndexing()) {
+            if (Ptr && Ptr->getOpcode() == Instruction::GetElementPtr) {
               if (auto *Var = dyn_cast<GlobalVariable>(Ptr->getOperand(0))) {
                 if (Var->hasInitializer()) {
                   if (auto *Array =
