@@ -90,7 +90,9 @@ where
             Duration::from_secs(1)
         };
 
-        executor.observers_mut().post_exec_all(state, &input, &exit_kind)?;
+        executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
 
         let map_first = &executor
             .observers()
@@ -134,7 +136,9 @@ where
 
             total_time += current_time() - start;
 
-            executor.observers_mut().post_exec_all(state, &input, &exit_kind)?;
+            executor
+                .observers_mut()
+                .post_exec_all(state, &input, &exit_kind)?;
 
             let map = &executor
                 .observers()
