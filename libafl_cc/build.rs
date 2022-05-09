@@ -206,7 +206,7 @@ fn main() {
             .args(&cxxflags)
             .args(&custom_flags)
             .arg(src_dir.join("autotokens-pass.cc"))
-            .arg("-DUSE_NEW_PM")
+            //.arg("-DUSE_NEW_PM")
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])
             .arg(out_dir.join(format!("autotokens-pass.{}", dll_extension())))
