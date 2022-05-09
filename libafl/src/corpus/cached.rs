@@ -104,8 +104,8 @@ where
     /// Creates the [`CachedOnDiskCorpus`].
     pub fn new(dir_path: PathBuf, cache_max_len: usize) -> Result<Self, Error> {
         if cache_max_len == 0 {
-            return Err(Error::IllegalArgument(
-                "The max cache len in CachedOnDiskCorpus cannot be 0".into(),
+            return Err(Error::illegal_argument(
+                "The max cache len in CachedOnDiskCorpus cannot be 0",
             ));
         }
         Ok(Self {
@@ -122,8 +122,8 @@ where
         cache_max_len: usize,
     ) -> Result<Self, Error> {
         if cache_max_len == 0 {
-            return Err(Error::IllegalArgument(
-                "The max cache len in CachedOnDiskCorpus cannot be 0".into(),
+            return Err(Error::illegal_argument(
+                "The max cache len in CachedOnDiskCorpus cannot be 0",
             ));
         }
         Ok(Self {

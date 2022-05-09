@@ -10,6 +10,7 @@ use tui::{backend::CrosstermBackend, Terminal};
 
 use std::{
     collections::VecDeque,
+    fmt::Write,
     io::{self, BufRead},
     string::String,
     sync::{Arc, RwLock},
@@ -285,7 +286,7 @@ impl Monitor for TuiMonitor {
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {
-            fmt += &format!(", {}: {}", key, val);
+            write!(fmt, ", {}: {}", key, val).unwrap();
         }
 
         {

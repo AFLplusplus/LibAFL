@@ -86,7 +86,7 @@ where
     phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
 }
 
-impl<'a, CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
+impl<CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
@@ -122,7 +122,7 @@ where
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
         if self.run_client.is_none() {
-            return Err(Error::IllegalArgument(
+            return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
             ));
         }

@@ -159,8 +159,8 @@ fn main() {
             .expect("Failed to execute llvm-config");
         let ldflags = str::from_utf8(&output.stdout).expect("Invalid llvm-config output");
 
-        let cxxflags: Vec<&str> = cxxflags.trim().split_whitespace().collect();
-        let mut ldflags: Vec<&str> = ldflags.trim().split_whitespace().collect();
+        let cxxflags: Vec<&str> = cxxflags.split_whitespace().collect();
+        let mut ldflags: Vec<&str> = ldflags.split_whitespace().collect();
 
         let sdk_path;
         if env::var("CARGO_CFG_TARGET_VENDOR").unwrap().as_str() == "apple" {

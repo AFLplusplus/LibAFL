@@ -159,7 +159,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {
-            Err(Error::Empty("Input Empty".into()))
+            Err(Error::empty("Input Empty"))
         } else {
             Ok(ExitKind::Ok)
         }
