@@ -658,9 +658,6 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
 
 
-#if USE_NEW_PM
-
-#else
   // Type
   ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
   // The actual dict
@@ -678,6 +675,9 @@ bool AutoTokensPass::runOnModule(Module &M) {
 #endif
 }
 
+#if USE_NEW_PM
+
+#else
 static void registerAutoTokensPass(const PassManagerBuilder &,
                                    legacy::PassManagerBase &PM) {
   PM.add(new AutoTokensPass());
