@@ -35,6 +35,11 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
 
+#if USE_NEW_PM
+#else
+  #include "llvm/IR/LegacyPassManager.h"
+  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#endif
 
 #if LLVM_VERSION_MAJOR >= 11
   #include "llvm/Passes/PassPlugin.h"
@@ -43,7 +48,6 @@
 #else
   #include "llvm/IR/LegacyPassManager.h"
 #endif
-
 
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/IR/BasicBlock.h"
@@ -143,11 +147,9 @@ bool isIgnoreFunction(const llvm::Function *F) {
 }
 
 #if USE_NEW_PM
-class AutoTokensPass : public PassInfoMixin<AutoTokensPass>{
-  public:
-    AutoTokensPass() {
-
-
+class AutoTokensPass : public PassInfoMixin<AutoTokensPass> {
+ public:
+  AutoTokensPass() {
 #else
 class AutoTokensPass : public ModulePass {
  public:
@@ -155,7 +157,6 @@ class AutoTokensPass : public ModulePass {
 
   AutoTokensPass() : ModulePass(ID) {
 #endif
-
   }
 
 #if USE_NEW_PM
@@ -174,7 +175,6 @@ class AutoTokensPass : public ModulePass {
 #if USE_NEW_PM
 extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
 llvmGetPassPluginInfo() {
-
   return {LLVM_PLUGIN_API_VERSION, "AutoTokensPass", "v0.1",
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
@@ -184,13 +184,9 @@ llvmGetPassPluginInfo() {
   #endif
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
-
                   MPM.addPass(AutoTokensPass());
-
                 });
-
           }};
-
 }
 #else
 char AutoTokensPass::ID = 0;
@@ -225,9 +221,8 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
   fsync(fd);
 }
 
-# if USE_NEW_PM
+#if USE_NEW_PM
 PreservedAnalyses AutoTokensPass::run(Module &M, ModuleAnalysisManager &MAM) {
-
 #else
 bool AutoTokensPass::runOnModule(Module &M) {
 
@@ -619,12 +614,12 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
   if (use_file) {
     close(fd);
-  #if USE_NEW_PM
+#if USE_NEW_PM
     auto PA = PreservedAnalyses::all();
     return PA;
-  #else
+#else
     return true;
-  #endif
+#endif
   }
 
   LLVMContext &Ctx = M.getContext();
@@ -654,9 +649,6 @@ bool AutoTokensPass::runOnModule(Module &M) {
       count++;
     }
   }
-
-
-
 
   // Type
   ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
