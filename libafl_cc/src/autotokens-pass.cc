@@ -36,12 +36,6 @@
 #include "llvm/IR/IRBuilder.h"
 
 #if USE_NEW_PM
-#else
-  #include "llvm/IR/LegacyPassManager.h"
-  #include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#endif
-
-#if LLVM_VERSION_MAJOR >= 11
   #include "llvm/Passes/PassPlugin.h"
   #include "llvm/Passes/PassBuilder.h"
   #include "llvm/IR/PassManager.h"
