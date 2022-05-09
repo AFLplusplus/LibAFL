@@ -73,15 +73,12 @@ where
             .clone();
 
         // Run once to get the initial calibration map
-        executor
-            .observers_mut()
-            .match_name_mut::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-            .reset_map()?;
+        executor.observers_mut().pre_exec_all(state, &input)?;
 
         let mut start = current_time();
 
-        let mut total_time = if executor.run_target(fuzzer, state, mgr, &input)? == ExitKind::Ok {
+        let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+        let mut total_time = if exit_kind == ExitKind::Ok {
             current_time() - start
         } else {
             mgr.log(
@@ -92,6 +89,8 @@ where
             // assume one second as default time
             Duration::from_secs(1)
         };
+
+        executor.observers_mut().post_exec_all(state, &input, &exit_kind)?;
 
         let map_first = &executor
             .observers()
@@ -113,14 +112,11 @@ where
                 .load_input()?
                 .clone();
 
-            executor
-                .observers_mut()
-                .match_name_mut::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
-                .reset_map()?;
+            executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
 
-            if executor.run_target(fuzzer, state, mgr, &input)? != ExitKind::Ok {
+            let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+            if exit_kind != ExitKind::Ok {
                 if !has_errors {
                     mgr.log(
                         state,
@@ -137,6 +133,8 @@ where
             };
 
             total_time += current_time() - start;
+
+            executor.observers_mut().post_exec_all(state, &input, &exit_kind)?;
 
             let map = &executor
                 .observers()
