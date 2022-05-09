@@ -25,6 +25,7 @@ cli = ["clap"]  # expose bolts::cli
 qemu_cli = ["cli"]
 frida_cli = ["cli"]
 afl_exec_sec = [] # calculate exec/sec like AFL
+errors_backtrace = ["backtrace"]
 
 # features hiding dependencies licensed under GPL
 gpl = []
@@ -77,7 +78,7 @@ uuid = { version = "0.8.2", optional = true, features = ["serde", "v4"] }
 libm = "0.2.1"
 tui = { version = "0.16", default-features = false, features = ['crossterm'], optional = true }
 crossterm = { version = "0.20", optional = true }
-clap = {version = "3.0", features = ["derive", "wrap_help"], optional = true}
+clap = {version = "3.1", features = ["derive", "wrap_help"], optional = true}
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 

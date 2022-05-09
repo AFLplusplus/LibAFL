@@ -1,15 +1,15 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
 use crate::{
-    bolts::current_time,
-    corpus::{Corpus, PowerScheduleTestcaseMetaData},
+    bolts::{current_time, tuples::MatchName},
+    corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{FeedbackState, MapFeedbackState},
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    schedulers::powersched::PowerScheduleMetadata,
+    schedulers::powersched::SchedulerMetadata,
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasFeedbackObjectiveStates, HasMetadata},
     Error,
@@ -90,7 +90,7 @@ where
         let map_first = &executor
             .observers()
             .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .to_vec();
 
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
@@ -131,7 +131,7 @@ where
             let map = &executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
                 .to_vec();
 
             let feedback_objective_states = state.feedback_objective_states();
@@ -162,26 +162,23 @@ where
             }
         };
 
-        // If power schedule is used, update it
-        let use_powerschedule = state.has_metadata::<PowerScheduleMetadata>()
+        // If weighted scheduler or powerscheduler is used, update it
+        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
             && state
                 .corpus()
                 .get(corpus_idx)?
                 .borrow()
-                .has_metadata::<PowerScheduleTestcaseMetaData>();
+                .has_metadata::<SchedulerTestcaseMetaData>();
 
         if use_powerschedule {
             let map = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
             let bitmap_size = map.count_bytes();
 
-            let psmeta = state
-                .metadata_mut()
-                .get_mut::<PowerScheduleMetadata>()
-                .unwrap();
+            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>().unwrap();
             let handicap = psmeta.queue_cycles();
 
             psmeta.set_exec_time(psmeta.exec_time() + total_time);
@@ -198,8 +195,10 @@ where
 
             let data = testcase
                 .metadata_mut()
-                .get_mut::<PowerScheduleTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+                .get_mut::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| {
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                })?;
 
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);

@@ -1127,7 +1127,7 @@ fn from_hex(hex: u8) -> Result<u8, Error> {
         48..=57 => Ok(hex - 48),
         65..=70 => Ok(hex - 55),
         97..=102 => Ok(hex - 87),
-        _ => Err(Error::IllegalArgument("Invalid hex character".to_owned())),
+        _ => Err(Error::illegal_argument("Invalid hex character".to_owned())),
     }
 }
 

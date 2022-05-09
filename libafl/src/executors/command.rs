@@ -279,15 +279,15 @@ where
         for (pos, arg) in args.into_iter().enumerate() {
             if pos == 0 {
                 if arg.as_ref() == afl_delim {
-                    return Err(Error::IllegalArgument(
-                        "The first argument must not be @@ but the program to execute".into(),
+                    return Err(Error::illegal_argument(
+                        "The first argument must not be @@ but the program to execute",
                     ));
                 }
                 builder.program(arg);
             } else if arg.as_ref() == afl_delim {
                 if atat_at.is_some() {
-                    return Err(Error::IllegalArgument(
-                        "Multiple @@ in afl commandline are not permitted".into(),
+                    return Err(Error::illegal_argument(
+                        "Multiple @@ in afl commandline are not permitted",
                     ));
                 }
                 atat_at = Some(pos);
@@ -344,8 +344,8 @@ where
         if self.has_asan_observer || self.has_stderr_observer {
             let mut stderr = String::new();
             child.stderr.as_mut().ok_or_else(|| {
-                Error::IllegalState(
-                    "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor".into(),
+                Error::illegal_state(
+                    "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
                 )
             })?.read_to_string(&mut stderr)?;
             if self.has_asan_observer {
@@ -364,8 +364,8 @@ where
         if self.has_stdout_observer {
             let mut stdout = String::new();
             child.stdout.as_mut().ok_or_else(|| {
-                Error::IllegalState(
-                    "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor".into(),
+                Error::illegal_state(
+                    "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor",
                 )
             })?.read_to_string(&mut stdout)?;
             self.observers
@@ -540,8 +540,8 @@ impl CommandExecutorBuilder {
         let program = if let Some(program) = &self.program {
             program
         } else {
-            return Err(Error::IllegalArgument(
-                "ComandExecutor::builder: no program set!".into(),
+            return Err(Error::illegal_argument(
+                "ComandExecutor::builder: no program set!",
             ));
         };
         let mut command = Command::new(program);

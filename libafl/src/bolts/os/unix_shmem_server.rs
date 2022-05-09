@@ -571,7 +571,7 @@ where
             ServedShMemRequest::Exit => {
                 println!("ShMemService - Exiting");
                 // stopping the server
-                return Err(Error::ShuttingDown);
+                return Err(Error::shuttingdown());
             }
         };
         // println!("send ashmem client: {}, response: {:?}", client_id, &response);
@@ -637,7 +637,7 @@ where
                 *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                 cvar.notify_one();
 
-                return Err(Error::Unknown(format!(
+                return Err(Error::unknown(format!(
                     "The ShMem server appears to already be running. We are probably a client. Error: {:?}", err)));
             }
         };

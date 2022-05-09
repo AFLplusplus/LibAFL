@@ -30,7 +30,7 @@ pub trait HashSetState<T> {
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 pub struct NewHashFeedbackState<T>
 where
-    T: PrimInt + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Hash + Debug,
+    T: PrimInt + Default + Copy + 'static + Serialize + Hash + Debug,
 {
     /// Contains information about untouched entries
     pub hash_set: HashSet<T>,

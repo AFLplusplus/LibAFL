@@ -80,7 +80,7 @@ where
     /// Gets the next entry at random
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_owned()))
+            Err(Error::empty("No entries in corpus".to_owned()))
         } else {
             let len = state.corpus().count();
             let id = state.rand_mut().below(len as u64) as usize;

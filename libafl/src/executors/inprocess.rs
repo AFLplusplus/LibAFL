@@ -23,7 +23,7 @@ use alloc::boxed::Box;
 use std::intrinsics::transmute;
 
 #[cfg(all(feature = "std", unix))]
-use libc::{siginfo_t, ucontext_t};
+use libc::siginfo_t;
 
 #[cfg(all(feature = "std", unix))]
 use nix::{
@@ -42,7 +42,7 @@ use crate::bolts::shmem::ShMemProvider;
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(all(feature = "std", unix))]
-use crate::bolts::os::unix_signals::{Handler, Signal};
+use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
 
 use crate::{
     events::{EventFirer, EventRestarter},
@@ -1675,14 +1675,14 @@ where
 /// signal handlers and `panic_hooks` for the child process
 #[cfg(all(feature = "std", unix))]
 pub mod child_signal_handlers {
-    use libc::{siginfo_t, ucontext_t};
+    use libc::siginfo_t;
     use std::panic;
 
     use super::InProcessForkExecutorGlobalData;
 
     use super::FORK_EXECUTOR_GLOBAL_DATA;
     use crate::{
-        bolts::os::unix_signals::Signal,
+        bolts::os::unix_signals::{ucontext_t, Signal},
         executors::{ExitKind, HasObservers},
         inputs::Input,
         observers::ObserversTuple,

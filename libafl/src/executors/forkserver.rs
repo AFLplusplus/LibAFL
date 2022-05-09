@@ -209,7 +209,7 @@ impl Forkserver {
         {
             Ok(_) => (),
             Err(err) => {
-                return Err(Error::Forkserver(format!(
+                return Err(Error::illegal_state(format!(
                     "Could not spawn the forkserver: {:#?}",
                     err
                 )))
@@ -292,7 +292,7 @@ impl Forkserver {
         let st_read = match self.st_pipe.read_end() {
             Some(fd) => fd,
             None => {
-                return Err(Error::File(io::Error::new(
+                return Err(Error::file(io::Error::new(
                     ErrorKind::BrokenPipe,
                     "Read pipe end was already closed",
                 )));
@@ -314,7 +314,7 @@ impl Forkserver {
                 let val: i32 = i32::from_ne_bytes(buf);
                 Ok(Some(val))
             } else {
-                Err(Error::Forkserver(
+                Err(Error::unknown(
                     "Unable to communicate with fork server (OOM?)".to_string(),
                 ))
             }
@@ -417,20 +417,20 @@ where
         self.executor.forkserver_mut().set_last_run_timed_out(0);
 
         if send_len != 4 {
-            return Err(Error::Forkserver(
+            return Err(Error::unknown(
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
         }
 
         let (recv_pid_len, pid) = self.executor.forkserver_mut().read_st()?;
         if recv_pid_len != 4 {
-            return Err(Error::Forkserver(
+            return Err(Error::unknown(
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
         }
 
         if pid <= 0 {
-            return Err(Error::Forkserver(
+            return Err(Error::unknown(
                 "Fork server is misbehaving (OOM?)".to_string(),
             ));
         }
@@ -455,9 +455,7 @@ where
             let _ = kill(self.executor.forkserver().child_pid(), self.signal);
             let (recv_status_len, _) = self.executor.forkserver_mut().read_st()?;
             if recv_status_len != 4 {
-                return Err(Error::Forkserver(
-                    "Could not kill timed-out child".to_string(),
-                ));
+                return Err(Error::unknown("Could not kill timed-out child".to_string()));
             }
             exit_kind = ExitKind::Timeout;
         }
@@ -601,7 +599,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 (t.clone(), forkserver)
             }
             None => {
-                return Err(Error::IllegalArgument(
+                return Err(Error::illegal_argument(
                     "ForkserverExecutorBuilder::build: target file not found".to_string(),
                 ))
             }
@@ -610,9 +608,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         let (rlen, status) = forkserver.read_st()?; // Initial handshake, read 4-bytes hello message from the forkserver.
 
         if rlen != 4 {
-            return Err(Error::Forkserver(
-                "Failed to start a forkserver".to_string(),
-            ));
+            return Err(Error::unknown("Failed to start a forkserver".to_string()));
         }
         println!("All right - fork server is up.");
         // If forkserver is responding, we then check if there's any option enabled.
@@ -631,24 +627,22 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
 
             let send_len = forkserver.write_ctl(send_status)?;
             if send_len != 4 {
-                return Err(Error::Forkserver(
-                    "Writing to forkserver failed.".to_string(),
-                ));
+                return Err(Error::unknown("Writing to forkserver failed.".to_string()));
             }
 
             if (send_status & FS_OPT_AUTODICT) == FS_OPT_AUTODICT {
                 let (read_len, dict_size) = forkserver.read_st()?;
                 if read_len != 4 {
-                    return Err(Error::Forkserver(
+                    return Err(Error::unknown(
                         "Reading from forkserver failed.".to_string(),
                     ));
                 }
 
                 if !(2..=0xffffff).contains(&dict_size) {
-                    return Err(Error::Forkserver(format!(
+                    return Err(Error::illegal_state(
                         "Dictionary has an illegal size of {} (should be in range 2 to 0xFFFFFF).",
                         dict_size
-                    )));
+                    ));
                 }
 
                 println!("Autodict size {:x}", dict_size);
@@ -656,9 +650,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
 
                 if rlen != dict_size as usize {
-                    return Err(Error::Forkserver(
-                        "Failed to load autodictionary".to_string(),
-                    ));
+                    return Err(Error::unknown("Failed to load autodictionary".to_string()));
                 }
 
                 if let Some(t) = &mut self.autotokens {
@@ -686,6 +678,44 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             phantom: PhantomData,
             has_asan_observer: None, // initialized on first use
         })
+    }
+
+    /// Use autodict?
+    #[must_use]
+    pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
+        self.autotokens = Some(tokens);
+        self
+    }
+
+    #[must_use]
+    /// Parse afl style command line
+    pub fn parse_afl_cmdline<IT, O>(mut self, args: IT) -> Self
+    where
+        IT: IntoIterator<Item = O>,
+        O: AsRef<OsStr>,
+    {
+        let mut res = vec![];
+        let mut use_stdin = true;
+
+        for item in args {
+            if item.as_ref() == "@@" && use_stdin {
+                use_stdin = false;
+                res.push(OsString::from(".cur_input"));
+            } else if let Some(name) = &self.out_filename {
+                if name == item.as_ref() && use_stdin {
+                    use_stdin = false;
+                    res.push(name.clone());
+                } else {
+                    res.push(item.as_ref().to_os_string());
+                }
+            } else {
+                res.push(item.as_ref().to_os_string());
+            }
+        }
+
+        self.arguments = res;
+        self.use_stdin = use_stdin;
+        self
     }
 }
 
@@ -787,47 +817,9 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 
     #[must_use]
-    /// Parse afl style command line
-    pub fn parse_afl_cmdline<IT, O>(mut self, args: IT) -> Self
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        let mut res = vec![];
-        let mut use_stdin = true;
-
-        for item in args {
-            if item.as_ref() == "@@" && use_stdin {
-                use_stdin = false;
-                res.push(OsString::from(".cur_input"));
-            } else if let Some(name) = &self.out_filename {
-                if name == item.as_ref() && use_stdin {
-                    use_stdin = false;
-                    res.push(name.clone());
-                } else {
-                    res.push(item.as_ref().to_os_string());
-                }
-            } else {
-                res.push(item.as_ref().to_os_string());
-            }
-        }
-
-        self.arguments = res;
-        self.use_stdin = use_stdin;
-        self
-    }
-
-    #[must_use]
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     pub fn debug_child(mut self, debug_child: bool) -> Self {
         self.debug_child = debug_child;
-        self
-    }
-
-    /// Use autodict?
-    #[must_use]
-    pub fn autotokens(mut self, tokens: &'a mut Tokens) -> Self {
-        self.autotokens = Some(tokens);
         self
     }
 
@@ -891,20 +883,20 @@ where
             .forkserver
             .write_ctl(self.forkserver().last_run_timed_out())?;
         if send_len != 4 {
-            return Err(Error::Forkserver(
+            return Err(Error::illegal_state(
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
         }
 
         let (recv_pid_len, pid) = self.forkserver.read_st()?;
         if recv_pid_len != 4 {
-            return Err(Error::Forkserver(
+            return Err(Error::illegal_state(
                 "Unable to request new process from fork server (OOM?)".to_string(),
             ));
         }
 
         if pid <= 0 {
-            return Err(Error::Forkserver(
+            return Err(Error::unknown(
                 "Fork server is misbehaving (OOM?)".to_string(),
             ));
         }
@@ -913,7 +905,7 @@ where
 
         let (recv_status_len, status) = self.forkserver.read_st()?;
         if recv_status_len != 4 {
-            return Err(Error::Forkserver(
+            return Err(Error::unknown(
                 "Unable to communicate with fork server (OOM?)".to_string(),
             ));
         }
@@ -1059,7 +1051,7 @@ mod tests {
         let result = match executor {
             Ok(_) => true,
             Err(e) => match e {
-                Error::Forkserver(s) => s == "Failed to start a forkserver",
+                Error::Unknown(s, _) => s == "Failed to start a forkserver",
                 _ => false,
             },
         };
