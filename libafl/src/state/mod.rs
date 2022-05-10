@@ -11,7 +11,7 @@ use std::{
 use crate::{
     bolts::{
         rands::Rand,
-        serdeany::{SerdeAny, SerdeAnyMap},
+        serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
@@ -110,6 +110,32 @@ pub trait HasMetadata {
     }
 }
 
+/// Trait for elements offering named metadata
+pub trait HasNamedMetadata {
+    /// A map, storing all metadata
+    fn named_metadata(&self) -> &NamedSerdeAnyMap;
+    /// A map, storing all metadata (mutable)
+    fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap;
+
+    /// Add a metadata to the metadata map
+    #[inline]
+    fn add_named_metadata<M>(&mut self, meta: M, name: &str)
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_mut().insert(meta, name);
+    }
+
+    /// Check for a metadata
+    #[inline]
+    fn has_named_metadata<M>(&self, name: &str) -> bool
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata().contains::<M>(name)
+    }
+}
+
 /// Trait for elements offering a feedback
 pub trait HasFeedbackStates {
     /// The associated feedback type implementing [`FeedbackStatesTuple`].
@@ -164,6 +190,8 @@ where
     solutions: SC,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
+    /// Metadata stored with names
+    named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
     /// The stability of the current fuzzing process
@@ -273,6 +301,27 @@ where
     #[inline]
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
+    }
+}
+
+impl<C, FT, I, R, SC> HasNamedMetadata for StdState<C, FT, I, R, SC>
+where
+    C: Corpus<I>,
+    I: Input,
+    R: Rand,
+    FT: FeedbackStatesTuple,
+    SC: Corpus<I>,
+{
+    /// Get all the metadata into an [`hashbrown::HashMap`]
+    #[inline]
+    fn named_metadata(&self) -> &NamedSerdeAnyMap {
+        &self.named_metadata
+    }
+
+    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
+    #[inline]
+    fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap {
+        &mut self.named_metadata
     }
 }
 
@@ -568,6 +617,7 @@ where
             stability: None,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
+            named_metadata: NamedSerdeAnyMap::default(),
             corpus,
             feedback_states,
             solutions,

@@ -302,6 +302,15 @@ macro_rules! create_serde_registry_for_trait {
                 map: HashMap<u64, HashMap<u64, Box<dyn $trait_name>>>,
             }
 
+            // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
+            // We unwrap postcard, it should not have a reason to fail.
+            impl Clone for NamedSerdeAnyMap {
+                fn clone(&self) -> Self {
+                    let serialized = postcard::to_allocvec(&self).unwrap();
+                    postcard::from_bytes(&serialized).unwrap()
+                }
+            }
+
             #[allow(unused_qualifications)]
             impl NamedSerdeAnyMap {
                 /// Get an element by name
@@ -496,15 +505,18 @@ macro_rules! create_serde_registry_for_trait {
                 /// Insert an element into this map.
                 #[inline]
                 #[allow(unused_qualifications)]
-                pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &str) {
-                    let id = unpack_type_id((*val).type_id());
+                pub fn insert<T>(&mut self, val: T, name: &str)
+                where
+                    T: $trait_name,
+                {
+                    let id = unpack_type_id(TypeId::of::<T>());
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
                     }
                     self.map
                         .get_mut(&id)
                         .unwrap()
-                        .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), val);
+                        .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), Box::new(val));
                 }
 
                 /// Returns the `len` of this map.
@@ -590,12 +602,22 @@ macro_rules! create_serde_registry_for_trait {
 create_serde_registry_for_trait!(serdeany_registry, crate::bolts::serdeany::SerdeAny);
 pub use serdeany_registry::*;
 
+#[cfg(feature = "std")]
+#[allow(missing_docs)]
+pub trait RegistryAtStartup {
+    fn serdeany_registry_at_startup();
+}
+
 /// Implement a [`SerdeAny`], registering it in the [`RegistryBuilder`]
 #[cfg(feature = "std")]
 #[macro_export]
 macro_rules! impl_serdeany {
-    ($struct_name:ident) => {
-        impl $crate::bolts::serdeany::SerdeAny for $struct_name {
+    ($struct_name:ident, $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ ) =>
+    {
+        impl < $( $lt $( : $clt $(+ $dlt )* )? ),+ >
+            $crate::bolts::serdeany::SerdeAny
+            for $struct_name < $( $lt ),+ >
+        {
             fn as_any(&self) -> &dyn ::core::any::Any {
                 self
             }
@@ -605,16 +627,61 @@ macro_rules! impl_serdeany {
             }
 
             fn as_any_boxed(
-                self: ::std::boxed::Box<Self>,
+                self: ::std::boxed::Box<$struct_name < $( $lt ),+ >>,
             ) -> ::std::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }
 
-        #[allow(non_snake_case)]
-        #[$crate::ctor]
-        fn $struct_name() {
-            $crate::bolts::serdeany::RegistryBuilder::register::<$struct_name>();
+        impl < $( $lt $( : $clt $(+ $dlt )* )? ),+ >
+            $crate::bolts::serdeany::RegistryAtStartup
+            for $struct_name < $( $lt ),+ >
+        {
+            #[cfg_attr(any(target_os = "linux", target_os = "android"), link_section = ".init_array")]
+            #[cfg_attr(target_os = "freebsd", link_section = ".init_array")]
+            #[cfg_attr(target_os = "netbsd", link_section = ".init_array")]
+            #[cfg_attr(target_os = "openbsd", link_section = ".init_array")]
+            #[cfg_attr(target_os = "illumos", link_section = ".init_array")]
+            #[cfg_attr(any(target_os = "macos", target_os = "ios"), link_section = "__DATA,__mod_init_func")]
+            #[cfg_attr(target_os = "windows", link_section = ".CRT$XCU")]
+            fn serdeany_registry_at_startup() {
+                crate::bolts::serdeany::RegistryBuilder::register::< $struct_name < $( $lt ),+ > >();
+            }
+        }
+    };
+    ($struct_name:ident) =>
+    {
+        impl $crate::bolts::serdeany::SerdeAny
+            for $struct_name
+        {
+            fn as_any(&self) -> &dyn ::core::any::Any {
+                self
+            }
+
+            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
+                self
+            }
+
+            fn as_any_boxed(
+                self: ::std::boxed::Box<$struct_name>,
+            ) -> ::std::boxed::Box<dyn ::core::any::Any> {
+                self
+            }
+        }
+
+        impl $crate::bolts::serdeany::RegistryAtStartup
+            for $struct_name
+        {
+            #[cfg_attr(any(target_os = "linux", target_os = "android"), link_section = ".init_array")]
+            #[cfg_attr(target_os = "freebsd", link_section = ".init_array")]
+            #[cfg_attr(target_os = "netbsd", link_section = ".init_array")]
+            #[cfg_attr(target_os = "openbsd", link_section = ".init_array")]
+            #[cfg_attr(target_os = "illumos", link_section = ".init_array")]
+            #[cfg_attr(any(target_os = "macos", target_os = "ios"), link_section = "__DATA,__mod_init_func")]
+            #[cfg_attr(target_os = "windows", link_section = ".CRT$XCU")]
+            fn serdeany_registry_at_startup() {
+                $crate::bolts::serdeany::RegistryBuilder::register::<$struct_name>();
+            }
         }
     };
 }
@@ -623,8 +690,12 @@ macro_rules! impl_serdeany {
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! impl_serdeany {
-    ($struct_name:ident) => {
-        impl $crate::bolts::serdeany::SerdeAny for $struct_name {
+    ($struct_name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)?) =>
+    {
+        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?
+            $crate::bolts::serdeany::SerdeAny
+            for $struct_name $(< $( $lt ),+ >)?
+        {
             fn as_any(&self) -> &dyn ::core::any::Any {
                 self
             }
@@ -634,8 +705,8 @@ macro_rules! impl_serdeany {
             }
 
             fn as_any_boxed(
-                self: ::alloc::boxed::Box<Self>,
-            ) -> ::alloc::boxed::Box<dyn ::core::any::Any> {
+                self: ::std::boxed::Box<$struct_name $(< $( $lt ),+ >)?>,
+            ) -> ::std::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }

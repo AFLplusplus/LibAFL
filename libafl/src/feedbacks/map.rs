@@ -7,7 +7,7 @@ use alloc::{
 use core::ops::{BitAnd, BitOr};
 use core::{fmt::Debug, marker::PhantomData};
 use num_traits::PrimInt;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bolts::{
@@ -273,7 +273,7 @@ impl MapNoveltiesMetadata {
 
 /// The state of [`MapFeedback`]
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "T: serde::de::DeserializeOwned")]
+#[serde(bound = "T: DeserializeOwned")]
 pub struct MapFeedbackState<T>
 where
     T: Default + Copy + 'static + Serialize,
@@ -284,9 +284,11 @@ where
     pub name: String,
 }
 
+crate::impl_serdeany!(MapFeedbackState, T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned);
+
 impl<T> FeedbackState for MapFeedbackState<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
 {
     fn reset(&mut self) -> Result<(), Error> {
         self.history_map.iter_mut().for_each(|x| *x = T::default());
@@ -296,7 +298,7 @@ where
 
 impl<T> Named for MapFeedbackState<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize + DeserializeOwned,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -306,7 +308,7 @@ where
 
 impl<T> MapFeedbackState<T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize + DeserializeOwned,
 {
     /// Create new `MapFeedbackState`
     #[must_use]
@@ -344,7 +346,7 @@ where
 #[derive(Clone, Debug)]
 pub struct MapFeedback<I, N, O, R, S, T>
 where
-    T: PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
@@ -365,7 +367,7 @@ where
 
 impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
 where
-    T: PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
@@ -471,7 +473,7 @@ where
 
 impl<I, N, O, R, S, T> Named for MapFeedback<I, N, O, R, S, T>
 where
-    T: PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
@@ -486,7 +488,7 @@ where
 
 impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
-    T: PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
