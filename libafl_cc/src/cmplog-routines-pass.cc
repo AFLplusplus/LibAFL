@@ -447,10 +447,13 @@ PreservedAnalyses CmpLogRoutines::run(Module &M, ModuleAnalysisManager &MAM) {
 bool CmpLogRoutines::runOnModule(Module &M) {
 #endif
   hookRtns(M);
-  verifyModule(M);
 
 #if USE_NEW_PM
   auto PA = PreservedAnalyses::all();
+#endif
+  verifyModule(M);
+
+#if USE_NEW_PM
   return PA;
 #else
   return true;
