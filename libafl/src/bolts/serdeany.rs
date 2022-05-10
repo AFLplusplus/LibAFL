@@ -645,7 +645,7 @@ macro_rules! impl_serdeany {
             #[cfg_attr(any(target_os = "macos", target_os = "ios"), link_section = "__DATA,__mod_init_func")]
             #[cfg_attr(target_os = "windows", link_section = ".CRT$XCU")]
             fn serdeany_registry_at_startup() {
-                crate::bolts::serdeany::RegistryBuilder::register::<$struct_name $(< $( $lt ),+ >)?>();
+                $crate::bolts::serdeany::RegistryBuilder::register::<$struct_name $(< $( $lt ),+ >)?>();
             }
         }
     };
