@@ -140,7 +140,9 @@ llvmGetPassPluginInfo() {
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
   #if 1
+    #if LLVM_VERSION_MAJOR <= 13
             using OptimizationLevel = typename PassBuilder::OptimizationLevel;
+    #endif
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(AFLCoverage());
@@ -254,20 +256,35 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       /* Load prev_loc */
 
-      LoadInst *PrevLoc = IRB.CreateLoad(AFLPrevLoc);
+      LoadInst *PrevLoc = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+          Int32Ty,
+#endif
+          AFLPrevLoc);
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
       /* Load SHM pointer */
 
-      LoadInst *MemReadPtr = IRB.CreateLoad(AFLMemOpPtr);
+      LoadInst *MemReadPtr = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+          PointerType::get(Int32Ty, 0),
+#endif
+          AFLMemOpPtr);
       MemReadPtr->setMetadata(M.getMDKindID("nosanitize"),
                               MDNode::get(C, None));
-      Value *MemReadPtrIdx =
-          IRB.CreateGEP(MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
+      Value *MemReadPtrIdx = IRB.CreateGEP(
+#if LLVM_VERSION_MAJOR >= 14
+          Int32Ty,
+#endif
+          MemReadPtr, IRB.CreateXor(PrevLoc, CurLoc));
 
       /* Update bitmap */
 
-      LoadInst *MemReadCount = IRB.CreateLoad(MemReadPtrIdx);
+      LoadInst *MemReadCount = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+          Int32Ty,
+#endif
+          MemReadPtrIdx);
       MemReadCount->setMetadata(M.getMDKindID("nosanitize"),
                                 MDNode::get(C, None));
       Value *MemReadIncr =
