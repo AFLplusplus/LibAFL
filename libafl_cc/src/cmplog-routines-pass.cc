@@ -111,13 +111,24 @@ bool isIgnoreFunction(const llvm::Function *F) {
   return false;
 }
 
+#if USE_NEW_PM
+class CmpLogRoutines : public PassInfoMixin<CmpLogRoutines> {
+ public:
+  CmpLogRoutines() {
+#else
+
 class CmpLogRoutines : public ModulePass {
  public:
   static char ID;
   CmpLogRoutines() : ModulePass(ID) {
+#endif
   }
 
-  bool runOnModule(Module &M) override;
+#if USE_NEW_PM
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
+#else
+  bool      runOnModule(Module &M) override;
+#endif
 
 #if LLVM_VERSION_MAJOR < 4
   const char *getPassName() const override {
@@ -134,7 +145,23 @@ class CmpLogRoutines : public ModulePass {
 
 }  // namespace
 
+#if USE_NEW_PM
+extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
+llvmGetPassPluginInfo() {
+  return {LLVM_PLUGIN_API_VERSION, "CmpLogRoutines", "v0.1",
+          [](PassBuilder &PB) {
+  #if LLVM_VERSION_MAJOR <= 13
+            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
+  #endif
+            PB.registerOptimizerLastEPCallback(
+                [](ModulePassManager &MPM, OptimizationLevel OL) {
+                  MPM.addPass(CmpLogRoutines());
+                });
+          }};
+}
+#else
 char CmpLogRoutines::ID = 0;
+#endif
 
 bool CmpLogRoutines::hookRtns(Module &M) {
   std::vector<CallInst *> calls, llvmStdStd, llvmStdC, gccStdStd, gccStdC;
@@ -407,13 +434,24 @@ bool CmpLogRoutines::hookRtns(Module &M) {
   return true;
 }
 
+#if USE_NEW_PM
+PreservedAnalyses CmpLogRoutines::run(Module &M, ModuleAnalysisManager &MAM) {
+#else
 bool CmpLogRoutines::runOnModule(Module &M) {
+#endif
   hookRtns(M);
   verifyModule(M);
 
+#if USE_NEW_PM
+  auto PA = PreservedAnalyses::all();
+  return PA;
+#else
   return true;
+#endif
 }
 
+#if USE_NEW_PM
+#else
 static void registerCmpLogRoutinesPass(const PassManagerBuilder &,
                                        legacy::PassManagerBase &PM) {
   auto p = new CmpLogRoutines();
@@ -426,8 +464,10 @@ static RegisterStandardPasses RegisterCmpLogRoutinesPass(
 static RegisterStandardPasses RegisterCmpLogRoutinesPass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerCmpLogRoutinesPass);
 
-#if LLVM_VERSION_MAJOR >= 11
+  #if LLVM_VERSION_MAJOR >= 11
 static RegisterStandardPasses RegisterCmpLogRoutinesPassLTO(
     PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
     registerCmpLogRoutinesPass);
+  #endif
+
 #endif
