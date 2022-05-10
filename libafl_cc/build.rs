@@ -112,6 +112,19 @@ fn main() {
 
     let llvm_config = find_llvm_config();
 
+    let llvm_version = llvm_config.split('-').collect::<Vec<&str>>()[2]
+        .parse::<usize>()
+        .ok();
+
+    match llvm_version {
+        Some(ver) => {
+            if ver >= 14 {
+                custom_flags.push("-DUSE_NEW_PM".to_string())
+            }
+        }
+        None => (),
+    }
+
     if let Ok(output) = Command::new(&llvm_config).args(&["--bindir"]).output() {
         let llvm_bindir = Path::new(
             str::from_utf8(&output.stdout)
@@ -132,11 +145,15 @@ fn main() {
 
             /// The size of the accounting maps
             pub const ACCOUNTING_MAP_SIZE: usize = {};
+
+            /// The llvm version used to build llvm passes
+            pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = {:?};
             ",
             llvm_bindir.join("clang"),
             llvm_bindir.join("clang++"),
             edges_map_size,
-            acc_map_size
+            acc_map_size,
+            llvm_version,
         )
         .expect("Could not write file");
 
