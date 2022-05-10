@@ -111,10 +111,13 @@ fn main() {
     custom_flags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={}", acc_map_size));
 
     let llvm_config = find_llvm_config();
-
-    let llvm_version = llvm_config.split('-').collect::<Vec<&str>>()[2]
-        .parse::<usize>()
-        .ok();
+    
+    let llvm_version = match llvm_config.split('-').collect::<Vec<&str>>().get(2) {
+        Some(ver) => {
+            ver.parse::<usize>().ok()
+        },
+        None => None,
+    };
 
     match llvm_version {
         Some(ver) => {
