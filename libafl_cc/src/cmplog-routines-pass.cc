@@ -25,9 +25,16 @@
 #include <sys/time.h>
 #include "llvm/Config/llvm-config.h"
 
+#if USE_NEW_PM
+  #include "llvm/Passes/PassPlugin.h"
+  #include "llvm/Passes/PassBuilder.h"
+  #include "llvm/IR/PassManager.h"
+#else
+  #include "llvm/IR/LegacyPassManager.h"
+#endif
+
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -127,17 +134,17 @@ class CmpLogRoutines : public ModulePass {
 #if USE_NEW_PM
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 #else
-  bool      runOnModule(Module &M) override;
-#endif
+  bool        runOnModule(Module &M) override;
 
-#if LLVM_VERSION_MAJOR < 4
+  #if LLVM_VERSION_MAJOR < 4
   const char *getPassName() const override {
-#else
+  #else
   StringRef getPassName() const override {
 
-#endif
+  #endif
     return "cmplog routines";
   }
+#endif
 
  private:
   bool hookRtns(Module &M);
