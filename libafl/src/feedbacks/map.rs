@@ -284,7 +284,9 @@ where
     pub name: String,
 }
 
-crate::impl_serdeany!(MapFeedbackState, T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned);
+crate::impl_serdeany!(
+    MapFeedbackState<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>
+);
 
 impl<T> FeedbackState for MapFeedbackState<T>
 where

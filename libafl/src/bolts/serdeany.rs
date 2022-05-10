@@ -612,11 +612,11 @@ pub trait RegistryAtStartup {
 #[cfg(feature = "std")]
 #[macro_export]
 macro_rules! impl_serdeany {
-    ($struct_name:ident, $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ ) =>
+    ($struct_name:ident $(< $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ >)?) =>
     {
-        impl < $( $lt $( : $clt $(+ $dlt )* )? ),+ >
+        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?
             $crate::bolts::serdeany::SerdeAny
-            for $struct_name < $( $lt ),+ >
+            for $struct_name $(< $( $lt ),+ >)?
         {
             fn as_any(&self) -> &dyn ::core::any::Any {
                 self
@@ -627,15 +627,15 @@ macro_rules! impl_serdeany {
             }
 
             fn as_any_boxed(
-                self: ::std::boxed::Box<$struct_name < $( $lt ),+ >>,
+                self: ::std::boxed::Box<$struct_name $(< $( $lt ),+ >)?>,
             ) -> ::std::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }
 
-        impl < $( $lt $( : $clt $(+ $dlt )* )? ),+ >
+        impl $(< $( $lt $( : $clt $(+ $dlt )* )? ),+ >)?
             $crate::bolts::serdeany::RegistryAtStartup
-            for $struct_name < $( $lt ),+ >
+            for $struct_name $(< $( $lt ),+ >)?
         {
             #[cfg_attr(any(target_os = "linux", target_os = "android"), link_section = ".init_array")]
             #[cfg_attr(target_os = "freebsd", link_section = ".init_array")]
@@ -645,42 +645,7 @@ macro_rules! impl_serdeany {
             #[cfg_attr(any(target_os = "macos", target_os = "ios"), link_section = "__DATA,__mod_init_func")]
             #[cfg_attr(target_os = "windows", link_section = ".CRT$XCU")]
             fn serdeany_registry_at_startup() {
-                crate::bolts::serdeany::RegistryBuilder::register::< $struct_name < $( $lt ),+ > >();
-            }
-        }
-    };
-    ($struct_name:ident) =>
-    {
-        impl $crate::bolts::serdeany::SerdeAny
-            for $struct_name
-        {
-            fn as_any(&self) -> &dyn ::core::any::Any {
-                self
-            }
-
-            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
-                self
-            }
-
-            fn as_any_boxed(
-                self: ::std::boxed::Box<$struct_name>,
-            ) -> ::std::boxed::Box<dyn ::core::any::Any> {
-                self
-            }
-        }
-
-        impl $crate::bolts::serdeany::RegistryAtStartup
-            for $struct_name
-        {
-            #[cfg_attr(any(target_os = "linux", target_os = "android"), link_section = ".init_array")]
-            #[cfg_attr(target_os = "freebsd", link_section = ".init_array")]
-            #[cfg_attr(target_os = "netbsd", link_section = ".init_array")]
-            #[cfg_attr(target_os = "openbsd", link_section = ".init_array")]
-            #[cfg_attr(target_os = "illumos", link_section = ".init_array")]
-            #[cfg_attr(any(target_os = "macos", target_os = "ios"), link_section = "__DATA,__mod_init_func")]
-            #[cfg_attr(target_os = "windows", link_section = ".CRT$XCU")]
-            fn serdeany_registry_at_startup() {
-                $crate::bolts::serdeany::RegistryBuilder::register::<$struct_name>();
+                crate::bolts::serdeany::RegistryBuilder::register::<$struct_name $(< $( $lt ),+ >)?>();
             }
         }
     };
