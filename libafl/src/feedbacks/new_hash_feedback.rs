@@ -39,6 +39,7 @@ where
     pub hash_set: HashSet<T>,
 }
 
+#[rustfmt::skip]
 crate::impl_serdeany!(
     NewHashFeedbackMetadata<
         T: PrimInt + Default + Copy + 'static + Serialize + DeserializeOwned + Hash + Debug
