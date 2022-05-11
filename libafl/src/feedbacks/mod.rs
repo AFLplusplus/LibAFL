@@ -27,7 +27,7 @@ use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchName, Named},
+    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -53,7 +53,7 @@ where
 {
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+    fn init_state(&mut self, _state: &mut S) -> Result<(), Error> {
         Ok(())
     }
 

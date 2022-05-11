@@ -306,7 +306,7 @@ where
     }
 
     /// Reset the map
-    fn reset(&mut self) -> Result<(), Error> {
+    pub fn reset(&mut self) -> Result<(), Error> {
         self.history_map.iter_mut().for_each(|x| *x = T::default());
         Ok(())
     }
@@ -346,7 +346,7 @@ where
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(MapFeedbackMetadata::<T>::default(), &self.name)?;
+        state.add_named_metadata(MapFeedbackMetadata::<T>::default(), &self.name);
         Ok(())
     }
 
@@ -479,7 +479,7 @@ where
         Self {
             indexes: None,
             novelties: None,
-            name: MAPFEEDBACK_PREFIX + map_observer.name(),
+            name: MAPFEEDBACK_PREFIX.to_string() + &map_observer.name(),
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
         }
@@ -491,7 +491,7 @@ where
         Self {
             indexes: if track_indexes { Some(vec![]) } else { None },
             novelties: if track_novelties { Some(vec![]) } else { None },
-            name: MAPFEEDBACK_PREFIX + map_observer.name(),
+            name: MAPFEEDBACK_PREFIX.to_string() + &map_observer.name(),
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
         }
@@ -527,7 +527,8 @@ where
     }
 
     #[inline]
-    fn observer_name(&self) -> &str {
+    /// The name associated to the map observer
+    pub fn observer_name(&self) -> &str {
         self.observer_name.as_str()
     }
 }

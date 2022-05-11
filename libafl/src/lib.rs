@@ -73,8 +73,6 @@ Welcome to `LibAFL`
 extern crate alloc;
 #[macro_use]
 extern crate static_assertions;
-#[cfg(feature = "std")]
-pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
 #[cfg(feature = "libafl_derive")]

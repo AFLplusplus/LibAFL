@@ -7,7 +7,7 @@ use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchName, Named},
+    bolts::tuples::Named,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
@@ -40,7 +40,9 @@ where
 }
 
 crate::impl_serdeany!(
-    NewHashFeedbackMetadata<T: PrimInt + Default + Copy + 'static + Serialize + DeserializeOwned + Hash + Debug>
+    NewHashFeedbackMetadata<
+        T: PrimInt + Default + Copy + 'static + Serialize + DeserializeOwned + Hash + Debug
+    >
 );
 
 impl<T> NewHashFeedbackMetadata<T>
@@ -49,12 +51,12 @@ where
 {
     /// Create a new [`NewHashFeedbackMetadata`]
     #[must_use]
-    pub fn new(name: &'static str) -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 
     /// Reset the internal state
-    fn reset(&mut self) -> Result<(), Error> {
+    pub fn reset(&mut self) -> Result<(), Error> {
         self.hash_set.clear();
         Ok(())
     }
@@ -92,7 +94,7 @@ where
     O: ObserverWithHashField + Named + Debug,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(NewHashFeedbackMetadata::<u64>::default(), &self.name)?;
+        state.add_named_metadata(NewHashFeedbackMetadata::<u64>::default(), &self.name);
         Ok(())
     }
 
@@ -159,7 +161,7 @@ where
     #[must_use]
     pub fn new(observer: &O) -> Self {
         Self {
-            name: NEWHASHFEEDBACK_PREFIX + observer.name().to_string(),
+            name: NEWHASHFEEDBACK_PREFIX.to_string() + &observer.name().to_string(),
             observer_name: observer.name().to_string(),
             o_type: PhantomData,
         }

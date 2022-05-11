@@ -156,6 +156,7 @@ pub trait HasStartTime {
 
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "C: serde::Serialize + for<'a> serde::Deserialize<'a>")]
 pub struct StdState<C, I, R, SC>
 where
     C: Corpus<I>,

@@ -137,7 +137,7 @@ where
 
             let history_map = &mut state
                 .named_metadata_mut()
-                .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_observer_name)
+                .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
                 .unwrap()
                 .history_map;
 
