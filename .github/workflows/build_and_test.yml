@@ -110,6 +110,7 @@ jobs:
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         key: ${{ github.job }}-${{ matrix.os }}
+        max-size: 2000M
     - name: enable mult-thread for `make`
       run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - uses: Swatinem/rust-cache@v1
