@@ -11,7 +11,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bolts::{
-        tuples::{MatchName, Named},
+        //tuples::{MatchName, Named},
+        tuples::Named,
         AsMutSlice, AsRefIterator, AsSlice, HasRefCnt,
     },
     corpus::Testcase,
@@ -21,7 +22,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfMonitor, HasFeedbackStates, HasMetadata, HasNamedMetadata},
     Error,
 };
 
@@ -353,7 +354,7 @@ where
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
-    S: HasFeedbackStates,
+    S: HasFeedbackStates + HasNamedMetadata,
 {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
@@ -375,7 +376,7 @@ where
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasFeedbackStates + HasClientPerfMonitor + Debug,
+    S: HasFeedbackStates + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -396,10 +397,11 @@ where
         let size = observer.usable_count();
         let initial = observer.initial();
 
-        let map_state = state
-            .feedback_states_mut()
-            .match_name_mut::<MapFeedbackState<T>>(&self.name)
-            .unwrap();
+        //let map_state = state
+        //    .feedback_states_mut()
+        //    .match_name_mut::<MapFeedbackState<T>>(&self.name)
+        //    .unwrap();
+        let map_state = state.named_metadata_mut().get_mut::<MapFeedbackState<T>>(&self.name).unwrap();
 
         assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
 
@@ -480,7 +482,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasFeedbackStates,
+    S: HasFeedbackStates + HasNamedMetadata,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -495,7 +497,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasFeedbackStates,
+    S: HasFeedbackStates + HasNamedMetadata,
 {
     /// Create new `MapFeedback`
     #[must_use]

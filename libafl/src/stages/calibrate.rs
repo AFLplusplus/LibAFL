@@ -2,7 +2,7 @@
 
 use crate::{
     bolts::current_time,
-    bolts::tuples::MatchName,
+    //bolts::tuples::MatchName,
     corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
@@ -12,7 +12,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata, HasNamedMetadata},
     Error,
 };
 use alloc::string::{String, ToString};
@@ -45,7 +45,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
+    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor + HasNamedMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -135,11 +135,13 @@ where
                 .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
                 .to_vec();
 
-            let history_map = &mut state
+            /*let history_map = &mut state
                 .feedback_states_mut()
                 .match_name_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name)
                 .unwrap()
-                .history_map;
+                .history_map;*/
+
+            let history_map = &mut state.named_metadata_mut().get_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name).unwrap().history_map;
 
             for j in 0..map_len {
                 if map_first[j] != map[j] && history_map[j] != O::Entry::max_value() {
