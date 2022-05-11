@@ -10,21 +10,20 @@ use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bolts::{
-        //tuples::{MatchName, Named},
-        tuples::Named,
-        AsMutSlice, AsRefIterator, AsSlice, HasRefCnt,
-    },
+    bolts::{tuples::Named, AsMutSlice, AsRefIterator, AsSlice, HasRefCnt},
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::{Feedback, FeedbackState},
+    feedbacks::Feedback,
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasFeedbackStates, HasMetadata, HasNamedMetadata},
+    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
     Error,
 };
+
+/// The prefix of the metadata names
+pub const MAPFEEDBACK_PREFIX: &'static str = "mapfeedback_metadata_";
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
 pub type AflMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, OrReducer, S, T>;
@@ -273,75 +272,43 @@ impl MapNoveltiesMetadata {
 }
 
 /// The state of [`MapFeedback`]
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "T: DeserializeOwned")]
-pub struct MapFeedbackState<T>
+pub struct MapFeedbackMetadata<T>
 where
     T: Default + Copy + 'static + Serialize,
 {
     /// Contains information about untouched entries
     pub history_map: Vec<T>,
-    /// Name identifier of this instance
-    pub name: String,
 }
 
 crate::impl_serdeany!(
-    MapFeedbackState<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>
+    MapFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>
 );
 
-impl<T> FeedbackState for MapFeedbackState<T>
+impl<T> MapFeedbackMetadata<T>
 where
-    T: Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
+    T: Default + Copy + 'static + Serialize + DeserializeOwned,
 {
+    /// Create new `MapFeedbackMetadata`
+    #[must_use]
+    pub fn new(map_size: usize) -> Self {
+        Self {
+            history_map: vec![T::default(); map_size],
+        }
+    }
+
+    /// Create new `MapFeedbackMetadata` using a name and a map.
+    /// The map can be shared.
+    #[must_use]
+    pub fn with_history_map(history_map: Vec<T>) -> Self {
+        Self { history_map }
+    }
+
+    /// Reset the map
     fn reset(&mut self) -> Result<(), Error> {
         self.history_map.iter_mut().for_each(|x| *x = T::default());
         Ok(())
-    }
-}
-
-impl<T> Named for MapFeedbackState<T>
-where
-    T: Default + Copy + 'static + Serialize + DeserializeOwned,
-{
-    #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-impl<T> MapFeedbackState<T>
-where
-    T: Default + Copy + 'static + Serialize + DeserializeOwned,
-{
-    /// Create new `MapFeedbackState`
-    #[must_use]
-    pub fn new(name: &'static str, map_size: usize) -> Self {
-        Self {
-            history_map: vec![T::default(); map_size],
-            name: name.to_string(),
-        }
-    }
-
-    /// Create new `MapFeedbackState` for the observer type.
-    pub fn with_observer<O>(map_observer: &O) -> Self
-    where
-        O: MapObserver<Entry = T>,
-        T: PartialEq + Debug,
-    {
-        Self {
-            history_map: vec![map_observer.initial(); map_observer.len()],
-            name: map_observer.name().to_string(),
-        }
-    }
-
-    /// Create new `MapFeedbackState` using a name and a map.
-    /// The map can be shared.
-    #[must_use]
-    pub fn with_history_map(name: &'static str, history_map: Vec<T>) -> Self {
-        Self {
-            history_map,
-            name: name.to_string(),
-        }
     }
 }
 
@@ -354,7 +321,7 @@ where
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
-    S: HasFeedbackStates + HasNamedMetadata,
+    S: HasNamedMetadata,
 {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
@@ -376,8 +343,13 @@ where
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasFeedbackStates + HasNamedMetadata + HasClientPerfMonitor + Debug,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        state.add_named_metadata(MapFeedbackMetadata::<T>::default(), &self.name)?;
+        Ok(())
+    }
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
@@ -397,13 +369,15 @@ where
         let size = observer.usable_count();
         let initial = observer.initial();
 
-        //let map_state = state
-        //    .feedback_states_mut()
-        //    .match_name_mut::<MapFeedbackState<T>>(&self.name)
-        //    .unwrap();
-        let map_state = state.named_metadata_mut().get_mut::<MapFeedbackState<T>>(&self.name).unwrap();
+        let map_state = state
+            .named_metadata_mut()
+            .get_mut::<MapFeedbackMetadata<T>>(&self.name)
+            .unwrap();
+        if map_state.history_map.len() < observer.len() {
+            map_state.history_map.resize(observer.len(), T::default());
+        }
 
-        assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
+        // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
 
         assert!(size <= observer.len());
 
@@ -482,7 +456,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasFeedbackStates + HasNamedMetadata,
+    S: HasNamedMetadata,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -497,15 +471,15 @@ where
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasFeedbackStates + HasNamedMetadata,
+    S: HasNamedMetadata,
 {
     /// Create new `MapFeedback`
     #[must_use]
-    pub fn new(feedback_state: &MapFeedbackState<T>, map_observer: &O) -> Self {
+    pub fn new(map_observer: &O) -> Self {
         Self {
             indexes: None,
             novelties: None,
-            name: feedback_state.name().to_string(),
+            name: MAPFEEDBACK_PREFIX + map_observer.name(),
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
         }
@@ -513,16 +487,11 @@ where
 
     /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
     #[must_use]
-    pub fn new_tracking(
-        feedback_state: &MapFeedbackState<T>,
-        map_observer: &O,
-        track_indexes: bool,
-        track_novelties: bool,
-    ) -> Self {
+    pub fn new_tracking(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
         Self {
             indexes: if track_indexes { Some(vec![]) } else { None },
             novelties: if track_novelties { Some(vec![]) } else { None },
-            name: feedback_state.name().to_string(),
+            name: MAPFEEDBACK_PREFIX + map_observer.name(),
             observer_name: map_observer.name().to_string(),
             phantom: PhantomData,
         }
@@ -555,6 +524,11 @@ where
             name: name.to_string(),
             phantom: PhantomData,
         }
+    }
+
+    #[inline]
+    fn observer_name(&self) -> &str {
+        self.observer_name.as_str()
     }
 }
 
@@ -682,7 +656,7 @@ mod tests {
 #[cfg(feature = "python")]
 /// Map Feedback Python bindings
 pub mod pybind {
-    use crate::feedbacks::map::{MapFeedbackState, MaxMapFeedback};
+    use crate::feedbacks::map::{MapFeedbackMetadata, MaxMapFeedback};
     use crate::inputs::BytesInput;
     use pyo3::prelude::*;
 
@@ -694,10 +668,10 @@ pub mod pybind {
 
             #[pyclass(unsendable, name = $map_feedback_state_py_name)]
             #[derive(Clone, Debug)]
-            /// Python class for MapFeedbackState
+            /// Python class for MapFeedbackMetadata
             pub struct $map_feedback_state_struct_name {
-                /// Rust wrapped MapFeedbackState object
-                pub map_feedback_state: MapFeedbackState<$datatype>,
+                /// Rust wrapped MapFeedbackMetadata object
+                pub map_feedback_state: MapFeedbackMetadata<$datatype>,
             }
 
             #[pymethods]
@@ -705,7 +679,7 @@ pub mod pybind {
                 #[staticmethod]
                 fn with_observer(py_observer: &$map_observer_name) -> Self {
                     Self {
-                        map_feedback_state: MapFeedbackState::with_observer(py_observer),
+                        map_feedback_state: MapFeedbackMetadata::with_observer(py_observer),
                     }
                 }
             }
@@ -746,8 +720,8 @@ pub mod pybind {
     }
 
     define_python_map_feedback!(
-        PythonMapFeedbackStateI8,
-        "MapFeedbackStateI8",
+        PythonMapFeedbackMetadataI8,
+        "MapFeedbackMetadataI8",
         PythonMaxMapFeedbackI8,
         "MaxMapFeedbackI8",
         i8,
@@ -756,8 +730,8 @@ pub mod pybind {
     );
 
     define_python_map_feedback!(
-        PythonMapFeedbackStateI16,
-        "MapFeedbackStateI16",
+        PythonMapFeedbackMetadataI16,
+        "MapFeedbackMetadataI16",
         PythonMaxMapFeedbackI16,
         "MaxMapFeedbackI16",
         i16,
@@ -765,8 +739,8 @@ pub mod pybind {
         MyStdStateI16
     );
     define_python_map_feedback!(
-        PythonMapFeedbackStateI32,
-        "MapFeedbackStateI32",
+        PythonMapFeedbackMetadataI32,
+        "MapFeedbackMetadataI32",
         PythonMaxMapFeedbackI32,
         "MaxMapFeedbackI32",
         i32,
@@ -774,8 +748,8 @@ pub mod pybind {
         MyStdStateI32
     );
     define_python_map_feedback!(
-        PythonMapFeedbackStateI64,
-        "MapFeedbackStateI64",
+        PythonMapFeedbackMetadataI64,
+        "MapFeedbackMetadataI64",
         PythonMaxMapFeedbackI64,
         "MaxMapFeedbackI64",
         i64,
@@ -784,8 +758,8 @@ pub mod pybind {
     );
 
     define_python_map_feedback!(
-        PythonMapFeedbackStateU8,
-        "MapFeedbackStateU8",
+        PythonMapFeedbackMetadataU8,
+        "MapFeedbackMetadataU8",
         PythonMaxMapFeedbackU8,
         "MaxMapFeedbackU8",
         u8,
@@ -794,8 +768,8 @@ pub mod pybind {
     );
 
     define_python_map_feedback!(
-        PythonMapFeedbackStateU16,
-        "MapFeedbackStateU16",
+        PythonMapFeedbackMetadataU16,
+        "MapFeedbackMetadataU16",
         PythonMaxMapFeedbackU16,
         "MaxMapFeedbackU16",
         u16,
@@ -803,8 +777,8 @@ pub mod pybind {
         MyStdStateU16
     );
     define_python_map_feedback!(
-        PythonMapFeedbackStateU32,
-        "MapFeedbackStateU32",
+        PythonMapFeedbackMetadataU32,
+        "MapFeedbackMetadataU32",
         PythonMaxMapFeedbackU32,
         "MaxMapFeedbackU32",
         u32,
@@ -812,8 +786,8 @@ pub mod pybind {
         MyStdStateU32
     );
     define_python_map_feedback!(
-        PythonMapFeedbackStateU64,
-        "MapFeedbackStateU64",
+        PythonMapFeedbackMetadataU64,
+        "MapFeedbackMetadataU64",
         PythonMaxMapFeedbackU64,
         "MaxMapFeedbackU64",
         u64,
@@ -823,15 +797,15 @@ pub mod pybind {
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonMapFeedbackStateI8>()?;
-        m.add_class::<PythonMapFeedbackStateI16>()?;
-        m.add_class::<PythonMapFeedbackStateI32>()?;
-        m.add_class::<PythonMapFeedbackStateI64>()?;
+        m.add_class::<PythonMapFeedbackMetadataI8>()?;
+        m.add_class::<PythonMapFeedbackMetadataI16>()?;
+        m.add_class::<PythonMapFeedbackMetadataI32>()?;
+        m.add_class::<PythonMapFeedbackMetadataI64>()?;
 
-        m.add_class::<PythonMapFeedbackStateU8>()?;
-        m.add_class::<PythonMapFeedbackStateU16>()?;
-        m.add_class::<PythonMapFeedbackStateU32>()?;
-        m.add_class::<PythonMapFeedbackStateU64>()?;
+        m.add_class::<PythonMapFeedbackMetadataU8>()?;
+        m.add_class::<PythonMapFeedbackMetadataU16>()?;
+        m.add_class::<PythonMapFeedbackMetadataU32>()?;
+        m.add_class::<PythonMapFeedbackMetadataU64>()?;
 
         m.add_class::<PythonMaxMapFeedbackI8>()?;
         m.add_class::<PythonMaxMapFeedbackI16>()?;

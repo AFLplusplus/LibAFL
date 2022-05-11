@@ -1,18 +1,17 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
 use crate::{
-    bolts::current_time,
-    //bolts::tuples::MatchName,
+    bolts::{current_time, tuples::Named, AsRefIterator},
     corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::MapFeedbackState,
+    feedbacks::map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata, HasNamedMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata},
     Error,
 };
 use alloc::string::{String, ToString};
@@ -27,9 +26,10 @@ where
     I: Input,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata,
+    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
 {
     map_observer_name: String,
+    map_name: String,
     stage_max: usize,
     phantom: PhantomData<(I, O, OT, S)>,
 }
@@ -45,7 +45,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor + HasNamedMetadata,
+    S: HasCorpus<I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -135,13 +135,11 @@ where
                 .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
                 .to_vec();
 
-            /*let history_map = &mut state
-                .feedback_states_mut()
-                .match_name_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name)
+            let history_map = &mut state
+                .named_metadata_mut()
+                .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_observer_name)
                 .unwrap()
-                .history_map;*/
-
-            let history_map = &mut state.named_metadata_mut().get_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name).unwrap().history_map;
+                .history_map;
 
             for j in 0..map_len {
                 if map_first[j] != map[j] && history_map[j] != O::Entry::max_value() {
@@ -213,12 +211,20 @@ where
     I: Input,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata,
+    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
-    pub fn new(map_observer_name: &O) -> Self {
+    pub fn new<N, R>(map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>) -> Self
+    where
+        O::Entry:
+            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+        R: Reducer<O::Entry>,
+        for<'it> O: AsRefIterator<'it, Item = O::Entry>,
+        N: IsNovel<O::Entry>,
+    {
         Self {
-            map_observer_name: map_observer_name.name().to_string(),
+            map_observer_name: map_feedback.observer_name().to_string(),
+            map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
             phantom: PhantomData,
         }

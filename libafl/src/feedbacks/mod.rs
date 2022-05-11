@@ -16,7 +16,7 @@ pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub use new_hash_feedback::NewHashFeedback;
 #[cfg(feature = "std")]
-pub use new_hash_feedback::NewHashFeedbackState;
+pub use new_hash_feedback::NewHashFeedbackMetadata;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
@@ -51,6 +51,12 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// Initializes the feedback state.
+    /// This method is called after that the `State` is created.
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// `is_interesting ` return if an input is worth the addition to the corpus
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -113,38 +119,6 @@ where
     #[inline]
     fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
-    }
-}
-
-/// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
-/// of the fuzzer State
-pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug {
-    /// Reset the internal state
-    fn reset(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-/// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwned + Debug {
-    /// Resets all the feedback states of the tuple
-    fn reset_all(&mut self) -> Result<(), Error>;
-}
-
-impl FeedbackStatesTuple for () {
-    fn reset_all(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-impl<Head, Tail> FeedbackStatesTuple for (Head, Tail)
-where
-    Head: FeedbackState,
-    Tail: FeedbackStatesTuple,
-{
-    fn reset_all(&mut self) -> Result<(), Error> {
-        self.0.reset()?;
-        self.1.reset_all()
     }
 }
 

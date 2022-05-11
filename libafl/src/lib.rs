@@ -440,7 +440,6 @@ mod tests {
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: StdState<
             InMemoryCorpus<BytesInput>,
-            (),
             BytesInput,
             StdRand,
             InMemoryCorpus<BytesInput>,
