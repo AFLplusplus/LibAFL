@@ -13,6 +13,7 @@ members = [
     "libafl_frida",
     "libafl_qemu",
     "libafl_sugar",
+    "libafl_nyx",
     "libafl_concolic/symcc_runtime",
     "libafl_concolic/symcc_libafl",
     "libafl_concolic/test/dump_constraints",
