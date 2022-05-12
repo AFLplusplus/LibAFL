@@ -119,7 +119,8 @@ jobs:
     - uses: lyricwulf/abc@v1
       with: 
         linux: llvm llvm-dev clang nasm ninja-build
-        macos: llvm libpng nasm coreutils z3
+        # update bash for macos to support `declare -A` command`
+        macos: llvm libpng nasm coreutils z3 bash
     - name: install cargo-make
       run: cargo install --force cargo-make
     - uses: actions/checkout@v2
@@ -197,25 +198,7 @@ jobs:
       run: ./scripts/shmem_limits_macos.sh
     - name: Run Tests
       run: cargo test
-  # macos-fuzzers:
-  #   runs-on: macOS-latest
-  #   steps:
-  #   - uses: actions-rs/toolchain@v1
-  #     with:
-  #       profile: minimal
-  #       toolchain: stable
-  #   - uses: Swatinem/rust-cache@v1
-  #   - name: Add nightly rustfmt and clippy
-  #     run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-  #   - name: Install deps
-  #     run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
-  #   - name: install cargo-make
-  #     run: cargo install --force cargo-make
-  #   - uses: actions/checkout@v2
-  #   - name: Increase map sizes
-  #     run: ./scripts/shmem_limits_macos.sh
-  #   - name: Build and run example fuzzers
-  #     run: ./scripts/test_all_fuzzers.sh
+
   other_targets:
     runs-on: macOS-latest
     steps:
