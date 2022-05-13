@@ -88,11 +88,15 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
+    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    
+    let calibration = CalibrationStage::new(&map_feedback);
+
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&edges_observer, true, false),
+        map_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer),
         PacketLenFeedback::new()
@@ -125,7 +129,6 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Setup a lain mutator with a mutational stage
     let mutator = LainMutator::new();
 
-    let calibration = CalibrationStage::new(&edges_observer);
     let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
     let mut stages = tuple_list!(calibration, power);

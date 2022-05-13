@@ -50,7 +50,7 @@ pub fn fuzz() {
     let broker_port = 1337;
     let cores = Cores::from_cmdline("0-11").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
-    let objective_dir = PathBuf::from("./crashes");
+    let mut objective_dir = PathBuf::from("./crashes");
 
     // Initialize QEMU
     env::remove_var("LD_LIBRARY_PATH");

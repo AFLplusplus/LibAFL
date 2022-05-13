@@ -253,11 +253,15 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
 
+    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+    
+    let calibration = CalibrationStage::new(&map_feedback);
+
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&edges_observer, true, false),
+        map_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
@@ -283,8 +287,6 @@ fn fuzz(
         )
         .unwrap()
     });
-
-    let calibration = CalibrationStage::new(&edges_observer);
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
