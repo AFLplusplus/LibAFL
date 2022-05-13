@@ -97,6 +97,7 @@ jobs:
   fuzzers:
     env:
       CC: ccache clang # use ccache in default
+      CXX: ccache clang # use ccache in default
     strategy:
       matrix:
           os: [ubuntu-latest, macos-latest]
@@ -124,8 +125,6 @@ jobs:
     - name: install cargo-make
       run: cargo install --force cargo-make
     - uses: actions/checkout@v2
-    - name: Build and run example fuzzers
-      run: ./scripts/test_all_fuzzers.sh
     - name: Build and run example fuzzers
       if: runner.os == 'Linux'
       run: ./scripts/test_all_fuzzers.sh
