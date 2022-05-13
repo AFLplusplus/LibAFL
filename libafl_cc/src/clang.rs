@@ -349,9 +349,13 @@ impl ClangWrapper {
     /// Create a new Clang Wrapper
     #[must_use]
     pub fn new() -> Self {
-        let use_new_pm = match LIBAFL_CC_LLVM_VERSION {
-            Some(ver) => ver >= 14,
-            None => false,
+        let use_new_pm = if cfg!(unix) {
+            match LIBAFL_CC_LLVM_VERSION {
+                Some(ver) => ver >= 14,
+                None => false,
+            }
+        } else {
+            false
         };
 
         Self {
