@@ -13,7 +13,7 @@ libafl=$(pwd)
 git submodule init && git submodule update
 
 # record time of each fuzzer
-declare -A time_record || echo "declare -A not avaliable, please update your bash bersion to 4";exit 1
+declare -A time_record || (echo "declare -A not avaliable, please update your bash bersion to 4";exit 1)
 for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
 do
     cd $fuzzer
