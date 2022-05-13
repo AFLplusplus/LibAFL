@@ -122,6 +122,12 @@ where
     }
 }
 
+/// Has an associated observer name (mostly used to retrieve the observer with `MatchName` from an `ObserverTuple`)
+pub trait HasObserverName {
+    /// The name associated with the observer
+    fn observer_name(&self) -> &str;
+}
+
 /// A combined feedback consisting of multiple [`Feedback`]s
 #[derive(Debug)]
 pub struct CombinedFeedback<A, B, FL, I, S>
@@ -181,6 +187,12 @@ where
     I: Input,
     S: HasClientPerfMonitor + Debug,
 {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        self.first.init_state(state)?;
+        self.second.init_state(state)?;
+        Ok(())
+    }
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
@@ -570,6 +582,10 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        self.first.init_state(state)
+    }
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,

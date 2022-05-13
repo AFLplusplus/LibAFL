@@ -1,16 +1,15 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
-use std::{fmt::Debug, hash::Hash, marker::PhantomData};
+use std::{fmt::Debug, marker::PhantomData};
 
 use hashbrown::HashSet;
-use num_traits::PrimInt;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::tuples::Named,
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, HasObserverName},
     inputs::Input,
     observers::{ObserverWithHashField, ObserversTuple},
     state::{HasClientPerfMonitor, HasNamedMetadata},
@@ -30,26 +29,15 @@ pub trait HashSetState<T> {
 
 /// The state of [`NewHashFeedback`]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "T: DeserializeOwned")]
-pub struct NewHashFeedbackMetadata<T>
-where
-    T: PrimInt + Default + Copy + 'static + Serialize + Hash + Debug,
-{
+pub struct NewHashFeedbackMetadata {
     /// Contains information about untouched entries
-    pub hash_set: HashSet<T>,
+    pub hash_set: HashSet<u64>,
 }
 
 #[rustfmt::skip]
-crate::impl_serdeany!(
-    NewHashFeedbackMetadata<
-        T: PrimInt + Default + Copy + 'static + Serialize + DeserializeOwned + Hash + Debug
-    >
-);
+crate::impl_serdeany!(NewHashFeedbackMetadata);
 
-impl<T> NewHashFeedbackMetadata<T>
-where
-    T: PrimInt + Default + Copy + 'static + Serialize + DeserializeOwned + Hash + Debug,
-{
+impl NewHashFeedbackMetadata {
     /// Create a new [`NewHashFeedbackMetadata`]
     #[must_use]
     pub fn new() -> Self {
@@ -63,17 +51,14 @@ where
     }
 }
 
-impl<T> HashSetState<T> for NewHashFeedbackMetadata<T>
-where
-    T: PrimInt + Default + Copy + 'static + Serialize + DeserializeOwned + Hash + Debug,
-{
+impl HashSetState<u64> for NewHashFeedbackMetadata {
     /// Create new [`NewHashFeedbackMetadata`] using a name and a hash set.
     #[must_use]
-    fn with_hash_set(hash_set: HashSet<T>) -> Self {
+    fn with_hash_set(hash_set: HashSet<u64>) -> Self {
         Self { hash_set }
     }
 
-    fn update_hash_set(&mut self, value: T) -> Result<bool, Error> {
+    fn update_hash_set(&mut self, value: u64) -> Result<bool, Error> {
         let r = self.hash_set.insert(value);
         // println!("Got r={}, the hashset is {:?}", r, &self.hash_set);
         Ok(r)
@@ -95,7 +80,7 @@ where
     O: ObserverWithHashField + Named + Debug,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
-        state.add_named_metadata(NewHashFeedbackMetadata::<u64>::default(), &self.name);
+        state.add_named_metadata(NewHashFeedbackMetadata::default(), &self.name);
         Ok(())
     }
 
@@ -118,7 +103,7 @@ where
 
         let backtrace_state = state
             .named_metadata_mut()
-            .get_mut::<NewHashFeedbackMetadata<u64>>(&self.name)
+            .get_mut::<NewHashFeedbackMetadata>(&self.name)
             .unwrap();
 
         match observer.hash() {
@@ -140,6 +125,13 @@ impl<O> Named for NewHashFeedback<O> {
     #[inline]
     fn name(&self) -> &str {
         &self.name
+    }
+}
+
+impl<O> HasObserverName for NewHashFeedback<O> {
+    #[inline]
+    fn observer_name(&self) -> &str {
+        &self.observer_name
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
-    feedbacks::Feedback,
+    feedbacks::{Feedback, HasObserverName},
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
@@ -283,7 +283,8 @@ where
 }
 
 crate::impl_serdeany!(
-    MapFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>
+    MapFeedbackMetadata<T: Debug + Default + Copy + 'static + Serialize + DeserializeOwned>,
+    <u8>,<u16>,<u32>,<u64>,<i8>,<i16>,<i32>,<i64>,<f32>,<f64>,<bool>,<char>
 );
 
 impl<T> MapFeedbackMetadata<T>
@@ -464,6 +465,21 @@ where
     }
 }
 
+impl<I, N, O, R, S, T> HasObserverName for MapFeedback<I, N, O, R, S, T>
+where
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
+    R: Reducer<T>,
+    N: IsNovel<T>,
+    O: MapObserver<Entry = T>,
+    for<'it> O: AsRefIterator<'it, Item = T>,
+    S: HasNamedMetadata,
+{
+    #[inline]
+    fn observer_name(&self) -> &str {
+        self.observer_name.as_str()
+    }
+}
+
 impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
@@ -524,12 +540,6 @@ where
             name: name.to_string(),
             phantom: PhantomData,
         }
-    }
-
-    #[inline]
-    /// The name associated to the map observer
-    pub fn observer_name(&self) -> &str {
-        self.observer_name.as_str()
     }
 }
 

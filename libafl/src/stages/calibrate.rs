@@ -5,7 +5,10 @@ use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
+    feedbacks::{
+        map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
+        HasObserverName,
+    },
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},

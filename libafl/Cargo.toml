@@ -13,7 +13,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 
 [features]
 default = ["std", "derive", "llmp_compression", "rand_trait", "fork"]
-std = ["serde_json", "serde_json/std", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid", "tui_monitor", "backtrace"] # print, env, launcher ... support
+std = ["serde_json", "serde_json/std", "hostname", "core_affinity", "nix", "serde/std", "bincode", "wait-timeout", "regex", "build_id", "uuid", "tui_monitor", "ctor", "backtrace"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
@@ -65,6 +65,7 @@ ahash = { version = "0.7", default-features=false, features=["compile-time-rng"]
 intervaltree = { version = "0.2.7", default-features = false, features = ["serde"] }
 backtrace = {version = "0.3", optional = true} # Used to get the stacktrace in StacktraceObserver
 
+ctor = { optional = true, version = "0.1" }
 serde_json = { version = "1.0", optional = true, default-features = false, features = ["alloc"] }
 miniz_oxide = { version = "0.4.4", optional = true}
 core_affinity = { version = "0.5", git = "https://github.com/s1341/core_affinity_rs", rev = "6648a7a", optional = true }
