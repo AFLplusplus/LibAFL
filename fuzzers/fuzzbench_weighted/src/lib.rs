@@ -261,7 +261,7 @@ fn fuzz(
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
-    
+
     let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input

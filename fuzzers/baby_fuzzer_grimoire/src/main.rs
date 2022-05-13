@@ -112,7 +112,8 @@ pub fn main() {
         &mut feedback,
         // Same for objective feedbacks
         &mut objective,
-    ).unwrap();
+    )
+    .unwrap();
 
     if state.metadata().get::<Tokens>().is_none() {
         state.add_metadata(Tokens::from([b"FOO".to_vec(), b"BAR".to_vec()]));

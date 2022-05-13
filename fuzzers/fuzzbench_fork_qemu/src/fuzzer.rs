@@ -241,7 +241,7 @@ fn fuzz(
         CmpLogObserver::new("cmplog", unsafe { CMPLOG_MAP_PTR.as_mut().unwrap() }, true);
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
-    
+
     let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
@@ -271,7 +271,8 @@ fn fuzz(
             &mut feedback,
             // Same for objective feedbacks
             &mut objective,
-        ).unwrap()
+        )
+        .unwrap()
     });
 
     // Setup a randomic Input2State stage

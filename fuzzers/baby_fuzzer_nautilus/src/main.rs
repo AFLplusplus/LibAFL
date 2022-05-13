@@ -72,7 +72,8 @@ pub fn main() {
         &mut feedback,
         // Same for objective feedbacks
         &mut objective,
-    ).unwrap();
+    )
+    .unwrap();
 
     if state.metadata().get::<NautilusChunksMetadata>().is_none() {
         state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));

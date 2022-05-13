@@ -89,7 +89,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let time_observer = TimeObserver::new("time");
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
-    
+
     let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
