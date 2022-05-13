@@ -33,7 +33,6 @@ pub fn main() {
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "fuzzbench")
             .add_pass(LLVMPasses::CmpLogRtn)
-            .use_new_pm(true)
             .run()
             .expect("Failed to run the wrapped compiler")
         {

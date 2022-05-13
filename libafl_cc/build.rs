@@ -111,18 +111,17 @@ fn main() {
     custom_flags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={}", acc_map_size));
 
     let llvm_config = find_llvm_config();
-    
+
+    // Get LLVM version.
     let llvm_version = match llvm_config.split('-').collect::<Vec<&str>>().get(2) {
-        Some(ver) => {
-            ver.parse::<usize>().ok()
-        },
+        Some(ver) => ver.parse::<usize>().ok(),
         None => None,
     };
 
     match llvm_version {
         Some(ver) => {
             if ver >= 14 {
-                custom_flags.push("-DUSE_NEW_PM".to_string())
+                custom_flags.push("-DUSE_NEW_PM".to_string());
             }
         }
         None => (),
@@ -205,7 +204,6 @@ fn main() {
             .args(&custom_flags)
             .arg(src_dir.join("cmplog-routines-pass.cc"))
             .args(&ldflags)
-            .arg("-DUSE_NEW_PM")
             .args(&["-fPIC", "-shared", "-o"])
             .arg(out_dir.join(format!("cmplog-routines-pass.{}", dll_extension())))
             .status()
@@ -217,7 +215,6 @@ fn main() {
             .args(&custom_flags)
             .arg(src_dir.join("afl-coverage-pass.cc"))
             .args(&ldflags)
-            .arg("-DUSE_NEW_PM")
             .args(&["-fPIC", "-shared", "-o"])
             .arg(out_dir.join(format!("afl-coverage-pass.{}", dll_extension())))
             .status()
@@ -228,7 +225,6 @@ fn main() {
             .args(&cxxflags)
             .args(&custom_flags)
             .arg(src_dir.join("autotokens-pass.cc"))
-            .arg("-DUSE_NEW_PM")
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])
             .arg(out_dir.join(format!("autotokens-pass.{}", dll_extension())))
@@ -241,7 +237,6 @@ fn main() {
             .args(&custom_flags)
             .arg(src_dir.join("coverage-accounting-pass.cc"))
             .args(&ldflags)
-            .arg("-DUSE_NEW_PM")
             .args(&["-fPIC", "-shared", "-o"])
             .arg(out_dir.join(format!("coverage-accounting-pass.{}", dll_extension())))
             .status()
