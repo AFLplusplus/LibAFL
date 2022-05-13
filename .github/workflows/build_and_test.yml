@@ -126,6 +126,12 @@ jobs:
     - uses: actions/checkout@v2
     - name: Build and run example fuzzers
       run: ./scripts/test_all_fuzzers.sh
+    - name: Build and run example fuzzers
+      if: runner.os == 'Linux'
+      run: ./scripts/test_all_fuzzers.sh
+    - name: Build and run example fuzzers
+      if: runner.os == 'macOS' # use bash v4
+      run: /usr/local/bin/bash ./scripts/test_all_fuzzers.sh
     - run: ccache --show-stats
   nostd-build:
     runs-on: ubuntu-latest
