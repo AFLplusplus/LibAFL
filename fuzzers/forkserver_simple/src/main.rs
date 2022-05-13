@@ -1,4 +1,4 @@
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use core::time::Duration;
 use libafl::{
     bolts::{
@@ -12,7 +12,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_and_fast, feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
@@ -33,7 +33,7 @@ use libafl::bolts::shmem::StdShMemProvider;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let res = App::new("forkserver_simple")
+    let res = Command::new("forkserver_simple")
         .about("Example Forkserver fuzer")
         .arg(
             Arg::new("executable")
@@ -63,7 +63,7 @@ pub fn main() {
         .arg(
             Arg::new("arguments")
                 .help("Arguments passed to the target")
-                .setting(clap::ArgSettings::MultipleValues)
+                .multiple_values(true)
                 .takes_value(true),
         )
         .arg(
@@ -101,28 +101,22 @@ pub fn main() {
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
-    // The state of the edges feedback for crashes.
-    let objective_state = MapFeedbackState::new("crash_edges", MAP_SIZE);
-
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        MaxMapFeedback::new_tracking(&edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does
-    let objective = feedback_and_fast!(
+    let mut objective = feedback_and_fast!(
         // Must be a crash
         CrashFeedback::new(),
         // Take it onlt if trigger new coverage over crashes
-        MaxMapFeedback::new(&objective_state, &edges_observer)
+        MaxMapFeedback::<_, _, _, u8>::new("map_objective", &edges_observer)
     );
 
     // create a State from scratch
@@ -135,9 +129,12 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state, objective_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{}", s));
@@ -163,7 +160,7 @@ pub fn main() {
 
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
-        .program(res.value_of("executable").unwrap().to_string())
+        .program(res.value_of("executable").unwrap())
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)

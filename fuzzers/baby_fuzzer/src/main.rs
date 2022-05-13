@@ -8,7 +8,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
@@ -41,7 +41,7 @@ pub fn main() {
                 signals_set(2);
                 if buf.len() > 2 && buf[2] == b'c' {
                     #[cfg(unix)]
-                    panic!("=(");
+                    panic!("Artificial bug triggered =)");
 
                     // panic!() raises a STATUS_STACK_BUFFER_OVERRUN exception which cannot be caught by the exception handler.
                     // Here we make it raise STATUS_ACCESS_VIOLATION instead.
@@ -58,16 +58,14 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
-
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&observer);
+    let observer =
+        unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
 
     // Feedback to rate the interestingness of an input
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -79,9 +77,12 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     let mon = SimpleMonitor::new(|s| println!("{}", s));

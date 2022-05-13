@@ -10,9 +10,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
     feedback_and,
-    feedbacks::{
-        CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
-    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
@@ -54,17 +52,13 @@ pub fn main() {
 
     let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-    let bt_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
-
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false);
+    let mut feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does
-    let objective = feedback_and!(
+    let mut objective = feedback_and!(
         CrashFeedback::new(),
         NewHashFeedback::new_with_observer("NewHashFeedback", &bt_observer)
     );
@@ -79,9 +73,12 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state, bt_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{}", s));

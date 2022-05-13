@@ -24,7 +24,7 @@ use libafl::{
     events::EventConfig,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::tui::TuiMonitor,
@@ -141,7 +141,9 @@ pub fn libafl_main() {
 
     let monitor = TuiMonitor::new("Test fuzzer on libpng".into(), true);
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr, _core_id| {
+    let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>,
+                          mut restarting_mgr,
+                          _core_id| {
         // Create an observation channel using the coverage map
         let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
@@ -149,20 +151,17 @@ pub fn libafl_main() {
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
 
-        // The state of the edges feedback.
-        let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
-        let feedback = feedback_or!(
+        let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+            MaxMapFeedback::new_tracking(&edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::new_with_observer(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
-        let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
@@ -175,9 +174,12 @@ pub fn libafl_main() {
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(&opt.output).unwrap(),
                 // States of the feedbacks.
-                // They are the data related to the feedbacks that you want to persist in the State.
-                tuple_list!(feedback_state),
+                // The feedbacks can report the data that should persist in the State.
+                &mut feedback,
+                // Same for objective feedbacks
+                &mut objective,
             )
+            .unwrap()
         });
 
         println!("We're a client, let's fuzz :)");

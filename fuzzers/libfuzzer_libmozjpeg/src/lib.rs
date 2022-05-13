@@ -17,7 +17,7 @@ use libafl::{
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -86,24 +86,15 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel using the allocations map
     let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map });
 
-    // The state of the edges feedback.
-    let edges_feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
-    // The state of the cmps feedback.
-    let cmps_feedback_state = MapFeedbackState::with_observer(&cmps_observer);
-
-    // The state of the allocs feedback.
-    let allocs_feedback_state = MapFeedbackState::with_observer(&allocs_observer);
-
     // Feedback to rate the interestingness of an input
-    let feedback = feedback_or!(
-        MaxMapFeedback::new(&edges_feedback_state, &edges_observer),
-        MaxMapFeedback::new(&cmps_feedback_state, &cmps_observer),
-        MaxMapFeedback::new(&allocs_feedback_state, &allocs_observer)
+    let mut feedback = feedback_or!(
+        MaxMapFeedback::new("EdgesFeedback", &edges_observer),
+        MaxMapFeedback::new("CmpFeedback", &cmps_observer),
+        MaxMapFeedback::new("AllocsFeedback", &allocs_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -116,13 +107,12 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(
-                edges_feedback_state,
-                cmps_feedback_state,
-                allocs_feedback_state
-            ),
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
         )
+        .unwrap()
     });
 
     println!("We're a client, let's fuzz :)");

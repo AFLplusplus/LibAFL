@@ -3,7 +3,7 @@ use libafl::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
-    feedbacks::{Feedback, MapIndexesMetadata},
+    feedbacks::{Feedback, MapIndexesMetadata, NopFeedbackState},
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
@@ -45,9 +45,13 @@ impl<S> Feedback<PacketData, S> for PacketLenFeedback
 where
     S: HasClientPerfMonitor,
 {
+    type FeedbackState = NopFeedbackState;
+
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         _manager: &mut EM,
         input: &PacketData,
         _observers: &OT,
@@ -65,6 +69,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
         testcase: &mut Testcase<PacketData>,
     ) -> Result<(), Error> {
         testcase
@@ -74,8 +79,17 @@ where
     }
 
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &PacketData) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut S,
+        _feedback_state: &mut Self::FeedbackState,
+        _input: &PacketData,
+    ) -> Result<(), Error> {
         Ok(())
+    }
+
+    fn init_state(&mut self) -> Result<Self::FeedbackState, Error> {
+        Ok(NopFeedbackState {})
     }
 }
 

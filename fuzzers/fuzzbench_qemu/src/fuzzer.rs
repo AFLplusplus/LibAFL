@@ -1,6 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -27,7 +27,7 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -68,7 +68,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match App::new("libafl_qemu_fuzzbench")
+    let res = match Command::new("libafl_qemu_fuzzbench")
         .version("0.4.0")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
@@ -113,7 +113,7 @@ pub fn main() {
                 env::current_exe()
                     .unwrap_or_else(|_| "fuzzer".into())
                     .to_string_lossy(),
-                err.info,
+                err,
             );
             return;
         }
@@ -253,20 +253,17 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        MaxMapFeedback::new_tracking(&edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -279,9 +276,12 @@ fn fuzz(
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(feedback_state),
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
         )
+        .unwrap()
     });
 
     let calibration = CalibrationStage::new(&edges_observer);

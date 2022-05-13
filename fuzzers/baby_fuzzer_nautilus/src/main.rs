@@ -9,9 +9,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{
-        CrashFeedback, MapFeedbackState, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback,
-    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, NautilusChunksMetadata, NautilusFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::{NautilusContext, NautilusGenerator},
     inputs::NautilusInput,
@@ -51,17 +49,14 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&observer);
-
     // Feedback to rate the interestingness of an input
-    let feedback = feedback_or!(
-        MaxMapFeedback::new(&feedback_state, &observer),
+    let mut feedback = feedback_or!(
+        MaxMapFeedback::new(&observer),
         NautilusFeedback::new(&context)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -73,9 +68,11 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    ).unwrap();
 
     if state.metadata().get::<NautilusChunksMetadata>().is_none() {
         state.add_metadata(NautilusChunksMetadata::new("/tmp/".into()));
