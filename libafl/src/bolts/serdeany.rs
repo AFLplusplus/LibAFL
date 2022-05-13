@@ -695,8 +695,8 @@ macro_rules! impl_serdeany {
             }
 
             fn as_any_boxed(
-                self: ::alloc::boxed::Box<$struct_name < $( $lt ),+ >>,
-            ) -> ::alloc::boxed::Box<dyn ::core::any::Any> {
+                self: $crate::alloc::boxed::Box<$struct_name < $( $lt ),+ >>,
+            ) -> $crate::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }
@@ -720,8 +720,8 @@ macro_rules! impl_serdeany {
             }
 
             fn as_any_boxed(
-                self: ::alloc::boxed::Box<$struct_name>,
-            ) -> ::alloc::boxed::Box<dyn ::core::any::Any> {
+                self: $crate::alloc::boxed::Box<$struct_name>,
+            ) -> $crate::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }

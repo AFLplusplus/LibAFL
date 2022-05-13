@@ -70,7 +70,7 @@ Welcome to `LibAFL`
 )]
 
 #[macro_use]
-extern crate alloc;
+pub extern crate alloc;
 #[macro_use]
 extern crate static_assertions;
 #[cfg(feature = "ctor")]
