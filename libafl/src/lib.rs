@@ -407,8 +407,10 @@ mod tests {
             rand,
             corpus,
             InMemoryCorpus::<BytesInput>::new(),
-            tuple_list!(),
-        );
+            &mut (),
+            &mut (),
+        )
+        .unwrap();
 
         let monitor = SimpleMonitor::new(|s| {
             println!("{}", s);
