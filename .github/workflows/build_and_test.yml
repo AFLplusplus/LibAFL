@@ -1,4 +1,4 @@
-name: Build and Test
+name: build and test
 
 on:
   push:
@@ -94,23 +94,44 @@ jobs:
       run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
       run: ./libafl_concolic/test/smoke_test.sh 
-  ubuntu-fuzzers:
-    runs-on: ubuntu-latest
+  fuzzers:
+    env:
+      CC: ccache clang # use ccache in default
+      CXX: ccache clang # use ccache in default
+    strategy:
+      matrix:
+          os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
         toolchain: stable
+    - name: add ccache 
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        key: ${{ github.job }}-${{ matrix.os }}
+        max-size: 2000M
+    - name: enable mult-thread for `make`
+      run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - uses: Swatinem/rust-cache@v1
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-    - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang nasm ninja-build
+    - uses: lyricwulf/abc@v1
+      with: 
+        linux: llvm llvm-dev clang nasm ninja-build
+        # update bash for macos to support `declare -A` command`
+        macos: llvm libpng nasm coreutils z3 bash
     - name: install cargo-make
       run: cargo install --force cargo-make
     - uses: actions/checkout@v2
     - name: Build and run example fuzzers
+      if: runner.os == 'Linux'
       run: ./scripts/test_all_fuzzers.sh
+    - name: Build and run example fuzzers
+      if: runner.os == 'macOS' # use bash v4
+      run: /usr/local/bin/bash ./scripts/test_all_fuzzers.sh
+    - run: ccache --show-stats
   nostd-build:
     runs-on: ubuntu-latest
     steps:
@@ -182,25 +203,7 @@ jobs:
       run: ./scripts/shmem_limits_macos.sh
     - name: Run Tests
       run: cargo test
-  macos-fuzzers:
-    runs-on: macOS-latest
-    steps:
-    - uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-    - uses: Swatinem/rust-cache@v1
-    - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-    - name: Install deps
-      run: brew install llvm libpng nasm coreutils z3 && brew link --force llvm
-    - name: install cargo-make
-      run: cargo install --force cargo-make
-    - uses: actions/checkout@v2
-    - name: Increase map sizes
-      run: ./scripts/shmem_limits_macos.sh
-    - name: Build and run example fuzzers
-      run: ./scripts/test_all_fuzzers.sh
+
   other_targets:
     runs-on: macOS-latest
     steps:

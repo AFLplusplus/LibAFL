@@ -12,9 +12,12 @@ libafl=$(pwd)
 
 git submodule init && git submodule update
 
+# record time of each fuzzer
+declare -A time_record || (echo "declare -A not avaliable, please update your bash version to 4";exit 1)
 for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
 do
     cd $fuzzer
+    start=`date +%s`
     # Clippy checks
     if [ "$1" != "--no-fmt" ]; then
         
@@ -35,9 +38,15 @@ do
         cargo build || exit 1
         echo "[+] Done building $fuzzer"
     fi
-
+    end=`date +%s`
+    time_record[$fuzzer]=$((end-start))
     # Save disk space
     cargo clean
     cd $libafl
     echo ""
+done
+
+# print time for each fuzzer
+for key in ${!time_record[@]}; do
+    echo "dir:"$key" time:"${time_record[$key]};
 done
