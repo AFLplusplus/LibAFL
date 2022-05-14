@@ -108,6 +108,7 @@ jobs:
         profile: minimal
         toolchain: stable
     - name: set mold linker as default linker
+      if: runner.os == 'Linux' # mold only support linux until now
       uses: rui314/setup-mold@v1
     - name: add ccache 
       uses: hendrikmuhs/ccache-action@v1.2
