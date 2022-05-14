@@ -11,16 +11,16 @@ backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 libafl=$(pwd)
 
 git submodule init && git submodule update
+
 # override default profile settings for speed
 export RUSTFLAGS="-C prefer-dynamic"
 for profile in DEV RELEASE; # loop for all profiles
 do
     export CARGO_PROFILE_"$profile"_OPT_LEVEL=z # optimize for size
     export CARGO_PROFILE_"$profile"_SPLIT_DEBUGINFO=unpacked # minimize debug info
-    export CARGO_PROFILE_"$profile"_PANIC=abort
+    # export CARGO_PROFILE_"$profile"_PANIC=abort
     export CARGO_PROFILE_"$profile"_INCREMENTAL=true
 done
-
 
 # record time of each fuzzer
 declare -A time_record || (echo "declare -A not avaliable, please update your bash version to 4";exit 1)
