@@ -107,6 +107,8 @@ jobs:
       with:
         profile: minimal
         toolchain: stable
+    - name: set mold linker as default linker
+      uses: rui314/setup-mold@v1
     - name: add ccache 
       uses: hendrikmuhs/ccache-action@v1.2
       with:
