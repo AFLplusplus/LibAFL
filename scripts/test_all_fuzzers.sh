@@ -13,7 +13,7 @@ libafl=$(pwd)
 git submodule init && git submodule update
 
 # override default profile settings for speed
-export RUSTFLAGS="-C prefer-dynamic"
+# export RUSTFLAGS="-C prefer-dynamic"
 for profile in DEV RELEASE; # loop for all profiles
 do
     export CARGO_PROFILE_"$profile"_OPT_LEVEL=z # optimize for size
