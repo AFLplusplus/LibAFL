@@ -28,22 +28,65 @@ def convert_to_gnf(grammar, start):
     if DEBUG:
         with open('debug_mixed.json', 'w+') as fd:
             json.dump(grammar, fd)
-    grammar = break_rules(grammar) # eliminate rules with more than two non-terminals
-    if DEBUG:
-        with open('debug_break.json', 'w+') as fd:
-            json.dump(grammar, fd)
     grammar = gnf(grammar)
 
-    # Dump GNF form of the grammar with only reachable rules 
+    # Dump GNF form of the grammar with only reachable rules
     # reachable_grammar = get_reachable(grammar, start)
     # with open('debug_gnf_reachable.json', 'w+') as fd:
     #     json.dump(reachable_grammar, fd)
     if DEBUG:
         with open('debug_gnf.json', 'w+') as fd:
             json.dump(grammar, fd)
-    
+
     grammar["Start"] = [start]
     return grammar
+
+def remove_left_recursion(grammar):
+    # Remove the left recursion in the grammar rules.
+    # This algorithm is adopted from
+    # https://www.geeksforgeeks.org/introduction-of-parsing-ambiguity-and-parsers-set-1/
+    # Note that the current implementation does not
+    # guarantee completeness and will not remove recursions
+    # similar to { "A": ["BC"], "B": ["AD"] }.
+    # Therefore, we need to call this function each time
+    # the rule is updated.
+    old_grammar = copy.deepcopy(grammar)
+    new_grammar = defaultdict(list)
+    no_left_recursion = False
+    while not no_left_recursion:
+        for lhs, rules in old_grammar.items():
+            left_recursion = []
+            others = []
+            for rule in rules:
+                tokens = gettokens(rule)
+                if tokens[0] == lhs:
+                    left_recursion.append(tokens)
+                else:
+                    others.append(tokens)
+            if left_recursion:
+                new_rule = get_nonterminal()
+                for r in others:
+                    r.append(new_rule)
+                left_recursion = [r[1:] + [new_rule] for r in left_recursion]
+                left_recursion.append(["' '"])
+                new_grammar[lhs] = [' '.join(rule) for rule in others]
+                new_grammar[new_rule] = [' '.join(rule) for rule in left_recursion]
+            else:
+                new_grammar[lhs] = [' '.join(rule) for rule in others]
+        no_left_recursion = True
+        for lhs, rules in old_grammar.items():
+            for rule in rules:
+                tokens = gettokens(rule)
+                if tokens[0] == lhs:
+                    left_recursion = False
+                    break
+            else:
+                continue
+            break
+        if not no_left_recursion:
+            old_grammar = copy.deepcopy(new_grammar)
+            new_grammar = defaultdict(list)
+    return new_grammar
 
 def get_reachable(grammar, start):
     '''
@@ -78,13 +121,15 @@ def gnf(grammar):
     new_grammar = defaultdict(list)
     isgnf = False
     while not isgnf:
+        old_grammar = remove_left_recursion(old_grammar)
         for lhs, rules in old_grammar.items():
             for rule in rules:
-                tokens = gettokens(rule) 
+                tokens = gettokens(rule)
                 if len(tokens) == 1 and isTerminal(rule):
                     new_grammar[lhs].append(rule)
                     continue
                 startoken = tokens[0]
+                assert(startoken != lhs)
                 endrule = tokens[1:]
                 if not isTerminal(startoken):
                     newrules = []
@@ -112,13 +157,13 @@ def gnf(grammar):
             old_grammar = copy.deepcopy(new_grammar)
             new_grammar = defaultdict(list)
     return new_grammar
-                
+
 
 def process_antlr4_grammar(data):
     productions = []
     production = []
     for line in data:
-        if line != '\n': 
+        if line != '\n':
             production.append(line)
         else:
             productions.append(production)
@@ -138,7 +183,7 @@ def process_antlr4_grammar(data):
     return final_rule_set
 
 def remove_unit(grammar):
-    nounitproductions = False 
+    nounitproductions = False
     old_grammar = copy.deepcopy(grammar)
     new_grammar = defaultdict(list)
     while not nounitproductions:
@@ -152,7 +197,7 @@ def remove_unit(grammar):
                         new_grammar[lhs].append(rhs)
                 else:
                     new_grammar[lhs].append(rhs)
-        # Checking there are no unit productions left in the grammar 
+        # Checking there are no unit productions left in the grammar
         nounitproductions = True
         for lhs, rules in new_grammar.items():
             for rhs in rules:
@@ -184,22 +229,17 @@ def remove_mixed(grammar):
     new_grammar = defaultdict(list)
     for lhs, rules in grammar.items():
         for rhs in rules:
-            # tokens = rhs.split(' ')
-            regen_rule = []
-            # print('---------------------')
-            # print(rhs)
             tokens = gettokens(rhs)
-            if len(gettokens(rhs)) == 1:
+            if len(tokens) == 1:
                 new_grammar[lhs].append(rhs)
                 continue
-            for token in tokens:
+            regen_rule = [tokens[0]]
+            for token in tokens[1:]:
                 # print(token, isTerminal(token), regen_rule)
                 # Identify if there is a terminal in the RHS
                 if isTerminal(token):
                     # Check if a corresponding nonterminal already exists
-                    # nonterminal = terminal_exist(token, new_grammar)
-                    nonterminal = None
-                    # TODO(andrea) disabled ATM, further investigation using the Ruby grammar needed
+                    nonterminal = terminal_exist(token, new_grammar)
                     if nonterminal:
                         regen_rule.append(nonterminal)
                     else:
@@ -211,60 +251,17 @@ def remove_mixed(grammar):
             new_grammar[lhs].append(' '.join(regen_rule))
     return new_grammar
 
-def break_rules(grammar):
-    new_grammar = defaultdict(list)
-    old_grammar = copy.deepcopy(grammar)
-    nomulti = False
-    while not nomulti:
-        for lhs, rules in old_grammar.items():
-            for rhs in rules:
-                tokens = gettokens(rhs)
-                if len(tokens) > 2 and (not isTerminal(rhs)):
-                    split = tokens[:-1] 
-                    nonterminal = terminal_exist(' '.join(split), new_grammar)
-                    if nonterminal:
-                        newrule = ' '.join([nonterminal, tokens[-1]])
-                        new_grammar[lhs].append(newrule)
-                    else:
-                        nonterminal = get_nonterminal()
-                        new_grammar[nonterminal].append(' '.join(split))
-                        newrule = ' '.join([nonterminal, tokens[-1]])
-                        new_grammar[lhs].append(newrule)
-                else:
-                    new_grammar[lhs].append(rhs)
-        nomulti = True
-        for lhs, rules in new_grammar.items():
-            for rhs in rules:
-                # tokens = rhs.split(' ')
-                tokens = gettokens(rhs)
-                if len(tokens) > 2 and (not isTerminal(rhs)):
-                    nomulti = False
-                    break
-        if not nomulti:
-            old_grammar = copy.deepcopy(new_grammar)
-            new_grammar = defaultdict(list)
-    return new_grammar
-
 def strip_chars(rule):
     return rule.strip('\n\t ')
 
 def get_nonterminal():
-    global NONTERMINALSET
-    if NONTERMINALSET:
-        return NONTERMINALSET.pop(0)
-    else:
-        _repopulate()
-        return NONTERMINALSET.pop(0)
-
-def _repopulate():
     global COUNT
-    global NONTERMINALSET
-    NONTERMINALSET = [''.join(x) for x in list(combinations(ascii_uppercase, COUNT))]
     COUNT += 1
+    return f"GeneratedTermVar{COUNT}"
 
 def terminal_exist(token, grammar):
     for nonterminal, rules in grammar.items():
-        if token in rules:
+        if token in rules and len(token) == 1:
             return nonterminal
     return None
 

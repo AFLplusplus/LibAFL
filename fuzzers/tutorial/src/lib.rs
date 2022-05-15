@@ -126,13 +126,12 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mutator = LainMutator::new();
 
     let calibration = CalibrationStage::new(&edges_observer);
-    let power =
-        StdPowerMutationalStage::new(&mut state, mutator, &edges_observer, PowerSchedule::FAST);
+    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = PacketLenMinimizerScheduler::new(PowerQueueScheduler::new());
+    let scheduler = PacketLenMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

@@ -1,12 +1,12 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
 use crate::{
     bolts::{HasLen, HasRefCnt},
-    corpus::{Corpus, PowerScheduleTestcaseMetaData, Testcase},
+    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
     schedulers::{
         minimizer::{IsFavoredMetadata, TopRatedsMetadata},
-        powersched::{PowerSchedule, PowerScheduleMetadata},
+        powersched::{PowerSchedule, SchedulerMetadata},
     },
     state::{HasCorpus, HasMetadata},
     Error,
@@ -79,44 +79,52 @@ where
     fn compute(entry: &mut Testcase<I>, state: &S) -> Result<f64, Error> {
         let psmeta = state
             .metadata()
-            .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::key_not_found("PowerScheduleMetadata not found".to_string()))?;
+            .get::<SchedulerMetadata>()
+            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
-        let fuzz_mu = if psmeta.strat() == PowerSchedule::COE {
-            let corpus = state.corpus();
-            let mut n_paths = 0;
-            let mut v = 0.0;
-            let cur_index = state.corpus().current().unwrap();
-            for idx in 0..corpus.count() {
-                let n_fuzz_entry = if cur_index == idx {
-                    entry
-                        .metadata()
-                        .get::<PowerScheduleTestcaseMetaData>()
-                        .ok_or_else(|| {
-                            Error::key_not_found("PowerScheduleTestData not found".to_string())
-                        })?
-                        .n_fuzz_entry()
-                } else {
-                    corpus
-                        .get(idx)?
-                        .borrow()
-                        .metadata()
-                        .get::<PowerScheduleTestcaseMetaData>()
-                        .ok_or_else(|| {
-                            Error::key_not_found("PowerScheduleTestData not found".to_string())
-                        })?
-                        .n_fuzz_entry()
-                };
-                v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
-                n_paths += 1;
+        let fuzz_mu = if let Some(strat) = psmeta.strat() {
+            if strat == PowerSchedule::COE {
+                let corpus = state.corpus();
+                let mut n_paths = 0;
+                let mut v = 0.0;
+                let cur_index = state.corpus().current().unwrap();
+                for idx in 0..corpus.count() {
+                    let n_fuzz_entry = if cur_index == idx {
+                        entry
+                            .metadata()
+                            .get::<SchedulerTestcaseMetaData>()
+                            .ok_or_else(|| {
+                                Error::key_not_found(
+                                    "SchedulerTestcaseMetaData not found".to_string(),
+                                )
+                            })?
+                            .n_fuzz_entry()
+                    } else {
+                        corpus
+                            .get(idx)?
+                            .borrow()
+                            .metadata()
+                            .get::<SchedulerTestcaseMetaData>()
+                            .ok_or_else(|| {
+                                Error::key_not_found(
+                                    "SchedulerTestcaseMetaData not found".to_string(),
+                                )
+                            })?
+                            .n_fuzz_entry()
+                    };
+                    v += libm::log2(f64::from(psmeta.n_fuzz()[n_fuzz_entry]));
+                    n_paths += 1;
+                }
+
+                if n_paths == 0 {
+                    return Err(Error::unknown(String::from("Queue state corrput")));
+                }
+
+                v /= f64::from(n_paths);
+                v
+            } else {
+                0.0
             }
-
-            if n_paths == 0 {
-                return Err(Error::unknown(String::from("Queue state corrput")));
-            }
-
-            v /= f64::from(n_paths);
-            v
         } else {
             0.0
         };
@@ -133,9 +141,9 @@ where
         let favored = entry.has_metadata::<IsFavoredMetadata>();
         let tcmeta = entry
             .metadata()
-            .get::<PowerScheduleTestcaseMetaData>()
+            .get::<SchedulerTestcaseMetaData>()
             .ok_or_else(|| {
-                Error::key_not_found("PowerScheduleTestcaseMetaData not found".to_string())
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
             })?;
 
         if q_exec_us * 0.1 > avg_exec_us {
@@ -191,81 +199,87 @@ where
 
         // COE and Fast schedule are fairly different from what are described in the original thesis,
         // This implementation follows the changes made in this pull request https://github.com/AFLplusplus/AFLplusplus/pull/568
-        match psmeta.strat() {
-            PowerSchedule::EXPLORE | PowerSchedule::RAND => {
-                // Nothing happens in EXPLORE
-            }
-            PowerSchedule::EXPLOIT => {
-                factor = MAX_FACTOR;
-            }
-            PowerSchedule::COE => {
-                if libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()])) > fuzz_mu
-                    && !favored
-                {
-                    // Never skip favorites.
-                    factor = 0.0;
+        if let Some(strat) = psmeta.strat() {
+            match strat {
+                PowerSchedule::EXPLORE => {
+                    // Nothing happens in EXPLORE
                 }
-            }
-            PowerSchedule::FAST => {
-                if entry.fuzz_level() != 0 {
-                    let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
-
-                    match lg {
-                        f if f < 2.0 => {
-                            factor = 4.0;
-                        }
-                        f if (2.0..4.0).contains(&f) => {
-                            factor = 3.0;
-                        }
-                        f if (4.0..5.0).contains(&f) => {
-                            factor = 2.0;
-                        }
-                        f if (6.0..7.0).contains(&f) => {
-                            if !favored {
-                                factor = 0.8;
-                            }
-                        }
-                        f if (7.0..8.0).contains(&f) => {
-                            if !favored {
-                                factor = 0.6;
-                            }
-                        }
-                        f if f >= 8.0 => {
-                            if !favored {
-                                factor = 0.4;
-                            }
-                        }
-                        _ => {
-                            factor = 1.0;
-                        }
-                    }
-
-                    if favored {
-                        factor *= 1.15;
+                PowerSchedule::EXPLOIT => {
+                    factor = MAX_FACTOR;
+                }
+                PowerSchedule::COE => {
+                    if libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()])) > fuzz_mu
+                        && !favored
+                    {
+                        // Never skip favorites.
+                        factor = 0.0;
                     }
                 }
-            }
-            PowerSchedule::LIN => {
-                factor = (entry.fuzz_level() as f64)
-                    / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
-            }
-            PowerSchedule::QUAD => {
-                factor = ((entry.fuzz_level() * entry.fuzz_level()) as f64)
-                    / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
+                PowerSchedule::FAST => {
+                    if entry.fuzz_level() != 0 {
+                        let lg = libm::log2(f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()]));
+
+                        match lg {
+                            f if f < 2.0 => {
+                                factor = 4.0;
+                            }
+                            f if (2.0..4.0).contains(&f) => {
+                                factor = 3.0;
+                            }
+                            f if (4.0..5.0).contains(&f) => {
+                                factor = 2.0;
+                            }
+                            f if (6.0..7.0).contains(&f) => {
+                                if !favored {
+                                    factor = 0.8;
+                                }
+                            }
+                            f if (7.0..8.0).contains(&f) => {
+                                if !favored {
+                                    factor = 0.6;
+                                }
+                            }
+                            f if f >= 8.0 => {
+                                if !favored {
+                                    factor = 0.4;
+                                }
+                            }
+                            _ => {
+                                factor = 1.0;
+                            }
+                        }
+
+                        if favored {
+                            factor *= 1.15;
+                        }
+                    }
+                }
+                PowerSchedule::LIN => {
+                    factor = (entry.fuzz_level() as f64)
+                        / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
+                }
+                PowerSchedule::QUAD => {
+                    factor = ((entry.fuzz_level() * entry.fuzz_level()) as f64)
+                        / f64::from(psmeta.n_fuzz()[tcmeta.n_fuzz_entry()] + 1);
+                }
             }
         }
 
-        if psmeta.strat() != PowerSchedule::EXPLORE {
-            if factor > MAX_FACTOR {
-                factor = MAX_FACTOR;
-            }
+        if let Some(strat) = psmeta.strat() {
+            if strat == PowerSchedule::EXPLORE {
+                if factor > MAX_FACTOR {
+                    factor = MAX_FACTOR;
+                }
 
-            perf_score *= factor / POWER_BETA;
+                perf_score *= factor / POWER_BETA;
+            }
         }
 
         // Lower bound if the strat is not COE.
-        if psmeta.strat() == PowerSchedule::COE && perf_score < 1.0 {
-            perf_score = 1.0;
+        if let Some(strat) = psmeta.strat() {
+            if strat == PowerSchedule::COE && perf_score < 1.0 {
+                perf_score = 1.0;
+            }
         }
 
         // Upper bound
@@ -299,16 +313,19 @@ where
         let mut weight = 1.0;
         let psmeta = state
             .metadata()
-            .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::key_not_found("PowerScheduleMetadata not found".to_string()))?;
+            .get::<SchedulerMetadata>()
+            .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
         let tcmeta = entry
             .metadata()
-            .get::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::key_not_found("PowerScheduleTestData not found".to_string()))?;
+            .get::<SchedulerTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+            })?;
 
         // This means that this testcase has never gone through the calibration stage before1,
         // In this case we'll just return the default weight
+        // This methoud is called in corpus's on_add() method. Fuzz_level is zero at that time.
         if entry.fuzz_level() == 0 || psmeta.cycles() == 0 {
             return Ok(weight);
         }
@@ -324,15 +341,20 @@ where
 
         let q_bitmap_size = tcmeta.bitmap_size() as f64;
 
-        match psmeta.strat() {
-            PowerSchedule::FAST | PowerSchedule::COE | PowerSchedule::LIN | PowerSchedule::QUAD => {
-                let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
-                if hits > 0 {
-                    weight *= libm::log10(f64::from(hits)) + 1.0;
+        if let Some(strat) = psmeta.strat() {
+            match strat {
+                PowerSchedule::FAST
+                | PowerSchedule::COE
+                | PowerSchedule::LIN
+                | PowerSchedule::QUAD => {
+                    let hits = psmeta.n_fuzz()[tcmeta.n_fuzz_entry()];
+                    if hits > 0 {
+                        weight *= libm::log10(f64::from(hits)) + 1.0;
+                    }
                 }
+                // EXPLORE and EXPLOIT fall into this
+                _ => {}
             }
-            // EXPLORE and EXPLOIT fall into this
-            _ => {}
         }
 
         weight *= avg_exec_us / q_exec_us;
