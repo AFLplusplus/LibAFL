@@ -347,7 +347,7 @@ pub mod pybind {
                 }
             }
 
-            impl  Named for $struct_name_trait {
+            impl Named for $struct_name_trait {
                 fn name(&self) -> &str {
                     self.unwrap().name()
                 }
@@ -358,7 +358,11 @@ pub mod pybind {
                     self.unwrap_mut().flush()
                 }
 
-                fn pre_exec(&mut self, state: &mut $my_std_state_type_name, input: &BytesInput) -> Result<(), Error> {
+                fn pre_exec(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                ) -> Result<(), Error> {
                     self.unwrap_mut().pre_exec(state, input)
                 }
 

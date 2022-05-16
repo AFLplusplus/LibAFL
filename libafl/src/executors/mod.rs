@@ -222,13 +222,10 @@ pub mod pybind {
                     BytesInput,
                     $my_std_state_type_name,
                     $my_std_fuzzer_type_name,
-                > + HasObservers<BytesInput, ($observer_name, ()), $my_std_state_type_name>)
-                {
+                > + HasObservers<BytesInput, ($observer_name, ()), $my_std_state_type_name>) {
                     unsafe {
                         match self.wrapper {
-                            $wrapper_name::OwnedInProcess(py_wrapper) => {
-                                &(*py_wrapper).upcast()
-                            }
+                            $wrapper_name::OwnedInProcess(py_wrapper) => &(*py_wrapper).upcast(),
                         }
                     }
                 }
@@ -240,11 +237,7 @@ pub mod pybind {
                     BytesInput,
                     $my_std_state_type_name,
                     $my_std_fuzzer_type_name,
-                > + HasObservers<
-                    BytesInput,
-                    ($observer_name, ()),
-                    $my_std_state_type_name,
-                >) {
+                > + HasObservers<BytesInput, ($observer_name, ()), $my_std_state_type_name>) {
                     unsafe {
                         match self.wrapper {
                             $wrapper_name::OwnedInProcess(py_wrapper) => {
@@ -295,8 +288,7 @@ pub mod pybind {
                     mgr: &mut $event_manager_name,
                     input: &BytesInput,
                 ) -> Result<ExitKind, Error> {
-                    self.unwrap_mut()
-                        .run_target(fuzzer, state, mgr, input)
+                    self.unwrap_mut().run_target(fuzzer, state, mgr, input)
                 }
             }
         };

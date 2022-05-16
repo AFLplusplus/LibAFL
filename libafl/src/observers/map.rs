@@ -1514,10 +1514,7 @@ pub mod pybind {
                 fn new(name: String, map: Vec<$datatype>) -> Self {
                     Self {
                         //TODO: Not leak memory
-                        inner: OwnedMapObserver::new(
-                            Box::leak(name.into_boxed_str()),
-                            map,
-                        ),
+                        inner: OwnedMapObserver::new(Box::leak(name.into_boxed_str()), map),
                     }
                 }
             }
@@ -1544,9 +1541,7 @@ pub mod pybind {
                     }
                 }
 
-                fn unwrap_mut(
-                    &mut self,
-                ) -> &mut impl MapObserver<Entry = $datatype> {
+                fn unwrap_mut(&mut self) -> &mut impl MapObserver<Entry = $datatype> {
                     unsafe {
                         match &mut self.wrapper {
                             $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
@@ -1562,17 +1557,15 @@ pub mod pybind {
                     }
                 }
 
-                fn upcast_mut<S>(
-                    &mut self,
-                ) -> &mut impl Observer<BytesInput, S> {
+                fn upcast_mut<S>(&mut self) -> &mut impl Observer<BytesInput, S> {
                     unsafe {
                         match &mut self.wrapper {
                             $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
                         }
                     }
                 }
-          }
-  
+            }
+
             #[pymethods]
             impl $struct_name_trait {
                 #[staticmethod]
@@ -1589,9 +1582,7 @@ pub mod pybind {
 
                 fn as_ref_iter(&'it self) -> Self::IntoIter {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.as_ref_iter()
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.as_ref_iter(),
                     }
                 }
             }
@@ -1602,9 +1593,7 @@ pub mod pybind {
 
                 fn as_mut_iter(&'it mut self) -> Self::IntoIter {
                     match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.as_mut_iter()
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.as_mut_iter(),
                     }
                 }
             }
@@ -1615,53 +1604,41 @@ pub mod pybind {
                 #[inline]
                 fn get(&self, idx: usize) -> &$datatype {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            &py_wrapper.inner.get(idx)
-                        }
+                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner.get(idx),
                     }
                 }
 
                 #[inline]
                 fn get_mut(&mut self, idx: usize) -> &mut $datatype {
                     match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.get_mut(idx)
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.get_mut(idx),
                     }
                 }
 
                 #[inline]
                 fn usable_count(&self) -> usize {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.wrapper.usable_count()
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.wrapper.usable_count(),
                     }
                 }
 
                 fn hash(&self) -> u64 {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.hash()
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.hash(),
                     }
                 }
 
                 #[inline]
                 fn initial(&self) -> $datatype {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.initial()
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.initial(),
                     }
                 }
 
                 #[inline]
                 fn initial_mut(&mut self) -> &mut $datatype {
                     match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.initial_mut()
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.initial_mut(),
                     }
                 }
 
@@ -1676,9 +1653,7 @@ pub mod pybind {
 
                 fn to_vec(&self) -> Vec<$datatype> {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.to_vec()
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.to_vec(),
                     }
                 }
             }
@@ -1687,9 +1662,7 @@ pub mod pybind {
                 #[inline]
                 fn name(&self) -> &str {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.name()
-                        }
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.name(),
                     }
                 }
             }

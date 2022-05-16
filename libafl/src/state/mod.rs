@@ -670,12 +670,7 @@ pub mod pybind {
             use crate::generators::pybind::$rand_printable_generator;
 
             /// `StdState` with fixed generics
-            pub type $type_name = StdState<
-                PythonCorpus,
-                BytesInput,
-                PythonRand,
-                PythonCorpus,
-            >;
+            pub type $type_name = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
 
             #[pyclass(unsendable, name = $py_name)]
             #[derive(Debug)]
@@ -696,13 +691,7 @@ pub mod pybind {
                     objective: &mut PythonFeedback,
                 ) -> Self {
                     Self {
-                        std_state: StdState::new(
-                            py_rand,
-                            corpus,
-                            solutions,
-                            feedback,
-                            objective
-                        ),
+                        std_state: StdState::new(py_rand, corpus, solutions, feedback, objective),
                     }
                 }
 
@@ -728,11 +717,7 @@ pub mod pybind {
         };
     }
 
-    define_python_state!(
-        PythonStdState,
-        PythonStdStateWrapper,
-        "StdState",
-    );
+    define_python_state!(PythonStdState, PythonStdStateWrapper, "StdState",);
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

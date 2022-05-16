@@ -980,13 +980,8 @@ where
 pub mod pybind {
     use crate::inputs::BytesInput;
     use crate::{
-        bolts::tuples::Named,
-        corpus::Testcase,
-        feedbacks::Feedback,
-        events::EventFirer,
-        executors::ExitKind,
-        observers::{ObserversTuple},
-        Error,
+        bolts::tuples::Named, corpus::Testcase, events::EventFirer, executors::ExitKind,
+        feedbacks::Feedback, observers::ObserversTuple, Error,
     };
     use pyo3::prelude::*;
 
@@ -1037,7 +1032,7 @@ pub mod pybind {
                 }
             }
 
-            impl  Named for $struct_name_trait {
+            impl Named for $struct_name_trait {
                 fn name(&self) -> &str {
                     self.unwrap().name()
                 }
@@ -1060,11 +1055,16 @@ pub mod pybind {
                     EM: EventFirer<I>,
                     OT: ObserversTuple<I, S>,
                 {
-                    self.unwrap_mut().is_interesting(state, manager, input, observers, exit_kind)
+                    self.unwrap_mut()
+                        .is_interesting(state, manager, input, observers, exit_kind)
                 }
 
-                fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-                  self.unwrap_mut().append_metadata(state, testcase)
+                fn append_metadata(
+                    &mut self,
+                    state: &mut S,
+                    testcase: &mut Testcase<I>,
+                ) -> Result<(), Error> {
+                    self.unwrap_mut().append_metadata(state, testcase)
                 }
 
                 fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -1087,4 +1087,3 @@ pub mod pybind {
         Ok(())
     }
 }
-
