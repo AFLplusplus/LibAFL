@@ -17,7 +17,7 @@ use crate::{
 };
 
 /// The prefix of the metadata names
-pub const NEWHASHFEEDBACK_PREFIX: &'static str = "newhashfeedback_metadata_";
+pub const NEWHASHFEEDBACK_PREFIX: &str = "newhashfeedback_metadata_";
 
 /// A state that implements this trait has a hash set
 pub trait HashSetState<T> {
@@ -154,7 +154,7 @@ where
     #[must_use]
     pub fn new(observer: &O) -> Self {
         Self {
-            name: NEWHASHFEEDBACK_PREFIX.to_string() + &observer.name().to_string(),
+            name: NEWHASHFEEDBACK_PREFIX.to_string() + observer.name(),
             observer_name: observer.name().to_string(),
             o_type: PhantomData,
         }

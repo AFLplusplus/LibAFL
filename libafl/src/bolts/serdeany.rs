@@ -602,61 +602,7 @@ macro_rules! create_serde_registry_for_trait {
 create_serde_registry_for_trait!(serdeany_registry, crate::bolts::serdeany::SerdeAny);
 pub use serdeany_registry::*;
 
-/*
-/// Implement a [`SerdeAny`], registering it in the [`RegistryBuilder`]
-#[cfg(feature = "ctor")]
-#[macro_export]
-macro_rules! impl_serdeany {
-    ($struct_name:ident) => {
-        impl $crate::bolts::serdeany::SerdeAny for $struct_name {
-            fn as_any(&self) -> &dyn ::core::any::Any {
-                self
-            }
-
-            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
-                self
-            }
-
-            fn as_any_boxed(
-                self: ::std::boxed::Box<Self>,
-            ) -> ::std::boxed::Box<dyn ::core::any::Any> {
-                self
-            }
-        }
-
-        #[allow(non_snake_case)]
-        #[$crate::ctor]
-        fn $struct_name() {
-            $crate::bolts::serdeany::RegistryBuilder::register::<$struct_name>();
-        }
-    };
-}
-
-/// Implement [`SerdeAny`] for a type
-#[cfg(not(feature = "std"))]
-#[macro_export]
-macro_rules! impl_serdeany {
-    ($struct_name:ident) => {
-        impl $crate::bolts::serdeany::SerdeAny for $struct_name {
-            fn as_any(&self) -> &dyn ::core::any::Any {
-                self
-            }
-
-            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
-                self
-            }
-
-            fn as_any_boxed(
-                self: ::alloc::boxed::Box<Self>,
-            ) -> ::alloc::boxed::Box<dyn ::core::any::Any> {
-                self
-            }
-        }
-    };
-}
-*/
-
-/// Register a SerdeAny type in the [`RegistryBuilder`]
+/// Register a `SerdeAny` type in the [`RegistryBuilder`]
 #[cfg(feature = "std")]
 #[macro_export]
 macro_rules! register_at_startup {
