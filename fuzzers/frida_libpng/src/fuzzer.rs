@@ -72,8 +72,8 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
 
     let shmem_provider = StdShMemProvider::new()?;
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>,
-                          mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+    let mut run_client = |state: Option<_>,
+                          mgr: LlmpRestartingEventManager<_, _, _, _>,
                           core_id| {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
 
@@ -92,9 +92,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
         };
 
         if options.asan && options.asan_cores.contains(core_id) {
-            (|state: Option<StdState<_, _, _, _, _, _>>,
-              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
-              _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -122,7 +120,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&"mapfeedback", &edges_observer, true, false),
+                    MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::new_with_observer(&time_observer)
                 );
@@ -219,9 +217,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else if options.cmplog && options.cmplog_cores.contains(core_id) {
-            (|state: Option<StdState<_, _, _, _, _, _>>,
-              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
-              _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -244,7 +240,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&"mapfeedback", &edges_observer, true, false),
+                    MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::new_with_observer(&time_observer)
                 );
@@ -355,9 +351,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 Ok(())
             })(state, mgr, core_id)
         } else {
-            (|state: Option<StdState<_, _, _, _, _, _>>,
-              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
-              _core_id| {
+            (|state: Option<_>, mut mgr: LlmpRestartingEventManager<_, _, _, _>, _core_id| {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
@@ -379,7 +373,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // This one is composed by two Feedbacks in OR
                 let mut feedback = feedback_or!(
                     // New maximization map feedback linked to the edges observer and the feedback state
-                    MaxMapFeedback::new_tracking(&"map_feedback", &edges_observer, true, false),
+                    MaxMapFeedback::new_tracking(&edges_observer, true, false),
                     // Time feedback, this one does not need a feedback state
                     TimeFeedback::new_with_observer(&time_observer)
                 );

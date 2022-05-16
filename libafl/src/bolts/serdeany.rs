@@ -616,7 +616,7 @@ macro_rules! register_at_startup {
     };
 }
 
-/// Do nothing for no_std, you have to register it manually in `main()` with [`RegistryBuilder::register`]
+/// Do nothing for `no_std`, you have to register it manually in `main()` with [`RegistryBuilder::register`]
 #[cfg(not(feature = "std"))]
 #[macro_export]
 macro_rules! register_at_startup {

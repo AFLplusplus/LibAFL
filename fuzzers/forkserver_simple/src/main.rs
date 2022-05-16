@@ -116,7 +116,7 @@ pub fn main() {
         // Must be a crash
         CrashFeedback::new(),
         // Take it onlt if trigger new coverage over crashes
-        MaxMapFeedback::<_, _, _, u8>::new("map_objective", &edges_observer)
+        MaxMapFeedback::<_, _, _, u8>::new(&edges_observer)
     );
 
     // create a State from scratch
