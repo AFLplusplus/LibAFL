@@ -975,7 +975,6 @@ where
     }
 }
 
-
 /// The [`ConstFeedback`] reports the same value, always.
 /// It can be used to enable or disable feedback results through composition.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
