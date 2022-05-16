@@ -217,6 +217,7 @@ where
     S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
+    #[must_use]
     pub fn new<N, R>(map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>) -> Self
     where
         O::Entry:

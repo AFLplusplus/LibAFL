@@ -290,6 +290,121 @@ where
     }
 }
 
+/// `Observer` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::bolts::tuples::Named;
+    use crate::executors::ExitKind;
+    use crate::inputs::BytesInput;
+    use crate::observers::Observer;
+    use crate::Error;
+    use pyo3::prelude::*;
+
+    macro_rules! define_python_observer {
+        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $my_std_state_type_name: ident) => {
+            use crate::observers::map::pybind::PythonMapObserverI8;
+            use crate::state::pybind::$my_std_state_type_name;
+
+            #[derive(Debug)]
+            enum $wrapper_name {
+                MapI8(*mut PythonMapObserverI8),
+            }
+
+            #[pyclass(unsendable, name = $py_name_trait)]
+            #[derive(Debug)]
+            /// Observer Trait binding
+            pub struct $struct_name_trait {
+                pub wrapper: $wrapper_name,
+            }
+
+            impl $struct_name_trait {
+                fn unwrap(&self) -> &impl Observer<BytesInput, $my_std_state_type_name> {
+                    unsafe {
+                        match self.wrapper {
+                            $wrapper_name::MapI8(py_wrapper) => &(*py_wrapper).upcast(),
+                        }
+                    }
+                }
+
+                fn unwrap_mut(
+                    &mut self,
+                ) -> &mut impl Observer<BytesInput, $my_std_state_type_name> {
+                    unsafe {
+                        match self.wrapper {
+                            $wrapper_name::MapI8(py_wrapper) => &mut (*py_wrapper).upcast_mut(),
+                        }
+                    }
+                }
+            }
+
+            #[pymethods]
+            impl $struct_name_trait {
+                #[staticmethod]
+                fn new_map(map_observer: &mut PythonMapObserverI8) -> Self {
+                    Self {
+                        observer: $wrapper_name::MapI8(map_observer),
+                    }
+                }
+            }
+
+            impl  Named for $struct_name_trait {
+                fn name(&self) -> &str {
+                    self.unwrap().name()
+                }
+            }
+
+            impl Observer<BytesInput, $my_std_state_type_name> for $struct_name_trait {
+                fn flush(&mut self) -> Result<(), Error> {
+                    self.unwrap_mut().flush()
+                }
+
+                fn pre_exec(&mut self, state: &mut $my_std_state_type_name, input: &BytesInput) -> Result<(), Error> {
+                    self.unwrap_mut().pre_exec(state, input)
+                }
+
+                fn post_exec(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                    exit_kind: &ExitKind,
+                ) -> Result<(), Error> {
+                    self.unwrap_mut().post_exec(state, input, exit_kind)
+                }
+
+                fn pre_exec_child(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                ) -> Result<(), Error> {
+                    self.unwrap_mut().pre_exec(state, input)
+                }
+
+                fn post_exec_child(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                    exit_kind: &ExitKind,
+                ) -> Result<(), Error> {
+                    self.unwrap_mut().post_exec_child(state, input, exit_kind)
+                }
+            }
+        };
+    }
+
+    define_python_observer!(
+        PythonObserver,
+        "Observer",
+        PythonObserverWrapper,
+        PythonStdState,
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonObserver>()?;
+        Ok(())
+    }
+}
+
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {

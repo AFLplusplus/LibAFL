@@ -1678,10 +1678,10 @@ pub mod pybind {
     use pyo3::types::PyBytes;
 
     macro_rules! define_python_in_process_executor {
-        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $std_state_name: ident, $event_manager_name: ident, $map_observer_name: ident, $std_fuzzer_name: ident) => {
+        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $std_state_name: ident, $event_manager_name: ident, $observer_name: ident, $std_fuzzer_name: ident) => {
             use crate::events::pybind::$event_manager_name;
             use crate::fuzzer::pybind::$std_fuzzer_name;
-            use crate::observers::pybind::$map_observer_name;
+            use crate::observers::map::pybind::$observer_name;
             use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
 
             #[pyclass(unsendable, name = $py_name)]
@@ -1691,7 +1691,7 @@ pub mod pybind {
                 /// Rust wrapped OwnedInProcessExecutor object
                 pub owned_in_process_executor: OwnedInProcessExecutor<
                     BytesInput,
-                    ($map_observer_name, ()),
+                    ($observer_name, ()),
                     $my_std_state_type_name,
                 >,
             }
@@ -1701,7 +1701,7 @@ pub mod pybind {
                 #[new]
                 fn new(
                     harness: PyObject,
-                    py_observer: $map_observer_name,
+                    py_observer: $observer_name,
                     py_fuzzer: &mut $std_fuzzer_name,
                     py_state: &mut $std_state_name,
                     py_event_manager: &mut $event_manager_name,
@@ -1730,9 +1730,9 @@ pub mod pybind {
     }
 
     define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorI8,
-        "OwnedInProcessExecutorI8",
-        MyStdStateI8,
+        PythonOwnedInProcessExecutor,
+        "OwnedInProcessExecutor",
+        PythonStdState,
         PythonStdStateI8,
         PythonEventManagerI8,
         PythonMapObserverI8,
