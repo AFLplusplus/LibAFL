@@ -30,6 +30,7 @@ use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub mod utils;
 /// Can be converted to a slice
 pub trait AsSlice<T> {
     /// Convert to a slice
