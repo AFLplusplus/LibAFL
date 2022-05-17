@@ -158,9 +158,9 @@ impl CoverageRuntime {
         let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
         let mut h64 = tmp ^ bitflip;
         h64 = h64.rotate_left(49) & h64.rotate_left(24);
-        h64 *= 0x9FB21C651E98DF25;
+        h64 = h64.wrapping_mul(0x9FB21C651E98DF25);
         h64 ^= (h64 >> 35) + 8;
-        h64 *= 0x9FB21C651E98DF25;
+        h64 = h64.wrapping_mul(0x9FB21C651E98DF25);
         h64 ^= h64 >> 28;
 
         let writer = output.writer();
