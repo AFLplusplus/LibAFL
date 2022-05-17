@@ -13,8 +13,8 @@ use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
 
-use libafl::bolts::utils::rrxmrrxmsx_0;
 use crate::helper::FridaRuntime;
+use libafl::bolts::utils::rrxmrrxmsx_0;
 
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
