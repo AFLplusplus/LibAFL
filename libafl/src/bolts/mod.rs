@@ -30,7 +30,6 @@ use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub mod utils;
 /// Can be converted to a slice
 pub trait AsSlice<T> {
     /// Convert to a slice
@@ -109,6 +108,22 @@ extern "C" {
 pub fn current_time() -> time::Duration {
     let millis = unsafe { external_current_millis() };
     time::Duration::from_millis(millis)
+}
+
+/// Given a value v, return a random number using this mixing function
+/// Mixing function <http://mostlymangling.blogspot.com/2018/07/on-mixing-functions-in-fast-splittable.html>
+#[inline]
+#[must_use]
+pub fn rrxmrrxmsx_0(v: u64) -> u64 {
+    let tmp = (v >> 32) + ((v & 0xffffffff) << 32);
+    let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
+    let mut h64 = tmp ^ bitflip;
+    h64 = h64.rotate_left(49) & h64.rotate_left(24);
+    h64 = h64.wrapping_mul(0x9FB21C651E98DF25);
+    h64 ^= (h64 >> 35) + 8;
+    h64 = h64.wrapping_mul(0x9FB21C651E98DF25);
+    h64 ^= h64 >> 28;
+    h64
 }
 
 /// Gets current nanoseconds since [`UNIX_EPOCH`]
