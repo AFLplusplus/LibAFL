@@ -585,9 +585,9 @@ impl LlmpMsg {
     /// Returns true, if the pointer is, indeed, in the page of this shared map.
     #[inline]
     pub fn in_shmem<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
+        let map_size = map.shmem.as_slice().len();
+        let buf_ptr = self.buf.as_ptr();
         unsafe {
-            let map_size = map.shmem.as_slice().len();
-            let buf_ptr = self.buf.as_ptr();
             if buf_ptr > (map.page_mut() as *const u8).add(size_of::<LlmpPage>())
                 && buf_ptr <= (map.page_mut() as *const u8).add(map_size - size_of::<LlmpMsg>())
             {
@@ -1733,8 +1733,8 @@ where
     #[allow(clippy::cast_ptr_alignment)]
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
         let offset = offset as usize;
-        unsafe {
-            let page = self.page_mut();
+        
+            let page = unsafe { self.page_mut() };
             let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
             if offset > page_size {
                 Err(Error::illegal_argument(format!(
@@ -1742,9 +1742,9 @@ where
                     page_size, offset
                 )))
             } else {
-                Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg)
+                unsafe { Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg) }
             }
-        }
+        
     }
 }
 
