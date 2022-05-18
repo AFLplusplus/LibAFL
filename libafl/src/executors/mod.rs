@@ -186,20 +186,21 @@ mod test {
 }
 
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 /// `Executor` Python bindings
 pub mod pybind {
     use crate::executors::{Executor, ExitKind, HasObservers};
     use crate::inputs::BytesInput;
+    use crate::observers::pybind::{PythonObserver,PythonObserversTuple};
     use crate::Error;
     use pyo3::prelude::*;
 
     macro_rules! define_python_executor {
         ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $my_std_state_type_name: ident, $my_std_fuzzer_type_name: ident,
-             $event_manager_name: ident, $in_process_executor_name: ident, $observer_name: ident) => {
+             $event_manager_name: ident, $in_process_executor_name: ident) => {
             use crate::events::pybind::$event_manager_name;
             use crate::executors::inprocess::pybind::$in_process_executor_name;
             use crate::fuzzer::pybind::$my_std_fuzzer_type_name;
-            use crate::observers::pybind::$observer_name;
             use crate::state::pybind::$my_std_state_type_name;
 
             #[derive(Debug)]
@@ -222,10 +223,10 @@ pub mod pybind {
                     BytesInput,
                     $my_std_state_type_name,
                     $my_std_fuzzer_type_name,
-                > + HasObservers<BytesInput, ($observer_name, ()), $my_std_state_type_name>) {
+                > + HasObservers<BytesInput, PythonObserversTuple, $my_std_state_type_name>) {
                     unsafe {
                         match self.wrapper {
-                            $wrapper_name::OwnedInProcess(py_wrapper) => &(*py_wrapper).upcast(),
+                            $wrapper_name::OwnedInProcess(py_wrapper) => &(*py_wrapper).inner,
                         }
                     }
                 }
@@ -237,12 +238,10 @@ pub mod pybind {
                     BytesInput,
                     $my_std_state_type_name,
                     $my_std_fuzzer_type_name,
-                > + HasObservers<BytesInput, ($observer_name, ()), $my_std_state_type_name>) {
+                > + HasObservers<BytesInput, PythonObserversTuple, $my_std_state_type_name>) {
                     unsafe {
                         match self.wrapper {
-                            $wrapper_name::OwnedInProcess(py_wrapper) => {
-                                &mut (*py_wrapper).upcast_mut()
-                            }
+                            $wrapper_name::OwnedInProcess(py_wrapper) => &mut (*py_wrapper).inner,
                         }
                     }
                 }
@@ -260,14 +259,16 @@ pub mod pybind {
                 }
             }
 
-            impl<I, S> HasObservers<I, ($observer_name, ()), S> for $struct_name_trait {
+            impl HasObservers<BytesInput, PythonObserversTuple, $my_std_state_type_name>
+                for $struct_name_trait
+            {
                 // #[inline]
-                fn observers(&self) -> &($observer_name, ()) {
+                fn observers(&self) -> &PythonObserversTuple {
                     self.unwrap().observers()
                 }
 
                 #[inline]
-                fn observers_mut(&mut self) -> &mut ($observer_name, ()) {
+                fn observers_mut(&mut self) -> &mut PythonObserversTuple {
                     self.unwrap_mut().observers_mut()
                 }
             }
@@ -301,8 +302,7 @@ pub mod pybind {
         PythonStdState,
         PythonStdFuzzer,
         PythonEventManager,
-        PythonOwnedInProcessExecutor,
-        PythonObserver
+        PythonOwnedInProcessExecutor
     );
 
     /// Register the classes to the python module

@@ -427,6 +427,7 @@ where
 }
 /// `SimpleEventManager` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
     use crate::events::SimpleEventManager;
     use crate::inputs::BytesInput;
@@ -438,7 +439,7 @@ pub mod pybind {
     /// Python class for SimpleEventManager
     pub struct PythonSimpleEventManager {
         /// Rust wrapped SimpleEventManager object
-        pub simple_event_manager: SimpleEventManager<BytesInput, PythonMonitor>,
+        pub inner: SimpleEventManager<BytesInput, PythonMonitor>,
     }
 
     #[pymethods]
@@ -446,7 +447,7 @@ pub mod pybind {
         #[new]
         fn new(py_monitor: PythonMonitor) -> Self {
             Self {
-                simple_event_manager: SimpleEventManager::new(py_monitor),
+                inner: SimpleEventManager::new(py_monitor),
             }
         }
     }

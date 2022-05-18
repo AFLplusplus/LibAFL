@@ -666,451 +666,107 @@ mod tests {
 
 /// `MapFeedback` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
-    use crate::bolts::{tuples::Named, AsMutIterator, AsRefIterator, HasLen};
-    use crate::observers::{map::OwnedMapObserver, MapObserver, Observer};
-    use crate::Error;
+    use super::*;
+    use crate::inputs::BytesInput;
+    use crate::observers::map::pybind::*;
+    use crate::state::pybind::PythonStdState;
     use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
-    use std::slice::{Iter, IterMut};
 
-    macro_rules! define_python_map_observer {
-        ($struct_name:ident, $py_name:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
+    macro_rules! define_python_map_feedback {
+        ($struct_name:ident, $py_name:tt, $datatype:ty, $map_observer_type_name: ident, $my_std_state_type_name: ident) => {
             #[pyclass(unsendable, name = $py_name)]
-            #[derive(Serialize, Deserialize, Debug, Clone)]
-            /// Python class for OwnedMapObserver (i.e. StdMapObserver with owned map)
+            #[derive(Debug, Clone)]
+            /// Python class for MaxMapFeedback
             pub struct $struct_name {
-                /// Rust wrapped OwnedMapObserver object
-                pub inner: OwnedMapObserver<$datatype>,
+                /// Rust wrapped MaxMapFeedback object
+                pub inner: MaxMapFeedback<
+                    BytesInput,
+                    $map_observer_type_name, /* PythonMapObserverI8 */
+                    $my_std_state_type_name,
+                    $datatype,
+                >,
             }
 
             #[pymethods]
             impl $struct_name {
                 #[new]
-                fn new(name: String, map: Vec<$datatype>) -> Self {
+                fn new(observer: &$map_observer_type_name) -> Self {
                     Self {
-                        //TODO: Not leak memory
-                        inner: OwnedMapObserver::new(Box::leak(name.into_boxed_str()), map),
+                        inner: MaxMapFeedback::new(observer),
                     }
                 }
             }
 
-            #[derive(Serialize, Deserialize, Debug, Clone)]
-            enum $wrapper_name {
-                Owned($struct_name),
-            }
-
-            // Should not be exposed to user
-            #[pyclass(unsendable, name = $py_name_trait)]
-            #[derive(Serialize, Deserialize, Debug, Clone)]
-            /// MapObserver + Observer Trait binding
-            pub struct $struct_name_trait {
-                pub wrapper: $wrapper_name,
-            }
-
-            impl $struct_name_trait {
-                fn unwrap(&self) -> &impl MapObserver<Entry = $datatype> {
-                    unsafe {
-                        match &self.wrapper {
-                            $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner,
-                        }
-                    }
-                }
-
-                fn unwrap_mut(&mut self) -> &mut impl MapObserver<Entry = $datatype> {
-                    unsafe {
-                        match &mut self.wrapper {
-                            $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
-                        }
-                    }
-                }
-
-                fn upcast<S>(&self) -> &impl Observer<BytesInput, S> {
-                    unsafe {
-                        match &self.wrapper {
-                            $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner,
-                        }
-                    }
-                }
-
-                fn upcast_mut<S>(&mut self) -> &mut impl Observer<BytesInput, S> {
-                    unsafe {
-                        match &mut self.wrapper {
-                            $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
-                        }
-                    }
-                }
-            }
-
-            #[pymethods]
-            impl $struct_name_trait {
-                #[staticmethod]
-                fn new_from_owned(owned_map: $struct_name) -> Self {
-                    Self {
-                        wrapper: $wrapper_name::Owned(owned_map),
-                    }
-                }
-            }
-
-            impl<'it> AsRefIterator<'it> for $struct_name_trait {
-                type Item = $datatype;
-                type IntoIter = Iter<'it, $datatype>;
-
-                fn as_ref_iter(&'it self) -> Self::IntoIter {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.as_ref_iter(),
-                    }
-                }
-            }
-
-            impl<'it> AsMutIterator<'it> for $struct_name_trait {
-                type Item = $datatype;
-                type IntoIter = IterMut<'it, $datatype>;
-
-                fn as_mut_iter(&'it mut self) -> Self::IntoIter {
-                    match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.as_mut_iter(),
-                    }
-                }
-            }
-
-            impl MapObserver for $struct_name_trait {
-                type Entry = $datatype;
-
-                #[inline]
-                fn get(&self, idx: usize) -> &$datatype {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner.get(idx),
-                    }
-                }
-
-                #[inline]
-                fn get_mut(&mut self, idx: usize) -> &mut $datatype {
-                    match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.get_mut(idx),
-                    }
-                }
-
-                #[inline]
-                fn usable_count(&self) -> usize {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.wrapper.usable_count(),
-                    }
-                }
-
-                fn hash(&self) -> u64 {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.hash(),
-                    }
-                }
-
-                #[inline]
-                fn initial(&self) -> $datatype {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.initial(),
-                    }
-                }
-
-                #[inline]
-                fn initial_mut(&mut self) -> &mut $datatype {
-                    match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.initial_mut(),
-                    }
-                }
-
-                #[inline]
-                fn set_initial(&mut self, initial: $datatype) {
-                    match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.set_initial(initial);
-                        }
-                    }
-                }
-
-                fn to_vec(&self) -> Vec<$datatype> {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.to_vec(),
-                    }
-                }
-            }
-
-            impl Named for $struct_name_trait {
-                #[inline]
-                fn name(&self) -> &str {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.name(),
-                    }
-                }
-            }
-
-            impl HasLen for $struct_name_trait {
-                #[inline]
-                fn len(&self) -> usize {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.len(),
-                    }
-                }
-            }
-
-            impl<I, S> Observer<I, S> for $struct_name_trait
-            where
-                Self: MapObserver,
-            {
-                #[inline]
-                fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-                    match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.pre_exec(_state, _input)
-                        }
-                    }
-                }
-            }
-        };
-    }
-
-    define_python_map_observer!(
-        PythonOwnedMapObserverI8,
-        "OwnedMapObserverI8",
-        PythonMapObserverI8,
-        "MapObserverI8",
-        i8,
-        PythonMapObserverWrapperI8
-    );
-    define_python_map_observer!(
-        PythonOwnedMapObserverI16,
-        "OwnedMapObserverI16",
-        PythonMapObserverI16,
-        "MapObserverI16",
-        i16,
-        PythonMapObserverWrapperI16
-    );
-    define_python_map_observer!(
-        PythonOwnedMapObserverI32,
-        "OwnedMapObserverI32",
-        PythonMapObserverI32,
-        "MapObserverI32",
-        i32,
-        PythonMapObserverWrapperI32
-    );
-    define_python_map_observer!(
-        PythonOwnedMapObserverI64,
-        "OwnedMapObserverI64",
-        PythonMapObserverI64,
-        "MapObserverI64",
-        i64,
-        PythonMapObserverWrapperI64
-    );
-
-    define_python_map_observer!(
-        PythonOwnedMapObserverU8,
-        "OwnedMapObserverU8",
-        PythonMapObserverU8,
-        "MapObserverU8",
-        u8,
-        PythonMapObserverWrapperU8
-    );
-    define_python_map_observer!(
-        PythonOwnedMapObserverU16,
-        "OwnedMapObserverU16",
-        PythonMapObserverU16,
-        "MapObserverU16",
-        u16,
-        PythonMapObserverWrapperU16
-    );
-    define_python_map_observer!(
-        PythonOwnedMapObserverU32,
-        "OwnedMapObserverU32",
-        PythonMapObserverU32,
-        "MapObserverU32",
-        u32,
-        PythonMapObserverWrapperU32
-    );
-    define_python_map_observer!(
-        PythonOwnedMapObserverU64,
-        "OwnedMapObserverU64",
-        PythonMapObserverU64,
-        "MapObserverU64",
-        u64,
-        PythonMapObserverWrapperU64
-    );
-
-    /// Register the classes to the python module
-    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonOwnedMapObserverI8>()?;
-        m.add_class::<PythonMapObserverI8>()?;
-        m.add_class::<PythonOwnedMapObserverI16>()?;
-        m.add_class::<PythonMapObserverI16>()?;
-        m.add_class::<PythonOwnedMapObserverI32>()?;
-        m.add_class::<PythonMapObserverI32>()?;
-        m.add_class::<PythonOwnedMapObserverI64>()?;
-        m.add_class::<PythonMapObserverI64>()?;
-
-        m.add_class::<PythonOwnedMapObserverU8>()?;
-        m.add_class::<PythonMapObserverU8>()?;
-        m.add_class::<PythonOwnedMapObserverU16>()?;
-        m.add_class::<PythonMapObserverU16>()?;
-        m.add_class::<PythonOwnedMapObserverU32>()?;
-        m.add_class::<PythonMapObserverU32>()?;
-        m.add_class::<PythonOwnedMapObserverU64>()?;
-        m.add_class::<PythonMapObserverU64>()?;
-        Ok(())
-    }
-}
-
-#[cfg(feature = "python")]
-/// Map Feedback Python bindings
-pub mod pybind {
-    use crate::feedbacks::map::{MapFeedbackMetadata, MaxMapFeedback};
-    use crate::inputs::BytesInput;
-    use pyo3::prelude::*;
-
-    macro_rules! define_python_map_feedback {
-        ($map_feedback_state_struct_name:ident, $map_feedback_state_py_name:tt, $max_map_feedback_struct_name:ident,
-            $max_map_feedback_py_name:tt, $datatype:ty, $map_observer_name: ident, $std_state_name: ident) => {
-            use crate::observers::map::pybind::$map_observer_name;
-            use crate::state::pybind::$std_state_name;
-
-            #[pyclass(unsendable, name = $map_feedback_state_py_name)]
-            #[derive(Clone, Debug)]
-            /// Python class for MapFeedbackMetadata
-            pub struct $map_feedback_state_struct_name {
-                /// Rust wrapped MapFeedbackMetadata object
-                pub map_feedback_state: MapFeedbackMetadata<$datatype>,
-            }
-
-            #[pymethods]
-            impl $map_feedback_state_struct_name {
-                #[staticmethod]
-                fn with_observer(py_observer: &$map_observer_name) -> Self {
-                    Self {
-                        map_feedback_state: MapFeedbackMetadata::with_observer(py_observer),
-                    }
-                }
-            }
-
-            #[pyclass(unsendable, name = $max_map_feedback_py_name)]
-            #[derive(Debug)]
-            /// Python class for MaxMapFeedback
-            pub struct $max_map_feedback_struct_name {
-                /// Rust wrapped MaxMapFeedback object
-                pub max_map_feedback:
-                    MaxMapFeedback<BytesInput, $map_observer_name, $std_state_name, $datatype>,
-            }
-
-            impl Clone for $max_map_feedback_struct_name {
-                fn clone(&self) -> Self {
-                    Self {
-                        max_map_feedback: self.max_map_feedback.clone(),
-                    }
-                }
-            }
-
-            #[pymethods]
-            impl $max_map_feedback_struct_name {
-                #[new]
-                fn new(
-                    py_feedback_state: &$map_feedback_state_struct_name,
-                    py_observer: &$map_observer_name,
-                ) -> Self {
-                    Self {
-                        max_map_feedback: MaxMapFeedback::new(
-                            &py_feedback_state.map_feedback_state,
-                            py_observer,
-                        ),
-                    }
+            impl HasObserverName for $struct_name {
+                fn observer_name(&self) -> &str {
+                    self.inner.observer_name()
                 }
             }
         };
     }
 
     define_python_map_feedback!(
-        PythonMapFeedbackMetadataI8,
-        "MapFeedbackMetadataI8",
         PythonMaxMapFeedbackI8,
         "MaxMapFeedbackI8",
         i8,
         PythonMapObserverI8,
-        MyStdStateI8
+        PythonStdState
     );
-
     define_python_map_feedback!(
-        PythonMapFeedbackMetadataI16,
-        "MapFeedbackMetadataI16",
         PythonMaxMapFeedbackI16,
         "MaxMapFeedbackI16",
         i16,
         PythonMapObserverI16,
-        MyStdStateI16
+        PythonStdState
     );
     define_python_map_feedback!(
-        PythonMapFeedbackMetadataI32,
-        "MapFeedbackMetadataI32",
         PythonMaxMapFeedbackI32,
         "MaxMapFeedbackI32",
         i32,
         PythonMapObserverI32,
-        MyStdStateI32
+        PythonStdState
     );
     define_python_map_feedback!(
-        PythonMapFeedbackMetadataI64,
-        "MapFeedbackMetadataI64",
         PythonMaxMapFeedbackI64,
         "MaxMapFeedbackI64",
         i64,
         PythonMapObserverI64,
-        MyStdStateI64
+        PythonStdState
     );
 
     define_python_map_feedback!(
-        PythonMapFeedbackMetadataU8,
-        "MapFeedbackMetadataU8",
         PythonMaxMapFeedbackU8,
         "MaxMapFeedbackU8",
         u8,
         PythonMapObserverU8,
-        MyStdStateU8
+        PythonStdState
     );
-
     define_python_map_feedback!(
-        PythonMapFeedbackMetadataU16,
-        "MapFeedbackMetadataU16",
         PythonMaxMapFeedbackU16,
         "MaxMapFeedbackU16",
         u16,
         PythonMapObserverU16,
-        MyStdStateU16
+        PythonStdState
     );
     define_python_map_feedback!(
-        PythonMapFeedbackMetadataU32,
-        "MapFeedbackMetadataU32",
         PythonMaxMapFeedbackU32,
         "MaxMapFeedbackU32",
         u32,
         PythonMapObserverU32,
-        MyStdStateU32
+        PythonStdState
     );
     define_python_map_feedback!(
-        PythonMapFeedbackMetadataU64,
-        "MapFeedbackMetadataU64",
         PythonMaxMapFeedbackU64,
         "MaxMapFeedbackU64",
         u64,
         PythonMapObserverU64,
-        MyStdStateU64
+        PythonStdState
     );
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonMapFeedbackMetadataI8>()?;
-        m.add_class::<PythonMapFeedbackMetadataI16>()?;
-        m.add_class::<PythonMapFeedbackMetadataI32>()?;
-        m.add_class::<PythonMapFeedbackMetadataI64>()?;
-
-        m.add_class::<PythonMapFeedbackMetadataU8>()?;
-        m.add_class::<PythonMapFeedbackMetadataU16>()?;
-        m.add_class::<PythonMapFeedbackMetadataU32>()?;
-        m.add_class::<PythonMapFeedbackMetadataU64>()?;
-
         m.add_class::<PythonMaxMapFeedbackI8>()?;
         m.add_class::<PythonMaxMapFeedbackI16>()?;
         m.add_class::<PythonMaxMapFeedbackI32>()?;

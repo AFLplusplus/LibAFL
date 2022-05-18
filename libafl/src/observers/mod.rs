@@ -292,46 +292,51 @@ where
 
 /// `Observer` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
-    use crate::bolts::tuples::Named;
+    use super::*;
+    use crate::bolts::{
+        ownedref::OwnedPtrMut,
+        tuples::{type_eq, MatchName, Named},
+    };
     use crate::executors::ExitKind;
     use crate::inputs::BytesInput;
-    use crate::observers::Observer;
     use crate::Error;
     use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize, Serializer};
 
     macro_rules! define_python_observer {
-        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $my_std_state_type_name: ident) => {
+        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $my_std_state_type_name: ident, $observer_tuple_name:ident, $observer_tuple_py_name: tt) => {
             use crate::observers::map::pybind::PythonMapObserverI8;
             use crate::state::pybind::$my_std_state_type_name;
 
-            #[derive(Debug)]
-            enum $wrapper_name {
-                MapI8(*mut PythonMapObserverI8),
+            #[derive(Serialize, Deserialize, Clone, Debug)]
+            pub enum $wrapper_name {
+                MapI8(OwnedPtrMut<PythonMapObserverI8>),
             }
 
             #[pyclass(unsendable, name = $py_name_trait)]
-            #[derive(Debug)]
+            #[derive(Serialize, Deserialize, Clone, Debug)]
             /// Observer Trait binding
             pub struct $struct_name_trait {
                 pub wrapper: $wrapper_name,
             }
 
             impl $struct_name_trait {
-                fn unwrap(&self) -> &impl Observer<BytesInput, $my_std_state_type_name> {
-                    unsafe {
-                        match self.wrapper {
-                            $wrapper_name::MapI8(py_wrapper) => &(*py_wrapper).upcast(),
+                pub fn unwrap(&self) -> &impl Observer<BytesInput, $my_std_state_type_name> {
+                    match &self.wrapper {
+                        $wrapper_name::MapI8(py_wrapper) => {
+                            py_wrapper.as_ref().upcast::<$my_std_state_type_name>()
                         }
                     }
                 }
 
-                fn unwrap_mut(
+                pub fn unwrap_mut(
                     &mut self,
                 ) -> &mut impl Observer<BytesInput, $my_std_state_type_name> {
-                    unsafe {
-                        match self.wrapper {
-                            $wrapper_name::MapI8(py_wrapper) => &mut (*py_wrapper).upcast_mut(),
+                    match &mut self.wrapper {
+                        $wrapper_name::MapI8(py_wrapper) => {
+                            py_wrapper.as_mut().upcast_mut::<$my_std_state_type_name>()
                         }
                     }
                 }
@@ -342,7 +347,7 @@ pub mod pybind {
                 #[staticmethod]
                 fn new_map(map_observer: &mut PythonMapObserverI8) -> Self {
                     Self {
-                        observer: $wrapper_name::MapI8(map_observer),
+                        wrapper: $wrapper_name::MapI8(OwnedPtrMut::Ptr(map_observer)),
                     }
                 }
             }
@@ -392,6 +397,107 @@ pub mod pybind {
                     self.unwrap_mut().post_exec_child(state, input, exit_kind)
                 }
             }
+
+            #[derive(Serialize, Deserialize, Clone, Debug)]
+            #[pyclass(unsendable, name = $observer_tuple_py_name)]
+            pub struct $observer_tuple_name {
+                list: Vec<PythonObserver>,
+            }
+            
+            #[pymethods]
+            impl $observer_tuple_name {
+                #[new]
+                fn new(list: Vec<PythonObserver>) -> Self {
+                    Self {
+                        list
+                    }
+                }
+            }
+
+            impl ObserversTuple<BytesInput, $my_std_state_type_name> for $observer_tuple_name {
+                fn pre_exec_all(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                ) -> Result<(), Error> {
+                    for ob in &mut self.list {
+                        ob.pre_exec(state, input)?;
+                    }
+                    Ok(())
+                }
+
+                fn post_exec_all(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                    exit_kind: &ExitKind,
+                ) -> Result<(), Error> {
+                    for ob in &mut self.list {
+                        ob.post_exec(state, input, exit_kind)?;
+                    }
+                    Ok(())
+                }
+
+                fn pre_exec_child_all(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                ) -> Result<(), Error> {
+                    for ob in &mut self.list {
+                        ob.pre_exec_child(state, input)?;
+                    }
+                    Ok(())
+                }
+
+                fn post_exec_child_all(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                    exit_kind: &ExitKind,
+                ) -> Result<(), Error> {
+                    for ob in &mut self.list {
+                        ob.post_exec_child(state, input, exit_kind)?;
+                    }
+                    Ok(())
+                }
+            }
+
+            impl MatchName for $observer_tuple_name {
+                fn match_name<T>(&self, name: &str) -> Option<&T> {
+                    unsafe {
+                        for ob in &self.list {
+                            match &ob.wrapper {
+                                PythonObserverWrapper::MapI8(py_wrapper) => {
+                                    if type_eq::<PythonMapObserverI8, T>()
+                                        && py_wrapper.as_ref().name() == name
+                                    {
+                                        return (py_wrapper.as_ref() as *const _ as *const T)
+                                            .as_ref();
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    }
+                }
+
+                fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
+                    unsafe {
+                        for ob in &mut self.list {
+                            match &mut ob.wrapper {
+                                PythonObserverWrapper::MapI8(py_wrapper) => {
+                                    if type_eq::<PythonMapObserverI8, T>()
+                                        && py_wrapper.as_ref().name() == name
+                                    {
+                                        return (py_wrapper.as_mut() as *mut _ as *mut T).as_mut();
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    }
+                }
+            }
         };
     }
 
@@ -400,11 +506,14 @@ pub mod pybind {
         "Observer",
         PythonObserverWrapper,
         PythonStdState,
+        PythonObserversTuple,
+        "ObserversTuple"
     );
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonObserver>()?;
+        m.add_class::<PythonObserversTuple>()?;
         Ok(())
     }
 }

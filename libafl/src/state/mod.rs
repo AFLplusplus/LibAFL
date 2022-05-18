@@ -652,11 +652,13 @@ where
 }
 
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 /// `State` Python bindings
 pub mod pybind {
     use crate::bolts::rands::pybind::PythonRand;
-    use crate::bolts::tuples::tuple_list;
     use crate::corpus::pybind::PythonCorpus;
+    //use crate::feedbacks::pybind::PythonFeedback;
+    use crate::events::pybind::PythonEventManager;
     use crate::feedbacks::pybind::PythonFeedback;
     use crate::inputs::BytesInput;
     use crate::state::StdState;
@@ -664,10 +666,10 @@ pub mod pybind {
 
     macro_rules! define_python_state {
         ($type_name:ident, $struct_name:ident, $py_name:tt) => {
-            use crate::events::pybind::$event_manager_name;
-            use crate::executors::pybind::$executor_name;
-            use crate::fuzzer::pybind::$fuzzer_name;
-            use crate::generators::pybind::$rand_printable_generator;
+            //use crate::events::pybind::$event_manager_name;
+            //use crate::executors::pybind::$executor_name;
+            //use crate::fuzzer::pybind::$fuzzer_name;
+            //use crate::generators::pybind::$rand_printable_generator;
 
             /// `StdState` with fixed generics
             pub type $type_name = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
@@ -677,7 +679,7 @@ pub mod pybind {
             /// Python class for StdState
             pub struct $struct_name {
                 /// Rust wrapped StdState object
-                pub std_state: $type_name,
+                pub inner: $type_name,
             }
 
             #[pymethods]
@@ -691,11 +693,12 @@ pub mod pybind {
                     objective: &mut PythonFeedback,
                 ) -> Self {
                     Self {
-                        std_state: StdState::new(py_rand, corpus, solutions, feedback, objective),
+                        inner: StdState::new(py_rand, corpus, solutions, feedback, objective)
+                            .expect("Failed to create a new StdState"),
                     }
                 }
 
-                fn generate_initial_inputs(
+                /*fn generate_initial_inputs(
                     &mut self,
                     py_fuzzer: &mut PythonFuzzer,
                     py_executor: &mut PythonExecutor,
@@ -703,21 +706,21 @@ pub mod pybind {
                     py_mgr: &mut PythonEventManager,
                     num: usize,
                 ) {
-                    self.std_state
+                    self.inner
                         .generate_initial_inputs(
-                            &mut py_fuzzer.std_fuzzer,
+                            &mut py_fuzzer.inner,
                             py_executor,
                             &mut py_generator.rand_printable_generator,
                             py_mgr,
                             num,
                         )
                         .expect("Failed to generate the initial corpus".into());
-                }
+                }*/
             }
         };
     }
 
-    define_python_state!(PythonStdState, PythonStdStateWrapper, "StdState",);
+    define_python_state!(PythonStdState, PythonStdStateWrapper, "StdState");
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

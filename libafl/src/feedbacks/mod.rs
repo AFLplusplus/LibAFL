@@ -1038,46 +1038,46 @@ impl From<bool> for ConstFeedback {
 
 /// `Feedback` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
-    use crate::inputs::BytesInput;
+    use super::*;
+    use crate::feedbacks::map::pybind::*;
+    use crate::state::pybind::PythonStdState;
     use crate::{
         bolts::tuples::Named, corpus::Testcase, events::EventFirer, executors::ExitKind,
-        feedbacks::Feedback, observers::ObserversTuple, Error,
+        inputs::BytesInput, observers::ObserversTuple, Error,
     };
     use pyo3::prelude::*;
 
     macro_rules! define_python_feedback {
         ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $my_std_state_type_name: ident) => {
-            use crate::observers::map::pybind::PythonMaxMapFeedbackI8;
-            use crate::state::pybind::$my_std_state_type_name;
-
-            #[derive(Debug)]
-            enum $wrapper_name {
+            #[derive(Clone, Debug)]
+            pub enum $wrapper_name {
                 MaxMapI8(*mut PythonMaxMapFeedbackI8),
             }
 
             #[pyclass(unsendable, name = $py_name_trait)]
-            #[derive(Debug)]
+            #[derive(Clone, Debug)]
             /// Observer Trait binding
             pub struct $struct_name_trait {
                 pub wrapper: $wrapper_name,
             }
 
             impl $struct_name_trait {
-                fn unwrap(&self) -> &impl Feedback<BytesInput, $my_std_state_type_name> {
+                pub fn unwrap(&self) -> &impl Feedback<BytesInput, $my_std_state_type_name> {
                     unsafe {
                         match self.wrapper {
-                            $wrapper_name::MaxMapI8(py_wrapper) => &(*py_wrapper).upcast(),
+                            $wrapper_name::MaxMapI8(py_wrapper) => &(*py_wrapper).inner,
                         }
                     }
                 }
 
-                fn unwrap_mut(
+                pub fn unwrap_mut(
                     &mut self,
                 ) -> &mut impl Feedback<BytesInput, $my_std_state_type_name> {
                     unsafe {
                         match self.wrapper {
-                            $wrapper_name::MaxMapI8(py_wrapper) => &mut (*py_wrapper).upcast_mut(),
+                            $wrapper_name::MaxMapI8(py_wrapper) => &mut (*py_wrapper).inner,
                         }
                     }
                 }
@@ -1086,9 +1086,9 @@ pub mod pybind {
             #[pymethods]
             impl $struct_name_trait {
                 #[staticmethod]
-                fn new_map(map_feedback: &mut PythonMaxMapFeedbackI8) -> Self {
+                fn new_max_map_i8(map_feedback: &mut PythonMaxMapFeedbackI8) -> Self {
                     Self {
-                        observer: $wrapper_name::MaxMapI8(map_feedback),
+                        wrapper: $wrapper_name::MaxMapI8(map_feedback),
                     }
                 }
             }
@@ -1100,35 +1100,40 @@ pub mod pybind {
             }
 
             impl Feedback<BytesInput, $my_std_state_type_name> for $struct_name_trait {
-                fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+                fn init_state(&mut self, state: &mut $my_std_state_type_name) -> Result<(), Error> {
                     self.unwrap_mut().init_state(state)
                 }
 
                 fn is_interesting<EM, OT>(
                     &mut self,
-                    state: &mut S,
+                    state: &mut $my_std_state_type_name,
                     manager: &mut EM,
-                    input: &I,
+                    input: &BytesInput,
                     observers: &OT,
                     exit_kind: &ExitKind,
                 ) -> Result<bool, Error>
                 where
-                    EM: EventFirer<I>,
-                    OT: ObserversTuple<I, S>,
+                    EM: EventFirer<BytesInput>,
+                    OT: ObserversTuple<BytesInput, $my_std_state_type_name>,
                 {
+                    // TODO cast observers enumerating all of the possible things in PythonObserverWrapper
                     self.unwrap_mut()
                         .is_interesting(state, manager, input, observers, exit_kind)
                 }
 
                 fn append_metadata(
                     &mut self,
-                    state: &mut S,
-                    testcase: &mut Testcase<I>,
+                    state: &mut $my_std_state_type_name,
+                    testcase: &mut Testcase<BytesInput>,
                 ) -> Result<(), Error> {
                     self.unwrap_mut().append_metadata(state, testcase)
                 }
 
-                fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+                fn discard_metadata(
+                    &mut self,
+                    state: &mut $my_std_state_type_name,
+                    input: &BytesInput,
+                ) -> Result<(), Error> {
                     self.unwrap_mut().discard_metadata(state, input)
                 }
             }
@@ -1139,7 +1144,7 @@ pub mod pybind {
         PythonFeedback,
         "Feedback",
         PythonFeedbackWrapper,
-        PythonStdState,
+        PythonStdState
     );
 
     /// Register the classes to the python module

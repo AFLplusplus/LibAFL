@@ -1490,13 +1490,12 @@ where
 
 /// `MapObserver` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
-    use crate::bolts::{tuples::Named, AsMutIterator, AsRefIterator, HasLen};
-    use crate::observers::{map::OwnedMapObserver, MapObserver, Observer};
-    use crate::Error;
+    use super::*;
+    use crate::inputs::BytesInput;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
-    use std::slice::{Iter, IterMut};
 
     macro_rules! define_python_map_observer {
         ($struct_name:ident, $py_name:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
@@ -1520,7 +1519,7 @@ pub mod pybind {
             }
 
             #[derive(Serialize, Deserialize, Debug, Clone)]
-            enum $wrapper_name {
+            pub enum $wrapper_name {
                 Owned($struct_name),
             }
 
@@ -1533,35 +1532,27 @@ pub mod pybind {
             }
 
             impl $struct_name_trait {
-                fn unwrap(&self) -> &impl MapObserver<Entry = $datatype> {
-                    unsafe {
-                        match &self.wrapper {
-                            $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner,
-                        }
+                pub fn unwrap(&self) -> &impl MapObserver<Entry = $datatype> {
+                    match &self.wrapper {
+                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner,
                     }
                 }
 
-                fn unwrap_mut(&mut self) -> &mut impl MapObserver<Entry = $datatype> {
-                    unsafe {
-                        match &mut self.wrapper {
-                            $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
-                        }
+                pub fn unwrap_mut(&mut self) -> &mut impl MapObserver<Entry = $datatype> {
+                    match &mut self.wrapper {
+                        $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
                     }
                 }
 
-                fn upcast<S>(&self) -> &impl Observer<BytesInput, S> {
-                    unsafe {
-                        match &self.wrapper {
-                            $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner,
-                        }
+                pub fn upcast<S>(&self) -> &impl Observer<BytesInput, S> {
+                    match &self.wrapper {
+                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner,
                     }
                 }
 
-                fn upcast_mut<S>(&mut self) -> &mut impl Observer<BytesInput, S> {
-                    unsafe {
-                        match &mut self.wrapper {
-                            $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
-                        }
+                pub fn upcast_mut<S>(&mut self) -> &mut impl Observer<BytesInput, S> {
+                    match &mut self.wrapper {
+                        $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
                     }
                 }
             }
@@ -1618,7 +1609,7 @@ pub mod pybind {
                 #[inline]
                 fn usable_count(&self) -> usize {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.wrapper.usable_count(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.usable_count(),
                     }
                 }
 

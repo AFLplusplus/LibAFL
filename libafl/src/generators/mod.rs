@@ -127,12 +127,12 @@ where
 }
 
 /// `Generator` Python bindings
-#[cfg(feature = "python")]
+#[cfg(feature = "python1")]
 pub mod pybind {
     use crate::generators::RandPrintablesGenerator;
     use pyo3::prelude::*;
 
-    macro_rules! define_python_event_manager {
+    macro_rules! define_python_generator {
         ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident) => {
             use crate::state::pybind::$my_std_state_type_name;
 

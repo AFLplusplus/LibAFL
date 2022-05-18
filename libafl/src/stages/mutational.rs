@@ -163,6 +163,7 @@ where
 }
 
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
     use crate::bolts::tuples::tuple_list_type;
@@ -215,7 +216,7 @@ pub mod pybind {
             /// Python class for StdMutationalStage
             pub struct $struct_name {
                 /// Rust wrapped StdMutationalStage object
-                pub std_mutational_stage: StdMutationalStage<
+                pub inner: StdMutationalStage<
                     $executor_name,
                     $event_manager_name,
                     BytesInput,
@@ -228,11 +229,9 @@ pub mod pybind {
             #[pymethods]
             impl $struct_name {
                 #[staticmethod]
-                fn new_from_scheduled_havoc_mutations() -> Self {
+                fn new() -> Self {
                     Self {
-                        std_mutational_stage: StdMutationalStage::new(StdScheduledMutator::new(
-                            havoc_mutations(),
-                        )),
+                        inner: StdMutationalStage::new(StdScheduledMutator::new(havoc_mutations())),
                     }
                 }
             }
@@ -240,84 +239,17 @@ pub mod pybind {
     }
 
     define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStageI8,
-        "StdScheduledHavocMutationsStageI8",
-        MyStdStateI8,
-        MyStdFuzzerI8,
-        PythonExecutorI8,
-        PythonEventManagerI8
-    );
-
-    define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStageI16,
-        "StdScheduledHavocMutationsStageI16",
-        MyStdStateI16,
-        MyStdFuzzerI16,
-        PythonExecutorI16,
-        PythonEventManagerI16
-    );
-    define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStageI32,
-        "StdScheduledHavocMutationsStageI32",
-        MyStdStateI32,
-        MyStdFuzzerI32,
-        PythonExecutorI32,
-        PythonEventManagerI32
-    );
-    define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStageI64,
-        "StdScheduledHavocMutationsStageI64",
-        MyStdStateI64,
-        MyStdFuzzerI64,
-        PythonExecutorI64,
-        PythonEventManagerI64
-    );
-
-    define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStageU8,
-        "StdScheduledHavocMutationsStageU8",
-        MyStdStateU8,
-        MyStdFuzzerU8,
-        PythonExecutorU8,
-        PythonEventManagerU8
-    );
-
-    define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStageU16,
-        "StdScheduledHavocMutationsStageU16",
-        MyStdStateU16,
-        MyStdFuzzerU16,
-        PythonExecutorU16,
-        PythonEventManagerU16
-    );
-    define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStageU32,
-        "StdScheduledHavocMutationsStageU32",
-        MyStdStateU32,
-        MyStdFuzzerU32,
-        PythonExecutorU32,
-        PythonEventManagerU32
-    );
-    define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStageU64,
-        "StdScheduledHavocMutationsStageU64",
-        MyStdStateU64,
-        MyStdFuzzerU64,
-        PythonExecutorU64,
-        PythonEventManagerU64
+        PythonStdScheduledHavocMutationsStage,
+        "StdScheduledHavocMutationsStage",
+        PythonStdState,
+        PythonStdFuzzer,
+        PythonExecutor,
+        PythonEventManager
     );
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdScheduledHavocMutationsStageI8>()?;
-        m.add_class::<PythonStdScheduledHavocMutationsStageI16>()?;
-        m.add_class::<PythonStdScheduledHavocMutationsStageI32>()?;
-        m.add_class::<PythonStdScheduledHavocMutationsStageI64>()?;
-
-        m.add_class::<PythonStdScheduledHavocMutationsStageU8>()?;
-        m.add_class::<PythonStdScheduledHavocMutationsStageU16>()?;
-        m.add_class::<PythonStdScheduledHavocMutationsStageU32>()?;
-        m.add_class::<PythonStdScheduledHavocMutationsStageU64>()?;
+        m.add_class::<PythonStdScheduledHavocMutationsStage>()?;
         Ok(())
     }
 }

@@ -11,7 +11,7 @@ use xxhash_rust::xxh3::xxh3_64;
 
 #[rustversion::nightly]
 /// From <https://stackoverflow.com/a/60138532/7658998>
-const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // Helper trait. `VALUE` is false, except for the specialization of the
     // case where `T == U`.
     trait TypeEq<U: ?Sized> {
@@ -32,7 +32,7 @@ const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
 }
 
 #[rustversion::not(nightly)]
-const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // BEWARE! This is not unsafe, it is SUPER UNSAFE
     true
 }

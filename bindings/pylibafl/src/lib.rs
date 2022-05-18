@@ -1,4 +1,4 @@
-//use libafl;
+use libafl;
 use libafl_qemu;
 use libafl_sugar;
 use pyo3::prelude::*;
@@ -14,9 +14,9 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     libafl_qemu::python_module(py, qemu_module)?;
     m.add_submodule(qemu_module)?;
 
-    //let libafl_module = PyModule::new(py, "libafl")?;
-    //libafl::python_module(py, libafl_module)?;
-    //m.add_submodule(libafl_module)?;
+    let libafl_module = PyModule::new(py, "libafl")?;
+    libafl::python_module(py, libafl_module)?;
+    m.add_submodule(libafl_module)?;
 
     Ok(())
 }
