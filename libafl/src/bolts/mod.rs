@@ -110,7 +110,7 @@ pub fn current_time() -> time::Duration {
     time::Duration::from_millis(millis)
 }
 
-/// Given a u64 number, return a random number using this mixing function
+/// Given a u64 number, return a hashed number using this mixing function
 /// This function is used to hash an address into a more random number (used in libafl_frida).
 /// Mixing function: <http://mostlymangling.blogspot.com/2018/07/on-mixing-functions-in-fast-splittable.html>
 #[inline]
