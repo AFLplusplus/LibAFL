@@ -110,11 +110,12 @@ pub fn current_time() -> time::Duration {
     time::Duration::from_millis(millis)
 }
 
-/// Given a value v, return a random number using this mixing function
-/// Mixing function <http://mostlymangling.blogspot.com/2018/07/on-mixing-functions-in-fast-splittable.html>
+/// Given a u64 number, return a random number using this mixing function
+/// This function is used to hash an address into a more random number (used in libafl_frida).
+/// Mixing function: <http://mostlymangling.blogspot.com/2018/07/on-mixing-functions-in-fast-splittable.html>
 #[inline]
 #[must_use]
-pub fn rrxmrrxmsx_0(v: u64) -> u64 {
+pub fn XXH3_rrmxmx_mixer(v: u64) -> u64 {
     let tmp = (v >> 32) + ((v & 0xffffffff) << 32);
     let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
     let mut h64 = tmp ^ bitflip;
