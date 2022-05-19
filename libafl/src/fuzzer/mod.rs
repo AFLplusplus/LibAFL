@@ -672,89 +672,102 @@ where
 #[allow(missing_docs)]
 /// `Fuzzer` Python bindings
 pub mod pybind {
+    use crate::bolts::ownedref::OwnedPtrMut;
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::pybind::PythonExecutor;
     use crate::feedbacks::pybind::PythonFeedback;
     use crate::feedbacks::CrashFeedback;
-    use crate::fuzzer::{Fuzzer, StdFuzzer, Evaluator};
+    use crate::fuzzer::{Evaluator, Fuzzer, StdFuzzer};
     use crate::inputs::BytesInput;
-    use crate::observers::pybind::{PythonObserversTuple, PythonObserver};
+    use crate::observers::pybind::PythonObserversTuple;
     use crate::schedulers::QueueScheduler;
-    use crate::executors::pybind::PythonExecutor;
-    use crate::events::pybind::PythonEventManager;
     use crate::stages::owned::pybind::PythonStagesOwnedList;
-    use crate::state::pybind::{PythonStdStateWrapper, PythonStdState};
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use pyo3::prelude::*;
 
-    macro_rules! define_python_fuzzer {
-        ($type_name:ident, $struct_name:ident, $py_name:tt, $my_std_state_type_name: ident,$std_state_name:ident, $executor_name: ident, $event_manager_name: ident,$stage_tuple_name:ident) => {
-            /// `StdFuzzer` with fixed generics
-            pub type $type_name = StdFuzzer<
-                QueueScheduler,
-                PythonFeedback,
-                BytesInput,
-                CrashFeedback,
-                PythonObserversTuple,
-                $my_std_state_type_name,
-            >;
-            /// Python class for StdFuzzer
-            #[pyclass(unsendable, name = $py_name)]
-            #[derive(Debug)]
-            pub struct $struct_name {
-                /// Rust wrapped StdFuzzer object
-                pub inner: $type_name,
-            }
+    /// `StdFuzzer` with fixed generics
+    pub type PythonStdFuzzer = StdFuzzer<
+        QueueScheduler,
+        PythonFeedback,
+        BytesInput,
+        CrashFeedback,
+        PythonObserversTuple,
+        PythonStdState,
+    >;
 
-            #[pymethods]
-            impl $struct_name {
-                #[new]
-                fn new(py_feedback: PythonFeedback) -> Self {
-                    Self {
-                        inner: StdFuzzer::new(
-                            QueueScheduler::new(),
-                            py_feedback,
-                            CrashFeedback::new(),
-                        ),
-                    }
-                }
-                
-                fn add_input(
-                    &mut self,
-                    py_state: &mut $std_state_name,
-                    py_executor: &mut $executor_name,
-                    py_mgr: &mut $event_manager_name,
-                    input: Vec<u8>,
-                ) -> usize {
-                    self.inner.add_input(&mut py_state.inner, py_executor, py_mgr, BytesInput::new(input)).expect("Failed to add input")
-                }
-
-                fn fuzz_loop(
-                    &mut self,
-                    py_executor: &mut $executor_name,
-                    py_state: &mut $std_state_name,
-                    py_mgr: &mut $event_manager_name,
-                    stages_tuple: &mut $stage_tuple_name,
-                ) {
-                    self.inner
-                        .fuzz_loop(
-                            &mut stages_tuple.inner,
-                            py_executor,
-                            &mut py_state.inner,
-                            py_mgr,
-                        )
-                        .expect("Failed to generate the initial corpus".into());
-                }
-            }
-        };
+    /// Python class for StdFuzzer
+    #[pyclass(unsendable, name = "StdFuzzer")]
+    #[derive(Debug)]
+    pub struct PythonStdFuzzerWrapper {
+        /// Rust wrapped StdFuzzer object
+        pub inner: OwnedPtrMut<PythonStdFuzzer>,
     }
 
-    define_python_fuzzer!(
-        PythonStdFuzzer,
-        PythonStdFuzzerWrapper,
-        "StdFuzzer",
-        PythonStdState,PythonStdStateWrapper,
-        PythonExecutor,
-        PythonEventManager,
-        PythonStagesOwnedList
-    );
+    impl PythonStdFuzzerWrapper {
+        pub fn wrap(r: &mut PythonStdFuzzer) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
+
+        pub fn unwrap(&self) -> &PythonStdFuzzer {
+            self.inner.as_ref()
+        }
+
+        pub fn unwrap_mut(&mut self) -> &mut PythonStdFuzzer {
+            self.inner.as_mut()
+        }
+    }
+
+    #[pymethods]
+    impl PythonStdFuzzerWrapper {
+        #[new]
+        fn new(py_feedback: PythonFeedback) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(StdFuzzer::new(
+                    QueueScheduler::new(),
+                    py_feedback,
+                    CrashFeedback::new(),
+                ))),
+            }
+        }
+
+        fn add_input(
+            &mut self,
+            py_state: &mut PythonStdStateWrapper,
+            py_executor: &mut PythonExecutor,
+            py_mgr: &mut PythonEventManager,
+            input: Vec<u8>,
+        ) -> usize {
+            self.inner
+                .as_mut()
+                .add_input(
+                    py_state.unwrap_mut(),
+                    py_executor,
+                    py_mgr,
+                    BytesInput::new(input),
+                )
+                .expect("Failed to add input")
+        }
+
+        fn fuzz_loop(
+            &mut self,
+            py_executor: &mut PythonExecutor,
+            py_state: &mut PythonStdStateWrapper,
+            py_mgr: &mut PythonEventManager,
+            stages_tuple: &mut PythonStagesOwnedList,
+        ) {
+            self.inner
+                .as_mut()
+                .fuzz_loop(
+                    &mut stages_tuple.inner,
+                    py_executor,
+                    py_state.unwrap_mut(),
+                    py_mgr,
+                )
+                .expect("Failed to generate the initial corpus".into());
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

@@ -85,6 +85,7 @@ wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to
 z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for concolic mutation
 
 pyo3 = { version = "0.15", optional = true }
+concat-idents = "1.1.3"
 
 # AGPL
 # !!! this create requires nightly

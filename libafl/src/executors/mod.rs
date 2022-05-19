@@ -191,7 +191,7 @@ mod test {
 pub mod pybind {
     use crate::executors::{Executor, ExitKind, HasObservers};
     use crate::inputs::BytesInput;
-    use crate::observers::pybind::{PythonObserver,PythonObserversTuple};
+    use crate::observers::pybind::PythonObserversTuple;
     use crate::Error;
     use pyo3::prelude::*;
 

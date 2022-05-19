@@ -1672,10 +1672,9 @@ mod tests {
 #[allow(missing_docs)]
 /// `InProcess` Python bindings
 pub mod pybind {
-    use crate::bolts::tuples::tuple_list;
     use crate::executors::{inprocess::OwnedInProcessExecutor, ExitKind};
     use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::observers::pybind::{PythonObserver, PythonObserversTuple};
+    use crate::observers::pybind::PythonObserversTuple;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
 
@@ -1719,8 +1718,8 @@ pub mod pybind {
                                 ExitKind::Ok
                             }),
                             py_observers,
-                            &mut py_fuzzer.inner,
-                            &mut py_state.inner,
+                            py_fuzzer.unwrap_mut(),
+                            py_state.unwrap_mut(),
                             py_event_manager,
                         )
                         .expect("Failed to create the Executor".into()),

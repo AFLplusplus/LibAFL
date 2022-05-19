@@ -1042,110 +1042,315 @@ impl From<bool> for ConstFeedback {
 pub mod pybind {
     use super::*;
     use crate::feedbacks::map::pybind::*;
-    use crate::state::pybind::PythonStdState;
+    use crate::inputs::HasBytesVec;
+    use crate::observers::pybind::PythonObserversTuple;
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::{
         bolts::tuples::Named, corpus::Testcase, events::EventFirer, executors::ExitKind,
         inputs::BytesInput, observers::ObserversTuple, Error,
     };
     use pyo3::prelude::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::cell::UnsafeCell;
 
-    macro_rules! define_python_feedback {
-        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $my_std_state_type_name: ident) => {
-            #[derive(Clone, Debug)]
-            pub enum $wrapper_name {
-                MaxMapI8(*mut PythonMaxMapFeedbackI8),
+    #[derive(Debug)]
+    pub struct PyObjectFeedback {
+        inner: PyObject,
+        name: UnsafeCell<String>,
+    }
+
+    impl Clone for PyObjectFeedback {
+        fn clone(&self) -> PyObjectFeedback {
+            PyObjectFeedback {
+                inner: self.inner.clone(),
+                name: UnsafeCell::new(String::new()),
             }
+        }
+    }
 
-            #[pyclass(unsendable, name = $py_name_trait)]
-            #[derive(Clone, Debug)]
-            /// Observer Trait binding
-            pub struct $struct_name_trait {
-                pub wrapper: $wrapper_name,
+    impl PyObjectFeedback {
+        pub fn new(obj: PyObject) -> Self {
+            PyObjectFeedback {
+                inner: obj,
+                name: UnsafeCell::new(String::new()),
             }
+        }
+    }
 
-            impl $struct_name_trait {
-                pub fn unwrap(&self) -> &impl Feedback<BytesInput, $my_std_state_type_name> {
-                    unsafe {
-                        match self.wrapper {
-                            $wrapper_name::MaxMapI8(py_wrapper) => &(*py_wrapper).inner,
-                        }
-                    }
-                }
+    impl Serialize for PyObjectFeedback {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let buf = Python::with_gil(|py| -> PyResult<Vec<u8>> {
+                let pickle = PyModule::import(py, "pickle")?;
+                let buf: Vec<u8> = pickle.getattr("dumps")?.call1((&self.inner,))?.extract()?;
+                Ok(buf)
+            })
+            .unwrap();
+            serializer.serialize_bytes(&buf)
+        }
+    }
 
-                pub fn unwrap_mut(
-                    &mut self,
-                ) -> &mut impl Feedback<BytesInput, $my_std_state_type_name> {
-                    unsafe {
-                        match self.wrapper {
-                            $wrapper_name::MaxMapI8(py_wrapper) => &mut (*py_wrapper).inner,
-                        }
-                    }
-                }
+    struct PyObjectFeedbackVisitor;
+
+    impl<'de> serde::de::Visitor<'de> for PyObjectFeedbackVisitor {
+        type Value = PyObjectFeedback;
+
+        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+            formatter.write_str("Expecting some bytes to deserialize from the Python side")
+        }
+
+        fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            let obj = Python::with_gil(|py| -> PyResult<PyObject> {
+                let pickle = PyModule::import(py, "pickle")?;
+                let obj = pickle.getattr("loads")?.call1((v,))?.to_object(py);
+                Ok(obj)
+            })
+            .unwrap();
+            Ok(PyObjectFeedback::new(obj))
+        }
+    }
+
+    impl<'de> Deserialize<'de> for PyObjectFeedback {
+        fn deserialize<D>(deserializer: D) -> Result<PyObjectFeedback, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            deserializer.deserialize_byte_buf(PyObjectFeedbackVisitor)
+        }
+    }
+
+    impl Named for PyObjectFeedback {
+        fn name(&self) -> &str {
+            let s = Python::with_gil(|py| -> PyResult<String> {
+                let s: String = self.inner.call_method0(py, "name")?.extract(py)?;
+                Ok(s)
+            })
+            .unwrap();
+            unsafe {
+                *self.name.get() = s;
+                &*self.name.get()
             }
+        }
+    }
 
-            #[pymethods]
-            impl $struct_name_trait {
-                #[staticmethod]
-                fn new_max_map_i8(map_feedback: &mut PythonMaxMapFeedbackI8) -> Self {
-                    Self {
-                        wrapper: $wrapper_name::MaxMapI8(map_feedback),
-                    }
+    impl Feedback<BytesInput, PythonStdState> for PyObjectFeedback {
+        fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner
+                    .call_method1(py, "init_state", (PythonStdStateWrapper::wrap(state),))?;
+                Ok(())
+            })
+            .unwrap();
+            Ok(())
+        }
+
+        fn is_interesting<EM, OT>(
+            &mut self,
+            state: &mut PythonStdState,
+            _manager: &mut EM,
+            input: &BytesInput,
+            observers: &OT,
+            _exit_kind: &ExitKind,
+        ) -> Result<bool, Error>
+        where
+            EM: EventFirer<BytesInput>,
+            OT: ObserversTuple<BytesInput, PythonStdState>,
+        {
+            // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
+            let dont_look_at_this: &PythonObserversTuple =
+                unsafe { std::mem::transmute(observers) };
+            // TODO pass the other args
+            Ok(Python::with_gil(|py| -> PyResult<bool> {
+                let r: bool = self
+                    .inner
+                    .call_method1(
+                        py,
+                        "is_interesting",
+                        (
+                            PythonStdStateWrapper::wrap(state),
+                            input.bytes(),
+                            dont_look_at_this.clone(),
+                        ),
+                    )?
+                    .extract(py)?;
+                Ok(r)
+            })
+            .unwrap())
+        }
+
+        fn append_metadata(
+            &mut self,
+            state: &mut PythonStdState,
+            _testcase: &mut Testcase<BytesInput>,
+        ) -> Result<(), Error> {
+            // TODO pass the other args
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner.call_method1(
+                    py,
+                    "append_metadata",
+                    (PythonStdStateWrapper::wrap(state),),
+                )?;
+                Ok(())
+            })
+            .unwrap();
+            Ok(())
+        }
+
+        fn discard_metadata(
+            &mut self,
+            state: &mut PythonStdState,
+            input: &BytesInput,
+        ) -> Result<(), Error> {
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner.call_method1(
+                    py,
+                    "discard_metadata",
+                    (PythonStdStateWrapper::wrap(state), input.bytes()),
+                )?;
+                Ok(())
+            })
+            .unwrap();
+            Ok(())
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum PythonFeedbackWrapper {
+        MaxMapI8(Py<PythonMaxMapFeedbackI8>),
+        Python(PyObjectFeedback),
+    }
+
+    #[pyclass(unsendable, name = "Feedback")]
+    #[derive(Debug)]
+    /// Observer Trait binding
+    pub struct PythonFeedback {
+        pub wrapper: PythonFeedbackWrapper,
+        name: UnsafeCell<String>,
+    }
+
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $result:ty, $name:ident, $body:block) => {
+            match &$wrapper {
+                PythonFeedbackWrapper::MaxMapI8(py_wrapper) => {
+                    Python::with_gil(|py| -> PyResult<$result> {
+                        let borrowed = py_wrapper.borrow(py);
+                        let $name = &borrowed.inner;
+                        Ok($body)
+                    })
+                    .unwrap()
                 }
-            }
-
-            impl Named for $struct_name_trait {
-                fn name(&self) -> &str {
-                    self.unwrap().name()
-                }
-            }
-
-            impl Feedback<BytesInput, $my_std_state_type_name> for $struct_name_trait {
-                fn init_state(&mut self, state: &mut $my_std_state_type_name) -> Result<(), Error> {
-                    self.unwrap_mut().init_state(state)
-                }
-
-                fn is_interesting<EM, OT>(
-                    &mut self,
-                    state: &mut $my_std_state_type_name,
-                    manager: &mut EM,
-                    input: &BytesInput,
-                    observers: &OT,
-                    exit_kind: &ExitKind,
-                ) -> Result<bool, Error>
-                where
-                    EM: EventFirer<BytesInput>,
-                    OT: ObserversTuple<BytesInput, $my_std_state_type_name>,
-                {
-                    // TODO cast observers enumerating all of the possible things in PythonObserverWrapper
-                    self.unwrap_mut()
-                        .is_interesting(state, manager, input, observers, exit_kind)
-                }
-
-                fn append_metadata(
-                    &mut self,
-                    state: &mut $my_std_state_type_name,
-                    testcase: &mut Testcase<BytesInput>,
-                ) -> Result<(), Error> {
-                    self.unwrap_mut().append_metadata(state, testcase)
-                }
-
-                fn discard_metadata(
-                    &mut self,
-                    state: &mut $my_std_state_type_name,
-                    input: &BytesInput,
-                ) -> Result<(), Error> {
-                    self.unwrap_mut().discard_metadata(state, input)
+                PythonFeedbackWrapper::Python(py_wrapper) => {
+                    let $name = py_wrapper;
+                    $body
                 }
             }
         };
     }
 
-    define_python_feedback!(
-        PythonFeedback,
-        "Feedback",
-        PythonFeedbackWrapper,
-        PythonStdState
-    );
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $result:ty, $name:ident, $body:block) => {
+            match &mut $wrapper {
+                PythonFeedbackWrapper::MaxMapI8(py_wrapper) => {
+                    Python::with_gil(|py| -> PyResult<$result> {
+                        let mut borrowed = py_wrapper.borrow_mut(py);
+                        let $name = &mut borrowed.inner;
+                        Ok($body)
+                    })
+                    .unwrap()
+                }
+                PythonFeedbackWrapper::Python(py_wrapper) => {
+                    let $name = py_wrapper;
+                    $body
+                }
+            }
+        };
+    }
+
+    impl Clone for PythonFeedback {
+        fn clone(&self) -> PythonFeedback {
+            PythonFeedback {
+                wrapper: self.wrapper.clone(),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+    }
+
+    #[pymethods]
+    impl PythonFeedback {
+        #[staticmethod]
+        pub fn new_max_map_i8(map_feedback: Py<PythonMaxMapFeedbackI8>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapI8(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        pub fn new_py(obj: PyObject) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Python(PyObjectFeedback::new(obj)),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        fn pippo(&mut self) {
+            unwrap_me_mut!(self.wrapper, (), f, {
+                println!("{:?}", f.name());
+            })
+        }
+    }
+
+    impl Named for PythonFeedback {
+        fn name(&self) -> &str {
+            let s = unwrap_me!(self.wrapper, String, f, { f.name().to_string() });
+            unsafe {
+                *self.name.get() = s;
+                &*self.name.get()
+            }
+        }
+    }
+
+    impl Feedback<BytesInput, PythonStdState> for PythonFeedback {
+        fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, Result<(), Error>, f, { f.init_state(state) })
+        }
+
+        fn is_interesting<EM, OT>(
+            &mut self,
+            state: &mut PythonStdState,
+            manager: &mut EM,
+            input: &BytesInput,
+            observers: &OT,
+            exit_kind: &ExitKind,
+        ) -> Result<bool, Error>
+        where
+            EM: EventFirer<BytesInput>,
+            OT: ObserversTuple<BytesInput, PythonStdState>,
+        {
+            unwrap_me_mut!(self.wrapper, Result<bool, Error>, f, { f.is_interesting(state, manager, input, observers, exit_kind) })
+        }
+
+        fn append_metadata(
+            &mut self,
+            state: &mut PythonStdState,
+            testcase: &mut Testcase<BytesInput>,
+        ) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, Result<(), Error>, f, { f.append_metadata(state, testcase) })
+        }
+
+        fn discard_metadata(
+            &mut self,
+            state: &mut PythonStdState,
+            input: &BytesInput,
+        ) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, Result<(), Error>, f, { f.discard_metadata(state, input) })
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

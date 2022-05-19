@@ -181,7 +181,7 @@ where
 /// The Map Observer retrieves the state of a map,
 /// that will get updated by the target.
 /// A well-known example is the AFL-Style coverage map.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<'a, T>
@@ -384,20 +384,26 @@ where
 {
     /// Creates a new [`MapObserver`]
     #[must_use]
-    pub fn new(name: &'static str, map: &'a mut [T]) -> Self {
+    pub fn new<S>(name: S, map: &'a mut [T]) -> Self
+    where
+        S: Into<String>,
+    {
         Self {
             map: OwnedSliceMut::from(map),
-            name: name.to_string(),
+            name: name.into(),
             initial: T::default(),
         }
     }
 
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
-    pub fn new_owned(name: &'static str, map: Vec<T>) -> Self {
+    pub fn new_owned<S>(name: S, map: Vec<T>) -> Self
+    where
+        S: Into<String>,
+    {
         Self {
             map: OwnedSliceMut::from(map),
-            name: name.to_string(),
+            name: name.into(),
             initial: T::default(),
         }
     }
@@ -407,10 +413,13 @@ where
     /// # Safety
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
-    pub fn new_from_ownedref(name: &'static str, map: OwnedSliceMut<'a, T>) -> Self {
+    pub fn new_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
+    where
+        S: Into<String>,
+    {
         Self {
             map,
-            name: name.to_string(),
+            name: name.into(),
             initial: T::default(),
         }
     }
@@ -419,10 +428,13 @@ where
     ///
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
-    pub unsafe fn new_from_ptr(name: &'static str, map_ptr: *mut T, len: usize) -> Self {
+    pub unsafe fn new_from_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
+    where
+        S: Into<String>,
+    {
         StdMapObserver {
             map: OwnedSliceMut::from_raw_parts_mut(map_ptr, len),
-            name: name.to_string(),
+            name: name.into(),
             initial: T::default(),
         }
     }
@@ -1493,22 +1505,47 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use super::*;
+    use crate::bolts::ownedref::OwnedPtrMut;
     use crate::inputs::BytesInput;
+    use crate::observers::pybind::PythonObserver;
+    use concat_idents::concat_idents;
     use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     macro_rules! define_python_map_observer {
-        ($struct_name:ident, $py_name:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
-            #[pyclass(unsendable, name = $py_name)]
+        ($struct_name1:ident, $py_name1:tt, $struct_name2:ident, $py_name2:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
+            #[pyclass(unsendable, name = $py_name1)]
+            #[derive(Serialize, Deserialize, Debug, Clone)]
+            /// Python class for StdMapObserver
+            pub struct $struct_name1 {
+                /// Rust wrapped StdMapObserver object
+                pub inner: StdMapObserver<'static, $datatype>,
+            }
+
+            #[pymethods]
+            impl $struct_name1 {
+                #[new]
+                fn new(name: String, ptr: usize, size: usize) -> Self {
+                    Self {
+                        inner: unsafe { StdMapObserver::new_from_ptr(name, ptr as *mut $datatype, size) }
+                    }
+                }
+
+                pub fn as_map_observer(&mut self) -> $struct_name_trait {
+                    $struct_name_trait::new_std(self)
+                }
+            }
+
+            #[pyclass(unsendable, name = $py_name2)]
             #[derive(Serialize, Deserialize, Debug, Clone)]
             /// Python class for OwnedMapObserver (i.e. StdMapObserver with owned map)
-            pub struct $struct_name {
+            pub struct $struct_name2 {
                 /// Rust wrapped OwnedMapObserver object
                 pub inner: OwnedMapObserver<$datatype>,
             }
 
             #[pymethods]
-            impl $struct_name {
+            impl $struct_name2 {
                 #[new]
                 fn new(name: String, map: Vec<$datatype>) -> Self {
                     Self {
@@ -1516,11 +1553,16 @@ pub mod pybind {
                         inner: OwnedMapObserver::new(Box::leak(name.into_boxed_str()), map),
                     }
                 }
+
+                pub fn as_map_observer(&mut self) -> $struct_name_trait {
+                    $struct_name_trait::new_owned(self)
+                }
             }
 
             #[derive(Serialize, Deserialize, Debug, Clone)]
             pub enum $wrapper_name {
-                Owned($struct_name),
+                Std(OwnedPtrMut<$struct_name1>),
+                Owned(OwnedPtrMut<$struct_name2>),
             }
 
             // Should not be exposed to user
@@ -1532,27 +1574,31 @@ pub mod pybind {
             }
 
             impl $struct_name_trait {
-                pub fn unwrap(&self) -> &impl MapObserver<Entry = $datatype> {
+                /*pub fn unwrap(&self) -> &impl MapObserver<Entry = $datatype> {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner,
+                        $wrapper_name::Std(py_wrapper) => &py_wrapper.as_ref().inner,
+                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.as_ref().inner,
                     }
                 }
 
                 pub fn unwrap_mut(&mut self) -> &mut impl MapObserver<Entry = $datatype> {
                     match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
+                        $wrapper_name::Std(py_wrapper) => &mut py_wrapper.as_mut().inner,
+                        $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.as_mut().inner,
                     }
-                }
+                }*/
 
-                pub fn upcast<S>(&self) -> &impl Observer<BytesInput, S> {
+                pub fn upcast<S>(&self) -> &dyn Observer<BytesInput, S> {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner,
+                        $wrapper_name::Std(py_wrapper) => &py_wrapper.as_ref().inner,
+                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.as_ref().inner,
                     }
                 }
 
-                pub fn upcast_mut<S>(&mut self) -> &mut impl Observer<BytesInput, S> {
+                pub fn upcast_mut<S>(&mut self) -> &mut dyn Observer<BytesInput, S> {
                     match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.inner,
+                        $wrapper_name::Std(py_wrapper) => &mut py_wrapper.as_mut().inner,
+                        $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.as_mut().inner,
                     }
                 }
             }
@@ -1560,10 +1606,46 @@ pub mod pybind {
             #[pymethods]
             impl $struct_name_trait {
                 #[staticmethod]
-                fn new_from_owned(owned_map: $struct_name) -> Self {
+                fn new_std(std_map: &mut $struct_name1) -> Self {
                     Self {
-                        wrapper: $wrapper_name::Owned(owned_map),
+                        wrapper: $wrapper_name::Std(OwnedPtrMut::Ptr(std_map)),
                     }
+                }
+
+                #[staticmethod]
+                fn new_owned(owned_map: &mut $struct_name2) -> Self {
+                    Self {
+                        wrapper: $wrapper_name::Owned(OwnedPtrMut::Ptr(owned_map)),
+                    }
+                }
+
+                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                    concat_idents!(func = new_map_,$datatype {
+                           PythonObserver::func(slf)
+                    })
+                }
+
+                fn __getitem__(&self, idx: usize) -> $datatype {
+                    *self.get(idx)
+                }
+
+                fn __setitem__(&mut self, idx: usize, val: $datatype) {
+                    *self.get_mut(idx) = val;
+                }
+
+                #[pyo3(name = "usable_count")]
+                fn pyusable_count(&self) -> usize {
+                    self.usable_count()
+                }
+
+                #[pyo3(name = "len")]
+                fn pylen(&self) -> usize {
+                    self.len()
+                }
+
+                #[pyo3(name = "name")]
+                fn pyname(&self) -> &str {
+                    self.name()
                 }
             }
 
@@ -1573,7 +1655,8 @@ pub mod pybind {
 
                 fn as_ref_iter(&'it self) -> Self::IntoIter {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.as_ref_iter(),
+                        $wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.as_ref_iter(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.as_ref_iter(),
                     }
                 }
             }
@@ -1584,7 +1667,8 @@ pub mod pybind {
 
                 fn as_mut_iter(&'it mut self) -> Self::IntoIter {
                     match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.as_mut_iter(),
+                        $wrapper_name::Std(py_wrapper) => py_wrapper.as_mut().inner.as_mut_iter(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_mut().inner.as_mut_iter(),
                     }
                 }
             }
@@ -1595,56 +1679,61 @@ pub mod pybind {
                 #[inline]
                 fn get(&self, idx: usize) -> &$datatype {
                     match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.inner.get(idx),
+                        $wrapper_name::Std(py_wrapper) => &py_wrapper.as_ref().inner.get(idx),
+                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.as_ref().inner.get(idx),
                     }
                 }
 
                 #[inline]
                 fn get_mut(&mut self, idx: usize) -> &mut $datatype {
                     match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.get_mut(idx),
+                        $wrapper_name::Std(py_wrapper) => py_wrapper.as_mut().inner.get_mut(idx),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_mut().inner.get_mut(idx),
                     }
                 }
 
                 #[inline]
                 fn usable_count(&self) -> usize {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.usable_count(),
+                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.usable_count(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.usable_count(),
                     }
                 }
 
                 fn hash(&self) -> u64 {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.hash(),
+                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.hash(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.hash(),
                     }
                 }
 
                 #[inline]
                 fn initial(&self) -> $datatype {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.initial(),
+                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.initial(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.initial(),
                     }
                 }
 
                 #[inline]
                 fn initial_mut(&mut self) -> &mut $datatype {
-                    match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.initial_mut(),
+                    match &mut self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_mut().inner.initial_mut(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_mut().inner.initial_mut(),
                     }
                 }
 
                 #[inline]
                 fn set_initial(&mut self, initial: $datatype) {
                     match &mut self.wrapper {
+                        $wrapper_name::Std(py_wrapper) => {
+                            py_wrapper.as_mut().inner.set_initial(initial);
+                        }
                         $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.set_initial(initial);
+                            py_wrapper.as_mut().inner.set_initial(initial);
                         }
                     }
                 }
 
                 fn to_vec(&self) -> Vec<$datatype> {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.to_vec(),
+                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.to_vec(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.to_vec(),
                     }
                 }
             }
@@ -1652,8 +1741,8 @@ pub mod pybind {
             impl Named for $struct_name_trait {
                 #[inline]
                 fn name(&self) -> &str {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.name(),
+                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.name(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.name(),
                     }
                 }
             }
@@ -1661,8 +1750,8 @@ pub mod pybind {
             impl HasLen for $struct_name_trait {
                 #[inline]
                 fn len(&self) -> usize {
-                    match &self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.inner.len(),
+                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.len(),
+                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.len(),
                     }
                 }
             }
@@ -1674,8 +1763,10 @@ pub mod pybind {
                 #[inline]
                 fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
                     match &mut self.wrapper {
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.inner.pre_exec(_state, _input)
+                        $wrapper_name::Std(py_wrapper) => {
+                            py_wrapper.as_mut().inner.pre_exec(_state, _input)
+                        }$wrapper_name::Owned(py_wrapper) => {
+                            py_wrapper.as_mut().inner.pre_exec(_state, _input)
                         }
                     }
                 }
@@ -1684,6 +1775,8 @@ pub mod pybind {
     }
 
     define_python_map_observer!(
+        PythonStdMapObserverI8,
+        "StdMapObserverI8",
         PythonOwnedMapObserverI8,
         "OwnedMapObserverI8",
         PythonMapObserverI8,
@@ -1692,6 +1785,8 @@ pub mod pybind {
         PythonMapObserverWrapperI8
     );
     define_python_map_observer!(
+        PythonStdMapObserverI16,
+        "StdMapObserverI16",
         PythonOwnedMapObserverI16,
         "OwnedMapObserverI16",
         PythonMapObserverI16,
@@ -1700,6 +1795,8 @@ pub mod pybind {
         PythonMapObserverWrapperI16
     );
     define_python_map_observer!(
+        PythonStdMapObserverI32,
+        "StdMapObserverI32",
         PythonOwnedMapObserverI32,
         "OwnedMapObserverI32",
         PythonMapObserverI32,
@@ -1708,6 +1805,8 @@ pub mod pybind {
         PythonMapObserverWrapperI32
     );
     define_python_map_observer!(
+        PythonStdMapObserverI64,
+        "StdMapObserverI64",
         PythonOwnedMapObserverI64,
         "OwnedMapObserverI64",
         PythonMapObserverI64,
@@ -1717,6 +1816,8 @@ pub mod pybind {
     );
 
     define_python_map_observer!(
+        PythonStdMapObserverU8,
+        "StdMapObserverU8",
         PythonOwnedMapObserverU8,
         "OwnedMapObserverU8",
         PythonMapObserverU8,
@@ -1725,6 +1826,8 @@ pub mod pybind {
         PythonMapObserverWrapperU8
     );
     define_python_map_observer!(
+        PythonStdMapObserverU16,
+        "StdMapObserverU16",
         PythonOwnedMapObserverU16,
         "OwnedMapObserverU16",
         PythonMapObserverU16,
@@ -1733,6 +1836,8 @@ pub mod pybind {
         PythonMapObserverWrapperU16
     );
     define_python_map_observer!(
+        PythonStdMapObserverU32,
+        "StdMapObserverU32",
         PythonOwnedMapObserverU32,
         "OwnedMapObserverU32",
         PythonMapObserverU32,
@@ -1741,6 +1846,8 @@ pub mod pybind {
         PythonMapObserverWrapperU32
     );
     define_python_map_observer!(
+        PythonStdMapObserverU64,
+        "StdMapObserverU64",
         PythonOwnedMapObserverU64,
         "OwnedMapObserverU64",
         PythonMapObserverU64,
@@ -1751,21 +1858,29 @@ pub mod pybind {
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdMapObserverI8>()?;
         m.add_class::<PythonOwnedMapObserverI8>()?;
         m.add_class::<PythonMapObserverI8>()?;
+        m.add_class::<PythonStdMapObserverI16>()?;
         m.add_class::<PythonOwnedMapObserverI16>()?;
         m.add_class::<PythonMapObserverI16>()?;
+        m.add_class::<PythonStdMapObserverI32>()?;
         m.add_class::<PythonOwnedMapObserverI32>()?;
         m.add_class::<PythonMapObserverI32>()?;
+        m.add_class::<PythonStdMapObserverI64>()?;
         m.add_class::<PythonOwnedMapObserverI64>()?;
         m.add_class::<PythonMapObserverI64>()?;
 
+        m.add_class::<PythonStdMapObserverU8>()?;
         m.add_class::<PythonOwnedMapObserverU8>()?;
         m.add_class::<PythonMapObserverU8>()?;
+        m.add_class::<PythonStdMapObserverU16>()?;
         m.add_class::<PythonOwnedMapObserverU16>()?;
         m.add_class::<PythonMapObserverU16>()?;
+        m.add_class::<PythonStdMapObserverU32>()?;
         m.add_class::<PythonOwnedMapObserverU32>()?;
         m.add_class::<PythonMapObserverU32>()?;
+        m.add_class::<PythonStdMapObserverU64>()?;
         m.add_class::<PythonOwnedMapObserverU64>()?;
         m.add_class::<PythonMapObserverU64>()?;
         Ok(())

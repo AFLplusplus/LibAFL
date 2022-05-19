@@ -655,72 +655,79 @@ where
 #[allow(missing_docs)]
 /// `State` Python bindings
 pub mod pybind {
+    use crate::bolts::ownedref::OwnedPtrMut;
     use crate::bolts::rands::pybind::PythonRand;
     use crate::corpus::pybind::PythonCorpus;
-    //use crate::feedbacks::pybind::PythonFeedback;
-    use crate::events::pybind::PythonEventManager;
+    //use crate::events::pybind::PythonEventManager;
     use crate::feedbacks::pybind::PythonFeedback;
     use crate::inputs::BytesInput;
     use crate::state::StdState;
     use pyo3::prelude::*;
 
-    macro_rules! define_python_state {
-        ($type_name:ident, $struct_name:ident, $py_name:tt) => {
-            //use crate::events::pybind::$event_manager_name;
-            //use crate::executors::pybind::$executor_name;
-            //use crate::fuzzer::pybind::$fuzzer_name;
-            //use crate::generators::pybind::$rand_printable_generator;
+    /// `StdState` with fixed generics
+    pub type PythonStdState = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
 
-            /// `StdState` with fixed generics
-            pub type $type_name = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
-
-            #[pyclass(unsendable, name = $py_name)]
-            #[derive(Debug)]
-            /// Python class for StdState
-            pub struct $struct_name {
-                /// Rust wrapped StdState object
-                pub inner: $type_name,
-            }
-
-            #[pymethods]
-            impl $struct_name {
-                #[new]
-                fn new(
-                    py_rand: PythonRand,
-                    corpus: PythonCorpus,
-                    solutions: PythonCorpus,
-                    feedback: &mut PythonFeedback,
-                    objective: &mut PythonFeedback,
-                ) -> Self {
-                    Self {
-                        inner: StdState::new(py_rand, corpus, solutions, feedback, objective)
-                            .expect("Failed to create a new StdState"),
-                    }
-                }
-
-                /*fn generate_initial_inputs(
-                    &mut self,
-                    py_fuzzer: &mut PythonFuzzer,
-                    py_executor: &mut PythonExecutor,
-                    py_generator: &mut PythonGenerator,
-                    py_mgr: &mut PythonEventManager,
-                    num: usize,
-                ) {
-                    self.inner
-                        .generate_initial_inputs(
-                            &mut py_fuzzer.inner,
-                            py_executor,
-                            &mut py_generator.rand_printable_generator,
-                            py_mgr,
-                            num,
-                        )
-                        .expect("Failed to generate the initial corpus".into());
-                }*/
-            }
-        };
+    #[pyclass(unsendable, name = "StdState")]
+    #[derive(Debug)]
+    /// Python class for StdState
+    pub struct PythonStdStateWrapper {
+        /// Rust wrapped StdState object
+        pub inner: OwnedPtrMut<PythonStdState>,
     }
 
-    define_python_state!(PythonStdState, PythonStdStateWrapper, "StdState");
+    impl PythonStdStateWrapper {
+        pub fn wrap(r: &mut PythonStdState) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
+
+        pub fn unwrap(&self) -> &PythonStdState {
+            self.inner.as_ref()
+        }
+
+        pub fn unwrap_mut(&mut self) -> &mut PythonStdState {
+            self.inner.as_mut()
+        }
+    }
+
+    #[pymethods]
+    impl PythonStdStateWrapper {
+        #[new]
+        fn new(
+            py_rand: PythonRand,
+            corpus: PythonCorpus,
+            solutions: PythonCorpus,
+            feedback: &mut PythonFeedback,
+            objective: &mut PythonFeedback,
+        ) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(
+                    StdState::new(py_rand, corpus, solutions, feedback, objective)
+                        .expect("Failed to create a new StdState"),
+                )),
+            }
+        }
+
+        /*fn generate_initial_inputs(
+            &mut self,
+            py_fuzzer: &mut PythonFuzzer,
+            py_executor: &mut PythonExecutor,
+            py_generator: &mut PythonGenerator,
+            py_mgr: &mut PythonEventManager,
+            num: usize,
+        ) {
+            self.inner
+                .generate_initial_inputs(
+                    &mut py_fuzzer.inner,
+                    py_executor,
+                    &mut py_generator.rand_printable_generator,
+                    py_mgr,
+                    num,
+                )
+                .expect("Failed to generate the initial corpus".into());
+        }*/
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
