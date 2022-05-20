@@ -88,9 +88,9 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(
-        MaxMapFeedback::new("EdgesFeedback", &edges_observer),
-        MaxMapFeedback::new("CmpFeedback", &cmps_observer),
-        MaxMapFeedback::new("AllocsFeedback", &allocs_observer)
+        MaxMapFeedback::new(&edges_observer),
+        MaxMapFeedback::new(&cmps_observer),
+        MaxMapFeedback::new(&allocs_observer)
     );
 
     // A feedback to choose if an input is a solution or not
