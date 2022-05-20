@@ -124,7 +124,7 @@ pub struct FuzzerOptions {
     pub stdout: String,
 
     /// the name of the configuration to use
-    #[clap(short, long, default_value = "default configuration")]
+    #[clap(long, default_value = "default configuration")]
     pub configuration: String,
 
     /// enable Address Sanitizer (ASAN)
@@ -278,7 +278,7 @@ pub struct FuzzerOptions {
     /// Spawn a client in each of the provided cores. Use 'all' to select all available
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
-    #[clap(long, default_value = "0", parse(try_from_str = Cores::from_cmdline))]
+    #[clap(short = 'c', long, default_value = "0", parse(try_from_str = Cores::from_cmdline))]
     pub cores: Cores,
 
     /// port on which the broker should listen
