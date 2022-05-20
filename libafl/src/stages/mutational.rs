@@ -166,90 +166,48 @@ where
 #[allow(missing_docs)]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
-    use crate::bolts::tuples::tuple_list_type;
     use crate::inputs::BytesInput;
-    pub use crate::mutators::mutations::*;
-    pub use crate::mutators::mutations::*;
-    use crate::mutators::{havoc_mutations, StdScheduledMutator};
     use crate::stages::StdMutationalStage;
+    use crate::stages::pybind::PythonStage;
+    use crate::mutators::pybind::PythonMutator;
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::pybind::PythonExecutor;
+    use crate::fuzzer::pybind::PythonStdFuzzer;
+    use crate::state::pybind::PythonStdState;
     use pyo3::prelude::*;
 
-    type HavocMutationsType = tuple_list_type!(
-        BitFlipMutator,
-        ByteFlipMutator,
-        ByteIncMutator,
-        ByteDecMutator,
-        ByteNegMutator,
-        ByteRandMutator,
-        ByteAddMutator,
-        WordAddMutator,
-        DwordAddMutator,
-        QwordAddMutator,
-        ByteInterestingMutator,
-        WordInterestingMutator,
-        DwordInterestingMutator,
-        BytesDeleteMutator,
-        BytesDeleteMutator,
-        BytesDeleteMutator,
-        BytesDeleteMutator,
-        BytesExpandMutator,
-        BytesInsertMutator,
-        BytesRandInsertMutator,
-        BytesSetMutator,
-        BytesRandSetMutator,
-        BytesCopyMutator,
-        BytesInsertCopyMutator,
-        BytesSwapMutator,
-        CrossoverInsertMutator,
-        CrossoverReplaceMutator,
-    );
-
-    macro_rules! define_python_std_mutational_stage {
-        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $my_std_fuzzer_type_name: ident, $executor_name: ident, $event_manager_name: ident) => {
-            use crate::events::pybind::$event_manager_name;
-            use crate::executors::pybind::$executor_name;
-            use crate::fuzzer::pybind::$my_std_fuzzer_type_name;
-            use crate::state::pybind::$my_std_state_type_name;
-
-            #[pyclass(unsendable, name = $py_name)]
-            #[derive(Debug)]
-            /// Python class for StdMutationalStage
-            pub struct $struct_name {
-                /// Rust wrapped StdMutationalStage object
-                pub inner: StdMutationalStage<
-                    $executor_name,
-                    $event_manager_name,
-                    BytesInput,
-                    StdScheduledMutator<BytesInput, HavocMutationsType, $my_std_state_type_name>,
-                    $my_std_state_type_name,
-                    $my_std_fuzzer_type_name,
-                >,
-            }
-
-            #[pymethods]
-            impl $struct_name {
-                #[staticmethod]
-                fn new() -> Self {
-                    Self {
-                        inner: StdMutationalStage::new(StdScheduledMutator::new(havoc_mutations())),
-                    }
-                }
-            }
-        };
+    #[pyclass(unsendable, name = "StdMutationalStage")]
+    #[derive(Debug)]
+    /// Python class for StdMutationalStage
+    pub struct PythonStdMutationalStage {
+        /// Rust wrapped StdMutationalStage object
+        pub inner: StdMutationalStage<
+            PythonExecutor,
+            PythonEventManager,
+            BytesInput,
+            PythonMutator,
+            PythonStdState,
+            PythonStdFuzzer,
+        >,
     }
 
-    define_python_std_mutational_stage!(
-        PythonStdScheduledHavocMutationsStage,
-        "StdScheduledHavocMutationsStage",
-        PythonStdState,
-        PythonStdFuzzer,
-        PythonExecutor,
-        PythonEventManager
-    );
+    #[pymethods]
+    impl PythonStdMutationalStage {
+        #[new]
+        fn new(mutator: PythonMutator) -> Self {
+            Self {
+                inner: StdMutationalStage::new(mutator),
+            }
+        }
+        
+        fn as_stage(slf: Py<Self>) -> PythonStage {
+            PythonStage::new_std_mutational(slf)
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdScheduledHavocMutationsStage>()?;
+        m.add_class::<PythonStdMutationalStage>()?;
         Ok(())
     }
 }

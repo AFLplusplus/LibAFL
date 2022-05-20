@@ -261,104 +261,175 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::impl_asany;
-    use crate::stages::Stage;
+    use crate::stages::{StagesTuple, Stage};
     use crate::Error;
     use pyo3::prelude::*;
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::pybind::PythonExecutor;
+    use crate::fuzzer::pybind::{PythonStdFuzzer,PythonStdFuzzerWrapper};
+    use crate::stages::mutational::pybind::PythonStdMutationalStage;
+    use crate::state::pybind::{PythonStdStateWrapper, PythonStdState};
 
-    use super::owned::AnyStage;
+    #[derive(Clone, Debug)]
+    pub struct PyObjectStage {
+        inner: PyObject,
+    }
 
-    macro_rules! define_python_stage {
-        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $std_havoc_mutations_stage_name: ident, $my_std_state_type_name: ident,
-            $my_std_fuzzer_type_name: ident, $executor_name: ident, $event_manager_name: ident) => {
-            use crate::events::pybind::$event_manager_name;
-            use crate::executors::pybind::$executor_name;
-            use crate::fuzzer::pybind::$my_std_fuzzer_type_name;
-            use crate::stages::mutational::pybind::$std_havoc_mutations_stage_name;
-            use crate::state::pybind::$my_std_state_type_name;
-
-            #[derive(Clone, Debug)]
-            pub enum $wrapper_name {
-                StdHavocMutations(*mut $std_havoc_mutations_stage_name),
+    impl PyObjectStage {
+        pub fn new(obj: PyObject) -> Self {
+            PyObjectStage {
+                inner: obj,
             }
+        }
+    }
+    
+    impl
+        Stage<
+            PythonExecutor,
+            PythonEventManager,
+            PythonStdState,
+            PythonStdFuzzer,
+        > for PyObjectStage
+    {
+        #[inline]
+        fn perform(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            executor: &mut PythonExecutor,
+            state: &mut PythonStdState,
+            manager: &mut PythonEventManager,
+            corpus_idx: usize,
+        ) -> Result<(), Error> {
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner.call_method1(
+                    py,
+                    "perform",
+                    (PythonStdFuzzerWrapper::wrap(fuzzer), executor.clone(), PythonStdStateWrapper::wrap(state), manager.clone(), corpus_idx),
+                )?;
+                Ok(())
+            })
+            .unwrap();
+            Ok(())
+        }
+    }
+    
+    #[derive(Clone, Debug)]
+    pub enum PythonStageWrapper {
+        StdMutational(Py<PythonStdMutationalStage>),
+        Python(PyObjectStage)
+    }
 
-            /// Stage Trait binding
-            #[pyclass(unsendable, name = $py_name_trait)]
-            #[derive(Clone, Debug)]
-            pub struct $struct_name_trait {
-                inner: $wrapper_name,
-            }
+    /// Stage Trait binding
+    #[pyclass(unsendable, name = "Stage")]
+    #[derive(Clone, Debug)]
+    pub struct PythonStage {
+        wrapper: PythonStageWrapper,
+    }
 
-            #[pymethods]
-            impl $struct_name_trait {
-                #[staticmethod]
-                fn new_std_scheduled(
-                    py_std_havoc_mutations_stage: &mut $std_havoc_mutations_stage_name,
-                ) -> Self {
-                    Self {
-                        inner: $wrapper_name::StdHavocMutations(py_std_havoc_mutations_stage),
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonStageWrapper,
+                { StdMutational },
+                {
+                    Python(py_wrapper) => {
+                        let $name = py_wrapper;
+                        $body
                     }
                 }
-            }
-
-            impl
-                Stage<
-                    $executor_name,
-                    $event_manager_name,
-                    $my_std_state_type_name,
-                    $my_std_fuzzer_type_name,
-                > for $struct_name_trait
-            {
-                #[inline]
-                #[allow(clippy::let_and_return)]
-                fn perform(
-                    &mut self,
-                    fuzzer: &mut $my_std_fuzzer_type_name,
-                    executor: &mut $executor_name,
-                    state: &mut $my_std_state_type_name,
-                    manager: &mut $event_manager_name,
-                    corpus_idx: usize,
-                ) -> Result<(), Error> {
-                    unsafe {
-                        match self.inner {
-                            $wrapper_name::StdHavocMutations(py_std_havoc_mutations_stage) => {
-                                (*py_std_havoc_mutations_stage)
-                                    .inner
-                                    .perform(fuzzer, executor, state, manager, corpus_idx)
-                            }
-                        }
-                    }
-                }
-            }
-
-            impl_asany!($struct_name_trait);
-
-            impl
-                AnyStage<
-                    $executor_name,
-                    $event_manager_name,
-                    $my_std_state_type_name,
-                    $my_std_fuzzer_type_name,
-                > for $struct_name_trait
-            {
-            }
+            )
         };
     }
 
-    define_python_stage!(
-        PythonStage,
-        "Stage",
-        PythonStageWrapper,
-        PythonStdScheduledHavocMutationsStage,
-        PythonStdState,
-        PythonStdFuzzer,
-        PythonExecutor,
-        PythonEventManager
-    );
+    #[pymethods]
+    impl PythonStage {
+        #[staticmethod]
+        pub fn new_std_mutational(
+            py_std_havoc_mutations_stage: Py<PythonStdMutationalStage>,
+        ) -> Self {
+            Self {
+                wrapper: PythonStageWrapper::StdMutational(py_std_havoc_mutations_stage),
+            }
+        }
+        
+        #[staticmethod]
+        pub fn new_py(obj: PyObject) -> Self {
+            Self {
+                wrapper: PythonStageWrapper::Python(PyObjectStage::new(obj)),
+            }
+        }
+
+        pub fn unwrap_py(&self) -> Option<PyObject> {
+            match &self.wrapper {
+                PythonStageWrapper::Python(pyo) => Some(pyo.inner.clone()),
+                _ => None,
+            }
+        }
+    }
+
+    impl
+        Stage<
+            PythonExecutor,
+            PythonEventManager,
+            PythonStdState,
+            PythonStdFuzzer,
+        > for PythonStage
+    {
+        #[inline]
+        #[allow(clippy::let_and_return)]
+        fn perform(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            executor: &mut PythonExecutor,
+            state: &mut PythonStdState,
+            manager: &mut PythonEventManager,
+            corpus_idx: usize,
+        ) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, s, { s.perform(fuzzer, executor, state, manager, corpus_idx) })
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[pyclass(unsendable, name = "StagesTuple")]
+    pub struct PythonStagesTuple {
+        list: Vec<PythonStage>,
+    }
+
+    #[pymethods]
+    impl PythonStagesTuple {
+        #[new]
+        fn new(list: Vec<PythonStage>) -> Self {
+            Self { list }
+        }
+
+        fn len(&self) -> usize {
+            self.list.len()
+        }
+
+        fn __getitem__(&self, idx: usize) -> PythonStage {
+            self.list[idx].clone()
+        }
+    }
+    
+    impl StagesTuple<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer> for PythonStagesTuple {
+        fn perform_all(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            executor: &mut PythonExecutor,
+            state: &mut PythonStdState,
+            manager: &mut PythonEventManager,
+            corpus_idx: usize,
+        ) -> Result<(), Error> {
+            for s in &mut self.list {
+                s.perform(fuzzer, executor, state, manager, corpus_idx)?;
+            }
+            Ok(())
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonStage>()?;
+        m.add_class::<PythonStagesTuple>()?;
         Ok(())
     }
 }

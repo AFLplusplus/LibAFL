@@ -815,95 +815,134 @@ impl Default for ClientPerfMonitor {
 }
 /// `Monitor` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
     use crate::monitors::{Monitor, SimpleMonitor};
     use pyo3::prelude::*;
+    use pyo3::types::PyUnicode;
 
     use super::ClientStats;
     use core::time::Duration;
 
+    // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625
+
     #[pyclass(unsendable, name = "SimpleMonitor")]
-    #[derive(Clone, Debug)]
     /// Python class for SimpleMonitor
     pub struct PythonSimpleMonitor {
         /// Rust wrapped SimpleMonitor object
-        pub simple_monitor: SimpleMonitor<fn(String)>,
+        pub inner: SimpleMonitor<Box<dyn FnMut(String)>>,
+        print_fn: PyObject,
+    }
+
+    impl std::fmt::Debug for PythonSimpleMonitor {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_struct("PythonSimpleMonitor")
+                .field("print_fn", &self.print_fn)
+                .finish()
+        }
+    }
+
+    impl Clone for PythonSimpleMonitor {
+        fn clone(&self) -> PythonSimpleMonitor {
+            let py_print_fn = self.print_fn.clone();
+            let closure = move |s: String| {
+                Python::with_gil(|py| -> PyResult<()> {
+                    py_print_fn.call1(py, (PyUnicode::new(py, &s),))?;
+                    Ok(())
+                })
+                .unwrap();
+            };
+
+            PythonSimpleMonitor {
+                inner: SimpleMonitor {
+                    print_fn: Box::new(closure),
+                    start_time: self.inner.start_time.clone(),
+                    client_stats: self.inner.client_stats.clone(),
+                },
+                print_fn: self.print_fn.clone(),
+            }
+        }
     }
 
     #[pymethods]
     impl PythonSimpleMonitor {
         #[new]
-        fn new(/*py_print_fn: PyObject */) -> Self {
-            // TODO: Find a fix to: closures can only be coerced to `fn` types if they
-            // do not capture any variables and print_fn expected to be fn pointer.
-            // fn printf_fn (s: String){
-            //     Python::with_gil(|py| -> PyResult<()> {
-            //         print_fn.call1(py, (PyUnicode::new(py, &s),));
-            //         Ok(())
-            //     });
-            // }
+        fn new(py_print_fn: PyObject) -> Self {
+            let py_print_fn1 = py_print_fn.clone();
+            let closure = move |s: String| {
+                Python::with_gil(|py| -> PyResult<()> {
+                    py_print_fn1.call1(py, (PyUnicode::new(py, &s),))?;
+                    Ok(())
+                })
+                .unwrap();
+            };
             Self {
-                simple_monitor: SimpleMonitor::new(|s| println!("{}", s)),
+                inner: SimpleMonitor::new(Box::new(closure)),
+                print_fn: py_print_fn,
             }
+        }
+
+        pub fn as_monitor(slf: Py<Self>) -> PythonMonitor {
+            PythonMonitor::new_simple(slf)
         }
     }
 
     #[derive(Clone, Debug)]
     enum PythonMonitorWrapper {
-        Simple(PythonSimpleMonitor),
+        Simple(Py<PythonSimpleMonitor>),
     }
 
     #[pyclass(unsendable, name = "Monitor")]
     #[derive(Clone, Debug)]
     /// EventManager Trait binding
     pub struct PythonMonitor {
-        monitor: PythonMonitorWrapper,
+        wrapper: PythonMonitorWrapper,
     }
 
-    impl PythonMonitor {
-        fn get_monitor(&self) -> &impl Monitor {
-            match &self.monitor {
-                PythonMonitorWrapper::Simple(py_simple_monitor) => {
-                    &py_simple_monitor.simple_monitor
-                }
-            }
-        }
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!($wrapper, $name, $body, PythonMonitorWrapper, { Simple })
+        };
+    }
 
-        fn get_mut_monitor(&mut self) -> &mut impl Monitor {
-            match &mut self.monitor {
-                PythonMonitorWrapper::Simple(py_simple_monitor) => {
-                    &mut py_simple_monitor.simple_monitor
-                }
-            }
-        }
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonMonitorWrapper, { Simple })
+        };
     }
 
     #[pymethods]
     impl PythonMonitor {
         #[staticmethod]
-        fn new_from_simple(simple_monitor: PythonSimpleMonitor) -> Self {
+        pub fn new_simple(simple_monitor: Py<PythonSimpleMonitor>) -> Self {
             Self {
-                monitor: PythonMonitorWrapper::Simple(simple_monitor),
+                wrapper: PythonMonitorWrapper::Simple(simple_monitor),
             }
         }
     }
 
     impl Monitor for PythonMonitor {
         fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
-            self.get_mut_monitor().client_stats_mut()
+            let ptr = unwrap_me_mut!(self.wrapper, m, {
+                m.client_stats_mut() as *mut Vec<ClientStats>
+            });
+            unsafe { ptr.as_mut().unwrap() }
         }
 
         fn client_stats(&self) -> &[ClientStats] {
-            self.get_monitor().client_stats()
+            let ptr = unwrap_me!(self.wrapper, m, {
+                m.client_stats() as *const [ClientStats]
+            });
+            unsafe { ptr.as_ref().unwrap() }
         }
 
         /// Time this fuzzing run stated
         fn start_time(&mut self) -> Duration {
-            self.get_mut_monitor().start_time()
+            unwrap_me_mut!(self.wrapper, m, { m.start_time() })
         }
 
         fn display(&mut self, event_msg: String, sender_id: u32) {
-            self.get_mut_monitor().display(event_msg, sender_id);
+            unwrap_me_mut!(self.wrapper, m, { m.display(event_msg, sender_id) });
         }
     }
     /// Register the classes to the python module

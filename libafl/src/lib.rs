@@ -681,6 +681,8 @@ pub mod pybind {
         executors::pybind::register(py, m)?;
         executors::inprocess::pybind::register(py, m)?;
         //generators::pybind::register(py, m)?;
+        mutators::pybind::register(py, m)?;
+        mutators::scheduled::pybind::register(py, m)?;
         corpus::pybind::register(py, m)?;
         corpus::testcase::pybind::register(py, m)?;
         corpus::ondisk::pybind::register(py, m)?;
@@ -688,7 +690,6 @@ pub mod pybind {
         corpus::cached::pybind::register(py, m)?;
         bolts::rands::pybind::register(py, m)?;
         stages::pybind::register(py, m)?;
-        stages::owned::pybind::register(py, m)?;
         stages::mutational::pybind::register(py, m)?;
         Ok(())
     }

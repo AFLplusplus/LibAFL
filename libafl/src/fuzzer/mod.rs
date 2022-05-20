@@ -681,7 +681,7 @@ pub mod pybind {
     use crate::inputs::BytesInput;
     use crate::observers::pybind::PythonObserversTuple;
     use crate::schedulers::QueueScheduler;
-    use crate::stages::owned::pybind::PythonStagesOwnedList;
+    use crate::stages::pybind::PythonStagesTuple;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use pyo3::prelude::*;
 
@@ -755,12 +755,12 @@ pub mod pybind {
             py_executor: &mut PythonExecutor,
             py_state: &mut PythonStdStateWrapper,
             py_mgr: &mut PythonEventManager,
-            stages_tuple: &mut PythonStagesOwnedList,
+            stages_tuple: &mut PythonStagesTuple,
         ) {
             self.inner
                 .as_mut()
                 .fuzz_loop(
-                    &mut stages_tuple.inner,
+                    stages_tuple,
                     py_executor,
                     py_state.unwrap_mut(),
                     py_mgr,

@@ -257,14 +257,14 @@ pub mod pybind {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     enum PythonExecutorWrapper {
         InProcess(Py<PythonOwnedInProcessExecutor>),
         Python(PyObjectExecutor),
     }
 
     #[pyclass(unsendable, name = "Executor")]
-    #[derive(Debug)]
+    #[derive(Clone, Debug)]
     /// Executor + HasObservers Trait binding
     pub struct PythonExecutor {
         wrapper: PythonExecutorWrapper,

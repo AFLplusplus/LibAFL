@@ -83,9 +83,9 @@ rand = StdRand.with_current_nanos()
 
 state = StdState(rand.as_rand(), InMemoryCorpus().as_corpus(), InMemoryCorpus().as_corpus(), feedback.as_feedback(), objective.as_feedback())
 
-monitor = SimpleMonitor()
+monitor = SimpleMonitor(lambda s: print(s))
 
-mgr = SimpleEventManager(Monitor.new_from_simple(monitor))
+mgr = SimpleEventManager(monitor.as_monitor())
 
 def harness(buf):
     #print(buf)
@@ -93,13 +93,11 @@ def harness(buf):
     if len(buf) > 0 and buf[0] == 66:
         m[1] = 1
 
-# executor = InProcessExecutor(harness, observers, fuzzer, state, mgr.as_manager())
+executor = InProcessExecutor(harness, observers, fuzzer, state, mgr.as_manager())
 
-executor = FooExecutor(harness, observers)
+stage = StdMutationalStage(StdHavocMutator().as_mutator())
 
-stage = StdScheduledHavocMutationsStage.new()
-
-stage_tuple_list = StagesOwnedList([Stage.new_std_scheduled(stage)])
+stage_tuple_list = StagesTuple([stage.as_stage()])
 
 fuzzer.add_input(state, executor.as_executor(), mgr.as_manager(), b'\0\0')
 

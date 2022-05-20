@@ -425,6 +425,7 @@ where
         Ok((state, mgr))
     }
 }
+
 /// `SimpleEventManager` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
