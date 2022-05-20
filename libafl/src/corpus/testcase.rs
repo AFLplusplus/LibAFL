@@ -345,3 +345,56 @@ impl SchedulerTestcaseMetaData {
 }
 
 crate::impl_serdeany!(SchedulerTestcaseMetaData);
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+/// `Testcase` Python bindings
+pub mod pybind {
+    use super::*;
+    use crate::bolts::ownedref::OwnedPtrMut;
+    use crate::inputs::BytesInput;
+    use pyo3::prelude::*;
+
+    /// `PythonTestcase` with fixed generics
+    pub type PythonTestcase = Testcase<BytesInput>;
+
+    #[pyclass(unsendable, name = "Testcase")]
+    #[derive(Debug)]
+    /// Python class for Testcase
+    pub struct PythonTestcaseWrapper {
+        /// Rust wrapped Testcase object
+        pub inner: OwnedPtrMut<PythonTestcase>,
+    }
+
+    impl PythonTestcaseWrapper {
+        pub fn wrap(r: &mut PythonTestcase) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
+
+        pub fn unwrap(&self) -> &PythonTestcase {
+            self.inner.as_ref()
+        }
+
+        pub fn unwrap_mut(&mut self) -> &mut PythonTestcase {
+            self.inner.as_mut()
+        }
+    }
+
+    #[pymethods]
+    impl PythonTestcaseWrapper {
+        #[new]
+        fn new(input: Vec<u8>) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
+            }
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonTestcaseWrapper>()?;
+        Ok(())
+    }
+}

@@ -1672,72 +1672,58 @@ mod tests {
 #[allow(missing_docs)]
 /// `InProcess` Python bindings
 pub mod pybind {
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::pybind::PythonExecutor;
     use crate::executors::{inprocess::OwnedInProcessExecutor, ExitKind};
+    use crate::fuzzer::pybind::PythonStdFuzzerWrapper;
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::observers::pybind::PythonObserversTuple;
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
 
-    macro_rules! define_python_in_process_executor {
-        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $std_state_name: ident, $event_manager_name: ident, $my_std_fuzzer_type_name: ident, $std_fuzzer_name: ident) => {
-            use crate::events::pybind::$event_manager_name;
-            use crate::fuzzer::pybind::$std_fuzzer_name;
-            use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
-
-            #[pyclass(unsendable, name = $py_name)]
-            #[derive(Debug)]
-            /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
-            pub struct $struct_name {
-                /// Rust wrapped OwnedInProcessExecutor object
-                pub inner: OwnedInProcessExecutor<
-                    BytesInput,
-                    PythonObserversTuple,
-                    $my_std_state_type_name,
-                >,
-            }
-
-            #[pymethods]
-            impl $struct_name {
-                #[new]
-                fn new(
-                    harness: PyObject,
-                    py_observers: PythonObserversTuple,
-                    py_fuzzer: &mut $std_fuzzer_name,
-                    py_state: &mut $std_state_name,
-                    py_event_manager: &mut $event_manager_name,
-                ) -> Self {
-                    Self {
-                        inner: OwnedInProcessExecutor::new(
-                            Box::new(move |input: &BytesInput| {
-                                Python::with_gil(|py| -> PyResult<()> {
-                                    let args = (PyBytes::new(py, input.bytes()),);
-                                    harness.call1(py, args)?;
-                                    Ok(())
-                                })
-                                .unwrap();
-                                ExitKind::Ok
-                            }),
-                            py_observers,
-                            py_fuzzer.unwrap_mut(),
-                            py_state.unwrap_mut(),
-                            py_event_manager,
-                        )
-                        .expect("Failed to create the Executor".into()),
-                    }
-                }
-            }
-        };
+    #[pyclass(unsendable, name = "InProcessExecutor")]
+    #[derive(Debug)]
+    /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
+    pub struct PythonOwnedInProcessExecutor {
+        /// Rust wrapped OwnedInProcessExecutor object
+        pub inner: OwnedInProcessExecutor<BytesInput, PythonObserversTuple, PythonStdState>,
     }
 
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutor,
-        "OwnedInProcessExecutor",
-        PythonStdState,
-        PythonStdStateWrapper,
-        PythonEventManager,
-        PythonStdFuzzer,
-        PythonStdFuzzerWrapper
-    );
+    #[pymethods]
+    impl PythonOwnedInProcessExecutor {
+        #[new]
+        fn new(
+            harness: PyObject,
+            py_observers: PythonObserversTuple,
+            py_fuzzer: &mut PythonStdFuzzerWrapper,
+            py_state: &mut PythonStdStateWrapper,
+            py_event_manager: &mut PythonEventManager,
+        ) -> Self {
+            Self {
+                inner: OwnedInProcessExecutor::new(
+                    Box::new(move |input: &BytesInput| {
+                        Python::with_gil(|py| -> PyResult<()> {
+                            let args = (PyBytes::new(py, input.bytes()),);
+                            harness.call1(py, args)?;
+                            Ok(())
+                        })
+                        .unwrap();
+                        ExitKind::Ok
+                    }),
+                    py_observers,
+                    py_fuzzer.unwrap_mut(),
+                    py_state.unwrap_mut(),
+                    py_event_manager,
+                )
+                .expect("Failed to create the Executor".into()),
+            }
+        }
+
+        pub fn as_executor(slf: Py<Self>) -> PythonExecutor {
+            PythonExecutor::new_inprocess(slf)
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

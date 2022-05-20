@@ -300,60 +300,13 @@ pub mod pybind {
     use crate::inputs::BytesInput;
     use crate::inputs::HasBytesVec;
     use crate::observers::map::pybind::*;
+    use crate::pybind::SerdePy;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::Error;
     use pyo3::prelude::*;
-    use pyo3::PyClass;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Serialize};
     use std::cell::UnsafeCell;
     use std::ops::Deref;
-
-    /*
-    #[derive(Debug, Clone)]
-    pub struct SerdePy<T> where T: PyClass + Serialize + serde::de::DeserializeOwned {
-        pub inner: Py<T>
-    }
-
-    impl<T> Serialize for SerdePy<T> where T: PyClass + Serialize + serde::de::DeserializeOwned  {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            Python::with_gil(|py| -> PyResult<Result<S::Ok, S::Error>> {
-                let borrowed = self.borrow(py);
-                Ok(borrowed.serialize(serializer))
-            }).unwrap()
-        }
-    }
-
-    impl<'de, T> Deserialize<'de> for SerdePy<T> where T: PyClass + Serialize + serde::de::DeserializeOwned {
-        fn deserialize<D>(deserializer: D) -> Result<SerdePy<T>, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            Ok(Python::with_gil(|py| -> PyResult<SerdePy<T>> {
-                Ok(SerdePy::new(Py::new(py, PyClassInitializer::from(T::deserialize(deserializer).unwrap()))?))
-            }).unwrap())
-        }
-    }
-
-    impl<T> SerdePy<T> where T: PyClass + Serialize + serde::de::DeserializeOwned  {
-        pub fn new(t: Py<T>) -> Self { Self { inner: t } }
-
-        pub fn borrow<'py>(&'py self, py: Python<'py>) -> PyRef<'py, T> {
-            self.inner.borrow(py)
-        }
-
-        pub fn borrow_mut<'py>(&'py self, py: Python<'py>) -> PyRefMut<'py, T> {
-        self.inner.borrow_mut(py)
-        }
-    }
-
-    impl<T> From<Py<T>> for SerdePy<T> where T: PyClass + Serialize + serde::de::DeserializeOwned {
-        fn from(item: Py<T>) -> Self {
-            Self::new(item)
-        }
-    }*/
 
     #[derive(Debug)]
     pub struct PyObjectObserver {
@@ -379,52 +332,7 @@ pub mod pybind {
         }
     }
 
-    impl Serialize for PyObjectObserver {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            let buf = Python::with_gil(|py| -> PyResult<Vec<u8>> {
-                let pickle = PyModule::import(py, "pickle")?;
-                let buf: Vec<u8> = pickle.getattr("dumps")?.call1((&self.inner,))?.extract()?;
-                Ok(buf)
-            })
-            .unwrap();
-            serializer.serialize_bytes(&buf)
-        }
-    }
-
-    struct PyObjectObserverVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for PyObjectObserverVisitor {
-        type Value = PyObjectObserver;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("Expecting some bytes to deserialize from the Python side")
-        }
-
-        fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            let obj = Python::with_gil(|py| -> PyResult<PyObject> {
-                let pickle = PyModule::import(py, "pickle")?;
-                let obj = pickle.getattr("loads")?.call1((v,))?.to_object(py);
-                Ok(obj)
-            })
-            .unwrap();
-            Ok(PyObjectObserver::new(obj))
-        }
-    }
-
-    impl<'de> Deserialize<'de> for PyObjectObserver {
-        fn deserialize<D>(deserializer: D) -> Result<PyObjectObserver, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserializer.deserialize_byte_buf(PyObjectObserverVisitor)
-        }
-    }
+    crate::impl_serde_pyobjectwrapper!(PyObjectObserver, inner);
 
     impl Named for PyObjectObserver {
         fn name(&self) -> &str {
@@ -521,106 +429,125 @@ pub mod pybind {
         }
     }
 
-    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize, Clone, Debug)]
     pub enum PythonObserverWrapper {
-        MapI8(Py<PythonMapObserverI8>),
-        MapI16(Py<PythonMapObserverI16>),
-        MapI32(Py<PythonMapObserverI32>),
-        MapI64(Py<PythonMapObserverI64>),
-        MapU8(Py<PythonMapObserverU8>),
-        MapU16(Py<PythonMapObserverU16>),
-        MapU32(Py<PythonMapObserverU32>),
-        MapU64(Py<PythonMapObserverU64>),
+        MapI8(SerdePy<PythonMapObserverI8>),
+        MapI16(SerdePy<PythonMapObserverI16>),
+        MapI32(SerdePy<PythonMapObserverI32>),
+        MapI64(SerdePy<PythonMapObserverI64>),
+        MapU8(SerdePy<PythonMapObserverU8>),
+        MapU16(SerdePy<PythonMapObserverU16>),
+        MapU32(SerdePy<PythonMapObserverU32>),
+        MapU64(SerdePy<PythonMapObserverU64>),
         Python(PyObjectObserver),
-        None,
-    }
-
-    impl Default for PythonObserverWrapper {
-        fn default() -> Self {
-            PythonObserverWrapper::None
-        }
     }
 
     #[pyclass(unsendable, name = "Observer")]
     #[derive(Serialize, Deserialize, Clone, Debug)]
     /// Observer Trait binding
     pub struct PythonObserver {
-        #[serde(skip)] // FIX this with SerdePy
         pub wrapper: PythonObserverWrapper,
     }
 
     macro_rules! unwrap_me {
         ($wrapper:expr, $name:ident, $body:block) => {
             match &$wrapper {
-                  PythonObserverWrapper::MapI8(py_wrapper) => {
-                      Python::with_gil(|py| -> PyResult<_> {
-                          let borrowed = py_wrapper.borrow(py);
-                          let $name = borrowed.upcast::<PythonStdState>()
-                          Ok($body)
-                      })
-                      .unwrap()
-                }
+                PythonObserverWrapper::MapI8(py_wrapper) => Python::with_gil(|py| -> PyResult<_> {
+                    let borrowed = py_wrapper.borrow(py);
+                    Ok(crate::mapob_unwrap_me!(
+                        PythonMapObserverWrapperI8,
+                        borrowed.wrapper,
+                        $name,
+                        $body
+                    ))
+                })
+                .unwrap(),
                 PythonObserverWrapper::MapI16(py_wrapper) => {
-                      Python::with_gil(|py| -> PyResult<_> {
-                          let borrowed = py_wrapper.borrow(py);
-                          let $name = borrowed.upcast::<PythonStdState>()
-                          Ok($body)
-                      })
-                      .unwrap()
+                    Python::with_gil(|py| -> PyResult<_> {
+                        let borrowed = py_wrapper.borrow(py);
+                        Ok(crate::mapob_unwrap_me!(
+                            PythonMapObserverWrapperI16,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
+                    })
+                    .unwrap()
                 }
                 PythonObserverWrapper::MapI32(py_wrapper) => {
-                      Python::with_gil(|py| -> PyResult<_> {
-                          let borrowed = py_wrapper.borrow(py);
-                          let $name = borrowed.upcast::<PythonStdState>()
-                          Ok($body)
-                      })
-                      .unwrap()
+                    Python::with_gil(|py| -> PyResult<_> {
+                        let borrowed = py_wrapper.borrow(py);
+                        Ok(crate::mapob_unwrap_me!(
+                            PythonMapObserverWrapperI32,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
+                    })
+                    .unwrap()
                 }
                 PythonObserverWrapper::MapI64(py_wrapper) => {
-                      Python::with_gil(|py| -> PyResult<_> {
-                          let borrowed = py_wrapper.borrow(py);
-                          let $name = borrowed.upcast::<PythonStdState>()
-                          Ok($body)
-                      })
-                      .unwrap()
+                    Python::with_gil(|py| -> PyResult<_> {
+                        let borrowed = py_wrapper.borrow(py);
+                        Ok(crate::mapob_unwrap_me!(
+                            PythonMapObserverWrapperI64,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
+                    })
+                    .unwrap()
                 }
-                PythonObserverWrapper::MapU8(py_wrapper) => {
-                      Python::with_gil(|py| -> PyResult<_> {
-                          let borrowed = py_wrapper.borrow(py);
-                          let $name = borrowed.upcast::<PythonStdState>()
-                          Ok($body)
-                      })
-                      .unwrap()
-                }
+                PythonObserverWrapper::MapU8(py_wrapper) => Python::with_gil(|py| -> PyResult<_> {
+                    let borrowed = py_wrapper.borrow(py);
+                    Ok(crate::mapob_unwrap_me!(
+                        PythonMapObserverWrapperU8,
+                        borrowed.wrapper,
+                        $name,
+                        $body
+                    ))
+                })
+                .unwrap(),
                 PythonObserverWrapper::MapU16(py_wrapper) => {
-                      Python::with_gil(|py| -> PyResult<_> {
-                          let borrowed = py_wrapper.borrow(py);
-                          let $name = borrowed.upcast::<PythonStdState>()
-                          Ok($body)
-                      })
-                      .unwrap()
+                    Python::with_gil(|py| -> PyResult<_> {
+                        let borrowed = py_wrapper.borrow(py);
+                        Ok(crate::mapob_unwrap_me!(
+                            PythonMapObserverWrapperU16,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
+                    })
+                    .unwrap()
                 }
                 PythonObserverWrapper::MapU32(py_wrapper) => {
-                      Python::with_gil(|py| -> PyResult<_> {
-                          let borrowed = py_wrapper.borrow(py);
-                          let $name = borrowed.upcast::<PythonStdState>()
-                          Ok($body)
-                      })
-                      .unwrap()
+                    Python::with_gil(|py| -> PyResult<_> {
+                        let borrowed = py_wrapper.borrow(py);
+                        Ok(crate::mapob_unwrap_me!(
+                            PythonMapObserverWrapperU32,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
+                    })
+                    .unwrap()
                 }
                 PythonObserverWrapper::MapU64(py_wrapper) => {
-                      Python::with_gil(|py| -> PyResult<_> {
-                          let borrowed = py_wrapper.borrow(py);
-                          let $name = borrowed.upcast::<PythonStdState>()
-                          Ok($body)
-                      })
-                      .unwrap()
+                    Python::with_gil(|py| -> PyResult<_> {
+                        let borrowed = py_wrapper.borrow(py);
+                        Ok(crate::mapob_unwrap_me!(
+                            PythonMapObserverWrapperU64,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
+                    })
+                    .unwrap()
                 }
                 PythonObserverWrapper::Python(py_wrapper) => {
                     let $name = py_wrapper;
                     $body
                 }
-                PythonObserverWrapper::None => { panic!("Serde is not supported ATM") }
             }
         };
     }
@@ -630,61 +557,93 @@ pub mod pybind {
             match &mut $wrapper {
                 PythonObserverWrapper::MapI8(py_wrapper) => Python::with_gil(|py| -> PyResult<_> {
                     let mut borrowed = py_wrapper.borrow_mut(py);
-                    let $name = borrowed.upcast_mut::<PythonStdState>();
-                    Ok($body)
+                    Ok(crate::mapob_unwrap_me_mut!(
+                        PythonMapObserverWrapperI8,
+                        borrowed.wrapper,
+                        $name,
+                        $body
+                    ))
                 })
                 .unwrap(),
                 PythonObserverWrapper::MapI16(py_wrapper) => {
                     Python::with_gil(|py| -> PyResult<_> {
                         let mut borrowed = py_wrapper.borrow_mut(py);
-                        let $name = borrowed.upcast_mut::<PythonStdState>();
-                        Ok($body)
+                        Ok(crate::mapob_unwrap_me_mut!(
+                            PythonMapObserverWrapperI16,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
                     })
                     .unwrap()
                 }
                 PythonObserverWrapper::MapI32(py_wrapper) => {
                     Python::with_gil(|py| -> PyResult<_> {
                         let mut borrowed = py_wrapper.borrow_mut(py);
-                        let $name = borrowed.upcast_mut::<PythonStdState>();
-                        Ok($body)
+                        Ok(crate::mapob_unwrap_me_mut!(
+                            PythonMapObserverWrapperI32,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
                     })
                     .unwrap()
                 }
                 PythonObserverWrapper::MapI64(py_wrapper) => {
                     Python::with_gil(|py| -> PyResult<_> {
                         let mut borrowed = py_wrapper.borrow_mut(py);
-                        let $name = borrowed.upcast_mut::<PythonStdState>();
-                        Ok($body)
+                        Ok(crate::mapob_unwrap_me_mut!(
+                            PythonMapObserverWrapperI64,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
                     })
                     .unwrap()
                 }
                 PythonObserverWrapper::MapU8(py_wrapper) => Python::with_gil(|py| -> PyResult<_> {
                     let mut borrowed = py_wrapper.borrow_mut(py);
-                    let $name = borrowed.upcast_mut::<PythonStdState>();
-                    Ok($body)
+                    Ok(crate::mapob_unwrap_me_mut!(
+                        PythonMapObserverWrapperU8,
+                        borrowed.wrapper,
+                        $name,
+                        $body
+                    ))
                 })
                 .unwrap(),
                 PythonObserverWrapper::MapU16(py_wrapper) => {
                     Python::with_gil(|py| -> PyResult<_> {
                         let mut borrowed = py_wrapper.borrow_mut(py);
-                        let $name = borrowed.upcast_mut::<PythonStdState>();
-                        Ok($body)
+                        Ok(crate::mapob_unwrap_me_mut!(
+                            PythonMapObserverWrapperU16,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
                     })
                     .unwrap()
                 }
                 PythonObserverWrapper::MapU32(py_wrapper) => {
                     Python::with_gil(|py| -> PyResult<_> {
                         let mut borrowed = py_wrapper.borrow_mut(py);
-                        let $name = borrowed.upcast_mut::<PythonStdState>();
-                        Ok($body)
+                        Ok(crate::mapob_unwrap_me_mut!(
+                            PythonMapObserverWrapperU32,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
                     })
                     .unwrap()
                 }
                 PythonObserverWrapper::MapU64(py_wrapper) => {
                     Python::with_gil(|py| -> PyResult<_> {
                         let mut borrowed = py_wrapper.borrow_mut(py);
-                        let $name = borrowed.upcast_mut::<PythonStdState>();
-                        Ok($body)
+                        Ok(crate::mapob_unwrap_me_mut!(
+                            PythonMapObserverWrapperU64,
+                            borrowed.wrapper,
+                            $name,
+                            $body
+                        ))
                     })
                     .unwrap()
                 }
@@ -692,124 +651,59 @@ pub mod pybind {
                     let $name = py_wrapper;
                     $body
                 }
-                PythonObserverWrapper::None => {
-                    panic!("Serde is not supported ATM")
-                }
             }
         };
     }
-
-    /*impl PythonObserver {
-        pub fn unwrap(&self) -> &dyn Observer<BytesInput, PythonStdState> {
-            match &self.wrapper {
-                PythonObserverWrapper::MapI8(py_wrapper) => {
-                    py_wrapper.as_ref().upcast::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapI16(py_wrapper) => {
-                    py_wrapper.as_ref().upcast::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapI32(py_wrapper) => {
-                    py_wrapper.as_ref().upcast::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapI64(py_wrapper) => {
-                    py_wrapper.as_ref().upcast::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapU8(py_wrapper) => {
-                    py_wrapper.as_ref().upcast::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapU16(py_wrapper) => {
-                    py_wrapper.as_ref().upcast::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapU32(py_wrapper) => {
-                    py_wrapper.as_ref().upcast::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapU64(py_wrapper) => {
-                    py_wrapper.as_ref().upcast::<PythonStdState>()
-                }
-                PythonObserverWrapper::Python(py_wrapper) => py_wrapper,
-            }
-        }
-
-        pub fn unwrap_mut(&mut self) -> &mut dyn Observer<BytesInput, PythonStdState> {
-            match &mut self.wrapper {
-                PythonObserverWrapper::MapI8(py_wrapper) => {
-                    py_wrapper.as_mut().upcast_mut::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapI16(py_wrapper) => {
-                    py_wrapper.as_mut().upcast_mut::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapI32(py_wrapper) => {
-                    py_wrapper.as_mut().upcast_mut::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapI64(py_wrapper) => {
-                    py_wrapper.as_mut().upcast_mut::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapU8(py_wrapper) => {
-                    py_wrapper.as_mut().upcast_mut::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapU16(py_wrapper) => {
-                    py_wrapper.as_mut().upcast_mut::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapU32(py_wrapper) => {
-                    py_wrapper.as_mut().upcast_mut::<PythonStdState>()
-                }
-                PythonObserverWrapper::MapU64(py_wrapper) => {
-                    py_wrapper.as_mut().upcast_mut::<PythonStdState>()
-                }
-                PythonObserverWrapper::Python(py_wrapper) => py_wrapper,
-            }
-        }
-    }*/
 
     #[pymethods]
     impl PythonObserver {
         #[staticmethod]
         pub fn new_map_i8(map_observer: Py<PythonMapObserverI8>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapI8(map_observer),
+                wrapper: PythonObserverWrapper::MapI8(map_observer.into()),
             }
         }
         #[staticmethod]
         pub fn new_map_i16(map_observer: Py<PythonMapObserverI16>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapI16(map_observer),
+                wrapper: PythonObserverWrapper::MapI16(map_observer.into()),
             }
         }
         #[staticmethod]
         pub fn new_map_i32(map_observer: Py<PythonMapObserverI32>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapI32(map_observer),
+                wrapper: PythonObserverWrapper::MapI32(map_observer.into()),
             }
         }
         #[staticmethod]
         pub fn new_map_i64(map_observer: Py<PythonMapObserverI64>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapI64(map_observer),
+                wrapper: PythonObserverWrapper::MapI64(map_observer.into()),
             }
         }
 
         #[staticmethod]
         pub fn new_map_u8(map_observer: Py<PythonMapObserverU8>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapU8(map_observer),
+                wrapper: PythonObserverWrapper::MapU8(map_observer.into()),
             }
         }
         #[staticmethod]
         pub fn new_map_u16(map_observer: Py<PythonMapObserverU16>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapU16(map_observer),
+                wrapper: PythonObserverWrapper::MapU16(map_observer.into()),
             }
         }
         #[staticmethod]
         pub fn new_map_u32(map_observer: Py<PythonMapObserverU32>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapU32(map_observer),
+                wrapper: PythonObserverWrapper::MapU32(map_observer.into()),
             }
         }
         #[staticmethod]
         pub fn new_map_u64(map_observer: Py<PythonMapObserverU64>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapU64(map_observer),
+                wrapper: PythonObserverWrapper::MapU64(map_observer.into()),
             }
         }
         #[staticmethod]
@@ -818,18 +712,27 @@ pub mod pybind {
                 wrapper: PythonObserverWrapper::Python(PyObjectObserver::new(py_observer)),
             }
         }
+
+        pub fn unwrap_py(&self) -> Option<PyObject> {
+            match &self.wrapper {
+                PythonObserverWrapper::Python(pyo) => Some(pyo.inner.clone()),
+                _ => None,
+            }
+        }
     }
 
     impl Named for PythonObserver {
         fn name(&self) -> &str {
-            //self.unwrap().name()
-            ""
+            let ptr = unwrap_me!(self.wrapper, o, { o.name() as *const str });
+            unsafe { ptr.as_ref().unwrap() }
         }
     }
 
     impl Observer<BytesInput, PythonStdState> for PythonObserver {
         fn flush(&mut self) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, o, { o.flush() })
+            unwrap_me_mut!(self.wrapper, o, {
+                Observer::<BytesInput, PythonStdState>::flush(o)
+            })
         }
 
         fn pre_exec(
@@ -880,6 +783,24 @@ pub mod pybind {
         #[new]
         fn new(list: Vec<PythonObserver>) -> Self {
             Self { list }
+        }
+
+        fn len(&self) -> usize {
+            self.list.len()
+        }
+
+        fn __getitem__(&self, idx: usize) -> PythonObserver {
+            self.list[idx].clone()
+        }
+
+        #[pyo3(name = "match_name")]
+        fn pymatch_name(&self, name: &str) -> Option<PythonObserver> {
+            for ob in &self.list {
+                if ob.name() == name {
+                    return Some(ob.clone());
+                }
+            }
+            None
         }
     }
 
@@ -942,28 +863,32 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI8, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T).as_ref()
+                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                        .as_ref()
                                 }
                             }
                             PythonObserverWrapper::MapI16(py_wrapper) => {
                                 if type_eq::<PythonMapObserverI16, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T).as_ref()
+                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                        .as_ref()
                                 }
                             }
                             PythonObserverWrapper::MapI32(py_wrapper) => {
                                 if type_eq::<PythonMapObserverI32, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T).as_ref()
+                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                        .as_ref()
                                 }
                             }
                             PythonObserverWrapper::MapI64(py_wrapper) => {
                                 if type_eq::<PythonMapObserverI64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T).as_ref()
+                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                        .as_ref()
                                 }
                             }
 
@@ -971,37 +896,38 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU8, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T).as_ref()
+                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                        .as_ref()
                                 }
                             }
                             PythonObserverWrapper::MapU16(py_wrapper) => {
                                 if type_eq::<PythonMapObserverU16, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T).as_ref()
+                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                        .as_ref()
                                 }
                             }
                             PythonObserverWrapper::MapU32(py_wrapper) => {
                                 if type_eq::<PythonMapObserverU32, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T).as_ref()
+                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                        .as_ref()
                                 }
                             }
                             PythonObserverWrapper::MapU64(py_wrapper) => {
                                 if type_eq::<PythonMapObserverU64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T).as_ref()
+                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                        .as_ref()
                                 }
                             }
                             PythonObserverWrapper::Python(py_wrapper) => {
                                 if type_eq::<PyObjectObserver, T>() && py_wrapper.name() == name {
                                     r = (py_wrapper as *const _ as *const T).as_ref();
                                 }
-                            }
-                            PythonObserverWrapper::None => {
-                                panic!("Serde is not supported ATM")
                             }
                         }
                         Ok(())
@@ -1022,28 +948,32 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI8, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T).as_mut()
+                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                        .as_mut()
                                 }
                             }
                             PythonObserverWrapper::MapI16(py_wrapper) => {
                                 if type_eq::<PythonMapObserverI16, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T).as_mut()
+                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                        .as_mut()
                                 }
                             }
                             PythonObserverWrapper::MapI32(py_wrapper) => {
                                 if type_eq::<PythonMapObserverI32, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T).as_mut()
+                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                        .as_mut()
                                 }
                             }
                             PythonObserverWrapper::MapI64(py_wrapper) => {
                                 if type_eq::<PythonMapObserverI64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T).as_mut()
+                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                        .as_mut()
                                 }
                             }
 
@@ -1051,37 +981,38 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU8, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T).as_mut()
+                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                        .as_mut()
                                 }
                             }
                             PythonObserverWrapper::MapU16(py_wrapper) => {
                                 if type_eq::<PythonMapObserverU16, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T).as_mut()
+                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                        .as_mut()
                                 }
                             }
                             PythonObserverWrapper::MapU32(py_wrapper) => {
                                 if type_eq::<PythonMapObserverU32, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T).as_mut()
+                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                        .as_mut()
                                 }
                             }
                             PythonObserverWrapper::MapU64(py_wrapper) => {
                                 if type_eq::<PythonMapObserverU64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T).as_mut()
+                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                        .as_mut()
                                 }
                             }
                             PythonObserverWrapper::Python(py_wrapper) => {
                                 if type_eq::<PyObjectObserver, T>() && py_wrapper.name() == name {
                                     r = (py_wrapper as *mut _ as *mut T).as_mut();
                                 }
-                            }
-                            PythonObserverWrapper::None => {
-                                panic!("Serde is not supported ATM")
                             }
                         }
                         Ok(())

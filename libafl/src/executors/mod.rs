@@ -189,121 +189,169 @@ mod test {
 #[allow(missing_docs)]
 /// `Executor` Python bindings
 pub mod pybind {
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::inprocess::pybind::PythonOwnedInProcessExecutor;
     use crate::executors::{Executor, ExitKind, HasObservers};
-    use crate::inputs::BytesInput;
+    use crate::fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper};
+    use crate::inputs::{BytesInput, HasBytesVec};
     use crate::observers::pybind::PythonObserversTuple;
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::Error;
     use pyo3::prelude::*;
 
-    macro_rules! define_python_executor {
-        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $my_std_state_type_name: ident, $my_std_fuzzer_type_name: ident,
-             $event_manager_name: ident, $in_process_executor_name: ident) => {
-            use crate::events::pybind::$event_manager_name;
-            use crate::executors::inprocess::pybind::$in_process_executor_name;
-            use crate::fuzzer::pybind::$my_std_fuzzer_type_name;
-            use crate::state::pybind::$my_std_state_type_name;
+    #[derive(Clone, Debug)]
+    pub struct PyObjectExecutor {
+        inner: PyObject,
+        tuple: PythonObserversTuple,
+    }
 
-            #[derive(Debug)]
-            enum $wrapper_name {
-                OwnedInProcess(*mut $in_process_executor_name),
-            }
+    impl PyObjectExecutor {
+        pub fn new(obj: PyObject) -> Self {
+            let tuple = Python::with_gil(|py| -> PyResult<PythonObserversTuple> {
+                obj.call_method1(py, "observers", ())?.extract(py)
+            })
+            .unwrap();
+            PyObjectExecutor { inner: obj, tuple }
+        }
+    }
 
-            #[pyclass(unsendable, name = $py_name_trait)]
-            #[derive(Debug)]
-            /// Executor + HasObservers Trait binding
-            pub struct $struct_name_trait {
-                wrapper: $wrapper_name,
-            }
+    impl HasObservers<BytesInput, PythonObserversTuple, PythonStdState> for PyObjectExecutor {
+        #[inline]
+        fn observers(&self) -> &PythonObserversTuple {
+            &self.tuple
+        }
 
-            impl $struct_name_trait {
-                fn unwrap(
-                    &self,
-                ) -> &(impl Executor<
-                    $event_manager_name,
-                    BytesInput,
-                    $my_std_state_type_name,
-                    $my_std_fuzzer_type_name,
-                > + HasObservers<BytesInput, PythonObserversTuple, $my_std_state_type_name>) {
-                    unsafe {
-                        match self.wrapper {
-                            $wrapper_name::OwnedInProcess(py_wrapper) => &(*py_wrapper).inner,
-                        }
+        #[inline]
+        fn observers_mut(&mut self) -> &mut PythonObserversTuple {
+            &mut self.tuple
+        }
+    }
+
+    impl Executor<PythonEventManager, BytesInput, PythonStdState, PythonStdFuzzer>
+        for PyObjectExecutor
+    {
+        #[inline]
+        fn run_target(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            state: &mut PythonStdState,
+            mgr: &mut PythonEventManager,
+            input: &BytesInput,
+        ) -> Result<ExitKind, Error> {
+            // TODO exit kind
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner.call_method1(
+                    py,
+                    "run_target",
+                    (
+                        PythonStdFuzzerWrapper::wrap(fuzzer),
+                        PythonStdStateWrapper::wrap(state),
+                        mgr.clone(),
+                        input.bytes(),
+                    ),
+                )?;
+                Ok(())
+            })
+            .unwrap();
+            Ok(ExitKind::Ok)
+        }
+    }
+
+    #[derive(Debug)]
+    enum PythonExecutorWrapper {
+        InProcess(Py<PythonOwnedInProcessExecutor>),
+        Python(PyObjectExecutor),
+    }
+
+    #[pyclass(unsendable, name = "Executor")]
+    #[derive(Debug)]
+    /// Executor + HasObservers Trait binding
+    pub struct PythonExecutor {
+        wrapper: PythonExecutorWrapper,
+    }
+
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!($wrapper, $name, $body, PythonExecutorWrapper,
+                { InProcess },
+                {
+                    Python(py_wrapper) => {
+                        let $name = py_wrapper;
+                        $body
                     }
                 }
-
-                fn unwrap_mut(
-                    &mut self,
-                ) -> &mut (impl Executor<
-                    $event_manager_name,
-                    BytesInput,
-                    $my_std_state_type_name,
-                    $my_std_fuzzer_type_name,
-                > + HasObservers<BytesInput, PythonObserversTuple, $my_std_state_type_name>) {
-                    unsafe {
-                        match self.wrapper {
-                            $wrapper_name::OwnedInProcess(py_wrapper) => &mut (*py_wrapper).inner,
-                        }
-                    }
-                }
-            }
-
-            #[pymethods]
-            impl $struct_name_trait {
-                #[staticmethod]
-                fn new_from_inprocess(
-                    owned_inprocess_executor: &mut $in_process_executor_name,
-                ) -> Self {
-                    Self {
-                        wrapper: $wrapper_name::OwnedInProcess(owned_inprocess_executor),
-                    }
-                }
-            }
-
-            impl HasObservers<BytesInput, PythonObserversTuple, $my_std_state_type_name>
-                for $struct_name_trait
-            {
-                // #[inline]
-                fn observers(&self) -> &PythonObserversTuple {
-                    self.unwrap().observers()
-                }
-
-                #[inline]
-                fn observers_mut(&mut self) -> &mut PythonObserversTuple {
-                    self.unwrap_mut().observers_mut()
-                }
-            }
-
-            impl
-                Executor<
-                    $event_manager_name,
-                    BytesInput,
-                    $my_std_state_type_name,
-                    $my_std_fuzzer_type_name,
-                > for $struct_name_trait
-            {
-                #[inline]
-                fn run_target(
-                    &mut self,
-                    fuzzer: &mut $my_std_fuzzer_type_name,
-                    state: &mut $my_std_state_type_name,
-                    mgr: &mut $event_manager_name,
-                    input: &BytesInput,
-                ) -> Result<ExitKind, Error> {
-                    self.unwrap_mut().run_target(fuzzer, state, mgr, input)
-                }
-            }
+            )
         };
     }
 
-    define_python_executor!(
-        PythonExecutor,
-        "Executor",
-        PythonExecutorWrapper,
-        PythonStdState,
-        PythonStdFuzzer,
-        PythonEventManager,
-        PythonOwnedInProcessExecutor
-    );
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonExecutorWrapper,
+                { InProcess },
+                {
+                    Python(py_wrapper) => {
+                        let $name = py_wrapper;
+                        $body
+                    }
+                }
+            )
+        };
+    }
+
+    #[pymethods]
+    impl PythonExecutor {
+        #[staticmethod]
+        pub fn new_inprocess(owned_inprocess_executor: Py<PythonOwnedInProcessExecutor>) -> Self {
+            Self {
+                wrapper: PythonExecutorWrapper::InProcess(owned_inprocess_executor),
+            }
+        }
+
+        #[staticmethod]
+        pub fn new_py(obj: PyObject) -> Self {
+            Self {
+                wrapper: PythonExecutorWrapper::Python(PyObjectExecutor::new(obj)),
+            }
+        }
+
+        pub fn unwrap_py(&self) -> Option<PyObject> {
+            match &self.wrapper {
+                PythonExecutorWrapper::Python(pyo) => Some(pyo.inner.clone()),
+                _ => None,
+            }
+        }
+    }
+
+    impl HasObservers<BytesInput, PythonObserversTuple, PythonStdState> for PythonExecutor {
+        #[inline]
+        fn observers(&self) -> &PythonObserversTuple {
+            let ptr = unwrap_me!(self.wrapper, e, {
+                e.observers() as *const PythonObserversTuple
+            });
+            unsafe { ptr.as_ref().unwrap() }
+        }
+
+        #[inline]
+        fn observers_mut(&mut self) -> &mut PythonObserversTuple {
+            let ptr = unwrap_me_mut!(self.wrapper, e, {
+                e.observers_mut() as *mut PythonObserversTuple
+            });
+            unsafe { ptr.as_mut().unwrap() }
+        }
+    }
+
+    impl Executor<PythonEventManager, BytesInput, PythonStdState, PythonStdFuzzer> for PythonExecutor {
+        #[inline]
+        fn run_target(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            state: &mut PythonStdState,
+            mgr: &mut PythonEventManager,
+            input: &BytesInput,
+        ) -> Result<ExitKind, Error> {
+            unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

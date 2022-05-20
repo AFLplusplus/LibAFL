@@ -1041,6 +1041,7 @@ impl From<bool> for ConstFeedback {
 #[allow(missing_docs)]
 pub mod pybind {
     use super::*;
+    use crate::events::pybind::PythonEventManager;
     use crate::feedbacks::map::pybind::*;
     use crate::inputs::HasBytesVec;
     use crate::observers::pybind::PythonObserversTuple;
@@ -1050,7 +1051,6 @@ pub mod pybind {
         inputs::BytesInput, observers::ObserversTuple, Error,
     };
     use pyo3::prelude::*;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     use std::cell::UnsafeCell;
 
     #[derive(Debug)]
@@ -1077,52 +1077,7 @@ pub mod pybind {
         }
     }
 
-    impl Serialize for PyObjectFeedback {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            let buf = Python::with_gil(|py| -> PyResult<Vec<u8>> {
-                let pickle = PyModule::import(py, "pickle")?;
-                let buf: Vec<u8> = pickle.getattr("dumps")?.call1((&self.inner,))?.extract()?;
-                Ok(buf)
-            })
-            .unwrap();
-            serializer.serialize_bytes(&buf)
-        }
-    }
-
-    struct PyObjectFeedbackVisitor;
-
-    impl<'de> serde::de::Visitor<'de> for PyObjectFeedbackVisitor {
-        type Value = PyObjectFeedback;
-
-        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
-            formatter.write_str("Expecting some bytes to deserialize from the Python side")
-        }
-
-        fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
-        where
-            E: serde::de::Error,
-        {
-            let obj = Python::with_gil(|py| -> PyResult<PyObject> {
-                let pickle = PyModule::import(py, "pickle")?;
-                let obj = pickle.getattr("loads")?.call1((v,))?.to_object(py);
-                Ok(obj)
-            })
-            .unwrap();
-            Ok(PyObjectFeedback::new(obj))
-        }
-    }
-
-    impl<'de> Deserialize<'de> for PyObjectFeedback {
-        fn deserialize<D>(deserializer: D) -> Result<PyObjectFeedback, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            deserializer.deserialize_byte_buf(PyObjectFeedbackVisitor)
-        }
-    }
+    // crate::impl_serde_pyobjectwrapper!(PyObjectObserver, inner);
 
     impl Named for PyObjectFeedback {
         fn name(&self) -> &str {
@@ -1152,7 +1107,7 @@ pub mod pybind {
         fn is_interesting<EM, OT>(
             &mut self,
             state: &mut PythonStdState,
-            _manager: &mut EM,
+            manager: &mut EM,
             input: &BytesInput,
             observers: &OT,
             _exit_kind: &ExitKind,
@@ -1164,6 +1119,7 @@ pub mod pybind {
             // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
                 unsafe { std::mem::transmute(observers) };
+            let dont_look_at_this2: &PythonEventManager = unsafe { std::mem::transmute(manager) };
             // TODO pass the other args
             Ok(Python::with_gil(|py| -> PyResult<bool> {
                 let r: bool = self
@@ -1173,6 +1129,7 @@ pub mod pybind {
                         "is_interesting",
                         (
                             PythonStdStateWrapper::wrap(state),
+                            dont_look_at_this2.clone(),
                             input.bytes(),
                             dont_look_at_this.clone(),
                         ),
@@ -1234,40 +1191,30 @@ pub mod pybind {
     }
 
     macro_rules! unwrap_me {
-        ($wrapper:expr, $result:ty, $name:ident, $body:block) => {
-            match &$wrapper {
-                PythonFeedbackWrapper::MaxMapI8(py_wrapper) => {
-                    Python::with_gil(|py| -> PyResult<$result> {
-                        let borrowed = py_wrapper.borrow(py);
-                        let $name = &borrowed.inner;
-                        Ok($body)
-                    })
-                    .unwrap()
-                }
-                PythonFeedbackWrapper::Python(py_wrapper) => {
-                    let $name = py_wrapper;
-                    $body
-                }
-            }
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!($wrapper, $name, $body, PythonFeedbackWrapper,
+               { MaxMapI8 },
+               {
+                    Python(py_wrapper) => {
+                        let $name = py_wrapper;
+                        $body
+                    }
+               }
+           )
         };
     }
 
     macro_rules! unwrap_me_mut {
-        ($wrapper:expr, $result:ty, $name:ident, $body:block) => {
-            match &mut $wrapper {
-                PythonFeedbackWrapper::MaxMapI8(py_wrapper) => {
-                    Python::with_gil(|py| -> PyResult<$result> {
-                        let mut borrowed = py_wrapper.borrow_mut(py);
-                        let $name = &mut borrowed.inner;
-                        Ok($body)
-                    })
-                    .unwrap()
-                }
-                PythonFeedbackWrapper::Python(py_wrapper) => {
-                    let $name = py_wrapper;
-                    $body
-                }
-            }
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonFeedbackWrapper,
+               { MaxMapI8 },
+               {
+                    Python(py_wrapper) => {
+                        let $name = py_wrapper;
+                        $body
+                    }
+               }
+           )
         };
     }
 
@@ -1298,16 +1245,17 @@ pub mod pybind {
             }
         }
 
-        fn pippo(&mut self) {
-            unwrap_me_mut!(self.wrapper, (), f, {
-                println!("{:?}", f.name());
-            })
+        pub fn unwrap_py(&self) -> Option<PyObject> {
+            match &self.wrapper {
+                PythonFeedbackWrapper::Python(pyo) => Some(pyo.inner.clone()),
+                _ => None,
+            }
         }
     }
 
     impl Named for PythonFeedback {
         fn name(&self) -> &str {
-            let s = unwrap_me!(self.wrapper, String, f, { f.name().to_string() });
+            let s = unwrap_me!(self.wrapper, f, { f.name().to_string() });
             unsafe {
                 *self.name.get() = s;
                 &*self.name.get()
@@ -1317,7 +1265,7 @@ pub mod pybind {
 
     impl Feedback<BytesInput, PythonStdState> for PythonFeedback {
         fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, Result<(), Error>, f, { f.init_state(state) })
+            unwrap_me_mut!(self.wrapper, f, { f.init_state(state) })
         }
 
         fn is_interesting<EM, OT>(
@@ -1332,7 +1280,9 @@ pub mod pybind {
             EM: EventFirer<BytesInput>,
             OT: ObserversTuple<BytesInput, PythonStdState>,
         {
-            unwrap_me_mut!(self.wrapper, Result<bool, Error>, f, { f.is_interesting(state, manager, input, observers, exit_kind) })
+            unwrap_me_mut!(self.wrapper, f, {
+                f.is_interesting(state, manager, input, observers, exit_kind)
+            })
         }
 
         fn append_metadata(
@@ -1340,7 +1290,7 @@ pub mod pybind {
             state: &mut PythonStdState,
             testcase: &mut Testcase<BytesInput>,
         ) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, Result<(), Error>, f, { f.append_metadata(state, testcase) })
+            unwrap_me_mut!(self.wrapper, f, { f.append_metadata(state, testcase) })
         }
 
         fn discard_metadata(
@@ -1348,7 +1298,7 @@ pub mod pybind {
             state: &mut PythonStdState,
             input: &BytesInput,
         ) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, Result<(), Error>, f, { f.discard_metadata(state, input) })
+            unwrap_me_mut!(self.wrapper, f, { f.discard_metadata(state, input) })
         }
     }
 

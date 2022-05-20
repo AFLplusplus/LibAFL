@@ -1505,12 +1505,52 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use super::*;
-    use crate::bolts::ownedref::OwnedPtrMut;
-    use crate::inputs::BytesInput;
     use crate::observers::pybind::PythonObserver;
     use concat_idents::concat_idents;
     use pyo3::prelude::*;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use serde::{Deserialize, Serialize};
+
+    #[macro_export]
+    macro_rules! mapob_unwrap_me {
+        ($wrapper_name:ident, $wrapper:expr, $name:ident, $body:block) => {
+            match &$wrapper {
+                $wrapper_name::Std(py_wrapper) => Python::with_gil(|py| -> PyResult<_> {
+                    let borrowed = py_wrapper.borrow(py);
+                    let $name = &borrowed.inner;
+                    Ok($body)
+                })
+                .unwrap(),
+                $wrapper_name::Owned(py_wrapper) => Python::with_gil(|py| -> PyResult<_> {
+                    let borrowed = py_wrapper.borrow(py);
+                    let $name = &borrowed.inner;
+                    Ok($body)
+                })
+                .unwrap(),
+                $wrapper_name::None => panic!("Serde is not supported ATM"),
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! mapob_unwrap_me_mut {
+        ($wrapper_name:ident, $wrapper:expr, $name:ident, $body:block) => {
+            match &mut $wrapper {
+                $wrapper_name::Std(py_wrapper) => Python::with_gil(|py| -> PyResult<_> {
+                    let mut borrowed = py_wrapper.borrow_mut(py);
+                    let $name = &mut borrowed.inner;
+                    Ok($body)
+                })
+                .unwrap(),
+                $wrapper_name::Owned(py_wrapper) => Python::with_gil(|py| -> PyResult<_> {
+                    let mut borrowed = py_wrapper.borrow_mut(py);
+                    let $name = &mut borrowed.inner;
+                    Ok($body)
+                })
+                .unwrap(),
+                $wrapper_name::None => panic!("Serde is not supported ATM"),
+            }
+        };
+    }
 
     macro_rules! define_python_map_observer {
         ($struct_name1:ident, $py_name1:tt, $struct_name2:ident, $py_name2:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
@@ -1531,9 +1571,41 @@ pub mod pybind {
                     }
                 }
 
-                pub fn as_map_observer(&mut self) -> $struct_name_trait {
-                    $struct_name_trait::new_std(self)
+                pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
+                    $struct_name_trait::new_std(slf)
                 }
+
+                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                    let m = Self::as_map_observer(slf);
+                    Python::with_gil(|py| -> PyResult<PythonObserver> {
+                        let p: Py<_> = Py::new(py, m)?;
+                        Ok($struct_name_trait::as_observer(p))
+                    }).unwrap()
+                }
+
+                fn __getitem__(&self, idx: usize) -> $datatype {
+                    *self.inner.get(idx)
+                }
+
+                fn __setitem__(&mut self, idx: usize, val: $datatype) {
+                    *self.inner.get_mut(idx) = val;
+                }
+
+                #[pyo3(name = "usable_count")]
+                fn pyusable_count(&self) -> usize {
+                    self.inner.usable_count()
+                }
+
+                #[pyo3(name = "len")]
+                fn pylen(&self) -> usize {
+                    self.inner.len()
+                }
+
+                #[pyo3(name = "name")]
+                fn pyname(&self) -> &str {
+                    self.inner.name()
+                }
+
             }
 
             #[pyclass(unsendable, name = $py_name2)]
@@ -1554,15 +1626,53 @@ pub mod pybind {
                     }
                 }
 
-                pub fn as_map_observer(&mut self) -> $struct_name_trait {
-                    $struct_name_trait::new_owned(self)
+                pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
+                    $struct_name_trait::new_owned(slf)
+                }
+
+                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                    let m = Self::as_map_observer(slf);
+                    Python::with_gil(|py| -> PyResult<PythonObserver> {
+                        let p: Py<_> = Py::new(py, m)?;
+                        Ok($struct_name_trait::as_observer(p))
+                    }).unwrap()
+                }
+
+                fn __getitem__(&self, idx: usize) -> $datatype {
+                    *self.inner.get(idx)
+                }
+
+                fn __setitem__(&mut self, idx: usize, val: $datatype) {
+                    *self.inner.get_mut(idx) = val;
+                }
+
+                #[pyo3(name = "usable_count")]
+                fn pyusable_count(&self) -> usize {
+                    self.inner.usable_count()
+                }
+
+                #[pyo3(name = "len")]
+                fn pylen(&self) -> usize {
+                    self.inner.len()
+                }
+
+                #[pyo3(name = "name")]
+                fn pyname(&self) -> &str {
+                    self.inner.name()
                 }
             }
 
-            #[derive(Serialize, Deserialize, Debug, Clone)]
+            #[derive(Debug, Clone)]
             pub enum $wrapper_name {
-                Std(OwnedPtrMut<$struct_name1>),
-                Owned(OwnedPtrMut<$struct_name2>),
+                Std(Py<$struct_name1>),
+                Owned(Py<$struct_name2>),
+                None
+            }
+
+            impl Default for $wrapper_name {
+                fn default() -> Self {
+                    $wrapper_name::None
+                }
             }
 
             // Should not be exposed to user
@@ -1570,52 +1680,23 @@ pub mod pybind {
             #[derive(Serialize, Deserialize, Debug, Clone)]
             /// MapObserver + Observer Trait binding
             pub struct $struct_name_trait {
+                #[serde(skip)]
                 pub wrapper: $wrapper_name,
-            }
-
-            impl $struct_name_trait {
-                /*pub fn unwrap(&self) -> &impl MapObserver<Entry = $datatype> {
-                    match &self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => &py_wrapper.as_ref().inner,
-                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.as_ref().inner,
-                    }
-                }
-
-                pub fn unwrap_mut(&mut self) -> &mut impl MapObserver<Entry = $datatype> {
-                    match &mut self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => &mut py_wrapper.as_mut().inner,
-                        $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.as_mut().inner,
-                    }
-                }*/
-
-                pub fn upcast<S>(&self) -> &dyn Observer<BytesInput, S> {
-                    match &self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => &py_wrapper.as_ref().inner,
-                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.as_ref().inner,
-                    }
-                }
-
-                pub fn upcast_mut<S>(&mut self) -> &mut dyn Observer<BytesInput, S> {
-                    match &mut self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => &mut py_wrapper.as_mut().inner,
-                        $wrapper_name::Owned(py_wrapper) => &mut py_wrapper.as_mut().inner,
-                    }
-                }
             }
 
             #[pymethods]
             impl $struct_name_trait {
                 #[staticmethod]
-                fn new_std(std_map: &mut $struct_name1) -> Self {
+                fn new_std(std_map: Py<$struct_name1>) -> Self {
                     Self {
-                        wrapper: $wrapper_name::Std(OwnedPtrMut::Ptr(std_map)),
+                        wrapper: $wrapper_name::Std(std_map),
                     }
                 }
 
                 #[staticmethod]
-                fn new_owned(owned_map: &mut $struct_name2) -> Self {
+                fn new_owned(owned_map: Py<$struct_name2>) -> Self {
                     Self {
-                        wrapper: $wrapper_name::Owned(OwnedPtrMut::Ptr(owned_map)),
+                        wrapper: $wrapper_name::Owned(owned_map),
                     }
                 }
 
@@ -1654,10 +1735,7 @@ pub mod pybind {
                 type IntoIter = Iter<'it, $datatype>;
 
                 fn as_ref_iter(&'it self) -> Self::IntoIter {
-                    match &self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.as_ref_iter(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.as_ref_iter(),
-                    }
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute::<_, Self::IntoIter>(m.as_ref_iter()) } })
                 }
             }
 
@@ -1666,10 +1744,7 @@ pub mod pybind {
                 type IntoIter = IterMut<'it, $datatype>;
 
                 fn as_mut_iter(&'it mut self) -> Self::IntoIter {
-                    match &mut self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => py_wrapper.as_mut().inner.as_mut_iter(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_mut().inner.as_mut_iter(),
-                    }
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute::<_, Self::IntoIter>(m.as_mut_iter()) } })
                 }
             }
 
@@ -1678,81 +1753,58 @@ pub mod pybind {
 
                 #[inline]
                 fn get(&self, idx: usize) -> &$datatype {
-                    match &self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => &py_wrapper.as_ref().inner.get(idx),
-                        $wrapper_name::Owned(py_wrapper) => &py_wrapper.as_ref().inner.get(idx),
-                    }
+                    let ptr = mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.get(idx) as *const $datatype });
+                    unsafe { ptr.as_ref().unwrap() }
                 }
 
                 #[inline]
                 fn get_mut(&mut self, idx: usize) -> &mut $datatype {
-                    match &mut self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => py_wrapper.as_mut().inner.get_mut(idx),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_mut().inner.get_mut(idx),
-                    }
+                    let ptr = mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.get_mut(idx) as *mut $datatype });
+                    unsafe { ptr.as_mut().unwrap() }
                 }
 
                 #[inline]
                 fn usable_count(&self) -> usize {
-                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.usable_count(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.usable_count(),
-                    }
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.usable_count() })
                 }
 
                 fn hash(&self) -> u64 {
-                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.hash(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.hash(),
-                    }
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.hash() })
                 }
 
                 #[inline]
                 fn initial(&self) -> $datatype {
-                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.initial(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.initial(),
-                    }
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.initial() })
                 }
 
                 #[inline]
                 fn initial_mut(&mut self) -> &mut $datatype {
-                    match &mut self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_mut().inner.initial_mut(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_mut().inner.initial_mut(),
-                    }
+                    let ptr = mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.initial_mut() as *mut $datatype });
+                    unsafe { ptr.as_mut().unwrap() }
                 }
 
                 #[inline]
                 fn set_initial(&mut self, initial: $datatype) {
-                    match &mut self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => {
-                            py_wrapper.as_mut().inner.set_initial(initial);
-                        }
-                        $wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.as_mut().inner.set_initial(initial);
-                        }
-                    }
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.set_initial(initial) });
                 }
 
                 fn to_vec(&self) -> Vec<$datatype> {
-                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.to_vec(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.to_vec(),
-                    }
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.to_vec() })
                 }
             }
 
             impl Named for $struct_name_trait {
                 #[inline]
                 fn name(&self) -> &str {
-                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.name(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.name(),
-                    }
+                    let ptr = mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.name() as *const str });
+                    unsafe { ptr.as_ref().unwrap() }
                 }
             }
 
             impl HasLen for $struct_name_trait {
                 #[inline]
                 fn len(&self) -> usize {
-                    match &self.wrapper {$wrapper_name::Std(py_wrapper) => py_wrapper.as_ref().inner.len(),
-                        $wrapper_name::Owned(py_wrapper) => py_wrapper.as_ref().inner.len(),
-                    }
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.len() })
                 }
             }
 
@@ -1761,14 +1813,8 @@ pub mod pybind {
                 Self: MapObserver,
             {
                 #[inline]
-                fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-                    match &mut self.wrapper {
-                        $wrapper_name::Std(py_wrapper) => {
-                            py_wrapper.as_mut().inner.pre_exec(_state, _input)
-                        }$wrapper_name::Owned(py_wrapper) => {
-                            py_wrapper.as_mut().inner.pre_exec(_state, _input)
-                        }
-                    }
+                fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.pre_exec(state, input) })
                 }
             }
         };

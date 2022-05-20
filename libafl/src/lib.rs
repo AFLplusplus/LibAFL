@@ -464,32 +464,232 @@ pub extern "C" fn external_current_millis() -> u64 {
 }
 
 #[cfg(feature = "python")]
-use pyo3::prelude::*;
+#[allow(missing_docs)]
+pub mod pybind {
+    use super::*;
+    use pyo3::prelude::*;
+    use pyo3::PyClass;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-#[cfg(feature = "python")]
-#[pymodule]
-#[pyo3(name = "libafl")]
-/// Register the classes to the python module
-pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
-    observers::map::pybind::register(py, m)?;
-    observers::pybind::register(py, m)?;
-    feedbacks::map::pybind::register(py, m)?;
-    feedbacks::pybind::register(py, m)?;
-    state::pybind::register(py, m)?;
-    monitors::pybind::register(py, m)?;
-    events::pybind::register(py, m)?;
-    events::simple::pybind::register(py, m)?;
-    fuzzer::pybind::register(py, m)?;
-    executors::pybind::register(py, m)?;
-    executors::inprocess::pybind::register(py, m)?;
-    //generators::pybind::register(py, m)?;
-    corpus::pybind::register(py, m)?;
-    corpus::ondisk::pybind::register(py, m)?;
-    corpus::inmemory::pybind::register(py, m)?;
-    corpus::cached::pybind::register(py, m)?;
-    bolts::rands::pybind::register(py, m)?;
-    stages::pybind::register(py, m)?;
-    stages::owned::pybind::register(py, m)?;
-    stages::mutational::pybind::register(py, m)?;
-    Ok(())
+    #[derive(Debug, Clone)]
+    pub struct SerdePy<T>
+    where
+        T: PyClass + Serialize + serde::de::DeserializeOwned,
+    {
+        pub inner: Py<T>,
+    }
+
+    impl<T> Serialize for SerdePy<T>
+    where
+        T: PyClass + Serialize + serde::de::DeserializeOwned,
+    {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Python::with_gil(|py| -> PyResult<Result<S::Ok, S::Error>> {
+                let borrowed = self.borrow(py);
+                Ok(borrowed.serialize(serializer))
+            })
+            .unwrap()
+        }
+    }
+
+    impl<'de, T> Deserialize<'de> for SerdePy<T>
+    where
+        T: PyClass + Into<PyClassInitializer<T>> + Serialize + serde::de::DeserializeOwned,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<SerdePy<T>, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let t = T::deserialize(deserializer)?;
+            Ok(Python::with_gil(|py| -> PyResult<SerdePy<T>> { SerdePy::new(py, t) }).unwrap())
+        }
+    }
+
+    impl<T> SerdePy<T>
+    where
+        T: PyClass + Serialize + serde::de::DeserializeOwned,
+    {
+        pub fn new(py: Python<'_>, value: impl Into<PyClassInitializer<T>>) -> PyResult<Self> {
+            Ok(Self {
+                inner: Py::new(py, value)?,
+            })
+        }
+
+        pub fn borrow<'py>(&'py self, py: Python<'py>) -> PyRef<'py, T> {
+            self.inner.borrow(py)
+        }
+
+        pub fn borrow_mut<'py>(&'py self, py: Python<'py>) -> PyRefMut<'py, T> {
+            self.inner.borrow_mut(py)
+        }
+
+        pub fn as_ref<'py>(&'py self, py: Python<'py>) -> &'py T::AsRefTarget {
+            self.inner.as_ref(py)
+        }
+    }
+
+    impl<T> From<Py<T>> for SerdePy<T>
+    where
+        T: PyClass + Serialize + serde::de::DeserializeOwned,
+    {
+        fn from(inner: Py<T>) -> Self {
+            Self { inner }
+        }
+    }
+
+    #[macro_export]
+    macro_rules! unwrap_me_body {
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),* }) => {
+            match &$wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let borrowed = py_wrapper.borrow(py);
+                            let $name = &borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+            }
+        };
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),* }, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
+            match &$wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let borrowed = py_wrapper.borrow(py);
+                            let $name = &borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! unwrap_me_mut_body {
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+            }
+        };
+        ($wrapper:expr, $name:ident, $body:block, $wrapper_type:ident, { $($wrapper_option:tt),*}, { $($wrapper_optional:tt($pw:ident) => $code_block:block)* }) => {
+            match &mut $wrapper {
+                $(
+                    $wrapper_type::$wrapper_option(py_wrapper) => {
+                        Python::with_gil(|py| -> PyResult<_> {
+                            let mut borrowed = py_wrapper.borrow_mut(py);
+                            let $name = &mut borrowed.inner;
+                            Ok($body)
+                        })
+                        .unwrap()
+                    }
+                )*
+                $($wrapper_type::$wrapper_optional($pw) => { $code_block })*
+            }
+        };
+    }
+
+    #[macro_export]
+    macro_rules! impl_serde_pyobjectwrapper {
+        ($struct_name:ident, $inner:tt) => {
+            const _: () = {
+                use pyo3::prelude::*;
+                use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+                impl Serialize for $struct_name {
+                    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                    where
+                        S: Serializer,
+                    {
+                        let buf = Python::with_gil(|py| -> PyResult<Vec<u8>> {
+                            let pickle = PyModule::import(py, "pickle")?;
+                            let buf: Vec<u8> =
+                                pickle.getattr("dumps")?.call1((&self.$inner,))?.extract()?;
+                            Ok(buf)
+                        })
+                        .unwrap();
+                        serializer.serialize_bytes(&buf)
+                    }
+                }
+
+                struct PyObjectVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for PyObjectVisitor {
+                    type Value = $struct_name;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter
+                            .write_str("Expecting some bytes to deserialize from the Python side")
+                    }
+
+                    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        let obj = Python::with_gil(|py| -> PyResult<PyObject> {
+                            let pickle = PyModule::import(py, "pickle")?;
+                            let obj = pickle.getattr("loads")?.call1((v,))?.to_object(py);
+                            Ok(obj)
+                        })
+                        .unwrap();
+                        Ok($struct_name::new(obj))
+                    }
+                }
+
+                impl<'de> Deserialize<'de> for $struct_name {
+                    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+                    where
+                        D: Deserializer<'de>,
+                    {
+                        deserializer.deserialize_byte_buf(PyObjectVisitor)
+                    }
+                }
+            };
+        };
+    }
+
+    #[pymodule]
+    #[pyo3(name = "libafl")]
+    /// Register the classes to the python module
+    pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
+        observers::map::pybind::register(py, m)?;
+        observers::pybind::register(py, m)?;
+        feedbacks::map::pybind::register(py, m)?;
+        feedbacks::pybind::register(py, m)?;
+        state::pybind::register(py, m)?;
+        monitors::pybind::register(py, m)?;
+        events::pybind::register(py, m)?;
+        events::simple::pybind::register(py, m)?;
+        fuzzer::pybind::register(py, m)?;
+        executors::pybind::register(py, m)?;
+        executors::inprocess::pybind::register(py, m)?;
+        //generators::pybind::register(py, m)?;
+        corpus::pybind::register(py, m)?;
+        corpus::testcase::pybind::register(py, m)?;
+        corpus::ondisk::pybind::register(py, m)?;
+        corpus::inmemory::pybind::register(py, m)?;
+        corpus::cached::pybind::register(py, m)?;
+        bolts::rands::pybind::register(py, m)?;
+        stages::pybind::register(py, m)?;
+        stages::owned::pybind::register(py, m)?;
+        stages::mutational::pybind::register(py, m)?;
+        Ok(())
+    }
 }

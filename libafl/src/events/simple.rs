@@ -429,6 +429,7 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use crate::events::pybind::PythonEventManager;
     use crate::events::SimpleEventManager;
     use crate::inputs::BytesInput;
     use crate::monitors::pybind::PythonMonitor;
@@ -449,6 +450,10 @@ pub mod pybind {
             Self {
                 inner: SimpleEventManager::new(py_monitor),
             }
+        }
+
+        fn as_manager(slf: Py<Self>) -> PythonEventManager {
+            PythonEventManager::new_simple(slf)
         }
     }
 

@@ -436,6 +436,7 @@ mod tests {
 pub mod pybind {
     use super::Rand;
     use crate::bolts::{current_nanos, rands::StdRand};
+    use crate::pybind::SerdePy;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
@@ -444,7 +445,7 @@ pub mod pybind {
     /// Python class for StdRand
     pub struct PythonStdRand {
         /// Rust wrapped StdRand object
-        pub std_rand: StdRand,
+        pub inner: StdRand,
     }
 
     #[pymethods]
@@ -452,52 +453,58 @@ pub mod pybind {
         #[staticmethod]
         fn with_current_nanos() -> Self {
             Self {
-                std_rand: StdRand::with_seed(current_nanos()),
+                inner: StdRand::with_seed(current_nanos()),
             }
         }
 
         #[staticmethod]
         fn with_seed(seed: u64) -> Self {
             Self {
-                std_rand: StdRand::with_seed(seed),
+                inner: StdRand::with_seed(seed),
             }
+        }
+
+        fn as_rand(slf: Py<Self>) -> PythonRand {
+            PythonRand::new_std(slf)
         }
     }
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     enum PythonRandWrapper {
-        StdRand(PythonStdRand),
+        Std(SerdePy<PythonStdRand>),
     }
 
     /// Rand Trait binding
     #[pyclass(unsendable, name = "Rand")]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct PythonRand {
-        rand: PythonRandWrapper,
+        wrapper: PythonRandWrapper,
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonRandWrapper, { Std })
+        };
     }
 
     #[pymethods]
     impl PythonRand {
         #[staticmethod]
-        fn new_from_std(py_std_rand: PythonStdRand) -> Self {
+        fn new_std(py_std_rand: Py<PythonStdRand>) -> Self {
             Self {
-                rand: PythonRandWrapper::StdRand(py_std_rand),
+                wrapper: PythonRandWrapper::Std(py_std_rand.into()),
             }
         }
     }
 
     impl Rand for PythonRand {
         fn set_seed(&mut self, seed: u64) {
-            match &mut self.rand {
-                PythonRandWrapper::StdRand(py_std_rand) => py_std_rand.std_rand.set_seed(seed),
-            }
+            unwrap_me_mut!(self.wrapper, r, { r.set_seed(seed) });
         }
 
         #[inline]
         fn next(&mut self) -> u64 {
-            match &mut self.rand {
-                PythonRandWrapper::StdRand(py_std_rand) => py_std_rand.std_rand.next(),
-            }
+            unwrap_me_mut!(self.wrapper, r, { r.next() })
         }
     }
 

@@ -54,10 +54,12 @@ where
 
 /// `Corpus` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
     use crate::corpus::inmemory::pybind::PythonInMemoryCorpus;
     use crate::corpus::{Corpus, Testcase};
     use crate::inputs::BytesInput;
+    use crate::pybind::SerdePy;
     use crate::Error;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
@@ -68,148 +70,114 @@ pub mod pybind {
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     enum PythonCorpusWrapper {
-        InMemory(PythonInMemoryCorpus),
-        CachedOnDisk(PythonCachedOnDiskCorpus),
-        OnDisk(PythonOnDiskCorpus),
+        InMemory(SerdePy<PythonInMemoryCorpus>),
+        CachedOnDisk(SerdePy<PythonCachedOnDiskCorpus>),
+        OnDisk(SerdePy<PythonOnDiskCorpus>),
     }
 
     /// Corpus Trait binding
     #[pyclass(unsendable, name = "Corpus")]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct PythonCorpus {
-        corpus: PythonCorpusWrapper,
+        wrapper: PythonCorpusWrapper,
     }
 
     #[pymethods]
     impl PythonCorpus {
         #[staticmethod]
-        fn new_from_in_memory(py_in_memory_corpus: PythonInMemoryCorpus) -> Self {
+        pub fn new_in_memory(py_in_memory_corpus: Py<PythonInMemoryCorpus>) -> Self {
             Self {
-                corpus: PythonCorpusWrapper::InMemory(py_in_memory_corpus),
+                wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus.into()),
             }
         }
 
         #[staticmethod]
-        fn new_from_cached_on_disk(py_cached_on_disk_corpus: PythonCachedOnDiskCorpus) -> Self {
+        pub fn new_cached_on_disk(py_cached_on_disk_corpus: Py<PythonCachedOnDiskCorpus>) -> Self {
             Self {
-                corpus: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus),
+                wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus.into()),
             }
         }
 
         #[staticmethod]
-        fn new_from_on_disk(py_on_disk_corpus: PythonOnDiskCorpus) -> Self {
+        pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
             Self {
-                corpus: PythonCorpusWrapper::OnDisk(py_on_disk_corpus),
+                wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus.into()),
             }
         }
+    }
+
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!(
+                $wrapper,
+                $name,
+                $body,
+                PythonCorpusWrapper,
+                {
+                    InMemory,
+                    CachedOnDisk,
+                    OnDisk
+                }
+            )
+        };
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!(
+                $wrapper,
+                $name,
+                $body,
+                PythonCorpusWrapper,
+                {
+                    InMemory,
+                    CachedOnDisk,
+                    OnDisk
+                }
+            )
+        };
     }
 
     impl Corpus<BytesInput> for PythonCorpus {
         #[inline]
         fn count(&self) -> usize {
-            match &self.corpus {
-                PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-                    py_in_memory_corpus.in_memory_corpus.count()
-                }
-                PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-                    py_cached_on_disk_corpus.cached_on_disk_corpus.count()
-                }
-                PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
-                    py_on_disk_corpus.on_disk_corpus.count()
-                }
-            }
+            unwrap_me!(self.wrapper, c, { c.count() })
         }
 
         #[inline]
         fn add(&mut self, testcase: Testcase<BytesInput>) -> Result<usize, Error> {
-            match &mut self.corpus {
-                PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-                    py_in_memory_corpus.in_memory_corpus.add(testcase)
-                }
-                PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-                    py_cached_on_disk_corpus.cached_on_disk_corpus.add(testcase)
-                }
-                PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
-                    py_on_disk_corpus.on_disk_corpus.add(testcase)
-                }
-            }
+            unwrap_me_mut!(self.wrapper, c, { c.add(testcase) })
         }
 
         #[inline]
         fn replace(&mut self, idx: usize, testcase: Testcase<BytesInput>) -> Result<(), Error> {
-            match &mut self.corpus {
-                PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-                    py_in_memory_corpus.in_memory_corpus.replace(idx, testcase)
-                }
-                PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-                    py_cached_on_disk_corpus
-                        .cached_on_disk_corpus
-                        .replace(idx, testcase)
-                }
-                PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
-                    py_on_disk_corpus.on_disk_corpus.replace(idx, testcase)
-                }
-            }
+            unwrap_me_mut!(self.wrapper, c, { c.replace(idx, testcase) })
         }
 
         #[inline]
         fn remove(&mut self, idx: usize) -> Result<Option<Testcase<BytesInput>>, Error> {
-            match &mut self.corpus {
-                PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-                    py_in_memory_corpus.in_memory_corpus.remove(idx)
-                }
-                PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-                    py_cached_on_disk_corpus.cached_on_disk_corpus.remove(idx)
-                }
-                PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
-                    py_on_disk_corpus.on_disk_corpus.remove(idx)
-                }
-            }
+            unwrap_me_mut!(self.wrapper, c, { c.remove(idx) })
         }
 
         #[inline]
         fn get(&self, idx: usize) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
-            match &self.corpus {
-                PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-                    py_in_memory_corpus.in_memory_corpus.get(idx)
-                }
-                PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-                    py_cached_on_disk_corpus.cached_on_disk_corpus.get(idx)
-                }
-                PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
-                    py_on_disk_corpus.on_disk_corpus.get(idx)
-                }
-            }
+            let ptr = unwrap_me!(self.wrapper, c, {
+                c.get(idx)
+                    .map(|v| v as *const RefCell<Testcase<BytesInput>>)
+            })?;
+            Ok(unsafe { ptr.as_ref().unwrap() })
         }
 
         #[inline]
         fn current(&self) -> &Option<usize> {
-            match &self.corpus {
-                PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-                    py_in_memory_corpus.in_memory_corpus.current()
-                }
-                PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-                    py_cached_on_disk_corpus.cached_on_disk_corpus.current()
-                }
-                PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
-                    py_on_disk_corpus.on_disk_corpus.current()
-                }
-            }
+            let ptr = unwrap_me!(self.wrapper, c, { c.current() as *const Option<usize> });
+            unsafe { ptr.as_ref().unwrap() }
         }
 
         #[inline]
         fn current_mut(&mut self) -> &mut Option<usize> {
-            match &mut self.corpus {
-                PythonCorpusWrapper::InMemory(py_in_memory_corpus) => {
-                    py_in_memory_corpus.in_memory_corpus.current_mut()
-                }
-                PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus) => {
-                    py_cached_on_disk_corpus.cached_on_disk_corpus.current_mut()
-                }
-                PythonCorpusWrapper::OnDisk(py_on_disk_corpus) => {
-                    py_on_disk_corpus.on_disk_corpus.current_mut()
-                }
-            }
+            let ptr = unwrap_me_mut!(self.wrapper, c, { c.current_mut() as *mut Option<usize> });
+            unsafe { ptr.as_mut().unwrap() }
         }
     }
 
