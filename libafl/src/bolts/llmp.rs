@@ -1733,18 +1733,17 @@ where
     #[allow(clippy::cast_ptr_alignment)]
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
         let offset = offset as usize;
-        
-            let page = unsafe { self.page_mut() };
-            let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
-            if offset > page_size {
-                Err(Error::illegal_argument(format!(
-                    "Msg offset out of bounds (size: {}, requested offset: {})",
-                    page_size, offset
-                )))
-            } else {
-                unsafe { Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg) }
-            }
-        
+
+        let page = unsafe { self.page_mut() };
+        let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
+        if offset > page_size {
+            Err(Error::illegal_argument(format!(
+                "Msg offset out of bounds (size: {}, requested offset: {})",
+                page_size, offset
+            )))
+        } else {
+            unsafe { Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg) }
+        }
     }
 }
 
