@@ -466,7 +466,10 @@ pub extern "C" fn external_current_millis() -> u64 {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::*;
+    use super::{
+        bolts, corpus, events, executors, feedbacks, fuzzer, monitors, mutators, observers, stages,
+        state,
+    };
     use pyo3::prelude::*;
     use pyo3::PyClass;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -518,14 +521,17 @@ pub mod pybind {
             })
         }
 
+        #[must_use]
         pub fn borrow<'py>(&'py self, py: Python<'py>) -> PyRef<'py, T> {
             self.inner.borrow(py)
         }
 
+        #[must_use]
         pub fn borrow_mut<'py>(&'py self, py: Python<'py>) -> PyRefMut<'py, T> {
             self.inner.borrow_mut(py)
         }
 
+        #[must_use]
         pub fn as_ref<'py>(&'py self, py: Python<'py>) -> &'py T::AsRefTarget {
             self.inner.as_ref(py)
         }

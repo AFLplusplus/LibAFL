@@ -505,7 +505,7 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::*;
+    use super::{havoc_mutations, Debug, HavocMutationsType, StdScheduledMutator};
     use crate::inputs::BytesInput;
     use crate::mutators::pybind::PythonMutator;
     use crate::state::pybind::PythonStdState;

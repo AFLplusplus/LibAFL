@@ -682,6 +682,7 @@ pub mod pybind {
             }
         }
 
+        #[must_use]
         pub fn unwrap(&self) -> &PythonStdState {
             self.inner.as_ref()
         }

@@ -294,19 +294,24 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::*;
+    use super::{CmpMap, Debug, MapObserver, Observer, ObserversTuple, String, Vec};
     use crate::bolts::tuples::{type_eq, MatchName, Named};
     use crate::executors::ExitKind;
     use crate::inputs::BytesInput;
     use crate::inputs::HasBytesVec;
-    use crate::observers::map::pybind::*;
+    use crate::observers::map::pybind::{
+        PythonMapObserverI16, PythonMapObserverI32, PythonMapObserverI64, PythonMapObserverI8,
+        PythonMapObserverU16, PythonMapObserverU32, PythonMapObserverU64, PythonMapObserverU8,
+        PythonMapObserverWrapperI16, PythonMapObserverWrapperI32, PythonMapObserverWrapperI64,
+        PythonMapObserverWrapperI8, PythonMapObserverWrapperU16, PythonMapObserverWrapperU32,
+        PythonMapObserverWrapperU64, PythonMapObserverWrapperU8,
+    };
     use crate::pybind::SerdePy;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::Error;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
     use std::cell::UnsafeCell;
-    use std::ops::Deref;
 
     #[derive(Debug)]
     pub struct PyObjectObserver {
@@ -324,6 +329,7 @@ pub mod pybind {
     }
 
     impl PyObjectObserver {
+        #[must_use]
         pub fn new(obj: PyObject) -> Self {
             PyObjectObserver {
                 inner: obj,
@@ -658,24 +664,28 @@ pub mod pybind {
     #[pymethods]
     impl PythonObserver {
         #[staticmethod]
+        #[must_use]
         pub fn new_map_i8(map_observer: Py<PythonMapObserverI8>) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::MapI8(map_observer.into()),
             }
         }
         #[staticmethod]
+        #[must_use]
         pub fn new_map_i16(map_observer: Py<PythonMapObserverI16>) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::MapI16(map_observer.into()),
             }
         }
         #[staticmethod]
+        #[must_use]
         pub fn new_map_i32(map_observer: Py<PythonMapObserverI32>) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::MapI32(map_observer.into()),
             }
         }
         #[staticmethod]
+        #[must_use]
         pub fn new_map_i64(map_observer: Py<PythonMapObserverI64>) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::MapI64(map_observer.into()),
@@ -683,30 +693,35 @@ pub mod pybind {
         }
 
         #[staticmethod]
+        #[must_use]
         pub fn new_map_u8(map_observer: Py<PythonMapObserverU8>) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::MapU8(map_observer.into()),
             }
         }
         #[staticmethod]
+        #[must_use]
         pub fn new_map_u16(map_observer: Py<PythonMapObserverU16>) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::MapU16(map_observer.into()),
             }
         }
         #[staticmethod]
+        #[must_use]
         pub fn new_map_u32(map_observer: Py<PythonMapObserverU32>) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::MapU32(map_observer.into()),
             }
         }
         #[staticmethod]
+        #[must_use]
         pub fn new_map_u64(map_observer: Py<PythonMapObserverU64>) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::MapU64(map_observer.into()),
             }
         }
         #[staticmethod]
+        #[must_use]
         pub fn new_py(py_observer: PyObject) -> Self {
             Self {
                 wrapper: PythonObserverWrapper::Python(PyObjectObserver::new(py_observer)),
@@ -863,7 +878,7 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI8, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
                                         .as_ref()
                                 }
                             }
@@ -871,7 +886,7 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI16, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
                                         .as_ref()
                                 }
                             }
@@ -879,7 +894,7 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI32, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
                                         .as_ref()
                                 }
                             }
@@ -887,7 +902,7 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
                                         .as_ref()
                                 }
                             }
@@ -896,7 +911,7 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU8, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
                                         .as_ref()
                                 }
                             }
@@ -904,7 +919,7 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU16, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
                                         .as_ref()
                                 }
                             }
@@ -912,7 +927,7 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU32, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
                                         .as_ref()
                                 }
                             }
@@ -920,7 +935,7 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow(py).deref() as *const _ as *const T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
                                         .as_ref()
                                 }
                             }
@@ -948,7 +963,8 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI8, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
+                                        as *mut T)
                                         .as_mut()
                                 }
                             }
@@ -956,7 +972,8 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI16, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
+                                        as *mut T)
                                         .as_mut()
                                 }
                             }
@@ -964,7 +981,8 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI32, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
+                                        as *mut T)
                                         .as_mut()
                                 }
                             }
@@ -972,7 +990,8 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverI64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
+                                        as *mut T)
                                         .as_mut()
                                 }
                             }
@@ -981,7 +1000,8 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU8, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
+                                        as *mut T)
                                         .as_mut()
                                 }
                             }
@@ -989,7 +1009,8 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU16, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
+                                        as *mut T)
                                         .as_mut()
                                 }
                             }
@@ -997,7 +1018,8 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU32, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
+                                        as *mut T)
                                         .as_mut()
                                 }
                             }
@@ -1005,7 +1027,8 @@ pub mod pybind {
                                 if type_eq::<PythonMapObserverU64, T>()
                                     && py_wrapper.borrow(py).name() == name
                                 {
-                                    r = ((*py_wrapper).borrow_mut(py).deref() as *const _ as *mut T)
+                                    r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
+                                        as *mut T)
                                         .as_mut()
                                 }
                             }

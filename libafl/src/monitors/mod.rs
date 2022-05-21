@@ -856,7 +856,7 @@ pub mod pybind {
             PythonSimpleMonitor {
                 inner: SimpleMonitor {
                     print_fn: Box::new(closure),
-                    start_time: self.inner.start_time.clone(),
+                    start_time: self.inner.start_time,
                     client_stats: self.inner.client_stats.clone(),
                 },
                 print_fn: self.print_fn.clone(),
@@ -882,6 +882,7 @@ pub mod pybind {
             }
         }
 
+        #[must_use]
         pub fn as_monitor(slf: Py<Self>) -> PythonMonitor {
             PythonMonitor::new_simple(slf)
         }
@@ -914,6 +915,7 @@ pub mod pybind {
     #[pymethods]
     impl PythonMonitor {
         #[staticmethod]
+        #[must_use]
         pub fn new_simple(simple_monitor: Py<PythonSimpleMonitor>) -> Self {
             Self {
                 wrapper: PythonMonitorWrapper::Simple(simple_monitor),

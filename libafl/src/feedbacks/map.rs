@@ -668,10 +668,10 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::*;
+    use super::{Debug, HasObserverName, MaxMapFeedback};
     use crate::feedbacks::pybind::PythonFeedback;
     use crate::inputs::BytesInput;
-    use crate::observers::map::pybind::*;
+    use crate::observers::map::pybind::PythonMapObserverI8;
     use crate::state::pybind::PythonStdState;
     use concat_idents::concat_idents;
     use pyo3::prelude::*;
@@ -700,7 +700,7 @@ pub mod pybind {
                     }
                 }
 
-                pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+                #[must_use] pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
                     concat_idents!(func = new_max_map_,$datatype {
                            PythonFeedback::func(slf)
                     })

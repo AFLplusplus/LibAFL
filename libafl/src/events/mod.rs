@@ -591,6 +591,7 @@ pub mod pybind {
     #[pymethods]
     impl PythonEventManager {
         #[staticmethod]
+        #[must_use]
         pub fn new_simple(mgr: Py<PythonSimpleEventManager>) -> Self {
             Self {
                 wrapper: PythonEventManagerWrapper::Simple(mgr),

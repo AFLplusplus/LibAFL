@@ -1040,9 +1040,9 @@ impl From<bool> for ConstFeedback {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::*;
+    use super::{Debug, Feedback, FeedbackLogic, String, ToString};
     use crate::events::pybind::PythonEventManager;
-    use crate::feedbacks::map::pybind::*;
+    use crate::feedbacks::map::pybind::PythonMaxMapFeedbackI8;
     use crate::inputs::HasBytesVec;
     use crate::observers::pybind::PythonObserversTuple;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
@@ -1069,6 +1069,7 @@ pub mod pybind {
     }
 
     impl PyObjectFeedback {
+        #[must_use]
         pub fn new(obj: PyObject) -> Self {
             PyObjectFeedback {
                 inner: obj,
@@ -1230,6 +1231,7 @@ pub mod pybind {
     #[pymethods]
     impl PythonFeedback {
         #[staticmethod]
+        #[must_use]
         pub fn new_max_map_i8(map_feedback: Py<PythonMaxMapFeedbackI8>) -> Self {
             Self {
                 wrapper: PythonFeedbackWrapper::MaxMapI8(map_feedback),
@@ -1238,6 +1240,7 @@ pub mod pybind {
         }
 
         #[staticmethod]
+        #[must_use]
         pub fn new_py(obj: PyObject) -> Self {
             Self {
                 wrapper: PythonFeedbackWrapper::Python(PyObjectFeedback::new(obj)),

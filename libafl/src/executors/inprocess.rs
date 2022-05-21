@@ -1716,10 +1716,11 @@ pub mod pybind {
                     py_state.unwrap_mut(),
                     py_event_manager,
                 )
-                .expect("Failed to create the Executor".into()),
+                .expect("Failed to create the Executor"),
             }
         }
 
+        #[must_use]
         pub fn as_executor(slf: Py<Self>) -> PythonExecutor {
             PythonExecutor::new_inprocess(slf)
         }

@@ -1504,7 +1504,10 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::*;
+    use super::{
+        AsMutIterator, AsRefIterator, AsSlice, Debug, Error, HasLen, Hasher, Iter, IterMut,
+        MapObserver, Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
+    };
     use crate::observers::pybind::PythonObserver;
     use concat_idents::concat_idents;
     use pyo3::prelude::*;
@@ -1571,11 +1574,11 @@ pub mod pybind {
                     }
                 }
 
-                pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
+                #[must_use] pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
                     $struct_name_trait::new_std(slf)
                 }
 
-                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                #[must_use] pub fn as_observer(slf: Py<Self>) -> PythonObserver {
                     let m = Self::as_map_observer(slf);
                     Python::with_gil(|py| -> PyResult<PythonObserver> {
                         let p: Py<_> = Py::new(py, m)?;
@@ -1626,11 +1629,11 @@ pub mod pybind {
                     }
                 }
 
-                pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
+                #[must_use] pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
                     $struct_name_trait::new_owned(slf)
                 }
 
-                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                #[must_use] pub fn as_observer(slf: Py<Self>) -> PythonObserver {
                     let m = Self::as_map_observer(slf);
                     Python::with_gil(|py| -> PyResult<PythonObserver> {
                         let p: Py<_> = Py::new(py, m)?;
@@ -1700,7 +1703,7 @@ pub mod pybind {
                     }
                 }
 
-                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                #[must_use] pub fn as_observer(slf: Py<Self>) -> PythonObserver {
                     concat_idents!(func = new_map_,$datatype {
                            PythonObserver::func(slf)
                     })

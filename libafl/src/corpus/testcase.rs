@@ -350,7 +350,7 @@ crate::impl_serdeany!(SchedulerTestcaseMetaData);
 #[allow(missing_docs)]
 /// `Testcase` Python bindings
 pub mod pybind {
-    use super::*;
+    use super::Testcase;
     use crate::bolts::ownedref::OwnedPtrMut;
     use crate::inputs::BytesInput;
     use pyo3::prelude::*;
@@ -373,6 +373,7 @@ pub mod pybind {
             }
         }
 
+        #[must_use]
         pub fn unwrap(&self) -> &PythonTestcase {
             self.inner.as_ref()
         }

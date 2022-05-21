@@ -212,7 +212,7 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::*;
+    use super::{HasConstLen, MutationResult, Mutator};
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::mutators::scheduled::pybind::PythonStdHavocMutator;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
@@ -225,6 +225,7 @@ pub mod pybind {
     }
 
     impl PyObjectMutator {
+        #[must_use]
         pub fn new(obj: PyObject) -> Self {
             PyObjectMutator { inner: obj }
         }
@@ -303,6 +304,7 @@ pub mod pybind {
     #[pymethods]
     impl PythonMutator {
         #[staticmethod]
+        #[must_use]
         pub fn new_std_havoc(mgr: Py<PythonStdHavocMutator>) -> Self {
             Self {
                 wrapper: PythonMutatorWrapper::StdHavoc(mgr),
@@ -310,12 +312,14 @@ pub mod pybind {
         }
 
         #[staticmethod]
+        #[must_use]
         pub fn new_py(obj: PyObject) -> Self {
             Self {
                 wrapper: PythonMutatorWrapper::Python(PyObjectMutator::new(obj)),
             }
         }
 
+        #[must_use]
         pub fn unwrap_py(&self) -> Option<PyObject> {
             match &self.wrapper {
                 PythonMutatorWrapper::Python(pyo) => Some(pyo.inner.clone()),

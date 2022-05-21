@@ -206,6 +206,7 @@ pub mod pybind {
     }
 
     impl PyObjectExecutor {
+        #[must_use]
         pub fn new(obj: PyObject) -> Self {
             let tuple = Python::with_gil(|py| -> PyResult<PythonObserversTuple> {
                 obj.call_method1(py, "observers", ())?.extract(py)
@@ -301,6 +302,7 @@ pub mod pybind {
     #[pymethods]
     impl PythonExecutor {
         #[staticmethod]
+        #[must_use]
         pub fn new_inprocess(owned_inprocess_executor: Py<PythonOwnedInProcessExecutor>) -> Self {
             Self {
                 wrapper: PythonExecutorWrapper::InProcess(owned_inprocess_executor),
@@ -308,12 +310,14 @@ pub mod pybind {
         }
 
         #[staticmethod]
+        #[must_use]
         pub fn new_py(obj: PyObject) -> Self {
             Self {
                 wrapper: PythonExecutorWrapper::Python(PyObjectExecutor::new(obj)),
             }
         }
 
+        #[must_use]
         pub fn unwrap_py(&self) -> Option<PyObject> {
             match &self.wrapper {
                 PythonExecutorWrapper::Python(pyo) => Some(pyo.inner.clone()),

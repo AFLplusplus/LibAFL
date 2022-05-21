@@ -276,6 +276,7 @@ pub mod pybind {
     }
 
     impl PyObjectStage {
+        #[must_use]
         pub fn new(obj: PyObject) -> Self {
             PyObjectStage { inner: obj }
         }
@@ -340,6 +341,7 @@ pub mod pybind {
     #[pymethods]
     impl PythonStage {
         #[staticmethod]
+        #[must_use]
         pub fn new_std_mutational(
             py_std_havoc_mutations_stage: Py<PythonStdMutationalStage>,
         ) -> Self {
@@ -349,12 +351,14 @@ pub mod pybind {
         }
 
         #[staticmethod]
+        #[must_use]
         pub fn new_py(obj: PyObject) -> Self {
             Self {
                 wrapper: PythonStageWrapper::Python(PyObjectStage::new(obj)),
             }
         }
 
+        #[must_use]
         pub fn unwrap_py(&self) -> Option<PyObject> {
             match &self.wrapper {
                 PythonStageWrapper::Python(pyo) => Some(pyo.inner.clone()),

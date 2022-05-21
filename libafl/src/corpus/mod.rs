@@ -85,6 +85,7 @@ pub mod pybind {
     #[pymethods]
     impl PythonCorpus {
         #[staticmethod]
+        #[must_use]
         pub fn new_in_memory(py_in_memory_corpus: Py<PythonInMemoryCorpus>) -> Self {
             Self {
                 wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus.into()),
@@ -92,6 +93,7 @@ pub mod pybind {
         }
 
         #[staticmethod]
+        #[must_use]
         pub fn new_cached_on_disk(py_cached_on_disk_corpus: Py<PythonCachedOnDiskCorpus>) -> Self {
             Self {
                 wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus.into()),
@@ -99,6 +101,7 @@ pub mod pybind {
         }
 
         #[staticmethod]
+        #[must_use]
         pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
             Self {
                 wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus.into()),
