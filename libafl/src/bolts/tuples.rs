@@ -9,8 +9,10 @@ use core::{
 
 use xxhash_rust::xxh3::xxh3_64;
 
-#[rustversion::nightly]
+/// Returns if the type `T` is equal to `U`
 /// From <https://stackoverflow.com/a/60138532/7658998>
+#[rustversion::nightly]
+#[must_use]
 pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // Helper trait. `VALUE` is false, except for the specialization of the
     // case where `T == U`.
@@ -31,7 +33,9 @@ pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     <T as TypeEq<U>>::VALUE
 }
 
+/// Returns if the type `T` is equal to `U`
 #[rustversion::not(nightly)]
+#[must_use]
 pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // BEWARE! This is not unsafe, it is SUPER UNSAFE
     true
