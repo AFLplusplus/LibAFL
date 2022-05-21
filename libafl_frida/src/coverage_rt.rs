@@ -113,7 +113,7 @@ impl CoverageRuntime {
             ;.qword 0
         );
         let ops_vec = ops.finalize().unwrap();
-        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice())
+        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
     /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream

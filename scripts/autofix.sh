@@ -32,7 +32,7 @@ RUST_BACKTRACE=full cargo +nightly clippy --fix --release --all --all-features -
    -A clippy::module-name-repetitions \
    -A clippy::unreadable-literal \
 
-cargo clippy --fix
+cargo clippy --fix --allow-dirty --allow-staged
 
 echo "[+] Done fixing clippy"
 echo
