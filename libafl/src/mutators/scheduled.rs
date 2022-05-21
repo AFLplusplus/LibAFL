@@ -507,8 +507,8 @@ mod tests {
 pub mod pybind {
     use super::*;
     use crate::inputs::BytesInput;
-    use crate::state::pybind::PythonStdState;
     use crate::mutators::pybind::PythonMutator;
+    use crate::state::pybind::PythonStdState;
     use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "StdHavocMutator")]

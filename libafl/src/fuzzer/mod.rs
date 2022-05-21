@@ -759,12 +759,7 @@ pub mod pybind {
         ) {
             self.inner
                 .as_mut()
-                .fuzz_loop(
-                    stages_tuple,
-                    py_executor,
-                    py_state.unwrap_mut(),
-                    py_mgr,
-                )
+                .fuzz_loop(stages_tuple, py_executor, py_state.unwrap_mut(), py_mgr)
                 .expect("Failed to generate the initial corpus".into());
         }
     }

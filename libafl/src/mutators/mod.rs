@@ -213,9 +213,9 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use super::*;
-    use crate::inputs::{HasBytesVec, BytesInput};
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use crate::inputs::{BytesInput, HasBytesVec};
     use crate::mutators::scheduled::pybind::PythonStdHavocMutator;
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::Error;
     use pyo3::prelude::*;
 
@@ -226,12 +226,10 @@ pub mod pybind {
 
     impl PyObjectMutator {
         pub fn new(obj: PyObject) -> Self {
-            PyObjectMutator {
-                inner: obj,
-            }
+            PyObjectMutator { inner: obj }
         }
     }
-    
+
     impl Mutator<BytesInput, PythonStdState> for PyObjectMutator {
         fn mutate(
             &mut self,
@@ -240,11 +238,13 @@ pub mod pybind {
             stage_idx: i32,
         ) -> Result<MutationResult, Error> {
             let mutated = Python::with_gil(|py| -> PyResult<bool> {
-                self.inner.call_method1(
-                    py,
-                    "mutate",
-                    (PythonStdStateWrapper::wrap(state), input.bytes(), stage_idx),
-                )?.extract(py)
+                self.inner
+                    .call_method1(
+                        py,
+                        "mutate",
+                        (PythonStdStateWrapper::wrap(state), input.bytes(), stage_idx),
+                    )?
+                    .extract(py)
             })
             .unwrap();
             Ok(if mutated {
@@ -276,7 +276,7 @@ pub mod pybind {
     #[derive(Debug, Clone)]
     pub enum PythonMutatorWrapper {
         StdHavoc(Py<PythonStdHavocMutator>),
-        Python(PyObjectMutator)
+        Python(PyObjectMutator),
     }
 
     /// Mutator Trait binding
@@ -340,7 +340,9 @@ pub mod pybind {
             stage_idx: i32,
             corpus_idx: Option<usize>,
         ) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, m, { m.post_exec(state, stage_idx, corpus_idx) })
+            unwrap_me_mut!(self.wrapper, m, {
+                m.post_exec(state, stage_idx, corpus_idx)
+            })
         }
     }
 

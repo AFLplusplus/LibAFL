@@ -261,14 +261,14 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::stages::{StagesTuple, Stage};
-    use crate::Error;
-    use pyo3::prelude::*;
     use crate::events::pybind::PythonEventManager;
     use crate::executors::pybind::PythonExecutor;
-    use crate::fuzzer::pybind::{PythonStdFuzzer,PythonStdFuzzerWrapper};
+    use crate::fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper};
     use crate::stages::mutational::pybind::PythonStdMutationalStage;
-    use crate::state::pybind::{PythonStdStateWrapper, PythonStdState};
+    use crate::stages::{Stage, StagesTuple};
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use crate::Error;
+    use pyo3::prelude::*;
 
     #[derive(Clone, Debug)]
     pub struct PyObjectStage {
@@ -277,20 +277,11 @@ pub mod pybind {
 
     impl PyObjectStage {
         pub fn new(obj: PyObject) -> Self {
-            PyObjectStage {
-                inner: obj,
-            }
+            PyObjectStage { inner: obj }
         }
     }
-    
-    impl
-        Stage<
-            PythonExecutor,
-            PythonEventManager,
-            PythonStdState,
-            PythonStdFuzzer,
-        > for PyObjectStage
-    {
+
+    impl Stage<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer> for PyObjectStage {
         #[inline]
         fn perform(
             &mut self,
@@ -304,7 +295,13 @@ pub mod pybind {
                 self.inner.call_method1(
                     py,
                     "perform",
-                    (PythonStdFuzzerWrapper::wrap(fuzzer), executor.clone(), PythonStdStateWrapper::wrap(state), manager.clone(), corpus_idx),
+                    (
+                        PythonStdFuzzerWrapper::wrap(fuzzer),
+                        executor.clone(),
+                        PythonStdStateWrapper::wrap(state),
+                        manager.clone(),
+                        corpus_idx,
+                    ),
                 )?;
                 Ok(())
             })
@@ -312,11 +309,11 @@ pub mod pybind {
             Ok(())
         }
     }
-    
+
     #[derive(Clone, Debug)]
     pub enum PythonStageWrapper {
         StdMutational(Py<PythonStdMutationalStage>),
-        Python(PyObjectStage)
+        Python(PyObjectStage),
     }
 
     /// Stage Trait binding
@@ -350,7 +347,7 @@ pub mod pybind {
                 wrapper: PythonStageWrapper::StdMutational(py_std_havoc_mutations_stage),
             }
         }
-        
+
         #[staticmethod]
         pub fn new_py(obj: PyObject) -> Self {
             Self {
@@ -366,14 +363,7 @@ pub mod pybind {
         }
     }
 
-    impl
-        Stage<
-            PythonExecutor,
-            PythonEventManager,
-            PythonStdState,
-            PythonStdFuzzer,
-        > for PythonStage
-    {
+    impl Stage<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer> for PythonStage {
         #[inline]
         #[allow(clippy::let_and_return)]
         fn perform(
@@ -384,7 +374,9 @@ pub mod pybind {
             manager: &mut PythonEventManager,
             corpus_idx: usize,
         ) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, s, { s.perform(fuzzer, executor, state, manager, corpus_idx) })
+            unwrap_me_mut!(self.wrapper, s, {
+                s.perform(fuzzer, executor, state, manager, corpus_idx)
+            })
         }
     }
 
@@ -409,8 +401,10 @@ pub mod pybind {
             self.list[idx].clone()
         }
     }
-    
-    impl StagesTuple<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer> for PythonStagesTuple {
+
+    impl StagesTuple<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer>
+        for PythonStagesTuple
+    {
         fn perform_all(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
