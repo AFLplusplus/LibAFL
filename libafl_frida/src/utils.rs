@@ -15,7 +15,7 @@ use num_traits::cast::FromPrimitive;
 /// Determine the width of the specified instruction
 #[cfg(target_arch = "aarch64")]
 #[inline]
-pub fn instruction_width(instr: &Insn, operands: &[arch::ArchOperand]) -> u32 {
+#[must_use] pub fn instruction_width(instr: &Insn, operands: &[arch::ArchOperand]) -> u32 {
     use capstone::arch::arm64::Arm64Insn as I;
     use capstone::arch::arm64::Arm64Reg as R;
     use capstone::arch::arm64::Arm64Vas as V;

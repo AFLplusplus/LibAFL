@@ -2470,7 +2470,7 @@ impl AsanRuntime {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            -(16 + redzone_size) as i64,
+            i64::from(-(16 + redzone_size)),
             IndexMode::PreAdjust,
         );
 
@@ -2597,18 +2597,18 @@ impl AsanRuntime {
         // Insert the check_shadow_mem code blob
         #[cfg(unix)]
         match width {
-            1 => writer.put_bytes(&self.blob_check_mem_byte()),
-            2 => writer.put_bytes(&self.blob_check_mem_halfword()),
-            3 => writer.put_bytes(&self.blob_check_mem_3bytes()),
-            4 => writer.put_bytes(&self.blob_check_mem_dword()),
-            6 => writer.put_bytes(&self.blob_check_mem_6bytes()),
-            8 => writer.put_bytes(&self.blob_check_mem_qword()),
-            12 => writer.put_bytes(&self.blob_check_mem_12bytes()),
-            16 => writer.put_bytes(&self.blob_check_mem_16bytes()),
-            24 => writer.put_bytes(&self.blob_check_mem_24bytes()),
-            32 => writer.put_bytes(&self.blob_check_mem_32bytes()),
-            48 => writer.put_bytes(&self.blob_check_mem_48bytes()),
-            64 => writer.put_bytes(&self.blob_check_mem_64bytes()),
+            1 => writer.put_bytes(self.blob_check_mem_byte()),
+            2 => writer.put_bytes(self.blob_check_mem_halfword()),
+            3 => writer.put_bytes(self.blob_check_mem_3bytes()),
+            4 => writer.put_bytes(self.blob_check_mem_dword()),
+            6 => writer.put_bytes(self.blob_check_mem_6bytes()),
+            8 => writer.put_bytes(self.blob_check_mem_qword()),
+            12 => writer.put_bytes(self.blob_check_mem_12bytes()),
+            16 => writer.put_bytes(self.blob_check_mem_16bytes()),
+            24 => writer.put_bytes(self.blob_check_mem_24bytes()),
+            32 => writer.put_bytes(self.blob_check_mem_32bytes()),
+            48 => writer.put_bytes(self.blob_check_mem_48bytes()),
+            64 => writer.put_bytes(self.blob_check_mem_64bytes()),
             _ => false,
         };
 
@@ -2629,7 +2629,7 @@ impl AsanRuntime {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            16 + redzone_size as i64,
+            16 + i64::from(redzone_size),
             IndexMode::PostAdjust,
         ));
     }
