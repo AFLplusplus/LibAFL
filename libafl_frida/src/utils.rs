@@ -15,7 +15,7 @@ use num_traits::cast::FromPrimitive;
 /// Determine the width of the specified instruction
 #[cfg(target_arch = "aarch64")]
 #[inline]
-pub fn instruction_width(instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32 {
+pub fn instruction_width(instr: &Insn, operands: &[arch::ArchOperand]) -> u32 {
     use capstone::arch::arm64::Arm64Insn as I;
     use capstone::arch::arm64::Arm64Reg as R;
     use capstone::arch::arm64::Arm64Vas as V;
@@ -48,7 +48,7 @@ pub fn instruction_width(instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32
             };
 
             return match operand.vas {
-                V::ARM64_VAS_1B => 1 * count_byte,
+                V::ARM64_VAS_1B => count_byte,
                 V::ARM64_VAS_1H => 2 * count_byte,
                 V::ARM64_VAS_4B | V::ARM64_VAS_1S | V::ARM64_VAS_1D | V::ARM64_VAS_2H => {
                     4 * count_byte
@@ -64,7 +64,7 @@ pub fn instruction_width(instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32
                 }
             };
         } else if let Arm64OperandType::Reg(operand) = operand.op_type {
-            match operand.0 as u32 {
+            match u32::from(operand.0) {
                 R::ARM64_REG_W0..=R::ARM64_REG_W30
                 | R::ARM64_REG_WZR
                 | R::ARM64_REG_WSP
@@ -79,12 +79,13 @@ pub fn instruction_width(instr: &Insn, operands: &Vec<arch::ArchOperand>) -> u32
     8 * num_registers
 }
 
-/// Convert from a capstone register id to a frida InstructionWriter register index
+/// Convert from a capstone register id to a frida `InstructionWriter` register index
 #[cfg(target_arch = "aarch64")]
+#[must_use]
 #[inline]
 pub fn writer_register(reg: capstone::RegId) -> Aarch64Register {
     let regint: u16 = reg.0;
-    Aarch64Register::from_u32(regint as u32).unwrap()
+    Aarch64Register::from_u32(u32::from(regint)).unwrap()
 }
 
 /// The writer registers
