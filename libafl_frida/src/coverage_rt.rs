@@ -14,6 +14,7 @@ use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
 
 use crate::helper::FridaRuntime;
+use libafl::bolts::xxh3_rrmxmx_mixer;
 
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
@@ -154,14 +155,7 @@ impl CoverageRuntime {
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
-        let tmp = (address >> 32) + ((address & 0xffffffff) << 32);
-        let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
-        let mut h64 = tmp ^ bitflip;
-        h64 = h64.rotate_left(49) & h64.rotate_left(24);
-        h64 *= 0x9FB21C651E98DF25;
-        h64 ^= (h64 >> 35) + 8;
-        h64 *= 0x9FB21C651E98DF25;
-        h64 ^= h64 >> 28;
+        let h64 = xxh3_rrmxmx_mixer(address);
 
         let writer = output.writer();
         #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.

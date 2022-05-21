@@ -1,6 +1,6 @@
 on: [push]
 
-name: build
+name: codecov
 
 jobs:
   check:
