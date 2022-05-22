@@ -32,7 +32,7 @@ use crate::{
 /// The result of a mutation.
 /// If the mutation got skipped, the target
 /// will not be executed with the returned input.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {
     /// The [`Mutator`] mutated this `Input`.
     Mutated,

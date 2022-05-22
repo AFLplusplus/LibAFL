@@ -789,7 +789,7 @@ where
 
                             broker_things(event_broker, self.remote_broker_addr)?;
 
-                            return Err(Error::shuttingdown());
+                            return Err(Error::shutting_down());
                         }
                         LlmpConnection::IsClient { client } => {
                             let mgr =
@@ -807,7 +807,7 @@ where
 
                     broker_things(event_broker, self.remote_broker_addr)?;
 
-                    return Err(Error::shuttingdown());
+                    return Err(Error::shutting_down());
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
