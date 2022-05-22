@@ -1993,7 +1993,7 @@ impl AsanRuntime {
             ; self_addr:
             ; .qword self as *mut _  as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword addr_of_mut!(self.regs) as *mut c_void as i64
+            ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
             ; .qword AsanRuntime::handle_trap as *mut c_void as i64
             ; register_frame_func:
