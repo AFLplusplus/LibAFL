@@ -243,7 +243,7 @@ impl Error {
     }
     /// Shutting down, not really an error.
     #[must_use]
-    pub fn shuttingdown() -> Self {
+    pub fn shutting_down() -> Self {
         Error::ShuttingDown
     }
     /// Something else happened
