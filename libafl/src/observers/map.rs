@@ -1558,6 +1558,7 @@ pub mod pybind {
     macro_rules! define_python_map_observer {
         ($struct_name1:ident, $py_name1:tt, $struct_name2:ident, $py_name2:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
             #[pyclass(unsendable, name = $py_name1)]
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Serialize, Deserialize, Debug, Clone)]
             /// Python class for StdMapObserver
             pub struct $struct_name1 {
