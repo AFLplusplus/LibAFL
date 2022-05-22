@@ -4,6 +4,7 @@ use core::{
     num::NonZeroUsize,
 };
 
+#[cfg(feature = "std")]
 use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};

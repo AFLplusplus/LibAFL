@@ -63,18 +63,17 @@
 //! }
 //!```
 
-use alloc::vec::Vec;
+#[cfg(feature = "frida_cli")]
+use alloc::boxed::Box;
 use alloc::{
-    boxed::Box,
     string::{String, ToString},
+    vec::Vec,
 };
 use clap::{Command, CommandFactory, Parser};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "frida_cli")]
 use std::error;
-use std::net::SocketAddr;
-use std::path::PathBuf;
-use std::time::Duration;
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use super::os::Cores;
 use crate::Error;

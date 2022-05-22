@@ -24,6 +24,8 @@ use crate::{
     Error,
 };
 
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::std::string::ToString;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;

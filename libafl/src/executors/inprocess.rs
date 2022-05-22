@@ -18,7 +18,7 @@ use core::{
 };
 
 use alloc::boxed::Box;
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std"))]
 use alloc::vec::Vec;
 
 #[cfg(all(feature = "std", unix))]
@@ -855,6 +855,9 @@ mod unix_signal_handler {
 
 #[cfg(all(windows, feature = "std"))]
 mod windows_exception_handler {
+    #[cfg(feature = "std")]
+    use alloc::boxed::Box;
+    use alloc::string::String;
     use alloc::vec::Vec;
     use core::ffi::c_void;
     use core::{mem::transmute, ptr};

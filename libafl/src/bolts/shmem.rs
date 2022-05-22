@@ -1154,6 +1154,7 @@ pub mod win32_shmem {
         Error,
     };
 
+    use alloc::string::String;
     use core::{
         ffi::c_void,
         fmt::{self, Debug, Formatter},
