@@ -294,7 +294,7 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{Debug, Observer, Observer, ObserversTuple, String, Vec};
+    use super::{Debug, Observer, ObserversTuple, String, Vec};
     use crate::bolts::tuples::{type_eq, MatchName, Named};
     use crate::executors::ExitKind;
     use crate::inputs::BytesInput;

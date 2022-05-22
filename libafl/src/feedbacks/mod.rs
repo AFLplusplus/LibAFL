@@ -1118,11 +1118,10 @@ pub mod pybind {
             OT: ObserversTuple<BytesInput, PythonStdState>,
         {
             // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
-            let dont_look_at_this: &PythonObserversTuple = unsafe {
-                &*(observers as *const OT as *const observers::pybind::PythonObserversTuple)
-            };
+            let dont_look_at_this: &PythonObserversTuple =
+                unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
             let dont_look_at_this2: &PythonEventManager =
-                unsafe { &*(manager as *mut EM as *const events::pybind::PythonEventManager) };
+                unsafe { &*(manager as *mut EM as *const PythonEventManager) };
             // TODO pass the other args
             Ok(Python::with_gil(|py| -> PyResult<bool> {
                 let r: bool = self
