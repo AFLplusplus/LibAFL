@@ -222,7 +222,7 @@ where
 }
 
 /// The corpus this input should be added to
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExecuteInputResult {
     /// No special input
     None,

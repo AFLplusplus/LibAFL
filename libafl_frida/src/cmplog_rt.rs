@@ -48,6 +48,7 @@ use capstone::{
 ///
 /// # Panic
 /// In debug mode, will panic on wraparound (which should never happen in practice)
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 #[allow(clippy::cast_possible_wrap)]
 fn gum_red_zone_size_i32() -> i32 {
     debug_assert!(
