@@ -129,14 +129,19 @@ impl SchedulerMetadata {
 }
 
 /// The power schedule to use
-#[allow(missing_docs)]
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PowerSchedule {
+    /// The `explore" power schedule
     EXPLORE,
+    /// The `exploit` power schedule
     EXPLOIT,
+    /// The `fast` power schedule
     FAST,
+    /// The `coe` power schedule
     COE,
+    /// The `lin` power schedule
     LIN,
+    /// The `quad` power schedule
     QUAD,
 }
 

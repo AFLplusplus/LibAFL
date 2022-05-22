@@ -384,15 +384,14 @@ impl InProcessHandlers {
 
 /// The global state of the in-process harness.
 #[derive(Debug)]
-#[allow(missing_docs)]
-pub struct InProcessExecutorHandlerData {
-    pub state_ptr: *mut c_void,
-    pub event_mgr_ptr: *mut c_void,
-    pub fuzzer_ptr: *mut c_void,
-    pub executor_ptr: *const c_void,
-    pub current_input_ptr: *const c_void,
-    pub crash_handler: *const c_void,
-    pub timeout_handler: *const c_void,
+pub(crate) struct InProcessExecutorHandlerData {
+    state_ptr: *mut c_void,
+    event_mgr_ptr: *mut c_void,
+    fuzzer_ptr: *mut c_void,
+    executor_ptr: *const c_void,
+    current_input_ptr: *const c_void,
+    crash_handler: *const c_void,
+    timeout_handler: *const c_void,
     #[cfg(windows)]
     pub tp_timer: *mut c_void,
     #[cfg(windows)]
@@ -446,7 +445,7 @@ impl InProcessExecutorHandlerData {
 }
 
 /// Exception handling needs some nasty unsafe.
-pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
     /// The state ptr for signal handling
     state_ptr: ptr::null_mut(),
     /// The event manager ptr for signal handling
@@ -527,7 +526,7 @@ mod unix_signal_handler {
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
-    pub type HandlerFuncPtr =
+    pub(crate) type HandlerFuncPtr =
         unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessExecutorHandlerData);
 
     /// A handler that does nothing.
@@ -649,7 +648,7 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub unsafe fn inproc_timeout_handler<E, EM, I, OF, OT, S, Z>(
+    pub(crate) unsafe fn inproc_timeout_handler<E, EM, I, OF, OT, S, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -729,7 +728,7 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
+    pub(crate) unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
         signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,

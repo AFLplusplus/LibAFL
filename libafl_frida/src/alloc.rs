@@ -27,20 +27,31 @@ use crate::asan::errors::{AsanError, AsanErrors};
 
 /// An allocator wrapper with binary-only address sanitization
 #[derive(Debug)]
-#[allow(missing_docs)]
 pub struct Allocator {
+    /// The fuzzer options
     #[allow(dead_code)]
     options: FuzzerOptions,
+    /// The page size
     page_size: usize,
+    /// The shadow offsets
     shadow_offset: usize,
+    /// The shadow bit
     shadow_bit: usize,
+    /// If the shadow is pre-allocated
     pre_allocated_shadow: bool,
+    /// All tracked allocations
     allocations: HashMap<usize, AllocationMetadata>,
+    /// The shadow memory pages
     shadow_pages: RangeSet<usize>,
+    /// A list of allocations
     allocation_queue: BTreeMap<usize, Vec<AllocationMetadata>>,
+    /// The size of the largest allocation
     largest_allocation: usize,
+    /// The total size of all allocations combined
     total_allocation_size: usize,
+    /// The base address of the shadow memory
     base_mapping_addr: usize,
+    /// The current mapping address
     current_mapping_addr: usize,
 }
 
@@ -57,14 +68,20 @@ macro_rules! map_to_shadow {
 
 /// Metadata for an allocation
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[allow(missing_docs)]
 pub struct AllocationMetadata {
+    /// The address of the allocation
     pub address: usize,
+    /// The size of the allocation
     pub size: usize,
+    /// The actual allocated size, including metadata
     pub actual_size: usize,
+    /// A backtrace to the allocation location
     pub allocation_site_backtrace: Option<Backtrace>,
+    /// A backtrace to the location where this memory has been released
     pub release_site_backtrace: Option<Backtrace>,
+    /// If the allocation has been freed
     pub freed: bool,
+    /// If the allocation was done with a size of 0
     pub is_malloc_zero: bool,
 }
 
