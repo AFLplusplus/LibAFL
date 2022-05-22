@@ -1444,7 +1444,7 @@ where
                 LLMP_TAG_EXITING => {
                     // The other side is done.
                     assert_eq!((*msg).buf_len, 0);
-                    return Err(Error::shuttingdown());
+                    return Err(Error::shutting_down());
                 }
                 LLMP_TAG_END_OF_PAGE => {
                     #[cfg(feature = "std")]

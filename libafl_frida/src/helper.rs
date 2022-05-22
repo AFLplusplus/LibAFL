@@ -324,15 +324,19 @@ where
 
                         #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
                         if let Some(rt) = helper.runtime::<CmpLogRuntime>() {
-                            if let Ok((op1, op2, special_case)) = rt
-                                .cmplog_is_interesting_instruction(&helper.capstone, address, instr)
+                            if let Some((op1, op2, special_case)) =
+                                CmpLogRuntime::cmplog_is_interesting_instruction(
+                                    &helper.capstone,
+                                    address,
+                                    instr,
+                                )
                             {
                                 //emit code that saves the relevant data in runtime(passes it to x0, x1)
                                 rt.emit_comparison_handling(
                                     address,
                                     &output,
-                                    op1,
-                                    op2,
+                                    &op1,
+                                    &op2,
                                     special_case,
                                 );
                             }
