@@ -143,7 +143,7 @@ pub fn libafl_main() {
 
     let monitor = MultiMonitor::new(|s| println!("{}", s));
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>,
+    let mut run_client = |state: Option<_>,
                           mut restarting_mgr,
                           _core_id| {
         // Create an observation channel using the coverage map
