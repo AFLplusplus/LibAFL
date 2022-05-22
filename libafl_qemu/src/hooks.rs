@@ -20,7 +20,7 @@ use crate::{
 };
 
 #[repr(C)]
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 struct FatPtr(*const c_void, *const c_void);
 
 // all kinds of hooks
