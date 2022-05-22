@@ -98,12 +98,13 @@ pub fn dump_registers<W: Write>(
 
 /// Write the content of all important registers
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
     let mcontext = unsafe { *ucontext.uc_mcontext };
-    for reg in 0..29 {
+    for reg in 0..29_u8 {
         writeln!(
             writer,
             "x{:02}: 0x{:016x} ",
@@ -218,6 +219,7 @@ fn write_crash<W: Write>(
 }
 
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,

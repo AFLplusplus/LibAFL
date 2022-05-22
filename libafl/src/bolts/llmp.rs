@@ -82,7 +82,7 @@ use std::{
     thread,
 };
 
-#[cfg(all(feature = "llmp_debug", feature = "std"))]
+#[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
 
 #[cfg(unix)]
