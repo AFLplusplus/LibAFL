@@ -38,7 +38,7 @@ jobs:
         run: cargo test
       - name: Test libafl no_std
         run: cd libafl && cargo test --no-default-features
-    - name: Test libafl_targets no_std
+      - name: Test libafl_targets no_std
         run: cd libafl_targets && cargo test --no-default-features
      
 
