@@ -700,7 +700,8 @@ pub mod pybind {
                     }
                 }
 
-                #[must_use] pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+                #[must_use]
+                pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
                     concat_idents!(func = new_max_map_,$datatype {
                            PythonFeedback::func(slf)
                     })

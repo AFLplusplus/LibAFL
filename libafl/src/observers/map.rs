@@ -1575,11 +1575,13 @@ pub mod pybind {
                     }
                 }
 
-                #[must_use] pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
+                #[must_use]
+                pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
                     $struct_name_trait::new_std(slf)
                 }
 
-                #[must_use] pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                #[must_use]
+                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
                     let m = Self::as_map_observer(slf);
                     Python::with_gil(|py| -> PyResult<PythonObserver> {
                         let p: Py<_> = Py::new(py, m)?;
@@ -1630,11 +1632,13 @@ pub mod pybind {
                     }
                 }
 
-                #[must_use] pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
+                #[must_use]
+                pub fn as_map_observer(slf: Py<Self>) -> $struct_name_trait {
                     $struct_name_trait::new_owned(slf)
                 }
 
-                #[must_use] pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                #[must_use]
+                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
                     let m = Self::as_map_observer(slf);
                     Python::with_gil(|py| -> PyResult<PythonObserver> {
                         let p: Py<_> = Py::new(py, m)?;
@@ -1704,7 +1708,8 @@ pub mod pybind {
                     }
                 }
 
-                #[must_use] pub fn as_observer(slf: Py<Self>) -> PythonObserver {
+                #[must_use]
+                pub fn as_observer(slf: Py<Self>) -> PythonObserver {
                     concat_idents!(func = new_map_,$datatype {
                            PythonObserver::func(slf)
                     })
