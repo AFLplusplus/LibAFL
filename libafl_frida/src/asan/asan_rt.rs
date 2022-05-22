@@ -2134,7 +2134,6 @@ impl AsanRuntime {
     #[must_use]
     #[inline]
     pub fn asan_is_interesting_instruction(
-        &self,
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
@@ -2184,10 +2183,8 @@ impl AsanRuntime {
     #[cfg(all(target_arch = "x86_64", unix))]
     #[inline]
     #[must_use]
-    #[allow(clippy::unused_self)]
     #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
-        &self,
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
@@ -2424,6 +2421,7 @@ impl AsanRuntime {
     /// Emit a shadow memory check into the instruction stream
     #[cfg(target_arch = "aarch64")]
     #[inline]
+    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
     pub fn emit_shadow_check(
         &mut self,
         _address: u64,
@@ -2435,14 +2433,19 @@ impl AsanRuntime {
         shift: Arm64Shift,
         extender: Arm64Extender,
     ) {
+        debug_assert!(
+            i32::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).is_ok(),
+            "GUM_RED_ZONE_SIZE is bigger than i32::max"
+        );
+        #[allow(clippy::cast_possible_wrap)]
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
         let basereg = writer_register(basereg);
-        let indexreg = if indexreg.0 != 0 {
-            Some(writer_register(indexreg))
-        } else {
+        let indexreg = if indexreg.0 == 0 {
             None
+        } else {
+            Some(writer_register(indexreg))
         };
 
         if self.current_report_impl == 0
@@ -2470,7 +2473,7 @@ impl AsanRuntime {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            -(16 + redzone_size) as i64,
+            i64::from(-(16 + redzone_size)),
             IndexMode::PreAdjust,
         );
 
@@ -2523,7 +2526,7 @@ impl AsanRuntime {
                     Arm64Extender::ARM64_EXT_SXTH => 0b101,
                     Arm64Extender::ARM64_EXT_SXTW => 0b110,
                     Arm64Extender::ARM64_EXT_SXTX => 0b111,
-                    _ => -1,
+                    Arm64Extender::ARM64_EXT_INVALID => -1,
                 };
                 let (shift_encoding, shift_amount): (i32, u32) = match shift {
                     Arm64Shift::Lsl(amount) => (0b00, amount),
@@ -2534,11 +2537,13 @@ impl AsanRuntime {
 
                 if extender_encoding != -1 && shift_amount < 0b1000 {
                     // emit add extended register: https://developer.arm.com/documentation/ddi0602/latest/Base-Instructions/ADD--extended-register---Add--extended-register--
+                    #[allow(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10))
                             .to_le_bytes(),
                     );
                 } else if shift_encoding != -1 {
+                    #[allow(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
                             .to_le_bytes(),
@@ -2559,56 +2564,62 @@ impl AsanRuntime {
         #[allow(clippy::comparison_chain)]
         if displacement < 0 {
             if displacement > -4096 {
+                #[allow(clippy::cast_sign_loss)]
+                let displacement = displacement.abs() as u32;
                 // Subtract the displacement into x0
                 writer.put_sub_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    displacement.abs() as u64,
+                    u64::from(displacement),
                 );
             } else {
-                let displacement_hi = displacement.abs() / 4096;
-                let displacement_lo = displacement.abs() % 4096;
-                writer.put_bytes(&(0xd1400000u32 | ((displacement_hi as u32) << 10)).to_le_bytes());
+                #[allow(clippy::cast_sign_loss)]
+                let displacement = displacement.abs() as u32;
+                let displacement_hi = displacement / 4096;
+                let displacement_lo = displacement % 4096;
+                writer.put_bytes(&(0xd1400000u32 | (displacement_hi << 10)).to_le_bytes());
                 writer.put_sub_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    displacement_lo as u64,
+                    u64::from(displacement_lo),
                 );
             }
         } else if displacement > 0 {
+            #[allow(clippy::cast_sign_loss)]
+            let displacement = displacement as u32;
             if displacement < 4096 {
                 // Add the displacement into x0
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    displacement as u64,
+                    u64::from(displacement),
                 );
             } else {
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
-                writer.put_bytes(&(0x91400000u32 | ((displacement_hi as u32) << 10)).to_le_bytes());
+                writer.put_bytes(&(0x91400000u32 | (displacement_hi << 10)).to_le_bytes());
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    displacement_lo as u64,
+                    u64::from(displacement_lo),
                 );
             }
         }
         // Insert the check_shadow_mem code blob
         #[cfg(unix)]
         match width {
-            1 => writer.put_bytes(&self.blob_check_mem_byte()),
-            2 => writer.put_bytes(&self.blob_check_mem_halfword()),
-            3 => writer.put_bytes(&self.blob_check_mem_3bytes()),
-            4 => writer.put_bytes(&self.blob_check_mem_dword()),
-            6 => writer.put_bytes(&self.blob_check_mem_6bytes()),
-            8 => writer.put_bytes(&self.blob_check_mem_qword()),
-            12 => writer.put_bytes(&self.blob_check_mem_12bytes()),
-            16 => writer.put_bytes(&self.blob_check_mem_16bytes()),
-            24 => writer.put_bytes(&self.blob_check_mem_24bytes()),
-            32 => writer.put_bytes(&self.blob_check_mem_32bytes()),
-            48 => writer.put_bytes(&self.blob_check_mem_48bytes()),
-            64 => writer.put_bytes(&self.blob_check_mem_64bytes()),
+            1 => writer.put_bytes(self.blob_check_mem_byte()),
+            2 => writer.put_bytes(self.blob_check_mem_halfword()),
+            3 => writer.put_bytes(self.blob_check_mem_3bytes()),
+            4 => writer.put_bytes(self.blob_check_mem_dword()),
+            6 => writer.put_bytes(self.blob_check_mem_6bytes()),
+            8 => writer.put_bytes(self.blob_check_mem_qword()),
+            12 => writer.put_bytes(self.blob_check_mem_12bytes()),
+            16 => writer.put_bytes(self.blob_check_mem_16bytes()),
+            24 => writer.put_bytes(self.blob_check_mem_24bytes()),
+            32 => writer.put_bytes(self.blob_check_mem_32bytes()),
+            48 => writer.put_bytes(self.blob_check_mem_48bytes()),
+            64 => writer.put_bytes(self.blob_check_mem_64bytes()),
             _ => false,
         };
 
@@ -2629,7 +2640,7 @@ impl AsanRuntime {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            16 + redzone_size as i64,
+            16 + i64::from(redzone_size),
             IndexMode::PostAdjust,
         ));
     }

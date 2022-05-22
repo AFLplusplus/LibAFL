@@ -633,6 +633,7 @@ impl CmpLogRuntime {
             None
         };
 
+        #[allow(clippy::cast_sign_loss)]
         let operand2 = match special_case {
             true => Some(CmplogOperandType::Imm(0)),
             false => {

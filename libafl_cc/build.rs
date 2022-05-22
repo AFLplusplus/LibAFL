@@ -118,13 +118,10 @@ fn main() {
         None => None,
     };
 
-    match llvm_version {
-        Some(ver) => {
-            if ver >= 14 {
-                custom_flags.push("-DUSE_NEW_PM".to_string());
-            }
+    if let Some(ver) = llvm_version {
+        if ver >= 14 {
+            custom_flags.push("-DUSE_NEW_PM".to_string());
         }
-        None => (),
     }
 
     if let Ok(output) = Command::new(&llvm_config).args(&["--bindir"]).output() {

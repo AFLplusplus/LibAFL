@@ -97,7 +97,7 @@ impl CoverageRuntime {
             ;   ldr x2, >previous_loc
             ;   ldr x4, [x2]
             ;   eor x4, x4, x0
-            ;   mov x3, ((MAP_SIZE - 1) as u32) as u64
+            ;   mov x3, u64::from((MAP_SIZE - 1) as u32)
             ;   and x4, x4, x3
             ;   ldr x3, [x1, x4]
             ;   add x3, x3, #1
@@ -113,7 +113,7 @@ impl CoverageRuntime {
             ;.qword 0
         );
         let ops_vec = ops.finalize().unwrap();
-        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice())
+        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
     /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
