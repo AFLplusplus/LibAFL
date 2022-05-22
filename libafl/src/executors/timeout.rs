@@ -40,7 +40,7 @@ use core::{ffi::c_void, ptr::write_volatile};
 
 #[cfg(windows)]
 use core::{
-    addr_of_mut,
+    ptr::addr_of_mut,
     sync::atomic::{compiler_fence, Ordering},
 };
 
