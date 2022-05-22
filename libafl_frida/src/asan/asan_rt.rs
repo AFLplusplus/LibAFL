@@ -1993,7 +1993,7 @@ impl AsanRuntime {
             ; self_addr:
             ; .qword self as *mut _  as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+            ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
             ; .qword AsanRuntime::handle_trap as *mut c_void as i64
             ; register_frame_func:
@@ -2565,7 +2565,7 @@ impl AsanRuntime {
         if displacement < 0 {
             if displacement > -4096 {
                 #[allow(clippy::cast_sign_loss)]
-                let displacement = displacement.abs() as u32;
+                let displacement = displacement.unsigned_abs();
                 // Subtract the displacement into x0
                 writer.put_sub_reg_reg_imm(
                     Aarch64Register::X0,
@@ -2574,7 +2574,7 @@ impl AsanRuntime {
                 );
             } else {
                 #[allow(clippy::cast_sign_loss)]
-                let displacement = displacement.abs() as u32;
+                let displacement = displacement.unsigned_abs();
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
                 writer.put_bytes(&(0xd1400000u32 | (displacement_hi << 10)).to_le_bytes());

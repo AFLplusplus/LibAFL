@@ -73,7 +73,7 @@ pub enum BrokerEventResult {
 }
 
 /// Distinguish a fuzzer by its config
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventConfig {
     /// Always assume unique setups for fuzzer configs
     AlwaysUnique,
