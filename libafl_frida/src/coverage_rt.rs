@@ -108,7 +108,7 @@ impl CoverageRuntime {
             ;   ldp x1, x2, [sp], #0x10
             ;   ret
             ;map_addr:
-            ;.qword &mut self.map as *mut _ as *mut c_void as i64
+            ;.qword std::ptr::addr_of_mut!(self.map) as *mut c_void as i64
             ;previous_loc:
             ;.qword 0
         );

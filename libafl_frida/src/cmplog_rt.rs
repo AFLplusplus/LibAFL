@@ -1,5 +1,5 @@
 //! Functionality for [`frida`](https://frida.re)-based binary-only `CmpLog`.
-//! With it, a fuzzer can collect feedback about each compare that happenned in the target
+//! With it, a fuzzer can collect feedback about each compare that happened in the target
 //! This allows the fuzzer to potentially solve the compares, if a compare value is directly
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
@@ -29,7 +29,7 @@ use frida_gum::{
 use crate::utils::{instruction_width, writer_register};
 
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-/// Speciial CmpLog Cases for `aarch64`
+/// Speciial `CmpLog` Cases for `aarch64`
 #[derive(Debug)]
 pub enum SpecialCmpLogCase {
     /// Test bit and branch if zero
@@ -44,8 +44,21 @@ use capstone::{
     Capstone, Insn,
 };
 
+/// The [`frida_gum_sys::GUM_RED_ZONE_SIZE`] casted to [`i32`]
+///
+/// # Panic
+/// In debug mode, will panic on wraparound (which should never happen in practice)
+#[allow(clippy::cast_possible_wrap)]
+fn gum_red_zone_size_i32() -> i32 {
+    debug_assert!(
+        i32::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).is_ok(),
+        "GUM_RED_ZONE_SIZE is bigger than i32::max"
+    );
+    frida_gum_sys::GUM_RED_ZONE_SIZE as i32
+}
+
 /// The type of an operand loggged during `CmpLog`
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
 pub enum CmplogOperandType {
     /// A Register
@@ -249,15 +262,16 @@ impl CmpLogRuntime {
         self.ops_handle_tbnz_masking.as_ref().unwrap()
     }
 
-    /// Emit the instrumentation code which is responsible for opernads value extraction and cmplog map population
+    /// Emit the instrumentation code which is responsible for operands value extraction and cmplog map population
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+    #[allow(clippy::too_many_lines)]
     #[inline]
     pub fn emit_comparison_handling(
         &self,
         _address: u64,
         output: &StalkerOutput,
-        op1: CmplogOperandType,
-        op2: CmplogOperandType,
+        op1: &CmplogOperandType,
+        op2: &CmplogOperandType,
         special_case: Option<SpecialCmpLogCase>,
     ) {
         let writer = output.writer();
@@ -267,17 +281,17 @@ impl CmpLogRuntime {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+            i64::from(-(16 + gum_red_zone_size_i32())),
             IndexMode::PreAdjust,
         );
 
         // make sure operand1 value is saved into x0
         match op1 {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
-                writer.put_ldr_reg_u64(Aarch64Register::X0, value);
+                writer.put_ldr_reg_u64(Aarch64Register::X0, *value);
             }
             CmplogOperandType::Regid(reg) => {
-                let reg = writer_register(reg);
+                let reg = writer_register(*reg);
                 match reg {
                     Aarch64Register::X0 | Aarch64Register::W0 => {}
                     Aarch64Register::X1 | Aarch64Register::W1 => {
@@ -291,17 +305,17 @@ impl CmpLogRuntime {
                 }
             }
             CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
-                let basereg = writer_register(basereg);
-                let indexreg = if indexreg.0 != 0 {
-                    Some(writer_register(indexreg))
-                } else {
+                let basereg = writer_register(*basereg);
+                let indexreg = if indexreg.0 == 0 {
                     None
+                } else {
+                    Some(writer_register(*indexreg))
                 };
 
                 // calculate base+index+displacment into x0
                 let displacement = displacement
                     + if basereg == Aarch64Register::Sp {
-                        16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32
+                        16 + gum_red_zone_size_i32()
                     } else {
                         0
                     };
@@ -324,7 +338,10 @@ impl CmpLogRuntime {
                     }
                 }
 
+                debug_assert!(displacement >= 0);
+
                 //add displacement
+                #[allow(clippy::cast_sign_loss)]
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
@@ -339,21 +356,21 @@ impl CmpLogRuntime {
         // make sure operand2 value is saved into x1
         match op2 {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
-                writer.put_ldr_reg_u64(Aarch64Register::X1, value);
+                writer.put_ldr_reg_u64(Aarch64Register::X1, *value);
                 match special_case {
                     Some(inst) => match inst {
                         SpecialCmpLogCase::Tbz => {
-                            writer.put_bytes(&self.ops_handle_tbz_masking());
+                            writer.put_bytes(self.ops_handle_tbz_masking());
                         }
                         SpecialCmpLogCase::Tbnz => {
-                            writer.put_bytes(&self.ops_handle_tbnz_masking());
+                            writer.put_bytes(self.ops_handle_tbnz_masking());
                         }
                     },
                     None => (),
                 }
             }
             CmplogOperandType::Regid(reg) => {
-                let reg = writer_register(reg);
+                let reg = writer_register(*reg);
                 match reg {
                     Aarch64Register::X1 | Aarch64Register::W1 => {}
                     Aarch64Register::X0 | Aarch64Register::W0 => {
@@ -371,17 +388,17 @@ impl CmpLogRuntime {
                 }
             }
             CmplogOperandType::Mem(basereg, indexreg, displacement, _width) => {
-                let basereg = writer_register(basereg);
-                let indexreg = if indexreg.0 != 0 {
-                    Some(writer_register(indexreg))
-                } else {
+                let basereg = writer_register(*basereg);
+                let indexreg = if indexreg.0 == 0 {
                     None
+                } else {
+                    Some(writer_register(*indexreg))
                 };
 
-                // calculate base+index+displacment into x1
+                // calculate base+index+displacement into x1
                 let displacement = displacement
                     + if basereg == Aarch64Register::Sp {
-                        16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32
+                        16 + gum_red_zone_size_i32()
                     } else {
                         0
                     };
@@ -392,7 +409,7 @@ impl CmpLogRuntime {
                             Aarch64Register::X0 | Aarch64Register::W0 => {
                                 match basereg {
                                     Aarch64Register::X1 | Aarch64Register::W1 => {
-                                        // x0 is overwrittern indexreg by op1 value.
+                                        // x0 is overwritten indexreg by op1 value.
                                         // x1 is basereg
 
                                         // Preserve x2, x3:
@@ -400,7 +417,7 @@ impl CmpLogRuntime {
                                             Aarch64Register::X2,
                                             Aarch64Register::X3,
                                             Aarch64Register::Sp,
-                                            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+                                            i64::from(-(16 + gum_red_zone_size_i32())),
                                             IndexMode::PreAdjust,
                                         );
 
@@ -422,7 +439,7 @@ impl CmpLogRuntime {
                                             Aarch64Register::X2,
                                             Aarch64Register::X3,
                                             Aarch64Register::Sp,
-                                            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+                                            16 + i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE),
                                             IndexMode::PostAdjust,
                                         ));
                                     }
@@ -448,7 +465,7 @@ impl CmpLogRuntime {
                             Aarch64Register::X1 | Aarch64Register::W1 => {
                                 match basereg {
                                     Aarch64Register::X0 | Aarch64Register::W0 => {
-                                        // x0 is overwrittern basereg by op1 value.
+                                        // x0 is overwritten basereg by op1 value.
                                         // x1 is indexreg
 
                                         // Preserve x2, x3:
@@ -456,7 +473,7 @@ impl CmpLogRuntime {
                                             Aarch64Register::X2,
                                             Aarch64Register::X3,
                                             Aarch64Register::Sp,
-                                            -(16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i32) as i64,
+                                            i64::from(-(16 + gum_red_zone_size_i32())),
                                             IndexMode::PreAdjust,
                                         );
 
@@ -478,7 +495,7 @@ impl CmpLogRuntime {
                                             Aarch64Register::X2,
                                             Aarch64Register::X3,
                                             Aarch64Register::Sp,
-                                            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+                                            16 + i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE),
                                             IndexMode::PostAdjust,
                                         ));
                                     }
@@ -494,7 +511,7 @@ impl CmpLogRuntime {
                             _ => {
                                 match basereg {
                                     Aarch64Register::X0 | Aarch64Register::W0 => {
-                                        //basereg is overwrittern by op1 value
+                                        //basereg is overwritten by op1 value
                                         //index reg is not x0 nor x1
 
                                         //reload basereg to x1
@@ -544,6 +561,7 @@ impl CmpLogRuntime {
                 }
 
                 // add displacement
+                #[allow(clippy::cast_sign_loss)]
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X1,
                     Aarch64Register::X1,
@@ -555,39 +573,37 @@ impl CmpLogRuntime {
         }
 
         //call cmplog runtime to populate the values map
-        writer.put_bytes(&self.ops_save_register_and_blr_to_populate());
+        writer.put_bytes(self.ops_save_register_and_blr_to_populate());
 
         // Restore x0, x1
         assert!(writer.put_ldp_reg_reg_reg_offset(
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            16 + frida_gum_sys::GUM_RED_ZONE_SIZE as i64,
+            16 + i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE),
             IndexMode::PostAdjust,
         ));
     }
 
     #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+    #[allow(clippy::similar_names)]
     #[inline]
     /// Check if the current instruction is cmplog relevant one(any opcode which sets the flags)
+    #[must_use]
     pub fn cmplog_is_interesting_instruction(
-        &self,
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
-    ) -> Result<
-        (
-            CmplogOperandType,
-            CmplogOperandType,
-            Option<SpecialCmpLogCase>,
-        ),
-        (),
-    > {
-        // We only care for compare instrunctions - aka instructions which set the flags
+    ) -> Option<(
+        CmplogOperandType,
+        CmplogOperandType,
+        Option<SpecialCmpLogCase>,
+    )> {
+        // We only care for compare instructions - aka instructions which set the flags
         match instr.mnemonic().unwrap() {
             "cmp" | "ands" | "subs" | "adds" | "negs" | "ngcs" | "sbcs" | "bics" | "cbz"
             | "cbnz" | "tbz" | "tbnz" | "adcs" => (),
-            _ => return Err(()),
+            _ => return None,
         }
         let mut operands = capstone
             .insn_detail(instr)
@@ -601,7 +617,7 @@ impl CmpLogRuntime {
         ]
         .contains(&instr.mnemonic().unwrap());
         if operands.len() != 2 && !special_case {
-            return Err(());
+            return None;
         }
 
         // handle special opcodes case which have 3 operands, but the 1st(dest) is not important to us
@@ -611,11 +627,10 @@ impl CmpLogRuntime {
         }
 
         // cbz marked as special since there is only 1 operand
-        let special_case = match instr.mnemonic().unwrap() {
-            "cbz" | "cbnz" => true,
-            _ => false,
-        };
+        #[allow(clippy::cast_sign_loss)]
+        let special_case = matches!(instr.mnemonic().unwrap(), "cbz" | "cbnz");
 
+        #[allow(clippy::cast_sign_loss, clippy::similar_names)]
         let operand1 = if let Arm64Operand(arm64operand) = operands.first().unwrap() {
             match arm64operand.op_type {
                 Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
@@ -627,33 +642,30 @@ impl CmpLogRuntime {
                     instruction_width(instr, &operands),
                 )),
                 Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
-                _ => return Err(()),
+                _ => return None,
             }
         } else {
             None
         };
 
         #[allow(clippy::cast_sign_loss)]
-        let operand2 = match special_case {
-            true => Some(CmplogOperandType::Imm(0)),
-            false => {
-                if let Arm64Operand(arm64operand2) = &operands[1] {
-                    match arm64operand2.op_type {
-                        Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
-                        Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
-                        Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
-                            opmem.base(),
-                            opmem.index(),
-                            opmem.disp(),
-                            instruction_width(instr, &operands),
-                        )),
-                        Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
-                        _ => return Err(()),
-                    }
-                } else {
-                    None
-                }
+        let operand2 = if special_case {
+            Some(CmplogOperandType::Imm(0))
+        } else if let Arm64Operand(arm64operand2) = &operands[1] {
+            match arm64operand2.op_type {
+                Arm64OperandType::Reg(regid) => Some(CmplogOperandType::Regid(regid)),
+                Arm64OperandType::Imm(val) => Some(CmplogOperandType::Imm(val as u64)),
+                Arm64OperandType::Mem(opmem) => Some(CmplogOperandType::Mem(
+                    opmem.base(),
+                    opmem.index(),
+                    opmem.disp(),
+                    instruction_width(instr, &operands),
+                )),
+                Arm64OperandType::Cimm(val) => Some(CmplogOperandType::Cimm(val as u64)),
+                _ => return None,
             }
+        } else {
+            None
         };
 
         // tbz will need to have special handling at emit time(masking operand1 value with operand2)
@@ -663,15 +675,16 @@ impl CmpLogRuntime {
             _ => None,
         };
 
-        if operand1.is_some() && operand2.is_some() {
-            Ok((operand1.unwrap(), operand2.unwrap(), special_case))
+        if let Some(op1) = operand1 {
+            operand2.map(|op2| (op1, op2, special_case))
         } else {
-            Err(())
+            None
         }
     }
 }
 
 impl Default for CmpLogRuntime {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
