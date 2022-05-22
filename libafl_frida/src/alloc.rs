@@ -125,10 +125,8 @@ impl Allocator {
 
                 // On x64, if end > 2**52, then range is not in userspace
                 #[cfg(target_arch = "aarch64")]
-                if end <= base.pow(52) {
-                    if end > userspace_max {
-                        userspace_max = end;
-                    }
+                if end <= base.pow(52) && end > userspace_max {
+                    userspace_max = end;
                 }
 
                 true

@@ -14,6 +14,7 @@ use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
 
 use crate::helper::FridaRuntime;
+use libafl::bolts::xxh3_rrmxmx_mixer;
 
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
@@ -96,7 +97,7 @@ impl CoverageRuntime {
             ;   ldr x2, >previous_loc
             ;   ldr x4, [x2]
             ;   eor x4, x4, x0
-            ;   mov x3, ((MAP_SIZE - 1) as u32) as u64
+            ;   mov x3, u64::from((MAP_SIZE - 1) as u32)
             ;   and x4, x4, x3
             ;   ldr x3, [x1, x4]
             ;   add x3, x3, #1
@@ -112,7 +113,7 @@ impl CoverageRuntime {
             ;.qword 0
         );
         let ops_vec = ops.finalize().unwrap();
-        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice())
+        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
     /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
@@ -154,14 +155,7 @@ impl CoverageRuntime {
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
-        let tmp = (address >> 32) + ((address & 0xffffffff) << 32);
-        let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
-        let mut h64 = tmp ^ bitflip;
-        h64 = h64.rotate_left(49) & h64.rotate_left(24);
-        h64 *= 0x9FB21C651E98DF25;
-        h64 ^= (h64 >> 35) + 8;
-        h64 *= 0x9FB21C651E98DF25;
-        h64 ^= h64 >> 28;
+        let h64 = xxh3_rrmxmx_mixer(address);
 
         let writer = output.writer();
         #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.

@@ -112,6 +112,18 @@ fn main() {
 
     let llvm_config = find_llvm_config();
 
+    // Get LLVM version.
+    let llvm_version = match llvm_config.split('-').collect::<Vec<&str>>().get(2) {
+        Some(ver) => ver.parse::<usize>().ok(),
+        None => None,
+    };
+
+    if let Some(ver) = llvm_version {
+        if ver >= 14 {
+            custom_flags.push("-DUSE_NEW_PM".to_string());
+        }
+    }
+
     if let Ok(output) = Command::new(&llvm_config).args(&["--bindir"]).output() {
         let llvm_bindir = Path::new(
             str::from_utf8(&output.stdout)
@@ -132,11 +144,15 @@ fn main() {
 
             /// The size of the accounting maps
             pub const ACCOUNTING_MAP_SIZE: usize = {};
+
+            /// The llvm version used to build llvm passes
+            pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = {:?};
             ",
             llvm_bindir.join("clang"),
             llvm_bindir.join("clang++"),
             edges_map_size,
-            acc_map_size
+            acc_map_size,
+            llvm_version,
         )
         .expect("Could not write file");
 
@@ -206,7 +222,6 @@ fn main() {
             .args(&cxxflags)
             .args(&custom_flags)
             .arg(src_dir.join("autotokens-pass.cc"))
-            //.arg("-DUSE_NEW_PM")
             .args(&ldflags)
             .args(&["-fPIC", "-shared", "-o"])
             .arg(out_dir.join(format!("autotokens-pass.{}", dll_extension())))

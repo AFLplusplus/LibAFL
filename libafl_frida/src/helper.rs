@@ -285,8 +285,12 @@ where
                         }
 
                         #[cfg(unix)]
-                        let res = if let Some(rt) = helper.runtime::<AsanRuntime>() {
-                            rt.asan_is_interesting_instruction(&helper.capstone, address, instr)
+                        let res = if let Some(_rt) = helper.runtime::<AsanRuntime>() {
+                            AsanRuntime::asan_is_interesting_instruction(
+                                &helper.capstone,
+                                address,
+                                instr,
+                            )
                         } else {
                             None
                         };

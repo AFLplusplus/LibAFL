@@ -140,7 +140,9 @@ llvmGetPassPluginInfo() {
           /* lambda to insert our pass into the pass pipeline. */
           [](PassBuilder &PB) {
   #if 1
+    #if LLVM_VERSION_MAJOR <= 13
             using OptimizationLevel = typename PassBuilder::OptimizationLevel;
+    #endif
             PB.registerOptimizerLastEPCallback(
                 [](ModulePassManager &MPM, OptimizationLevel OL) {
                   MPM.addPass(AFLCoverage());
@@ -433,7 +435,11 @@ bool AFLCoverage::runOnModule(Module &M) {
       if (instrument_ctx && &BB == &F.getEntryBlock()) {
 #ifdef HAVE_VECTOR_INTRINSICS
         if (CtxK) {
-          PrevCaller = IRB.CreateLoad(AFLPrevCaller);
+          PrevCaller = IRB.CreateLoad(
+  #if LLVM_VERSION_MAJOR >= 14
+              PrevCallerTy,
+  #endif
+              AFLPrevCaller);
           PrevCaller->setMetadata(M.getMDKindID("nosanitize"),
                                   MDNode::get(C, None));
           PrevCtx =
@@ -445,7 +451,12 @@ bool AFLCoverage::runOnModule(Module &M) {
 
           // load the context ID of the previous function and write to to a
           // local variable on the stack
-          LoadInst *PrevCtxLoad = IRB.CreateLoad(AFLContext);
+          LoadInst *PrevCtxLoad = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+            IRB.getInt32Ty(),
+#endif
+            AFLContext
+          );
           PrevCtxLoad->setMetadata(M.getMDKindID("nosanitize"),
                                    MDNode::get(C, None));
           PrevCtx = PrevCtxLoad;
@@ -573,7 +584,11 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       /* Load prev_loc */
 
-      LoadInst *PrevLoc = IRB.CreateLoad(AFLPrevLoc);
+      LoadInst *PrevLoc = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+          PrevLocTy,
+#endif
+          AFLPrevLoc);
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
       Value *PrevLocTrans;
 
@@ -597,20 +612,31 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       /* Load SHM pointer */
 
-      LoadInst *MapPtr = IRB.CreateLoad(AFLMapPtr);
+      LoadInst *MapPtr = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+          PointerType::get(Int8Ty, 0),
+#endif
+          AFLMapPtr);
       MapPtr->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
       Value *MapPtrIdx;
 #ifdef HAVE_VECTOR_INTRINSICS
       if (Ngram)
         MapPtrIdx = IRB.CreateGEP(
+  #if LLVM_VERSION_MAJOR >= 14
+            Int8Ty,
+  #endif
             MapPtr,
             IRB.CreateZExt(
                 IRB.CreateXor(PrevLocTrans, IRB.CreateZExt(CurLoc, Int32Ty)),
                 Int32Ty));
       else
 #endif
-        MapPtrIdx = IRB.CreateGEP(MapPtr, IRB.CreateXor(PrevLocTrans, CurLoc));
+        MapPtrIdx = IRB.CreateGEP(
+#if LLVM_VERSION_MAJOR >= 14
+            Int8Ty,
+#endif
+            MapPtr, IRB.CreateXor(PrevLocTrans, CurLoc));
 
       /* Update bitmap */
 
@@ -643,7 +669,11 @@ bool AFLCoverage::runOnModule(Module &M) {
         */
 
       } else {
-        LoadInst *Counter = IRB.CreateLoad(MapPtrIdx);
+        LoadInst *Counter = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+            IRB.getInt8Ty(),
+#endif
+            MapPtrIdx);
         Counter->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
 
         Value *Incr = IRB.CreateAdd(Counter, One);
