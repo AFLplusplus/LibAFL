@@ -63,6 +63,11 @@
 //! }
 //!```
 
+use alloc::vec::Vec;
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+};
 use clap::{Command, CommandFactory, Parser};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "frida_cli")]
@@ -411,7 +416,7 @@ mod tests {
     fn parse_instrumentation_location_succeeds_without_0x() {
         assert_eq!(
             parse_instrumentation_location("mod_name@12345").unwrap(),
-            (String::from("mod_name"), 74565)
+            (alloc::string::String::from("mod_name"), 74565)
         );
     }
 
@@ -421,7 +426,7 @@ mod tests {
     fn parse_instrumentation_location_succeeds_with_0x() {
         assert_eq!(
             parse_instrumentation_location("mod_name@0x12345").unwrap(),
-            (String::from("mod_name"), 74565)
+            (alloc::string::String::from("mod_name"), 74565)
         );
     }
 

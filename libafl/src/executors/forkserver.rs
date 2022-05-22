@@ -27,6 +27,7 @@ use crate::{
     Error,
 };
 
+use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use nix::{
     sys::{
         select::{pselect, FdSet},

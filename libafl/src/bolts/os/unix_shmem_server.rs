@@ -12,6 +12,12 @@ use crate::{
     },
     Error,
 };
+
+#[cfg(feature = "std")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{mem::ManuallyDrop, ptr::addr_of};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};

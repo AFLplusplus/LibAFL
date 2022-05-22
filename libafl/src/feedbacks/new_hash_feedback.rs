@@ -2,6 +2,7 @@
 
 use std::{fmt::Debug, hash::Hash, marker::PhantomData};
 
+use alloc::string::{String, ToString};
 use hashbrown::HashSet;
 use num_traits::PrimInt;
 use serde::{Deserialize, Serialize};

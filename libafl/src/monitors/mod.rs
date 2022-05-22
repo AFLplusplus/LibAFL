@@ -820,6 +820,7 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     use super::ClientStats;
+    use alloc::{string::String, vec::Vec};
     use core::time::Duration;
 
     #[pyclass(unsendable, name = "SimpleMonitor")]

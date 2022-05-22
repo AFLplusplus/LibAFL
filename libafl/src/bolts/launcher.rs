@@ -121,6 +121,8 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        use alloc::string::ToString;
+
         if self.run_client.is_none() {
             return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),

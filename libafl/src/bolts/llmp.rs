@@ -1852,6 +1852,8 @@ where
     where
         A: ToSocketAddrs,
     {
+        use alloc::string::ToString;
+
         let mut stream = TcpStream::connect(addr)?;
         println!("B2B: Connected to {:?}", stream);
 
@@ -2050,6 +2052,8 @@ where
         b2b_client_id: ClientId,
         broker_shmem_description: &ShMemDescription,
     ) -> Result<ShMemDescription, Error> {
+        use alloc::string::ToString;
+
         let broker_shmem_description = *broker_shmem_description;
 
         // A channel to get the new "client's" sharedmap id from
@@ -2656,6 +2660,8 @@ where
     #[cfg(feature = "std")]
     /// Create a [`LlmpClient`], getting the ID from a given port
     pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
+        use alloc::string::ToString;
+
         let mut stream = match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
             Ok(stream) => stream,
             Err(e) => {

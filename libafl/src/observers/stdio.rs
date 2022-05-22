@@ -2,6 +2,8 @@
 //! The executor must explicitely support these observers.
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].
 
+use alloc::string::String;
+
 use crate::{bolts::tuples::Named, observers::Observer};
 
 /// An observer that captures stdout of a target.

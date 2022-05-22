@@ -8,6 +8,7 @@ use crate::{
     Error,
 };
 
+use alloc::string::{String, ToString};
 use backtrace::Backtrace;
 use regex::Regex;
 use serde::{Deserialize, Serialize};

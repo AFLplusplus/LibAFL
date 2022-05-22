@@ -1,6 +1,7 @@
 //! Stores and restores state when a client needs to relaunch.
 //! Uses a [`ShMem`] up to a threshold, then write to disk.
 use ahash::AHasher;
+use alloc::string::{String, ToString};
 use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -241,6 +242,10 @@ where
 #[cfg(test)]
 mod tests {
 
+    use alloc::{
+        string::{String, ToString},
+        vec::Vec,
+    };
     use serial_test::serial;
 
     use crate::bolts::{

@@ -212,6 +212,7 @@ pub mod pybind {
 
     use crate::corpus::OnDiskCorpus;
     use crate::inputs::BytesInput;
+    use alloc::string::String;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 

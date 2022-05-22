@@ -3,6 +3,8 @@
 //! This feedback should be used in combination with another feedback as this feedback always considers testcases
 //! to be not interesting.
 //! Requires a [`ConcolicObserver`] to observe the concolic trace.
+use alloc::{borrow::ToOwned, string::String};
+
 use crate::{
     bolts::tuples::Named,
     corpus::Testcase,

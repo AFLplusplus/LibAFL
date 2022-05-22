@@ -154,6 +154,8 @@ impl Tokens {
     where
         P: AsRef<Path>,
     {
+        use alloc::borrow::ToOwned;
+
         // println!("Loading tokens file {:?} ...", file);
 
         let file = File::open(file)?; // panic if not found

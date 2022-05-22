@@ -3,7 +3,7 @@ Welcome to `LibAFL`
 */
 
 #![allow(incomplete_features)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 // For `type_eq`
 #![cfg_attr(unstable_feature, feature(specialization))]
 // For `type_id` and owned things
@@ -69,6 +69,9 @@ Welcome to `LibAFL`
     )
 )]
 
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
 #[macro_use]
 extern crate alloc;
 #[macro_use]

@@ -18,6 +18,8 @@ use core::{
 };
 
 use alloc::boxed::Box;
+#[cfg(feature = "std")]
+use alloc::vec::Vec;
 
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
@@ -504,6 +506,8 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
+    #[cfg(feature = "std")]
+    use alloc::{boxed::Box, string::String};
     use core::mem::transmute;
     use libc::siginfo_t;
     #[cfg(feature = "std")]
@@ -1546,6 +1550,7 @@ where
 /// signal handlers and `panic_hooks` for the child process
 #[cfg(all(feature = "std", unix))]
 pub mod child_signal_handlers {
+    use alloc::boxed::Box;
     use libc::siginfo_t;
     use std::panic;
 
@@ -1708,7 +1713,7 @@ pub mod pybind {
                 ) -> Self {
                     Self {
                         owned_in_process_executor: OwnedInProcessExecutor::new(
-                            Box::new(move |input: &BytesInput| {
+                            alloc::boxed::Box::new(move |input: &BytesInput| {
                                 Python::with_gil(|py| -> PyResult<()> {
                                     let args = (PyBytes::new(py, input.bytes()),);
                                     harness.call1(py, args)?;

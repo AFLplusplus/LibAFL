@@ -80,7 +80,7 @@ pub mod pybind {
                     unsafe {
                         Self {
                             stages_owned_list: StagesOwnedList {
-                                list: vec![Box::new(std::mem::transmute_copy::<
+                                list: vec![alloc::boxed::Box::new(std::mem::transmute_copy::<
                                     $stage_name,
                                     $stage_name,
                                 >(stage))],

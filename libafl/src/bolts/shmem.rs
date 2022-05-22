@@ -539,6 +539,7 @@ pub mod unix_shmem {
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
 
+        use alloc::string::ToString;
         use core::{ptr, slice};
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
@@ -919,6 +920,7 @@ pub mod unix_shmem {
     /// Module containing `ashmem` shared memory support, commonly used on Android.
     #[cfg(all(unix, feature = "std"))]
     pub mod ashmem {
+        use alloc::string::ToString;
         use core::{ptr, slice};
         use libc::{
             c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
