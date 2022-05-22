@@ -2,6 +2,8 @@
 //! This makes `LibAFL` interoperable with harnesses written for other fuzzers like `Libfuzzer` and [`AFLplusplus`](aflplus.plus).
 //! We will interact with a C++ target, so use external c functionality
 
+use alloc::{string::String, vec::Vec};
+
 extern "C" {
     /// int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size)
     fn LLVMFuzzerTestOneInput(data: *const u8, size: usize) -> i32;

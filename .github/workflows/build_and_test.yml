@@ -160,8 +160,6 @@ jobs:
       run: cd ./libafl && cargo test --no-default-features 
     - name: libalf armv6m-none-eabi (32 bit no_std) clippy
       run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
-    - name: libafl_targets armv6m-none-eabi (32 bit no_std) clippy
-      run: cd ./libafl_targets && cargo clippy --target thumbv6m-none-eabi --no-default-features
   build-docker:
     runs-on: ubuntu-latest
     steps:
