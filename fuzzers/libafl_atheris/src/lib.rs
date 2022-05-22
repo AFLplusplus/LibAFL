@@ -213,7 +213,7 @@ pub fn LLVMFuzzerRunDriver(
 
     // TODO: we need to handle Atheris calls to `exit` on errors somhow.
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _, _>>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
             HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
