@@ -321,7 +321,7 @@ pub mod pybind {
         pub fn unwrap_py(&self) -> Option<PyObject> {
             match &self.wrapper {
                 PythonExecutorWrapper::Python(pyo) => Some(pyo.inner.clone()),
-                _ => None,
+                PythonExecutorWrapper::InProcess(_) => None,
             }
         }
     }

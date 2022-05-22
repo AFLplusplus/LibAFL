@@ -212,7 +212,7 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{HasConstLen, MutationResult, Mutator};
+    use super::{MutationResult, Mutator};
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::mutators::scheduled::pybind::PythonStdHavocMutator;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
@@ -323,7 +323,7 @@ pub mod pybind {
         pub fn unwrap_py(&self) -> Option<PyObject> {
             match &self.wrapper {
                 PythonMutatorWrapper::Python(pyo) => Some(pyo.inner.clone()),
-                _ => None,
+                PythonMutatorWrapper::StdHavoc(_) => None,
             }
         }
     }

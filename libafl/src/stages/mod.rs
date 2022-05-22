@@ -362,7 +362,7 @@ pub mod pybind {
         pub fn unwrap_py(&self) -> Option<PyObject> {
             match &self.wrapper {
                 PythonStageWrapper::Python(pyo) => Some(pyo.inner.clone()),
-                _ => None,
+                PythonStageWrapper::StdMutational(_) => None,
             }
         }
     }

@@ -1505,8 +1505,8 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use super::{
-        AsMutIterator, AsRefIterator, AsSlice, Debug, Error, HasLen, Hasher, Iter, IterMut,
-        MapObserver, Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
+        AsMutIterator, AsRefIterator, Debug, Error, HasLen, Iter, IterMut, MapObserver, Named,
+        Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
     use crate::observers::pybind::PythonObserver;
     use concat_idents::concat_idents;

@@ -294,7 +294,7 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{CmpMap, Debug, MapObserver, Observer, ObserversTuple, String, Vec};
+    use super::{Debug, Observer, Observer, ObserversTuple, String, Vec};
     use crate::bolts::tuples::{type_eq, MatchName, Named};
     use crate::executors::ExitKind;
     use crate::inputs::BytesInput;
@@ -879,7 +879,7 @@ pub mod pybind {
                                     && py_wrapper.borrow(py).name() == name
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
-                                        .as_ref()
+                                        .as_ref();
                                 }
                             }
                             PythonObserverWrapper::MapI16(py_wrapper) => {
@@ -887,7 +887,7 @@ pub mod pybind {
                                     && py_wrapper.borrow(py).name() == name
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
-                                        .as_ref()
+                                        .as_ref();
                                 }
                             }
                             PythonObserverWrapper::MapI32(py_wrapper) => {
@@ -895,7 +895,7 @@ pub mod pybind {
                                     && py_wrapper.borrow(py).name() == name
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
-                                        .as_ref()
+                                        .as_ref();
                                 }
                             }
                             PythonObserverWrapper::MapI64(py_wrapper) => {
@@ -903,7 +903,7 @@ pub mod pybind {
                                     && py_wrapper.borrow(py).name() == name
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
-                                        .as_ref()
+                                        .as_ref();
                                 }
                             }
 
@@ -912,7 +912,7 @@ pub mod pybind {
                                     && py_wrapper.borrow(py).name() == name
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
-                                        .as_ref()
+                                        .as_ref();
                                 }
                             }
                             PythonObserverWrapper::MapU16(py_wrapper) => {
@@ -920,7 +920,7 @@ pub mod pybind {
                                     && py_wrapper.borrow(py).name() == name
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
-                                        .as_ref()
+                                        .as_ref();
                                 }
                             }
                             PythonObserverWrapper::MapU32(py_wrapper) => {
@@ -928,7 +928,7 @@ pub mod pybind {
                                     && py_wrapper.borrow(py).name() == name
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
-                                        .as_ref()
+                                        .as_ref();
                                 }
                             }
                             PythonObserverWrapper::MapU64(py_wrapper) => {
@@ -936,7 +936,7 @@ pub mod pybind {
                                     && py_wrapper.borrow(py).name() == name
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow(py)) as *const T)
-                                        .as_ref()
+                                        .as_ref();
                                 }
                             }
                             PythonObserverWrapper::Python(py_wrapper) => {
@@ -965,7 +965,7 @@ pub mod pybind {
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
                                         as *mut T)
-                                        .as_mut()
+                                        .as_mut();
                                 }
                             }
                             PythonObserverWrapper::MapI16(py_wrapper) => {
@@ -974,7 +974,7 @@ pub mod pybind {
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
                                         as *mut T)
-                                        .as_mut()
+                                        .as_mut();
                                 }
                             }
                             PythonObserverWrapper::MapI32(py_wrapper) => {
@@ -983,7 +983,7 @@ pub mod pybind {
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
                                         as *mut T)
-                                        .as_mut()
+                                        .as_mut();
                                 }
                             }
                             PythonObserverWrapper::MapI64(py_wrapper) => {
@@ -992,7 +992,7 @@ pub mod pybind {
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
                                         as *mut T)
-                                        .as_mut()
+                                        .as_mut();
                                 }
                             }
 
@@ -1002,7 +1002,7 @@ pub mod pybind {
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
                                         as *mut T)
-                                        .as_mut()
+                                        .as_mut();
                                 }
                             }
                             PythonObserverWrapper::MapU16(py_wrapper) => {
@@ -1011,7 +1011,7 @@ pub mod pybind {
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
                                         as *mut T)
-                                        .as_mut()
+                                        .as_mut();
                                 }
                             }
                             PythonObserverWrapper::MapU32(py_wrapper) => {
@@ -1020,7 +1020,7 @@ pub mod pybind {
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
                                         as *mut T)
-                                        .as_mut()
+                                        .as_mut();
                                 }
                             }
                             PythonObserverWrapper::MapU64(py_wrapper) => {
@@ -1029,7 +1029,7 @@ pub mod pybind {
                                 {
                                     r = (std::ptr::addr_of!(*(*py_wrapper).borrow_mut(py))
                                         as *mut T)
-                                        .as_mut()
+                                        .as_mut();
                                 }
                             }
                             PythonObserverWrapper::Python(py_wrapper) => {

@@ -1040,7 +1040,7 @@ impl From<bool> for ConstFeedback {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{Debug, Feedback, FeedbackLogic, String, ToString};
+    use super::{Debug, Feedback, String, ToString};
     use crate::events::pybind::PythonEventManager;
     use crate::feedbacks::map::pybind::PythonMaxMapFeedbackI8;
     use crate::inputs::HasBytesVec;
@@ -1118,9 +1118,11 @@ pub mod pybind {
             OT: ObserversTuple<BytesInput, PythonStdState>,
         {
             // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
-            let dont_look_at_this: &PythonObserversTuple =
-                unsafe { std::mem::transmute(observers) };
-            let dont_look_at_this2: &PythonEventManager = unsafe { std::mem::transmute(manager) };
+            let dont_look_at_this: &PythonObserversTuple = unsafe {
+                &*(observers as *const OT as *const observers::pybind::PythonObserversTuple)
+            };
+            let dont_look_at_this2: &PythonEventManager =
+                unsafe { &*(manager as *mut EM as *const events::pybind::PythonEventManager) };
             // TODO pass the other args
             Ok(Python::with_gil(|py| -> PyResult<bool> {
                 let r: bool = self
@@ -1251,7 +1253,7 @@ pub mod pybind {
         pub fn unwrap_py(&self) -> Option<PyObject> {
             match &self.wrapper {
                 PythonFeedbackWrapper::Python(pyo) => Some(pyo.inner.clone()),
-                _ => None,
+                PythonFeedbackWrapper::MaxMapI8(_) => None,
             }
         }
     }
