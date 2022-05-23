@@ -68,8 +68,8 @@ where
 
 /// The metadata used for `gramatron`
 #[derive(Debug, Serialize, Deserialize)]
-#[allow(missing_docs)]
 pub struct GramatronIdxMapMetadata {
+    /// The map containing a vec for each terminal
     pub map: HashMap<usize, Vec<usize>>,
 }
 
