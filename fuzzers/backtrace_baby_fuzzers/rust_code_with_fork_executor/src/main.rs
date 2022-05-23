@@ -80,10 +80,7 @@ pub fn main() {
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and!(
         CrashFeedback::new(),
-        NewHashFeedback::<BacktraceObserver>::new_with_observer(
-            "BacktraceObserver",
-            &bt_observer
-        )
+        NewHashFeedback::<BacktraceObserver>::new_with_observer("BacktraceObserver", &bt_observer)
     );
 
     // create a State from scratch
