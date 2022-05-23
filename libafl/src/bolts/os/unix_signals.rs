@@ -100,6 +100,14 @@ use crate::Error;
 pub use libc::{c_void, siginfo_t};
 
 extern "C" {
+    /// The `libc` `getcontext`
+    ///
+    /// # Notes
+    ///
+    /// Somehow, `MacOS` on `aarch64` claims this type uses a 128 bit `int`
+    /// (@`rustc` 1.59.0)
+    /// Not much we can about it, for now.
+    #[allow(improper_ctypes)]
     fn getcontext(ucp: *mut ucontext_t) -> c_int;
 }
 

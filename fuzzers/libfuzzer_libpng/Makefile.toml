@@ -22,7 +22,7 @@ windows_alias = "unsupported"
 condition = { files_not_exist = ["./libpng-1.6.37"]}
 script_runner="@shell"
 script='''
-wget https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz
+curl https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz --output libpng-1.6.37.tar.xz
 tar -xvf libpng-1.6.37.tar.xz
 '''
 

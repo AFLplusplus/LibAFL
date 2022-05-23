@@ -27,9 +27,7 @@ use libafl::{
     mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
     mutators::token_mutations::Tokens,
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
-    },
+    schedulers::{IndexesLenTimeMinimizerScheduler, StdWeightedScheduler},
     stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -58,6 +56,7 @@ pub fn libafl_main() {
 }
 
 /// The actual fuzzer
+#[cfg(not(test))]
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
     let monitor = MultiMonitor::new(|s| println!("{}", s));
