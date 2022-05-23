@@ -158,7 +158,7 @@ jobs:
       run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
     - name: no_std tests
       run: cd ./libafl && cargo test --no-default-features 
-    - name: libalf armv6m-none-eabi (32 bit no_std) clippy
+    - name: libafl armv6m-none-eabi (32 bit no_std) clippy
       run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
   build-docker:
     runs-on: ubuntu-latest
