@@ -57,6 +57,7 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use crate::corpus::inmemory::pybind::PythonInMemoryCorpus;
+    use crate::corpus::testcase::pybind::PythonTestcaseWrapper;
     use crate::corpus::{Corpus, Testcase};
     use crate::inputs::BytesInput;
     use crate::Error;
@@ -79,33 +80,6 @@ pub mod pybind {
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct PythonCorpus {
         wrapper: PythonCorpusWrapper,
-    }
-
-    #[pymethods]
-    impl PythonCorpus {
-        #[staticmethod]
-        #[must_use]
-        pub fn new_in_memory(py_in_memory_corpus: Py<PythonInMemoryCorpus>) -> Self {
-            Self {
-                wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus),
-            }
-        }
-
-        #[staticmethod]
-        #[must_use]
-        pub fn new_cached_on_disk(py_cached_on_disk_corpus: Py<PythonCachedOnDiskCorpus>) -> Self {
-            Self {
-                wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus),
-            }
-        }
-
-        #[staticmethod]
-        #[must_use]
-        pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
-            Self {
-                wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus),
-            }
-        }
     }
 
     macro_rules! unwrap_me {
@@ -138,6 +112,53 @@ pub mod pybind {
                 }
             )
         };
+    }
+
+    #[pymethods]
+    impl PythonCorpus {
+        #[staticmethod]
+        #[must_use]
+        pub fn new_in_memory(py_in_memory_corpus: Py<PythonInMemoryCorpus>) -> Self {
+            Self {
+                wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_cached_on_disk(py_cached_on_disk_corpus: Py<PythonCachedOnDiskCorpus>) -> Self {
+            Self {
+                wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
+            Self {
+                wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus),
+            }
+        }
+
+        #[pyo3(name = "count")]
+        fn pycount(&self) -> usize {
+            self.count()
+        }
+
+        #[pyo3(name = "current")]
+        fn pycurrent(&self) -> Option<usize> {
+            self.current().clone()
+        }
+
+        #[pyo3(name = "get")]
+        fn pyget(&self, idx: usize) -> PythonTestcaseWrapper {
+            let t: &mut Testcase<BytesInput> = unwrap_me!(self.wrapper, c, {
+                c.get(idx)
+                    .map(|v| unsafe { v.as_ptr().as_mut().unwrap() })
+                    .expect("PythonCorpus::get failed")
+            });
+            PythonTestcaseWrapper::wrap(t)
+        }
     }
 
     impl Corpus<BytesInput> for PythonCorpus {

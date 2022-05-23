@@ -670,6 +670,7 @@ pub mod pybind {
     };
     use pyo3::prelude::*;
     use pyo3::types::PyDict;
+    use std::path::PathBuf;
 
     /// `StdState` with fixed generics
     pub type PythonStdState = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
@@ -766,6 +767,19 @@ pub mod pybind {
                     num,
                 )
                 .expect("Failed to generate the initial corpus".into());
+        }
+
+        fn load_initial_inputs(
+            &mut self,
+            py_fuzzer: &mut PythonStdFuzzerWrapper,
+            py_executor: &mut PythonExecutor,
+            py_mgr: &mut PythonEventManager,
+            in_dirs: Vec<PathBuf>,
+        ) {
+            self.inner
+                .as_mut()
+                .load_initial_inputs(py_fuzzer.unwrap_mut(), py_executor, py_mgr, &in_dirs)
+                .expect("Failed to load the initial corpus".into());
         }
     }
 
