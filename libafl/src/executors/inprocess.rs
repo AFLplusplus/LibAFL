@@ -389,10 +389,12 @@ pub(crate) struct InProcessExecutorHandlerData {
     event_mgr_ptr: *mut c_void,
     fuzzer_ptr: *mut c_void,
     executor_ptr: *const c_void,
-    pub(crate) current_input_ptr: *const c_void,
-    #[cfg(feature = "std")]
+    pub current_input_ptr: *const c_void,
+    /// The timeout handler
+    #[allow(unused)] // for no_std
     crash_handler: *const c_void,
-    #[cfg(feature = "std")]
+    /// The timeout handler
+    #[allow(unused)] // for no_std
     timeout_handler: *const c_void,
     #[cfg(windows)]
     pub tp_timer: *mut c_void,
@@ -881,7 +883,8 @@ mod windows_exception_handler {
     use core::sync::atomic::{compiler_fence, Ordering};
     use windows::Win32::System::Threading::ExitProcess;
 
-    pub type HandlerFuncPtr = unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+    pub(crate) type HandlerFuncPtr =
+        unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
 
     /*pub unsafe fn nop_handler(
         _code: ExceptionCode,
@@ -1245,7 +1248,7 @@ mod windows_exception_handler {
 
 /// The signature of the crash handler function
 #[cfg(all(feature = "std", unix))]
-pub type ForkHandlerFuncPtr =
+pub(crate) type ForkHandlerFuncPtr =
     unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
 
 /// The inmem fork executor's handlers.
@@ -1307,7 +1310,7 @@ impl InChildProcessHandlers {
 /// The global state of the in-process-fork harness.
 #[cfg(all(feature = "std", unix))]
 #[derive(Debug)]
-pub struct InProcessForkExecutorGlobalData {
+pub(crate) struct InProcessForkExecutorGlobalData {
     /// Stores a pointer to the fork executor struct
     pub executor_ptr: *const c_void,
     /// Stores a pointer to the state
@@ -1350,7 +1353,7 @@ impl InProcessForkExecutorGlobalData {
 
 /// a static variable storing the global state
 #[cfg(all(feature = "std", unix))]
-pub static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
+pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
     InProcessForkExecutorGlobalData {
         executor_ptr: ptr::null(),
         crash_handler: ptr::null(),
@@ -1592,7 +1595,7 @@ pub mod child_signal_handlers {
     /// The function should only be called from a child crash handler.
     /// It will dereference the `data` pointer and assume it's valid.
     #[cfg(unix)]
-    pub unsafe fn child_crash_handler<E, I, OT, S>(
+    pub(crate) unsafe fn child_crash_handler<E, I, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
