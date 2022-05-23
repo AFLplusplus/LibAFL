@@ -676,7 +676,6 @@ pub mod pybind {
     use crate::events::pybind::PythonEventManager;
     use crate::executors::pybind::PythonExecutor;
     use crate::feedbacks::pybind::PythonFeedback;
-    use crate::feedbacks::CrashFeedback;
     use crate::fuzzer::{Evaluator, Fuzzer, StdFuzzer};
     use crate::inputs::BytesInput;
     use crate::observers::pybind::PythonObserversTuple;
@@ -690,7 +689,7 @@ pub mod pybind {
         QueueScheduler,
         PythonFeedback,
         BytesInput,
-        CrashFeedback,
+        PythonFeedback,
         PythonObserversTuple,
         PythonStdState,
     >;
@@ -723,12 +722,12 @@ pub mod pybind {
     #[pymethods]
     impl PythonStdFuzzerWrapper {
         #[new]
-        fn new(py_feedback: PythonFeedback) -> Self {
+        fn new(py_feedback: PythonFeedback, py_objective: PythonFeedback) -> Self {
             Self {
                 inner: OwnedPtrMut::Owned(Box::new(StdFuzzer::new(
                     QueueScheduler::new(),
                     py_feedback,
-                    CrashFeedback::new(),
+                    py_objective,
                 ))),
             }
         }

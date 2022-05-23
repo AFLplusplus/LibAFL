@@ -38,9 +38,9 @@ observers = ObserversTuple([observer.as_map_observer().as_observer()])
 
 feedback = MaxMapFeedbackI8(m)
 
-objective = MaxMapFeedbackI8(m) # useless atm
+objective = CrashFeedback()
 
-fuzzer = StdFuzzer(feedback.as_feedback())
+fuzzer = StdFuzzer(feedback.as_feedback(), objective.as_feedback())
 
 rand = StdRand.with_current_nanos()
 

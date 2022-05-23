@@ -432,6 +432,7 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 /// `Rand` Python bindings
 pub mod pybind {
     use super::Rand;

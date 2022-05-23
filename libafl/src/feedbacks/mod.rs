@@ -1040,7 +1040,7 @@ impl From<bool> for ConstFeedback {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{Debug, Feedback, String, ToString};
+    use super::{CrashFeedback, Debug, Feedback, String, ToString};
     use crate::corpus::testcase::pybind::{PythonTestcase, PythonTestcaseWrapper};
     use crate::events::pybind::PythonEventManager;
     use crate::executors::pybind::PythonExitKind;
@@ -1187,6 +1187,27 @@ pub mod pybind {
     }
 
     #[derive(Clone, Debug)]
+    #[pyclass(unsendable, name = "CrashFeedback")]
+    pub struct PythonCrashFeedback {
+        pub inner: CrashFeedback,
+    }
+
+    #[pymethods]
+    impl PythonCrashFeedback {
+        #[new]
+        fn new() -> Self {
+            Self {
+                inner: CrashFeedback::new(),
+            }
+        }
+
+        #[must_use]
+        pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+            PythonFeedback::new_crash(slf)
+        }
+    }
+
+    #[derive(Clone, Debug)]
     pub enum PythonFeedbackWrapper {
         MaxMapI8(Py<PythonMaxMapFeedbackI8>),
         MaxMapI16(Py<PythonMaxMapFeedbackI16>),
@@ -1196,6 +1217,7 @@ pub mod pybind {
         MaxMapU16(Py<PythonMaxMapFeedbackU16>),
         MaxMapU32(Py<PythonMaxMapFeedbackU32>),
         MaxMapU64(Py<PythonMaxMapFeedbackU64>),
+        Crash(Py<PythonCrashFeedback>),
         Python(PyObjectFeedback),
     }
 
@@ -1218,7 +1240,8 @@ pub mod pybind {
                     MaxMapU8,
                     MaxMapU16,
                     MaxMapU32,
-                    MaxMapU64
+                    MaxMapU64,
+                    Crash
                 },
                 {
                      Python(py_wrapper) => {
@@ -1241,7 +1264,8 @@ pub mod pybind {
                     MaxMapU8,
                     MaxMapU16,
                     MaxMapU32,
-                    MaxMapU64
+                    MaxMapU64,
+                    Crash
                 },
                 {
                      Python(py_wrapper) => {
@@ -1338,6 +1362,15 @@ pub mod pybind {
 
         #[staticmethod]
         #[must_use]
+        pub fn new_crash(feedback: Py<PythonCrashFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Crash(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
         pub fn new_py(obj: PyObject) -> Self {
             Self {
                 wrapper: PythonFeedbackWrapper::Python(PyObjectFeedback::new(obj)),
@@ -1365,7 +1398,9 @@ pub mod pybind {
 
     impl Feedback<BytesInput, PythonStdState> for PythonFeedback {
         fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, f, { f.init_state(state) })
+            unwrap_me_mut!(self.wrapper, f, {
+                Feedback::<BytesInput, PythonStdState>::init_state(f, state)
+            })
         }
 
         fn is_interesting<EM, OT>(
@@ -1404,6 +1439,7 @@ pub mod pybind {
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonCrashFeedback>()?;
         m.add_class::<PythonFeedback>()?;
         Ok(())
     }

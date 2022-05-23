@@ -467,8 +467,8 @@ pub extern "C" fn external_current_millis() -> u64 {
 #[allow(missing_docs)]
 pub mod pybind {
     use super::{
-        bolts, corpus, events, executors, feedbacks, fuzzer, monitors, mutators, observers, stages,
-        state,
+        bolts, corpus, events, executors, feedbacks, fuzzer, generators, monitors, mutators,
+        observers, stages, state,
     };
     use pyo3::prelude::*;
 
@@ -627,7 +627,7 @@ pub mod pybind {
         fuzzer::pybind::register(py, m)?;
         executors::pybind::register(py, m)?;
         executors::inprocess::pybind::register(py, m)?;
-        //generators::pybind::register(py, m)?;
+        generators::pybind::register(py, m)?;
         mutators::pybind::register(py, m)?;
         mutators::scheduled::pybind::register(py, m)?;
         corpus::pybind::register(py, m)?;

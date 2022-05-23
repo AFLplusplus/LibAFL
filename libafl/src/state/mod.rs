@@ -658,11 +658,16 @@ pub mod pybind {
     use crate::bolts::ownedref::OwnedPtrMut;
     use crate::bolts::rands::pybind::PythonRand;
     use crate::corpus::pybind::PythonCorpus;
-    //use crate::events::pybind::PythonEventManager;
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::pybind::PythonExecutor;
     use crate::feedbacks::pybind::PythonFeedback;
+    use crate::fuzzer::pybind::PythonStdFuzzerWrapper;
+    use crate::generators::pybind::PythonGenerator;
     use crate::inputs::BytesInput;
     use crate::pybind::PythonMetadata;
-    use crate::state::{HasMetadata, StdState};
+    use crate::state::{
+        HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,
+    };
     use pyo3::prelude::*;
     use pyo3::types::PyDict;
 
@@ -723,24 +728,45 @@ pub mod pybind {
             meta.get::<PythonMetadata>().unwrap().map.clone()
         }
 
-        /*fn generate_initial_inputs(
+        fn rand(&self) -> PythonRand {
+            self.inner.as_ref().rand().clone()
+        }
+
+        fn corpus(&self) -> PythonCorpus {
+            self.inner.as_ref().corpus().clone()
+        }
+
+        fn solutions(&self) -> PythonCorpus {
+            self.inner.as_ref().solutions().clone()
+        }
+
+        fn executions(&self) -> usize {
+            *self.inner.as_ref().executions()
+        }
+
+        fn max_size(&self) -> usize {
+            self.inner.as_ref().max_size()
+        }
+
+        fn generate_initial_inputs(
             &mut self,
-            py_fuzzer: &mut PythonFuzzer,
+            py_fuzzer: &mut PythonStdFuzzerWrapper,
             py_executor: &mut PythonExecutor,
             py_generator: &mut PythonGenerator,
             py_mgr: &mut PythonEventManager,
             num: usize,
         ) {
             self.inner
+                .as_mut()
                 .generate_initial_inputs(
-                    &mut py_fuzzer.inner,
+                    py_fuzzer.unwrap_mut(),
                     py_executor,
-                    &mut py_generator.rand_printable_generator,
+                    py_generator,
                     py_mgr,
                     num,
                 )
                 .expect("Failed to generate the initial corpus".into());
-        }*/
+        }
     }
 
     /// Register the classes to the python module

@@ -2,6 +2,7 @@ use libafl;
 use libafl_qemu;
 use libafl_sugar;
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
 const LIBAFL_CODE: &str = r#"
 class BaseObserver:
@@ -82,10 +83,19 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     
     modules.set_item("pylibafl.qemu", qemu_module)?;
 
-    let libafl_module = PyModule::from_code(py, LIBAFL_CODE, "libafl", "libafl")?;
+    let libafl_module = PyModule::new(py, "libafl")?;
     libafl::pybind::python_module(py, libafl_module)?;
-    m.add_submodule(libafl_module)?;
     
+    libafl_module.add("__builtins__", py.import("builtins")?)?;
+    
+    let locals = PyDict::new(py);
+    py.run(LIBAFL_CODE, Some(libafl_module.dict()), Some(locals))?;
+    for (key, val) in locals.iter() {
+        libafl_module.add(key.extract::<&str>()?, val)?;
+    }
+    
+    m.add_submodule(libafl_module)?;
+
     modules.set_item("pylibafl.libafl", libafl_module)?;
     
     Ok(())
