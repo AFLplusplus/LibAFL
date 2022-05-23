@@ -1108,7 +1108,7 @@ mod windows_exception_handler {
     }
 
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
+    pub(crate) unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
