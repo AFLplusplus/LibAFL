@@ -24,7 +24,7 @@ class BaseObserver:
 class BaseFeedback:
     def init_state(self, state):
         pass
-    def is_interesting(self, state, mgr, input, observers, exit_kind):
+    def is_interesting(self, state, mgr, input, observers, exit_kind) -> bool:
         return False
     def append_metadata(self, state, testcase):
         pass
@@ -64,6 +64,21 @@ class FnStage(BaseStage):
         self.fn(fuzzer, executor, state, manager, corpus_idx)
     def perform(self, fuzzer, executor, state, manager, corpus_idx):
         self.fn(fuzzer, executor, state, manager, corpus_idx)
+
+def feedback_not(a):
+    return NotFeedback(a).as_feedback()
+
+def feedback_and(a, b):
+    return EagerAndFeedback(a, b).as_feedback()
+
+def feedback_and_fast(a, b):
+    return FastAndFeedback(a, b).as_feedback()
+
+def feedback_or(a, b):
+    return EagerOrFeedback(a, b).as_feedback()
+
+def feedback_or_fast(a, b):
+    return FastOrFeedback(a, b).as_feedback()
 "#;
 
 #[pymodule]

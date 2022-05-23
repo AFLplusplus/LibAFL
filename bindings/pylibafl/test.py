@@ -23,8 +23,7 @@ class FooExecutor(BaseExecutor):
     def observers(self):
         return self.o
     def run_target(self, fuzzer, state, mgr, input) -> ExitKind:
-        (self.h)(input)
-        ExitKind.ok()
+        return (self.h)(input)
 
 libc = ctypes.cdll.LoadLibrary("libc.so.6")
 
@@ -34,29 +33,37 @@ observer = StdMapObserverI8("mymap", area_ptr, 4096)
 
 m = observer.as_map_observer()
 
-observers = ObserversTuple([observer.as_map_observer().as_observer()])
+observers = ObserversTuple([observer.as_map_observer().as_observer(), FooObserver().as_observer()])
 
-feedback = MaxMapFeedbackI8(m)
+feedback = feedback_or(MaxMapFeedbackI8(m).as_feedback(), FooFeedback().as_feedback())
 
-objective = CrashFeedback()
+objective = feedback_and_fast(CrashFeedback().as_feedback(), MaxMapFeedbackI8(m).as_feedback())
 
-fuzzer = StdFuzzer(feedback.as_feedback(), objective.as_feedback())
+fuzzer = StdFuzzer(feedback, objective)
 
 rand = StdRand.with_current_nanos()
 
-state = StdState(rand.as_rand(), InMemoryCorpus().as_corpus(), InMemoryCorpus().as_corpus(), feedback.as_feedback(), objective.as_feedback())
+state = StdState(rand.as_rand(), InMemoryCorpus().as_corpus(), InMemoryCorpus().as_corpus(), feedback, objective)
 
 monitor = SimpleMonitor(lambda s: print(s))
 
 mgr = SimpleEventManager(monitor.as_monitor())
 
-def harness(buf):
+def harness(buf) -> ExitKind:
     #print(buf)
     m[0] = 1
-    if len(buf) > 0 and buf[0] == 66:
+    if len(buf) > 0 and buf[0] == ord('a'):
         m[1] = 1
+        if len(buf) > 1 and buf[1] == ord('b'):
+            m[2] = 1
+            if len(buf) > 2 and buf[2] == ord('c'):
+                m[3] = 1
+                return ExitKind.crash()
+    return ExitKind.ok()
 
-executor = InProcessExecutor(harness, observers, fuzzer, state, mgr.as_manager())
+# executor = InProcessExecutor(harness, observers, fuzzer, state, mgr.as_manager())
+
+executor = FooExecutor(harness, observers)
 
 stage = StdMutationalStage(StdHavocMutator().as_mutator())
 

@@ -1040,7 +1040,10 @@ impl From<bool> for ConstFeedback {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{CrashFeedback, Debug, Feedback, String, ToString};
+    use super::{
+        ConstFeedback, CrashFeedback, Debug, EagerAndFeedback, EagerOrFeedback, FastAndFeedback,
+        FastOrFeedback, Feedback, NotFeedback, String, ToString,
+    };
     use crate::corpus::testcase::pybind::{PythonTestcase, PythonTestcaseWrapper};
     use crate::events::pybind::PythonEventManager;
     use crate::executors::pybind::PythonExitKind;
@@ -1208,6 +1211,98 @@ pub mod pybind {
     }
 
     #[derive(Clone, Debug)]
+    #[pyclass(unsendable, name = "ConstFeedback")]
+    pub struct PythonConstFeedback {
+        pub inner: ConstFeedback,
+    }
+
+    #[pymethods]
+    impl PythonConstFeedback {
+        #[new]
+        fn new(v: bool) -> Self {
+            Self {
+                inner: ConstFeedback::new(v),
+            }
+        }
+
+        #[must_use]
+        pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+            PythonFeedback::new_const(slf)
+        }
+    }
+
+    #[derive(Debug)]
+    #[pyclass(unsendable, name = "NotFeedback")]
+    pub struct PythonNotFeedback {
+        pub inner: NotFeedback<PythonFeedback, BytesInput, PythonStdState>,
+    }
+
+    #[pymethods]
+    impl PythonNotFeedback {
+        #[new]
+        fn new(feedback: PythonFeedback) -> Self {
+            Self {
+                inner: NotFeedback::new(feedback),
+            }
+        }
+
+        #[must_use]
+        pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+            PythonFeedback::new_not(slf)
+        }
+    }
+
+    macro_rules! define_combined {
+        ($feed:ident, $pyname:ident, $pystring:tt, $method:ident) => {
+            #[derive(Debug)]
+            #[pyclass(unsendable, name = $pystring)]
+            pub struct $pyname {
+                pub inner: $feed<PythonFeedback, PythonFeedback, BytesInput, PythonStdState>,
+            }
+
+            #[pymethods]
+            impl $pyname {
+                #[new]
+                fn new(a: PythonFeedback, b: PythonFeedback) -> Self {
+                    Self {
+                        inner: $feed::new(a, b),
+                    }
+                }
+
+                #[must_use]
+                pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+                    PythonFeedback::$method(slf)
+                }
+            }
+        };
+    }
+
+    define_combined!(
+        EagerAndFeedback,
+        PythonEagerAndFeedback,
+        "EagerAndFeedback",
+        new_and
+    );
+    define_combined!(
+        FastAndFeedback,
+        PythonFastAndFeedback,
+        "FastAndFeedback",
+        new_fast_and
+    );
+    define_combined!(
+        EagerOrFeedback,
+        PythonEagerOrFeedback,
+        "EagerOrFeedback",
+        new_or
+    );
+    define_combined!(
+        FastOrFeedback,
+        PythonFastOrFeedback,
+        "FastOrFeedback",
+        new_fast_or
+    );
+
+    #[derive(Clone, Debug)]
     pub enum PythonFeedbackWrapper {
         MaxMapI8(Py<PythonMaxMapFeedbackI8>),
         MaxMapI16(Py<PythonMaxMapFeedbackI16>),
@@ -1218,6 +1313,12 @@ pub mod pybind {
         MaxMapU32(Py<PythonMaxMapFeedbackU32>),
         MaxMapU64(Py<PythonMaxMapFeedbackU64>),
         Crash(Py<PythonCrashFeedback>),
+        Const(Py<PythonConstFeedback>),
+        Not(Py<PythonNotFeedback>),
+        And(Py<PythonEagerAndFeedback>),
+        FastAnd(Py<PythonFastAndFeedback>),
+        Or(Py<PythonEagerOrFeedback>),
+        FastOr(Py<PythonFastOrFeedback>),
         Python(PyObjectFeedback),
     }
 
@@ -1241,7 +1342,13 @@ pub mod pybind {
                     MaxMapU16,
                     MaxMapU32,
                     MaxMapU64,
-                    Crash
+                    Crash,
+                    Const,
+                    Not,
+                    And,
+                    FastAnd,
+                    Or,
+                    FastOr
                 },
                 {
                      Python(py_wrapper) => {
@@ -1265,7 +1372,13 @@ pub mod pybind {
                     MaxMapU16,
                     MaxMapU32,
                     MaxMapU64,
-                    Crash
+                    Crash,
+                    Const,
+                    Not,
+                    And,
+                    FastAnd,
+                    Or,
+                    FastOr
                 },
                 {
                      Python(py_wrapper) => {
@@ -1371,6 +1484,60 @@ pub mod pybind {
 
         #[staticmethod]
         #[must_use]
+        pub fn new_const(feedback: Py<PythonConstFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Const(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_not(feedback: Py<PythonNotFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Not(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_and(feedback: Py<PythonEagerAndFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::And(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_fast_and(feedback: Py<PythonFastAndFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::FastAnd(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_or(feedback: Py<PythonEagerOrFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Or(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_fast_or(feedback: Py<PythonFastOrFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::FastOr(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
         pub fn new_py(obj: PyObject) -> Self {
             Self {
                 wrapper: PythonFeedbackWrapper::Python(PyObjectFeedback::new(obj)),
@@ -1440,6 +1607,12 @@ pub mod pybind {
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonCrashFeedback>()?;
+        m.add_class::<PythonConstFeedback>()?;
+        m.add_class::<PythonNotFeedback>()?;
+        m.add_class::<PythonEagerAndFeedback>()?;
+        m.add_class::<PythonFastAndFeedback>()?;
+        m.add_class::<PythonEagerOrFeedback>()?;
+        m.add_class::<PythonFastOrFeedback>()?;
         m.add_class::<PythonFeedback>()?;
         Ok(())
     }
