@@ -471,78 +471,19 @@ pub mod pybind {
         state,
     };
     use pyo3::prelude::*;
-    use pyo3::PyClass;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     #[derive(Debug, Clone)]
-    pub struct SerdePy<T>
-    where
-        T: PyClass + Serialize + serde::de::DeserializeOwned,
-    {
-        pub inner: Py<T>,
+    pub struct PythonMetadata {
+        pub map: PyObject,
     }
 
-    impl<T> Serialize for SerdePy<T>
-    where
-        T: PyClass + Serialize + serde::de::DeserializeOwned,
-    {
-        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
-        {
-            Python::with_gil(|py| -> PyResult<Result<S::Ok, S::Error>> {
-                let borrowed = self.borrow(py);
-                Ok(borrowed.serialize(serializer))
-            })
-            .unwrap()
-        }
-    }
+    crate::impl_serde_pyobjectwrapper!(PythonMetadata, map);
+    crate::impl_serdeany!(PythonMetadata);
 
-    impl<'de, T> Deserialize<'de> for SerdePy<T>
-    where
-        T: PyClass + Into<PyClassInitializer<T>> + Serialize + serde::de::DeserializeOwned,
-    {
-        fn deserialize<D>(deserializer: D) -> Result<SerdePy<T>, D::Error>
-        where
-            D: Deserializer<'de>,
-        {
-            let t = T::deserialize(deserializer)?;
-            Ok(Python::with_gil(|py| -> PyResult<SerdePy<T>> { SerdePy::new(py, t) }).unwrap())
-        }
-    }
-
-    impl<T> SerdePy<T>
-    where
-        T: PyClass + Serialize + serde::de::DeserializeOwned,
-    {
-        pub fn new(py: Python<'_>, value: impl Into<PyClassInitializer<T>>) -> PyResult<Self> {
-            Ok(Self {
-                inner: Py::new(py, value)?,
-            })
-        }
-
+    impl PythonMetadata {
         #[must_use]
-        pub fn borrow<'py>(&'py self, py: Python<'py>) -> PyRef<'py, T> {
-            self.inner.borrow(py)
-        }
-
-        #[must_use]
-        pub fn borrow_mut<'py>(&'py self, py: Python<'py>) -> PyRefMut<'py, T> {
-            self.inner.borrow_mut(py)
-        }
-
-        #[must_use]
-        pub fn as_ref<'py>(&'py self, py: Python<'py>) -> &'py T::AsRefTarget {
-            self.inner.as_ref(py)
-        }
-    }
-
-    impl<T> From<Py<T>> for SerdePy<T>
-    where
-        T: PyClass + Serialize + serde::de::DeserializeOwned,
-    {
-        fn from(inner: Py<T>) -> Self {
-            Self { inner }
+        pub fn new(map: PyObject) -> Self {
+            Self { map }
         }
     }
 

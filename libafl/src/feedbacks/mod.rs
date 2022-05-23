@@ -1041,8 +1041,14 @@ impl From<bool> for ConstFeedback {
 #[allow(missing_docs)]
 pub mod pybind {
     use super::{Debug, Feedback, String, ToString};
+    use crate::corpus::testcase::pybind::{PythonTestcase, PythonTestcaseWrapper};
     use crate::events::pybind::PythonEventManager;
-    use crate::feedbacks::map::pybind::PythonMaxMapFeedbackI8;
+    use crate::executors::pybind::PythonExitKind;
+    use crate::feedbacks::map::pybind::{
+        PythonMaxMapFeedbackI16, PythonMaxMapFeedbackI32, PythonMaxMapFeedbackI64,
+        PythonMaxMapFeedbackI8, PythonMaxMapFeedbackU16, PythonMaxMapFeedbackU32,
+        PythonMaxMapFeedbackU64, PythonMaxMapFeedbackU8,
+    };
     use crate::inputs::HasBytesVec;
     use crate::observers::pybind::PythonObserversTuple;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
@@ -1111,7 +1117,7 @@ pub mod pybind {
             manager: &mut EM,
             input: &BytesInput,
             observers: &OT,
-            _exit_kind: &ExitKind,
+            exit_kind: &ExitKind,
         ) -> Result<bool, Error>
         where
             EM: EventFirer<BytesInput>,
@@ -1122,7 +1128,6 @@ pub mod pybind {
                 unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
             let dont_look_at_this2: &PythonEventManager =
                 unsafe { &*(manager as *mut EM as *const PythonEventManager) };
-            // TODO pass the other args
             Ok(Python::with_gil(|py| -> PyResult<bool> {
                 let r: bool = self
                     .inner
@@ -1134,6 +1139,7 @@ pub mod pybind {
                             dont_look_at_this2.clone(),
                             input.bytes(),
                             dont_look_at_this.clone(),
+                            PythonExitKind::from(exit_kind.clone()),
                         ),
                     )?
                     .extract(py)?;
@@ -1145,14 +1151,16 @@ pub mod pybind {
         fn append_metadata(
             &mut self,
             state: &mut PythonStdState,
-            _testcase: &mut Testcase<BytesInput>,
+            testcase: &mut PythonTestcase,
         ) -> Result<(), Error> {
-            // TODO pass the other args
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,
                     "append_metadata",
-                    (PythonStdStateWrapper::wrap(state),),
+                    (
+                        PythonStdStateWrapper::wrap(state),
+                        PythonTestcaseWrapper::wrap(testcase),
+                    ),
                 )?;
                 Ok(())
             })
@@ -1181,6 +1189,13 @@ pub mod pybind {
     #[derive(Clone, Debug)]
     pub enum PythonFeedbackWrapper {
         MaxMapI8(Py<PythonMaxMapFeedbackI8>),
+        MaxMapI16(Py<PythonMaxMapFeedbackI16>),
+        MaxMapI32(Py<PythonMaxMapFeedbackI32>),
+        MaxMapI64(Py<PythonMaxMapFeedbackI64>),
+        MaxMapU8(Py<PythonMaxMapFeedbackU8>),
+        MaxMapU16(Py<PythonMaxMapFeedbackU16>),
+        MaxMapU32(Py<PythonMaxMapFeedbackU32>),
+        MaxMapU64(Py<PythonMaxMapFeedbackU64>),
         Python(PyObjectFeedback),
     }
 
@@ -1195,28 +1210,46 @@ pub mod pybind {
     macro_rules! unwrap_me {
         ($wrapper:expr, $name:ident, $body:block) => {
             crate::unwrap_me_body!($wrapper, $name, $body, PythonFeedbackWrapper,
-               { MaxMapI8 },
-               {
-                    Python(py_wrapper) => {
-                        let $name = py_wrapper;
-                        $body
-                    }
-               }
-           )
+                {
+                    MaxMapI8,
+                    MaxMapI16,
+                    MaxMapI32,
+                    MaxMapI64,
+                    MaxMapU8,
+                    MaxMapU16,
+                    MaxMapU32,
+                    MaxMapU64
+                },
+                {
+                     Python(py_wrapper) => {
+                         let $name = py_wrapper;
+                         $body
+                     }
+                }
+            )
         };
     }
 
     macro_rules! unwrap_me_mut {
         ($wrapper:expr, $name:ident, $body:block) => {
             crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonFeedbackWrapper,
-               { MaxMapI8 },
-               {
-                    Python(py_wrapper) => {
-                        let $name = py_wrapper;
-                        $body
-                    }
-               }
-           )
+                {
+                    MaxMapI8,
+                    MaxMapI16,
+                    MaxMapI32,
+                    MaxMapI64,
+                    MaxMapU8,
+                    MaxMapU16,
+                    MaxMapU32,
+                    MaxMapU64
+                },
+                {
+                     Python(py_wrapper) => {
+                         let $name = py_wrapper;
+                         $body
+                     }
+                }
+            )
         };
     }
 
@@ -1242,6 +1275,69 @@ pub mod pybind {
 
         #[staticmethod]
         #[must_use]
+        pub fn new_max_map_i16(map_feedback: Py<PythonMaxMapFeedbackI16>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapI16(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_i32(map_feedback: Py<PythonMaxMapFeedbackI32>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapI32(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_i64(map_feedback: Py<PythonMaxMapFeedbackI64>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapI64(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_u8(map_feedback: Py<PythonMaxMapFeedbackU8>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapU8(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_u16(map_feedback: Py<PythonMaxMapFeedbackU16>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapU16(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_u32(map_feedback: Py<PythonMaxMapFeedbackU32>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapU32(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_u64(map_feedback: Py<PythonMaxMapFeedbackU64>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapU64(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
         pub fn new_py(obj: PyObject) -> Self {
             Self {
                 wrapper: PythonFeedbackWrapper::Python(PyObjectFeedback::new(obj)),
@@ -1252,7 +1348,7 @@ pub mod pybind {
         pub fn unwrap_py(&self) -> Option<PyObject> {
             match &self.wrapper {
                 PythonFeedbackWrapper::Python(pyo) => Some(pyo.inner.clone()),
-                PythonFeedbackWrapper::MaxMapI8(_) => None,
+                _ => None,
             }
         }
     }

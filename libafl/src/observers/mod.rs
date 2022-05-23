@@ -296,6 +296,7 @@ where
 pub mod pybind {
     use super::{Debug, Observer, ObserversTuple, String, Vec};
     use crate::bolts::tuples::{type_eq, MatchName, Named};
+    use crate::executors::pybind::PythonExitKind;
     use crate::executors::ExitKind;
     use crate::inputs::BytesInput;
     use crate::inputs::HasBytesVec;
@@ -306,7 +307,6 @@ pub mod pybind {
         PythonMapObserverWrapperI8, PythonMapObserverWrapperU16, PythonMapObserverWrapperU32,
         PythonMapObserverWrapperU64, PythonMapObserverWrapperU8,
     };
-    use crate::pybind::SerdePy;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::Error;
     use pyo3::prelude::*;
@@ -385,14 +385,18 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &BytesInput,
-            _exit_kind: &ExitKind,
+            exit_kind: &ExitKind,
         ) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,
                     "post_exec",
-                    (PythonStdStateWrapper::wrap(state), input.bytes()),
-                )?; // TODO add exit kind
+                    (
+                        PythonStdStateWrapper::wrap(state),
+                        input.bytes(),
+                        PythonExitKind::from(exit_kind.clone()),
+                    ),
+                )?;
                 Ok(())
             })
             .unwrap();
@@ -420,14 +424,18 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &BytesInput,
-            _exit_kind: &ExitKind,
+            exit_kind: &ExitKind,
         ) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
                     py,
                     "post_exec_child",
-                    (PythonStdStateWrapper::wrap(state), input.bytes()),
-                )?; // TODO add exit kind
+                    (
+                        PythonStdStateWrapper::wrap(state),
+                        input.bytes(),
+                        PythonExitKind::from(exit_kind.clone()),
+                    ),
+                )?;
                 Ok(())
             })
             .unwrap();
@@ -437,14 +445,14 @@ pub mod pybind {
 
     #[derive(Serialize, Deserialize, Clone, Debug)]
     pub enum PythonObserverWrapper {
-        MapI8(SerdePy<PythonMapObserverI8>),
-        MapI16(SerdePy<PythonMapObserverI16>),
-        MapI32(SerdePy<PythonMapObserverI32>),
-        MapI64(SerdePy<PythonMapObserverI64>),
-        MapU8(SerdePy<PythonMapObserverU8>),
-        MapU16(SerdePy<PythonMapObserverU16>),
-        MapU32(SerdePy<PythonMapObserverU32>),
-        MapU64(SerdePy<PythonMapObserverU64>),
+        MapI8(Py<PythonMapObserverI8>),
+        MapI16(Py<PythonMapObserverI16>),
+        MapI32(Py<PythonMapObserverI32>),
+        MapI64(Py<PythonMapObserverI64>),
+        MapU8(Py<PythonMapObserverU8>),
+        MapU16(Py<PythonMapObserverU16>),
+        MapU32(Py<PythonMapObserverU32>),
+        MapU64(Py<PythonMapObserverU64>),
         Python(PyObjectObserver),
     }
 
@@ -667,28 +675,28 @@ pub mod pybind {
         #[must_use]
         pub fn new_map_i8(map_observer: Py<PythonMapObserverI8>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapI8(map_observer.into()),
+                wrapper: PythonObserverWrapper::MapI8(map_observer),
             }
         }
         #[staticmethod]
         #[must_use]
         pub fn new_map_i16(map_observer: Py<PythonMapObserverI16>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapI16(map_observer.into()),
+                wrapper: PythonObserverWrapper::MapI16(map_observer),
             }
         }
         #[staticmethod]
         #[must_use]
         pub fn new_map_i32(map_observer: Py<PythonMapObserverI32>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapI32(map_observer.into()),
+                wrapper: PythonObserverWrapper::MapI32(map_observer),
             }
         }
         #[staticmethod]
         #[must_use]
         pub fn new_map_i64(map_observer: Py<PythonMapObserverI64>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapI64(map_observer.into()),
+                wrapper: PythonObserverWrapper::MapI64(map_observer),
             }
         }
 
@@ -696,28 +704,28 @@ pub mod pybind {
         #[must_use]
         pub fn new_map_u8(map_observer: Py<PythonMapObserverU8>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapU8(map_observer.into()),
+                wrapper: PythonObserverWrapper::MapU8(map_observer),
             }
         }
         #[staticmethod]
         #[must_use]
         pub fn new_map_u16(map_observer: Py<PythonMapObserverU16>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapU16(map_observer.into()),
+                wrapper: PythonObserverWrapper::MapU16(map_observer),
             }
         }
         #[staticmethod]
         #[must_use]
         pub fn new_map_u32(map_observer: Py<PythonMapObserverU32>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapU32(map_observer.into()),
+                wrapper: PythonObserverWrapper::MapU32(map_observer),
             }
         }
         #[staticmethod]
         #[must_use]
         pub fn new_map_u64(map_observer: Py<PythonMapObserverU64>) -> Self {
             Self {
-                wrapper: PythonObserverWrapper::MapU64(map_observer.into()),
+                wrapper: PythonObserverWrapper::MapU64(map_observer),
             }
         }
         #[staticmethod]

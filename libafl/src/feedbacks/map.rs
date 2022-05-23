@@ -671,13 +671,14 @@ pub mod pybind {
     use super::{Debug, HasObserverName, MaxMapFeedback};
     use crate::feedbacks::pybind::PythonFeedback;
     use crate::inputs::BytesInput;
-    use crate::observers::map::pybind::PythonMapObserverI8;
     use crate::state::pybind::PythonStdState;
     use concat_idents::concat_idents;
     use pyo3::prelude::*;
 
     macro_rules! define_python_map_feedback {
         ($struct_name:ident, $py_name:tt, $datatype:ty, $map_observer_type_name: ident, $my_std_state_type_name: ident) => {
+            use crate::observers::map::pybind::$map_observer_type_name;
+
             #[pyclass(unsendable, name = $py_name)]
             #[derive(Debug, Clone)]
             /// Python class for MaxMapFeedback
@@ -723,7 +724,7 @@ pub mod pybind {
         PythonMapObserverI8,
         PythonStdState
     );
-    /*define_python_map_feedback!(
+    define_python_map_feedback!(
         PythonMaxMapFeedbackI16,
         "MaxMapFeedbackI16",
         i16,
@@ -772,19 +773,19 @@ pub mod pybind {
         u64,
         PythonMapObserverU64,
         PythonStdState
-    );*/
+    );
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonMaxMapFeedbackI8>()?;
-        /*m.add_class::<PythonMaxMapFeedbackI16>()?;
+        m.add_class::<PythonMaxMapFeedbackI16>()?;
         m.add_class::<PythonMaxMapFeedbackI32>()?;
         m.add_class::<PythonMaxMapFeedbackI64>()?;
 
         m.add_class::<PythonMaxMapFeedbackU8>()?;
         m.add_class::<PythonMaxMapFeedbackU16>()?;
         m.add_class::<PythonMaxMapFeedbackU32>()?;
-        m.add_class::<PythonMaxMapFeedbackU64>()?;*/
+        m.add_class::<PythonMaxMapFeedbackU64>()?;
         Ok(())
     }
 }

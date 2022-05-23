@@ -436,7 +436,6 @@ mod tests {
 pub mod pybind {
     use super::Rand;
     use crate::bolts::{current_nanos, rands::StdRand};
-    use crate::pybind::SerdePy;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
@@ -471,7 +470,7 @@ pub mod pybind {
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     enum PythonRandWrapper {
-        Std(SerdePy<PythonStdRand>),
+        Std(Py<PythonStdRand>),
     }
 
     /// Rand Trait binding
@@ -492,7 +491,7 @@ pub mod pybind {
         #[staticmethod]
         fn new_std(py_std_rand: Py<PythonStdRand>) -> Self {
             Self {
-                wrapper: PythonRandWrapper::Std(py_std_rand.into()),
+                wrapper: PythonRandWrapper::Std(py_std_rand),
             }
         }
     }

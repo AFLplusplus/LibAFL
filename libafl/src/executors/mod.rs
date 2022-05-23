@@ -198,6 +198,78 @@ pub mod pybind {
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::Error;
     use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    #[pyclass(unsendable, name = "ExitKind")]
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct PythonExitKind {
+        pub inner: ExitKind,
+    }
+
+    impl From<ExitKind> for PythonExitKind {
+        fn from(inner: ExitKind) -> Self {
+            Self { inner }
+        }
+    }
+
+    #[pymethods]
+    impl PythonExitKind {
+        fn __eq__(&self, other: PythonExitKind) -> bool {
+            self.inner == other.inner
+        }
+
+        #[must_use]
+        fn is_ok(&self) -> bool {
+            self.inner == ExitKind::Ok
+        }
+
+        #[must_use]
+        fn is_crash(&self) -> bool {
+            self.inner == ExitKind::Crash
+        }
+
+        #[must_use]
+        fn is_oom(&self) -> bool {
+            self.inner == ExitKind::Oom
+        }
+
+        #[must_use]
+        fn is_timeout(&self) -> bool {
+            self.inner == ExitKind::Timeout
+        }
+
+        #[staticmethod]
+        #[must_use]
+        fn ok() -> Self {
+            Self {
+                inner: ExitKind::Ok,
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        fn crash() -> Self {
+            Self {
+                inner: ExitKind::Crash,
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        fn oom() -> Self {
+            Self {
+                inner: ExitKind::Oom,
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        fn timeout() -> Self {
+            Self {
+                inner: ExitKind::Timeout,
+            }
+        }
+    }
 
     #[derive(Clone, Debug)]
     pub struct PyObjectExecutor {
@@ -239,22 +311,24 @@ pub mod pybind {
             mgr: &mut PythonEventManager,
             input: &BytesInput,
         ) -> Result<ExitKind, Error> {
-            // TODO exit kind
-            Python::with_gil(|py| -> PyResult<()> {
-                self.inner.call_method1(
-                    py,
-                    "run_target",
-                    (
-                        PythonStdFuzzerWrapper::wrap(fuzzer),
-                        PythonStdStateWrapper::wrap(state),
-                        mgr.clone(),
-                        input.bytes(),
-                    ),
-                )?;
-                Ok(())
+            let ek = Python::with_gil(|py| -> PyResult<_> {
+                let ek: PythonExitKind = self
+                    .inner
+                    .call_method1(
+                        py,
+                        "run_target",
+                        (
+                            PythonStdFuzzerWrapper::wrap(fuzzer),
+                            PythonStdStateWrapper::wrap(state),
+                            mgr.clone(),
+                            input.bytes(),
+                        ),
+                    )?
+                    .extract(py)?;
+                Ok(ek)
             })
             .unwrap();
-            Ok(ExitKind::Ok)
+            Ok(ek.inner)
         }
     }
 
@@ -359,6 +433,7 @@ pub mod pybind {
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonExitKind>()?;
         m.add_class::<PythonExecutor>()?;
         Ok(())
     }

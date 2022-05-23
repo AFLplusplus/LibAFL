@@ -350,10 +350,12 @@ crate::impl_serdeany!(SchedulerTestcaseMetaData);
 #[allow(missing_docs)]
 /// `Testcase` Python bindings
 pub mod pybind {
-    use super::Testcase;
+    use super::{HasMetadata, Testcase};
     use crate::bolts::ownedref::OwnedPtrMut;
-    use crate::inputs::BytesInput;
+    use crate::inputs::{BytesInput, HasBytesVec};
+    use crate::pybind::PythonMetadata;
     use pyo3::prelude::*;
+    use pyo3::types::PyDict;
 
     /// `PythonTestcase` with fixed generics
     pub type PythonTestcase = Testcase<BytesInput>;
@@ -390,6 +392,45 @@ pub mod pybind {
             Self {
                 inner: OwnedPtrMut::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
             }
+        }
+
+        fn load_input(&mut self) -> &[u8] {
+            self.inner
+                .as_mut()
+                .load_input()
+                .expect("Failed to load input")
+                .bytes()
+        }
+
+        #[getter]
+        fn exec_time_ms(&self) -> Option<u128> {
+            self.inner.as_ref().exec_time().map(|t| t.as_millis())
+        }
+
+        #[getter]
+        fn executions(&self) -> usize {
+            self.inner.as_ref().executions().clone()
+        }
+
+        #[getter]
+        fn fuzz_level(&self) -> usize {
+            self.inner.as_ref().fuzz_level().clone()
+        }
+
+        #[getter]
+        fn fuzzed(&self) -> bool {
+            self.inner.as_ref().fuzzed().clone()
+        }
+
+        fn metadata(&mut self) -> PyObject {
+            let meta = self.inner.as_mut().metadata_mut();
+            if !meta.contains::<PythonMetadata>() {
+                Python::with_gil(|py| {
+                    let dict: Py<PyDict> = PyDict::new(py).into();
+                    meta.insert(PythonMetadata::new(dict.to_object(py)));
+                });
+            }
+            meta.get::<PythonMetadata>().unwrap().map.clone()
         }
     }
 

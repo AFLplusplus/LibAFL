@@ -1,44 +1,6 @@
 from pylibafl.libafl import *
 import ctypes
 
-class BaseObserver:
-    def flush(self):
-        pass
-    def pre_exec(self, state, input):
-        pass
-    def post_exec(self, state, input):
-        pass
-    def pre_exec_child(self, state, input):
-        pass
-    def post_exec_child(self, state, input):
-        pass
-    def name(self):
-        return type(self).__name__
-    def as_observer(self):
-        return Observer.new_py(self)
-
-class BaseFeedback:
-    def init_state(self, state):
-        pass
-    def is_interesting(self, state, mgr, input, observers):
-        return False
-    def append_metadata(self, state):
-        pass
-    def discard_metadata(self, state, input):
-        pass
-    def name(self):
-        return type(self).__name__
-    def as_feedback(self):
-        return Feedback.new_py(self)
-
-class BaseExecutor:
-    def observers(self) -> ObserversTuple:
-        raise NotImplementedError('Implement this yourself')
-    def run_target(self, fuzzer, state, mgr, input):
-        raise NotImplementedError('Implement this yourself')
-    def as_executor(self):
-        return Executor.new_py(self)
-
 class FooObserver(BaseObserver):
     def __init__(self):
         self.n = 0
@@ -50,7 +12,7 @@ class FooObserver(BaseObserver):
         self.n += 1
 
 class FooFeedback(BaseFeedback):
-    def is_interesting(self, state, mgr, input, observers):
+    def is_interesting(self, state, mgr, input, observers, exit_kind):
         ob = observers.match_name("Foo").unwrap_py()
         return ob.n % 10000 == 0
 
@@ -60,8 +22,9 @@ class FooExecutor(BaseExecutor):
         self.o = observers
     def observers(self):
         return self.o
-    def run_target(self, fuzzer, state, mgr, input):
+    def run_target(self, fuzzer, state, mgr, input) -> ExitKind:
         (self.h)(input)
+        ExitKind.ok()
 
 libc = ctypes.cdll.LoadLibrary("libc.so.6")
 

@@ -59,7 +59,6 @@ pub mod pybind {
     use crate::corpus::inmemory::pybind::PythonInMemoryCorpus;
     use crate::corpus::{Corpus, Testcase};
     use crate::inputs::BytesInput;
-    use crate::pybind::SerdePy;
     use crate::Error;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
@@ -70,9 +69,9 @@ pub mod pybind {
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     enum PythonCorpusWrapper {
-        InMemory(SerdePy<PythonInMemoryCorpus>),
-        CachedOnDisk(SerdePy<PythonCachedOnDiskCorpus>),
-        OnDisk(SerdePy<PythonOnDiskCorpus>),
+        InMemory(Py<PythonInMemoryCorpus>),
+        CachedOnDisk(Py<PythonCachedOnDiskCorpus>),
+        OnDisk(Py<PythonOnDiskCorpus>),
     }
 
     /// Corpus Trait binding
@@ -88,7 +87,7 @@ pub mod pybind {
         #[must_use]
         pub fn new_in_memory(py_in_memory_corpus: Py<PythonInMemoryCorpus>) -> Self {
             Self {
-                wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus.into()),
+                wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus),
             }
         }
 
@@ -96,7 +95,7 @@ pub mod pybind {
         #[must_use]
         pub fn new_cached_on_disk(py_cached_on_disk_corpus: Py<PythonCachedOnDiskCorpus>) -> Self {
             Self {
-                wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus.into()),
+                wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus),
             }
         }
 
@@ -104,7 +103,7 @@ pub mod pybind {
         #[must_use]
         pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
             Self {
-                wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus.into()),
+                wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus),
             }
         }
     }

@@ -661,8 +661,10 @@ pub mod pybind {
     //use crate::events::pybind::PythonEventManager;
     use crate::feedbacks::pybind::PythonFeedback;
     use crate::inputs::BytesInput;
-    use crate::state::StdState;
+    use crate::pybind::PythonMetadata;
+    use crate::state::{HasMetadata, StdState};
     use pyo3::prelude::*;
+    use pyo3::types::PyDict;
 
     /// `StdState` with fixed generics
     pub type PythonStdState = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
@@ -708,6 +710,17 @@ pub mod pybind {
                         .expect("Failed to create a new StdState"),
                 )),
             }
+        }
+
+        fn metadata(&mut self) -> PyObject {
+            let meta = self.inner.as_mut().metadata_mut();
+            if !meta.contains::<PythonMetadata>() {
+                Python::with_gil(|py| {
+                    let dict: Py<PyDict> = PyDict::new(py).into();
+                    meta.insert(PythonMetadata::new(dict.to_object(py)));
+                });
+            }
+            meta.get::<PythonMetadata>().unwrap().map.clone()
         }
 
         /*fn generate_initial_inputs(
