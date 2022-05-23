@@ -389,8 +389,10 @@ pub(crate) struct InProcessExecutorHandlerData {
     event_mgr_ptr: *mut c_void,
     fuzzer_ptr: *mut c_void,
     executor_ptr: *const c_void,
-    current_input_ptr: *const c_void,
+    pub(crate) current_input_ptr: *const c_void,
+    #[cfg(feature = "std")]
     crash_handler: *const c_void,
+    #[cfg(feature = "std")]
     timeout_handler: *const c_void,
     #[cfg(windows)]
     pub tp_timer: *mut c_void,
