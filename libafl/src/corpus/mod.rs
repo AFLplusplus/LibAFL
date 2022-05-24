@@ -21,7 +21,7 @@ use core::cell::RefCell;
 use crate::{inputs::Input, Error};
 
 /// Corpus with all current testcases
-pub trait Corpus<I>: serde::Serialize + serde::de::DeserializeOwned
+pub trait Corpus<I>: serde::Serialize + for<'de> serde::Deserialize<'de>
 where
     I: Input,
 {

@@ -70,10 +70,10 @@ Welcome to `LibAFL`
 )]
 
 #[macro_use]
-extern crate alloc;
+pub extern crate alloc;
 #[macro_use]
 extern crate static_assertions;
-#[cfg(feature = "std")]
+#[cfg(feature = "ctor")]
 pub use ctor::ctor;
 
 // Re-export derive(SerdeAny)
@@ -407,8 +407,10 @@ mod tests {
             rand,
             corpus,
             InMemoryCorpus::<BytesInput>::new(),
-            tuple_list!(),
-        );
+            &mut (),
+            &mut (),
+        )
+        .unwrap();
 
         let monitor = SimpleMonitor::new(|s| {
             println!("{}", s);
@@ -440,7 +442,6 @@ mod tests {
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: StdState<
             InMemoryCorpus<BytesInput>,
-            (),
             BytesInput,
             StdRand,
             InMemoryCorpus<BytesInput>,

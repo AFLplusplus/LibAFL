@@ -11,11 +11,11 @@ use std::{
 use crate::{
     bolts::{
         rands::Rand,
-        serdeany::{SerdeAny, SerdeAnyMap},
+        serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
-    feedbacks::FeedbackStatesTuple,
+    feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::Input,
@@ -110,15 +110,30 @@ pub trait HasMetadata {
     }
 }
 
-/// Trait for elements offering a feedback
-pub trait HasFeedbackStates {
-    /// The associated feedback type implementing [`FeedbackStatesTuple`].
-    type FeedbackStates: FeedbackStatesTuple;
-    /// The feedback states
-    fn feedback_states(&self) -> &Self::FeedbackStates;
+/// Trait for elements offering named metadata
+pub trait HasNamedMetadata {
+    /// A map, storing all metadata
+    fn named_metadata(&self) -> &NamedSerdeAnyMap;
+    /// A map, storing all metadata (mutable)
+    fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap;
 
-    /// The feedback states (mutable)
-    fn feedback_states_mut(&mut self) -> &mut Self::FeedbackStates;
+    /// Add a metadata to the metadata map
+    #[inline]
+    fn add_named_metadata<M>(&mut self, meta: M, name: &str)
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_mut().insert(meta, name);
+    }
+
+    /// Check for a metadata
+    #[inline]
+    fn has_named_metadata<M>(&self, name: &str) -> bool
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata().contains::<M>(name)
+    }
 }
 
 /// Trait for the execution counter
@@ -141,13 +156,12 @@ pub trait HasStartTime {
 
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "FT: serde::de::DeserializeOwned")]
-pub struct StdState<C, FT, I, R, SC>
+#[serde(bound = "C: serde::Serialize + for<'a> serde::Deserialize<'a>")]
+pub struct StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// RNG instance
@@ -158,12 +172,12 @@ where
     start_time: Duration,
     /// The corpus
     corpus: C,
-    /// States of the feedback used to evaluate an input
-    feedback_states: FT,
     // Solutions corpus
     solutions: SC,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
+    /// Metadata stored with names
+    named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
     /// The stability of the current fuzzing process
@@ -176,22 +190,20 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<C, FT, I, R, SC> State for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> State for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
 }
 
-impl<C, FT, I, R, SC> HasRand for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasRand for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     type Rand = R;
@@ -209,12 +221,11 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasCorpus<I> for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasCorpus<I> for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     type Corpus = C;
@@ -232,12 +243,11 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasSolutions<I> for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasSolutions<I> for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     type Solutions = SC;
@@ -255,12 +265,11 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasMetadata for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// Get all the metadata into an [`hashbrown::HashMap`]
@@ -276,35 +285,31 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasFeedbackStates for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    type FeedbackStates = FT;
-
-    /// The feedback states
+    /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn feedback_states(&self) -> &FT {
-        &self.feedback_states
+    fn named_metadata(&self) -> &NamedSerdeAnyMap {
+        &self.named_metadata
     }
 
-    /// The feedback states (mutable)
+    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn feedback_states_mut(&mut self) -> &mut FT {
-        &mut self.feedback_states
+    fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap {
+        &mut self.named_metadata
     }
 }
 
-impl<C, FT, I, R, SC> HasExecutions for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// The executions counter
@@ -320,12 +325,11 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasMaxSize for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn max_size(&self) -> usize {
@@ -337,12 +341,11 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasStartTime for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// The starting time
@@ -359,12 +362,11 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, FT, I, R, SC> StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// Loads inputs from a directory.
@@ -480,12 +482,11 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn generate_initial_internal<G, E, EM, Z>(
@@ -561,31 +562,43 @@ where
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    pub fn new(rand: R, corpus: C, solutions: SC, feedback_states: FT) -> Self {
-        Self {
+    pub fn new<F, O>(
+        rand: R,
+        corpus: C,
+        solutions: SC,
+        feedback: &mut F,
+        objective: &mut O,
+    ) -> Result<Self, Error>
+    where
+        F: Feedback<I, Self>,
+        O: Feedback<I, Self>,
+    {
+        let mut state = Self {
             rand,
             executions: 0,
             stability: None,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
+            named_metadata: NamedSerdeAnyMap::default(),
             corpus,
-            feedback_states,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             phantom: PhantomData,
-        }
+        };
+        feedback.init_state(&mut state)?;
+        objective.init_state(&mut state)?;
+        Ok(state)
     }
 }
 
 #[cfg(feature = "introspection")]
-impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
@@ -610,12 +623,11 @@ where
 }
 
 #[cfg(not(feature = "introspection"))]
-impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
@@ -645,28 +657,20 @@ pub mod pybind {
     use crate::bolts::rands::pybind::PythonRand;
     use crate::bolts::tuples::tuple_list;
     use crate::corpus::pybind::PythonCorpus;
-    use crate::feedbacks::map::MapFeedbackState;
+    use crate::feedbacks::pybind::PythonFeedback;
     use crate::inputs::BytesInput;
     use crate::state::StdState;
     use pyo3::prelude::*;
 
     macro_rules! define_python_state {
-        ($type_name:ident, $struct_name:ident, $py_name:tt, $datatype:ty, $py_map_feedback_state_name:ident, $event_manager_name: ident,
-        $fuzzer_name: ident, $executor_name: ident, $rand_printable_generator: ident) => {
+        ($type_name:ident, $struct_name:ident, $py_name:tt) => {
             use crate::events::pybind::$event_manager_name;
             use crate::executors::pybind::$executor_name;
-            use crate::feedbacks::map::pybind::$py_map_feedback_state_name;
             use crate::fuzzer::pybind::$fuzzer_name;
             use crate::generators::pybind::$rand_printable_generator;
 
             /// `StdState` with fixed generics
-            pub type $type_name = StdState<
-                PythonCorpus,
-                (MapFeedbackState<$datatype>, ()),
-                BytesInput,
-                PythonRand,
-                PythonCorpus,
-            >;
+            pub type $type_name = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
 
             #[pyclass(unsendable, name = $py_name)]
             #[derive(Debug)]
@@ -683,24 +687,20 @@ pub mod pybind {
                     py_rand: PythonRand,
                     corpus: PythonCorpus,
                     solutions: PythonCorpus,
-                    py_map_feedback_state: $py_map_feedback_state_name,
+                    feedback: &mut PythonFeedback,
+                    objective: &mut PythonFeedback,
                 ) -> Self {
                     Self {
-                        std_state: StdState::new(
-                            py_rand,
-                            corpus,
-                            solutions,
-                            tuple_list!(py_map_feedback_state.map_feedback_state),
-                        ),
+                        std_state: StdState::new(py_rand, corpus, solutions, feedback, objective),
                     }
                 }
 
                 fn generate_initial_inputs(
                     &mut self,
-                    py_fuzzer: &mut $fuzzer_name,
-                    py_executor: &mut $executor_name,
-                    py_generator: &mut $rand_printable_generator,
-                    py_mgr: &mut $event_manager_name,
+                    py_fuzzer: &mut PythonFuzzer,
+                    py_executor: &mut PythonExecutor,
+                    py_generator: &mut PythonGenerator,
+                    py_mgr: &mut PythonEventManager,
                     num: usize,
                 ) {
                     self.std_state
@@ -717,109 +717,11 @@ pub mod pybind {
         };
     }
 
-    define_python_state!(
-        MyStdStateI8,
-        PythonStdStateI8,
-        "StdStateI8",
-        i8,
-        PythonMapFeedbackStateI8,
-        PythonEventManagerI8,
-        PythonStdFuzzerI8,
-        PythonExecutorI8,
-        PythonRandPrintablesGeneratorI8
-    );
-
-    define_python_state!(
-        MyStdStateI16,
-        PythonStdStateI16,
-        "StdStateI16",
-        i16,
-        PythonMapFeedbackStateI16,
-        PythonEventManagerI16,
-        PythonStdFuzzerI16,
-        PythonExecutorI16,
-        PythonRandPrintablesGeneratorI16
-    );
-
-    define_python_state!(
-        MyStdStateI32,
-        PythonStdStateI32,
-        "StdStateI32",
-        i32,
-        PythonMapFeedbackStateI32,
-        PythonEventManagerI32,
-        PythonStdFuzzerI32,
-        PythonExecutorI32,
-        PythonRandPrintablesGeneratorI32
-    );
-
-    define_python_state!(
-        MyStdStateI64,
-        PythonStdStateI64,
-        "StdStateI64",
-        i64,
-        PythonMapFeedbackStateI64,
-        PythonEventManagerI64,
-        PythonStdFuzzerI64,
-        PythonExecutorI64,
-        PythonRandPrintablesGeneratorI64
-    );
-    define_python_state!(
-        MyStdStateU8,
-        PythonStdStateU8,
-        "StdStateU8",
-        u8,
-        PythonMapFeedbackStateU8,
-        PythonEventManagerU8,
-        PythonStdFuzzerU8,
-        PythonExecutorU8,
-        PythonRandPrintablesGeneratorU8
-    );
-    define_python_state!(
-        MyStdStateU16,
-        PythonStdStateU16,
-        "StdStateU16",
-        u16,
-        PythonMapFeedbackStateU16,
-        PythonEventManagerU16,
-        PythonStdFuzzerU16,
-        PythonExecutorU16,
-        PythonRandPrintablesGeneratorU16
-    );
-    define_python_state!(
-        MyStdStateU32,
-        PythonStdStateU32,
-        "StdStateU32",
-        u32,
-        PythonMapFeedbackStateU32,
-        PythonEventManagerU32,
-        PythonStdFuzzerU32,
-        PythonExecutorU32,
-        PythonRandPrintablesGeneratorU32
-    );
-    define_python_state!(
-        MyStdStateU64,
-        PythonStdStateU64,
-        "StdStateU64",
-        u64,
-        PythonMapFeedbackStateU64,
-        PythonEventManagerU64,
-        PythonStdFuzzerU64,
-        PythonExecutorU64,
-        PythonRandPrintablesGeneratorU64
-    );
+    define_python_state!(PythonStdState, PythonStdStateWrapper, "StdState",);
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdStateI8>()?;
-        m.add_class::<PythonStdStateI16>()?;
-        m.add_class::<PythonStdStateI32>()?;
-        m.add_class::<PythonStdStateI64>()?;
-
-        m.add_class::<PythonStdStateU8>()?;
-        m.add_class::<PythonStdStateU16>()?;
-        m.add_class::<PythonStdStateU32>()?;
-        m.add_class::<PythonStdStateU64>()?;
+        m.add_class::<PythonStdStateWrapper>()?;
         Ok(())
     }
 }

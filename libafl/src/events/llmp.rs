@@ -967,7 +967,7 @@ mod tests {
 
         let solutions = InMemoryCorpus::<BytesInput>::new();
 
-        let mut state = StdState::new(rand, corpus, solutions, tuple_list!());
+        let mut state = StdState::new(rand, corpus, solutions, &mut (), &mut ()).unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
 

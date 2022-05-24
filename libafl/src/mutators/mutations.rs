@@ -1230,7 +1230,8 @@ mod tests {
             .add(BytesInput::new(vec![0x42; 0x1337]).into())
             .unwrap();
 
-        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
+        let mut state =
+            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
 
         let mut mutations = test_mutations();
         for _ in 0..2 {

@@ -3,7 +3,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use core::{cell::RefCell, time::Duration};
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -30,7 +30,7 @@ use libafl::{
     events::SimpleRestartingEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -64,7 +64,7 @@ pub fn libafl_main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match App::new("libafl_fuzzbench")
+    let res = match Command::new("libafl_fuzzbench")
         .version("0.7.1")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
@@ -113,7 +113,7 @@ pub fn libafl_main() {
                 env::current_exe()
                     .unwrap_or_else(|_| "fuzzer".into())
                     .to_string_lossy(),
-                err.info,
+                err,
             );
             return;
         }
@@ -260,20 +260,21 @@ fn fuzz(
     let cmplog = unsafe { &mut CMPLOG_MAP };
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        map_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -286,9 +287,12 @@ fn fuzz(
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(feedback_state),
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
         )
+        .unwrap()
     });
 
     println!("Let's fuzz :)");
@@ -299,8 +303,6 @@ fn fuzz(
     if libfuzzer_initialize(&args) == -1 {
         println!("Warning: LLVMFuzzerInitialize failed with -1")
     }
-
-    let calibration = CalibrationStage::new(&edges_observer);
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));

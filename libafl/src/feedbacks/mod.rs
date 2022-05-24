@@ -16,7 +16,7 @@ pub mod new_hash_feedback;
 #[cfg(feature = "std")]
 pub use new_hash_feedback::NewHashFeedback;
 #[cfg(feature = "std")]
-pub use new_hash_feedback::NewHashFeedbackState;
+pub use new_hash_feedback::NewHashFeedbackMetadata;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
@@ -27,7 +27,7 @@ use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::tuples::{MatchName, Named},
+    bolts::tuples::Named,
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -51,6 +51,12 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// Initializes the feedback state.
+    /// This method is called after that the `State` is created.
+    fn init_state(&mut self, _state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// `is_interesting ` return if an input is worth the addition to the corpus
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -116,36 +122,10 @@ where
     }
 }
 
-/// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
-/// of the fuzzer State
-pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug {
-    /// Reset the internal state
-    fn reset(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-/// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwned + Debug {
-    /// Resets all the feedback states of the tuple
-    fn reset_all(&mut self) -> Result<(), Error>;
-}
-
-impl FeedbackStatesTuple for () {
-    fn reset_all(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-impl<Head, Tail> FeedbackStatesTuple for (Head, Tail)
-where
-    Head: FeedbackState,
-    Tail: FeedbackStatesTuple,
-{
-    fn reset_all(&mut self) -> Result<(), Error> {
-        self.0.reset()?;
-        self.1.reset_all()
-    }
+/// Has an associated observer name (mostly used to retrieve the observer with `MatchName` from an `ObserverTuple`)
+pub trait HasObserverName {
+    /// The name associated with the observer
+    fn observer_name(&self) -> &str;
 }
 
 /// A combined feedback consisting of multiple [`Feedback`]s
@@ -207,6 +187,12 @@ where
     I: Input,
     S: HasClientPerfMonitor + Debug,
 {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        self.first.init_state(state)?;
+        self.second.init_state(state)?;
+        Ok(())
+    }
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
@@ -596,6 +582,10 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        self.first.init_state(state)
+    }
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
@@ -982,5 +972,179 @@ where
             name: observer.name().to_string(),
             phantom: PhantomData,
         }
+    }
+}
+
+/// The [`ConstFeedback`] reports the same value, always.
+/// It can be used to enable or disable feedback results through composition.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConstFeedback {
+    /// Always returns `true`
+    True,
+    /// Alsways returns `false`
+    False,
+}
+
+impl<I, S> Feedback<I, S> for ConstFeedback
+where
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        _observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        Ok(match self {
+            ConstFeedback::True => true,
+            ConstFeedback::False => false,
+        })
+    }
+}
+
+impl Named for ConstFeedback {
+    #[inline]
+    fn name(&self) -> &str {
+        "ConstFeedback"
+    }
+}
+
+impl ConstFeedback {
+    /// Creates a new [`ConstFeedback`] from the given boolean
+    #[must_use]
+    pub fn new(val: bool) -> Self {
+        Self::from(val)
+    }
+}
+
+impl From<bool> for ConstFeedback {
+    fn from(val: bool) -> Self {
+        if val {
+            Self::True
+        } else {
+            Self::False
+        }
+    }
+}
+
+/// `Feedback` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use crate::inputs::BytesInput;
+    use crate::{
+        bolts::tuples::Named, corpus::Testcase, events::EventFirer, executors::ExitKind,
+        feedbacks::Feedback, observers::ObserversTuple, Error,
+    };
+    use pyo3::prelude::*;
+
+    macro_rules! define_python_feedback {
+        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $my_std_state_type_name: ident) => {
+            use crate::observers::map::pybind::PythonMaxMapFeedbackI8;
+            use crate::state::pybind::$my_std_state_type_name;
+
+            #[derive(Debug)]
+            enum $wrapper_name {
+                MaxMapI8(*mut PythonMaxMapFeedbackI8),
+            }
+
+            #[pyclass(unsendable, name = $py_name_trait)]
+            #[derive(Debug)]
+            /// Observer Trait binding
+            pub struct $struct_name_trait {
+                pub wrapper: $wrapper_name,
+            }
+
+            impl $struct_name_trait {
+                fn unwrap(&self) -> &impl Feedback<BytesInput, $my_std_state_type_name> {
+                    unsafe {
+                        match self.wrapper {
+                            $wrapper_name::MaxMapI8(py_wrapper) => &(*py_wrapper).upcast(),
+                        }
+                    }
+                }
+
+                fn unwrap_mut(
+                    &mut self,
+                ) -> &mut impl Feedback<BytesInput, $my_std_state_type_name> {
+                    unsafe {
+                        match self.wrapper {
+                            $wrapper_name::MaxMapI8(py_wrapper) => &mut (*py_wrapper).upcast_mut(),
+                        }
+                    }
+                }
+            }
+
+            #[pymethods]
+            impl $struct_name_trait {
+                #[staticmethod]
+                fn new_map(map_feedback: &mut PythonMaxMapFeedbackI8) -> Self {
+                    Self {
+                        observer: $wrapper_name::MaxMapI8(map_feedback),
+                    }
+                }
+            }
+
+            impl Named for $struct_name_trait {
+                fn name(&self) -> &str {
+                    self.unwrap().name()
+                }
+            }
+
+            impl Feedback<BytesInput, $my_std_state_type_name> for $struct_name_trait {
+                fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+                    self.unwrap_mut().init_state(state)
+                }
+
+                fn is_interesting<EM, OT>(
+                    &mut self,
+                    state: &mut S,
+                    manager: &mut EM,
+                    input: &I,
+                    observers: &OT,
+                    exit_kind: &ExitKind,
+                ) -> Result<bool, Error>
+                where
+                    EM: EventFirer<I>,
+                    OT: ObserversTuple<I, S>,
+                {
+                    self.unwrap_mut()
+                        .is_interesting(state, manager, input, observers, exit_kind)
+                }
+
+                fn append_metadata(
+                    &mut self,
+                    state: &mut S,
+                    testcase: &mut Testcase<I>,
+                ) -> Result<(), Error> {
+                    self.unwrap_mut().append_metadata(state, testcase)
+                }
+
+                fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+                    self.unwrap_mut().discard_metadata(state, input)
+                }
+            }
+        };
+    }
+
+    define_python_feedback!(
+        PythonFeedback,
+        "Feedback",
+        PythonFeedbackWrapper,
+        PythonStdState,
+    );
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonFeedback>()?;
+        Ok(())
     }
 }
