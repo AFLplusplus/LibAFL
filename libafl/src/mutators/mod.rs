@@ -246,8 +246,7 @@ pub mod pybind {
                         (PythonStdStateWrapper::wrap(state), input.bytes(), stage_idx),
                     )?
                     .extract(py)
-            })
-            .unwrap();
+            })?;
             Ok(if mutated {
                 MutationResult::Mutated
             } else {
@@ -268,8 +267,7 @@ pub mod pybind {
                     (PythonStdStateWrapper::wrap(state), stage_idx, corpus_idx),
                 )?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
     }

@@ -1109,8 +1109,7 @@ pub mod pybind {
                 self.inner
                     .call_method1(py, "init_state", (PythonStdStateWrapper::wrap(state),))?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
 
@@ -1147,8 +1146,7 @@ pub mod pybind {
                     )?
                     .extract(py)?;
                 Ok(r)
-            })
-            .unwrap())
+            })?)
         }
 
         fn append_metadata(
@@ -1166,8 +1164,7 @@ pub mod pybind {
                     ),
                 )?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
 
@@ -1183,8 +1180,7 @@ pub mod pybind {
                     (PythonStdStateWrapper::wrap(state), input.bytes()),
                 )?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
     }

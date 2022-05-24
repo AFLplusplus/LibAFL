@@ -326,8 +326,7 @@ pub mod pybind {
                     )?
                     .extract(py)?;
                 Ok(ek)
-            })
-            .unwrap();
+            })?;
             Ok(ek.inner)
         }
     }

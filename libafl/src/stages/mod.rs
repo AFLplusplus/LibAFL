@@ -305,8 +305,7 @@ pub mod pybind {
                     ),
                 )?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
     }

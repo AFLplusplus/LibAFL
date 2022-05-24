@@ -371,6 +371,22 @@ impl From<TryFromSliceError> for Error {
     }
 }
 
+#[cfg(feature = "python")]
+impl From<pyo3::PyErr> for Error {
+    fn from(err: pyo3::PyErr) -> Self {
+        pyo3::Python::with_gil(|py| {
+            if err.matches(
+                py,
+                pyo3::types::PyType::new::<pyo3::exceptions::PyKeyboardInterrupt>(py),
+            ) {
+                Self::shutting_down()
+            } else {
+                Self::illegal_state(format!("Python exception: {:?}", err))
+            }
+        })
+    }
+}
+
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 

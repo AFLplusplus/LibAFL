@@ -376,8 +376,7 @@ pub mod pybind {
                     (PythonStdStateWrapper::wrap(state), input.bytes()),
                 )?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
 
@@ -398,8 +397,7 @@ pub mod pybind {
                     ),
                 )?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
 
@@ -415,8 +413,7 @@ pub mod pybind {
                     (PythonStdStateWrapper::wrap(state), input.bytes()),
                 )?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
 
@@ -437,8 +434,7 @@ pub mod pybind {
                     ),
                 )?;
                 Ok(())
-            })
-            .unwrap();
+            })?;
             Ok(())
         }
     }
