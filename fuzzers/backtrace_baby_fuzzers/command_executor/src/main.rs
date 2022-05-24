@@ -47,10 +47,7 @@ pub fn main() {
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and!(
         CrashFeedback::new(),
-        NewHashFeedback::<ASANBacktraceObserver, u64>::new_with_observer(
-            "ASANBacktraceObserver",
-            &bt_observer
-        )
+        NewHashFeedback::<ASANBacktraceObserver>::new(&bt_observer)
     );
     // let mut objective = CrashFeedback::new();
 

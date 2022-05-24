@@ -206,7 +206,7 @@ pub mod pybind {
         pub inner: ExitKind,
     }
 
-    impl From<ExitKind> for PythonExitKind {
+  impl From<ExitKind> for PythonExitKind {
         fn from(inner: ExitKind) -> Self {
             Self { inner }
         }
