@@ -1730,7 +1730,7 @@ pub mod pybind {
         }
     }
 
-  /// Register the classes to the python module
+    /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
         m.add_class::<PythonOwnedInProcessExecutor>()?;
         Ok(())

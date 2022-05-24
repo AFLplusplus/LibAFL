@@ -95,23 +95,23 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     let qemu_module = PyModule::new(py, "qemu")?;
     libafl_qemu::python_module(py, qemu_module)?;
     m.add_submodule(qemu_module)?;
-    
+
     modules.set_item("pylibafl.qemu", qemu_module)?;
 
     let libafl_module = PyModule::new(py, "libafl")?;
     libafl::pybind::python_module(py, libafl_module)?;
-    
+
     libafl_module.add("__builtins__", py.import("builtins")?)?;
-    
+
     let locals = PyDict::new(py);
     py.run(LIBAFL_CODE, Some(libafl_module.dict()), Some(locals))?;
     for (key, val) in locals.iter() {
         libafl_module.add(key.extract::<&str>()?, val)?;
     }
-    
+
     m.add_submodule(libafl_module)?;
 
     modules.set_item("pylibafl.libafl", libafl_module)?;
-    
+
     Ok(())
 }
