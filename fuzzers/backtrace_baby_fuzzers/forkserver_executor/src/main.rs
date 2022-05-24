@@ -10,7 +10,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
     feedback_and,
-    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState},
+    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
@@ -58,10 +58,7 @@ pub fn main() {
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does
-    let mut objective = feedback_and!(
-        CrashFeedback::new(),
-        NewHashFeedback::new_with_observer("NewHashFeedback", &bt_observer)
-    );
+    let mut objective = feedback_and!(CrashFeedback::new(), NewHashFeedback::new(&bt_observer));
 
     // create a State from scratch
     let mut state = StdState::new(
