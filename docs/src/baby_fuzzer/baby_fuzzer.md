@@ -74,7 +74,7 @@ debug = true
 Opening `src/main.rs`, we have an empty `main` function.
 To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`. `ExitKind` is used to inform the harness' exit status.
 
-```rust
+```rust,ignore
 extern crate libafl;
 use libafl::{
     bolts::AsSlice,
