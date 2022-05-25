@@ -19,13 +19,13 @@ impl<'a> EasyElf<'a> {
         let elf = {
             let mut binary_file = File::open(path)?;
             binary_file.read_to_end(buffer)?;
-            Elf::parse(buffer).map_err(|e| Error::Unknown(format!("{}", e)))
+            Elf::parse(buffer).map_err(|e| Error::unknown(format!("{}", e)))
         }?;
         Ok(Self { elf })
     }
 
     pub fn from_slice(buffer: &'a [u8]) -> Result<Self, Error> {
-        let elf = Elf::parse(buffer).map_err(|e| Error::Unknown(format!("{}", e)))?;
+        let elf = Elf::parse(buffer).map_err(|e| Error::unknown(format!("{}", e)))?;
         Ok(Self { elf })
     }
 

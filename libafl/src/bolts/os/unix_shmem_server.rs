@@ -12,6 +12,12 @@ use crate::{
     },
     Error,
 };
+
+#[cfg(feature = "std")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{mem::ManuallyDrop, ptr::addr_of};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -571,7 +577,7 @@ where
             ServedShMemRequest::Exit => {
                 println!("ShMemService - Exiting");
                 // stopping the server
-                return Err(Error::ShuttingDown);
+                return Err(Error::shutting_down());
             }
         };
         // println!("send ashmem client: {}, response: {:?}", client_id, &response);
@@ -637,7 +643,7 @@ where
                 *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                 cvar.notify_one();
 
-                return Err(Error::Unknown(format!(
+                return Err(Error::unknown(format!(
                     "The ShMem server appears to already be running. We are probably a client. Error: {:?}", err)));
             }
         };

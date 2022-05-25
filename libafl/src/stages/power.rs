@@ -4,17 +4,14 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    bolts::rands::Rand,
-    corpus::{Corpus, PowerScheduleTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     schedulers::{
-        powersched::{PowerSchedule, PowerScheduleMetadata},
-        testcase_score::CorpusPowerTestcaseScore,
-        TestcaseScore,
+        powersched::SchedulerMetadata, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
     },
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
@@ -67,29 +64,8 @@ where
     #[allow(clippy::cast_sign_loss)]
     fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
         // Update handicap
-        let use_random = state
-            .metadata_mut()
-            .get_mut::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
-            .strat()
-            == PowerSchedule::RAND;
-        if use_random {
-            return Ok(1 + state.rand_mut().below(128) as usize);
-        }
-
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let score = F::compute(&mut *testcase, state)? as usize;
-        let tcmeta = testcase
-            .metadata_mut()
-            .get_mut::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| {
-                Error::KeyNotFound("PowerScheduleTestcaseMetaData not found".to_string())
-            })?;
-        if tcmeta.handicap() >= 4 {
-            tcmeta.set_handicap(tcmeta.handicap() - 4);
-        } else if tcmeta.handicap() > 0 {
-            tcmeta.set_handicap(tcmeta.handicap() - 1);
-        }
 
         Ok(score)
     }
@@ -120,14 +96,14 @@ where
             let observer = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
             let mut hash = observer.hash() as usize;
 
             let psmeta = state
                 .metadata_mut()
-                .get_mut::<PowerScheduleMetadata>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+                .get_mut::<SchedulerMetadata>()
+                .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
             hash %= psmeta.n_fuzz().len();
             // Update the path frequency
@@ -139,9 +115,9 @@ where
                     .get(idx)?
                     .borrow_mut()
                     .metadata_mut()
-                    .get_mut::<PowerScheduleTestcaseMetaData>()
+                    .get_mut::<SchedulerTestcaseMetaData>()
                     .ok_or_else(|| {
-                        Error::KeyNotFound("PowerScheduleTestData not found".to_string())
+                        Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
                     })?
                     .set_n_fuzz_entry(hash);
             }
@@ -192,10 +168,7 @@ where
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn new(state: &mut S, mutator: M, map_observer_name: &O, strat: PowerSchedule) -> Self {
-        if !state.has_metadata::<PowerScheduleMetadata>() {
-            state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new(strat));
-        }
+    pub fn new(mutator: M, map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator,

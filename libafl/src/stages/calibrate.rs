@@ -1,18 +1,20 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
 use crate::{
-    bolts::current_time,
-    bolts::tuples::MatchName,
-    corpus::{Corpus, PowerScheduleTestcaseMetaData},
+    bolts::{current_time, tuples::Named, AsRefIterator},
+    corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
-    feedbacks::MapFeedbackState,
+    feedbacks::{
+        map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
+        HasObserverName,
+    },
     fuzzer::Evaluator,
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    schedulers::powersched::PowerScheduleMetadata,
+    schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasFeedbackStates, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata},
     Error,
 };
 use alloc::string::{String, ToString};
@@ -27,9 +29,10 @@ where
     I: Input,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata,
+    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
 {
     map_observer_name: String,
+    map_name: String,
     stage_max: usize,
     phantom: PhantomData<(I, O, OT, S)>,
 }
@@ -45,7 +48,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasFeedbackStates + HasClientPerfMonitor,
+    S: HasCorpus<I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -74,9 +77,11 @@ where
 
         // Run once to get the initial calibration map
         executor.observers_mut().pre_exec_all(state, &input)?;
+
         let mut start = current_time();
 
-        let mut total_time = if executor.run_target(fuzzer, state, mgr, &input)? == ExitKind::Ok {
+        let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+        let mut total_time = if exit_kind == ExitKind::Ok {
             current_time() - start
         } else {
             mgr.log(
@@ -88,10 +93,14 @@ where
             Duration::from_secs(1)
         };
 
+        executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
+
         let map_first = &executor
             .observers()
             .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .to_vec();
 
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
@@ -111,7 +120,8 @@ where
             executor.observers_mut().pre_exec_all(state, &input)?;
             start = current_time();
 
-            if executor.run_target(fuzzer, state, mgr, &input)? != ExitKind::Ok {
+            let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+            if exit_kind != ExitKind::Ok {
                 if !has_errors {
                     mgr.log(
                         state,
@@ -129,15 +139,19 @@ where
 
             total_time += current_time() - start;
 
+            executor
+                .observers_mut()
+                .post_exec_all(state, &input, &exit_kind)?;
+
             let map = &executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
                 .to_vec();
 
             let history_map = &mut state
-                .feedback_states_mut()
-                .match_name_mut::<MapFeedbackState<O::Entry>>(&self.map_observer_name)
+                .named_metadata_mut()
+                .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
                 .unwrap()
                 .history_map;
 
@@ -160,26 +174,23 @@ where
             }
         };
 
-        // If power schedule is used, update it
-        let use_powerschedule = state.has_metadata::<PowerScheduleMetadata>()
+        // If weighted scheduler or powerscheduler is used, update it
+        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
             && state
                 .corpus()
                 .get(corpus_idx)?
                 .borrow()
-                .has_metadata::<PowerScheduleTestcaseMetaData>();
+                .has_metadata::<SchedulerTestcaseMetaData>();
 
         if use_powerschedule {
             let map = executor
                 .observers()
                 .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
             let bitmap_size = map.count_bytes();
 
-            let psmeta = state
-                .metadata_mut()
-                .get_mut::<PowerScheduleMetadata>()
-                .unwrap();
+            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>().unwrap();
             let handicap = psmeta.queue_cycles();
 
             psmeta.set_exec_time(psmeta.exec_time() + total_time);
@@ -196,8 +207,10 @@ where
 
             let data = testcase
                 .metadata_mut()
-                .get_mut::<PowerScheduleTestcaseMetaData>()
-                .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+                .get_mut::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| {
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                })?;
 
             data.set_bitmap_size(bitmap_size);
             data.set_handicap(handicap);
@@ -212,12 +225,21 @@ where
     I: Input,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata,
+    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
-    pub fn new(map_observer_name: &O) -> Self {
+    #[must_use]
+    pub fn new<N, R>(map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>) -> Self
+    where
+        O::Entry:
+            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+        R: Reducer<O::Entry>,
+        for<'it> O: AsRefIterator<'it, Item = O::Entry>,
+        N: IsNovel<O::Entry>,
+    {
         Self {
-            map_observer_name: map_observer_name.name().to_string(),
+            map_observer_name: map_feedback.observer_name().to_string(),
+            map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
             phantom: PhantomData,
         }

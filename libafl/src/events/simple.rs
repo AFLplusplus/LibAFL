@@ -208,7 +208,7 @@ where
     // Handle arriving events in the client
     #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
     fn handle_in_client<S>(&mut self, _state: &mut S, event: Event<I>) -> Result<(), Error> {
-        Err(Error::Unknown(format!(
+        Err(Error::unknown(format!(
             "Received illegal message that message should not have arrived: {:?}.",
             event
         )))
@@ -307,7 +307,7 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<'a, I, MT, SP> SimpleRestartingEventManager<I, MT, SP>
+impl<I, MT, SP> SimpleRestartingEventManager<I, MT, SP>
 where
     I: Input,
     SP: ShMemProvider,
@@ -425,9 +425,12 @@ where
         Ok((state, mgr))
     }
 }
+
 /// `SimpleEventManager` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
+    use crate::events::pybind::PythonEventManager;
     use crate::events::SimpleEventManager;
     use crate::inputs::BytesInput;
     use crate::monitors::pybind::PythonMonitor;
@@ -438,7 +441,7 @@ pub mod pybind {
     /// Python class for SimpleEventManager
     pub struct PythonSimpleEventManager {
         /// Rust wrapped SimpleEventManager object
-        pub simple_event_manager: SimpleEventManager<BytesInput, PythonMonitor>,
+        pub inner: SimpleEventManager<BytesInput, PythonMonitor>,
     }
 
     #[pymethods]
@@ -446,8 +449,12 @@ pub mod pybind {
         #[new]
         fn new(py_monitor: PythonMonitor) -> Self {
             Self {
-                simple_event_manager: SimpleEventManager::new(py_monitor),
+                inner: SimpleEventManager::new(py_monitor),
             }
+        }
+
+        fn as_manager(slf: Py<Self>) -> PythonEventManager {
+            PythonEventManager::new_simple(slf)
         }
     }
 

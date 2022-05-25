@@ -12,9 +12,13 @@ use crate::{
     emu::{Emulator, MmapPerms},
     helper::{QemuHelper, QemuHelperTuple},
     hooks::QemuHooks,
-    GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mmap, SYS_mprotect,
-    SYS_mremap, SYS_newfstatat, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
+    GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
+    SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
+#[cfg(cpu_target = "arm")]
+use crate::{SYS_fstatat64, SYS_mmap2};
+#[cfg(not(cpu_target = "arm"))]
+use crate::{SYS_mmap, SYS_newfstatat};
 
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
@@ -337,7 +341,17 @@ where
                 .unwrap();
             h.access(a0 as GuestAddr, a3 as usize);
         }
+        #[cfg(not(cpu_target = "arm"))]
         SYS_newfstatat => {
+            if a2 != 0 {
+                let h = helpers
+                    .match_first_type_mut::<QemuSnapshotHelper>()
+                    .unwrap();
+                h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
+            }
+        }
+        #[cfg(cpu_target = "arm")]
+        SYS_fstatat64 => {
             if a2 != 0 {
                 let h = helpers
                     .match_first_type_mut::<QemuSnapshotHelper>()
@@ -364,6 +378,30 @@ where
             {
                 return result;
             }
+
+            #[cfg(cpu_target = "arm")]
+            if i64::from(sys_num) == SYS_mmap2 {
+                if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
+                    let h = helpers
+                        .match_first_type_mut::<QemuSnapshotHelper>()
+                        .unwrap();
+                    h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
+                }
+            } else if i64::from(sys_num) == SYS_mremap {
+                let h = helpers
+                    .match_first_type_mut::<QemuSnapshotHelper>()
+                    .unwrap();
+                h.add_mapped(result as GuestAddr, a2 as usize, None);
+            } else if i64::from(sys_num) == SYS_mprotect {
+                if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
+                    let h = helpers
+                        .match_first_type_mut::<QemuSnapshotHelper>()
+                        .unwrap();
+                    h.add_mapped(a0 as GuestAddr, a2 as usize, Some(prot));
+                }
+            }
+
+            #[cfg(not(cpu_target = "arm"))]
             if i64::from(sys_num) == SYS_mmap {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = helpers

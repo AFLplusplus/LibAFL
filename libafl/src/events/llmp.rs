@@ -384,7 +384,7 @@ where
                 }
                 Ok(())
             }
-            _ => Err(Error::Unknown(format!(
+            _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event.name()
             ))),
@@ -694,7 +694,6 @@ pub fn setup_restarting_mgr_std<I, MT, OT, S>(
 >
 where
     I: Input,
-    S: DeserializeOwned,
     MT: Monitor + Clone,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
@@ -790,7 +789,7 @@ where
 
                             broker_things(event_broker, self.remote_broker_addr)?;
 
-                            return Err(Error::ShuttingDown);
+                            return Err(Error::shutting_down());
                         }
                         LlmpConnection::IsClient { client } => {
                             let mgr =
@@ -808,7 +807,7 @@ where
 
                     broker_things(event_broker, self.remote_broker_addr)?;
 
-                    return Err(Error::ShuttingDown);
+                    return Err(Error::shutting_down());
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
@@ -968,7 +967,7 @@ mod tests {
 
         let solutions = InMemoryCorpus::<BytesInput>::new();
 
-        let mut state = StdState::new(rand, corpus, solutions, tuple_list!());
+        let mut state = StdState::new(rand, corpus, solutions, &mut (), &mut ()).unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
 

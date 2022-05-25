@@ -5,6 +5,8 @@
 use ahash::AHasher;
 use core::hash::Hasher;
 
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 #[cfg(feature = "std")]
 use core::str::from_utf8;
@@ -74,7 +76,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
         for id in input.codes() {
             let tok = self.id_table.get(&(id % self.next_id)).ok_or_else(|| {
-                Error::IllegalState(format!("Id {} not in the decoder table", id))
+                Error::illegal_state(format!("Id {} not in the decoder table", id))
             })?;
             bytes.extend_from_slice(tok.as_bytes());
             bytes.push(b' ');
@@ -145,7 +147,7 @@ impl Tokenizer for NaiveTokenizer {
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error> {
         let mut tokens = vec![];
         let string =
-            from_utf8(bytes).map_err(|_| Error::IllegalArgument("Invalid UTF-8".to_owned()))?;
+            from_utf8(bytes).map_err(|_| Error::illegal_argument("Invalid UTF-8".to_owned()))?;
         let string = self.comment_re.replace_all(string, "").to_string();
         let mut str_prev = 0;
         for str_match in self.string_re.find_iter(&string) {
@@ -256,6 +258,8 @@ impl EncodedInput {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+    use alloc::borrow::ToOwned;
+
     use crate::inputs::encoded::{
         InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
     };

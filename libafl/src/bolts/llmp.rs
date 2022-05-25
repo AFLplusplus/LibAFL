@@ -74,6 +74,8 @@ use core::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
+use alloc::string::ToString;
+#[cfg(feature = "std")]
 use std::{
     env,
     io::{ErrorKind, Read, Write},
@@ -82,7 +84,7 @@ use std::{
     thread,
 };
 
-#[cfg(all(feature = "llmp_debug", feature = "std"))]
+#[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
 
 #[cfg(unix)]
@@ -392,7 +394,7 @@ where
 {
     let msg = postcard::to_allocvec(msg)?;
     if msg.len() > u32::MAX as usize {
-        return Err(Error::IllegalState(format!(
+        return Err(Error::illegal_state(format!(
             "Trying to send message a tcp message > u32! (size: {})",
             msg.len()
         )));
@@ -499,7 +501,7 @@ unsafe fn llmp_next_msg_ptr_checked<SHM: ShMem>(
     if next_ptr >= msg_begin_min && next_ptr <= msg_begin_max {
         Ok(next)
     } else {
-        Err(Error::IllegalState(format!(
+        Err(Error::illegal_state(format!(
             "Inconsistent data on sharedmap, or Bug (next_ptr was {:x}, sharedmap page was {:x})",
             next_ptr as usize, page as usize
         )))
@@ -577,7 +579,7 @@ impl LlmpMsg {
             if self.in_shmem(map) {
                 Ok(self.as_slice_unsafe())
             } else {
-                Err(Error::IllegalState("Current message not in page. The sharedmap get tampered with or we have a BUG.".into()))
+                Err(Error::illegal_state("Current message not in page. The sharedmap get tampered with or we have a BUG."))
             }
         }
     }
@@ -585,9 +587,9 @@ impl LlmpMsg {
     /// Returns true, if the pointer is, indeed, in the page of this shared map.
     #[inline]
     pub fn in_shmem<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
+        let map_size = map.shmem.as_slice().len();
+        let buf_ptr = self.buf.as_ptr();
         unsafe {
-            let map_size = map.shmem.as_slice().len();
-            let buf_ptr = self.buf.as_ptr();
             if buf_ptr > (map.page_mut() as *const u8).add(size_of::<LlmpPage>())
                 && buf_ptr <= (map.page_mut() as *const u8).add(map_size - size_of::<LlmpMsg>())
             {
@@ -635,7 +637,7 @@ where
                 let _listener_thread = broker.launch_listener(Listener::Tcp(listener))?;
                 Ok(LlmpConnection::IsBroker { broker })
             }
-            Err(Error::File(e)) if e.kind() == ErrorKind::AddrInUse => {
+            Err(Error::File(e, _)) if e.kind() == ErrorKind::AddrInUse => {
                 // We are the client :)
                 println!(
                     "We're the client (internal port already bound by broker, {:#?})",
@@ -1077,7 +1079,7 @@ where
         }
         let page = self.out_shmems.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
-            return Err(Error::Unknown(format!(
+            return Err(Error::unknown(format!(
                 "Llmp Message {:?} is null or not in current page",
                 msg
             )));
@@ -1184,7 +1186,7 @@ where
 
         match unsafe { self.alloc_next_if_space(buf_len) } {
             Some(msg) => Ok(msg),
-            None => Err(Error::Unknown(format!(
+            None => Err(Error::unknown(format!(
                 "Error allocating {} bytes in shmap",
                 buf_len
             ))),
@@ -1212,12 +1214,10 @@ where
         shrinked_len: usize,
     ) -> Result<(), Error> {
         if msg.is_null() {
-            return Err(Error::IllegalArgument(
-                "Null msg passed to shrink_alloced".into(),
-            ));
+            return Err(Error::illegal_argument("Null msg passed to shrink_alloced"));
         } else if !self.has_unsent_message {
-            return Err(Error::IllegalState(
-                "Called shrink_alloced, but the msg was not unsent".into(),
+            return Err(Error::illegal_state(
+                "Called shrink_alloced, but the msg was not unsent",
             ));
         }
 
@@ -1230,7 +1230,7 @@ where
             - size_of::<LlmpMsg>();
 
         if buf_len_padded > old_len_padded.try_into().unwrap() {
-            return Err(Error::IllegalArgument(format!("Cannot shrink msg of size {} (paded: {}) to requested larger size of {} (padded: {})!", (*msg).buf_len, old_len_padded, shrinked_len, buf_len_padded)));
+            return Err(Error::illegal_argument(format!("Cannot shrink msg of size {} (paded: {}) to requested larger size of {} (padded: {})!", (*msg).buf_len, old_len_padded, shrinked_len, buf_len_padded)));
         }
 
         (*msg).buf_len = shrinked_len as u64;
@@ -1255,7 +1255,7 @@ where
             || tag == LLMP_TAG_UNINITIALIZED
             || tag == LLMP_TAG_UNSET
         {
-            return Err(Error::Unknown(format!(
+            return Err(Error::unknown(format!(
                 "Reserved tag supplied to send_buf ({:#X})",
                 tag
             )));
@@ -1279,7 +1279,7 @@ where
             || tag == LLMP_TAG_UNINITIALIZED
             || tag == LLMP_TAG_UNSET
         {
-            return Err(Error::Unknown(format!(
+            return Err(Error::unknown(format!(
                 "Reserved tag supplied to send_buf ({:#X})",
                 tag
             )));
@@ -1434,7 +1434,7 @@ where
         // Let's see what we got.
         if let Some(msg) = ret {
             if !(*msg).in_shmem(&mut self.current_recv_shmem) {
-                return Err(Error::IllegalState("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!".into()));
+                return Err(Error::illegal_state("Unexpected message in map (out of map bounds) - bugy client or tampered shared map detedted!"));
             }
             // Handle special, LLMP internal, messages.
             match (*msg).tag {
@@ -1446,7 +1446,7 @@ where
                 LLMP_TAG_EXITING => {
                     // The other side is done.
                     assert_eq!((*msg).buf_len, 0);
-                    return Err(Error::ShuttingDown);
+                    return Err(Error::shutting_down());
                 }
                 LLMP_TAG_END_OF_PAGE => {
                     #[cfg(feature = "std")]
@@ -1684,7 +1684,7 @@ where
     }
 
     /// Gets the offset of a message on this here page.
-    /// Will return [`crate::Error::IllegalArgument`] error if msg is not on page.
+    /// Will return [`crate::Error::illegal_argument`] error if msg is not on page.
     ///
     /// # Safety
     /// This dereferences msg, make sure to pass a proper pointer to it.
@@ -1695,7 +1695,7 @@ where
             // Cast both sides to u8 arrays, get the offset, then cast the return isize to u64
             Ok((msg as *const u8).offset_from((*page).messages.as_ptr() as *const u8) as u64)
         } else {
-            Err(Error::IllegalArgument(format!(
+            Err(Error::illegal_argument(format!(
                 "Message (0x{:X}) not in page (0x{:X})",
                 page as u64, msg as u64
             )))
@@ -1731,21 +1731,20 @@ where
     }
 
     /// Gets this message from this page, at the indicated offset.
-    /// Will return [`crate::Error::IllegalArgument`] error if the offset is out of bounds.
+    /// Will return [`crate::Error::illegal_argument`] error if the offset is out of bounds.
     #[allow(clippy::cast_ptr_alignment)]
     pub fn msg_from_offset(&mut self, offset: u64) -> Result<*mut LlmpMsg, Error> {
         let offset = offset as usize;
-        unsafe {
-            let page = self.page_mut();
-            let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
-            if offset > page_size {
-                Err(Error::IllegalArgument(format!(
-                    "Msg offset out of bounds (size: {}, requested offset: {})",
-                    page_size, offset
-                )))
-            } else {
-                Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg)
-            }
+
+        let page = unsafe { self.page_mut() };
+        let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
+        if offset > page_size {
+            Err(Error::illegal_argument(format!(
+                "Msg offset out of bounds (size: {}, requested offset: {})",
+                page_size, offset
+            )))
+        } else {
+            unsafe { Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg) }
         }
     }
 }
@@ -1864,7 +1863,7 @@ where
                 hostname,
             } => println!("B2B: Connected to {}", hostname),
             _ => {
-                return Err(Error::IllegalState(
+                return Err(Error::illegal_state(
                     "Unexpected response from B2B server received.".to_string(),
                 ))
             }
@@ -1883,7 +1882,7 @@ where
                 broker_id
             }
             _ => {
-                return Err(Error::IllegalState(
+                return Err(Error::illegal_state(
                     "Unexpected response from B2B server received.".to_string(),
                 ));
             }
@@ -2157,7 +2156,7 @@ where
         });
 
         let ret = recv.recv().map_err(|_| {
-            Error::Unknown("Error launching background thread for b2b communcation".to_string())
+            Error::unknown("Error launching background thread for b2b communcation".to_string())
         });
 
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
@@ -2346,7 +2345,7 @@ where
             match (*msg).tag {
                 // first, handle the special, llmp-internal messages
                 LLMP_SLOW_RECEIVER_PANIC => {
-                    return Err(Error::Unknown(format!("The broker was too slow to handle messages of client {} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!", client_id)));
+                    return Err(Error::unknown(format!("The broker was too slow to handle messages of client {} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!", client_id)));
                 }
                 LLMP_TAG_NEW_SHM_CLIENT => {
                     /* This client informs us about yet another new client
@@ -2359,7 +2358,7 @@ where
                             size_of::<LlmpPayloadSharedMapInfo>()
                         );
                         #[cfg(not(feature = "std"))]
-                        return Err(Error::Unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
+                        return Err(Error::unknown(format!("Broken CLIENT_ADDED msg with incorrect size received. Expected {} but got {}",
                             msg_buf_len_padded,
                             size_of::<LlmpPayloadSharedMapInfo>()
                         )));
@@ -2387,7 +2386,7 @@ where
                             #[cfg(feature = "std")]
                             println!("Error adding client! Ignoring: {:?}", e);
                             #[cfg(not(feature = "std"))]
-                            return Err(Error::Unknown(format!(
+                            return Err(Error::unknown(format!(
                                 "Error adding client! PANIC! {:?}",
                                 e
                             )));
@@ -2674,7 +2673,7 @@ where
                             }
                         }
                     }
-                    _ => return Err(Error::IllegalState(e.to_string())),
+                    _ => return Err(Error::illegal_state(e.to_string())),
                 }
             }
         };
@@ -2687,7 +2686,7 @@ where
         {
             broker_shmem_description
         } else {
-            return Err(Error::IllegalState(
+            return Err(Error::illegal_state(
                 "Received unexpected Broker Hello".to_string(),
             ));
         };
@@ -2710,7 +2709,7 @@ where
         {
             client_id
         } else {
-            return Err(Error::IllegalState(
+            return Err(Error::illegal_state(
                 "Unexpected Response from Broker".to_string(),
             ));
         };

@@ -100,6 +100,14 @@ use crate::Error;
 pub use libc::{c_void, siginfo_t};
 
 extern "C" {
+    /// The `libc` `getcontext`
+    ///
+    /// # Notes
+    ///
+    /// Somehow, `MacOS` on `aarch64` claims this type uses a 128 bit `int`
+    /// (@`rustc` 1.59.0)
+    /// Not much we can about it, for now.
+    #[allow(improper_ctypes)]
     fn getcontext(ucp: *mut ucontext_t) -> c_int;
 }
 
@@ -266,7 +274,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
                 let err_str = CString::new(format!("Failed to setup {} handler", sig)).unwrap();
                 libc::perror(err_str.as_ptr());
             }
-            return Err(Error::Unknown(format!("Could not set up {} handler", sig)));
+            return Err(Error::unknown(format!("Could not set up {} handler", sig)));
         }
     }
     compiler_fence(Ordering::SeqCst);
@@ -293,10 +301,10 @@ pub fn ucontext() -> Result<ucontext_t, Error> {
             libc::perror(b"Failed to get ucontext\n".as_ptr() as _);
         };
         #[cfg(not(feature = "std"))]
-        return Err(Error::Unknown("Failed to get ucontex".into()));
+        return Err(Error::unknown("Failed to get ucontex"));
 
         #[cfg(feature = "std")]
-        Err(Error::Unknown(format!(
+        Err(Error::unknown(format!(
             "Failed to get ucontext: {:?}",
             Errno::from_i32(errno())
         )))

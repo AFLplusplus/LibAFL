@@ -20,11 +20,11 @@ use crate::{
 };
 
 #[repr(C)]
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 struct FatPtr(*const c_void, *const c_void);
 
 // all kinds of hooks
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Hook {
     Function(*const c_void),
     Closure(FatPtr),

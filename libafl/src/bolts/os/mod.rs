@@ -80,7 +80,7 @@ pub unsafe fn fork() -> Result<ForkResult, Error> {
                 let err_str = CString::new("Fork failed").unwrap();
                 libc::perror(err_str.as_ptr());
             }
-            Err(Error::Unknown(format!("Fork failed ({})", pid)))
+            Err(Error::unknown(format!("Fork failed ({})", pid)))
         }
         _ => Ok(ForkResult::Child),
     }
@@ -101,7 +101,7 @@ pub fn startable_self() -> Result<Command, Error> {
 #[cfg(all(unix, feature = "std"))]
 pub fn dup2(fd: i32, device: i32) -> Result<(), Error> {
     match unsafe { libc::dup2(fd, device) } {
-        -1 => Err(Error::File(std::io::Error::last_os_error())),
+        -1 => Err(Error::file(std::io::Error::last_os_error())),
         _ => Ok(()),
     }
 }
@@ -184,7 +184,7 @@ impl Cores {
             let num_cores = if let Some(cores) = core_affinity::get_core_ids() {
                 cores.len()
             } else {
-                return Err(Error::IllegalState(
+                return Err(Error::illegal_state(
                     "Could not read core count from core_affinity".to_string(),
                 ));
             };
@@ -208,7 +208,7 @@ impl Cores {
         }
 
         if cores.is_empty() {
-            return Err(Error::IllegalArgument(format!(
+            return Err(Error::illegal_argument(format!(
                 "No cores specified! parsed: {}",
                 args
             )));

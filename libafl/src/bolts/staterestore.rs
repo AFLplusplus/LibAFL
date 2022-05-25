@@ -1,6 +1,7 @@
 //! Stores and restores state when a client needs to relaunch.
 //! Uses a [`ShMem`] up to a threshold, then write to disk.
 use ahash::AHasher;
+use alloc::string::{String, ToString};
 use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
@@ -45,7 +46,7 @@ impl StateShMemContent {
     pub fn buf_len_checked(&self, shmem_size: usize) -> Result<usize, Error> {
         let buf_len = unsafe { read_volatile(&self.buf_len) };
         if size_of::<StateShMemContent>() + buf_len > shmem_size {
-            Err(Error::IllegalState(format!("Stored buf_len is larger than the shared map! Shared data corrupted? Expected {} bytes max, but got {} (buf_len {})", shmem_size, size_of::<StateShMemContent>() + buf_len, buf_len)))
+            Err(Error::illegal_state(format!("Stored buf_len is larger than the shared map! Shared data corrupted? Expected {} bytes max, but got {} (buf_len {})", shmem_size, size_of::<StateShMemContent>() + buf_len, buf_len)))
         } else {
             Ok(buf_len)
         }
@@ -103,7 +104,7 @@ where
         S: Serialize,
     {
         if self.has_content() {
-            return Err(Error::IllegalState(
+            return Err(Error::illegal_state(
                 "Trying to save state to a non-empty state map".to_string(),
             ));
         }
@@ -125,7 +126,7 @@ where
 
             let len = filename_buf.len();
             if len > self.shmem.len() {
-                return Err(Error::IllegalState(format!(
+                return Err(Error::illegal_state(format!(
                     "The state restorer map is too small to fit anything, even the filename! 
                         It needs to be at least {} bytes. 
                         The tmpfile was written to {:?}.",
@@ -226,7 +227,7 @@ where
             file_content = vec![];
             File::open(tmpfile)?.read_to_end(&mut file_content)?;
             if file_content.is_empty() {
-                return Err(Error::IllegalState(format!(
+                return Err(Error::illegal_state(format!(
                     "Colud not restore state from file {}",
                     &filename
                 )));
@@ -241,6 +242,10 @@ where
 #[cfg(test)]
 mod tests {
 
+    use alloc::{
+        string::{String, ToString},
+        vec::Vec,
+    };
     use serial_test::serial;
 
     use crate::bolts::{

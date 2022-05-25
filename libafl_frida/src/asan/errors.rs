@@ -444,7 +444,7 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                for reg in 0..=30 {
+                for (reg, val) in registers.iter().enumerate().take(30 + 1) {
                     if basereg.is_some() && reg == basereg.unwrap() as usize {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
@@ -454,7 +454,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg]).unwrap();
+                    write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();

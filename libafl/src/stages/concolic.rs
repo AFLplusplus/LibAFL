@@ -4,6 +4,10 @@
 
 use core::marker::PhantomData;
 
+use alloc::string::String;
+#[cfg(feature = "concolic_mutation")]
+use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
+
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},

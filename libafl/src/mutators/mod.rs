@@ -32,7 +32,7 @@ use crate::{
 /// The result of a mutation.
 /// If the mutation got skipped, the target
 /// will not be executed with the returned input.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MutationResult {
     /// The [`Mutator`] mutated this `Input`.
     Mutated,
@@ -205,5 +205,152 @@ where
             self.1
                 .get_and_post_exec(index - 1, state, stage_idx, corpus_idx)
         }
+    }
+}
+
+/// `Mutator` Python bindings
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+pub mod pybind {
+    use super::{MutationResult, Mutator};
+    use crate::inputs::{BytesInput, HasBytesVec};
+    use crate::mutators::scheduled::pybind::PythonStdHavocMutator;
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use crate::Error;
+    use pyo3::prelude::*;
+
+    #[derive(Clone, Debug)]
+    pub struct PyObjectMutator {
+        inner: PyObject,
+    }
+
+    impl PyObjectMutator {
+        #[must_use]
+        pub fn new(obj: PyObject) -> Self {
+            PyObjectMutator { inner: obj }
+        }
+    }
+
+    impl Mutator<BytesInput, PythonStdState> for PyObjectMutator {
+        fn mutate(
+            &mut self,
+            state: &mut PythonStdState,
+            input: &mut BytesInput,
+            stage_idx: i32,
+        ) -> Result<MutationResult, Error> {
+            let mutated = Python::with_gil(|py| -> PyResult<bool> {
+                self.inner
+                    .call_method1(
+                        py,
+                        "mutate",
+                        (PythonStdStateWrapper::wrap(state), input.bytes(), stage_idx),
+                    )?
+                    .extract(py)
+            })?;
+            Ok(if mutated {
+                MutationResult::Mutated
+            } else {
+                MutationResult::Skipped
+            })
+        }
+
+        fn post_exec(
+            &mut self,
+            state: &mut PythonStdState,
+            stage_idx: i32,
+            corpus_idx: Option<usize>,
+        ) -> Result<(), Error> {
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner.call_method1(
+                    py,
+                    "post_exec",
+                    (PythonStdStateWrapper::wrap(state), stage_idx, corpus_idx),
+                )?;
+                Ok(())
+            })?;
+            Ok(())
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub enum PythonMutatorWrapper {
+        StdHavoc(Py<PythonStdHavocMutator>),
+        Python(PyObjectMutator),
+    }
+
+    /// Mutator Trait binding
+    #[pyclass(unsendable, name = "Mutator")]
+    #[derive(Debug, Clone)]
+    pub struct PythonMutator {
+        pub wrapper: PythonMutatorWrapper,
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonMutatorWrapper, {
+                StdHavoc
+            },
+            {
+                Python(py_wrapper) => {
+                    let $name = py_wrapper;
+                    $body
+                }
+            })
+        };
+    }
+
+    #[pymethods]
+    impl PythonMutator {
+        #[staticmethod]
+        #[must_use]
+        pub fn new_std_havoc(mgr: Py<PythonStdHavocMutator>) -> Self {
+            Self {
+                wrapper: PythonMutatorWrapper::StdHavoc(mgr),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_py(obj: PyObject) -> Self {
+            Self {
+                wrapper: PythonMutatorWrapper::Python(PyObjectMutator::new(obj)),
+            }
+        }
+
+        #[must_use]
+        pub fn unwrap_py(&self) -> Option<PyObject> {
+            match &self.wrapper {
+                PythonMutatorWrapper::Python(pyo) => Some(pyo.inner.clone()),
+                PythonMutatorWrapper::StdHavoc(_) => None,
+            }
+        }
+    }
+
+    impl Mutator<BytesInput, PythonStdState> for PythonMutator {
+        fn mutate(
+            &mut self,
+            state: &mut PythonStdState,
+            input: &mut BytesInput,
+            stage_idx: i32,
+        ) -> Result<MutationResult, Error> {
+            unwrap_me_mut!(self.wrapper, m, { m.mutate(state, input, stage_idx) })
+        }
+
+        fn post_exec(
+            &mut self,
+            state: &mut PythonStdState,
+            stage_idx: i32,
+            corpus_idx: Option<usize>,
+        ) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, m, {
+                m.post_exec(state, stage_idx, corpus_idx)
+            })
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonMutator>()?;
+        Ok(())
     }
 }

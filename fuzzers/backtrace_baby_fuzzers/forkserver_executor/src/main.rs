@@ -2,7 +2,7 @@ use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider},
         tuples::tuple_list,
         AsMutSlice,
     },
@@ -10,9 +10,7 @@ use libafl::{
     events::SimpleEventManager,
     executors::forkserver::ForkserverExecutor,
     feedback_and,
-    feedbacks::{
-        CrashFeedback, MapFeedbackState, MaxMapFeedback, NewHashFeedback, NewHashFeedbackState,
-    },
+    feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::BytesInput,
@@ -25,12 +23,22 @@ use libafl::{
 };
 use std::path::PathBuf;
 
+#[cfg(not(target_vendor = "apple"))]
+use libafl::bolts::shmem::StdShMemProvider;
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
+
 #[allow(clippy::similar_names)]
 pub fn main() {
     const MAP_SIZE: usize = 65536;
 
     //Coverage map shared between observer and executor
+    #[cfg(target_vendor = "apple")]
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+
+    #[cfg(not(target_vendor = "apple"))]
     let mut shmem_provider = StdShMemProvider::new().unwrap();
+
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
     //let the forkserver know the shmid
     shmem.write_to_env("__AFL_SHM_ID").unwrap();
@@ -44,20 +52,13 @@ pub fn main() {
 
     let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-    let bt_state = NewHashFeedbackState::<u64>::with_observer(&bt_observer);
-
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false);
+    let mut feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 
     // A feedback to choose if an input is a solution or not
     // We want to do the same crash deduplication that AFL does
-    let objective = feedback_and!(
-        CrashFeedback::new(),
-        NewHashFeedback::new_with_observer("NewHashFeedback", &bt_observer)
-    );
+    let mut objective = feedback_and!(CrashFeedback::new(), NewHashFeedback::new(&bt_observer));
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -69,9 +70,12 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state, bt_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{}", s));
@@ -87,7 +91,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let mut executor = ForkserverExecutor::builder()
-        .program("./target/release/program".to_string())
+        .program("./target/release/program")
         .arg_input_file_std()
         .shmem_provider(&mut shmem_provider)
         .build(tuple_list!(bt_observer, edges_observer))
