@@ -766,7 +766,7 @@ pub mod pybind {
                     py_mgr,
                     num,
                 )
-                .expect("Failed to generate the initial corpus".into());
+                .expect("Failed to generate the initial corpus");
         }
 
         fn load_initial_inputs(
@@ -779,7 +779,7 @@ pub mod pybind {
             self.inner
                 .as_mut()
                 .load_initial_inputs(py_fuzzer.unwrap_mut(), py_executor, py_mgr, &in_dirs)
-                .expect("Failed to load the initial corpus".into());
+                .expect("Failed to load the initial corpus");
         }
     }
 

@@ -393,7 +393,7 @@ pub mod pybind {
                     (
                         PythonStdStateWrapper::wrap(state),
                         input.bytes(),
-                        PythonExitKind::from(exit_kind.clone()),
+                        PythonExitKind::from(*exit_kind),
                     ),
                 )?;
                 Ok(())
@@ -430,7 +430,7 @@ pub mod pybind {
                     (
                         PythonStdStateWrapper::wrap(state),
                         input.bytes(),
-                        PythonExitKind::from(exit_kind.clone()),
+                        PythonExitKind::from(*exit_kind),
                     ),
                 )?;
                 Ok(())

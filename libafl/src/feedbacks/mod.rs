@@ -1141,7 +1141,7 @@ pub mod pybind {
                             dont_look_at_this2.clone(),
                             input.bytes(),
                             dont_look_at_this.clone(),
-                            PythonExitKind::from(exit_kind.clone()),
+                            PythonExitKind::from(*exit_kind),
                         ),
                     )?
                     .extract(py)?;

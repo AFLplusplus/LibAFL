@@ -409,17 +409,17 @@ pub mod pybind {
 
         #[getter]
         fn executions(&self) -> usize {
-            self.inner.as_ref().executions().clone()
+            *self.inner.as_ref().executions()
         }
 
         #[getter]
         fn fuzz_level(&self) -> usize {
-            self.inner.as_ref().fuzz_level().clone()
+            self.inner.as_ref().fuzz_level()
         }
 
         #[getter]
         fn fuzzed(&self) -> bool {
-            self.inner.as_ref().fuzzed().clone()
+            self.inner.as_ref().fuzzed()
         }
 
         fn metadata(&mut self) -> PyObject {

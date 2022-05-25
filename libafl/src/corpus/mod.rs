@@ -147,7 +147,7 @@ pub mod pybind {
 
         #[pyo3(name = "current")]
         fn pycurrent(&self) -> Option<usize> {
-            self.current().clone()
+            *self.current()
         }
 
         #[pyo3(name = "get")]
