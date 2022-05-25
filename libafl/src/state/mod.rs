@@ -769,6 +769,7 @@ pub mod pybind {
                 .expect("Failed to generate the initial corpus");
         }
 
+        #[allow(clippy::needless_pass_by_value)]
         fn load_initial_inputs(
             &mut self,
             py_fuzzer: &mut PythonStdFuzzerWrapper,

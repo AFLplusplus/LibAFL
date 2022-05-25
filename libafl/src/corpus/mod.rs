@@ -77,6 +77,7 @@ pub mod pybind {
 
     /// Corpus Trait binding
     #[pyclass(unsendable, name = "Corpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct PythonCorpus {
         wrapper: PythonCorpusWrapper,

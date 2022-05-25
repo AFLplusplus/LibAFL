@@ -214,7 +214,7 @@ pub mod pybind {
 
     #[pymethods]
     impl PythonExitKind {
-        fn __eq__(&self, other: PythonExitKind) -> bool {
+        fn __eq__(&self, other: &PythonExitKind) -> bool {
             self.inner == other.inner
         }
 
