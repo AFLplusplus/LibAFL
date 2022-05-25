@@ -74,7 +74,7 @@ debug = true
 Opening `src/main.rs`, we have an empty `main` function.
 To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`. `ExitKind` is used to inform the harness' exit status.
 
-```rust,ignore
+```rust
 extern crate libafl;
 use libafl::{
     bolts::AsSlice,
@@ -97,7 +97,7 @@ fn main(){
     };
     // To test the panic:
     let input = BytesInput::new(Vec::from("abc"));
-    harness(&input);
+    // harness(&input);
 }
 ```
 
