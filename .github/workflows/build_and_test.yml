@@ -111,8 +111,8 @@ jobs:
     - name: Install maturin
       run: python3 -m pip install maturin
     - uses: actions/checkout@v2
-    - name: Run a develop build
-      run: cd ./bindings/pylibafl && maturin develop
+    - name: Run a maturin build
+      run: cd ./bindings/pylibafl && maturin build
   fuzzers:
     env:
       CC: ccache clang # use ccache in default
