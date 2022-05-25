@@ -128,7 +128,7 @@ let mut state = StdState::new(
   To avoid type annotation error, you can use `InMemoryCorpus::<BytesInput>::new()` to replace `InMemoryCorpus::new()`. If not, type annotation will be automatically inferred when adding `executor`.
 
 - third parameter is another corpus that stores the "solution" testcases for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory, so we can inspect it.
-- last two parameters is feedback and objective, we will discuss them later.
+- last two parameters are feedback and objective, we will discuss them later.
 
 Another required component is the **EventManager**. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a `Monitor` instance.
 
