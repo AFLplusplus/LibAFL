@@ -345,3 +345,98 @@ impl SchedulerTestcaseMetaData {
 }
 
 crate::impl_serdeany!(SchedulerTestcaseMetaData);
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+/// `Testcase` Python bindings
+pub mod pybind {
+    use super::{HasMetadata, Testcase};
+    use crate::bolts::ownedref::OwnedPtrMut;
+    use crate::inputs::{BytesInput, HasBytesVec};
+    use crate::pybind::PythonMetadata;
+    use pyo3::prelude::*;
+    use pyo3::types::PyDict;
+
+    /// `PythonTestcase` with fixed generics
+    pub type PythonTestcase = Testcase<BytesInput>;
+
+    #[pyclass(unsendable, name = "Testcase")]
+    #[derive(Debug)]
+    /// Python class for Testcase
+    pub struct PythonTestcaseWrapper {
+        /// Rust wrapped Testcase object
+        pub inner: OwnedPtrMut<PythonTestcase>,
+    }
+
+    impl PythonTestcaseWrapper {
+        pub fn wrap(r: &mut PythonTestcase) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
+
+        #[must_use]
+        pub fn unwrap(&self) -> &PythonTestcase {
+            self.inner.as_ref()
+        }
+
+        pub fn unwrap_mut(&mut self) -> &mut PythonTestcase {
+            self.inner.as_mut()
+        }
+    }
+
+    #[pymethods]
+    impl PythonTestcaseWrapper {
+        #[new]
+        fn new(input: Vec<u8>) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
+            }
+        }
+
+        fn load_input(&mut self) -> &[u8] {
+            self.inner
+                .as_mut()
+                .load_input()
+                .expect("Failed to load input")
+                .bytes()
+        }
+
+        #[getter]
+        fn exec_time_ms(&self) -> Option<u128> {
+            self.inner.as_ref().exec_time().map(|t| t.as_millis())
+        }
+
+        #[getter]
+        fn executions(&self) -> usize {
+            *self.inner.as_ref().executions()
+        }
+
+        #[getter]
+        fn fuzz_level(&self) -> usize {
+            self.inner.as_ref().fuzz_level()
+        }
+
+        #[getter]
+        fn fuzzed(&self) -> bool {
+            self.inner.as_ref().fuzzed()
+        }
+
+        fn metadata(&mut self) -> PyObject {
+            let meta = self.inner.as_mut().metadata_mut();
+            if !meta.contains::<PythonMetadata>() {
+                Python::with_gil(|py| {
+                    let dict: Py<PyDict> = PyDict::new(py).into();
+                    meta.insert(PythonMetadata::new(dict.to_object(py)));
+                });
+            }
+            meta.get::<PythonMetadata>().unwrap().map.clone()
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonTestcaseWrapper>()?;
+        Ok(())
+    }
+}

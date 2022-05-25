@@ -652,72 +652,137 @@ where
 }
 
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 /// `State` Python bindings
 pub mod pybind {
+    use crate::bolts::ownedref::OwnedPtrMut;
     use crate::bolts::rands::pybind::PythonRand;
-    use crate::bolts::tuples::tuple_list;
     use crate::corpus::pybind::PythonCorpus;
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::pybind::PythonExecutor;
     use crate::feedbacks::pybind::PythonFeedback;
+    use crate::fuzzer::pybind::PythonStdFuzzerWrapper;
+    use crate::generators::pybind::PythonGenerator;
     use crate::inputs::BytesInput;
-    use crate::state::StdState;
+    use crate::pybind::PythonMetadata;
+    use crate::state::{
+        HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,
+    };
     use pyo3::prelude::*;
+    use pyo3::types::PyDict;
+    use std::path::PathBuf;
 
-    macro_rules! define_python_state {
-        ($type_name:ident, $struct_name:ident, $py_name:tt) => {
-            use crate::events::pybind::$event_manager_name;
-            use crate::executors::pybind::$executor_name;
-            use crate::fuzzer::pybind::$fuzzer_name;
-            use crate::generators::pybind::$rand_printable_generator;
+    /// `StdState` with fixed generics
+    pub type PythonStdState = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
 
-            /// `StdState` with fixed generics
-            pub type $type_name = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
-
-            #[pyclass(unsendable, name = $py_name)]
-            #[derive(Debug)]
-            /// Python class for StdState
-            pub struct $struct_name {
-                /// Rust wrapped StdState object
-                pub std_state: $type_name,
-            }
-
-            #[pymethods]
-            impl $struct_name {
-                #[new]
-                fn new(
-                    py_rand: PythonRand,
-                    corpus: PythonCorpus,
-                    solutions: PythonCorpus,
-                    feedback: &mut PythonFeedback,
-                    objective: &mut PythonFeedback,
-                ) -> Self {
-                    Self {
-                        std_state: StdState::new(py_rand, corpus, solutions, feedback, objective),
-                    }
-                }
-
-                fn generate_initial_inputs(
-                    &mut self,
-                    py_fuzzer: &mut PythonFuzzer,
-                    py_executor: &mut PythonExecutor,
-                    py_generator: &mut PythonGenerator,
-                    py_mgr: &mut PythonEventManager,
-                    num: usize,
-                ) {
-                    self.std_state
-                        .generate_initial_inputs(
-                            &mut py_fuzzer.std_fuzzer,
-                            py_executor,
-                            &mut py_generator.rand_printable_generator,
-                            py_mgr,
-                            num,
-                        )
-                        .expect("Failed to generate the initial corpus".into());
-                }
-            }
-        };
+    #[pyclass(unsendable, name = "StdState")]
+    #[derive(Debug)]
+    /// Python class for StdState
+    pub struct PythonStdStateWrapper {
+        /// Rust wrapped StdState object
+        pub inner: OwnedPtrMut<PythonStdState>,
     }
 
-    define_python_state!(PythonStdState, PythonStdStateWrapper, "StdState",);
+    impl PythonStdStateWrapper {
+        pub fn wrap(r: &mut PythonStdState) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
+
+        #[must_use]
+        pub fn unwrap(&self) -> &PythonStdState {
+            self.inner.as_ref()
+        }
+
+        pub fn unwrap_mut(&mut self) -> &mut PythonStdState {
+            self.inner.as_mut()
+        }
+    }
+
+    #[pymethods]
+    impl PythonStdStateWrapper {
+        #[new]
+        fn new(
+            py_rand: PythonRand,
+            corpus: PythonCorpus,
+            solutions: PythonCorpus,
+            feedback: &mut PythonFeedback,
+            objective: &mut PythonFeedback,
+        ) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(
+                    StdState::new(py_rand, corpus, solutions, feedback, objective)
+                        .expect("Failed to create a new StdState"),
+                )),
+            }
+        }
+
+        fn metadata(&mut self) -> PyObject {
+            let meta = self.inner.as_mut().metadata_mut();
+            if !meta.contains::<PythonMetadata>() {
+                Python::with_gil(|py| {
+                    let dict: Py<PyDict> = PyDict::new(py).into();
+                    meta.insert(PythonMetadata::new(dict.to_object(py)));
+                });
+            }
+            meta.get::<PythonMetadata>().unwrap().map.clone()
+        }
+
+        fn rand(&self) -> PythonRand {
+            self.inner.as_ref().rand().clone()
+        }
+
+        fn corpus(&self) -> PythonCorpus {
+            self.inner.as_ref().corpus().clone()
+        }
+
+        fn solutions(&self) -> PythonCorpus {
+            self.inner.as_ref().solutions().clone()
+        }
+
+        fn executions(&self) -> usize {
+            *self.inner.as_ref().executions()
+        }
+
+        fn max_size(&self) -> usize {
+            self.inner.as_ref().max_size()
+        }
+
+        fn generate_initial_inputs(
+            &mut self,
+            py_fuzzer: &mut PythonStdFuzzerWrapper,
+            py_executor: &mut PythonExecutor,
+            py_generator: &mut PythonGenerator,
+            py_mgr: &mut PythonEventManager,
+            num: usize,
+        ) {
+            self.inner
+                .as_mut()
+                .generate_initial_inputs(
+                    py_fuzzer.unwrap_mut(),
+                    py_executor,
+                    py_generator,
+                    py_mgr,
+                    num,
+                )
+                .expect("Failed to generate the initial corpus");
+        }
+
+        #[allow(clippy::needless_pass_by_value)]
+        fn load_initial_inputs(
+            &mut self,
+            py_fuzzer: &mut PythonStdFuzzerWrapper,
+            py_executor: &mut PythonExecutor,
+            py_mgr: &mut PythonEventManager,
+            in_dirs: Vec<PathBuf>,
+        ) {
+            self.inner
+                .as_mut()
+                .load_initial_inputs(py_fuzzer.unwrap_mut(), py_executor, py_mgr, &in_dirs)
+                .expect("Failed to load the initial corpus");
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

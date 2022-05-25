@@ -208,19 +208,19 @@ where
 #[cfg(feature = "python")]
 /// `OnDiskCorpus` Python bindings
 pub mod pybind {
-    use std::path::PathBuf;
-
+    use crate::corpus::pybind::PythonCorpus;
     use crate::corpus::OnDiskCorpus;
     use crate::inputs::BytesInput;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
+    use std::path::PathBuf;
 
     #[pyclass(unsendable, name = "OnDiskCorpus")]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for OnDiskCorpus
     pub struct PythonOnDiskCorpus {
         /// Rust wrapped OnDiskCorpus object
-        pub on_disk_corpus: OnDiskCorpus<BytesInput>,
+        pub inner: OnDiskCorpus<BytesInput>,
     }
 
     #[pymethods]
@@ -228,8 +228,12 @@ pub mod pybind {
         #[new]
         fn new(path: String) -> Self {
             Self {
-                on_disk_corpus: OnDiskCorpus::new(PathBuf::from(path)).unwrap(),
+                inner: OnDiskCorpus::new(PathBuf::from(path)).unwrap(),
             }
+        }
+
+        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
+            PythonCorpus::new_on_disk(slf)
         }
     }
     /// Register the classes to the python module
