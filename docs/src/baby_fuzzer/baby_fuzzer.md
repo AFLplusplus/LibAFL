@@ -79,6 +79,7 @@ extern crate libafl;
 use libafl::{
     bolts::AsSlice,
     inputs::{BytesInput, HasTargetBytes},
+    executors::ExitKind,
 };
 
 fn main(){
