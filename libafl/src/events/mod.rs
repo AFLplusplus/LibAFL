@@ -106,7 +106,7 @@ impl EventConfig {
     #[must_use]
     pub fn from_build_id() -> Self {
         EventConfig::BuildID {
-            id: build_id::get(),
+            id: crate::bolts::build_id::get(),
         }
     }
 
