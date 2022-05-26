@@ -668,6 +668,7 @@ pub mod pybind {
     use crate::state::{
         HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,
     };
+    use alloc::{boxed::Box, vec::Vec};
     use pyo3::prelude::*;
     use pyo3::types::PyDict;
     use std::path::PathBuf;

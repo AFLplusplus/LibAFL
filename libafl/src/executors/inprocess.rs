@@ -18,6 +18,8 @@ use core::{
 };
 
 use alloc::boxed::Box;
+#[cfg(all(unix, feature = "std"))]
+use alloc::vec::Vec;
 
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
@@ -507,6 +509,8 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
+    #[cfg(feature = "std")]
+    use alloc::{boxed::Box, string::String};
     use core::mem::transmute;
     use libc::siginfo_t;
     #[cfg(feature = "std")]
@@ -854,6 +858,9 @@ mod unix_signal_handler {
 
 #[cfg(all(windows, feature = "std"))]
 mod windows_exception_handler {
+    #[cfg(feature = "std")]
+    use alloc::boxed::Box;
+    use alloc::string::String;
     use alloc::vec::Vec;
     use core::ffi::c_void;
     use core::{mem::transmute, ptr};
@@ -1550,6 +1557,7 @@ where
 /// signal handlers and `panic_hooks` for the child process
 #[cfg(all(feature = "std", unix))]
 pub mod child_signal_handlers {
+    use alloc::boxed::Box;
     use libc::siginfo_t;
     use std::panic;
 
@@ -1683,6 +1691,7 @@ pub mod pybind {
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::observers::pybind::PythonObserversTuple;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use alloc::boxed::Box;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
 

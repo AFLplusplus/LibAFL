@@ -1,4 +1,5 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
+use alloc::string::String;
 use core::fmt::Debug;
 use grammartec::{chunkstore::ChunkStore, context::Context};
 use serde::{Deserialize, Serialize};

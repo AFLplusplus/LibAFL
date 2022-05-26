@@ -74,6 +74,8 @@ use core::{
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
+use alloc::string::ToString;
+#[cfg(feature = "std")]
 use std::{
     env,
     io::{ErrorKind, Read, Write},

@@ -111,9 +111,9 @@ __attribute__((noinline)) void func1() {
 
 // Export this symbol
 #ifdef _WIN32
-  #define HARNESS_EXPORTS __declspec(dllexport)
+#    define HARNESS_EXPORTS __declspec(dllexport)
 #else
-  #define HARNESS_EXPORTS
+#    define HARNESS_EXPORTS
 #endif
 
 // Entry point for LibFuzzer.

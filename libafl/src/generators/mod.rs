@@ -134,6 +134,7 @@ pub mod pybind {
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::Error;
+    use alloc::vec::Vec;
     use pyo3::prelude::*;
 
     #[derive(Clone, Debug)]

@@ -24,6 +24,8 @@ use crate::{
     Error,
 };
 
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;

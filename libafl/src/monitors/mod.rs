@@ -822,6 +822,7 @@ pub mod pybind {
     use pyo3::types::PyUnicode;
 
     use super::ClientStats;
+    use alloc::{boxed::Box, string::String, vec::Vec};
     use core::time::Duration;
 
     // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625

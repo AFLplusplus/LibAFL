@@ -4,6 +4,8 @@ use core::{
     marker::PhantomData,
 };
 
+#[cfg(feature = "std")]
+use alloc::{borrow::ToOwned, string::String, vec::Vec};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(feature = "std")]
@@ -696,6 +698,8 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_parse_afl_cmdline() {
+        use alloc::string::ToString;
+
         let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
