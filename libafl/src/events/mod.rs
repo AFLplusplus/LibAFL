@@ -543,208 +543,99 @@ mod tests {
         };
     }
 }
+
 /// `EventManager` Python bindings
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 pub mod pybind {
     use crate::events::simple::pybind::PythonSimpleEventManager;
     use crate::events::{
         Event, EventFirer, EventManager, EventManagerId, EventProcessor, EventRestarter,
         HasEventManagerId, ProgressReporter,
     };
+    use crate::executors::pybind::PythonExecutor;
+    use crate::fuzzer::pybind::PythonStdFuzzer;
     use crate::inputs::BytesInput;
+    use crate::state::pybind::PythonStdState;
     use crate::Error;
     use pyo3::prelude::*;
 
-    macro_rules! define_python_event_manager {
-        ($struct_name_trait:ident, $py_name_trait:tt, $wrapper_name: ident, $std_state_name: ident, $executor_name: ident, $my_std_fuzzer_type_name: ident) => {
-            use crate::executors::pybind::$executor_name;
-            use crate::pybind::$my_std_fuzzer_type_name;
-            use crate::state::pybind::$std_state_name;
+    #[derive(Debug, Clone)]
+    pub enum PythonEventManagerWrapper {
+        Simple(Py<PythonSimpleEventManager>),
+    }
 
-            #[derive(Debug, Clone)]
-            enum $wrapper_name {
-                Simple(*mut PythonSimpleEventManager),
-            }
+    /// EventManager Trait binding
+    #[pyclass(unsendable, name = "EventManager")]
+    #[derive(Debug, Clone)]
+    pub struct PythonEventManager {
+        pub wrapper: PythonEventManagerWrapper,
+    }
 
-            /// EventManager Trait binding
-            #[pyclass(unsendable, name = $py_name_trait)]
-            #[derive(Debug, Clone)]
-            pub struct $struct_name_trait {
-                event_manager: $wrapper_name,
-            }
-
-            impl $struct_name_trait {
-                fn get_event_manager(
-                    &self,
-                ) -> &impl EventManager<
-                    $executor_name,
-                    BytesInput,
-                    $std_state_name,
-                    $my_std_fuzzer_type_name,
-                > {
-                    unsafe {
-                        match self.event_manager {
-                            $wrapper_name::Simple(py_simple_event_manager) => {
-                                &(*py_simple_event_manager).simple_event_manager
-                            }
-                        }
-                    }
-                }
-
-                fn get_mut_event_manager(
-                    &mut self,
-                ) -> &mut impl EventManager<
-                    $executor_name,
-                    BytesInput,
-                    $std_state_name,
-                    $my_std_fuzzer_type_name,
-                > {
-                    unsafe {
-                        match self.event_manager {
-                            $wrapper_name::Simple(py_simple_event_manager) => {
-                                &mut (*py_simple_event_manager).simple_event_manager
-                            }
-                        }
-                    }
-                }
-            }
-
-            #[pymethods]
-            impl $struct_name_trait {
-                #[staticmethod]
-                fn new_from_simple(py_simple_event_manager: &mut PythonSimpleEventManager) -> Self {
-                    Self {
-                        event_manager: $wrapper_name::Simple(py_simple_event_manager),
-                    }
-                }
-            }
-
-            impl EventFirer<BytesInput> for $struct_name_trait {
-                fn fire<S>(
-                    &mut self,
-                    _state: &mut S,
-                    event: Event<BytesInput>,
-                ) -> Result<(), Error> {
-                    self.get_mut_event_manager().fire(_state, event)
-                }
-            }
-
-            impl<S> EventRestarter<S> for $struct_name_trait {}
-
-            impl
-                EventProcessor<
-                    $executor_name,
-                    BytesInput,
-                    $std_state_name,
-                    $my_std_fuzzer_type_name,
-                > for $struct_name_trait
-            {
-                fn process(
-                    &mut self,
-                    _fuzzer: &mut $my_std_fuzzer_type_name,
-                    state: &mut $std_state_name,
-                    _executor: &mut $executor_name,
-                ) -> Result<usize, Error> {
-                    self.get_mut_event_manager()
-                        .process(_fuzzer, state, _executor)
-                }
-            }
-
-            impl ProgressReporter<BytesInput> for $struct_name_trait {}
-
-            impl HasEventManagerId for $struct_name_trait {
-                fn mgr_id(&self) -> EventManagerId {
-                    self.get_event_manager().mgr_id()
-                }
-            }
-
-            impl EventManager<$executor_name, BytesInput, $std_state_name, $my_std_fuzzer_type_name>
-                for $struct_name_trait
-            {
-            }
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!($wrapper, $name, $body, PythonEventManagerWrapper, {
+                Simple
+            })
         };
     }
 
-    define_python_event_manager!(
-        PythonEventManagerI8,
-        "EventManagerI8",
-        PythonEventManagerWrapperI8,
-        MyStdStateI8,
-        PythonExecutorI8,
-        MyStdFuzzerI8
-    );
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonEventManagerWrapper, {
+                Simple
+            })
+        };
+    }
 
-    define_python_event_manager!(
-        PythonEventManagerI16,
-        "EventManagerI16",
-        PythonEventManagerWrapperI16,
-        MyStdStateI16,
-        PythonExecutorI16,
-        MyStdFuzzerI16
-    );
+    #[pymethods]
+    impl PythonEventManager {
+        #[staticmethod]
+        #[must_use]
+        pub fn new_simple(mgr: Py<PythonSimpleEventManager>) -> Self {
+            Self {
+                wrapper: PythonEventManagerWrapper::Simple(mgr),
+            }
+        }
+    }
 
-    define_python_event_manager!(
-        PythonEventManagerI32,
-        "EventManagerI32",
-        PythonEventManagerWrapperI32,
-        MyStdStateI32,
-        PythonExecutorI32,
-        MyStdFuzzerI32
-    );
+    impl EventFirer<BytesInput> for PythonEventManager {
+        fn fire<S>(&mut self, state: &mut S, event: Event<BytesInput>) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
+        }
+    }
 
-    define_python_event_manager!(
-        PythonEventManagerI64,
-        "EventManagerI64",
-        PythonEventManagerWrapperI64,
-        MyStdStateI64,
-        PythonExecutorI64,
-        MyStdFuzzerI64
-    );
+    impl<S> EventRestarter<S> for PythonEventManager {}
 
-    define_python_event_manager!(
-        PythonEventManagerU8,
-        "EventManagerU8",
-        PythonEventManagerWrapperU8,
-        MyStdStateU8,
-        PythonExecutorU8,
-        MyStdFuzzerU8
-    );
-    define_python_event_manager!(
-        PythonEventManagerU16,
-        "EventManagerU16",
-        PythonEventManagerWrapperU16,
-        MyStdStateU16,
-        PythonExecutorU16,
-        MyStdFuzzerU16
-    );
-    define_python_event_manager!(
-        PythonEventManagerU32,
-        "EventManagerU32",
-        PythonEventManagerWrapperU32,
-        MyStdStateU32,
-        PythonExecutorU32,
-        MyStdFuzzerU32
-    );
-    define_python_event_manager!(
-        PythonEventManagerU64,
-        "EventManagerU64",
-        PythonEventManagerWrapperU64,
-        MyStdStateU64,
-        PythonExecutorU64,
-        MyStdFuzzerU64
-    );
+    impl EventProcessor<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
+        for PythonEventManager
+    {
+        fn process(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            state: &mut PythonStdState,
+            executor: &mut PythonExecutor,
+        ) -> Result<usize, Error> {
+            unwrap_me_mut!(self.wrapper, e, { e.process(fuzzer, state, executor) })
+        }
+    }
+
+    impl ProgressReporter<BytesInput> for PythonEventManager {}
+
+    impl HasEventManagerId for PythonEventManager {
+        fn mgr_id(&self) -> EventManagerId {
+            unwrap_me!(self.wrapper, e, { e.mgr_id() })
+        }
+    }
+
+    impl EventManager<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
+        for PythonEventManager
+    {
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonEventManagerI8>()?;
-        m.add_class::<PythonEventManagerI16>()?;
-        m.add_class::<PythonEventManagerI32>()?;
-        m.add_class::<PythonEventManagerI64>()?;
-
-        m.add_class::<PythonEventManagerU8>()?;
-        m.add_class::<PythonEventManagerU16>()?;
-        m.add_class::<PythonEventManagerU32>()?;
-        m.add_class::<PythonEventManagerU64>()?;
+        m.add_class::<PythonEventManager>()?;
         Ok(())
     }
 }

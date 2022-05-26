@@ -91,6 +91,7 @@ where
 /// `InMemoryCorpus` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
+    use crate::corpus::pybind::PythonCorpus;
     use crate::corpus::InMemoryCorpus;
     use crate::inputs::BytesInput;
     use pyo3::prelude::*;
@@ -101,7 +102,7 @@ pub mod pybind {
     /// Python class for InMemoryCorpus
     pub struct PythonInMemoryCorpus {
         /// Rust wrapped InMemoryCorpus object
-        pub in_memory_corpus: InMemoryCorpus<BytesInput>,
+        pub inner: InMemoryCorpus<BytesInput>,
     }
 
     #[pymethods]
@@ -109,8 +110,12 @@ pub mod pybind {
         #[new]
         fn new() -> Self {
             Self {
-                in_memory_corpus: InMemoryCorpus::new(),
+                inner: InMemoryCorpus::new(),
             }
+        }
+
+        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
+            PythonCorpus::new_in_memory(slf)
         }
     }
     /// Register the classes to the python module

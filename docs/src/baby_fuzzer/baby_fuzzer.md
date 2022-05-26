@@ -15,7 +15,7 @@ You can find a complete version of this tutorial as an example fuzzer in [`fuzze
 
 ## Creating a project
 
-We use cargo to create a new Rust project with LibAFL as a dependency. 
+We use cargo to create a new Rust project with LibAFL as a dependency.
 
 ```sh
 $ cargo new baby_fuzzer
@@ -46,7 +46,6 @@ Alongside this setting, we add some optimization flags for the compile when buil
 
 The final `Cargo.toml` should look similar to the following:
 
-
 ```toml
 [package]
 name = "baby_fuzzer"
@@ -73,29 +72,33 @@ debug = true
 ## The function under test
 
 Opening `src/main.rs`, we have an empty `main` function.
-To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`.
+To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`. `ExitKind` is used to inform the harness' exit status.
 
 ```rust
 extern crate libafl;
 use libafl::{
     bolts::AsSlice,
     inputs::{BytesInput, HasTargetBytes},
+    executors::ExitKind,
 };
 
-let mut harness = |input: &BytesInput| {
-    let target = input.target_bytes();
-    let buf = target.as_slice();
-    if buf.len() > 0 && buf[0] == 'a' as u8 {
-        if buf.len() > 1 && buf[1] == 'b' as u8 {
-            if buf.len() > 2 && buf[2] == 'c' as u8 {
-                panic!("=)");
+fn main(){
+    let mut harness = |input: &BytesInput| {
+        let target = input.target_bytes();
+        let buf = target.as_slice();
+        if buf.len() > 0 && buf[0] == 'a' as u8 {
+            if buf.len() > 1 && buf[1] == 'b' as u8 {
+                if buf.len() > 2 && buf[2] == 'c' as u8 {
+                    panic!("=)");
+                }
             }
         }
-    }
-};
-// To test the panic:
-// let input = BytesInput::new("abc".as_bytes());
-// harness(&input);
+        ExitKind::Ok
+    };
+    // To test the panic:
+    let input = BytesInput::new(Vec::from("abc"));
+    // harness(&input);
+}
 ```
 
 ## Generating and running some tests
@@ -119,13 +122,15 @@ let mut state = StdState::new(
 ).unwrap();
 ```
 
-It takes a random number generator, that is part of the fuzzer state, in this case, we use the default one `StdRand` but you can choose a different one. We seed it with the current nanoseconds.
+- first parameter is a random number generator, that is part of the fuzzer state, in this case, we use the default one `StdRand` but you can choose a different one. We seed it with the current nanoseconds.
+- second parameter is an instance of something implementing the Corpus trait, `InMemoryCorpus` in this case. The corpus is the container of the testcases evolved by the fuzzer, in this case, we keep it all in memory.
 
-As the second parameter, it takes an instance of something implementing the Corpus trait, InMemoryCorpus in this case. The corpus is the container of the testcases evolved by the fuzzer, in this case, we keep it all in memory.
+  To avoid type annotation error, you can use `InMemoryCorpus::<BytesInput>::new()` to replace `InMemoryCorpus::new()`. If not, type annotation will be automatically inferred when adding `executor`.
 
-We will discuss the last parameter later. The third parameter is another corpus, in this case, to store the testcases that are considered as "solutions" for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory, so we can inspect it.
+- third parameter is another corpus that stores the "solution" testcases for the fuzzer. For our purpose, the solution is the input that triggers the panic. In this case, we want to store it to disk under the `crashes` directory, so we can inspect it.
+- last two parameters are feedback and objective, we will discuss them later.
 
-Another required component is the EventManager. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a `Monitor` instance.
+Another required component is the **EventManager**. It handles some events such as the addition of a testcase to the corpus during the fuzzing process. For our purpose, we use the simplest one that just displays the information about these events to the user using a `Monitor` instance.
 
 ```rust,ignore
 // The Monitor trait defines how the fuzzer stats are displayed to the user
@@ -136,8 +141,8 @@ let mon = SimpleMonitor::new(|s| println!("{}", s));
 let mut mgr = SimpleEventManager::new(mon);
 ```
 
-In addition, we have the Fuzzer, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a Scheduler.
-We create it as QueueScheduler, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
+In addition, we have the **Fuzzer**, an entity that contains some actions that alter the State. One of these actions is the scheduling of the testcases to the fuzzer using a **Scheduler**.
+We create it as `QueueScheduler`, a scheduler that serves testcases to the fuzzer in a FIFO fashion.
 
 ```rust,ignore
 // A queue policy to get testcasess from the corpus
@@ -147,7 +152,7 @@ let scheduler = QueueScheduler::new();
 let mut fuzzer = StdFuzzer::new(scheduler, (), ());
 ```
 
-Last but not least, we need an Executor that is the entity responsible to run our program under test. In this example, we want to run the harness function in-process (without forking off a child, for example), and so we use the `InProcessExecutor`.
+Last but not least, we need an **Executor** that is the entity responsible to run our program under test. In this example, we want to run the harness function in-process (without forking off a child, for example), and so we use the `InProcessExecutor`.
 
 ```rust,ignore
 // Create the executor for an in-process function
@@ -162,11 +167,11 @@ let mut executor = InProcessExecutor::new(
 ```
 
 It takes a reference to the harness, the state, and the event manager. We will discuss the second parameter later.
-As the executor expects that the harness returns an ExitKind object, we add `ExitKind::Ok` to our harness function.
+As the executor expects that the harness returns an ExitKind object, so we have added `ExitKind::Ok` to our harness function before.
 
 Now we have the 4 major entities ready for running our tests, but we still cannot generate testcases.
 
-For this purpose, we use a Generator, `RandPrintablesGenerator` that generates a string of printable bytes.
+For this purpose, we use a **Generator**, `RandPrintablesGenerator` that generates a string of printable bytes.
 
 ```rust,ignore
 use libafl::generators::RandPrintablesGenerator;
@@ -187,7 +192,7 @@ extern crate libafl;
 
 use std::path::PathBuf;
 use libafl::{
-    bolts::{current_nanos, rands::StdRand},
+    bolts::{AsSlice, current_nanos, rands::StdRand},
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
@@ -213,12 +218,12 @@ $ cargo run
 
 Now you simply ran 8 randomly generated testcases, but none of them has been stored in the corpus. If you are very lucky, maybe you triggered the panic by chance but you don't see any saved file in `crashes`.
 
-Now we want to turn our simple fuzzer into a feedback-based one and increase the chance to generate the right input to trigger the panic. We are going to implement a simple feedback based on the 3 conditions that are needed to reach the panic.
+Now we want to turn our simple fuzzer into a feedback-based one and increase the chance to generate the right input to trigger the panic. We are going to implement a simple feedback based on the 3 conditions that are needed to reach the panic. To do that, we need a way to keep track of if a condition is satisfied.
 
-To do that, we need a way to keep track of if a condition is satisfied. The component that feeds the fuzzer with information about properties of a fuzzing run, the satisfied conditions in our case, is the Observer. We use the `StdMapObserver`, the default observer that uses a map to keep track of covered elements. In our fuzzer, each condition is mapped to an entry of such map.
+**Observer** can record the information about properties of a fuzzing run and then feeds the fuzzer. We use the `StdMapObserver`, the default observer that uses a map to keep track of covered elements. In our fuzzer, each condition is mapped to an entry of such map.
 
 We represent such map as a `static mut` variable.
-As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions in a map modifying our tested function:
+As we don't rely on any instrumentation engine, we have to manually track the satisfied conditions by `singals_set` in our harness:
 
 ```rust
 extern crate libafl;
@@ -239,11 +244,11 @@ fn signals_set(idx: usize) {
 let mut harness = |input: &BytesInput| {
     let target = input.target_bytes();
     let buf = target.as_slice();
-    signals_set(0);
+    signals_set(0); // set SIGNALS[0]
     if buf.len() > 0 && buf[0] == 'a' as u8 {
-        signals_set(1);
+        signals_set(1); // set SIGNALS[1]
         if buf.len() > 1 && buf[1] == 'b' as u8 {
-            signals_set(2);
+            signals_set(2); // set SIGNALS[2]
             if buf.len() > 2 && buf[2] == 'c' as u8 {
                 panic!("=)");
             }
@@ -274,11 +279,13 @@ let mut executor = InProcessExecutor::new(
 .expect("Failed to create the Executor".into());
 ```
 
-Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback. The Feedback is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far in a metadata in the State, in our case it maintains the set of conditions satisfied in the previous runs.
+Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback.
 
-We use MaxMapFeedback, a feedback that implements a novelty search over the map of the MapObserver. Basically, if there is a value in the observer's map that is greater than the maximum value registered so far for the same entry, it rates the input as interesting and updates its state.
+**Feedback** is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far in a metadata in the State, in our case it maintains the set of conditions satisfied in the previous runs.
 
-Feedbacks are used also to decide if an input is a "solution". The feedback that does that is called the Objective Feedback and when it rates an input as interesting it is not saved to the corpus but to the solutions, written in the `crashes` folder in our case. We use the CrashFeedback to tell the fuzzer that if an input causes the program to crash it is a solution for us.
+We use `MaxMapFeedback`, a feedback that implements a novelty search over the map of the MapObserver. Basically, if there is a value in the observer's map that is greater than the maximum value registered so far for the same entry, it rates the input as interesting and updates its state.
+
+**Objective Feedback** is another kind of Feedback which decide if an input is a "solution". It will save input to solutions(`./crashes` in our case) other than corpus when the input is rated interesting. We use `CrashFeedback` to tell the fuzzer that if an input causes the program to crash it is a solution for us.
 
 We need to update our State creation including the feedback state and the Fuzzer including the feedback and the objective:
 
@@ -294,7 +301,7 @@ use libafl::{
 };
 
 // Feedback to rate the interestingness of an input
-let mut feedback = MaxMapFeedback::new(&feedback_state, &observer);
+let mut feedback = MaxMapFeedback::new(&observer);
 
 // A feedback to choose if an input is a solution or not
 let mut objective = CrashFeedback::new();
@@ -322,7 +329,7 @@ let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
 Now, after including the correct `use`, we can run the program, but the outcome is not so different from the previous one as the random generator does not take into account what we save as interesting in the corpus. To do that, we need to plug a Mutator.
 
-Another central component of LibAFL are the Stages, that are actions done on individual inputs taken from the corpus. The MutationalStage mutates the input and executes it several times for instance.
+**Stages** are action sequence done on individual inputs taken from the corpus. The `MutationalStage` mutates the input and executes it several times for instance.
 
 As the last step, we create a MutationalStage that uses a mutator inspired by the havoc mutator of AFL.
 
@@ -367,3 +374,5 @@ Bye!
 ```
 
 As you can see, after the panic message, the `objectives` count of the log increased by one and you will find the crashing input in `crashes/`.
+
+The complete code can be found in `./fuzzers/baby_fuzzer`.
