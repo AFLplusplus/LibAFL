@@ -576,6 +576,7 @@ pub mod pybind {
     macro_rules! impl_serde_pyobjectwrapper {
         ($struct_name:ident, $inner:tt) => {
             const _: () = {
+                use alloc::vec::Vec;
                 use pyo3::prelude::*;
                 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

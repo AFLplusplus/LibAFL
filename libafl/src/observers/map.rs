@@ -1625,10 +1625,10 @@ pub mod pybind {
             #[pymethods]
             impl $struct_name2 {
                 #[new]
-                fn new(name: alloc::string::String, map: alloc::vec::Vec<$datatype>) -> Self {
+                fn new(name: String, map: Vec<$datatype>) -> Self {
                     Self {
                         //TODO: Not leak memory
-                        inner: OwnedMapObserver::new(Box::leak(name.into_boxed_str()), map),
+                        inner: OwnedMapObserver::new(alloc::boxed::Box::leak(name.into_boxed_str()), map),
                     }
                 }
 

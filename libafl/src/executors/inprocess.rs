@@ -1691,6 +1691,7 @@ pub mod pybind {
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::observers::pybind::PythonObserversTuple;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use alloc::boxed::Box;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
 

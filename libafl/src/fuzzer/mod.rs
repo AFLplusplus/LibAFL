@@ -682,6 +682,7 @@ pub mod pybind {
     use crate::schedulers::QueueScheduler;
     use crate::stages::pybind::PythonStagesTuple;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use alloc::vec::Vec;
     use pyo3::prelude::*;
 
     /// `StdFuzzer` with fixed generics
@@ -724,7 +725,7 @@ pub mod pybind {
         #[new]
         fn new(py_feedback: PythonFeedback, py_objective: PythonFeedback) -> Self {
             Self {
-                inner: OwnedPtrMut::Owned(Box::new(StdFuzzer::new(
+                inner: OwnedPtrMut::Owned(alloc::boxed::Box::new(StdFuzzer::new(
                     QueueScheduler::new(),
                     py_feedback,
                     py_objective,

@@ -354,6 +354,7 @@ pub mod pybind {
     use crate::bolts::ownedref::OwnedPtrMut;
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::pybind::PythonMetadata;
+    use alloc::vec::Vec;
     use pyo3::prelude::*;
     use pyo3::types::PyDict;
 
@@ -390,7 +391,9 @@ pub mod pybind {
         #[new]
         fn new(input: Vec<u8>) -> Self {
             Self {
-                inner: OwnedPtrMut::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
+                inner: OwnedPtrMut::Owned(alloc::boxed::Box::new(PythonTestcase::new(
+                    BytesInput::new(input),
+                ))),
             }
         }
 
