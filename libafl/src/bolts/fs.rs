@@ -152,7 +152,7 @@ mod test {
 
     #[test]
     fn test_atomic_file_write() {
-        let path = "atomic_file_testfile";
+        let path = "test_atomic_file_write.tmp";
         write_file_atomic(&path, b"test").unwrap();
         let content = fs::read_to_string(&path).unwrap();
         fs::remove_file(&path).unwrap();
@@ -161,7 +161,7 @@ mod test {
 
     #[test]
     fn test_cloned_ref() {
-        let mut one = OutFile::create("test.tmp").unwrap();
+        let mut one = OutFile::create("test_cloned_ref.tmp").unwrap();
         let two = one.clone();
         one.write_buf("Welp".as_bytes()).unwrap();
         drop(one);
