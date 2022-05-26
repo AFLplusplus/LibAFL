@@ -5,6 +5,7 @@ use crate::{
         Observer,
     },
 };
+use alloc::string::String;
 use serde::{Deserialize, Serialize};
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.

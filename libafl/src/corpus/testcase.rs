@@ -354,6 +354,7 @@ pub mod pybind {
     use crate::bolts::ownedref::OwnedPtrMut;
     use crate::inputs::{BytesInput, HasBytesVec};
     use crate::pybind::PythonMetadata;
+    use alloc::{boxed::Box, vec::Vec};
     use pyo3::prelude::*;
     use pyo3::types::PyDict;
 

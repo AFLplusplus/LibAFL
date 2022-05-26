@@ -682,6 +682,7 @@ pub mod pybind {
     use crate::schedulers::QueueScheduler;
     use crate::stages::pybind::PythonStagesTuple;
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use alloc::{boxed::Box, vec::Vec};
     use pyo3::prelude::*;
 
     /// `StdFuzzer` with fixed generics

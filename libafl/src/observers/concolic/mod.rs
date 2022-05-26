@@ -5,6 +5,8 @@ use core::{
 };
 
 #[cfg(feature = "std")]
+use alloc::vec::Vec;
+#[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
 /// A `SymExprRef` identifies a [`SymExpr`] in a trace. Reading a `SymExpr` from a trace will always also yield its

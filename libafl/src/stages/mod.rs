@@ -268,6 +268,7 @@ pub mod pybind {
     use crate::stages::{Stage, StagesTuple};
     use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::Error;
+    use alloc::vec::Vec;
     use pyo3::prelude::*;
 
     #[derive(Clone, Debug)]

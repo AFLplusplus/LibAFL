@@ -9,6 +9,9 @@ use std::{
 #[cfg(unix)]
 use std::os::unix::prelude::{AsRawFd, RawFd};
 
+#[cfg(feature = "std")]
+use alloc::borrow::ToOwned;
+
 use crate::Error;
 
 /// The default filename to use to deliver testcases to the target

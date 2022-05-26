@@ -2,6 +2,7 @@
 
 use std::{fmt::Debug, marker::PhantomData};
 
+use alloc::string::{String, ToString};
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 

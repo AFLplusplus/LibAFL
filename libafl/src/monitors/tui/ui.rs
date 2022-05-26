@@ -1,5 +1,6 @@
 use super::{current_time, format_duration_hms, Duration, String, TimedStats, TuiContext};
 
+use alloc::vec::Vec;
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},

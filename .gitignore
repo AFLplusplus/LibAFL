@@ -42,3 +42,5 @@ a
 forkserver_test
 __pycache__
 *.lafl_lock
+
+*atomic_file_testfile*
