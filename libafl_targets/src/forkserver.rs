@@ -10,7 +10,6 @@ extern "C" {
 /// # Safety
 ///
 /// The forkserver logic is written in C and this code is a wrapper.
-#[must_use]
 pub fn start_forkserver() -> ! {
     unsafe { __afl_start_forkserver() }
 }
