@@ -1,16 +1,16 @@
 //! `LibAFL` functionality for filesystem interaction
 
+#[cfg(feature = "std")]
+use alloc::borrow::ToOwned;
+use alloc::rc::Rc;
+use core::cell::RefCell;
+#[cfg(unix)]
+use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::{
     fs::{self, remove_file, File, OpenOptions},
     io::{Seek, SeekFrom, Write},
     path::{Path, PathBuf},
 };
-
-#[cfg(unix)]
-use std::os::unix::prelude::{AsRawFd, RawFd};
-
-#[cfg(feature = "std")]
-use alloc::borrow::ToOwned;
 
 use crate::Error;
 
@@ -56,6 +56,9 @@ pub struct OutFile {
     pub path: PathBuf,
     /// The underlying file that got created
     pub file: File,
+    /// The ref count for this [`OutFile`].
+    /// Once it reaches 0, the underlying [`File`] will be removed.
+    pub rc: Rc<RefCell<usize>>,
 }
 
 impl Eq for OutFile {}
@@ -68,9 +71,15 @@ impl PartialEq for OutFile {
 
 impl Clone for OutFile {
     fn clone(&self) -> Self {
+        {
+            let mut rc = self.rc.borrow_mut();
+            assert_ne!(*rc, usize::MAX, "OutFile rc overflow");
+            *rc += 1;
+        }
         Self {
             path: self.path.clone(),
             file: self.file.try_clone().unwrap(),
+            rc: self.rc.clone(),
         }
     }
 }
@@ -91,6 +100,7 @@ impl OutFile {
         Ok(Self {
             path: filename.as_ref().to_owned(),
             file: f,
+            rc: Rc::new(RefCell::new(1)),
         })
     }
 
@@ -125,23 +135,36 @@ impl OutFile {
 #[cfg(feature = "std")]
 impl Drop for OutFile {
     fn drop(&mut self) {
-        // try to remove the file, but ignore errors
-        drop(remove_file(&self.path));
+        let mut rc = self.rc.borrow_mut();
+        assert_ne!(*rc, 0, "OutFile rc should never be 0");
+        *rc = *rc - 1;
+        if *rc == 0 {
+            // try to remove the file, but ignore errors
+            drop(remove_file(&self.path));
+        }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::bolts::fs::write_file_atomic;
+    use crate::bolts::fs::{write_file_atomic, OutFile};
     use std::fs;
 
     #[test]
     fn test_atomic_file_write() {
         let path = "atomic_file_testfile";
-
         write_file_atomic(&path, b"test").unwrap();
         let content = fs::read_to_string(&path).unwrap();
         fs::remove_file(&path).unwrap();
         assert_eq!(content, "test");
+    }
+
+    #[test]
+    fn test_cloned_ref() {
+        let mut one = OutFile::create("/tmp/test").unwrap();
+        let two = one.clone();
+        one.write_buf("Welp".as_bytes()).unwrap();
+        drop(one);
+        assert_eq!("Welp", fs::read_to_string(&two.path).unwrap());
     }
 }
