@@ -137,8 +137,9 @@ impl Drop for OutFile {
     fn drop(&mut self) {
         let mut rc = self.rc.borrow_mut();
         assert_ne!(*rc, 0, "OutFile rc should never be 0");
-        *rc = *rc - 1;
+        *rc -= 1;
         if *rc == 0 {
+            println!("Dropping");
             // try to remove the file, but ignore errors
             drop(remove_file(&self.path));
         }
@@ -161,7 +162,7 @@ mod test {
 
     #[test]
     fn test_cloned_ref() {
-        let mut one = OutFile::create("/tmp/test").unwrap();
+        let mut one = OutFile::create("test.tmp").unwrap();
         let two = one.clone();
         one.write_buf("Welp".as_bytes()).unwrap();
         drop(one);
