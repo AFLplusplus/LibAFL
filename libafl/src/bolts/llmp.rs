@@ -57,10 +57,7 @@ Check out the `llmp_test` example in ./examples, or build it with `cargo run --e
 
 */
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{string::String, vec::Vec};
 #[cfg(not(target_pointer_width = "64"))]
 use core::sync::atomic::AtomicU32;
 #[cfg(target_pointer_width = "64")]
@@ -76,6 +73,8 @@ use core::{
 };
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 #[cfg(feature = "std")]
 use std::{
     env,
