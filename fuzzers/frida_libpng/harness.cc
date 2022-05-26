@@ -26,16 +26,18 @@
 
 #define PNG_CLEANUP                                                        \
   if (png_handler.png_ptr) {                                               \
-    if (png_handler.row_ptr)                                               \
+    if (png_handler.row_ptr) {                                             \
       png_free(png_handler.png_ptr, png_handler.row_ptr);                  \
-    if (png_handler.end_info_ptr)                                          \
+    }                                                                      \
+    if (png_handler.end_info_ptr) {                                        \
       png_destroy_read_struct(&png_handler.png_ptr, &png_handler.info_ptr, \
                               &png_handler.end_info_ptr);                  \
-    else if (png_handler.info_ptr)                                         \
+    } else if (png_handler.info_ptr) {                                     \
       png_destroy_read_struct(&png_handler.png_ptr, &png_handler.info_ptr, \
                               nullptr);                                    \
-    else                                                                   \
+    } else {                                                               \
       png_destroy_read_struct(&png_handler.png_ptr, nullptr, nullptr);     \
+    }                                                                      \
     png_handler.png_ptr = nullptr;                                         \
     png_handler.row_ptr = nullptr;                                         \
     png_handler.info_ptr = nullptr;                                        \
@@ -55,13 +57,14 @@ struct PngObjectHandler {
   BufState   *buf_state = nullptr;
 
   ~PngObjectHandler() {
-    if (row_ptr) png_free(png_ptr, row_ptr);
-    if (end_info_ptr)
+    if (row_ptr) { png_free(png_ptr, row_ptr); }
+    if (end_info_ptr) {
       png_destroy_read_struct(&png_ptr, &info_ptr, &end_info_ptr);
-    else if (info_ptr)
+    } else if (info_ptr) {
       png_destroy_read_struct(&png_ptr, &info_ptr, nullptr);
-    else
+    } else {
       png_destroy_read_struct(&png_ptr, nullptr, nullptr);
+    }
     delete buf_state;
   }
 };
@@ -80,7 +83,8 @@ extern "C" int afl_libfuzzer_init() {
   return 0;
 }
 
-static char                   *allocation = NULL;
+static char *allocation = NULL;
+
 __attribute__((noinline)) void func3(char *alloc) {
 // printf("func3\n");
 #ifdef _WIN32

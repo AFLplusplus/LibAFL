@@ -10,7 +10,9 @@ echo "[*] Running fmt for the main crates"
 cargo fmt
 
 echo "[*] Formatting C(pp) files"
-clang-format-13 -i --style=file $(find -E . -regex '.*\.(cpp|hpp|cc|cxx|c|h)' | grep -ve 'target' | grep -ve 'libpng-1.6.37')
+clang-format-13 -i --style=file $(find -E . -regex '.*\.(cpp|hpp|cc|cxx|c|h)' | grep -ve 'target' | grep -ve 'libpng-1.6.37' | grep -ve 'stb_image.h' | grep -ve 'dlmalloc.c')
+
+
 
 fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)

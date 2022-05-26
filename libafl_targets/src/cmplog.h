@@ -52,7 +52,7 @@ void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2)
 
 static inline void __libafl_targets_cmplog(uintptr_t k, uint8_t shape, uint64_t arg1, uint64_t arg2) {
 
-  if (!libafl_cmplog_enabled) return;
+  if (!libafl_cmplog_enabled) {return;}
   
   uint16_t hits;
   if (libafl_cmplog_map_ptr->headers[k].kind != CMPLOG_KIND_INS) {

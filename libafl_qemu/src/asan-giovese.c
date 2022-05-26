@@ -1155,16 +1155,18 @@ static void print_alloc_location(target_ulong addr, target_ulong fault_addr) {
   }
 
   int i = 0;
-  while (!ckinfo && i < DEFAULT_REDZONE_SIZE)
+  while (!ckinfo && i < DEFAULT_REDZONE_SIZE) {
     ckinfo = asan_giovese_alloc_search(fault_addr - (i++));
+  }
   if (ckinfo) {
     print_alloc_location_chunk(ckinfo, fault_addr);
     return;
   }
 
   i = 0;
-  while (!ckinfo && i < DEFAULT_REDZONE_SIZE)
+  while (!ckinfo && i < DEFAULT_REDZONE_SIZE) {
     ckinfo = asan_giovese_alloc_search(fault_addr + (i++));
+  }
   if (ckinfo) {
     print_alloc_location_chunk(ckinfo, fault_addr);
     return;

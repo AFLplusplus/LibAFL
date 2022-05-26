@@ -6263,7 +6263,7 @@ int mspace_mallopt(int param_number, int value) {
 
     void **ptr;
 
-    for (ptr = our_os_pools; ptr < &our_os_pools[MAX_POOL_ENTRIES]; ptr++)
+    for (ptr = our_os_pools; ptr < &our_os_pools[MAX_POOL_ENTRIES]; ptr++) {
       if (*ptr)
       {
 
@@ -6271,6 +6271,7 @@ int mspace_mallopt(int param_number, int value) {
          *ptr = 0;
 
       }
+    }
 
   }
 

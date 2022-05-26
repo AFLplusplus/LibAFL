@@ -248,10 +248,11 @@ void *memchr(const void *s, int c, size_t n) {
 
   QASAN_DEBUG("%14p: memchr(%p, %d, %zu)\n", rtv, s, c, n);
   void *r = __libqasan_memchr(s, c, n);
-  if (r == NULL)
+  if (r == NULL) {
     QASAN_LOAD(s, n);
-  else
+  } else {
     QASAN_LOAD(s, r - s);
+  }
   QASAN_DEBUG("\t\t = %p\n", r);
 
   return r;

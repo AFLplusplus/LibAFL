@@ -43,27 +43,30 @@ void __libqasan_print_maps(void) {
   int   i;
   char *line = NULL;
   for (i = 0; i < len; i++) {
-    if (!line) line = &buf[i];
-    if (buf[i] == '\n') {
-      buf[i] = 0;
-      QASAN_LOG("%s\n", line);
-      line = NULL;
-    }
+    if (!line) line = { &buf[i];
   }
+  if (buf[i] == '\n') {
+    buf[i] = 0;
+    QASAN_LOG("%s\n", line);
+    line = NULL;
+  }
+}
 
-  if (line) QASAN_LOG("%s\n", line);
-  QASAN_LOG("\n");
+if (line) { QASAN_LOG("%s\n", line); }
+QASAN_LOG("\n");
 }
 
 int __libqasan_is_initialized = 0;
 
 __attribute__((constructor)) void __libqasan_init() {
-  if (__libqasan_is_initialized) return;
+  if (__libqasan_is_initialized) { return; }
   __libqasan_is_initialized = 1;
 
   __libqasan_init_hooks();
 
-  if (getenv("AFL_INST_LIBS") || getenv("QASAN_HOTPACH")) __libqasan_hotpatch();
+  if (getenv("AFL_INST_LIBS") || getenv("QASAN_HOTPACH")) {
+    __libqasan_hotpatch();
+  }
 
 #ifdef DEBUG
   __qasan_debug = getenv("QASAN_DEBUG") != NULL;
@@ -75,7 +78,7 @@ __attribute__((constructor)) void __libqasan_init() {
       "Copyright (C) 2019-2021 Andrea Fioraldi <andreafioraldi@gmail.com>\n");
   QASAN_LOG("\n");
 
-  if (__qasan_log) __libqasan_print_maps();
+  if (__qasan_log) { __libqasan_print_maps(); }
 }
 
 int __libc_start_main(int (*main)(int, char **, char **), int argc, char **argv,

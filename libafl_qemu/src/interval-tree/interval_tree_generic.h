@@ -48,7 +48,7 @@
     ITTYPE max = ITLAST(node), subtree_last;                                   \
     if (node->ITRB.rb_left) {                                                  \
       subtree_last = rb_entry(node->ITRB.rb_left, ITSTRUCT, ITRB)->ITSUBTREE;  \
-      if (max < subtree_last) max = subtree_last;                              \
+      if (max < subtree_last) { max = subtree_last; }                          \
     }                                                                          \
     if (node->ITRB.rb_right) {                                                 \
       subtree_last = rb_entry(node->ITRB.rb_right, ITSTRUCT, ITRB)->ITSUBTREE; \
@@ -160,16 +160,17 @@
       /* Move up the tree until we come from a node's left child */            \
       do {                                                                     \
         rb = rb_parent(&node->ITRB);                                           \
-        if (!rb) return NULL;                                                  \
+        if (!rb) { return NULL; }                                              \
         prev = &node->ITRB;                                                    \
         node = rb_entry(rb, ITSTRUCT, ITRB);                                   \
         rb = node->ITRB.rb_right;                                              \
       } while (prev == rb);                                                    \
                                                                                \
       /* Check if the node intersects [start;last] */                          \
-      if (last < ITSTART(node)) /* !Cond1 */                                   \
+      if (last < ITSTART(node)) { /* !Cond1 */                                 \
         return NULL;                                                           \
-      else if (start <= ITLAST(node)) /* Cond2 */                              \
+      } else if (start <= ITLAST(node)) { /* Cond2 */                          \
         return node;                                                           \
+      }                                                                        \
     }                                                                          \
   }

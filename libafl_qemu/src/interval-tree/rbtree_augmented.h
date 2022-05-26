@@ -70,7 +70,7 @@ static inline void rb_insert_augmented(
     while (rb != stop) {                                                  \
       rbstruct *node = rb_entry(rb, rbstruct, rbfield);                   \
       rbtype    augmented = rbcompute(node);                              \
-      if (node->rbaugmented == augmented) break;                          \
+      if (node->rbaugmented == augmented) { break; }                      \
       node->rbaugmented = augmented;                                      \
       rb = rb_parent(&node->rbfield);                                     \
     }                                                                     \
@@ -116,12 +116,14 @@ static inline void __rb_change_child(struct rb_node *old, struct rb_node *new,
                                      struct rb_node *parent,
                                      struct rb_root *root) {
   if (parent) {
-    if (parent->rb_left == old)
+    if (parent->rb_left == old) {
       parent->rb_left = new;
-    else
+    } else {
       parent->rb_right = new;
-  } else
+    }
+  } else {
     root->rb_node = new;
+  }
 }
 
 extern void __rb_erase_color(struct rb_node *parent, struct rb_root *root,
@@ -228,7 +230,7 @@ static inline void rb_erase_augmented(
     struct rb_node *node, struct rb_root *root,
     const struct rb_augment_callbacks *augment) {
   struct rb_node *rebalance = __rb_erase_augmented(node, root, augment);
-  if (rebalance) __rb_erase_color(rebalance, root, augment->rotate);
+  if (rebalance) { __rb_erase_color(rebalance, root, augment->rotate); }
 }
 
 #endif /* _LINUX_RBTREE_AUGMENTED_H */

@@ -43,15 +43,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define X_GET_FNDECL(type, name) type name
 #define GET_FNDECL(x) X_GET_FNDECL x
 
-#define HOOK_UNINSTRUMENT(rettype, name, ...)                       \
-  rettype (*__lq_libc_##name)(MAP_LIST(GET_FNTYPE, __VA_ARGS__));   \
-  rettype name(MAP_LIST(GET_FNDECL, __VA_ARGS__)) {                 \
-    if (!(__lq_libc_##name)) __lq_libc_##name = ASSERT_DLSYM(name); \
-    int     state = QASAN_SWAP(QASAN_DISABLED);                     \
-    rettype r = __lq_libc_##name(MAP_LIST(GET_FNPAR, __VA_ARGS__)); \
-    QASAN_SWAP(state);                                              \
-                                                                    \
-    return r;                                                       \
+#define HOOK_UNINSTRUMENT(rettype, name, ...)                           \
+  rettype (*__lq_libc_##name)(MAP_LIST(GET_FNTYPE, __VA_ARGS__));       \
+  rettype name(MAP_LIST(GET_FNDECL, __VA_ARGS__)) {                     \
+    if (!(__lq_libc_##name)) { __lq_libc_##name = ASSERT_DLSYM(name); } \
+    int     state = QASAN_SWAP(QASAN_DISABLED);                         \
+    rettype r = __lq_libc_##name(MAP_LIST(GET_FNPAR, __VA_ARGS__));     \
+    QASAN_SWAP(state);                                                  \
+                                                                        \
+    return r;                                                           \
   }
 
 HOOK_UNINSTRUMENT(char *, getenv, (const char *, name))
