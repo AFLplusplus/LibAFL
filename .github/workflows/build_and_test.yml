@@ -80,6 +80,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Format
       run: cargo fmt -- --check
+    - name: Run clang-format style check for C/C++ programs.
+      run: clang-format-13 -n -Werror --style=file $(find -E . -regex '.*\.(cpp|hpp|cc|cxx|c|h)' | grep -ve 'target' | grep -ve 'libpng-1.6.37' | grep -ve 'stb_image.h' | grep -ve 'dlmalloc.c')
     - uses: actions/checkout@v2
     - name: Build Docs
       run: cargo doc
@@ -87,11 +89,6 @@ jobs:
       run: cargo +nightly test --doc --all-features
     - name: Run clippy
       run: ./scripts/clippy.sh
-    - name: Run clang-format style check for C/C++ programs.
-      uses: jidicula/clang-format-action@v4.6.2
-      with:
-        clang-format-version: '13'
-        check-path: '.'
   ubuntu-concolic:
     runs-on: ubuntu-latest
     steps:
