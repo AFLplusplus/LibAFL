@@ -78,6 +78,8 @@ jobs:
       run: cargo fmt -- --check
     - uses: actions/checkout@v2
     - name: Build Docs
+      run: cargo doc
+    - name: Test Docs
       run: cargo +nightly test --doc --all-features
     - name: Run clippy
       run: ./scripts/clippy.sh
