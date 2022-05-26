@@ -45,6 +45,7 @@ impl<S> Feedback<PacketData, S> for PacketLenFeedback
 where
     S: HasClientPerfMonitor,
 {
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -70,11 +71,6 @@ where
         testcase
             .metadata_mut()
             .insert(PacketLenMetadata { length: self.len });
-        Ok(())
-    }
-
-    #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &PacketData) -> Result<(), Error> {
         Ok(())
     }
 }

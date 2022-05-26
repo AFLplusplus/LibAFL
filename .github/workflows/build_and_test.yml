@@ -100,6 +100,23 @@ jobs:
       run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
       run: ./libafl_concolic/test/smoke_test.sh 
+  bindings:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+    - uses: Swatinem/rust-cache@v1
+    - name: set mold linker as default linker
+      uses: rui314/setup-mold@v1
+    - name: Install deps
+      run: sudo apt-get install -y llvm llvm-dev clang ninja-build python3-dev python3-pip python3-venv
+    - name: Install maturin
+      run: python3 -m pip install maturin
+    - uses: actions/checkout@v2
+    - name: Run a maturin build
+      run: cd ./bindings/pylibafl && maturin build
   fuzzers:
     env:
       CC: ccache clang # use ccache in default

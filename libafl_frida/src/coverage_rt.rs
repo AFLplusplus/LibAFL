@@ -3,9 +3,6 @@ use core::ptr::addr_of_mut;
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use rangemap::RangeMap;
 
-#[cfg(target_arch = "aarch64")]
-use std::ffi::c_void;
-
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]

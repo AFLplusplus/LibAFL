@@ -114,8 +114,9 @@ let mut state = StdState::new(
     // Corpus in which we store solutions (crashes in this example),
     // on disk so the user can get them after stopping the fuzzer
     OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-    (),
-);
+    &mut (),
+    &mut ()
+).unwrap();
 ```
 
 It takes a random number generator, that is part of the fuzzer state, in this case, we use the default one `StdRand` but you can choose a different one. We seed it with the current nanoseconds.
@@ -273,7 +274,7 @@ let mut executor = InProcessExecutor::new(
 .expect("Failed to create the Executor".into());
 ```
 
-Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback. The Feedback is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far in a so-called FeedbackState instance, in our case it maintains the set of conditions satisfied in the previous runs.
+Now that the fuzzer can observe which condition is satisfied, we need a way to rate an input as interesting (i.e. worth of addition to the corpus) based on this observation. Here comes the notion of Feedback. The Feedback is part of the State and provides a way to rate input and its corresponding execution as interesting looking for the information in the observers. Feedbacks can maintain a cumulative state of the information seen so far in a metadata in the State, in our case it maintains the set of conditions satisfied in the previous runs.
 
 We use MaxMapFeedback, a feedback that implements a novelty search over the map of the MapObserver. Basically, if there is a value in the observer's map that is greater than the maximum value registered so far for the same entry, it rates the input as interesting and updates its state.
 
@@ -286,20 +287,17 @@ extern crate libafl;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus},
-    feedbacks::{MapFeedbackState, MaxMapFeedback, CrashFeedback},
+    feedbacks::{MaxMapFeedback, CrashFeedback},
     fuzzer::StdFuzzer,
     state::StdState,
     observers::StdMapObserver,
 };
 
-// The state of the edges feedback.
-let feedback_state = MapFeedbackState::with_observer(&observer);
-
 // Feedback to rate the interestingness of an input
-let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+let mut feedback = MaxMapFeedback::new(&feedback_state, &observer);
 
 // A feedback to choose if an input is a solution or not
-let objective = CrashFeedback::new();
+let mut objective = CrashFeedback::new();
 
 // create a State from scratch
 let mut state = StdState::new(
@@ -310,10 +308,9 @@ let mut state = StdState::new(
     // Corpus in which we store solutions (crashes in this example),
     // on disk so the user can get them after stopping the fuzzer
     OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
-    // States of the feedbacks.
-    // They are the data related to the feedbacks that you want to persist in the State.
-    tuple_list!(feedback_state),
-);
+    &mut feedback,
+    &mut objective
+).unwrap();
 
 // ...
 
