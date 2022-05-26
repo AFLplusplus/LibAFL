@@ -24,8 +24,8 @@ use crate::{
     Error,
 };
 
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::std::string::ToString;
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
@@ -123,8 +123,6 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
-        use alloc::string::ToString;
-
         if self.run_client.is_none() {
             return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),

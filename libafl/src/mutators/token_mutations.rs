@@ -2,6 +2,8 @@
 //! They may be inserted as part of mutations during fuzzing.
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
+#[cfg(target_os = "linux")]
+use alloc::borrow::ToOwned;
 use alloc::vec::Vec;
 #[cfg(target_os = "linux")]
 use core::slice::from_raw_parts;
@@ -154,8 +156,6 @@ impl Tokens {
     where
         P: AsRef<Path>,
     {
-        use alloc::borrow::ToOwned;
-
         // println!("Loading tokens file {:?} ...", file);
 
         let file = File::open(file)?; // panic if not found
@@ -172,16 +172,16 @@ impl Tokens {
             }
             let pos_quote = match line.find('\"') {
                 Some(x) => x,
-                None => return Err(Error::illegal_argument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::illegal_argument(format!("Illegal line: {}", line))),
             };
             if line.chars().nth(line.len() - 1) != Some('"') {
-                return Err(Error::illegal_argument("Illegal line: ".to_owned() + line));
+                return Err(Error::illegal_argument(format!("Illegal line: {}", line)));
             }
 
             // extract item
             let item = match line.get(pos_quote + 1..line.len() - 1) {
                 Some(x) => x,
-                None => return Err(Error::illegal_argument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::illegal_argument(format!("Illegal line: {}", line))),
             };
             if item.is_empty() {
                 continue;
@@ -191,9 +191,10 @@ impl Tokens {
             let token: Vec<u8> = match str_decode(item) {
                 Ok(val) => val,
                 Err(_) => {
-                    return Err(Error::illegal_argument(
-                        "Illegal line (hex decoding): ".to_owned() + line,
-                    ))
+                    return Err(Error::illegal_argument(format!(
+                        "Illegal line (hex decoding): {}",
+                        line
+                    )))
                 }
             };
 

@@ -371,6 +371,8 @@ pub fn parse_args() -> FuzzerOptions {
 ))]
 mod tests {
     use super::*;
+    #[cfg(feature = "frida_cli")]
+    use alloc::string::String;
 
     /// pass a standard option and `--` followed by some options that `FuzzerOptions` doesn't know
     /// about; expect the standard option to work normally, and everything after `--` to be
@@ -415,7 +417,7 @@ mod tests {
     fn parse_instrumentation_location_succeeds_without_0x() {
         assert_eq!(
             parse_instrumentation_location("mod_name@12345").unwrap(),
-            (alloc::string::String::from("mod_name"), 74565)
+            (String::from("mod_name"), 74565)
         );
     }
 
@@ -425,7 +427,7 @@ mod tests {
     fn parse_instrumentation_location_succeeds_with_0x() {
         assert_eq!(
             parse_instrumentation_location("mod_name@0x12345").unwrap(),
-            (alloc::string::String::from("mod_name"), 74565)
+            (String::from("mod_name"), 74565)
         );
     }
 

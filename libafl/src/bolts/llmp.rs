@@ -57,7 +57,10 @@ Check out the `llmp_test` example in ./examples, or build it with `cargo run --e
 
 */
 
-use alloc::{string::String, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(not(target_pointer_width = "64"))]
 use core::sync::atomic::AtomicU32;
 #[cfg(target_pointer_width = "64")]
@@ -1852,8 +1855,6 @@ where
     where
         A: ToSocketAddrs,
     {
-        use alloc::string::ToString;
-
         let mut stream = TcpStream::connect(addr)?;
         println!("B2B: Connected to {:?}", stream);
 
@@ -2052,8 +2053,6 @@ where
         b2b_client_id: ClientId,
         broker_shmem_description: &ShMemDescription,
     ) -> Result<ShMemDescription, Error> {
-        use alloc::string::ToString;
-
         let broker_shmem_description = *broker_shmem_description;
 
         // A channel to get the new "client's" sharedmap id from
@@ -2660,8 +2659,6 @@ where
     #[cfg(feature = "std")]
     /// Create a [`LlmpClient`], getting the ID from a given port
     pub fn create_attach_to_tcp(mut shmem_provider: SP, port: u16) -> Result<Self, Error> {
-        use alloc::string::ToString;
-
         let mut stream = match TcpStream::connect((_LLMP_CONNECT_ADDR, port)) {
             Ok(stream) => stream,
             Err(e) => {

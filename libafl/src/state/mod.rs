@@ -668,7 +668,7 @@ pub mod pybind {
     use crate::state::{
         HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,
     };
-    use alloc::vec::Vec;
+    use alloc::{boxed::Box, vec::Vec};
     use pyo3::prelude::*;
     use pyo3::types::PyDict;
     use std::path::PathBuf;
@@ -712,7 +712,7 @@ pub mod pybind {
             objective: &mut PythonFeedback,
         ) -> Self {
             Self {
-                inner: OwnedPtrMut::Owned(alloc::boxed::Box::new(
+                inner: OwnedPtrMut::Owned(Box::new(
                     StdState::new(py_rand, corpus, solutions, feedback, objective)
                         .expect("Failed to create a new StdState"),
                 )),
