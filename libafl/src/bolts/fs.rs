@@ -139,7 +139,6 @@ impl Drop for OutFile {
         assert_ne!(*rc, 0, "OutFile rc should never be 0");
         *rc -= 1;
         if *rc == 0 {
-            println!("Dropping");
             // try to remove the file, but ignore errors
             drop(remove_file(&self.path));
         }
