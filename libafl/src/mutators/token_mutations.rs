@@ -2,8 +2,6 @@
 //! They may be inserted as part of mutations during fuzzing.
 #[cfg(feature = "std")]
 use crate::mutators::str_decode;
-#[cfg(target_os = "linux")]
-use alloc::borrow::ToOwned;
 use alloc::vec::Vec;
 #[cfg(target_os = "linux")]
 use core::slice::from_raw_parts;
