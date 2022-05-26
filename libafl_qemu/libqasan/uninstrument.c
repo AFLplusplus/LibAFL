@@ -46,14 +46,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define HOOK_UNINSTRUMENT(rettype, name, ...)                       \
   rettype (*__lq_libc_##name)(MAP_LIST(GET_FNTYPE, __VA_ARGS__));   \
   rettype name(MAP_LIST(GET_FNDECL, __VA_ARGS__)) {                 \
-                                                                    \
     if (!(__lq_libc_##name)) __lq_libc_##name = ASSERT_DLSYM(name); \
     int     state = QASAN_SWAP(QASAN_DISABLED);                     \
     rettype r = __lq_libc_##name(MAP_LIST(GET_FNPAR, __VA_ARGS__)); \
     QASAN_SWAP(state);                                              \
                                                                     \
     return r;                                                       \
-                                                                    \
   }
 
 HOOK_UNINSTRUMENT(char *, getenv, (const char *, name))
@@ -80,4 +78,3 @@ HOOK_UNINSTRUMENT(int, getpwnam_r, (const char *, name), (struct passwd *, pwd),
 HOOK_UNINSTRUMENT(int, getpwuid_r, (uid_t, uid), (struct passwd *, pwd), (char
 *, buf), (size_t, buflen), (struct passwd **, result))
 */
-

@@ -453,10 +453,9 @@ bool AFLCoverage::runOnModule(Module &M) {
           // local variable on the stack
           LoadInst *PrevCtxLoad = IRB.CreateLoad(
 #if LLVM_VERSION_MAJOR >= 14
-            IRB.getInt32Ty(),
+              IRB.getInt32Ty(),
 #endif
-            AFLContext
-          );
+              AFLContext);
           PrevCtxLoad->setMetadata(M.getMDKindID("nosanitize"),
                                    MDNode::get(C, None));
           PrevCtx = PrevCtxLoad;

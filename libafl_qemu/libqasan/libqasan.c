@@ -31,7 +31,6 @@ int __qasan_debug;
 int __qasan_log;
 
 void __libqasan_print_maps(void) {
-
   int  fd = open("/proc/self/maps", O_RDONLY);
   char buf[4096] = {0};
 
@@ -44,27 +43,21 @@ void __libqasan_print_maps(void) {
   int   i;
   char *line = NULL;
   for (i = 0; i < len; i++) {
-
     if (!line) line = &buf[i];
     if (buf[i] == '\n') {
-
       buf[i] = 0;
       QASAN_LOG("%s\n", line);
       line = NULL;
-
     }
-
   }
 
   if (line) QASAN_LOG("%s\n", line);
   QASAN_LOG("\n");
-
 }
 
 int __libqasan_is_initialized = 0;
 
 __attribute__((constructor)) void __libqasan_init() {
-
   if (__libqasan_is_initialized) return;
   __libqasan_is_initialized = 1;
 
@@ -83,18 +76,14 @@ __attribute__((constructor)) void __libqasan_init() {
   QASAN_LOG("\n");
 
   if (__qasan_log) __libqasan_print_maps();
-
 }
 
 int __libc_start_main(int (*main)(int, char **, char **), int argc, char **argv,
                       int (*init)(int, char **, char **), void (*fini)(void),
                       void (*rtld_fini)(void), void *stack_end) {
-
   typeof(&__libc_start_main) orig = dlsym(RTLD_NEXT, "__libc_start_main");
 
   __libqasan_init();
 
   return orig(main, argc, argv, init, fini, rtld_fini, stack_end);
-
 }
-

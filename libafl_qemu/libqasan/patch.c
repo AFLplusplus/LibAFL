@@ -29,7 +29,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef __x86_64__
 
 uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
-
   // mov rax, dest
   addr[0] = 0x48;
   addr[1] = 0xb8;
@@ -40,13 +39,11 @@ uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
   addr[11] = 0xe0;
 
   return &addr[12];
-
 }
 
 #elif __i386__
 
 uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
-
   // mov eax, dest
   addr[0] = 0xb8;
   *(uint8_t **)&addr[1] = dest;
@@ -56,7 +53,6 @@ uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
   addr[6] = 0xe0;
 
   return &addr[7];
-
 }
 
 #elif __arm__
@@ -65,7 +61,6 @@ uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
 // so let's use it in our stub
 
 uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
-
   // ldr r12, OFF
   addr[0] = 0x0;
   addr[1] = 0xc0;
@@ -82,7 +77,6 @@ uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
   *(uint32_t *)&addr[8] = (uint32_t)dest;
 
   return &addr[12];
-
 }
 
 #elif __aarch64__
@@ -91,7 +85,6 @@ uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
 // so let's use it in our stub
 
 uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
-
   // ldr x16, OFF
   addr[0] = 0x50;
   addr[1] = 0x0;
@@ -108,7 +101,6 @@ uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
   *(uint64_t *)&addr[8] = (uint64_t)dest;
 
   return &addr[16];
-
 }
 
 #else
@@ -120,7 +112,6 @@ uint8_t *__libqasan_patch_jump(uint8_t *addr, uint8_t *dest) {
 #ifdef CANNOT_HOTPATCH
 
 void __libqasan_hotpatch(void) {
-
 }
 
 #else
@@ -129,9 +120,8 @@ static void *libc_start, *libc_end;
 int          libc_perms;
 
 static void find_libc(void) {
-
-  FILE *  fp;
-  char *  line = NULL;
+  FILE   *fp;
+  char   *line = NULL;
   size_t  len = 0;
   ssize_t read;
 
@@ -139,7 +129,6 @@ static void find_libc(void) {
   if (fp == NULL) return;
 
   while ((read = getline(&line, &len, fp)) != -1) {
-
     int      fields, dev_maj, dev_min, inode;
     uint64_t min, max, offset;
     char     flag_r, flag_w, flag_x, flag_p;
@@ -155,7 +144,6 @@ static void find_libc(void) {
 
     if (flag_x == 'x' && (__libqasan_strstr(path, "/libc.so") ||
                           __libqasan_strstr(path, "/libc-"))) {
-
       libc_start = (void *)min;
       libc_end = (void *)max;
 
@@ -164,14 +152,11 @@ static void find_libc(void) {
       if (flag_r == 'r') libc_perms |= PROT_READ;
 
       break;
-
     }
-
   }
 
   free(line);
   fclose(fp);
-
 }
 
 /* Why this shit? https://twitter.com/andreafioraldi/status/1227635146452541441
@@ -181,7 +166,6 @@ static void find_libc(void) {
 */
 
 void __libqasan_hotpatch(void) {
-
   find_libc();
 
   if (!libc_start) return;
@@ -236,8 +220,6 @@ void __libqasan_hotpatch(void) {
   #undef HOTPATCH
 
   mprotect(libc_start, libc_end - libc_start, libc_perms);
-
 }
 
 #endif
-
