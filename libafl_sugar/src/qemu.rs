@@ -8,7 +8,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::Cores,
+        os::core_affinity::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -432,7 +432,7 @@ where
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::qemu;
-    use libafl::bolts::os::Cores;
+    use libafl::bolts::os::core_affinity::Cores;
     use libafl_qemu::emu::pybind::Emulator;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;

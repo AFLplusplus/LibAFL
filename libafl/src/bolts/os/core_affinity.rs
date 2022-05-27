@@ -38,7 +38,7 @@ use crate::Error;
 
 /// This function tries to retrieve information
 /// on all the "cores" active on this system.
-pub fn get_core_ids() -> Option<Vec<CoreId>> {
+pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
     get_core_ids_helper()
 }
 
@@ -47,7 +47,7 @@ pub fn get_core_ids() -> Option<Vec<CoreId>> {
 ///
 /// # Arguments
 ///
-/// * core_id - ID of the core to pin
+/// * `core_id` - `ID` of the core to pin
 pub fn set_for_current(core_id: CoreId) {
     set_for_current_helper(core_id);
 }
@@ -98,13 +98,8 @@ impl Cores {
 
         // ./fuzzer --cores all -> one client runs in each available core
         if args == "all" {
-            let num_cores = if let Some(cores) = get_core_ids() {
-                cores.len()
-            } else {
-                return Err(Error::illegal_state(
-                    "Could not read core count from core_affinity".to_string(),
-                ));
-            };
+            // TODO: is this really correct? Core ID != core number?
+            let num_cores = get_core_ids()?.len();
             for x in 0..num_cores {
                 cores.push(x.into());
             }
@@ -342,6 +337,7 @@ extern crate winapi;
 
 #[cfg(target_os = "windows")]
 mod windows {
+    use alloc::string::ToString;
     use kernel32::{
         GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
     };
@@ -349,7 +345,7 @@ mod windows {
 
     use super::CoreId;
 
-    pub fn get_core_ids() -> Option<Vec<CoreId>> {
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         if let Some(mask) = get_affinity_mask() {
             // Find all active cores in the bitmask.
             let mut core_ids: Vec<CoreId> = Vec::new();
@@ -364,7 +360,7 @@ mod windows {
 
             Some(core_ids)
         } else {
-            None
+            Error::unknown("Illegal affinity mask received".to_string())
         }
     }
 
@@ -439,7 +435,7 @@ mod windows {
 
 #[cfg(target_os = "macos")]
 #[inline]
-fn get_core_ids_helper() -> Option<Vec<CoreId>> {
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     macos::get_core_ids()
 }
 
@@ -451,6 +447,10 @@ fn set_for_current_helper(core_id: CoreId) {
 
 #[cfg(target_os = "macos")]
 mod macos {
+    use core::ptr::addr_of_mut;
+
+    use crate::Error;
+
     use super::CoreId;
     use alloc::vec::Vec;
     use libc::{
@@ -474,25 +474,24 @@ mod macos {
         ) -> kern_return_t;
     }
 
-    pub fn get_core_ids() -> Option<Vec<CoreId>> {
-        Some(
-            (0..(num_cpus::get()))
-                .into_iter()
-                .map(|n| CoreId { id: n })
-                .collect::<Vec<_>>(),
-        )
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(num_cpus::get()))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
     }
 
     pub fn set_for_current(core_id: CoreId) {
         let mut info = thread_affinity_policy_data_t {
-            affinity_tag: core_id.id as integer_t,
+            affinity_tag: core_id.id.try_into().unwrap(),
         };
 
         unsafe {
             thread_policy_set(
                 pthread_self() as thread_t,
                 THREAD_AFFINITY_POLICY as _,
-                (&mut info) as *mut thread_affinity_policy_data_t as thread_policy_t,
+                addr_of_mut!(info) as thread_policy_t,
                 THREAD_AFFINITY_POLICY_COUNT,
             );
         }
@@ -507,11 +506,11 @@ mod macos {
         #[test]
         fn test_windows_get_core_ids() {
             match get_core_ids() {
-                Some(set) => {
+                Ok(set) => {
                     assert_eq!(set.len(), num_cpus::get());
                 }
-                None => {
-                    assert!(false);
+                Err(err) => {
+                    panic!("Failed to get core ids: {}", err);
                 }
             }
         }
@@ -520,34 +519,12 @@ mod macos {
         fn test_windows_set_for_current() {
             let ids = get_core_ids().unwrap();
 
-            assert!(ids.len() > 0);
+            assert!(!ids.is_empty());
 
             set_for_current(ids[0]);
         }
     }
 }
-
-// Stub Section
-
-#[cfg(not(any(
-    target_os = "linux",
-    target_os = "android",
-    target_os = "windows",
-    target_os = "macos"
-)))]
-#[inline]
-fn get_core_ids_helper() -> Option<Vec<CoreId>> {
-    None
-}
-
-#[cfg(not(any(
-    target_os = "linux",
-    target_os = "android",
-    target_os = "windows",
-    target_os = "macos"
-)))]
-#[inline]
-fn set_for_current_helper(core_id: CoreId) {}
 
 #[cfg(test)]
 mod tests {
@@ -561,21 +538,15 @@ mod tests {
 
     #[test]
     fn test_get_core_ids() {
-        match get_core_ids() {
-            Some(set) => {
-                assert_eq!(set.len(), num_cpus::get());
-            }
-            None => {
-                assert!(false);
-            }
-        }
+        let set = get_core_ids().unwrap();
+        assert_eq!(set.len(), num_cpus::get());
     }
 
     #[test]
     fn test_set_for_current() {
         let ids = get_core_ids().unwrap();
 
-        assert!(ids.len() > 0);
+        assert!(!ids.is_empty());
 
         set_for_current(ids[0]);
     }
