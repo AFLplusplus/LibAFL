@@ -16,7 +16,7 @@ use crate::bolts::os::startable_self;
 use crate::bolts::os::{dup2, fork, ForkResult};
 #[cfg(feature = "std")]
 use crate::{
-    bolts::{os::Cores, shmem::ShMemProvider},
+    bolts::{os::core_affinity::Cores, shmem::ShMemProvider},
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
     monitors::Monitor,
@@ -123,13 +123,15 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        use crate::bolts::os::core_affinity::get_core_ids;
+
         if self.run_client.is_none() {
             return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
             ));
         }
 
-        let core_ids = core_affinity::get_core_ids().unwrap();
+        let core_ids = get_core_ids().unwrap();
         let num_cores = core_ids.len();
         let mut handles = vec![];
 

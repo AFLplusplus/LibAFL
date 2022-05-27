@@ -1,5 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
+#[cfg(feature = "std")]
+use crate::bolts::os::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
@@ -14,6 +16,7 @@ use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::
 use crate::{
     bolts::{
         llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
+        os::core_affinity::set_for_current,
         shmem::ShMemProvider,
     },
     events::{
@@ -31,8 +34,6 @@ use alloc::string::ToString;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{marker::PhantomData, time::Duration};
-#[cfg(feature = "std")]
-use core_affinity::CoreId;
 use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use serde::Serialize;
@@ -823,7 +824,7 @@ where
 
             if let Some(core_id) = core_id {
                 println!("Setting core affinity to {:?}", core_id);
-                core_affinity::set_for_current(core_id);
+                set_for_current(core_id);
             }
 
             // We are the fuzzer respawner in a llmp client
@@ -891,7 +892,7 @@ where
         };
 
         if let Some(core_id) = core_id {
-            core_affinity::set_for_current(core_id);
+            set_for_current(core_id);
         }
 
         // If we're restarting, deserialize the old state.
