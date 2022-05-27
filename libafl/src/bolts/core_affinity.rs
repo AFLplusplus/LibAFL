@@ -344,13 +344,13 @@ mod windows {
                 let test_mask = 1 << i;
 
                 if (mask & test_mask) == test_mask {
-                    core_ids.push(CoreId { id: i as usize });
+                    core_ids.push(CoreId { id: i });
                 }
             }
 
-            Some(core_ids)
+            Ok(core_ids)
         } else {
-            Error::unknown("Illegal affinity mask received".to_string())
+            Err(Error::unknown("Illegal affinity mask received".to_string()))
         }
     }
 
@@ -364,7 +364,7 @@ mod windows {
         }
     }
 
-    fn get_affinity_mask() -> Option<u64> {
+    fn get_affinity_mask() -> Result<u64, Error> {
         #[cfg(target_pointer_width = "64")]
         let mut process_mask: u64 = 0;
         #[cfg(target_pointer_width = "32")]
@@ -377,18 +377,21 @@ mod windows {
         let res = unsafe {
             GetProcessAffinityMask(
                 GetCurrentProcess(),
-                &mut process_mask as _,
-                &mut system_mask as _,
+                addr_of_mut!(process_mask) as _,
+                addr_of_mut!(system_mask) as _,
             )
         };
 
         // Successfully retrieved affinity mask
-        if res != 0 {
-            Some(process_mask as _)
+        if res {
+            #[allow(trivial_numeric_casts)]
+            Ok(process_mask as _)
         }
         // Failed to retrieve affinity mask
         else {
-            None
+            Err(Error::unknown(
+                "Could not get affinity mask, GetProcessAffinityMask failed.".to_string(),
+            ))
         }
     }
 
