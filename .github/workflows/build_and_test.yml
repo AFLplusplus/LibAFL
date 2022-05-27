@@ -52,7 +52,7 @@ jobs:
     - name: set mold linker as default linker
       uses: rui314/setup-mold@v1
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang ninja-build clang-format-13
+      run: sudo apt-get install -y llvm llvm-dev clang ninja-build clang-format-13 shellcheck
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -80,9 +80,7 @@ jobs:
     - name: Run clang-format style check for C/C++ programs.
       run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c')
     - name: run shellcheck
-      uses: ludeeus/action-shellcheck@master
-      with:
-       scandir: './scripts'
+      run: shellcheck ./*.sh
     - uses: actions/checkout@v2
     - name: Build Docs
       run: cargo doc

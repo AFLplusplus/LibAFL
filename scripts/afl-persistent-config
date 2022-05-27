@@ -5,7 +5,7 @@
 test "$1" = "-h" -o "$1" = "-hh" && {
   echo 'afl-persistent-config'
   echo
-  echo $0
+  echo "$0"
   echo
   echo afl-persistent-config has no command line options
   echo
@@ -32,7 +32,7 @@ if [[ "$ANSWER" != "YES" ]]; then
 fi
 
 echo
-PLATFORM=`uname -s`
+PLATFORM=$(uname -s)
 
 # check that we're on Mac
 if [[ "$PLATFORM" = "Darwin" ]] ; then
