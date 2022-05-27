@@ -4,7 +4,7 @@
 //!
 //! This example shows how create a thread for each available processor and pin each thread to its corresponding processor.
 //!
-//! ```
+//! ```rust
 //! extern crate core_affinity;
 //!
 //! use std::thread;
@@ -25,8 +25,9 @@
 //!     handle.join().unwrap();
 //! }
 //!
-//! *This has been forked from <https://github.com/Elzair/core_affinity_rs>*
 //! ```
+//!
+//! *This file is a fork of <https://github.com/Elzair/core_affinity_rs>*
 
 use alloc::{
     string::{String, ToString},
@@ -183,7 +184,7 @@ pub fn parse_core_bind_arg(args: &str) -> Option<Vec<usize>> {
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 #[inline]
-fn get_core_ids_helper() -> Option<Vec<CoreId>> {
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     linux::get_core_ids()
 }
 
@@ -201,7 +202,7 @@ mod linux {
 
     use super::CoreId;
 
-    pub fn get_core_ids() -> Option<Vec<CoreId>> {
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         if let Some(full_set) = get_affinity_mask() {
             let mut core_ids: Vec<CoreId> = Vec::new();
 
@@ -211,9 +212,9 @@ mod linux {
                 }
             }
 
-            Some(core_ids)
+            Ok(core_ids)
         } else {
-            None
+            Err::unknwon("Could not get affinity mask");
         }
     }
 
@@ -320,7 +321,7 @@ mod linux {
 
 #[cfg(target_os = "windows")]
 #[inline]
-fn get_core_ids_helper() -> Option<Vec<CoreId>> {
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     windows::get_core_ids()
 }
 
@@ -409,7 +410,7 @@ mod windows {
         use super::*;
 
         #[test]
-        fn test_macos_get_core_ids() {
+        fn test_apple_get_core_ids() {
             match get_core_ids() {
                 Some(set) => {
                     assert_eq!(set.len(), num_cpus::get());
@@ -421,7 +422,7 @@ mod windows {
         }
 
         #[test]
-        fn test_macos_set_for_current() {
+        fn test_apple_set_for_current() {
             let ids = get_core_ids().unwrap();
 
             assert!(ids.len() > 0);
@@ -431,22 +432,22 @@ mod windows {
     }
 }
 
-// MacOS Section
+// Apple Section
 
-#[cfg(target_os = "macos")]
+#[cfg(target_vendor = "apple")]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
-    macos::get_core_ids()
+    apple::get_core_ids()
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(target_vendor = "apple")]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) {
-    macos::set_for_current(core_id);
+    apple::set_for_current(core_id);
 }
 
-#[cfg(target_os = "macos")]
-mod macos {
+#[cfg(target_vendor = "apple")]
+mod apple {
     use core::ptr::addr_of_mut;
 
     use crate::Error;
