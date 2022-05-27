@@ -41,9 +41,6 @@ jobs:
       - name: Test libafl_targets no_std
         run: cd libafl_targets && cargo test --no-default-features
      
-
-     
-
   ubuntu:
     runs-on: ubuntu-22.04
     steps:
@@ -93,6 +90,7 @@ jobs:
       run: cargo +nightly test --doc --all-features
     - name: Run clippy
       run: ./scripts/clippy.sh
+
   ubuntu-concolic:
     runs-on: ubuntu-latest
     steps:
@@ -106,6 +104,7 @@ jobs:
       run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
       run: ./libafl_concolic/test/smoke_test.sh 
+
   bindings:
     runs-on: ubuntu-latest
     steps:
@@ -123,6 +122,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Run a maturin build
       run: cd ./bindings/pylibafl && maturin build
+
   fuzzers:
     env:
       CC: ccache clang # use ccache in default
@@ -164,6 +164,7 @@ jobs:
       if: runner.os == 'macOS' # use bash v4
       run: /usr/local/bin/bash ./scripts/test_all_fuzzers.sh
     - run: ccache --show-stats
+
   nostd-build:
     runs-on: ubuntu-latest
     steps:
@@ -183,12 +184,14 @@ jobs:
       run: cd ./libafl && cargo test --no-default-features 
     - name: libafl armv6m-none-eabi (32 bit no_std) clippy
       run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
+
   build-docker:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - name: Build docker
       run: docker build -t libafl .
+
   windows:
     runs-on: windows-latest
     steps:
