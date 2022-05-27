@@ -24,13 +24,13 @@ use crate::{
     Error,
 };
 
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::bolts::os::core_affinity::CoreId;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use alloc::string::ToString;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use os::core_affinity::CoreId;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
