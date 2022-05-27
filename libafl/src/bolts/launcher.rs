@@ -227,6 +227,8 @@ where
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        use crate::bolts::core_affinity;
+
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 
         let mut handles = match is_client {

@@ -7,9 +7,9 @@ use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
+        core_affinity::Cores,
         current_nanos,
         launcher::Launcher,
-        core_affinity::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},

@@ -327,26 +327,20 @@ fn set_for_current_helper(core_id: CoreId) {
 }
 
 #[cfg(target_os = "windows")]
-extern crate kernel32;
-#[cfg(target_os = "windows")]
-extern crate winapi;
-
-#[cfg(target_os = "windows")]
 mod windows {
-    use alloc::string::ToString;
-    use kernel32::{
-        GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
+    use alloc::{string::ToString, vec::Vec};
+    use windows::Win32::System::Threading::{
+        GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetProcessAffinityMask,
     };
-    use winapi::basetsd::{DWORD_PTR, PDWORD_PTR};
 
-    use super::CoreId;
+    use libafl::{bolts::core_affinity::CoreId, Error};
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         if let Some(mask) = get_affinity_mask() {
             // Find all active cores in the bitmask.
             let mut core_ids: Vec<CoreId> = Vec::new();
 
-            for i in 0..64 as u64 {
+            for i in 0..64 {
                 let test_mask = 1 << i;
 
                 if (mask & test_mask) == test_mask {
@@ -366,7 +360,7 @@ mod windows {
 
         // Set core affinity for current thread.
         unsafe {
-            SetThreadAffinityMask(GetCurrentThread(), mask as DWORD_PTR);
+            SetThreadAffinityMask(GetCurrentThread(), mask as _);
         }
     }
 
@@ -383,14 +377,14 @@ mod windows {
         let res = unsafe {
             GetProcessAffinityMask(
                 GetCurrentProcess(),
-                &mut process_mask as PDWORD_PTR,
-                &mut system_mask as PDWORD_PTR,
+                &mut process_mask as _,
+                &mut system_mask as _,
             )
         };
 
         // Successfully retrieved affinity mask
         if res != 0 {
-            Some(process_mask as u64)
+            Some(process_mask as _)
         }
         // Failed to retrieve affinity mask
         else {
