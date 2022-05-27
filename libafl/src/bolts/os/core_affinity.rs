@@ -196,11 +196,12 @@ fn set_for_current_helper(core_id: CoreId) {
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 mod linux {
+    use super::CoreId;
+    use alloc::vec::Vec;
+    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
     use std::mem;
 
-    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
-
-    use super::CoreId;
+    use crate::Error;
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         if let Some(full_set) = get_affinity_mask() {
@@ -214,7 +215,7 @@ mod linux {
 
             Ok(core_ids)
         } else {
-            Err::unknwon("Could not get affinity mask");
+            Error::unknwon("Could not get affinity mask");
         }
     }
 
