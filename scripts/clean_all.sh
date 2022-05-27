@@ -12,6 +12,7 @@ cargo clean
 fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 
+# shellcheck disable=SC2116
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
     pushd "$fuzzer" || exit 1

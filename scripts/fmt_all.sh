@@ -18,6 +18,7 @@ clang-format-13 -i --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.h
 fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 
+# shellcheck disable=SC2116
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
     pushd "$fuzzer" || exit 1
