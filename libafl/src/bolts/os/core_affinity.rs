@@ -5,7 +5,7 @@
 //! This example shows how create a thread for each available processor and pin each thread to its corresponding processor.
 //!
 //! ```rust
-//! extern crate core_affinity;
+//! use libafl::bolts::os::core_affinity;
 //!
 //! use std::thread;
 //!
