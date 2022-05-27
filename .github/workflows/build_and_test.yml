@@ -80,7 +80,7 @@ jobs:
     - name: Run clang-format style check for C/C++ programs.
       run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c')
     - name: run shellcheck
-      run: shellcheck ./*.sh
+      run: shellcheck ./scripts/*.sh
     - uses: actions/checkout@v2
     - name: Build Docs
       run: cargo doc
