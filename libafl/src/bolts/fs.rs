@@ -15,7 +15,7 @@ use std::{
 use crate::Error;
 
 /// The default filename to use to deliver testcases to the target
-pub const OUTFILE_STD: &str = ".cur_input";
+pub const INPUTFILE_STD: &str = ".cur_input";
 
 /// Creates a `.{file_name}.tmp` file, and writes all bytes to it.
 /// After all bytes have been written, the tmp-file is moved to it's original `path`.
@@ -47,33 +47,33 @@ where
     inner(path.as_ref(), bytes)
 }
 
-/// An [`OutFile`] to write fuzzer input to.
+/// An [`InputFile`] to write fuzzer input to.
 /// The target/forkserver will read from this file.
 #[cfg(feature = "std")]
 #[derive(Debug)]
-pub struct OutFile {
-    /// The filename/path too this [`OutFile`]
+pub struct InputFile {
+    /// The filename/path too this [`InputFile`]
     pub path: PathBuf,
     /// The underlying file that got created
     pub file: File,
-    /// The ref count for this [`OutFile`].
+    /// The ref count for this [`InputFile`].
     /// Once it reaches 0, the underlying [`File`] will be removed.
     pub rc: Rc<RefCell<usize>>,
 }
 
-impl Eq for OutFile {}
+impl Eq for InputFile {}
 
-impl PartialEq for OutFile {
+impl PartialEq for InputFile {
     fn eq(&self, other: &Self) -> bool {
         self.path == other.path
     }
 }
 
-impl Clone for OutFile {
+impl Clone for InputFile {
     fn clone(&self) -> Self {
         {
             let mut rc = self.rc.borrow_mut();
-            assert_ne!(*rc, usize::MAX, "OutFile rc overflow");
+            assert_ne!(*rc, usize::MAX, "InputFile rc overflow");
             *rc += 1;
         }
         Self {
@@ -85,8 +85,8 @@ impl Clone for OutFile {
 }
 
 #[cfg(feature = "std")]
-impl OutFile {
-    /// Creates a new [`OutFile`]
+impl InputFile {
+    /// Creates a new [`InputFile`]
     pub fn create<P>(filename: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -133,10 +133,10 @@ impl OutFile {
 }
 
 #[cfg(feature = "std")]
-impl Drop for OutFile {
+impl Drop for InputFile {
     fn drop(&mut self) {
         let mut rc = self.rc.borrow_mut();
-        assert_ne!(*rc, 0, "OutFile rc should never be 0");
+        assert_ne!(*rc, 0, "InputFile rc should never be 0");
         *rc -= 1;
         if *rc == 0 {
             // try to remove the file, but ignore errors
@@ -147,7 +147,7 @@ impl Drop for OutFile {
 
 #[cfg(test)]
 mod test {
-    use crate::bolts::fs::{write_file_atomic, OutFile};
+    use crate::bolts::fs::{write_file_atomic, InputFile};
     use std::fs;
 
     #[test]
@@ -161,7 +161,7 @@ mod test {
 
     #[test]
     fn test_cloned_ref() {
-        let mut one = OutFile::create("test_cloned_ref.tmp").unwrap();
+        let mut one = InputFile::create("test_cloned_ref.tmp").unwrap();
         let two = one.clone();
         one.write_buf("Welp".as_bytes()).unwrap();
         drop(one);

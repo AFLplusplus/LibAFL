@@ -15,7 +15,7 @@ use std::{
 
 use crate::{
     bolts::{
-        fs::{OutFile, OUTFILE_STD},
+        fs::{InputFile, INPUTFILE_STD},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         AsMutSlice, AsSlice,
@@ -175,7 +175,7 @@ impl Forkserver {
         target: OsString,
         args: Vec<OsString>,
         envs: Vec<(OsString, OsString)>,
-        out_filefd: RawFd,
+        input_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
         debug_output: bool,
@@ -199,7 +199,7 @@ impl Forkserver {
             .envs(envs)
             .setlimit(memlimit)
             .setsid()
-            .setstdin(out_filefd, use_stdin)
+            .setstdin(input_filefd, use_stdin)
             .setpipe(
                 st_pipe.read_end().unwrap(),
                 st_pipe.write_end().unwrap(),
@@ -337,10 +337,10 @@ pub trait HasForkserver {
     fn forkserver_mut(&mut self) -> &mut Forkserver;
 
     /// The file the forkserver is reading from
-    fn out_file(&self) -> &OutFile;
+    fn input_file(&self) -> &InputFile;
 
     /// The file the forkserver is reading from, mutable
-    fn out_file_mut(&mut self) -> &mut OutFile;
+    fn input_file_mut(&mut self) -> &mut InputFile;
 
     /// The map of the fuzzer
     fn shmem(&self) -> &Option<<<Self as HasForkserver>::SP as ShMemProvider>::ShMem>;
@@ -405,7 +405,7 @@ where
             }
             None => {
                 self.executor
-                    .out_file_mut()
+                    .input_file_mut()
                     .write_buf(input.target_bytes().as_slice())?;
             }
         }
@@ -479,12 +479,12 @@ where
 {
     target: OsString,
     args: Vec<OsString>,
-    out_file: OutFile,
+    input_file: InputFile,
     forkserver: Forkserver,
     observers: OT,
     map: Option<SP::ShMem>,
     phantom: PhantomData<(I, S)>,
-    /// Cache that indicates if we have a asan observer registered.
+    /// Cache that indicates if we have a `ASan` observer registered.
     has_asan_observer: Option<bool>,
 }
 
@@ -497,7 +497,7 @@ where
         f.debug_struct("ForkserverExecutor")
             .field("target", &self.target)
             .field("args", &self.args)
-            .field("out_file", &self.out_file)
+            .field("input_file", &self.input_file)
             .field("forkserver", &self.forkserver)
             .field("observers", &self.observers)
             .field("map", &self.map)
@@ -534,9 +534,9 @@ where
         &self.forkserver
     }
 
-    /// The [`OutFile`] used by this [`Executor`].
-    pub fn out_file(&self) -> &OutFile {
-        &self.out_file
+    /// The [`InputFile`] used by this [`Executor`].
+    pub fn input_file(&self) -> &InputFile {
+        &self.input_file
     }
 }
 
@@ -549,7 +549,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     debug_child: bool,
     use_stdin: bool,
     autotokens: Option<&'a mut Tokens>,
-    out_filename: Option<OsString>,
+    input_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
 }
 
@@ -565,12 +565,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         OT: ObserversTuple<I, S>,
         SP: ShMemProvider,
     {
-        let out_filename = match &self.out_filename {
+        let input_filename = match &self.input_filename {
             Some(name) => name.clone(),
             None => OsString::from(".cur_input"),
         };
 
-        let out_file = OutFile::create(&out_filename)?;
+        let input_file = InputFile::create(&input_filename)?;
 
         let map = match &mut self.shmem_provider {
             None => None,
@@ -591,7 +591,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     t.clone(),
                     self.arguments.clone(),
                     self.envs.clone(),
-                    out_file.as_raw_fd(),
+                    input_file.as_raw_fd(),
                     self.use_stdin,
                     0,
                     self.debug_child,
@@ -671,7 +671,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         Ok(ForkserverExecutor {
             target,
             args: self.arguments.clone(),
-            out_file,
+            input_file,
             forkserver,
             observers,
             map,
@@ -701,7 +701,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             if item.as_ref() == "@@" && use_stdin {
                 use_stdin = false;
                 res.push(OsString::from(".cur_input"));
-            } else if let Some(name) = &self.out_filename {
+            } else if let Some(name) = &self.input_filename {
                 if name == item.as_ref() && use_stdin {
                     use_stdin = false;
                     res.push(name.clone());
@@ -734,7 +734,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             debug_child: false,
             use_stdin: true,
             autotokens: None,
-            out_filename: None,
+            input_filename: None,
             shmem_provider: None,
         }
     }
@@ -806,14 +806,14 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     /// Place the input at this position and set the filename for the input.
     pub fn arg_input_file<P: AsRef<Path>>(self, path: P) -> Self {
         let mut moved = self.arg(path.as_ref());
-        moved.out_filename = Some(path.as_ref().as_os_str().to_os_string());
+        moved.input_filename = Some(path.as_ref().as_os_str().to_os_string());
         moved
     }
 
     #[must_use]
     /// Place the input at this position and set the default filename for the input.
     pub fn arg_input_file_std(self) -> Self {
-        self.arg_input_file(OUTFILE_STD)
+        self.arg_input_file(INPUTFILE_STD)
     }
 
     #[must_use]
@@ -835,7 +835,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             debug_child: self.debug_child,
             use_stdin: self.use_stdin,
             autotokens: self.autotokens,
-            out_filename: self.out_filename,
+            input_filename: self.input_filename,
             shmem_provider: Some(shmem_provider),
         }
     }
@@ -875,7 +875,7 @@ where
                     .copy_from_slice(target_bytes.as_slice());
             }
             None => {
-                self.out_file.write_buf(input.target_bytes().as_slice())?;
+                self.input_file.write_buf(input.target_bytes().as_slice())?;
             }
         }
 
@@ -971,13 +971,13 @@ where
     }
 
     #[inline]
-    fn out_file(&self) -> &OutFile {
-        &self.out_file
+    fn input_file(&self) -> &InputFile {
+        &self.input_file
     }
 
     #[inline]
-    fn out_file_mut(&mut self) -> &mut OutFile {
-        &mut self.out_file
+    fn input_file_mut(&mut self) -> &mut InputFile {
+        &mut self.input_file
     }
 
     #[inline]
