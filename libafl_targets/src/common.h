@@ -6,21 +6,20 @@
 #define true 1
 #define false 0
 
-#define STATIC_ASSERT(pred) switch(0){case 0:case pred:;}
+#define STATIC_ASSERT(pred) \
+  switch (0) {              \
+    case 0:                 \
+    case pred:;             \
+  }
 
 // From https://stackoverflow.com/a/18298965
 #if __STDC_VERSION__ >= 201112 && !defined __STDC_NO_THREADS__
   #define THREAD_LOCAL _Thread_local
-#elif defined _WIN32 && ( \
-      defined _MSC_VER || \
-      defined __ICL || \
-      defined __DMC__ || \
-      defined __BORLANDC__ )
-  #define THREAD_LOCAL __declspec(thread) 
+#elif defined _WIN32 && (defined _MSC_VER || defined __ICL || \
+                         defined __DMC__ || defined __BORLANDC__)
+  #define THREAD_LOCAL __declspec(thread)
 /* note that ICC (linux) and Clang are covered by __GNUC__ */
-#elif defined __GNUC__ || \
-      defined __SUNPRO_C || \
-      defined __xlC__
+#elif defined __GNUC__ || defined __SUNPRO_C || defined __xlC__
   #define THREAD_LOCAL __thread
 #endif
 
@@ -40,119 +39,116 @@
 #endif
 
 #ifdef _WIN32
-  #define RETADDR (uintptr_t)_ReturnAddress()
+  #define RETADDR (uintptr_t) _ReturnAddress()
   #define EXPORT_FN __declspec(dllexport)
 #else
-  #define RETADDR (uintptr_t)__builtin_return_address(0)
+  #define RETADDR (uintptr_t) __builtin_return_address(0)
   #define EXPORT_FN
 #endif
 
 #ifdef __GNUC__
   #define MAX(a, b)           \
     ({                        \
-                              \
       __typeof__(a) _a = (a); \
       __typeof__(b) _b = (b); \
       _a > _b ? _a : _b;      \
-                              \
     })
   #define MIN(a, b)           \
     ({                        \
-                              \
       __typeof__(a) _a = (a); \
       __typeof__(b) _b = (b); \
       _a < _b ? _a : _b;      \
-                              \
     })
   #define MEMCPY __builtin_memcpy
 #else
-  #define MAX(a, b) (((a) > (b)) ? (a) : (b)) 
+  #define MAX(a, b) (((a) > (b)) ? (a) : (b))
   #define MIN(a, b) (((a) < (b)) ? (a) : (b))
   #define MEMCPY memcpy
 #endif
 
 #ifdef _WIN32
 
-// From Libfuzzer
-// Intermediate macro to ensure the parameter is expanded before stringified.
-#define STRINGIFY_(A) #A
-#define STRINGIFY(A) STRINGIFY_(A)
+  // From Libfuzzer
+  // Intermediate macro to ensure the parameter is expanded before stringified.
+  #define STRINGIFY_(A) #A
+  #define STRINGIFY(A) STRINGIFY_(A)
 
-#if _MSC_VER
-// Copied from compiler-rt/lib/sanitizer_common/sanitizer_win_defs.h
-#if defined(_M_IX86) || defined(__i386__)
-#define WIN_SYM_PREFIX "_"
-#else
-#define WIN_SYM_PREFIX
-#endif
+  #if _MSC_VER
+    // Copied from compiler-rt/lib/sanitizer_common/sanitizer_win_defs.h
+    #if defined(_M_IX86) || defined(__i386__)
+      #define WIN_SYM_PREFIX "_"
+    #else
+      #define WIN_SYM_PREFIX
+    #endif
 
-// Declare external functions as having alternativenames, so that we can
-// determine if they are not defined.
-#define EXTERNAL_FUNC(Name, Default)                                   \
-  __pragma(comment(linker, "/alternatename:" WIN_SYM_PREFIX STRINGIFY( \
-                               Name) "=" WIN_SYM_PREFIX STRINGIFY(Default)))
+    // Declare external functions as having alternativenames, so that we can
+    // determine if they are not defined.
+    #define EXTERNAL_FUNC(Name, Default)                              \
+      __pragma(                                                       \
+          comment(linker, "/alternatename:" WIN_SYM_PREFIX STRINGIFY( \
+                              Name) "=" WIN_SYM_PREFIX STRINGIFY(Default)))
 
-#define CHECK_WEAK_FN(Name) ((void*)Name != (void*)&Name##Def)
+    #define CHECK_WEAK_FN(Name) ((void *)Name != (void *)&Name##Def)
 
-#define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
-  RETURN_TYPE NAME##Def FUNC_SIG;                           \
-  EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG; \
-  RETURN_TYPE NAME##Def FUNC_SIG                            \
+    #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN)    \
+      RETURN_TYPE NAME##Def                           FUNC_SIG; \
+      EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG; \
+      RETURN_TYPE NAME##Def FUNC_SIG
 
-#define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)         \
-  RETURN_TYPE (*NAME##Def) FUNC_SIG = NULL;                 \
-  EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
-#else
-// Declare external functions as weak to allow them to default to a specified
-// function if not defined explicitly. We must use weak symbols because clang's
-// support for alternatename is not 100%, see
-// https://bugs.llvm.org/show_bug.cgi?id=40218 for more details.
-#define EXTERNAL_FUNC(Name, Default) \
-  __attribute__((weak, alias(STRINGIFY(Default))))
+    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      RETURN_TYPE(*NAME##Def) FUNC_SIG = NULL;          \
+      EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
+  #else
+    // Declare external functions as weak to allow them to default to a
+    // specified function if not defined explicitly. We must use weak symbols
+    // because clang's support for alternatename is not 100%, see
+    // https://bugs.llvm.org/show_bug.cgi?id=40218 for more details.
+    #define EXTERNAL_FUNC(Name, Default) \
+      __attribute__((weak, alias(STRINGIFY(Default))))
 
-#define CHECK_WEAK_FN(Name) (Name != NULL)
+    #define CHECK_WEAK_FN(Name) (Name != NULL)
 
-#define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
-  EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
+    #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
 
-#define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)         \
-  RETURN_TYPE (*NAME##Def) FUNC_SIG = NULL;                 \
-  EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
-#endif  // _MSC_VER
-
-#else
-
-#if defined(__APPLE__)
-  // On Apple, weak_import and weak attrs behave differently to linux.
-
-  #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)      \
-  __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG { \
-      return (RETURN_TYPE) 0;                              \
-  }
-
-  #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
-  __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
-
-  // Weakly defined globals
-  #define EXT_VAR(NAME, TYPE) \
-  TYPE __attribute__((weak, visibility("default"))) NAME
+    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      RETURN_TYPE(*NAME##Def) FUNC_SIG = NULL;          \
+      EXTERNAL_FUNC(NAME, NAME##Def) RETURN_TYPE NAME FUNC_SIG
+  #endif  // _MSC_VER
 
 #else
 
-#define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
-  EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
+  #if defined(__APPLE__)
+    // On Apple, weak_import and weak attrs behave differently to linux.
 
-// Declare these symbols as weak to allow them to be optionally defined.
-#define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                            \
-  __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
+    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)                        \
+      __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG { \
+        return (RETURN_TYPE)0;                                                 \
+      }
 
-// Weakly defined globals
-#define EXT_VAR(NAME, TYPE) \
-  TYPE __attribute__((weak, visibility("default"))) NAME
+    #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
 
-#endif
+    // Weakly defined globals
+    #define EXT_VAR(NAME, TYPE) \
+      TYPE __attribute__((weak, visibility("default"))) NAME
 
-#define CHECK_WEAK_FN(Name) (Name != NULL)
-#endif // _WIN32
+  #else
+
+    #define EXT_FUNC_IMPL(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN)
+
+    // Declare these symbols as weak to allow them to be optionally defined.
+    #define EXT_FUNC(NAME, RETURN_TYPE, FUNC_SIG, WARN) \
+      __attribute__((weak, visibility("default"))) RETURN_TYPE NAME FUNC_SIG
+
+    // Weakly defined globals
+    #define EXT_VAR(NAME, TYPE) \
+      TYPE __attribute__((weak, visibility("default"))) NAME
+
+  #endif
+
+  #define CHECK_WEAK_FN(Name) (Name != NULL)
+#endif  // _WIN32
 
 #endif
