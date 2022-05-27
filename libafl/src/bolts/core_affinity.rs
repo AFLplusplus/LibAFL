@@ -330,10 +330,10 @@ fn set_for_current_helper(core_id: CoreId) {
 mod windows {
     use alloc::{string::ToString, vec::Vec};
     use windows::Win32::System::Threading::{
-        GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetProcessAffinityMask,
+        GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
     };
 
-    use libafl::{bolts::core_affinity::CoreId, Error};
+    use crate::bolts::core_affinity::{CoreId, Error};
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         if let Some(mask) = get_affinity_mask() {

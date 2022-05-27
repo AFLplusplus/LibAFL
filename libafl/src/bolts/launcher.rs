@@ -26,7 +26,7 @@ use crate::{
 
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::core_affinity::CoreId;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
+#[cfg(all(feature = "std"))]
 use alloc::string::ToString;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
