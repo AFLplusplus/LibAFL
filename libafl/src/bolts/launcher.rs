@@ -16,7 +16,7 @@ use crate::bolts::os::startable_self;
 use crate::bolts::os::{dup2, fork, ForkResult};
 #[cfg(feature = "std")]
 use crate::{
-    bolts::{os::bolts::core_affinity::Cores, shmem::ShMemProvider},
+    bolts::{os::core_affinity::Cores, shmem::ShMemProvider},
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
     monitors::Monitor,
@@ -24,13 +24,13 @@ use crate::{
     Error,
 };
 
-#[cfg(feature = "std")]
+#[cfg(all(unix, feature = "std", feature = "fork"))]
 use alloc::string::ToString;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use core_affinity::CoreId;
+use os::core_affinity::CoreId;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
@@ -123,7 +123,7 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
-        use crate::bolts::os::bolts::core_affinity::get_core_ids;
+        use crate::bolts::os::core_affinity::get_core_ids;
 
         if self.run_client.is_none() {
             return Err(Error::illegal_argument(

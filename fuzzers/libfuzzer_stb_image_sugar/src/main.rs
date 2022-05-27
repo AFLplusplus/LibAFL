@@ -6,7 +6,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 use std::{env, path::PathBuf};
 
-use libafl::bolts::os::bolts::core_affinity::Cores;
+use libafl::bolts::os::core_affinity::Cores;
 use libafl_sugar::InMemoryBytesCoverageSugar;
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input};
 
