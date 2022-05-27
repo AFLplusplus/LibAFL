@@ -86,7 +86,7 @@ pub mod executor;
 pub mod utils;
 
 // for parsing asan and cmplog cores
-use libafl::bolts::os::core_affinity::{get_core_ids, CoreId, Cores};
+use libafl::bolts::core_affinity::{get_core_ids, CoreId, Cores};
 
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

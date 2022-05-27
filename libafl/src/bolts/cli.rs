@@ -77,7 +77,7 @@ use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
 use crate::Error;
 
-use super::os::core_affinity::Cores;
+use super::core_affinity::Cores;
 
 /// helper function to go from a parsed cli string to a `Duration`
 fn parse_timeout(src: &str) -> Result<Duration, Error> {

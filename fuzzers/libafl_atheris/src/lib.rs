@@ -15,7 +15,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::core_affinity::Cores,
+        core_affinity::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},

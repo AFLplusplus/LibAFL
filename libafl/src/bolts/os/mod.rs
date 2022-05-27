@@ -16,9 +16,6 @@ pub mod unix_signals;
 #[cfg(all(unix, feature = "std"))]
 pub mod pipes;
 
-#[cfg(feature = "std")]
-pub mod core_affinity;
-
 #[cfg(all(unix, feature = "std"))]
 use std::ffi::CString;
 

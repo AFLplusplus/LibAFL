@@ -1,7 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
 #[cfg(feature = "std")]
-use crate::bolts::os::core_affinity::CoreId;
+use crate::bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
@@ -12,11 +12,13 @@ use crate::bolts::{
     llmp::{LLMP_FLAG_COMPRESSED, LLMP_FLAG_INITIALIZED},
 };
 #[cfg(feature = "std")]
-use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
+use crate::bolts::{
+    core_affinity::set_for_current, llmp::LlmpConnection, shmem::StdShMemProvider,
+    staterestore::StateRestorer,
+};
 use crate::{
     bolts::{
         llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
-        os::core_affinity::set_for_current,
         shmem::ShMemProvider,
     },
     events::{
