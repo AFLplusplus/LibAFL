@@ -9,7 +9,7 @@ use libafl::{
     bolts::{
         current_nanos,
         launcher::Launcher,
-        os::core_affinity::Cores,
+        os::bolts::core_affinity::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -356,7 +356,7 @@ where
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::inmemory;
-    use libafl::bolts::os::core_affinity::Cores;
+    use libafl::bolts::os::bolts::core_affinity::Cores;
     use pyo3::prelude::*;
     use pyo3::types::PyBytes;
     use std::path::PathBuf;
