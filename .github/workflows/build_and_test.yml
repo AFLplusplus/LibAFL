@@ -81,7 +81,11 @@ jobs:
     - name: Format
       run: cargo fmt -- --check
     - name: Run clang-format style check for C/C++ programs.
-      run: clang-format-13 -n -Werror --style=file $(find -E . -regex '.*\.(cpp|hpp|cc|cxx|c|h)' | grep -ve 'target' | grep -ve 'libpng-1.6.37' | grep -ve 'stb_image.h' | grep -ve 'dlmalloc.c')
+      run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c')
+    - name: run shellcheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+       scandir: './scripts'
     - uses: actions/checkout@v2
     - name: Build Docs
       run: cargo doc
