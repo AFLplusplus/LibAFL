@@ -215,7 +215,7 @@ mod linux {
 
             Ok(core_ids)
         } else {
-            Error::unknwon("Could not get affinity mask");
+            Err(Error::unknown("Could not get affinity mask"))
         }
     }
 
@@ -270,28 +270,22 @@ mod linux {
             match get_affinity_mask() {
                 Some(_) => {}
                 None => {
-                    assert!(false);
+                    panic!("Couldn't get affinity")
                 }
             }
         }
 
         #[test]
         fn test_linux_get_core_ids() {
-            match get_core_ids() {
-                Some(set) => {
-                    assert_eq!(set.len(), num_cpus::get());
-                }
-                None => {
-                    assert!(false);
-                }
-            }
+            let set = get_core_ids().unwrap();
+            assert_eq!(set.len(), num_cpus::get());
         }
 
         #[test]
         fn test_linux_set_for_current() {
             let ids = get_core_ids().unwrap();
 
-            assert!(ids.len() > 0);
+            assert!(!ids.is_empty());
 
             set_for_current(ids[0]);
 
@@ -426,7 +420,7 @@ mod windows {
         fn test_apple_set_for_current() {
             let ids = get_core_ids().unwrap();
 
-            assert!(ids.len() > 0);
+            assert!(!ids.is_empty());
 
             set_for_current(ids[0]);
         }
