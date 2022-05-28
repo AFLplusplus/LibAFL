@@ -171,13 +171,14 @@ impl TryFrom<&str> for Cores {
 /// Returns a Vec of CPU IDs.
 /// * `./fuzzer --cores 1,2-4,6`: clients run in cores 1,2,3,4,6
 /// * `./fuzzer --cores all`: one client runs on each available core
-#[must_use]
 #[cfg(feature = "std")]
 #[deprecated(since = "0.7.1", note = "Use Cores::from_cmdline instead")]
-pub fn parse_core_bind_arg(args: &str) -> Option<Vec<usize>> {
-    Cores::from_cmdline(args)
-        .ok()
-        .map(|cores| cores.ids.iter().map(|x| x.id).collect())
+pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
+    Ok(Cores::from_cmdline(args)?
+        .ids
+        .iter()
+        .map(|x| x.id)
+        .collect())
 }
 
 // Linux Section
@@ -197,26 +198,23 @@ fn set_for_current_helper(core_id: CoreId) {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 mod linux {
     use super::CoreId;
-    use alloc::vec::Vec;
+    use alloc::{string::ToString, vec::Vec};
     use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
     use std::mem;
 
     use crate::Error;
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
-        if let Some(full_set) = get_affinity_mask() {
-            let mut core_ids: Vec<CoreId> = Vec::new();
+        let full_set = get_affinity_mask()?;
+        let mut core_ids: Vec<CoreId> = Vec::new();
 
-            for i in 0..CPU_SETSIZE as usize {
-                if unsafe { CPU_ISSET(i, &full_set) } {
-                    core_ids.push(CoreId { id: i });
-                }
+        for i in 0..CPU_SETSIZE as usize {
+            if unsafe { CPU_ISSET(i, &full_set) } {
+                core_ids.push(CoreId { id: i });
             }
-
-            Ok(core_ids)
-        } else {
-            Err(Error::unknown("Could not get affinity mask"))
         }
+
+        Ok(core_ids)
     }
 
     pub fn set_for_current(core_id: CoreId) {
@@ -236,7 +234,7 @@ mod linux {
         }
     }
 
-    fn get_affinity_mask() -> Option<cpu_set_t> {
+    fn get_affinity_mask() -> Result<cpu_set_t, Error> {
         let mut set = new_cpu_set();
 
         // Try to get current core affinity mask.
@@ -249,9 +247,11 @@ mod linux {
         };
 
         if result == 0 {
-            Some(set)
+            Ok(set)
         } else {
-            None
+            Err(Error::unknown(
+                "Failed to retrieve affinity using sched_getaffinity".to_string(),
+            ))
         }
     }
 
@@ -267,12 +267,7 @@ mod linux {
 
         #[test]
         fn test_linux_get_affinity_mask() {
-            match get_affinity_mask() {
-                Some(_) => {}
-                None => {
-                    panic!("Couldn't get affinity")
-                }
-            }
+            get_affinity_mask().unwrap();
         }
 
         #[test]
@@ -336,22 +331,19 @@ mod windows {
     use crate::bolts::core_affinity::{CoreId, Error};
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
-        if let Some(mask) = get_affinity_mask() {
-            // Find all active cores in the bitmask.
-            let mut core_ids: Vec<CoreId> = Vec::new();
+        let mask = get_affinity_mask()?;
+        // Find all active cores in the bitmask.
+        let mut core_ids: Vec<CoreId> = Vec::new();
 
-            for i in 0..64 {
-                let test_mask = 1 << i;
+        for i in 0..64 {
+            let test_mask = 1 << i;
 
-                if (mask & test_mask) == test_mask {
-                    core_ids.push(CoreId { id: i });
-                }
+            if (mask & test_mask) == test_mask {
+                core_ids.push(CoreId { id: i });
             }
-
-            Ok(core_ids)
-        } else {
-            Err(Error::unknown("Illegal affinity mask received".to_string()))
         }
+
+        Ok(core_ids)
     }
 
     pub fn set_for_current(core_id: CoreId) {
