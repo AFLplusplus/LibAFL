@@ -208,9 +208,9 @@ mod linux {
         let full_set = get_affinity_mask()?;
         let mut core_ids: Vec<CoreId> = Vec::new();
 
-        for i in 0..CPU_SETSIZE as usize {
-            if unsafe { CPU_ISSET(i, &full_set) } {
-                core_ids.push(CoreId { id: i });
+        for i in 0..CPU_SETSIZE {
+            if unsafe { CPU_ISSET(i as usize, &full_set) } {
+                core_ids.push(CoreId { id: i as usize });
             }
         }
 
