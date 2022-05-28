@@ -397,14 +397,8 @@ mod windows {
 
         #[test]
         fn test_apple_get_core_ids() {
-            match get_core_ids() {
-                Some(set) => {
-                    assert_eq!(set.len(), num_cpus::get());
-                }
-                None => {
-                    assert!(false);
-                }
-            }
+            let set = get_core_ids().unwrap();
+            assert_eq!(set.len(), num_cpus::get());
         }
 
         #[test]
@@ -492,14 +486,8 @@ mod apple {
 
         #[test]
         fn test_windows_get_core_ids() {
-            match get_core_ids() {
-                Ok(set) => {
-                    assert_eq!(set.len(), num_cpus::get());
-                }
-                Err(err) => {
-                    panic!("Failed to get core ids: {}", err);
-                }
-            }
+            let set = get_core_ids().unwrap();
+            assert_eq!(set.len(), num_cpus::get());
         }
 
         #[test]
