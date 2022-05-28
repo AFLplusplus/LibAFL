@@ -323,6 +323,8 @@ fn set_for_current_helper(core_id: CoreId) {
 
 #[cfg(target_os = "windows")]
 mod windows {
+    use core::ptr::addr_of_mut;
+
     use alloc::{string::ToString, vec::Vec};
     use windows::Win32::System::Threading::{
         GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadAffinityMask,
@@ -375,7 +377,7 @@ mod windows {
         };
 
         // Successfully retrieved affinity mask
-        if res {
+        if res.as_bool() {
             #[allow(trivial_numeric_casts)]
             Ok(process_mask as _)
         }
