@@ -415,6 +415,7 @@ mod windows {
     }
 
     #[allow(trivial_numeric_casts)]
+    #[allow(clippy::cast_possible_wrap)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
         use std::mem;
         use std::ptr;
@@ -479,7 +480,7 @@ mod windows {
         }
 
         // Allocate memory where we will store the processor info.
-        let mut buffer: Vec<u8> = vec![0 as u8; needed_size as usize];
+        let mut buffer: Vec<u8> = vec![0_u8; needed_size as usize];
 
         unsafe {
             let result: bool = GetLogicalProcessorInformationEx(
@@ -488,7 +489,7 @@ mod windows {
                 &mut needed_size,
             );
 
-            if result == false {
+            if !result {
                 return None;
             }
         }
@@ -504,6 +505,7 @@ mod windows {
                     mem::transmute::<*const u8, *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(
                         part_ptr_raw,
                     );
+                let part_ptr = part_ptr_raw as *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
                 let part: &SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX = &*part_ptr;
 
                 // we are only interested in RelationProcessorCore information and hence
