@@ -500,12 +500,11 @@ mod windows {
         while byte_offset < needed_size as usize {
             unsafe {
                 // interpret this byte-array as SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX struct
-                let part_ptr_raw: *const u8 = buffer.as_ptr().offset(byte_offset as isize);
+                let part_ptr_raw: *const u8 = buffer.as_ptr().add(byte_offset);
                 let part_ptr: *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX =
                     mem::transmute::<*const u8, *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(
                         part_ptr_raw,
                     );
-                let part_ptr = part_ptr_raw as *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
                 let part: &SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX = &*part_ptr;
 
                 // we are only interested in RelationProcessorCore information and hence
