@@ -1207,13 +1207,8 @@ pub mod win32_shmem {
                     0,
                     map_size as u32,
                     PCSTR(map_str_bytes.as_mut_ptr()),
-                )
-                .map_err(|_| {
-                    Error::unknown(format!(
-                        "Cannot create shared memory {}",
-                        String::from_utf8_lossy(map_str_bytes)
-                    ))
-                })?;
+                )?;
+
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
@@ -1239,13 +1234,7 @@ pub mod win32_shmem {
                     FILE_MAP_ALL_ACCESS.0,
                     BOOL(0),
                     PCSTR(map_str_bytes.as_ptr() as *mut _),
-                )
-                .map_err(|_| {
-                    Error::unknown(format!(
-                        "Cannot open shared memory {}",
-                        String::from_utf8_lossy(&map_str_bytes)
-                    ))
-                })?;
+                )?;
 
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
