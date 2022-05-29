@@ -1096,12 +1096,6 @@ mod windows_exception_handler {
                 compiler_fence(Ordering::SeqCst);
 
                 ExitProcess(1);
-
-                LeaveCriticalSection(
-                    (data.critical as *mut RTL_CRITICAL_SECTION)
-                        .as_mut()
-                        .unwrap(),
-                );
             }
         }
         compiler_fence(Ordering::SeqCst);

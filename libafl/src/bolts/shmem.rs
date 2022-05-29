@@ -1165,7 +1165,8 @@ pub mod win32_shmem {
     const INVALID_HANDLE_VALUE: isize = -1;
 
     use windows::{
-        Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
+        core::PCSTR,
+        Win32::Foundation::{CloseHandle, BOOL, HANDLE},
         Win32::System::Memory::{
             CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
             FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
@@ -1205,14 +1206,14 @@ pub mod win32_shmem {
                     PAGE_READWRITE,
                     0,
                     map_size as u32,
-                    PSTR(map_str_bytes.as_mut_ptr()),
-                );
-                if handle == HANDLE(0) {
-                    return Err(Error::unknown(format!(
+                    PCSTR(map_str_bytes.as_mut_ptr()),
+                )
+                .map_err(|_| {
+                    Error::unknown(format!(
                         "Cannot create shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
-                    )));
-                }
+                    ))
+                })?;
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
@@ -1235,16 +1236,17 @@ pub mod win32_shmem {
                 let map_str_bytes = id.id;
                 // Unlike MapViewOfFile this one needs u32
                 let handle = OpenFileMappingA(
-                    FILE_MAP_ALL_ACCESS,
+                    FILE_MAP_ALL_ACCESS.0,
                     BOOL(0),
-                    PSTR(map_str_bytes.as_ptr() as *mut _),
-                );
-                if handle == HANDLE(0) {
-                    return Err(Error::unknown(format!(
+                    PCSTR(map_str_bytes.as_ptr() as *mut _),
+                )
+                .map_err(|_| {
+                    Error::unknown(format!(
                         "Cannot open shared memory {}",
                         String::from_utf8_lossy(&map_str_bytes)
-                    )));
-                }
+                    ))
+                })?;
+
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
