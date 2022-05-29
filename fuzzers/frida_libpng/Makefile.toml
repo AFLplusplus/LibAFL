@@ -1,8 +1,7 @@
 # Variables
 [env]
-FUZZER_NAME='frida_fuzzer'
+FUZZER_NAME={ source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "frida_fuzzer", mapping = {"linux" = "frida_fuzzer", "macos" = "frida_fuzzer", "windows" = "frida_fuzzer.exe"} }
 FUZZER = './target/release/${FUZZER_NAME}'
-PROJECT_DIR = { script = ["pwd"] }
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -34,7 +33,7 @@ windows_alias = "unsupported"
 script_runner="@shell"
 script='''
 cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes
-cd "${PROJECT_DIR}"
+cd ..
 make -C libpng-1.6.37
 '''
 dependencies = [ "libpng" ]
@@ -43,7 +42,7 @@ dependencies = [ "libpng" ]
 [tasks.harness]
 linux_alias = "harness_unix"
 mac_alias = "harness_unix"
-windows_alias = "unsupported"
+windows_alias = "harness_windows"
 
 [tasks.harness_unix]
 script_runner="@shell"
@@ -53,6 +52,11 @@ clang++ -O3 harness.o libpng-1.6.37/.libs/libpng16.a -shared -lz -o libpng-harne
 '''
 dependencies = [ "lib" ]
 
+[tasks.harness_windows]
+script_runner="@shell"
+script='''
+cl /c harness_win.cpp && link harness_win.obj /dll
+'''
 
 # Fuzzer
 [tasks.fuzzer]
@@ -66,12 +70,19 @@ cp ./target/release/${FUZZER_NAME} .
 [tasks.run]
 linux_alias = "run_unix"
 mac_alias = "run_unix"
-windows_alias = "unsupported"
+windows_alias = "run_windows"
 
 [tasks.run_unix]
 script_runner = "@shell"
 script='''
 ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so
+'''
+dependencies = [ "fuzzer", "harness" ]
+
+[tasks.run_windows]
+script_runner = "@shell"
+script='''
+./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
 '''
 dependencies = [ "fuzzer", "harness" ]
 
