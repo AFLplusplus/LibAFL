@@ -415,6 +415,7 @@ mod windows {
     }
 
     #[allow(trivial_numeric_casts)]
+    #[allow(clippy::transmute_ptr_to_ptr)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
         use std::mem;
