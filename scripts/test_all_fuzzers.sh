@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/.." || exit 1
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
@@ -25,11 +25,11 @@ done
 # record time of each fuzzer
 declare -A time_record || (echo "declare -A not avaliable, please update your bash version to 4";exit 1)
 
-
-for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
+# shellcheck disable=SC2116
+for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
-    cd $fuzzer
-    start=`date +%s`
+    cd "$fuzzer" || exit 1
+    start=$(date +%s)
     # Clippy checks
     if [ "$1" != "--no-fmt" ]; then
         
@@ -50,15 +50,15 @@ do
         cargo build || exit 1
         echo "[+] Done building $fuzzer"
     fi
-    end=`date +%s`
+    end=$(date +%s)
     time_record[$fuzzer]=$((end-start))
     # Save disk space
     cargo clean
-    cd $libafl
+    cd "$libafl" || exit 1
     echo ""
 done
 
 # print time for each fuzzer
-for key in ${!time_record[@]}; do
-    echo "dir:"$key" time:"${time_record[$key]};
+for key in "${!time_record[@]}"; do
+    echo "dir: $key, time: ${time_record[$key]}";
 done

@@ -89,7 +89,7 @@ namespace {
 SECURITY_SENSITIVE_FUNCS(StringRef)
 
 bool isSecuritySensitiveFunction(Function *F) {
-  if (!F) return 0;
+  if (!F) { return 0; }
   auto func_name = F->getName();
   for (auto name : securitySensitiveFunctions) {
     if (func_name.contains(name)) {
@@ -231,21 +231,23 @@ bool AFLCoverage::runOnModule(Module &M) {
       BasicBlock::iterator IP = BB.getFirstInsertionPt();
       IRBuilder<>          IRB(&(*IP));
 
-      if (RandBelow(100) >= InstRatio) continue;
+      if (RandBelow(100) >= InstRatio) { continue; }
 
       // Start with 1 to implicitly track edge coverage too
       uint32_t MemCnt = 1;
       for (auto &I : BB) {
         switch (granularity) {
-          case BB_GRAN:
-            if (I.mayReadFromMemory() || I.mayWriteToMemory()) ++MemCnt;
+          case BB_GRAN: {
+            if (I.mayReadFromMemory() || I.mayWriteToMemory()) { ++MemCnt; }
             break;
-          case FUNC_GRAN:
+          }
+          case FUNC_GRAN: {
             if (auto *C = dyn_cast<CallInst>(&I)) {
               auto F = C->getCalledFunction();
               MemCnt += isSecuritySensitiveFunction(F);
             }
             break;
+          }
         }
       }
       /* Make up cur_loc */

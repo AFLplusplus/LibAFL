@@ -210,8 +210,9 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
 
   line[j] = 0;
   strcat(line, "\"\n");
-  if (write(fd, line, strlen(line)) <= 0)
+  if (write(fd, line, strlen(line)) <= 0) {
     FATAL("Could not write to the dictionary file");
+  }
   fsync(fd);
 }
 
@@ -248,7 +249,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
   /* Instrument all the things! */
 
   for (auto &F : M) {
-    if (isIgnoreFunction(&F)) continue;
+    if (isIgnoreFunction(&F)) { continue; }
 
     /*  Some implementation notes.
      *
@@ -294,8 +295,8 @@ bool AutoTokensPass::runOnModule(Module &M) {
           if (ilen && ilen->uge(0xffffffffffffffff) == false) {
             uint64_t val2 = 0, val = ilen->getZExtValue();
             uint32_t len = 0;
-            if (val > 0x10000 && val < 0xffffffff) len = 4;
-            if (val > 0x100000001 && val < 0xffffffffffffffff) len = 8;
+            if (val > 0x10000 && val < 0xffffffff) { len = 4; }
+            if (val > 0x100000001 && val < 0xffffffffffffffff) { len = 8; }
 
             if (len) {
               auto c = cmpInst->getPredicate();
@@ -309,7 +310,7 @@ bool AutoTokensPass::runOnModule(Module &M) {
                   // signed comparison and it is a negative constant
                   if ((len == 4 && (val & 80000000)) ||
                       (len == 8 && (val & 8000000000000000))) {
-                    if ((val & 0xffff) != 1) val2 = val - 1;
+                    if ((val & 0xffff) != 1) { val2 = val - 1; }
                     break;
                   }
 

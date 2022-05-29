@@ -5,11 +5,8 @@
 __AFL_FUZZ_INIT();
 
 int main(int argc, char **argv) {
-
   FILE *file = stdin;
-  if (argc > 1) {
-    file = fopen(argv[1], "rb");
-  }
+  if (argc > 1) { file = fopen(argv[1], "rb"); }
 
   // The following three lines are for normal fuzzing.
   /*
