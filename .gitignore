@@ -6,6 +6,7 @@ vendor
 .DS_Store
 .env
 
+*.tmp
 *.o
 *.a
 *.so
