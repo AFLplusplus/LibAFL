@@ -173,10 +173,11 @@ PreservedAnalyses AFLCoverage::run(Module &M, ModuleAnalysisManager &MAM) {
 #else
 bool AFLCoverage::runOnModule(Module &M) {
 #endif
-  if (Ctx && DumpCFG)
+  if (Ctx && DumpCFG) {
     FATAL(
         "Does not support dumping CFG with full context sensitive coverage "
         "enabled.");
+  }
   LLVMContext &C = M.getContext();
 
   IntegerType *Int8Ty = IntegerType::getInt8Ty(C);
@@ -201,9 +202,10 @@ bool AFLCoverage::runOnModule(Module &M) {
     if ((ptr = getenv("AFL_MAP_SIZE")) || (ptr = getenv("AFL_MAPSIZE"))) {
 
       map_size = atoi(ptr);
-      if (map_size < 8 || map_size > (1 << 29))
+      if (map_size < 8 || map_size > (1 << 29)) {
         FATAL("illegal AFL_MAP_SIZE %u, must be between 2^3 and 2^30",
-    map_size); if (map_size % 8) map_size = (((map_size >> 3) + 1) << 3);
+      }
+    map_size); if (map_size % 8) {map_size = (((map_size >> 3) + 1) << 3);}
 
     }
 
@@ -211,8 +213,9 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   /* Decide instrumentation ratio */
 
-  if (!InstRatio || InstRatio > 100)
+  if (!InstRatio || InstRatio > 100) {
     FATAL("Bad value of the instrumentation ratio (must be between 1 and 100)");
+  }
 
   unsigned PrevLocSize = 0;
   unsigned PrevCallerSize = 0;
@@ -224,25 +227,28 @@ bool AFLCoverage::runOnModule(Module &M) {
   /* Decide previous location vector size (must be a power of two) */
   VectorType *PrevLocTy = NULL;
 
-  if (Ngram && (Ngram < 2 || Ngram > NGRAM_SIZE_MAX))
+  if (Ngram && (Ngram < 2 || Ngram > NGRAM_SIZE_MAX)) {
     FATAL(
         "Bad value of the Ngram size (must be between 2 and NGRAM_SIZE_MAX "
         "(%u))",
         NGRAM_SIZE_MAX);
+  }
 
-  if (Ngram)
+  if (Ngram) {
     PrevLocSize = Ngram - 1;
-  else
+  } else {
     PrevLocSize = 1;
+  }
 
   /* Decide K-Ctx vector size (must be a power of two) */
   VectorType *PrevCallerTy = NULL;
 
-  if (CtxK > CTX_MAX_K)
+  if (CtxK > CTX_MAX_K) {
     FATAL(
         "Bad value of K for K-context sensitivity (must be between 1 and "
         "CTX_MAX_K (%u))",
         CTX_MAX_K);
+  }
 
   if (CtxK == 1) {
     CtxK = 0;
@@ -381,11 +387,13 @@ bool AFLCoverage::runOnModule(Module &M) {
 
   SmallVector<Constant *, 32> PrevLocShuffle = {UndefValue::get(Int32Ty)};
 
-  for (unsigned I = 0; I < PrevLocSize - 1; ++I)
+  for (unsigned I = 0; I < PrevLocSize - 1; ++I) {
     PrevLocShuffle.push_back(ConstantInt::get(Int32Ty, I));
+  }
 
-  for (int I = PrevLocSize; I < PrevLocVecSize; ++I)
+  for (int I = PrevLocSize; I < PrevLocVecSize; ++I) {
     PrevLocShuffle.push_back(ConstantInt::get(Int32Ty, PrevLocSize));
+  }
 
   Constant *PrevLocShuffleMask = ConstantVector::get(PrevLocShuffle);
 
@@ -393,11 +401,13 @@ bool AFLCoverage::runOnModule(Module &M) {
   SmallVector<Constant *, 32> PrevCallerShuffle = {UndefValue::get(Int32Ty)};
 
   if (CtxK) {
-    for (unsigned I = 0; I < PrevCallerSize - 1; ++I)
+    for (unsigned I = 0; I < PrevCallerSize - 1; ++I) {
       PrevCallerShuffle.push_back(ConstantInt::get(Int32Ty, I));
+    }
 
-    for (int I = PrevCallerSize; I < PrevCallerVecSize; ++I)
+    for (int I = PrevCallerSize; I < PrevCallerVecSize; ++I) {
       PrevCallerShuffle.push_back(ConstantInt::get(Int32Ty, PrevCallerSize));
+    }
 
     PrevCallerShuffleMask = ConstantVector::get(PrevCallerShuffle);
   }
@@ -424,7 +434,7 @@ bool AFLCoverage::runOnModule(Module &M) {
     // if (!isInInstrumentList(&F)) { continue; }
 
     if (F.size() < function_minimum_size) { continue; }
-    if (DumpCFG) entry_bb[F.getName()] = &F.getEntryBlock();
+    if (DumpCFG) { entry_bb[F.getName()] = &F.getEntryBlock(); }
 
     std::list<Value *> todo;
     for (auto &BB : F) {
@@ -453,10 +463,9 @@ bool AFLCoverage::runOnModule(Module &M) {
           // local variable on the stack
           LoadInst *PrevCtxLoad = IRB.CreateLoad(
 #if LLVM_VERSION_MAJOR >= 14
-            IRB.getInt32Ty(),
+              IRB.getInt32Ty(),
 #endif
-            AFLContext
-          );
+              AFLContext);
           PrevCtxLoad->setMetadata(M.getMDKindID("nosanitize"),
                                    MDNode::get(C, None));
           PrevCtx = PrevCtxLoad;
@@ -465,7 +474,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         // does the function have calls? and is any of the calls larger than one
         // basic block?
         for (auto &BB_2 : F) {
-          if (has_calls) break;
+          if (has_calls) { break; }
           for (auto &IN : BB_2) {
             CallInst *callInst = nullptr;
             if ((callInst = dyn_cast<CallInst>(&IN))) {
@@ -500,7 +509,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 #endif
           {
 
-            if (Ctx) NewCtx = IRB.CreateXor(PrevCtx, NewCtx);
+            if (Ctx) { NewCtx = IRB.CreateXor(PrevCtx, NewCtx); }
             StoreInst *StoreCtx = IRB.CreateStore(NewCtx, AFLContext);
             StoreCtx->setMetadata(M.getMDKindID("nosanitize"),
                                   MDNode::get(C, None));
@@ -508,13 +517,13 @@ bool AFLCoverage::runOnModule(Module &M) {
         }
       }
 
-      if (RandBelow(100) >= InstRatio) continue;
+      if (RandBelow(100) >= InstRatio) { continue; }
 
       /* Make up cur_loc */
 
       // cur_loc++;
       cur_loc = RandBelow(map_size);
-      if (DumpCFG) bb_to_cur_loc[&BB] = cur_loc;
+      if (DumpCFG) { bb_to_cur_loc[&BB] = cur_loc; }
 /* There is a problem with Ubuntu 18.04 and llvm 6.0 (see issue #63).
    The inline function successors() is not inlined and also not found at runtime
    :-( As I am unable to detect Ubuntu18.04 heree, the next best thing is to
@@ -531,7 +540,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         BasicBlock *Pred = *PI;
 
         int count = 0;
-        if (more_than_one == -1) more_than_one = 0;
+        if (more_than_one == -1) { more_than_one = 0; }
         // fprintf(stderr, " %p=>", Pred);
 
         for (succ_iterator SI = succ_begin(Pred), E = succ_end(Pred); SI != E;
@@ -540,11 +549,11 @@ bool AFLCoverage::runOnModule(Module &M) {
 
           // if (count > 0)
           //  fprintf(stderr, "|");
-          if (Succ != NULL) count++;
+          if (Succ != NULL) { count++; }
           // fprintf(stderr, "%p", Succ);
         }
 
-        if (count > 1) more_than_one = 1;
+        if (count > 1) { more_than_one = 1; }
       }
 
       // fprintf(stderr, " == %d\n", more_than_one);
@@ -783,7 +792,7 @@ bool AFLCoverage::runOnModule(Module &M) {
         cfg += formatv("->{0}\n", bb_to_cur_loc[*bb_successor]).str();
       }
     }
-    if (Debug) errs() << "CFG: \n" << cfg;
+    if (Debug) { errs() << "CFG: \n" << cfg; }
     if (cfg.size() > 0 && write(fd, cfg.c_str(), cfg.length()) <= 0)
       FATAL("Failed to dump CFG.\n");
   }

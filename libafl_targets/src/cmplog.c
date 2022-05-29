@@ -52,25 +52,26 @@ void __libafl_targets_cmplog_instructions(uintptr_t k, uint8_t shape, uint64_t a
 // to avoid to call it on .text addresses
 static long area_is_valid(void *ptr, size_t len) {
 
-  if (!ptr || __asan_region_is_poisoned(ptr, len)) return 0;
+  if (!ptr || __asan_region_is_poisoned(ptr, len)) {return 0;}
 
   long valid_len;
 
 #if defined(_WIN32)
-  if (IsBadReadPtr(ptr, len)) return 0;
+  if (IsBadReadPtr(ptr, len)) {return 0;}
   valid_len = (long)len;
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
   if (!dymmy_initialized) {
     if ((dummy_fd[1] = open("/dev/null", O_WRONLY)) < 0) {
-      if (pipe(dummy_fd) < 0)
+      if (pipe(dummy_fd) < 0) {
         dummy_fd[1] = 1;
+      }
     }
     dymmy_initialized = 1;
   }
 
   valid_len = syscall(SYS_write, dummy_fd[1], ptr, len);
   
-  if (valid_len <= 0 || valid_len > (long)len) return 0;
+  if (valid_len <= 0 || valid_len > (long)len) {return 0;}
 #endif
 
   // even if the write succeed this can be a false positive if we cross
@@ -98,12 +99,13 @@ static long area_is_valid(void *ptr, size_t len) {
 
 void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2) {
 
-  if (!libafl_cmplog_enabled) return;
+  if (!libafl_cmplog_enabled) { return; }
 
   int l1, l2;
   if ((l1 = area_is_valid(ptr1, CMPLOG_RTN_LEN)) <= 0 ||
-      (l2 = area_is_valid(ptr2, CMPLOG_RTN_LEN)) <= 0)
+      (l2 = area_is_valid(ptr2, CMPLOG_RTN_LEN)) <= 0) {
     return;
+  }
   int len = MIN(l1, l2);
 
   uint32_t hits;
@@ -115,8 +117,9 @@ void __libafl_targets_cmplog_routines(uintptr_t k, uint8_t *ptr1, uint8_t *ptr2)
     hits = 0;
   } else {
     hits = libafl_cmplog_map_ptr->headers[k].hits++;
-    if (libafl_cmplog_map_ptr->headers[k].shape < len)
+    if (libafl_cmplog_map_ptr->headers[k].shape < len) {
       libafl_cmplog_map_ptr->headers[k].shape = len;
+    }
   }
 
   hits &= CMPLOG_MAP_RTN_H - 1;
@@ -154,8 +157,8 @@ static uint8_t *get_gcc_stdstring(uint8_t *string) {
 //             IcEEE7compareEmmPKcm
 static uint8_t *get_llvm_stdstring(uint8_t *string) {
 
-  // length is in: if ((string[0] & 1) == 0) uint8_t len = (string[0] >> 1);
-  // or: if (string[0] & 1) uint32_t *len = (uint32_t *) (string + 8);
+  // length is in: if ((string[0] & 1) == 0) {uint8_t len = (string[0] >> 1);}
+  // or: if (string[0] & 1) {uint32_t *len = (uint32_t *) (string + 8);}
 
   if (string[0] & 1) {  // in memory
     uint8_t **ptr = (uint8_t **)(string + 16);
@@ -168,9 +171,10 @@ static uint8_t *get_llvm_stdstring(uint8_t *string) {
 
 void __cmplog_rtn_gcc_stdstring_cstring(uint8_t *stdstring, uint8_t *cstring) {
 
-  if (!libafl_cmplog_enabled) return;
-  if (area_is_valid(stdstring, 32) <= 0)
+  if (!libafl_cmplog_enabled) {return;}
+  if (area_is_valid(stdstring, 32) <= 0) {
     return;
+  }
 
   __cmplog_rtn_hook(get_gcc_stdstring(stdstring), cstring);
 
@@ -178,9 +182,10 @@ void __cmplog_rtn_gcc_stdstring_cstring(uint8_t *stdstring, uint8_t *cstring) {
 
 void __cmplog_rtn_gcc_stdstring_stdstring(uint8_t *stdstring1, uint8_t *stdstring2) {
 
-  if (!libafl_cmplog_enabled) return;
-  if (area_is_valid(stdstring1, 32) <= 0 || area_is_valid(stdstring2, 32) <= 0)
+  if (!libafl_cmplog_enabled) {return;}
+  if (area_is_valid(stdstring1, 32) <= 0 || area_is_valid(stdstring2, 32) <= 0) {
     return;
+    }
 
   __cmplog_rtn_hook(get_gcc_stdstring(stdstring1),
                     get_gcc_stdstring(stdstring2));
@@ -189,9 +194,10 @@ void __cmplog_rtn_gcc_stdstring_stdstring(uint8_t *stdstring1, uint8_t *stdstrin
 
 void __cmplog_rtn_llvm_stdstring_cstring(uint8_t *stdstring, uint8_t *cstring) {
 
-  if (!libafl_cmplog_enabled) return;
-  if (area_is_valid(stdstring, 32) <= 0)
+  if (!libafl_cmplog_enabled) {return;}
+  if (area_is_valid(stdstring, 32) <= 0){
     return;
+  }
 
   __cmplog_rtn_hook(get_llvm_stdstring(stdstring), cstring);
 
@@ -199,9 +205,10 @@ void __cmplog_rtn_llvm_stdstring_cstring(uint8_t *stdstring, uint8_t *cstring) {
 
 void __cmplog_rtn_llvm_stdstring_stdstring(uint8_t *stdstring1, uint8_t *stdstring2) {
 
-  if (!libafl_cmplog_enabled) return;
-  if (area_is_valid(stdstring1, 32) <= 0 || area_is_valid(stdstring2, 32) <= 0)
+  if (!libafl_cmplog_enabled) {return;}
+  if (area_is_valid(stdstring1, 32) <= 0 || area_is_valid(stdstring2, 32) <= 0) {
     return;
+  }
 
   __cmplog_rtn_hook(get_llvm_stdstring(stdstring1),
                     get_llvm_stdstring(stdstring2));

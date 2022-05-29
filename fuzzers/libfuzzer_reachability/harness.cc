@@ -23,40 +23,38 @@
 #define PNG_INTERNAL
 #include "png.h"
 
-#define PNG_CLEANUP \
-  if(png_handler.png_ptr) \
-  { \
-    if (png_handler.row_ptr) \
-      png_free(png_handler.png_ptr, png_handler.row_ptr); \
-    if (png_handler.end_info_ptr) \
-      png_destroy_read_struct(&png_handler.png_ptr, &png_handler.info_ptr,\
-        &png_handler.end_info_ptr); \
-    else if (png_handler.info_ptr) \
-      png_destroy_read_struct(&png_handler.png_ptr, &png_handler.info_ptr,\
-        nullptr); \
-    else \
-      png_destroy_read_struct(&png_handler.png_ptr, nullptr, nullptr); \
-    png_handler.png_ptr = nullptr; \
-    png_handler.row_ptr = nullptr; \
-    png_handler.info_ptr = nullptr; \
-    png_handler.end_info_ptr = nullptr; \
+#define PNG_CLEANUP                                                        \
+  if (png_handler.png_ptr) {                                               \
+    if (png_handler.row_ptr)                                               \
+      png_free(png_handler.png_ptr, png_handler.row_ptr);                  \
+    if (png_handler.end_info_ptr)                                          \
+      png_destroy_read_struct(&png_handler.png_ptr, &png_handler.info_ptr, \
+                              &png_handler.end_info_ptr);                  \
+    else if (png_handler.info_ptr)                                         \
+      png_destroy_read_struct(&png_handler.png_ptr, &png_handler.info_ptr, \
+                              nullptr);                                    \
+    else                                                                   \
+      png_destroy_read_struct(&png_handler.png_ptr, nullptr, nullptr);     \
+    png_handler.png_ptr = nullptr;                                         \
+    png_handler.row_ptr = nullptr;                                         \
+    png_handler.info_ptr = nullptr;                                        \
+    png_handler.end_info_ptr = nullptr;                                    \
   }
 
 struct BufState {
-  const uint8_t* data;
-  size_t bytes_left;
+  const uint8_t *data;
+  size_t         bytes_left;
 };
 
 struct PngObjectHandler {
-  png_infop info_ptr = nullptr;
+  png_infop   info_ptr = nullptr;
   png_structp png_ptr = nullptr;
-  png_infop end_info_ptr = nullptr;
-  png_voidp row_ptr = nullptr;
-  BufState* buf_state = nullptr;
+  png_infop   end_info_ptr = nullptr;
+  png_voidp   row_ptr = nullptr;
+  BufState   *buf_state = nullptr;
 
   ~PngObjectHandler() {
-    if (row_ptr)
-      png_free(png_ptr, row_ptr);
+    if (row_ptr) { png_free(png_ptr, row_ptr); }
     if (end_info_ptr)
       png_destroy_read_struct(&png_ptr, &info_ptr, &end_info_ptr);
     else if (info_ptr)
@@ -68,10 +66,8 @@ struct PngObjectHandler {
 };
 
 void user_read_data(png_structp png_ptr, png_bytep data, size_t length) {
-  BufState* buf_state = static_cast<BufState*>(png_get_io_ptr(png_ptr));
-  if (length > buf_state->bytes_left) {
-    png_error(png_ptr, "read error");
-  }
+  BufState *buf_state = static_cast<BufState *>(png_get_io_ptr(png_ptr));
+  if (length > buf_state->bytes_left) { png_error(png_ptr, "read error"); }
   memcpy(data, buf_state->data, length);
   buf_state->bytes_left -= length;
   buf_state->data += length;
@@ -82,10 +78,8 @@ static const int kPngHeaderSize = 8;
 // Entry point for LibFuzzer.
 // Roughly follows the libpng book example:
 // http://www.libpng.org/pub/png/book/chapter13.html
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
-  if (size < kPngHeaderSize) {
-    return 0;
-  }
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
+  if (size < kPngHeaderSize) { return 0; }
 
   std::vector<unsigned char> v(data, data + size);
   if (png_sig_cmp(v.data(), 0, kPngHeaderSize)) {
@@ -99,11 +93,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   png_handler.info_ptr = nullptr;
   png_handler.end_info_ptr = nullptr;
 
-  png_handler.png_ptr = png_create_read_struct
-    (PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-  if (!png_handler.png_ptr) {
-    return 0;
-  }
+  png_handler.png_ptr =
+      png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+  if (!png_handler.png_ptr) { return 0; }
 
   png_handler.info_ptr = png_create_info_struct(png_handler.png_ptr);
   if (!png_handler.info_ptr) {
@@ -144,12 +136,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   }
 
   png_uint_32 width, height;
-  int bit_depth, color_type, interlace_type, compression_type;
-  int filter_type;
+  int         bit_depth, color_type, interlace_type, compression_type;
+  int         filter_type;
 
-  if (!png_get_IHDR(png_handler.png_ptr, png_handler.info_ptr, &width,
-                    &height, &bit_depth, &color_type, &interlace_type,
-                    &compression_type, &filter_type)) {
+  if (!png_get_IHDR(png_handler.png_ptr, png_handler.info_ptr, &width, &height,
+                    &bit_depth, &color_type, &interlace_type, &compression_type,
+                    &filter_type)) {
     PNG_CLEANUP
     return 0;
   }
@@ -158,11 +150,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   if (width && height > 100000000 / width) {
     PNG_CLEANUP
 #ifdef HAS_DUMMY_CRASH
- #ifdef __aarch64__
-      asm volatile (".word 0xf7f0a000\n");
- #else
-      asm("ud2");
- #endif
+  #ifdef __aarch64__
+    asm volatile(".word 0xf7f0a000\n");
+  #else
+    asm("ud2");
+  #endif
 #endif
     return 0;
   }
@@ -178,9 +170,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
   png_read_update_info(png_handler.png_ptr, png_handler.info_ptr);
 
-  png_handler.row_ptr = png_malloc(
-      png_handler.png_ptr, png_get_rowbytes(png_handler.png_ptr,
-                                            png_handler.info_ptr));
+  png_handler.row_ptr =
+      png_malloc(png_handler.png_ptr,
+                 png_get_rowbytes(png_handler.png_ptr, png_handler.info_ptr));
 
   for (int pass = 0; pass < passes; ++pass) {
     for (png_uint_32 y = 0; y < height; ++y) {
@@ -194,4 +186,3 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   PNG_CLEANUP
   return 0;
 }
-

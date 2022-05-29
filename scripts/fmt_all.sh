@@ -1,7 +1,7 @@
 #!/bin/bash
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/.." || exit 1
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
@@ -9,13 +9,20 @@ echo "Welcome to the happy fmt script. :)"
 echo "[*] Running fmt for the main crates"
 cargo fmt
 
+echo "[*] Formatting C(pp) files"
+# shellcheck disable=SC2046
+clang-format-13 -i --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c')
+
+
+
 fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 
-for fuzzer in $(echo $fuzzers $backtrace_fuzzers);
+# shellcheck disable=SC2116
+for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
-    pushd $fuzzer
+    pushd "$fuzzer" || exit 1
     echo "[*] Running fmt for $fuzzer"
     cargo fmt --all
-    popd
+    popd || exit 1
 done
