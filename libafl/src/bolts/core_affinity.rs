@@ -415,10 +415,9 @@ mod windows {
     }
 
     #[allow(trivial_numeric_casts)]
-    #[allow(clippy::transmute_ptr_to_ptr)]
+    #[allow(clippy::cast_ptr_alignment)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
-        use std::mem;
         use std::ptr;
         use std::slice;
 
@@ -503,9 +502,7 @@ mod windows {
                 // interpret this byte-array as SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX struct
                 let part_ptr_raw: *const u8 = buffer.as_ptr().add(byte_offset);
                 let part_ptr: *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX =
-                    mem::transmute::<*const u8, *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(
-                        part_ptr_raw,
-                    );
+                    part_ptr_raw as *const SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
                 let part: &SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX = &*part_ptr;
 
                 // we are only interested in RelationProcessorCore information and hence
