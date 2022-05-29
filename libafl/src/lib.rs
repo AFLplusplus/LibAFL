@@ -374,6 +374,13 @@ impl From<TryFromSliceError> for Error {
     }
 }
 
+#[cfg(windows)]
+impl From<windows::core::Error> for Error {
+    fn from(err: windows::core::Error) -> Self {
+        Self::unknown(format!("Windows API error: {:?}", err))
+    }
+}
+
 #[cfg(feature = "python")]
 impl From<pyo3::PyErr> for Error {
     fn from(err: pyo3::PyErr) -> Self {
