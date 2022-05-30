@@ -214,6 +214,7 @@ jobs:
       run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
     - name: install cargo-make
       run: cargo install --force cargo-make
+    - uses: ilammy/msvc-dev-cmd@v1
     - name: Build frida
       run: cd fuzzers/frida_libpng/ && cargo make run
       
