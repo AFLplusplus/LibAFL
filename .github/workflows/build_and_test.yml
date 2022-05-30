@@ -216,7 +216,7 @@ jobs:
       run: cargo install --force cargo-make
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Build frida
-      run: cd fuzzers/frida_libpng/ && cargo make run
+      run: cd fuzzers/frida_libpng/ && cargo make test
       
   macos:
     runs-on: macOS-latest
