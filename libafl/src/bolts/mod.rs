@@ -10,6 +10,8 @@ pub mod build_id;
 pub mod cli;
 #[cfg(feature = "llmp_compression")]
 pub mod compress;
+#[cfg(feature = "std")]
+pub mod core_affinity;
 pub mod cpu;
 #[cfg(feature = "std")]
 pub mod fs;

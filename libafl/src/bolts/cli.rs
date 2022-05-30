@@ -75,8 +75,9 @@ use serde::{Deserialize, Serialize};
 use std::error;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
-use super::os::Cores;
 use crate::Error;
+
+use super::core_affinity::Cores;
 
 /// helper function to go from a parsed cli string to a `Duration`
 fn parse_timeout(src: &str) -> Result<Duration, Error> {
