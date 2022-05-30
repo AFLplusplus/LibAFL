@@ -213,7 +213,7 @@ jobs:
     - name: Set LIBCLANG_PATH
       run: echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
     - name: Build frida
-      run: cd fuzzers/frida_libpng/ && cargo build --release
+      run: cd fuzzers/frida_libpng/ && cargo make run
       
   macos:
     runs-on: macOS-latest
