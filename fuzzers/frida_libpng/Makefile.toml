@@ -90,13 +90,21 @@ dependencies = [ "fuzzer", "harness" ]
 [tasks.test]
 linux_alias = "test_unix"
 mac_alias = "test_unix"
-windows_alias = "unsupported"
+windows_alias = "test_windows"
 
 [tasks.test_unix]
 script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
 timeout 10s ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l ./libpng-harness.so &
+'''
+dependencies = [ "fuzzer", "harness" ]
+
+[tasks.test_windows]
+script_runner = "@shell"
+script='''
+start "" "./${FUZZER_NAME}" -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
+timeout /t 10 && taskkill /im ${FUZZER_NAME} /F
 '''
 dependencies = [ "fuzzer", "harness" ]
 
