@@ -633,7 +633,7 @@ mod apple {
             // 0 == KERN_SUCCESS
 
             if result != 0 {
-                Err(Error::unknown("Failed to set_for_current"))
+                Err(Error::unknown(format!("Failed to set_for_current {:?}", result)))
             } else {
                 Ok(())
             }
