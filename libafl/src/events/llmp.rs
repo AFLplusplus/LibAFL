@@ -826,7 +826,7 @@ where
 
             if let Some(core_id) = core_id {
                 println!("Setting core affinity to {:?}", core_id);
-                set_for_current(core_id);
+                set_for_current(core_id)?;
             }
 
             // We are the fuzzer respawner in a llmp client
@@ -894,7 +894,7 @@ where
         };
 
         if let Some(core_id) = core_id {
-            set_for_current(core_id);
+            set_for_current(core_id)?;
         }
 
         // If we're restarting, deserialize the old state.
