@@ -617,7 +617,7 @@ mod apple {
             .collect::<Vec<_>>())
     }
 
-    pub fn set_for_current(core_id: CoreId) {
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error>{
         let mut info = thread_affinity_policy_data_t {
             affinity_tag: core_id.id.try_into().unwrap(),
         };
