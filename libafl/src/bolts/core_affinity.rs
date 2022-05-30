@@ -589,7 +589,7 @@ mod apple {
     use super::CoreId;
     use alloc::vec::Vec;
     use libc::{
-        integer_t, kern_return_t, mach_msg_type_number_t, pthread_self, thread_policy_flavor_t,
+        integer_t, kern_return_t, mach_msg_type_number_t, pthread_self, thread_policy_flavor_t, pthread_mach_thread_np,
         thread_policy_t, thread_t, THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
     };
     use num_cpus;
@@ -624,7 +624,7 @@ mod apple {
 
         unsafe {
             let result = thread_policy_set(
-                pthread_self() as thread_t,
+                pthread_mach_thread_np(pthread_self()),
                 THREAD_AFFINITY_POLICY as _,
                 addr_of_mut!(info) as thread_policy_t,
                 THREAD_AFFINITY_POLICY_COUNT,
