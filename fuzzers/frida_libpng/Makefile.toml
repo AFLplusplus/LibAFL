@@ -101,7 +101,7 @@ timeout 10s ./${FUZZER_NAME} -F LLVMFuzzerTestOneInput -H ./libpng-harness.so -l
 dependencies = [ "fuzzer", "harness" ]
 
 [tasks.test_windows]
-script_runner = "powershell"
+script_runner = "@shell"
 script='''
 start "" "frida_fuzzer.exe" -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./harness_win.dll --cores=0
 #ping is for timeout
