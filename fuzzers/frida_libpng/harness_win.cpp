@@ -9,7 +9,7 @@ extern "C" __declspec(dllexport) size_t
     if (data[1] == 'a') {
       if (data[2] == 'd') {
         // STATUS_ACCESS_VIOLATION
-        int *p = 0x0;
+        int volatile *p = 0x0;
         *p = 0;
       }
     }
