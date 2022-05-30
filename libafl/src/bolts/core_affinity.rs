@@ -49,8 +49,8 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
 /// # Arguments
 ///
 /// * `core_id` - `ID` of the core to pin
-pub fn set_for_current(core_id: CoreId) {
-    set_for_current_helper(core_id);
+pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+    set_for_current_helper(core_id)
 }
 
 /// This represents a CPU core.
@@ -62,8 +62,8 @@ pub struct CoreId {
 
 impl CoreId {
     /// Set the affinity of the current process to this [`CoreId`]
-    pub fn set_affinity(&self) {
-        set_for_current(*self);
+    pub fn set_affinity(&self) -> Result<(), Error> {
+        set_for_current(*self)
     }
 }
 
@@ -197,8 +197,8 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 #[inline]
-fn set_for_current_helper(core_id: CoreId) {
-    linux::set_for_current(core_id);
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    linux::set_for_current(core_id)
 }
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
@@ -224,7 +224,7 @@ mod linux {
         Ok(core_ids)
     }
 
-    pub fn set_for_current(core_id: CoreId) {
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         // Turn `core_id` into a `libc::cpu_set_t` with only
         // one core active.
         let mut set = new_cpu_set();
@@ -232,12 +232,18 @@ mod linux {
         unsafe { CPU_SET(core_id.id, &mut set) };
 
         // Set the current thread's core affinity.
-        unsafe {
+        let result = unsafe {
             sched_setaffinity(
                 0, // Defaults to current thread
                 mem::size_of::<cpu_set_t>(),
                 &set,
-            );
+            )
+        };
+
+        if result < 0 {
+            Err(Error::unknown("Failed to set_for_current"))
+        } else {
+            Ok(())
         }
     }
 
@@ -289,7 +295,7 @@ mod linux {
 
             assert!(!ids.is_empty());
 
-            set_for_current(ids[0]);
+            set_for_current(ids[0]).unwrap();
 
             // Ensure that the system pinned the current thread
             // to the specified core.
@@ -324,8 +330,8 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 
 #[cfg(target_os = "windows")]
 #[inline]
-fn set_for_current_helper(core_id: CoreId) {
-    windows::set_for_current(core_id);
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    windows::set_for_current(core_id)
 }
 
 #[cfg(target_os = "windows")]
@@ -355,7 +361,7 @@ mod windows {
         Ok(core_ids)
     }
 
-    pub fn set_for_current(id: CoreId) {
+    pub fn set_for_current(id: CoreId) -> Result<(), Error> {
         let id: usize = id.into();
         let mut cpu_group = 0;
         let mut cpu_id = id;
@@ -379,7 +385,12 @@ mod windows {
 
             let mut outga = GROUP_AFFINITY::default();
 
-            SetThreadGroupAffinity(GetCurrentThread(), &ga, &mut outga);
+            let result = SetThreadGroupAffinity(GetCurrentThread(), &ga, &mut outga);
+            if result.0 == 0 {
+                Err(Error::unknown("Failed to set_for_current"))
+            } else {
+                Ok(())
+            }
         }
     }
 
@@ -550,7 +561,7 @@ mod windows {
 
             assert!(!ids.is_empty());
 
-            set_for_current(ids[0]);
+            set_for_current(ids[0]).unwrap();
         }
     }
 }
@@ -565,8 +576,8 @@ fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
 
 #[cfg(target_vendor = "apple")]
 #[inline]
-fn set_for_current_helper(core_id: CoreId) {
-    apple::set_for_current(core_id);
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    apple::set_for_current(core_id)
 }
 
 #[cfg(target_vendor = "apple")]
@@ -578,8 +589,9 @@ mod apple {
     use super::CoreId;
     use alloc::vec::Vec;
     use libc::{
-        integer_t, kern_return_t, mach_msg_type_number_t, pthread_self, thread_policy_flavor_t,
-        thread_policy_t, thread_t, THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
+        integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
+        thread_policy_flavor_t, thread_policy_t, thread_t, THREAD_AFFINITY_POLICY,
+        THREAD_AFFINITY_POLICY_COUNT,
     };
     use num_cpus;
 
@@ -606,18 +618,29 @@ mod apple {
             .collect::<Vec<_>>())
     }
 
-    pub fn set_for_current(core_id: CoreId) {
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         let mut info = thread_affinity_policy_data_t {
             affinity_tag: core_id.id.try_into().unwrap(),
         };
 
         unsafe {
-            thread_policy_set(
-                pthread_self() as thread_t,
+            let result = thread_policy_set(
+                pthread_mach_thread_np(pthread_self()),
                 THREAD_AFFINITY_POLICY as _,
                 addr_of_mut!(info) as thread_policy_t,
                 THREAD_AFFINITY_POLICY_COUNT,
             );
+
+            // 0 == KERN_SUCCESS
+
+            if result == 0 {
+                Ok(())
+            } else {
+                Err(Error::unknown(format!(
+                    "Failed to set_for_current {:?}",
+                    result
+                )))
+            }
         }
     }
 
@@ -639,7 +662,7 @@ mod apple {
 
             assert!(!ids.is_empty());
 
-            set_for_current(ids[0]);
+            set_for_current(ids[0]).unwrap();
         }
     }
 }
@@ -666,6 +689,6 @@ mod tests {
 
         assert!(!ids.is_empty());
 
-        set_for_current(ids[0]);
+        set_for_current(ids[0]).unwrap();
     }
 }
