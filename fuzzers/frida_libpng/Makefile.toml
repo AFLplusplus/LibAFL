@@ -107,6 +107,7 @@ start "" "frida_fuzzer.exe" -F LLVMFuzzerTestOneInput -H ./harness_win.dll -l ./
 #ping is for timeout
 ping -n 10 127.0.0.1>NUL && taskkill /im frida_fuzzer.exe /F
 >nul 2>nul dir /a-d "corpus_discovered\*" && (echo Files exist) || (exit /b 1337)
+'''
 dependencies = [ "fuzzer", "harness" ]
 
 # Clean up
