@@ -589,8 +589,9 @@ mod apple {
     use super::CoreId;
     use alloc::vec::Vec;
     use libc::{
-        integer_t, kern_return_t, mach_msg_type_number_t, pthread_self, thread_policy_flavor_t, pthread_mach_thread_np,
-        thread_policy_t, thread_t, THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
+        integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
+        thread_policy_flavor_t, thread_policy_t, thread_t, THREAD_AFFINITY_POLICY,
+        THREAD_AFFINITY_POLICY_COUNT,
     };
     use num_cpus;
 
@@ -633,7 +634,10 @@ mod apple {
             // 0 == KERN_SUCCESS
 
             if result != 0 {
-                Err(Error::unknown(format!("Failed to set_for_current {:?}", result)))
+                Err(Error::unknown(format!(
+                    "Failed to set_for_current {:?}",
+                    result
+                )))
             } else {
                 Ok(())
             }
