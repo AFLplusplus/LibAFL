@@ -118,6 +118,15 @@ fn main() {
         .file(src_dir.join("cmplog.c"))
         .compile("cmplog");
 
+    #[cfg(any(target_os = "linux"))]
+    {
+        println!("cargo:rerun-if-changed=src/forkserver.c");
+
+        cc::Build::new()
+            .file(src_dir.join("forkserver.c"))
+            .compile("forkserver");
+    }
+
     println!("cargo:rustc-link-search=native={}", &out_dir);
 
     println!("cargo:rerun-if-changed=build.rs");
