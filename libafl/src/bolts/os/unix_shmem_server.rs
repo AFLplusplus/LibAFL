@@ -18,7 +18,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{mem::ManuallyDrop, ptr::addr_of, time::Duration};
+use core::{mem::ManuallyDrop, ptr::addr_of};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -29,7 +29,7 @@ use std::{
     marker::PhantomData,
     rc::{Rc, Weak},
     sync::{Arc, Condvar, Mutex},
-    thread::{sleep, JoinHandle},
+    thread::JoinHandle,
 };
 
 #[cfg(target_vendor = "apple")]

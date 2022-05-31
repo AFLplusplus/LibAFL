@@ -16,7 +16,7 @@
 //! let handles = core_ids.into_iter().map(|id| {
 //!     thread::spawn(move || {
 //!         // Pin this thread to a single CPU core.
-//!         core_affinity::set_for_current(id);
+//!         id.set_affinity();
 //!         // Do more work after this.
 //!     })
 //! }).collect::<Vec<_>>();
@@ -288,18 +288,12 @@ mod linux {
         }
 
         #[test]
-        fn test_linux_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
-        }
-
-        #[test]
         fn test_linux_set_for_current() {
             let ids = get_core_ids().unwrap();
 
             assert!(!ids.is_empty());
 
-            set_for_current(ids[0]).unwrap();
+            ids[0].set_affinity().unwrap();
 
             // Ensure that the system pinned the current thread
             // to the specified core.
@@ -546,28 +540,6 @@ mod windows {
 
         Some(n_logical_procs)
     }
-
-    #[cfg(test)]
-    mod tests {
-        use num_cpus;
-
-        use super::*;
-
-        #[test]
-        fn test_apple_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
-        }
-
-        #[test]
-        fn test_apple_set_for_current() {
-            let ids = get_core_ids().unwrap();
-
-            assert!(!ids.is_empty());
-
-            set_for_current(ids[0]).unwrap();
-        }
-    }
 }
 
 // Apple Section
@@ -591,7 +563,7 @@ mod apple {
     use crate::Error;
 
     use super::CoreId;
-    use alloc::{string::ToString, vec::Vec};
+    use alloc::vec::Vec;
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
         thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
@@ -656,28 +628,6 @@ mod apple {
             }
         }
     }
-
-    #[cfg(test)]
-    mod tests {
-        use num_cpus;
-
-        use super::*;
-
-        #[test]
-        fn test_windows_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
-        }
-
-        #[test]
-        fn test_windows_set_for_current() {
-            let ids = get_core_ids().unwrap();
-
-            assert!(!ids.is_empty());
-
-            set_for_current(ids[0]).unwrap();
-        }
-    }
 }
 
 #[cfg(test)]
@@ -697,11 +647,11 @@ mod tests {
     }
 
     #[test]
-    fn test_set_for_current() {
+    fn test_set_affinity() {
         let ids = get_core_ids().unwrap();
 
         assert!(!ids.is_empty());
 
-        set_for_current(ids[0]).unwrap();
+        ids[0].set_affinity().unwrap();
     }
 }
