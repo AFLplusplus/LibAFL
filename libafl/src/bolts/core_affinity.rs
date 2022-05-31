@@ -43,16 +43,6 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
     get_core_ids_helper()
 }
 
-/// This function tries to pin the current
-/// thread to the specified core.
-///
-/// # Arguments
-///
-/// * `core_id` - `ID` of the core to pin
-pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
-    set_for_current_helper(core_id)
-}
-
 /// This represents a CPU core.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CoreId {
@@ -62,8 +52,22 @@ pub struct CoreId {
 
 impl CoreId {
     /// Set the affinity of the current process to this [`CoreId`]
+    ///
+    /// Note: This will *_not_* fail if the target platform does not support core affinity.
+    /// (only on error cases for supported platforms)
+    /// If you really need to fail for unsupported platforms (like `aarch64` on `macOS`), use [`set_affinity_forced`] instead.
+    ///
     pub fn set_affinity(&self) -> Result<(), Error> {
-        set_for_current(*self)
+        match set_for_current_helper(*self) {
+            Ok(_) => Ok(()),
+            Err(Error::Unsupported(_, _)) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Set the affinity of the current process to this [`CoreId`]
+    pub fn set_affinity_forced(&self) -> Result<(), Error> {
+        set_for_current_helper(*self)
     }
 }
 
@@ -587,7 +591,7 @@ mod apple {
     use crate::Error;
 
     use super::CoreId;
-    use alloc::vec::Vec;
+    use alloc::{string::ToString, vec::Vec};
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
         thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
@@ -632,15 +636,18 @@ mod apple {
             );
 
             // 0 == KERN_SUCCESS
-            // 46 == KERN_NOT_SUPPORTED
-            // Seting a core affinity is not supported on aarch64 apple...
-            // We won't report this as an error to the user, a there's nothing they could do about it.
-            // Error codes, see <https://opensource.apple.com/source/xnu/xnu-792/osfmk/mach/kern_return.h>
-            if result == KERN_SUCCESS
-                || (cfg!(all(target_vendor = "apple", target_arch = "aarch64"))
-                    && result == KERN_NOT_SUPPORTED)
-            {
+            if result == KERN_SUCCESS {
                 Ok(())
+            } else if result == KERN_NOT_SUPPORTED {
+                // 46 == KERN_NOT_SUPPORTED
+                // Seting a core affinity is not supported on aarch64 apple...
+                // We won't report this as an error to the user, a there's nothing they could do about it.
+                // Error codes, see <https://opensource.apple.com/source/xnu/xnu-792/osfmk/mach/kern_return.h>
+                //|| (cfg!(all(target_vendor = "apple", target_arch = "aarch64"))
+                //    && result == KERN_NOT_SUPPORTED)
+                Err(Error::unsupported(
+                    "Setting a core affinity is not supported on this platform (KERN_NOT_SUPPORTED)",
+                ))
             } else {
                 Err(Error::unknown(format!(
                     "Failed to set_for_current {:?}",
