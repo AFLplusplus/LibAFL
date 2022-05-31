@@ -18,7 +18,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{mem::ManuallyDrop, ptr::addr_of};
+use core::{mem::ManuallyDrop, ptr::addr_of, time::Duration};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -29,7 +29,7 @@ use std::{
     marker::PhantomData,
     rc::{Rc, Weak},
     sync::{Arc, Condvar, Mutex},
-    thread::JoinHandle,
+    thread::{sleep, JoinHandle},
 };
 
 #[cfg(target_vendor = "apple")]
@@ -190,6 +190,7 @@ where
         res.id = id;
         Ok(res)
     }
+
     fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
@@ -716,5 +717,20 @@ where
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::bolts::{
+        os::unix_shmem_server::ServedShMemProvider,
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    };
+
+    #[test]
+    fn test_shmem_server_connection() {
+        let mut sp = ServedShMemProvider::<UnixShMemProvider>::new().unwrap();
+        let map = sp.new_shmem(1).unwrap();
+        assert!(map.is_empty());
     }
 }
