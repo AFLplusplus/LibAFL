@@ -51,7 +51,7 @@ int __afl_sharedmem_fuzzing __attribute__((weak));
 
 extern size_t __afl_map_size;
 extern uint8_t* __token_start;
-extern uint8_t* __token_end;
+extern uint8_t* __token_stop;
 
 uint8_t* __afl_fuzz_ptr;
 static uint32_t __afl_fuzz_len_local;
@@ -180,7 +180,7 @@ void __afl_start_forkserver(void) {
 
   }
 
-  int autodict_on = __token_start != NULL && __token_end != NULL;
+  int autodict_on = __token_start != NULL && __token_stop != NULL;
   if (autodict_on) {
 
     status_for_fsrv |= FS_OPT_AUTODICT;
@@ -214,11 +214,11 @@ void __afl_start_forkserver(void) {
     if ((was_killed & (FS_OPT_ENABLED | FS_OPT_AUTODICT)) == (FS_OPT_ENABLED | FS_OPT_AUTODICT) && autodict_on) {
 
       // great lets pass the dictionary through the forkserver FD
-      uint32_t len = (__token_end - __token_start), offset = 0;
+      uint32_t len = (__token_stop - __token_start), offset = 0;
 
       if (write(FORKSRV_FD + 1, &len, 4) != 4) {
 
-        write(2, "Error: could not send dictionary len\n", strlen("Error: could not send dictionary len\n"));
+        write_error("could not send dictionary len");
         _exit(1);
 
       }
@@ -230,7 +230,7 @@ void __afl_start_forkserver(void) {
 
         if (ret < 1) {
 
-          write(2, "Error: could not send dictionary\n", strlen("Error: could not send dictionary\n"));
+          write_error("could not send dictionary");
           _exit(1);
 
         }
