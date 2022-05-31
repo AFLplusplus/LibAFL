@@ -270,7 +270,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
-    if (isIgnoreFunction(&F)) continue;
+    if (isIgnoreFunction(&F)) { continue; }
 
     for (auto &BB : F) {
       for (auto &IN : BB) {
@@ -278,8 +278,8 @@ bool CmpLogRoutines::hookRtns(Module &M) {
 
         if ((callInst = dyn_cast<CallInst>(&IN))) {
           Function *Callee = callInst->getCalledFunction();
-          if (!Callee) continue;
-          if (callInst->getCallingConv() != llvm::CallingConv::C) continue;
+          if (!Callee) { continue; }
+          if (callInst->getCallingConv() != llvm::CallingConv::C) { continue; }
 
           FunctionType *FT = Callee->getFunctionType();
 
@@ -350,8 +350,9 @@ bool CmpLogRoutines::hookRtns(Module &M) {
   }
 
   if (!calls.size() && !gccStdStd.size() && !gccStdC.size() &&
-      !llvmStdStd.size() && !llvmStdC.size())
+      !llvmStdStd.size() && !llvmStdC.size()) {
     return false;
+  }
 
   for (auto &callInst : calls) {
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);

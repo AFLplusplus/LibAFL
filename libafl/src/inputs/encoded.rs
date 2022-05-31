@@ -5,6 +5,8 @@
 use ahash::AHasher;
 use core::hash::Hasher;
 
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 #[cfg(feature = "std")]
 use core::str::from_utf8;
@@ -256,6 +258,8 @@ impl EncodedInput {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+    use alloc::borrow::ToOwned;
+
     use crate::inputs::encoded::{
         InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
     };

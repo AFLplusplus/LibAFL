@@ -6,6 +6,7 @@ vendor
 .DS_Store
 .env
 
+*.tmp
 *.o
 *.a
 *.so
@@ -42,3 +43,5 @@ a
 forkserver_test
 __pycache__
 *.lafl_lock
+
+*atomic_file_testfile*

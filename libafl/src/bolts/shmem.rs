@@ -539,6 +539,7 @@ pub mod unix_shmem {
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
 
+        use alloc::string::ToString;
         use core::{ptr, slice};
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
@@ -919,6 +920,7 @@ pub mod unix_shmem {
     /// Module containing `ashmem` shared memory support, commonly used on Android.
     #[cfg(all(unix, feature = "std"))]
     pub mod ashmem {
+        use alloc::string::ToString;
         use core::{ptr, slice};
         use libc::{
             c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
@@ -1152,6 +1154,7 @@ pub mod win32_shmem {
         Error,
     };
 
+    use alloc::string::String;
     use core::{
         ffi::c_void,
         fmt::{self, Debug, Formatter},
@@ -1162,7 +1165,8 @@ pub mod win32_shmem {
     const INVALID_HANDLE_VALUE: isize = -1;
 
     use windows::{
-        Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
+        core::PCSTR,
+        Win32::Foundation::{CloseHandle, BOOL, HANDLE},
         Win32::System::Memory::{
             CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
             FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
@@ -1202,14 +1206,9 @@ pub mod win32_shmem {
                     PAGE_READWRITE,
                     0,
                     map_size as u32,
-                    PSTR(map_str_bytes.as_mut_ptr()),
-                );
-                if handle == HANDLE(0) {
-                    return Err(Error::unknown(format!(
-                        "Cannot create shared memory {}",
-                        String::from_utf8_lossy(map_str_bytes)
-                    )));
-                }
+                    PCSTR(map_str_bytes.as_mut_ptr()),
+                )?;
+
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(
@@ -1232,16 +1231,11 @@ pub mod win32_shmem {
                 let map_str_bytes = id.id;
                 // Unlike MapViewOfFile this one needs u32
                 let handle = OpenFileMappingA(
-                    FILE_MAP_ALL_ACCESS,
+                    FILE_MAP_ALL_ACCESS.0,
                     BOOL(0),
-                    PSTR(map_str_bytes.as_ptr() as *mut _),
-                );
-                if handle == HANDLE(0) {
-                    return Err(Error::unknown(format!(
-                        "Cannot open shared memory {}",
-                        String::from_utf8_lossy(&map_str_bytes)
-                    )));
-                }
+                    PCSTR(map_str_bytes.as_ptr() as *mut _),
+                )?;
+
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
                     return Err(Error::unknown(format!(

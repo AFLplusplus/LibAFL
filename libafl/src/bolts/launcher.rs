@@ -16,7 +16,7 @@ use crate::bolts::os::startable_self;
 use crate::bolts::os::{dup2, fork, ForkResult};
 #[cfg(feature = "std")]
 use crate::{
-    bolts::{os::Cores, shmem::ShMemProvider},
+    bolts::{core_affinity::Cores, shmem::ShMemProvider},
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
     inputs::Input,
     monitors::Monitor,
@@ -24,11 +24,13 @@ use crate::{
     Error,
 };
 
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::bolts::core_affinity::CoreId;
+#[cfg(all(feature = "std"))]
+use alloc::string::ToString;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use core_affinity::CoreId;
 #[cfg(feature = "std")]
 use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
@@ -121,13 +123,15 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        use crate::bolts::core_affinity::get_core_ids;
+
         if self.run_client.is_none() {
             return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
             ));
         }
 
-        let core_ids = core_affinity::get_core_ids().unwrap();
+        let core_ids = get_core_ids().unwrap();
         let num_cores = core_ids.len();
         let mut handles = vec![];
 
@@ -223,6 +227,8 @@ where
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        use crate::bolts::core_affinity;
+
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 
         let mut handles = match is_client {

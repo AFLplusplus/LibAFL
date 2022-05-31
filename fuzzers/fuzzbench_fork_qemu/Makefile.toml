@@ -46,14 +46,14 @@ cd libpng-1.6.37 && ./configure --enable-shared=no --with-pic=yes --enable-hardw
 cd "${PROJECT_DIR}"
 make -C libpng-1.6.37
 cc -c "${PROJECT_DIR}/libfuzzer_main.c"
-# Build the libpng harness	
+# Build the libpng harness    
 c++ \
-	../libfuzzer_libpng/harness.cc \
-	./libpng-1.6.37/.libs/libpng16.a \
-	./libfuzzer_main.o \
-	-I./libpng-1.6.37/ \
-	-o ${FUZZER_NAME} \
-	-lm -lz
+    ../libfuzzer_libpng/harness.cc \
+    ./libpng-1.6.37/.libs/libpng16.a \
+    ./libfuzzer_main.o \
+    -I./libpng-1.6.37/ \
+    -o ${FUZZER_NAME} \
+    -lm -lz
 '''
 dependencies = ["libpng"]
 

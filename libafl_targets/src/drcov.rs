@@ -2,6 +2,7 @@
 //! writing basic-block trace files to be read by coverage analysis tools, such as [Lighthouse](https://github.com/gaasedelen/lighthouse),
 //! [bncov](https://github.com/ForAllSecure/bncov), [dragondance](https://github.com/0ffffffffh/dragondance), etc.
 
+use alloc::{string::String, vec::Vec};
 use core::ptr::addr_of;
 use libafl::Error;
 use rangemap::RangeMap;

@@ -3,7 +3,7 @@ Welcome to `LibAFL`
 */
 
 #![allow(incomplete_features)]
-#![cfg_attr(not(feature = "std"), no_std)]
+#![no_std]
 // For `type_eq`
 #![cfg_attr(unstable_feature, feature(specialization))]
 // For `type_id` and owned things
@@ -69,6 +69,9 @@ Welcome to `LibAFL`
     )
 )]
 
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
 #[macro_use]
 pub extern crate alloc;
 #[macro_use]
@@ -371,6 +374,13 @@ impl From<TryFromSliceError> for Error {
     }
 }
 
+#[cfg(windows)]
+impl From<windows::core::Error> for Error {
+    fn from(err: windows::core::Error) -> Self {
+        Self::unknown(format!("Windows API error: {:?}", err))
+    }
+}
+
 #[cfg(feature = "python")]
 impl From<pyo3::PyErr> for Error {
     fn from(err: pyo3::PyErr) -> Self {
@@ -573,6 +583,7 @@ pub mod pybind {
     macro_rules! impl_serde_pyobjectwrapper {
         ($struct_name:ident, $inner:tt) => {
             const _: () = {
+                use alloc::vec::Vec;
                 use pyo3::prelude::*;
                 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

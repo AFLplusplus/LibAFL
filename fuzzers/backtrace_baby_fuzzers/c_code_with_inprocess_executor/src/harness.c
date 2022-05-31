@@ -8,7 +8,7 @@
 #define MAP_SIZE 100
 
 // uint8_t *array;
-uint8_t array[MAP_SIZE];
+uint8_t  array[MAP_SIZE];
 uint8_t *array_ptr = &array;
 
 int init() {

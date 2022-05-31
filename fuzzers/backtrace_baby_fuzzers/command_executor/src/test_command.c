@@ -35,9 +35,7 @@ uint8_t get_value(int i) {
 }
 
 int destroy_shmem() {
-  if (-1 == shmctl(shmid, IPC_RMID, NULL)) {
-    return -1;
-  }
+  if (-1 == shmctl(shmid, IPC_RMID, NULL)) { return -1; }
   return 0;
 }
 

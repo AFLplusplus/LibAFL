@@ -1557,6 +1557,7 @@ pub mod pybind {
 
     macro_rules! define_python_map_observer {
         ($struct_name1:ident, $py_name1:tt, $struct_name2:ident, $py_name2:tt, $struct_name_trait:ident, $py_name_trait:tt, $datatype:ty, $wrapper_name: ident) => {
+
             #[pyclass(unsendable, name = $py_name1)]
             #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -1628,7 +1629,7 @@ pub mod pybind {
                 fn new(name: String, map: Vec<$datatype>) -> Self {
                     Self {
                         //TODO: Not leak memory
-                        inner: OwnedMapObserver::new(Box::leak(name.into_boxed_str()), map),
+                        inner: OwnedMapObserver::new(alloc::boxed::Box::leak(name.into_boxed_str()), map),
                     }
                 }
 

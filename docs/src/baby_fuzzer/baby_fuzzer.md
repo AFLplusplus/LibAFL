@@ -37,12 +37,12 @@ edition = "2018"
 ```
 
 In order to use LibAFl we must add it as dependency adding `libafl = { path = "path/to/libafl/" }` under `[dependencies]`.
-You can use the LibAFL version from crates.io if you want, in this case, you have to use `libafl = "*"` to get the latest version (or set it to the current version).
+You can use the LibAFL version from [crates.io](https://crates.io/crates/libafl) if you want, in this case, you have to use `libafl = "*"` to get the latest version (or set it to the current version).
 
 As we are going to fuzz Rust code, we want that a panic does not simply cause the program to exit, but raise an `abort` that can then be caught by the fuzzer.
 To do that, we specify `panic = "abort"` in the [profiles](https://doc.rust-lang.org/cargo/reference/profiles.html).
 
-Alongside this setting, we add some optimization flags for the compile when building in release mode.
+Alongside this setting, we add some optimization flags for the compilation, when building in release mode.
 
 The final `Cargo.toml` should look similar to the following:
 
@@ -72,7 +72,8 @@ debug = true
 ## The function under test
 
 Opening `src/main.rs`, we have an empty `main` function.
-To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`. `ExitKind` is used to inform the harness' exit status.
+To start, we create the closure that we want to fuzz. It takes a buffer as input and panics if it starts with `"abc"`.
+`ExitKind` is used to inform the fuzzer about the harness' exit status.
 
 ```rust
 extern crate libafl;
@@ -97,14 +98,15 @@ fn main(){
     };
     // To test the panic:
     let input = BytesInput::new(Vec::from("abc"));
-    // harness(&input);
+    #[cfg(feature = "panic")]
+    harness(&input);
 }
 ```
 
 ## Generating and running some tests
 
 One of the main components that a LibAFL-based fuzzer uses is the State, a container of the data that is evolved during the fuzzing process.
-Includes all State, such as the Corpus of inputs, the current rng state, and potential Metadata for the testcases and run.
+Includes all State, such as the Corpus of inputs, the current RNG state, and potential Metadata for the testcases and run.
 In our `main` we create a basic State instance like the following:
 
 ```rust,ignore
@@ -122,8 +124,8 @@ let mut state = StdState::new(
 ).unwrap();
 ```
 
-- first parameter is a random number generator, that is part of the fuzzer state, in this case, we use the default one `StdRand` but you can choose a different one. We seed it with the current nanoseconds.
-- second parameter is an instance of something implementing the Corpus trait, `InMemoryCorpus` in this case. The corpus is the container of the testcases evolved by the fuzzer, in this case, we keep it all in memory.
+- The first parameter is a random number generator, that is part of the fuzzer state, in this case, we use the default one `StdRand`, but you can choose a different one. We seed it with the current nanoseconds.
+- The second parameter is an instance of something implementing the Corpus trait, `InMemoryCorpus` in this case. The corpus is the container of the testcases evolved by the fuzzer, in this case, we keep it all in memory.
 
   To avoid type annotation error, you can use `InMemoryCorpus::<BytesInput>::new()` to replace `InMemoryCorpus::new()`. If not, type annotation will be automatically inferred when adding `executor`.
 
@@ -329,7 +331,8 @@ let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
 Now, after including the correct `use`, we can run the program, but the outcome is not so different from the previous one as the random generator does not take into account what we save as interesting in the corpus. To do that, we need to plug a Mutator.
 
-**Stages** are action sequence done on individual inputs taken from the corpus. The `MutationalStage` mutates the input and executes it several times for instance.
+**Stages** perform actions on individual inputs, taken from the corpus.
+For instance, the `MutationalStage` executes the harness several times in a row, every time with mutated inputs.
 
 As the last step, we create a MutationalStage that uses a mutator inspired by the havoc mutator of AFL.
 

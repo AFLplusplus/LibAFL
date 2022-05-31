@@ -4,6 +4,8 @@ use core::{
     marker::PhantomData,
 };
 
+#[cfg(feature = "std")]
+use alloc::{borrow::ToOwned, string::String, vec::Vec};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(feature = "std")]
@@ -17,7 +19,7 @@ use std::{
 
 use crate::{
     bolts::{
-        fs::{OutFile, OUTFILE_STD},
+        fs::{InputFile, INPUTFILE_STD},
         tuples::MatchName,
         AsSlice,
     },
@@ -37,7 +39,7 @@ use super::HasObservers;
 
 /// How to deliver input to an external program
 /// `StdIn`: The traget reads from stdin
-/// `File`: The target reads from the specified [`OutFile`]
+/// `File`: The target reads from the specified [`InputFile`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum InputLocation {
     /// Mutate a commandline argument to deliver an input
@@ -47,11 +49,11 @@ enum InputLocation {
     },
     /// Deliver input via `StdIn`
     StdIn,
-    /// Deliver the iniput via the specified [`OutFile`]
-    /// You can use specify [`OutFile::create(OUTFILE_STD)`] to use a default filename.
+    /// Deliver the input via the specified [`InputFile`]
+    /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
     File {
-        /// The fiel to write input to. The target should read input from this location.
-        out_file: OutFile,
+        /// The file to write input to. The target should read input from this location.
+        input_file: InputFile,
     },
 }
 
@@ -131,8 +133,8 @@ impl CommandConfigurator for StdCommandConfigurator {
                 drop(stdin);
                 Ok(handle)
             }
-            InputLocation::File { out_file } => {
-                out_file.write_buf(input.target_bytes().as_slice())?;
+            InputLocation::File { input_file } => {
+                input_file.write_buf(input.target_bytes().as_slice())?;
                 Ok(self.command.spawn()?)
             }
         }
@@ -248,7 +250,7 @@ where
             has_asan_observer,
             configurer: StdCommandConfigurator {
                 input_location: InputLocation::File {
-                    out_file: OutFile::create(path)?,
+                    input_file: InputFile::create(path)?,
                 },
                 command,
                 debug_child,
@@ -459,7 +461,7 @@ impl CommandExecutorBuilder {
     /// Uses a default filename.
     /// Use [`Self::arg_input_file`] to specify a custom filename.
     pub fn arg_input_file_std(&mut self) -> &mut Self {
-        self.arg_input_file(OUTFILE_STD);
+        self.arg_input_file(INPUTFILE_STD);
         self
     }
 
@@ -467,9 +469,9 @@ impl CommandExecutorBuilder {
     /// and adds the filename as arg to at the current position.
     pub fn arg_input_file<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
         self.arg(path.as_ref());
-        let out_file_std = OutFile::create(path.as_ref()).unwrap();
+        let input_file_std = InputFile::create(path.as_ref()).unwrap();
         self.input(InputLocation::File {
-            out_file: out_file_std,
+            input_file: input_file_std,
         });
         self
     }
@@ -696,6 +698,8 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_parse_afl_cmdline() {
+        use alloc::string::ToString;
+
         let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
