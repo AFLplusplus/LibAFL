@@ -103,7 +103,7 @@ pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    let mcontext = unsafe { *ucontext.uc_mcontext };
+    let mcontext = unsafe { &*ucontext.uc_mcontext };
     for reg in 0..29_u8 {
         writeln!(
             writer,
@@ -225,7 +225,7 @@ fn write_crash<W: Write>(
     signal: Signal,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    let mcontext = unsafe { *ucontext.uc_mcontext };
+    let mcontext = unsafe { &*ucontext.uc_mcontext };
     writeln!(
         writer,
         "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",

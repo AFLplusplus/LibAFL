@@ -590,8 +590,8 @@ mod apple {
     use alloc::vec::Vec;
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
-        thread_policy_flavor_t, thread_policy_t, thread_t, THREAD_AFFINITY_POLICY,
-        THREAD_AFFINITY_POLICY_COUNT,
+        thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
+        THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
     };
     use num_cpus;
 
@@ -632,8 +632,14 @@ mod apple {
             );
 
             // 0 == KERN_SUCCESS
-
-            if result == 0 {
+            // 46 == KERN_NOT_SUPPORTED
+            // Seting a core affinity is not supported on aarch64 apple...
+            // We won't report this as an error to the user, a there's nothing they could do about it.
+            // Error codes, see <https://opensource.apple.com/source/xnu/xnu-792/osfmk/mach/kern_return.h>
+            if result == KERN_SUCCESS
+                || (cfg!(all(target_vendor = "apple", target_arch = "aarch64"))
+                    && result == KERN_NOT_SUPPORTED)
+            {
                 Ok(())
             } else {
                 Err(Error::unknown(format!(

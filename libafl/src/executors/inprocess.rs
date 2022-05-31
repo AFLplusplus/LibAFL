@@ -1624,6 +1624,7 @@ pub mod child_signal_handlers {
 #[cfg(test)]
 mod tests {
     use core::marker::PhantomData;
+    use serial_test::serial;
 
     #[cfg(all(feature = "std", feature = "fork", unix))]
     use crate::{
@@ -1653,6 +1654,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         use crate::executors::inprocess::InChildProcessHandlers;
