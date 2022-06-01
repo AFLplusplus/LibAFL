@@ -822,6 +822,7 @@ where
             };
 
             if let Some(core_id) = core_id {
+                let core_id: CoreId = core_id;
                 println!("Setting core affinity to {:?}", core_id);
                 core_id.set_affinity()?;
             }
@@ -891,6 +892,7 @@ where
         };
 
         if let Some(core_id) = core_id {
+            let core_id: CoreId = core_id;
             core_id.set_affinity()?;
         }
 

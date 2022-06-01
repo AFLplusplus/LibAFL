@@ -59,8 +59,7 @@ impl CoreId {
     ///
     pub fn set_affinity(&self) -> Result<(), Error> {
         match set_for_current_helper(*self) {
-            Ok(_) => Ok(()),
-            Err(Error::Unsupported(_, _)) => Ok(()),
+            Ok(_) | Err(Error::Unsupported(_, _)) => Ok(()),
             Err(e) => Err(e),
         }
     }

@@ -242,10 +242,12 @@ pub use libc::{c_void, siginfo_t};
 )))]
 pub use libc::ucontext_t;
 
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+use libc::ssize_t;
 use libc::{
-    c_int, malloc, sigaction, sigaddset, sigaltstack, sigemptyset, ssize_t, stack_t, SA_NODEFER,
-    SA_ONSTACK, SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL,
-    SIGPIPE, SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
+    c_int, malloc, sigaction, sigaddset, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
+    SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
+    SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
