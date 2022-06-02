@@ -55,7 +55,7 @@ impl CoreId {
     ///
     /// Note: This will *_not_* fail if the target platform does not support core affinity.
     /// (only on error cases for supported platforms)
-    /// If you really need to fail for unsupported platforms (like `aarch64` on `macOS`), use [`set_affinity_forced`] instead.
+    /// If you really need to fail for unsupported platforms (like `aarch64` on `macOS`), use [`CoreId::set_affinity_forced`] instead.
     ///
     pub fn set_affinity(&self) -> Result<(), Error> {
         match set_for_current_helper(*self) {

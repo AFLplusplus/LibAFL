@@ -730,7 +730,7 @@ mod tests {
     #[test]
     fn test_shmem_server_connection() {
         let mut sp = ServedShMemProvider::<UnixShMemProvider>::new().unwrap();
-        let map = sp.new_shmem(1).unwrap();
+        let map = sp.new_shmem(4096).unwrap();
         assert!(map.is_empty());
     }
 }
