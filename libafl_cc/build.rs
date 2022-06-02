@@ -263,5 +263,11 @@ pub const CLANGXX_PATH: &str = \"clang++\";
         .file(src_dir.join("no-link-rt.c"))
         .compile("no-link-rt");
 
+    cc::Build::new()
+        .file(src_dir.join("forkserver-rt.c"))
+        .compile("forkserver-rt");
+
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/forkserver-rt.c");
+
 }

@@ -436,6 +436,13 @@ impl ClangWrapper {
         self.use_new_pm = value;
         self
     }
+
+    /// Add forkserver runtime
+    pub fn forkserver(&mut self) -> &'_ mut Self {
+        self.link_staticlib(&PathBuf::from(env!("OUT_DIR")), "forkserver-rt");
+        self
+    }
+
 }
 
 #[cfg(test)]

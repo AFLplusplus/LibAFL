@@ -196,6 +196,7 @@ impl Forkserver {
             .stderr(stderr)
             .env("LD_BIND_LAZY", "1")
             .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
+            .env("LIBAFL_START_FORKSERVER", "1")
             .envs(envs)
             .setlimit(memlimit)
             .setsid()

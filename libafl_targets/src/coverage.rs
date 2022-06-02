@@ -1,6 +1,7 @@
 //! Coverage maps as static mut array
 
 use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE};
+use libafl::bolts::AsMutSlice;
 #[cfg(target_os = "linux")]
 use libafl::{mutators::Tokens, Error};
 
@@ -61,7 +62,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
 pub use __afl_map_size as EDGES_MAP_PTR_SIZE;
 use libafl::bolts::ownedref::OwnedSliceMut;
-
+use libafl::bolts::shmem::{ShMemProvider, StdShMemProvider, ShMem};
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
 ///
 /// # Safety
@@ -72,6 +73,15 @@ use libafl::bolts::ownedref::OwnedSliceMut;
 pub unsafe fn edges_map_from_ptr<'a>() -> OwnedSliceMut<'a, u8> {
     debug_assert!(!EDGES_MAP_PTR.is_null());
     OwnedSliceMut::from_raw_parts_mut(EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE)
+}
+
+/// Setup shmem for forkserver
+#[no_mangle]
+pub unsafe fn edges_map_ptr_from_env() {
+    let mut shmem_provider = StdShMemProvider::new().unwrap();
+    let mut shmem = shmem_provider.existing_from_env("__AFL_SHM_ID").unwrap();
+    EDGES_MAP_PTR = shmem.as_mut_slice().as_mut_ptr();
+    EDGES_MAP_PTR_SIZE = shmem.len();
 }
 
 /// Gets the current maximum number of edges tracked.

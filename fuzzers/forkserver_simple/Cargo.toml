@@ -17,5 +17,16 @@ opt-level = 3
 
 [dependencies]
 libafl = { path = "../../libafl/" }
+libafl_targets = { path = "../../libafl_targets", features = ["sancov_pcguard_edges", "pointer_maps"] }
+libafl_cc = { path = "../../libafl_cc" }
+
 clap = { version = "3.1", features = ["default"] }
 nix = "0.23"
+ctor = "0.1.22"
+
+[[bin]]
+name = "forkserver_simple"
+
+[lib]
+name = "forkserver_simple"
+crate-type = ["staticlib"]
