@@ -62,7 +62,11 @@ pub fn autotokens() -> Result<Tokens, Error> {
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
 pub use __afl_map_size as EDGES_MAP_PTR_SIZE;
 use libafl::bolts::ownedref::OwnedSliceMut;
-use libafl::bolts::shmem::{ShMemProvider, StdShMemProvider, ShMem};
+use libafl::bolts::shmem::{ShMem, ShMemProvider};
+
+#[cfg(feature = "std")]
+use libafl::bolts::shmem::StdShMemProvider;
+
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
 ///
 /// # Safety
@@ -77,6 +81,7 @@ pub unsafe fn edges_map_from_ptr<'a>() -> OwnedSliceMut<'a, u8> {
 
 /// Setup shmem for forkserver
 #[no_mangle]
+#[cfg(feature = "std")]
 pub unsafe fn edges_map_ptr_from_env() {
     let mut shmem_provider = StdShMemProvider::new().unwrap();
     let mut shmem = shmem_provider.existing_from_env("__AFL_SHM_ID").unwrap();

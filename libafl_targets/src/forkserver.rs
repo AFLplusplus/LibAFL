@@ -2,7 +2,7 @@
 
 extern "C" {
     /// Start the forkserver.
-    fn __afl_start_forkserver() ;
+    fn __afl_start_forkserver();
 }
 
 /// Start the forkserver from this point. Any shared memory must be created before.

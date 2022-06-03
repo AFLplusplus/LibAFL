@@ -438,11 +438,11 @@ impl ClangWrapper {
     }
 
     /// Add forkserver runtime
+    #[cfg(target_os = "linux")]
     pub fn forkserver(&mut self) -> &'_ mut Self {
         self.link_staticlib(&PathBuf::from(env!("OUT_DIR")), "forkserver-rt");
         self
     }
-
 }
 
 #[cfg(test)]
