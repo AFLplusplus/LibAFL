@@ -81,6 +81,7 @@ pub unsafe fn edges_map_from_ptr<'a>() -> OwnedSliceMut<'a, u8> {
 
 /// Setup shmem for forkserver
 #[no_mangle]
+#[allow(clippy::missing_safety_doc)]
 #[cfg(feature = "std")]
 pub unsafe fn edges_map_ptr_from_env() {
     let mut shmem_provider = StdShMemProvider::new().unwrap();
