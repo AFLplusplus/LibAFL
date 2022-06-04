@@ -722,12 +722,15 @@ where
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use crate::bolts::{
         os::unix_shmem_server::ServedShMemProvider,
         shmem::{ShMem, ShMemProvider, UnixShMemProvider},
     };
 
     #[test]
+    #[serial]
     fn test_shmem_server_connection() {
         let mut sp = ServedShMemProvider::<UnixShMemProvider>::new().unwrap();
         let map = sp.new_shmem(2 << 14).unwrap();
