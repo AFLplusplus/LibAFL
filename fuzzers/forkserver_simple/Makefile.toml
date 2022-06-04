@@ -1,0 +1,81 @@
+[env]
+FUZZER_NAME="forkserver_simple"
+PROJECT_DIR = { script = ["pwd"] }
+
+[tasks.unsupported]
+script_runner="@shell"
+script='''
+echo "Cargo-make not integrated yet on this"
+'''
+
+# Compilers
+[tasks.cxx]
+linux_alias = "cxx_unix"
+mac_alias = "cxx_unix"
+windows_alias = "unsupported"
+
+[tasks.cxx_unix]
+command = "cargo"
+args = ["build" , "--release"]
+
+[tasks.cc]
+linux_alias = "cc_unix"
+mac_alias = "cc_unix"
+windows_alias = "unsupported"
+
+[tasks.cc_unix]
+command = "cargo"
+args = ["build" , "--release"]
+
+# Fuzzer
+[tasks.harness]
+linux_alias = "fuzzer_harness"
+mac_alias = "fuzzer_harness"
+windows_alias = "unsupported"
+
+[tasks.fuzzer_harness]
+command = "target/release/libafl_cxx"
+args = ["src/program.c", "-o", "program"]
+dependencies = ["cc", "cxx"]
+
+# Run
+[tasks.run]
+linux_alias = "run_unix"
+mac_alias = "run_unix"
+windows_alias = "unsupported"
+
+[tasks.run_unix]
+script_runner="@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+./target/release/${FUZZER_NAME} ./program ./corpus
+'''
+dependencies = ["harness"]
+
+
+# Test
+[tasks.test]
+linux_alias = "test_unix"
+mac_alias = "test_unix"
+windows_alias = "unsupported"
+
+[tasks.test_unix]
+script_runner="@shell"
+script='''
+rm -rf libafl_unix_shmem_server || true
+# Allow sigterm as exit code 
+timeout 11s ./target/release/${FUZZER_NAME} ./program ./corpus || [ $? -eq 124 ]
+'''
+dependencies = ["harness"]
+
+# Clean
+[tasks.clean]
+linux_alias = "clean_unix"
+mac_alias = "clean_unix"
+windows_alias = "unsupported"
+
+[tasks.clean_unix]
+script_runner="@shell"
+script='''
+rm program || true
+'''
