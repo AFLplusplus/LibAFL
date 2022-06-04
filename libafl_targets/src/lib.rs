@@ -102,5 +102,5 @@ pub mod drcov;
 
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 pub mod forkserver;
-#[cfg(target_os = "linux", target_vendor = "apple")]
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 pub use forkserver::*;
