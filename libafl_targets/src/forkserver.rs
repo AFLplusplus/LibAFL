@@ -10,7 +10,21 @@ extern "C" {
 /// # Safety
 ///
 /// The forkserver logic is written in C and this code is a wrapper.
-#[no_mangle]
 pub fn start_forkserver() {
     unsafe { __afl_start_forkserver() }
+}
+
+#[cfg(feature = "std")]
+use crate::edges_map_ptr_from_env;
+#[cfg(feature = "std")]
+use std::env;
+/// Start forkserver
+#[cfg(feature = "std")]
+pub fn forkserver_init() {
+    if env::var("LIBAFL_START_FORKSERVER").is_ok() {
+        unsafe {
+            edges_map_ptr_from_env();
+        }
+        start_forkserver();
+    }
 }

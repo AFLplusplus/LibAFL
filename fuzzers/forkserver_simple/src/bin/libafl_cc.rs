@@ -21,7 +21,6 @@ pub fn main() {
             // silence the compiler wrapper output, needed for some configure scripts.
             .parse_args(&args)
             .expect("Failed to parse the command line")
-            .forkserver()
             .link_staticlib(&dir, "forkserver_simple")
             .add_arg("-fsanitize-coverage=trace-pc-guard")
             .run()
