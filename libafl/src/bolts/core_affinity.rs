@@ -277,8 +277,6 @@ mod linux {
 
     #[cfg(test)]
     mod tests {
-        use num_cpus;
-
         use super::*;
 
         #[test]
