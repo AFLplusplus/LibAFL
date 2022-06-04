@@ -161,6 +161,8 @@ pub enum Error {
     IllegalState(String, ErrorBacktrace),
     /// The argument passed to this method or function is not valid
     IllegalArgument(String, ErrorBacktrace),
+    /// The performed action is not supported on the current platform
+    Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
@@ -249,6 +251,14 @@ impl Error {
     pub fn shutting_down() -> Self {
         Error::ShuttingDown
     }
+    /// This operation is not supported on the current architecture or platform
+    #[must_use]
+    pub fn unsupported<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Unsupported(arg.into(), ErrorBacktrace::new())
+    }
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -302,6 +312,14 @@ impl fmt::Display for Error {
             }
             Self::IllegalArgument(s, b) => {
                 write!(f, "Illegal argument: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::Unsupported(s, b) => {
+                write!(
+                    f,
+                    "The operation is not supported on the current platform: {0}",
+                    &s
+                )?;
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),

@@ -16,7 +16,7 @@
 //! let handles = core_ids.into_iter().map(|id| {
 //!     thread::spawn(move || {
 //!         // Pin this thread to a single CPU core.
-//!         core_affinity::set_for_current(id);
+//!         id.set_affinity();
 //!         // Do more work after this.
 //!     })
 //! }).collect::<Vec<_>>();
@@ -43,16 +43,6 @@ pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
     get_core_ids_helper()
 }
 
-/// This function tries to pin the current
-/// thread to the specified core.
-///
-/// # Arguments
-///
-/// * `core_id` - `ID` of the core to pin
-pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
-    set_for_current_helper(core_id)
-}
-
 /// This represents a CPU core.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CoreId {
@@ -62,8 +52,21 @@ pub struct CoreId {
 
 impl CoreId {
     /// Set the affinity of the current process to this [`CoreId`]
+    ///
+    /// Note: This will *_not_* fail if the target platform does not support core affinity.
+    /// (only on error cases for supported platforms)
+    /// If you really need to fail for unsupported platforms (like `aarch64` on `macOS`), use [`CoreId::set_affinity_forced`] instead.
+    ///
     pub fn set_affinity(&self) -> Result<(), Error> {
-        set_for_current(*self)
+        match set_for_current_helper(*self) {
+            Ok(_) | Err(Error::Unsupported(_, _)) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Set the affinity of the current process to this [`CoreId`]
+    pub fn set_affinity_forced(&self) -> Result<(), Error> {
+        set_for_current_helper(*self)
     }
 }
 
@@ -274,8 +277,6 @@ mod linux {
 
     #[cfg(test)]
     mod tests {
-        use num_cpus;
-
         use super::*;
 
         #[test]
@@ -284,18 +285,12 @@ mod linux {
         }
 
         #[test]
-        fn test_linux_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
-        }
-
-        #[test]
         fn test_linux_set_for_current() {
             let ids = get_core_ids().unwrap();
 
             assert!(!ids.is_empty());
 
-            set_for_current(ids[0]).unwrap();
+            ids[0].set_affinity().unwrap();
 
             // Ensure that the system pinned the current thread
             // to the specified core.
@@ -542,28 +537,6 @@ mod windows {
 
         Some(n_logical_procs)
     }
-
-    #[cfg(test)]
-    mod tests {
-        use num_cpus;
-
-        use super::*;
-
-        #[test]
-        fn test_apple_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
-        }
-
-        #[test]
-        fn test_apple_set_for_current() {
-            let ids = get_core_ids().unwrap();
-
-            assert!(!ids.is_empty());
-
-            set_for_current(ids[0]).unwrap();
-        }
-    }
 }
 
 // Apple Section
@@ -590,8 +563,8 @@ mod apple {
     use alloc::vec::Vec;
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
-        thread_policy_flavor_t, thread_policy_t, thread_t, THREAD_AFFINITY_POLICY,
-        THREAD_AFFINITY_POLICY_COUNT,
+        thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
+        THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
     };
     use num_cpus;
 
@@ -632,37 +605,24 @@ mod apple {
             );
 
             // 0 == KERN_SUCCESS
-
-            if result == 0 {
+            if result == KERN_SUCCESS {
                 Ok(())
+            } else if result == KERN_NOT_SUPPORTED {
+                // 46 == KERN_NOT_SUPPORTED
+                // Seting a core affinity is not supported on aarch64 apple...
+                // We won't report this as an error to the user, a there's nothing they could do about it.
+                // Error codes, see <https://opensource.apple.com/source/xnu/xnu-792/osfmk/mach/kern_return.h>
+                //|| (cfg!(all(target_vendor = "apple", target_arch = "aarch64"))
+                //    && result == KERN_NOT_SUPPORTED)
+                Err(Error::unsupported(
+                    "Setting a core affinity is not supported on this platform (KERN_NOT_SUPPORTED)",
+                ))
             } else {
                 Err(Error::unknown(format!(
                     "Failed to set_for_current {:?}",
                     result
                 )))
             }
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use num_cpus;
-
-        use super::*;
-
-        #[test]
-        fn test_windows_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
-        }
-
-        #[test]
-        fn test_windows_set_for_current() {
-            let ids = get_core_ids().unwrap();
-
-            assert!(!ids.is_empty());
-
-            set_for_current(ids[0]).unwrap();
         }
     }
 }
@@ -684,11 +644,11 @@ mod tests {
     }
 
     #[test]
-    fn test_set_for_current() {
+    fn test_set_affinity() {
         let ids = get_core_ids().unwrap();
 
         assert!(!ids.is_empty());
 
-        set_for_current(ids[0]).unwrap();
+        ids[0].set_affinity().unwrap();
     }
 }

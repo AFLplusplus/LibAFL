@@ -190,6 +190,7 @@ where
         res.id = id;
         Ok(res)
     }
+
     fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
@@ -718,3 +719,25 @@ where
         }
     }
 }
+
+/*
+TODO: Fix test
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    use crate::bolts::{
+        os::unix_shmem_server::ServedShMemProvider,
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    };
+
+    #[test]
+    #[serial]
+    fn test_shmem_server_connection() {
+        let mut sp = ServedShMemProvider::<UnixShMemProvider>::new().unwrap();
+        let map = sp.new_shmem(2 << 14).unwrap();
+        assert!(map.is_empty());
+    }
+}
+*/
