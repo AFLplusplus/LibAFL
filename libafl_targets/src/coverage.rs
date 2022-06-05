@@ -27,11 +27,11 @@ extern "C" {
     pub static mut __afl_acc_memop_ptr: *mut u32;
 
     /// Start of libafl token section
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     pub static __token_start: *const u8;
 
     /// End of libafl token section
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     pub static __token_stop: *const u8;
 }
 pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
@@ -66,8 +66,11 @@ use libafl::bolts::ownedref::OwnedSliceMut;
 #[cfg(feature = "std")]
 use libafl::bolts::shmem::{ShMem, ShMemProvider};
 
-#[cfg(feature = "std")]
+#[cfg(all(feature = "std", target_os = "linux"))]
 use libafl::bolts::shmem::StdShMemProvider;
+
+#[cfg(all(feature = "std", target_vendor = "apple"))]
+use libafl::bolts::shmem::UnixShMemProvider;
 
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
 ///
@@ -86,7 +89,12 @@ pub unsafe fn edges_map_from_ptr<'a>() -> OwnedSliceMut<'a, u8> {
 #[allow(clippy::missing_safety_doc)]
 #[cfg(feature = "std")]
 pub unsafe fn edges_map_ptr_from_env() {
+    #[cfg(target_os = "linux")]
     let mut shmem_provider = StdShMemProvider::new().unwrap();
+
+    #[cfg(target_vendor = "apple")]
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+
     let mut shmem = shmem_provider.existing_from_env("__AFL_SHM_ID").unwrap();
     EDGES_MAP_PTR = shmem.as_mut_slice().as_mut_ptr();
     EDGES_MAP_PTR_SIZE = shmem.len();
