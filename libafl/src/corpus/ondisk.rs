@@ -16,6 +16,8 @@ use crate::{
     state::HasMetadata, Error,
 };
 
+use super::{CorpusID, id_manager::CorpusIDManager};
+
 /// Options for the the format of the on-disk metadata
 #[cfg(feature = "std")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,24 +48,27 @@ where
     I: Input,
 {
     entries: Vec<RefCell<Testcase<I>>>,
-    current: Option<usize>,
+    current: Option<CorpusID>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
+    id_manager: CorpusIDManager,
 }
 
 impl<I> Corpus<I> for OnDiskCorpus<I>
 where
     I: Input,
 {
+
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
+        debug_assert!(self.entries.len() == self.id_manager.active_ids().len());
         self.entries.len()
     }
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, mut testcase: Testcase<I>) -> Result<CorpusID, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase
@@ -131,7 +136,7 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
         if idx >= self.entries.len() {
             return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
         }
@@ -141,7 +146,7 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
         if idx >= self.entries.len() {
             Ok(None)
         } else {
@@ -151,20 +156,24 @@ where
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
         Ok(&self.entries[idx])
     }
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<usize> {
+    fn current(&self) -> &Option<CorpusID> {
         &self.current
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
+    fn current_mut(&mut self) -> &mut Option<CorpusID> {
         &mut self.current
+    }
+
+    fn id_manager(&self) -> &CorpusIDManager {
+        &self.id_manager
     }
 }
 
@@ -181,10 +190,8 @@ where
         fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
             fs::create_dir_all(&dir_path)?;
             Ok(OnDiskCorpus {
-                entries: vec![],
-                current: None,
                 dir_path,
-                meta_format: None,
+                ..Default::default(),
             })
         }
         new(dir_path.as_ref().to_path_buf())
@@ -198,10 +205,9 @@ where
     ) -> Result<Self, Error> {
         fs::create_dir_all(&dir_path)?;
         Ok(Self {
-            entries: vec![],
-            current: None,
             dir_path,
             meta_format,
+            ..Default::default(),
         })
     }
 }

@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
 
+use super::CorpusID;
+
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -14,7 +16,7 @@ where
     I: Input,
 {
     entries: Vec<RefCell<Testcase<I>>>,
-    current: Option<usize>,
+    current: Option<CorpusID>,
 }
 
 impl<I> Corpus<I> for InMemoryCorpus<I>
@@ -29,14 +31,14 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusID, Error> {
         self.entries.push(RefCell::new(testcase));
         Ok(self.entries.len() - 1)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
         if idx >= self.entries.len() {
             return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
         }
@@ -46,7 +48,7 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
         if idx >= self.entries.len() {
             Ok(None)
         } else {
@@ -56,19 +58,19 @@ where
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
         Ok(&self.entries[idx])
     }
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<usize> {
+    fn current(&self) -> &Option<CorpusID> {
         &self.current
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
+    fn current_mut(&mut self) -> &mut Option<CorpusID> {
         &mut self.current
     }
 }

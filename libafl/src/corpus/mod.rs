@@ -1,7 +1,11 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
 pub mod testcase;
+use serde::{Serialize, Deserialize};
 pub use testcase::{SchedulerTestcaseMetaData, Testcase};
+
+mod id_manager;
+pub use id_manager::CorpusID;
 
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
@@ -17,6 +21,7 @@ pub mod cached;
 pub use cached::CachedOnDiskCorpus;
 
 use core::cell::RefCell;
+use core::fmt::{Display, Formatter};
 
 use crate::{inputs::Input, Error};
 
@@ -28,28 +33,34 @@ where
     /// Returns the number of elements
     fn count(&self) -> usize;
 
+    fn ids(&self) -> &[CorpusID] {
+        self.id_manager().active_ids()
+    }
+
+    fn id_manager(&self) -> &id_manager::CorpusIDManager;
+
     /// Returns true, if no elements are in this corpus yet
     fn is_empty(&self) -> bool {
         self.count() == 0
     }
 
     /// Add an entry to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error>;
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusID, Error>;
 
     /// Replaces the testcase at the given idx
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error>;
+    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<(), Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error>;
+    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error>;
 
     /// Get by id
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error>;
+    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<I>>, Error>;
 
     /// Current testcase scheduled
-    fn current(&self) -> &Option<usize>;
+    fn current(&self) -> &Option<CorpusID>;
 
     /// Current testcase scheduled (mutable)
-    fn current_mut(&mut self) -> &mut Option<usize>;
+    fn current_mut(&mut self) -> &mut Option<CorpusID>;
 }
 
 /// `Corpus` Python bindings

@@ -14,6 +14,8 @@ use crate::{
     Error,
 };
 
+use super::CorpusID;
+
 /// A corpus that keep in memory a maximun number of testcases. The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -23,7 +25,7 @@ where
     I: Input,
 {
     inner: OnDiskCorpus<I>,
-    cached_indexes: RefCell<VecDeque<usize>>,
+    cached_indexes: RefCell<VecDeque<CorpusID>>,
     cache_max_len: usize,
 }
 
@@ -39,20 +41,20 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusID, Error> {
         self.inner.add(testcase)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
         // TODO finish
         self.inner.replace(idx, testcase)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
         let testcase = self.inner.remove(idx)?;
         if testcase.is_some() {
             self.cached_indexes.borrow_mut().retain(|e| *e != idx);
@@ -62,7 +64,7 @@ where
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get(idx)? };
         if testcase.borrow().input().is_none() {
             let _ = testcase.borrow_mut().load_input()?;
@@ -79,20 +81,21 @@ where
                     }
                 }
             }
-            self.cached_indexes.borrow_mut().push_back(idx);
+            self.cached_indexes.borrow_mut().push_back(
+                idx);
         }
         Ok(testcase)
     }
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<usize> {
+    fn current(&self) -> &Option<CorpusID> {
         self.inner.current()
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
+    fn current_mut(&mut self) -> &mut Option<CorpusID> {
         self.inner.current_mut()
     }
 }
