@@ -1,8 +1,11 @@
 //! Coverage maps as static mut array
 
 use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE};
+
 #[cfg(feature = "std")]
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::bolts::AsMutSlice;
+
 #[cfg(target_os = "linux")]
 use libafl::{mutators::Tokens, Error};
 
@@ -63,7 +66,9 @@ pub fn autotokens() -> Result<Tokens, Error> {
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
 pub use __afl_map_size as EDGES_MAP_PTR_SIZE;
 use libafl::bolts::ownedref::OwnedSliceMut;
+
 #[cfg(feature = "std")]
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl::bolts::shmem::{ShMem, ShMemProvider};
 
 #[cfg(all(feature = "std", target_os = "linux"))]
