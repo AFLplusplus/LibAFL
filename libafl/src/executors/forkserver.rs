@@ -183,6 +183,10 @@ impl Forkserver {
         let mut st_pipe = Pipe::new().unwrap();
         let mut ctl_pipe = Pipe::new().unwrap();
 
+        if std::env::var("__AFL_SHM_ID").is_err() {
+            return Err(Error::unknown("__AFL_SHM_ID not set"));
+        }
+
         let (stdout, stderr) = if debug_output {
             (Stdio::inherit(), Stdio::inherit())
         } else {
