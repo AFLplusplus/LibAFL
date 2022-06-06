@@ -17,13 +17,14 @@ use core::{
 
 use crate::{
     bolts::current_time,
+    corpus::CorpusID,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::Input,
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler, corpus::CorpusID,
+    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
 /// Send a monitor update all 15 (or more) seconds

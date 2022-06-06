@@ -2,13 +2,13 @@
 //! [`CorpusID`] to its corresponding corpus index to allow for a vector-based corpus storage. It is the only component
 //! that should be able to create new [`CorpusID`]s.
 
-use core::fmt::{Formatter, Display, Error};
-use serde::{Serialize, Deserialize};
 use alloc::vec::Vec;
+use core::fmt::{Display, Error, Formatter};
+use serde::{Deserialize, Serialize};
 
 use crate::bolts::rands::Rand;
 use crate::inputs::Input;
-use crate::state::{HasRand, HasCorpus};
+use crate::state::{HasCorpus, HasRand};
 
 use super::Corpus;
 
@@ -35,7 +35,6 @@ pub struct CorpusIDManager {
 }
 
 impl CorpusIDManager {
-
     /// Creates a new [`CorpusIDManager`].
     #[must_use]
     pub fn new() -> Self {
@@ -64,7 +63,7 @@ impl CorpusIDManager {
     /// Invalidate the given [`CorpusID`]. This will cause any future operations and lookups for this [`CorpusID`] to
     /// fail. If the id was valid, returns the index where it was found;
     #[must_use]
-    pub (crate) fn remove_id(&mut self, id: CorpusID) -> Option<usize> {
+    pub(crate) fn remove_id(&mut self, id: CorpusID) -> Option<usize> {
         // debug_assert!(self.active_ids_.is_sorted());
         let idx = self.active_ids_.binary_search(&id).ok()?;
         self.active_ids_.remove(idx);
@@ -97,7 +96,8 @@ impl CorpusIDManager {
         // debug_assert!(self.active_ids_.is_sorted());
 
         // TODO: change to binary search
-        self.active_ids_.iter()
+        self.active_ids_
+            .iter()
             .find(|x| x.identifier > id.identifier)
             .copied()
     }
@@ -105,10 +105,10 @@ impl CorpusIDManager {
 
 /// Return a random entry from the corpus of a given state. This function is mainly for encapsulation to make the borrow
 /// checker happy and keep the random index creation confined to one spot.
-pub (crate) fn random_corpus_entry<I, S>(state: &mut S) -> Option<(usize, CorpusID)>
+pub(crate) fn random_corpus_entry<I, S>(state: &mut S) -> Option<(usize, CorpusID)>
 where
     S: HasCorpus<I> + HasRand,
-    I: Input
+    I: Input,
 {
     let num = state.corpus().count();
     if num == 0 {

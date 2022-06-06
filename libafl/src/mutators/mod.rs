@@ -22,8 +22,9 @@ pub use nautilus::*;
 
 use crate::{
     bolts::tuples::{HasConstLen, Named},
+    corpus::CorpusID,
     inputs::Input,
-    Error, corpus::CorpusID,
+    Error,
 };
 
 // TODO mutator stats method that produces something that can be sent with the NewTestcase event

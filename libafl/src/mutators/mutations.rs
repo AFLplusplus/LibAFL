@@ -2,14 +2,14 @@
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
-    corpus::{Corpus, id_manager::random_corpus_entry},
+    corpus::{id_manager::random_corpus_entry, Corpus},
     inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
 
-use alloc::{borrow::ToOwned, vec::Vec, string::String};
+use alloc::{borrow::ToOwned, string::String, vec::Vec};
 use core::{
     cmp::{max, min},
     mem::size_of,
@@ -911,8 +911,11 @@ where
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
 
-        let (_, chosen_id) = random_corpus_entry(state)
-            .ok_or_else(|| Error::empty(String::from("Cannot CrossoverInsert mutate on an empty corpus")))?;
+        let (_, chosen_id) = random_corpus_entry(state).ok_or_else(|| {
+            Error::empty(String::from(
+                "Cannot CrossoverInsert mutate on an empty corpus",
+            ))
+        })?;
 
         // We don't want to use the testcase we're already using for splicing
         if let Some(cur) = state.corpus().current() {
@@ -990,8 +993,11 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let (_, chosen_id) = random_corpus_entry(state)
-            .ok_or_else(|| Error::empty(String::from("Cannot CrossoverReplace mutate on an empty corpus")))?;
+        let (_, chosen_id) = random_corpus_entry(state).ok_or_else(|| {
+            Error::empty(String::from(
+                "Cannot CrossoverReplace mutate on an empty corpus",
+            ))
+        })?;
 
         // We don't want to use the testcase we're already using for splicing
         if let Some(cur) = state.corpus().current() {

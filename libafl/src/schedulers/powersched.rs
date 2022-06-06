@@ -6,7 +6,7 @@ use alloc::{
 };
 
 use crate::{
-    corpus::{Corpus, SchedulerTestcaseMetaData, CorpusID},
+    corpus::{Corpus, CorpusID, SchedulerTestcaseMetaData},
     inputs::Input,
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata},
@@ -213,8 +213,7 @@ where
                     Ok(first_id)
                 }
             })
-            .unwrap_or(Ok(first_id))
-            ?;
+            .unwrap_or(Ok(first_id))?;
         *state.corpus_mut().current_mut() = Some(next_id);
 
         // Update the handicap

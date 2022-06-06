@@ -2,7 +2,7 @@
 
 use crate::{
     bolts::{current_time, tuples::Named, AsRefIterator},
-    corpus::{Corpus, SchedulerTestcaseMetaData, CorpusID},
+    corpus::{Corpus, CorpusID, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{

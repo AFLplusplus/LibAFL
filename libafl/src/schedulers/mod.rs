@@ -26,7 +26,7 @@ pub use powersched::PowerQueueScheduler;
 use alloc::borrow::ToOwned;
 
 use crate::{
-    corpus::{Corpus, Testcase, CorpusID, id_manager::random_corpus_entry},
+    corpus::{id_manager::random_corpus_entry, Corpus, CorpusID, Testcase},
     inputs::Input,
     state::{HasCorpus, HasRand},
     Error,
@@ -78,7 +78,6 @@ where
 {
     /// Gets the next entry at random
     fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
-
         let (_, corpus_id) = random_corpus_entry(state)
             .ok_or_else(|| Error::empty("No entries in corpus".to_owned()))?;
 

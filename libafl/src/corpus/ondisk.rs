@@ -16,7 +16,7 @@ use crate::{
     state::HasMetadata, Error,
 };
 
-use super::{CorpusID, id_manager::CorpusIDManager};
+use super::{id_manager::CorpusIDManager, CorpusID};
 
 /// Options for the the format of the on-disk metadata
 #[cfg(feature = "std")]
@@ -58,7 +58,6 @@ impl<I> Corpus<I> for OnDiskCorpus<I>
 where
     I: Input,
 {
-
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
@@ -139,7 +138,8 @@ where
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, id: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
-        let old_idx = self.id_manager
+        let old_idx = self
+            .id_manager
             .remove_id(id)
             .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
         self.entries[old_idx] = RefCell::new(testcase);
@@ -151,8 +151,7 @@ where
     fn remove(&mut self, id: CorpusID) -> Result<Option<Testcase<I>>, Error> {
         if let Some(idx) = self.id_manager.active_index_for(id) {
             Ok(Some(self.entries.remove(idx).into_inner()))
-        }
-        else {
+        } else {
             Ok(None)
         }
     }
@@ -160,7 +159,8 @@ where
     /// Get by id
     #[inline]
     fn get(&self, id: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
-        let idx = self.id_manager
+        let idx = self
+            .id_manager
             .active_index_for(id)
             .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
         Ok(&self.entries[idx])
@@ -200,7 +200,7 @@ where
                 current: None,
                 dir_path,
                 meta_format: None,
-                id_manager: CorpusIDManager::new()
+                id_manager: CorpusIDManager::new(),
             })
         }
         new(dir_path.as_ref().to_path_buf())

@@ -1,14 +1,11 @@
 //! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
 //! This queue corpus scheduler needs calibration stage.
 
-use alloc::{
-    string::ToString,
-    vec::Vec,
-};
+use alloc::{string::ToString, vec::Vec};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, SchedulerTestcaseMetaData, CorpusID, id_manager::random_corpus_entry},
+    corpus::{id_manager::random_corpus_entry, Corpus, CorpusID, SchedulerTestcaseMetaData},
     inputs::Input,
     schedulers::{
         powersched::SchedulerMetadata,
@@ -260,7 +257,6 @@ where
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
-
         let (chosen_idx, _chosen_id) = random_corpus_entry(state)
             .ok_or_else(|| Error::empty("No entries in corpus".to_string()))?;
 
@@ -295,9 +291,7 @@ where
             let psmeta = state
                 .metadata_mut()
                 .get_mut::<SchedulerMetadata>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerMetadata not found".to_string())
-                })?;
+                .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
             psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
         }
         let id = state.corpus().ids()[idx];

@@ -4,8 +4,9 @@ use alloc::{boxed::Box, vec::Vec};
 
 use crate::{
     bolts::anymap::AsAny,
+    corpus::CorpusID,
     stages::{Stage, StagesTuple},
-    Error, corpus::CorpusID,
+    Error,
 };
 
 /// Combine `Stage` and `AsAny`

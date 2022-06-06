@@ -1,6 +1,6 @@
 //! Mutations for [`EncodedInput`]s
 //!
-use alloc::{vec::Vec, string::String};
+use alloc::{string::String, vec::Vec};
 use core::cmp::{max, min};
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
         rands::Rand,
         tuples::{tuple_list, tuple_list_type},
     },
-    corpus::{Corpus, id_manager::random_corpus_entry},
+    corpus::{id_manager::random_corpus_entry, Corpus},
     inputs::EncodedInput,
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
@@ -321,9 +321,7 @@ where
 
         // We don't want to use the testcase we're already using for splicing
         let (_, chosen_id) = random_corpus_entry(state)
-            .ok_or_else(
-                || Error::empty(String::from("Corpus is empty"))
-            )?;
+            .ok_or_else(|| Error::empty(String::from("Corpus is empty")))?;
         if *state.corpus().current() == Some(chosen_id) {
             return Ok(MutationResult::Skipped);
         }
@@ -397,9 +395,7 @@ where
         }
 
         let (_, chosen_id) = random_corpus_entry(state)
-            .ok_or_else(
-                || Error::empty(String::from("Corpus is empty"))
-            )?;
+            .ok_or_else(|| Error::empty(String::from("Corpus is empty")))?;
         if *state.corpus().current() == Some(chosen_id) {
             return Ok(MutationResult::Skipped);
         }

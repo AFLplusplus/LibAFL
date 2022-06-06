@@ -2,7 +2,7 @@
 
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
-    corpus::{Corpus, Testcase, CorpusID},
+    corpus::{Corpus, CorpusID, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
     schedulers::{
@@ -114,7 +114,12 @@ where
         self.inner.on_add(state, idx)
     }
 
-    fn on_replace(&self, state: &mut S, idx: CorpusID, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &self,
+        state: &mut S,
+        idx: CorpusID,
+        testcase: &Testcase<I>,
+    ) -> Result<(), Error> {
         self.inner.on_replace(state, idx, testcase)
     }
 

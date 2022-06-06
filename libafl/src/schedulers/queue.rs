@@ -17,9 +17,9 @@ where
     /// Gets the next entry in the queue
     fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
         let id_manager = state.corpus().id_manager();
-        let first_id = id_manager.first_id().ok_or_else (
-            || Error::empty("No entries in corpus".to_owned())
-        )?;
+        let first_id = id_manager
+            .first_id()
+            .ok_or_else(|| Error::empty("No entries in corpus".to_owned()))?;
         let next_id = state
             .corpus()
             .current()

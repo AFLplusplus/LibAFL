@@ -1,7 +1,7 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
 pub mod testcase;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 pub use testcase::{SchedulerTestcaseMetaData, Testcase};
 
 pub mod id_manager;

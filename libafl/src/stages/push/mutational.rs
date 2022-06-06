@@ -169,12 +169,11 @@ where
     ) -> Result<(), Error> {
         // todo: isintersting, etc.
 
-        let (_exec_result, corpus_id) = fuzzer.process_execution(
-            state, event_mgr, last_input, observers, &exit_kind, true)?;
+        let (_exec_result, corpus_id) =
+            fuzzer.process_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
-        self.mutator
-            .post_exec(state, self.stage_idx, corpus_id)?;
+        self.mutator.post_exec(state, self.stage_idx, corpus_id)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
         self.testcases_done += 1;
 

@@ -3,7 +3,7 @@
 
 use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
-    corpus::{Corpus, Testcase, CorpusID},
+    corpus::{Corpus, CorpusID, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
@@ -87,7 +87,12 @@ where
     }
 
     /// Replaces the testcase at the given idx
-    fn on_replace(&self, state: &mut S, idx: CorpusID, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &self,
+        state: &mut S,
+        idx: CorpusID,
+        testcase: &Testcase<I>,
+    ) -> Result<(), Error> {
         self.base.on_replace(state, idx, testcase)
     }
 

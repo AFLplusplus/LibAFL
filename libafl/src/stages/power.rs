@@ -4,7 +4,7 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::{Corpus, SchedulerTestcaseMetaData, CorpusID},
+    corpus::{Corpus, CorpusID, SchedulerTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,

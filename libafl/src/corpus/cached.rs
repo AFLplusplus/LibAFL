@@ -14,7 +14,7 @@ use crate::{
     Error,
 };
 
-use super::{CorpusID, id_manager::CorpusIDManager};
+use super::{id_manager::CorpusIDManager, CorpusID};
 
 /// A corpus that keep in memory a maximun number of testcases. The eviction policy is FIFO.
 #[cfg(feature = "std")]
@@ -81,8 +81,7 @@ where
                     }
                 }
             }
-            self.cached_ids.borrow_mut().push_back(
-                idx);
+            self.cached_ids.borrow_mut().push_back(idx);
         }
         Ok(testcase)
     }

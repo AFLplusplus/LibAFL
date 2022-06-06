@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
 
-use super::CorpusID;
 use super::id_manager::CorpusIDManager;
+use super::CorpusID;
 
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -43,7 +43,8 @@ where
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, id: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
-        let old_idx = self.id_manager
+        let old_idx = self
+            .id_manager
             .remove_id(id)
             .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
         self.entries[old_idx] = RefCell::new(testcase);
@@ -55,8 +56,7 @@ where
     fn remove(&mut self, id: CorpusID) -> Result<Option<Testcase<I>>, Error> {
         if let Some(old_idx) = self.id_manager.remove_id(id) {
             Ok(Some(self.entries.remove(old_idx).into_inner()))
-        }
-        else {
+        } else {
             Ok(None)
         }
     }
@@ -64,7 +64,8 @@ where
     /// Get by id
     #[inline]
     fn get(&self, id: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
-        let idx = self.id_manager
+        let idx = self
+            .id_manager
             .active_index_for(id)
             .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
         Ok(&self.entries[idx])

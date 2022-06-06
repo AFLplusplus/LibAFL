@@ -2,7 +2,7 @@
 
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, Testcase, CorpusID},
+    corpus::{Corpus, CorpusID, Testcase},
     events::{Event, EventConfig, EventFirer, EventManager, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,

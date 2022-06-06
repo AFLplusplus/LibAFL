@@ -10,11 +10,12 @@ use std::{
 };
 
 use crate::{
+    corpus::CorpusID,
     fuzzer::Evaluator,
     inputs::Input,
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
-    Error, corpus::CorpusID,
+    Error,
 };
 
 /// Metadata used to store information about disk sync time
