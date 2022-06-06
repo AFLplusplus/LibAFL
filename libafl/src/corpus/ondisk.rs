@@ -131,7 +131,7 @@ where
             .expect("Could not save testcase to disk");
         debug_assert!(self.entries.len() == self.id_manager().active_ids().len());
         self.entries.push(RefCell::new(testcase));
-        let id = self.id_manager.provide_next();
+        let id = self.id_manager.provide_next()?;
         Ok(id)
     }
 

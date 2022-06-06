@@ -35,7 +35,7 @@ where
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusID, Error> {
         debug_assert!(self.entries.len() == self.id_manager.active_ids().len());
-        let new_id = self.id_manager.provide_next();
+        let new_id = self.id_manager.provide_next()?;
         self.entries.push(RefCell::new(testcase));
         Ok(new_id)
     }

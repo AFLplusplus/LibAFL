@@ -2,13 +2,15 @@
 //! [`CorpusID`] to its corresponding corpus index to allow for a vector-based corpus storage. It is the only component
 //! that should be able to create new [`CorpusID`]s.
 
+use alloc::string::String;
 use alloc::vec::Vec;
-use core::fmt::{Display, Error, Formatter};
+use core::fmt::{Display, Error as FormatError, Formatter};
 use serde::{Deserialize, Serialize};
 
 use crate::bolts::rands::Rand;
 use crate::inputs::Input;
 use crate::state::{HasCorpus, HasRand};
+use crate::Error;
 
 use super::Corpus;
 
@@ -18,11 +20,11 @@ use super::Corpus;
 /// Two different testcases should never have the same [`CorpusID`].
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct CorpusID {
-    identifier: usize,
+    id: usize,
 }
 impl Display for CorpusID {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        write!(f, "CorpusID[#{}]", self.identifier)
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FormatError> {
+        write!(f, "CorpusID[#{}]", self.id)
     }
 }
 
@@ -52,12 +54,14 @@ impl CorpusIDManager {
 
     /// Allocate the next [`CorpusID`] and return it. This returns a [`CorpusID`] with an identifer larger than all
     /// previously issued [`CorpusID`]s. This new [`CorpusID`] is immediately added to the `active_ids`.
-    pub(super) fn provide_next(&mut self) -> CorpusID {
-        let val = self.next;
-        self.next = val.checked_add(1).unwrap();
-        let id = CorpusID { identifier: val };
+    pub(super) fn provide_next(&mut self) -> Result<CorpusID, Error> {
+        let id = self.next;
+        self.next = id
+            .checked_add(1)
+            .ok_or_else(|| Error::illegal_state(String::from("Detected Integer overflow")))?;
+        let id = CorpusID { id };
         self.active_ids_.push(id);
-        id
+        Ok(id)
     }
 
     /// Invalidate the given [`CorpusID`]. This will cause any future operations and lookups for this [`CorpusID`] to
@@ -96,10 +100,7 @@ impl CorpusIDManager {
         // debug_assert!(self.active_ids_.is_sorted());
 
         // TODO: change to binary search
-        self.active_ids_
-            .iter()
-            .find(|x| x.identifier > id.identifier)
-            .copied()
+        self.active_ids_.iter().find(|x| x.id > id.id).copied()
     }
 }
 

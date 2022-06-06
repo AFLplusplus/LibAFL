@@ -197,12 +197,6 @@ where
         manager: &mut EM,
         iters: u64,
     ) -> Result<CorpusID, Error> {
-        if iters == 0 {
-            return Err(Error::illegal_argument(
-                "Cannot fuzz for 0 iterations!".to_string(),
-            ));
-        }
-
         let mut ret = None;
         let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
@@ -217,7 +211,7 @@ where
         // But as the state may grow to a few megabytes,
         // for now we won' and the user has to do it (unless we find a way to do this on `Drop`).
 
-        Ok(ret.expect("iters should not be able to be 0"))
+        ret.ok_or_else(|| Error::illegal_argument("Cannot fuzz for 0 iterations!".to_string()))
     }
 }
 
