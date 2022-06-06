@@ -1,6 +1,6 @@
-//! The CorpusIDManager is responsible for keeping track of active CorpusIDs. It lets the corpus map CorpusIDs to corpus
-//! indices to allow for a vector-based corpus storage. It is the only component That should be able to create new
-//! CorpusIDs.
+//! The [`CorpusIDManager`] is responsible for keeping track of active [`CorpusID`]s. It lets the corpus map a
+//! [`CorpusID`] to its corresponding corpus index to allow for a vector-based corpus storage. It is the only component
+//! that should be able to create new [`CorpusID`]s.
 
 use core::fmt::{Formatter, Display, Error};
 use serde::{Serialize, Deserialize};
@@ -12,7 +12,7 @@ use crate::state::{HasRand, HasCorpus};
 
 use super::Corpus;
 
-/// Creates a new [`CorpusID`]. [`CorpusID']s are globally unique for a corpus and monotonically increasing.
+/// Creates a new [`CorpusID`]. [`CorpusID`]s are globally unique for a corpus and monotonically increasing.
 /// They should only ever be created by a [`CorpusIDManager`], everything else must acquire them from one.
 /// [`CorpusID`]s allow us to track a testcase uniquely even when corpora can have testcases be removed or replaced.
 /// Two different testcases should never have the same [`CorpusID`].
@@ -41,8 +41,8 @@ impl CorpusIDManager {
         Default::default()
     }
 
-    /// Get a slice of the currently active [`CorpusID`]s. The length of this slice should always match the `count()` of the
-    /// corpus.
+    /// Get a slice of the currently active [`CorpusID`]s. The length of this slice should always match the `count()` of
+    /// the corpus.
     pub fn active_ids(&self) -> &[CorpusID] {
         // should always be sorted, since it only increasing values are ever appended!
         // debug_assert!(self.active_ids_.is_sorted());
@@ -50,7 +50,7 @@ impl CorpusIDManager {
     }
 
     /// Allocate the next [`CorpusID`] and return it. This returns a [`CorpusID`] with an identifer larger than all
-    /// previously issued `CorpusID`s. This new [`CorpusID`] is immediately added to the `active_ids`.
+    /// previously issued [`CorpusID`]s. This new [`CorpusID`] is immediately added to the `active_ids`.
     pub(super) fn provide_next(&mut self) -> CorpusID {
         let val = self.next;
         self.next = val.checked_add(1).unwrap();
@@ -69,7 +69,7 @@ impl CorpusIDManager {
         Some(idx)
     }
 
-    /// Get the corpus index for the given [`CorpusID`]. Should only ever be called by a `Corpus`.
+    /// Get the corpus index for the given [`CorpusID`]. Should only ever be called by a [`Corpus`].
     #[must_use]
     pub(crate) fn active_index_for(&self, id: CorpusID) -> Option<usize> {
         // debug_assert!(self.active_ids_.is_sorted());
