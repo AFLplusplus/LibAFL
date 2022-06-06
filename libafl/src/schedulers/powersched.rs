@@ -6,7 +6,7 @@ use alloc::{
 };
 
 use crate::{
-    corpus::{Corpus, SchedulerTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData, CorpusID},
     inputs::Input,
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata},
@@ -157,7 +157,7 @@ where
     I: Input,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(self.strat)));
         }
@@ -188,13 +188,21 @@ where
         Ok(())
     }
 
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        if state.corpus().count() == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
-        } else {
-            let id = match state.corpus().current() {
-                Some(cur) => {
-                    if *cur + 1 >= state.corpus().count() {
+    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
+        let first_id = state
+            .corpus()
+            .id_manager()
+            .first_id()
+            .ok_or(Error::empty(String::from("No entries in corpus")))?;
+
+        let next_id = state
+            .corpus()
+            .current()
+            .map(|cur| -> Result<CorpusID, Error> {
+                match state.corpus().id_manager().find_next(cur) {
+                    Some(next_id) => Ok(next_id),
+                    None => {
+                        // If we can't advance to the next corpus element, we started a new cycle
                         let psmeta = state
                             .metadata_mut()
                             .get_mut::<SchedulerMetadata>()
@@ -202,32 +210,30 @@ where
                                 Error::key_not_found("SchedulerMetadata not found".to_string())
                             })?;
                         psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
-                        0
-                    } else {
-                        *cur + 1
-                    }
+                        Ok(first_id)
+                    },
                 }
-                None => 0,
-            };
-            *state.corpus_mut().current_mut() = Some(id);
+            })
+            .unwrap_or(Ok(first_id))
+            ?;
+        *state.corpus_mut().current_mut() = Some(next_id);
 
-            // Update the handicap
-            let mut testcase = state.corpus().get(id)?.borrow_mut();
-            let tcmeta = testcase
-                .metadata_mut()
-                .get_mut::<SchedulerTestcaseMetaData>()
-                .ok_or_else(|| {
-                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
-                })?;
+        // Update the handicap
+        let mut testcase = state.corpus().get(next_id)?.borrow_mut();
+        let tcmeta = testcase
+            .metadata_mut()
+            .get_mut::<SchedulerTestcaseMetaData>()
+            .ok_or_else(|| {
+                Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+            })?;
 
-            if tcmeta.handicap() >= 4 {
-                tcmeta.set_handicap(tcmeta.handicap() - 4);
-            } else if tcmeta.handicap() > 0 {
-                tcmeta.set_handicap(tcmeta.handicap() - 1);
-            }
-
-            Ok(id)
+        if tcmeta.handicap() >= 4 {
+            tcmeta.set_handicap(tcmeta.handicap() - 4);
+        } else if tcmeta.handicap() > 0 {
+            tcmeta.set_handicap(tcmeta.handicap() - 1);
         }
+
+        Ok(next_id)
     }
 }
 

@@ -5,7 +5,7 @@ use alloc::{boxed::Box, vec::Vec};
 use crate::{
     bolts::anymap::AsAny,
     stages::{Stage, StagesTuple},
-    Error,
+    Error, corpus::CorpusID,
 };
 
 /// Combine `Stage` and `AsAny`
@@ -26,7 +26,7 @@ impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for StagesOwnedList<E, EM, S, Z> {
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         for s in &mut self.list {
             s.perform(fuzzer, executor, state, manager, corpus_idx)?;

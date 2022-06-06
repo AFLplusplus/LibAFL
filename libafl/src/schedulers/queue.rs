@@ -2,6 +2,7 @@
 
 use alloc::borrow::ToOwned;
 
+use crate::corpus::CorpusID;
 use crate::{corpus::Corpus, inputs::Input, schedulers::Scheduler, state::HasCorpus, Error};
 
 /// Walk the corpus in a queue-like fashion
@@ -14,23 +15,18 @@ where
     I: Input,
 {
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        if state.corpus().count() == 0 {
-            Err(Error::empty("No entries in corpus".to_owned()))
-        } else {
-            let id = match state.corpus().current() {
-                Some(cur) => {
-                    if *cur + 1 >= state.corpus().count() {
-                        0
-                    } else {
-                        *cur + 1
-                    }
-                }
-                None => 0,
-            };
-            *state.corpus_mut().current_mut() = Some(id);
-            Ok(id)
-        }
+    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
+        let id_manager = state.corpus().id_manager();
+        let first_id = id_manager.first_id().ok_or(
+            Error::empty("No entries in corpus".to_owned())
+        )?;
+        let next_id = state
+            .corpus()
+            .current()
+            .and_then(|cur| id_manager.find_next(cur))
+            .unwrap_or(first_id);
+        *state.corpus_mut().current_mut() = Some(next_id);
+        Ok(next_id)
     }
 }
 

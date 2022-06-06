@@ -14,7 +14,7 @@ use crate::{
     inputs::Input,
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
-    Error,
+    Error, corpus::CorpusID,
 };
 
 /// Metadata used to store information about disk sync time
@@ -63,7 +63,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        _corpus_idx: usize,
+        _corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         let last = state
             .metadata()

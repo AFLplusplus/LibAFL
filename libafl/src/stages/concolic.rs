@@ -9,7 +9,7 @@ use alloc::string::String;
 use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, CorpusID},
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::{concolic::ConcolicObserver, ObserversTuple},
@@ -46,7 +46,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         self.inner
             .perform(fuzzer, executor, state, manager, corpus_idx)?;
@@ -365,7 +365,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         start_timer!(state);
         let testcase = state.corpus().get(corpus_idx)?.clone();

@@ -3,7 +3,7 @@
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
-    corpus::Corpus,
+    corpus::{Corpus, CorpusID},
     executors::{Executor, HasObservers, ShadowExecutor},
     inputs::Input,
     mark_feature_time,
@@ -45,7 +45,7 @@ where
         _executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         start_timer!(state);
         let input = state
@@ -124,7 +124,7 @@ where
         executor: &mut ShadowExecutor<E, I, S, SOT>,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         start_timer!(state);
         let input = state

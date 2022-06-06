@@ -3,7 +3,7 @@ use alloc::{string::ToString, vec::Vec};
 
 use crate::{
     bolts::{current_nanos, rands::Rand, rands::StdRand},
-    corpus::Corpus,
+    corpus::{Corpus, CorpusID},
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
@@ -417,7 +417,7 @@ where
         &mut self,
         state: &mut S,
         _stage_idx: i32,
-        _corpus_idx: Option<usize>,
+        _corpus_idx: Option<CorpusID>,
     ) -> Result<(), Error> {
         let before = self.finds_before;
         let after = state.corpus().count() + state.solutions().count();

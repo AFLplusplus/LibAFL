@@ -13,7 +13,7 @@ use crate::{
         tuples::{tuple_list, tuple_list_type, NamedTuple},
         AsMutSlice, AsSlice,
     },
-    corpus::Corpus,
+    corpus::{Corpus, CorpusID},
     inputs::Input,
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand},
@@ -329,7 +329,7 @@ where
         &mut self,
         state: &mut S,
         _stage_idx: i32,
-        corpus_idx: Option<usize>,
+        corpus_idx: Option<CorpusID>,
     ) -> Result<(), Error> {
         if let Some(idx) = corpus_idx {
             let mut testcase = (*state.corpus_mut().get(idx)?).borrow_mut();
@@ -444,10 +444,10 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let mut rand = XkcdRand::with_seed(5);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
-        corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
+        let id_0 = corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
+        let _id_1 = corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
 
-        let testcase = corpus.get(0).expect("Corpus did not contain entries");
+        let testcase = corpus.get(id_0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
         let mut state =
@@ -471,10 +471,10 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
-        corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
+        let id_0 = corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
+        let _id_1 = corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
 
-        let testcase = corpus.get(0).expect("Corpus did not contain entries");
+        let testcase = corpus.get(id_0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 

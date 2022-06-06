@@ -2,7 +2,7 @@
 
 use crate::{
     bolts::{current_time, tuples::Named, AsRefIterator},
-    corpus::{Corpus, SchedulerTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData, CorpusID},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{
@@ -59,7 +59,7 @@ where
         executor: &mut E,
         state: &mut S,
         mgr: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry
         if state.corpus().get(corpus_idx)?.borrow_mut().fuzz_level() > 0 {

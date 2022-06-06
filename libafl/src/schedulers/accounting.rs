@@ -2,7 +2,7 @@
 
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, Testcase, CorpusID},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
     schedulers::{
@@ -69,7 +69,7 @@ impl AccountingIndexesMetadata {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopAccountingMetadata {
     /// map index -> corpus index
-    pub map: HashMap<usize, usize>,
+    pub map: HashMap<usize, CorpusID>,
     /// If changed sicne the previous add to the corpus
     pub changed: bool,
     /// The max accounting seen so far
@@ -109,25 +109,25 @@ where
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)
     }
 
-    fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(&self, state: &mut S, idx: CorpusID, testcase: &Testcase<I>) -> Result<(), Error> {
         self.inner.on_replace(state, idx, testcase)
     }
 
     fn on_remove(
         &self,
         state: &mut S,
-        idx: usize,
+        idx: CorpusID,
         testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         self.inner.on_remove(state, idx, testcase)
     }
 
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
         if state
             .metadata()
             .get::<TopAccountingMetadata>()
@@ -137,19 +137,19 @@ where
         } else {
             self.inner.cull(state)?;
         }
-        let mut idx = self.inner.base().next(state)?;
+        let mut id = self.inner.base().next(state)?;
         while {
             let has = !state
                 .corpus()
-                .get(idx)?
+                .get(id)?
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
         } && state.rand_mut().below(100) < self.skip_non_favored_prob
         {
-            idx = self.inner.base().next(state)?;
+            id = self.inner.base().next(state)?;
         }
-        Ok(idx)
+        Ok(id)
     }
 }
 
@@ -162,7 +162,7 @@ where
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_accounting_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    pub fn update_accounting_score(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
         {

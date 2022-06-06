@@ -1,13 +1,13 @@
 //! Gramatron is the rewritten gramatron fuzzer in rust.
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
-use alloc::vec::Vec;
+use alloc::{vec::Vec, string::String};
 use core::cmp::max;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
-    corpus::Corpus,
+    corpus::{Corpus, id_manager::random_corpus_entry},
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
@@ -106,14 +106,14 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let (_, chosen_id) = random_corpus_entry(state)
+            .ok_or(Error::empty(String::from("Cannot gramatron mutate on an empty corpus")))?;
 
         let insert_at = state.rand_mut().below(input.terminals().len() as u64) as usize;
 
         let rand_num = state.rand_mut().next() as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(chosen_id)?.borrow_mut();
         other_testcase.load_input()?; // Preload the input
 
         if !other_testcase.has_metadata::<GramatronIdxMapMetadata>() {

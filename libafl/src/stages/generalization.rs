@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::AsSlice,
-    corpus::Corpus,
+    corpus::{Corpus, CorpusID},
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
     inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec},
@@ -31,7 +31,7 @@ const MAX_GENERALIZED_LEN: usize = 8192;
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct GeneralizedIndexesMetadata {
     /// The set of indexes
-    pub indexes: HashSet<usize>,
+    pub indexes: HashSet<CorpusID>,
 }
 
 crate::impl_serdeany!(GeneralizedIndexesMetadata);
@@ -86,7 +86,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         if state
             .metadata()

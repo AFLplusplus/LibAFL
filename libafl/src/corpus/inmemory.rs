@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
 
 use super::CorpusID;
+use super::id_manager::CorpusIDManager;
 
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -17,6 +18,7 @@ where
 {
     entries: Vec<RefCell<Testcase<I>>>,
     current: Option<CorpusID>,
+    id_manager: CorpusIDManager,
 }
 
 impl<I> Corpus<I> for InMemoryCorpus<I>
@@ -32,33 +34,39 @@ where
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusID, Error> {
+        debug_assert!(self.entries.len() == self.id_manager.active_ids().len());
+        let new_id = self.id_manager.provide_next();
         self.entries.push(RefCell::new(testcase));
-        Ok(self.entries.len() - 1)
+        Ok(new_id)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
-        if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
-        }
-        self.entries[idx] = RefCell::new(testcase);
+    fn replace(&mut self, id: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
+        let old_idx = self.id_manager
+            .remove_id(id)
+            .ok_or(Error::key_not_found(format!("ID {:?} is stale", id)))?;
+        self.entries[old_idx] = RefCell::new(testcase);
         Ok(())
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
-        if idx >= self.entries.len() {
+    fn remove(&mut self, id: CorpusID) -> Result<Option<Testcase<I>>, Error> {
+        if let Some(old_idx) = self.id_manager.remove_id(id) {
+            Ok(Some(self.entries.remove(old_idx).into_inner()))
+        }
+        else {
             Ok(None)
-        } else {
-            Ok(Some(self.entries.remove(idx).into_inner()))
         }
     }
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, id: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
+        let idx = self.id_manager
+            .active_index_for(id)
+            .ok_or(Error::key_not_found(format!("ID {:?} is stale", id)))?;
         Ok(&self.entries[idx])
     }
 
@@ -73,6 +81,10 @@ where
     fn current_mut(&mut self) -> &mut Option<CorpusID> {
         &mut self.current
     }
+
+    fn id_manager(&self) -> &CorpusIDManager {
+        &self.id_manager
+    }
 }
 
 impl<I> InMemoryCorpus<I>
@@ -86,6 +98,7 @@ where
         Self {
             entries: vec![],
             current: None,
+            id_manager: Default::default(),
         }
     }
 }

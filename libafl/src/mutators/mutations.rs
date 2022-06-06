@@ -2,14 +2,14 @@
 
 use crate::{
     bolts::{rands::Rand, tuples::Named},
-    corpus::Corpus,
+    corpus::{Corpus, id_manager::random_corpus_entry},
     inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
 
-use alloc::{borrow::ToOwned, vec::Vec};
+use alloc::{borrow::ToOwned, vec::Vec, string::String};
 use core::{
     cmp::{max, min},
     mem::size_of,
@@ -911,18 +911,19 @@ where
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
 
+        let (_, chosen_id) = random_corpus_entry(state)
+            .ok_or(Error::empty(String::from("Cannot CrossoverInsert mutate on an empty corpus")))?;
+
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if chosen_id == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
         let other_size = state
             .corpus()
-            .get(idx)?
+            .get(chosen_id)?
             .borrow_mut()
             .load_input()?
             .bytes()
@@ -936,7 +937,7 @@ where
         let to = state.rand_mut().below(size as u64) as usize;
         let mut len = 1 + state.rand_mut().below((other_size - from) as u64) as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(chosen_id)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
         if size + len > max_size {
@@ -989,18 +990,19 @@ where
             return Ok(MutationResult::Skipped);
         }
 
+        let (_, chosen_id) = random_corpus_entry(state)
+            .ok_or(Error::empty(String::from("Cannot CrossoverReplace mutate on an empty corpus")))?;
+
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if chosen_id == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
         let other_size = state
             .corpus()
-            .get(idx)?
+            .get(chosen_id)?
             .borrow_mut()
             .load_input()?
             .bytes()
@@ -1013,7 +1015,7 @@ where
         let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
         let to = state.rand_mut().below((size - len) as u64) as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(chosen_id)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
         buffer_copy(input.bytes_mut(), other.bytes(), from, to, len);
@@ -1069,16 +1071,16 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
+        let (_, chosen_id) = random_corpus_entry(state)
+            .ok_or(Error::empty("Cannot mutate on an empty corpus!".to_owned()))?;
         if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
+            if chosen_id == *cur {
                 return Ok(MutationResult::Skipped);
             }
         }
 
         let (first_diff, last_diff) = {
-            let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+            let mut other_testcase = state.corpus().get(chosen_id)?.borrow_mut();
             let other = other_testcase.load_input()?;
 
             let mut counter: u32 = 0;
@@ -1097,7 +1099,7 @@ where
 
         let split_at = state.rand_mut().between(first_diff, last_diff) as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(chosen_id)?.borrow_mut();
         let other = other_testcase.load_input()?;
         input
             .bytes_mut()

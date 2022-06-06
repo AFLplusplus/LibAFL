@@ -6,7 +6,7 @@ use core::cell::{Cell, RefCell};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::Corpus,
+    corpus::{Corpus, CorpusID},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::Input,
@@ -46,7 +46,7 @@ where
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
-    current_corpus_idx: Option<usize>,
+    current_corpus_idx: Option<CorpusID>,
     testcases_to_do: usize,
     testcases_done: usize,
 
@@ -69,12 +69,12 @@ where
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
-    fn iterations(&self, state: &mut S, _corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut S, _corpus_idx: CorpusID) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
     }
 
     /// Sets the current corpus index
-    pub fn set_current_corpus_idx(&mut self, current_corpus_idx: usize) {
+    pub fn set_current_corpus_idx(&mut self, current_corpus_idx: CorpusID) {
         self.current_corpus_idx = Some(current_corpus_idx);
     }
 }
@@ -169,11 +169,12 @@ where
     ) -> Result<(), Error> {
         // todo: isintersting, etc.
 
-        fuzzer.process_execution(state, event_mgr, last_input, observers, &exit_kind, true)?;
+        let (_exec_result, corpus_id) = fuzzer.process_execution(
+            state, event_mgr, last_input, observers, &exit_kind, true)?;
 
         start_timer!(state);
         self.mutator
-            .post_exec(state, self.stage_idx, Some(self.testcases_done))?;
+            .post_exec(state, self.stage_idx, corpus_id)?;
         mark_feature_time!(state, PerfFeature::MutatePostExec);
         self.testcases_done += 1;
 

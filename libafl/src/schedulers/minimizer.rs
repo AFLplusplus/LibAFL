@@ -3,7 +3,7 @@
 
 use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, Testcase, CorpusID},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
@@ -28,7 +28,7 @@ crate::impl_serdeany!(IsFavoredMetadata);
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopRatedsMetadata {
     /// map index -> corpus index
-    pub map: HashMap<usize, usize>,
+    pub map: HashMap<usize, CorpusID>,
 }
 
 crate::impl_serdeany!(TopRatedsMetadata);
@@ -44,7 +44,7 @@ impl TopRatedsMetadata {
 
     /// Getter for map
     #[must_use]
-    pub fn map(&self) -> &HashMap<usize, usize> {
+    pub fn map(&self) -> &HashMap<usize, CorpusID> {
         &self.map
     }
 }
@@ -81,13 +81,13 @@ where
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
         self.update_score(state, idx)?;
         self.base.on_add(state, idx)
     }
 
     /// Replaces the testcase at the given idx
-    fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(&self, state: &mut S, idx: CorpusID, testcase: &Testcase<I>) -> Result<(), Error> {
         self.base.on_replace(state, idx, testcase)
     }
 
@@ -95,28 +95,28 @@ where
     fn on_remove(
         &self,
         state: &mut S,
-        idx: usize,
+        idx: CorpusID,
         testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, idx, testcase)
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
         self.cull(state)?;
-        let mut idx = self.base.next(state)?;
+        let mut id = self.base.next(state)?;
         while {
             let has = !state
                 .corpus()
-                .get(idx)?
+                .get(id)?
                 .borrow()
                 .has_metadata::<IsFavoredMetadata>();
             has
         } && state.rand_mut().below(100) < self.skip_non_favored_prob
         {
-            idx = self.base.next(state)?;
+            id = self.base.next(state)?;
         }
-        Ok(idx)
+        Ok(id)
     }
 }
 
@@ -131,7 +131,7 @@ where
     /// Update the `Corpus` score using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    pub fn update_score(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata().get::<TopRatedsMetadata>().is_none() {
             state.add_metadata(TopRatedsMetadata::new());

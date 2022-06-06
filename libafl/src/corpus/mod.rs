@@ -4,7 +4,7 @@ pub mod testcase;
 use serde::{Serialize, Deserialize};
 pub use testcase::{SchedulerTestcaseMetaData, Testcase};
 
-mod id_manager;
+pub mod id_manager;
 pub use id_manager::CorpusID;
 
 pub mod inmemory;
@@ -21,22 +21,26 @@ pub mod cached;
 pub use cached::CachedOnDiskCorpus;
 
 use core::cell::RefCell;
-use core::fmt::{Display, Formatter};
 
 use crate::{inputs::Input, Error};
 
 /// Corpus with all current testcases
-pub trait Corpus<I>: serde::Serialize + for<'de> serde::Deserialize<'de>
+pub trait Corpus<I>: Serialize + for<'de> Deserialize<'de>
 where
     I: Input,
 {
     /// Returns the number of elements
-    fn count(&self) -> usize;
+    fn count(&self) -> usize {
+        self.id_manager().active_ids().len()
+    }
 
+    /// Returns a slice of all currently active [`CorpusID`]s.
     fn ids(&self) -> &[CorpusID] {
         self.id_manager().active_ids()
     }
 
+    /// Returns an immutable reference to the [`CorpusIDManager`]. This should be used to manage the traversal of the
+    /// corpus, e.g. in a Scheduler.
     fn id_manager(&self) -> &id_manager::CorpusIDManager;
 
     /// Returns true, if no elements are in this corpus yet

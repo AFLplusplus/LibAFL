@@ -23,7 +23,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
+    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler, corpus::CorpusID,
 };
 
 /// Send a monitor update all 15 (or more) seconds
@@ -97,7 +97,7 @@ where
     pub errored: bool,
 
     /// The corpus index we're currently working on
-    pub current_corpus_idx: Option<usize>,
+    pub current_corpus_idx: Option<CorpusID>,
 
     /// The input we just ran
     pub current_input: Option<I>, // Todo: Get rid of copy
@@ -195,7 +195,7 @@ where
     fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, I, OT, S, Z>;
 
     /// Set the current corpus index this stage works on
-    fn set_current_corpus_idx(&mut self, corpus_idx: usize) {
+    fn set_current_corpus_idx(&mut self, corpus_idx: CorpusID) {
         self.push_stage_helper_mut().current_corpus_idx = Some(corpus_idx);
     }
 

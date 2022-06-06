@@ -26,7 +26,7 @@ impl FeedbackStatesTuple for FeedbackStatesOwnedList {
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: usize,
+        corpus_idx: CorpusID,
     ) -> Result<(), Error> {
         for s in &mut self.list {
             s.perform(fuzzer, executor, state, manager, corpus_idx)?;

@@ -82,14 +82,17 @@ where
             .get::<SchedulerMetadata>()
             .ok_or_else(|| Error::key_not_found("SchedulerMetadata not found".to_string()))?;
 
+        let id_manager = state.corpus().id_manager();
+        let corpus_ids = id_manager.active_ids();
+
         let fuzz_mu = if let Some(strat) = psmeta.strat() {
             if strat == PowerSchedule::COE {
                 let corpus = state.corpus();
                 let mut n_paths = 0;
                 let mut v = 0.0;
                 let cur_index = state.corpus().current().unwrap();
-                for idx in 0..corpus.count() {
-                    let n_fuzz_entry = if cur_index == idx {
+                for id in corpus_ids {
+                    let n_fuzz_entry = if cur_index == *id {
                         entry
                             .metadata()
                             .get::<SchedulerTestcaseMetaData>()
@@ -101,7 +104,7 @@ where
                             .n_fuzz_entry()
                     } else {
                         corpus
-                            .get(idx)?
+                            .get(*id)?
                             .borrow()
                             .metadata()
                             .get::<SchedulerTestcaseMetaData>()

@@ -26,8 +26,7 @@ pub use powersched::PowerQueueScheduler;
 use alloc::borrow::ToOwned;
 
 use crate::{
-    bolts::rands::Rand,
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, Testcase, CorpusID, id_manager::random_corpus_entry},
     inputs::Input,
     state::{HasCorpus, HasRand},
     Error,
@@ -40,7 +39,7 @@ where
     I: Input,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, _state: &mut S, _idx: usize) -> Result<(), Error> {
+    fn on_add(&self, _state: &mut S, _id: CorpusID) -> Result<(), Error> {
         Ok(())
     }
 
@@ -48,7 +47,7 @@ where
     fn on_replace(
         &self,
         _state: &mut S,
-        _idx: usize,
+        _id: CorpusID,
         _testcase: &Testcase<I>,
     ) -> Result<(), Error> {
         Ok(())
@@ -58,14 +57,14 @@ where
     fn on_remove(
         &self,
         _state: &mut S,
-        _idx: usize,
+        _id: CorpusID,
         _testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut S) -> Result<usize, Error>;
+    fn next(&self, state: &mut S) -> Result<CorpusID, Error>;
 }
 
 /// Feed the fuzzer simpply with a random testcase on request
@@ -78,15 +77,13 @@ where
     I: Input,
 {
     /// Gets the next entry at random
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        if state.corpus().count() == 0 {
-            Err(Error::empty("No entries in corpus".to_owned()))
-        } else {
-            let len = state.corpus().count();
-            let id = state.rand_mut().below(len as u64) as usize;
-            *state.corpus_mut().current_mut() = Some(id);
-            Ok(id)
-        }
+    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
+
+        let (_, corpus_id) = random_corpus_entry(state)
+            .ok_or(Error::empty("No entries in corpus".to_owned()))?;
+
+        *state.corpus_mut().current_mut() = Some(corpus_id);
+        Ok(corpus_id)
     }
 }
 

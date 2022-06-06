@@ -1,6 +1,6 @@
 //! Mutations for [`EncodedInput`]s
 //!
-use alloc::vec::Vec;
+use alloc::{vec::Vec, string::String};
 use core::cmp::{max, min};
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
         rands::Rand,
         tuples::{tuple_list, tuple_list_type},
     },
-    corpus::Corpus,
+    corpus::{Corpus, id_manager::random_corpus_entry},
     inputs::EncodedInput,
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
@@ -320,17 +320,17 @@ where
         let size = input.codes().len();
 
         // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
-        if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        let (_, chosen_id) = random_corpus_entry(state)
+            .ok_or(
+                Error::empty(String::from("Corpus is empty"))
+            )?;
+        if *state.corpus().current() == Some(chosen_id) {
+            return Ok(MutationResult::Skipped);
         }
 
         let other_size = state
             .corpus()
-            .get(idx)?
+            .get(chosen_id)?
             .borrow_mut()
             .load_input()?
             .codes()
@@ -344,7 +344,7 @@ where
         let to = state.rand_mut().below(size as u64) as usize;
         let mut len = 1 + state.rand_mut().below((other_size - from) as u64) as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(chosen_id)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
         if size + len > max_size {
@@ -396,18 +396,17 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        // We don't want to use the testcase we're already using for splicing
-        let count = state.corpus().count();
-        let idx = state.rand_mut().below(count as u64) as usize;
-        if let Some(cur) = state.corpus().current() {
-            if idx == *cur {
-                return Ok(MutationResult::Skipped);
-            }
+        let (_, chosen_id) = random_corpus_entry(state)
+            .ok_or(
+                Error::empty(String::from("Corpus is empty"))
+            )?;
+        if *state.corpus().current() == Some(chosen_id) {
+            return Ok(MutationResult::Skipped);
         }
 
         let other_size = state
             .corpus()
-            .get(idx)?
+            .get(chosen_id)?
             .borrow_mut()
             .load_input()?
             .codes()
@@ -420,7 +419,7 @@ where
         let len = state.rand_mut().below(min(other_size - from, size) as u64) as usize;
         let to = state.rand_mut().below((size - len) as u64) as usize;
 
-        let mut other_testcase = state.corpus().get(idx)?.borrow_mut();
+        let mut other_testcase = state.corpus().get(chosen_id)?.borrow_mut();
         let other = other_testcase.load_input()?;
 
         buffer_copy(input.codes_mut(), other.codes(), from, to, len);

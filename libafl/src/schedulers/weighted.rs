@@ -2,13 +2,13 @@
 //! This queue corpus scheduler needs calibration stage.
 
 use alloc::{
-    string::{String, ToString},
+    string::ToString,
     vec::Vec,
 };
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, SchedulerTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData, CorpusID, id_manager::random_corpus_entry},
     inputs::Input,
     schedulers::{
         powersched::SchedulerMetadata,
@@ -125,7 +125,13 @@ where
         clippy::cast_lossless
     )]
     pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
-        let n = state.corpus().count();
+        // TODO Ideally this would not be using IDs, since we can't otherwise guarantee that the testcase haven't been
+        // changed since the weights and probabilities were computed.
+
+        let corpus = state.corpus();
+        let id_manager = corpus.id_manager();
+        let corpus_ids = id_manager.active_ids();
+        let n = corpus_ids.len();
 
         let mut alias_table: Vec<usize> = vec![0; n];
         let mut alias_probability: Vec<f64> = vec![0.0; n];
@@ -137,8 +143,8 @@ where
 
         let mut sum: f64 = 0.0;
 
-        for (i, item) in weights.iter_mut().enumerate().take(n) {
-            let mut testcase = state.corpus().get(i)?.borrow_mut();
+        for (&id, item) in corpus_ids.iter().zip(weights.iter_mut()).take(n) {
+            let mut testcase = state.corpus().get(id)?.borrow_mut();
             let weight = F::compute(&mut *testcase, state)?;
             *item = weight;
             sum += weight;
@@ -214,7 +220,7 @@ where
     I: Input,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata(SchedulerMetadata::new(None));
         }
@@ -253,49 +259,50 @@ where
     }
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        if state.corpus().count() == 0 {
-            Err(Error::empty(String::from("No entries in corpus")))
+    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
+
+        let (chosen_idx, _chosen_id) = random_corpus_entry(state)
+            .ok_or(Error::empty("No entries in corpus".to_string()))?;
+
+        let corpus_count = state.corpus().count();
+
+        // Choose a random value between 0.000000000 and 1.000000000
+        let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
+
+        let wsmeta = state
+            .metadata_mut()
+            .get_mut::<WeightedScheduleMetadata>()
+            .ok_or_else(|| {
+                Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
+            })?;
+
+        let current_cycles = wsmeta.runs_in_current_cycle();
+
+        if current_cycles > corpus_count {
+            wsmeta.set_runs_current_cycle(0);
         } else {
-            let corpus_counts = state.corpus().count();
-            let s = state.rand_mut().below(corpus_counts as u64) as usize;
-            // Choose a random value between 0.000000000 and 1.000000000
-            let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
-
-            let wsmeta = state
-                .metadata_mut()
-                .get_mut::<WeightedScheduleMetadata>()
-                .ok_or_else(|| {
-                    Error::key_not_found("WeigthedScheduleMetadata not found".to_string())
-                })?;
-
-            let current_cycles = wsmeta.runs_in_current_cycle();
-
-            if current_cycles > corpus_counts {
-                wsmeta.set_runs_current_cycle(0);
-            } else {
-                wsmeta.set_runs_current_cycle(current_cycles + 1);
-            }
-
-            let idx = if probability < wsmeta.alias_probability()[s] {
-                s
-            } else {
-                wsmeta.alias_table()[s]
-            };
-
-            // Update depth
-            if current_cycles > corpus_counts {
-                let psmeta = state
-                    .metadata_mut()
-                    .get_mut::<SchedulerMetadata>()
-                    .ok_or_else(|| {
-                        Error::key_not_found("SchedulerMetadata not found".to_string())
-                    })?;
-                psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
-            }
-            *state.corpus_mut().current_mut() = Some(idx);
-            Ok(idx)
+            wsmeta.set_runs_current_cycle(current_cycles + 1);
         }
+
+        let idx = if probability < wsmeta.alias_probability()[chosen_idx] {
+            chosen_idx
+        } else {
+            wsmeta.alias_table()[chosen_idx]
+        };
+
+        // Update depth
+        if current_cycles > corpus_count {
+            let psmeta = state
+                .metadata_mut()
+                .get_mut::<SchedulerMetadata>()
+                .ok_or_else(|| {
+                    Error::key_not_found("SchedulerMetadata not found".to_string())
+                })?;
+            psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
+        }
+        let id = state.corpus().ids()[idx];
+        *state.corpus_mut().current_mut() = Some(id);
+        Ok(id)
     }
 }
 

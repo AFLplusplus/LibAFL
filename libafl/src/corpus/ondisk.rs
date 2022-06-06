@@ -130,33 +130,39 @@ where
         testcase
             .store_input()
             .expect("Could not save testcase to disk");
+        debug_assert!(self.entries.len() == self.id_manager().active_ids().len());
         self.entries.push(RefCell::new(testcase));
-        Ok(self.entries.len() - 1)
+        let id = self.id_manager.provide_next();
+        Ok(id)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
-        if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
-        }
-        self.entries[idx] = RefCell::new(testcase);
+    fn replace(&mut self, id: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
+        let old_idx = self.id_manager
+            .remove_id(id)
+            .ok_or(Error::key_not_found(format!("ID {:?} is stale", id)))?;
+        self.entries[old_idx] = RefCell::new(testcase);
         Ok(())
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
-        if idx >= self.entries.len() {
-            Ok(None)
-        } else {
+    fn remove(&mut self, id: CorpusID) -> Result<Option<Testcase<I>>, Error> {
+        if let Some(idx) = self.id_manager.active_index_for(id) {
             Ok(Some(self.entries.remove(idx).into_inner()))
+        }
+        else {
+            Ok(None)
         }
     }
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, id: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
+        let idx = self.id_manager
+            .active_index_for(id)
+            .ok_or(Error::key_not_found(format!("ID {:?} is stale", id)))?;
         Ok(&self.entries[idx])
     }
 
@@ -189,9 +195,12 @@ where
     {
         fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
             fs::create_dir_all(&dir_path)?;
-            Ok(OnDiskCorpus {
+            Ok(OnDiskCorpus::<I> {
+                entries: vec![],
+                current: None,
                 dir_path,
-                ..Default::default(),
+                meta_format: None,
+                id_manager: CorpusIDManager::new()
             })
         }
         new(dir_path.as_ref().to_path_buf())
@@ -205,9 +214,11 @@ where
     ) -> Result<Self, Error> {
         fs::create_dir_all(&dir_path)?;
         Ok(Self {
+            entries: vec![],
+            current: None,
             dir_path,
             meta_format,
-            ..Default::default(),
+            id_manager: CorpusIDManager::new(),
         })
     }
 }

@@ -14,7 +14,7 @@ use crate::{
     Error,
 };
 
-use super::CorpusID;
+use super::{CorpusID, id_manager::CorpusIDManager};
 
 /// A corpus that keep in memory a maximun number of testcases. The eviction policy is FIFO.
 #[cfg(feature = "std")]
@@ -25,7 +25,7 @@ where
     I: Input,
 {
     inner: OnDiskCorpus<I>,
-    cached_indexes: RefCell<VecDeque<CorpusID>>,
+    cached_ids: RefCell<VecDeque<CorpusID>>,
     cache_max_len: usize,
 }
 
@@ -57,7 +57,7 @@ where
     fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
         let testcase = self.inner.remove(idx)?;
         if testcase.is_some() {
-            self.cached_indexes.borrow_mut().retain(|e| *e != idx);
+            self.cached_ids.borrow_mut().retain(|e| *e != idx);
         }
         Ok(testcase)
     }
@@ -69,19 +69,19 @@ where
         if testcase.borrow().input().is_none() {
             let _ = testcase.borrow_mut().load_input()?;
             let mut borrowed_num = 0;
-            while self.cached_indexes.borrow().len() >= self.cache_max_len {
-                let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
+            while self.cached_ids.borrow().len() >= self.cache_max_len {
+                let removed = self.cached_ids.borrow_mut().pop_front().unwrap();
                 if let Ok(mut borrowed) = self.inner.get(removed)?.try_borrow_mut() {
                     *borrowed.input_mut() = None;
                 } else {
-                    self.cached_indexes.borrow_mut().push_back(removed);
+                    self.cached_ids.borrow_mut().push_back(removed);
                     borrowed_num += 1;
                     if self.cache_max_len == borrowed_num {
                         break;
                     }
                 }
             }
-            self.cached_indexes.borrow_mut().push_back(
+            self.cached_ids.borrow_mut().push_back(
                 idx);
         }
         Ok(testcase)
@@ -98,6 +98,10 @@ where
     fn current_mut(&mut self) -> &mut Option<CorpusID> {
         self.inner.current_mut()
     }
+
+    fn id_manager(&self) -> &CorpusIDManager {
+        &self.inner.id_manager()
+    }
 }
 
 impl<I> CachedOnDiskCorpus<I>
@@ -113,7 +117,7 @@ where
         }
         Ok(Self {
             inner: OnDiskCorpus::new(dir_path)?,
-            cached_indexes: RefCell::new(VecDeque::new()),
+            cached_ids: RefCell::new(VecDeque::new()),
             cache_max_len,
         })
     }
@@ -131,7 +135,7 @@ where
         }
         Ok(Self {
             inner: OnDiskCorpus::new_save_meta(dir_path, meta_format)?,
-            cached_indexes: RefCell::new(VecDeque::new()),
+            cached_ids: RefCell::new(VecDeque::new()),
             cache_max_len,
         })
     }
