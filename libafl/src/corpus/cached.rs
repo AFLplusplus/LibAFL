@@ -100,7 +100,7 @@ where
     }
 
     fn id_manager(&self) -> &CorpusIDManager {
-        &self.inner.id_manager()
+        self.inner.id_manager()
     }
 }
 

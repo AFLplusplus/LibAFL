@@ -321,8 +321,8 @@ where
 
         // We don't want to use the testcase we're already using for splicing
         let (_, chosen_id) = random_corpus_entry(state)
-            .ok_or(
-                Error::empty(String::from("Corpus is empty"))
+            .ok_or_else(
+                || Error::empty(String::from("Corpus is empty"))
             )?;
         if *state.corpus().current() == Some(chosen_id) {
             return Ok(MutationResult::Skipped);
@@ -397,8 +397,8 @@ where
         }
 
         let (_, chosen_id) = random_corpus_entry(state)
-            .ok_or(
-                Error::empty(String::from("Corpus is empty"))
+            .ok_or_else(
+                || Error::empty(String::from("Corpus is empty"))
             )?;
         if *state.corpus().current() == Some(chosen_id) {
             return Ok(MutationResult::Skipped);

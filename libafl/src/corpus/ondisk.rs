@@ -141,7 +141,7 @@ where
     fn replace(&mut self, id: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
         let old_idx = self.id_manager
             .remove_id(id)
-            .ok_or(Error::key_not_found(format!("ID {:?} is stale", id)))?;
+            .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
         self.entries[old_idx] = RefCell::new(testcase);
         Ok(())
     }
@@ -162,7 +162,7 @@ where
     fn get(&self, id: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
         let idx = self.id_manager
             .active_index_for(id)
-            .ok_or(Error::key_not_found(format!("ID {:?} is stale", id)))?;
+            .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
         Ok(&self.entries[idx])
     }
 

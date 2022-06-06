@@ -262,7 +262,7 @@ where
     fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
 
         let (chosen_idx, _chosen_id) = random_corpus_entry(state)
-            .ok_or(Error::empty("No entries in corpus".to_string()))?;
+            .ok_or_else(|| Error::empty("No entries in corpus".to_string()))?;
 
         let corpus_count = state.corpus().count();
 

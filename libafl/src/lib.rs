@@ -69,8 +69,6 @@ Welcome to `LibAFL`
     )
 )]
 
-#![cfg_attr(debug_assertions, feature(is_sorted))]
-
 #[cfg(feature = "std")]
 #[macro_use]
 extern crate std;

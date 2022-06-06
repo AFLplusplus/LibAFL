@@ -41,16 +41,16 @@ impl CorpusIDManager {
         Default::default()
     }
 
-    /// Get a slice of the currently active CorpusIDs. The length of this slice should always match the `count()` of the
+    /// Get a slice of the currently active [`CorpusID`]s. The length of this slice should always match the `count()` of the
     /// corpus.
     pub fn active_ids(&self) -> &[CorpusID] {
         // should always be sorted, since it only increasing values are ever appended!
-        debug_assert!(self.active_ids_.is_sorted());
+        // debug_assert!(self.active_ids_.is_sorted());
         &self.active_ids_
     }
 
-    /// Allocate the next [`CorpusID`] and return it. This returns a CorpusID with an identifer larger than all
-    /// previously issued CorpusIDs. This new [`CorpusID`] is immediately added to the `active_ids`.
+    /// Allocate the next [`CorpusID`] and return it. This returns a [`CorpusID`] with an identifer larger than all
+    /// previously issued `CorpusID`s. This new [`CorpusID`] is immediately added to the `active_ids`.
     pub(super) fn provide_next(&mut self) -> CorpusID {
         let val = self.next;
         self.next = val.checked_add(1).unwrap();
@@ -59,40 +59,45 @@ impl CorpusIDManager {
         id
     }
 
-    /// Invalidate the given [`CorpusID`]. This will cause any future operations and lookups for this CorpusID to fail.
-    /// If the id was valid, returns the index where it was found;
+    /// Invalidate the given [`CorpusID`]. This will cause any future operations and lookups for this [`CorpusID`] to
+    /// fail. If the id was valid, returns the index where it was found;
+    #[must_use]
     pub (crate) fn remove_id(&mut self, id: CorpusID) -> Option<usize> {
-        debug_assert!(self.active_ids_.is_sorted());
+        // debug_assert!(self.active_ids_.is_sorted());
         let idx = self.active_ids_.binary_search(&id).ok()?;
         self.active_ids_.remove(idx);
         Some(idx)
     }
 
     /// Get the corpus index for the given [`CorpusID`]. Should only ever be called by a `Corpus`.
+    #[must_use]
     pub(crate) fn active_index_for(&self, id: CorpusID) -> Option<usize> {
-        debug_assert!(self.active_ids_.is_sorted());
+        // debug_assert!(self.active_ids_.is_sorted());
         self.active_ids_.binary_search(&id).ok()
     }
 
     /// Get the [`CorpusID`] at the given index. If the index is out of bounds, returns `None`.
+    #[must_use]
     pub fn get(&self, idx: usize) -> Option<CorpusID> {
-        self.active_ids_.get(idx).map(|x| *x)
+        self.active_ids_.get(idx).copied()
     }
 
     /// Get the id of the first (oldest) active [`CorpusID`].
+    #[must_use]
     pub fn first_id(&self) -> Option<CorpusID> {
-        self.active_ids_.first().map(|x| *x)
+        self.active_ids_.first().copied()
     }
 
     /// Gets the "next" (least less old) active [`CorpusID`]. This is like incrementing the index.
+    #[must_use]
     pub fn find_next(&self, id: CorpusID) -> Option<CorpusID> {
         // it should ALWAYS be sorted since it only ever gets appended to with larger values (next ids)
-        debug_assert!(self.active_ids_.is_sorted());
+        // debug_assert!(self.active_ids_.is_sorted());
 
         // TODO: change to binary search
         self.active_ids_.iter()
             .find(|x| x.identifier > id.identifier)
-            .map(|x|*x)
+            .copied()
     }
 }
 

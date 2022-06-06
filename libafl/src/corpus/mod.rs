@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 pub use testcase::{SchedulerTestcaseMetaData, Testcase};
 
 pub mod id_manager;
-pub use id_manager::CorpusID;
+pub use id_manager::{CorpusID, CorpusIDManager};
 
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
@@ -41,7 +41,7 @@ where
 
     /// Returns an immutable reference to the [`CorpusIDManager`]. This should be used to manage the traversal of the
     /// corpus, e.g. in a Scheduler.
-    fn id_manager(&self) -> &id_manager::CorpusIDManager;
+    fn id_manager(&self) -> &CorpusIDManager;
 
     /// Returns true, if no elements are in this corpus yet
     fn is_empty(&self) -> bool {

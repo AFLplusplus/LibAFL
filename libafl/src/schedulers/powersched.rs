@@ -193,25 +193,24 @@ where
             .corpus()
             .id_manager()
             .first_id()
-            .ok_or(Error::empty(String::from("No entries in corpus")))?;
+            .ok_or_else(|| Error::empty(String::from("No entries in corpus")))?;
 
         let next_id = state
             .corpus()
             .current()
             .map(|cur| -> Result<CorpusID, Error> {
-                match state.corpus().id_manager().find_next(cur) {
-                    Some(next_id) => Ok(next_id),
-                    None => {
-                        // If we can't advance to the next corpus element, we started a new cycle
-                        let psmeta = state
-                            .metadata_mut()
-                            .get_mut::<SchedulerMetadata>()
-                            .ok_or_else(|| {
-                                Error::key_not_found("SchedulerMetadata not found".to_string())
-                            })?;
-                        psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
-                        Ok(first_id)
-                    },
+                if let Some(next_id) = state.corpus().id_manager().find_next(cur) {
+                    Ok(next_id)
+                } else {
+                    // If we can't advance to the next corpus element, we started a new cycle
+                    let psmeta = state
+                        .metadata_mut()
+                        .get_mut::<SchedulerMetadata>()
+                        .ok_or_else(|| {
+                            Error::key_not_found("SchedulerMetadata not found".to_string())
+                        })?;
+                    psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
+                    Ok(first_id)
                 }
             })
             .unwrap_or(Ok(first_id))

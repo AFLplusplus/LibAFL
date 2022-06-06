@@ -107,7 +107,7 @@ where
         }
 
         let (_, chosen_id) = random_corpus_entry(state)
-            .ok_or(Error::empty(String::from("Cannot gramatron mutate on an empty corpus")))?;
+            .ok_or_else(|| Error::empty(String::from("Cannot gramatron mutate on an empty corpus")))?;
 
         let insert_at = state.rand_mut().below(input.terminals().len() as u64) as usize;
 

@@ -80,7 +80,7 @@ where
     fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
 
         let (_, corpus_id) = random_corpus_entry(state)
-            .ok_or(Error::empty("No entries in corpus".to_owned()))?;
+            .ok_or_else(|| Error::empty("No entries in corpus".to_owned()))?;
 
         *state.corpus_mut().current_mut() = Some(corpus_id);
         Ok(corpus_id)
