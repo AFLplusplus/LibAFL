@@ -37,12 +37,14 @@ pub struct CorpusIDManager {
 impl CorpusIDManager {
 
     /// Creates a new [`CorpusIDManager`].
+    #[must_use]
     pub fn new() -> Self {
-        Default::default()
+        CorpusIDManager::default()
     }
 
     /// Get a slice of the currently active [`CorpusID`]s. The length of this slice should always match the `count()` of
     /// the corpus.
+    #[must_use]
     pub fn active_ids(&self) -> &[CorpusID] {
         // should always be sorted, since it only increasing values are ever appended!
         // debug_assert!(self.active_ids_.is_sorted());
