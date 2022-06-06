@@ -2,7 +2,7 @@
 //! indices to allow for a vector-based corpus storage. It is the only component That should be able to create new
 //! CorpusIDs.
 
-use core::fmt::{Formatter, Display};
+use core::fmt::{Formatter, Display, Error};
 use serde::{Serialize, Deserialize};
 use alloc::vec::Vec;
 
@@ -21,7 +21,7 @@ pub struct CorpusID {
     identifier: usize,
 }
 impl Display for CorpusID {
-    fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
         write!(f, "CorpusID[#{}]", self.identifier)
     }
 }
