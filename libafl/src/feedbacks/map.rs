@@ -308,7 +308,10 @@ where
 
     /// Reset the map
     pub fn reset(&mut self) -> Result<(), Error> {
-        self.history_map.iter_mut().for_each(|x| *x = T::default());
+        let cnt = self.history_map.len();
+        for i in 0..cnt {
+            self.history_map[i] = T::default();
+        }
         Ok(())
     }
 }
@@ -340,7 +343,7 @@ impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<Entry = T>,
+    O: MapObserver<Entry = T> + AsSlice<T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
@@ -368,37 +371,32 @@ where
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
         let size = observer.usable_count();
+        let len = observer.len();
         let initial = observer.initial();
 
         let map_state = state
             .named_metadata_mut()
             .get_mut::<MapFeedbackMetadata<T>>(&self.name)
             .unwrap();
-        if map_state.history_map.len() < observer.len() {
-            map_state.history_map.resize(observer.len(), T::default());
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, T::default());
         }
 
         // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
 
-        assert!(size <= observer.len());
-
-        if self.novelties.is_some() {
-            for (i, &item) in observer.as_ref_iter().enumerate() {
-                let history = map_state.history_map[i];
-                let reduced = R::reduce(history, item);
-                if N::is_novel(history, reduced) {
-                    map_state.history_map[i] = reduced;
-                    interesting = true;
+        assert!(size <= len);
+        let map = observer.as_slice();
+        let history_map = map_state.history_map.as_mut_slice();
+        
+        for i in 0..size {
+            let history = history_map[i];
+            let item = map[i];
+            let reduced = R::reduce(history, item);
+            if N::is_novel(history, reduced) {
+                history_map[i] = reduced;
+                interesting = true;
+                if self.novelties.is_some() {
                     self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        } else {
-            for (i, &item) in observer.as_ref_iter().enumerate() {
-                let history = map_state.history_map[i];
-                let reduced = R::reduce(history, item);
-                if N::is_novel(history, reduced) {
-                    map_state.history_map[i] = reduced;
-                    interesting = true;
                 }
             }
         }
@@ -406,7 +404,7 @@ where
         if interesting {
             let mut filled = 0;
             for i in 0..size {
-                if map_state.history_map[i] != initial {
+                if history_map[i] != initial {
                     filled += 1;
                     if self.indexes.is_some() {
                         self.indexes.as_mut().unwrap().push(i);

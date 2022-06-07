@@ -598,6 +598,20 @@ where
         &mut self.as_mut_slice()[idx]
     }
 
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for x in map[0..cnt].iter() {
+            if *x != initial {
+                res += 1;
+            }
+        }
+        res
+    }
+
     fn usable_count(&self) -> usize {
         self.as_slice().len()
     }
@@ -606,9 +620,38 @@ where
         hash_slice(self.as_slice())
     }
 
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        // Normal memset, see https://rust.godbolt.org/z/Trs5hv
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_mut_slice();
+        for x in map[0..cnt].iter_mut() {
+            *x = initial;
+        }
+        Ok(())
+    }
+
     fn to_vec(&self) -> Vec<T> {
         self.as_slice().to_vec()
     }
+
+    /// Get the number of set entries with the specified indexes
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && map[*i] != initial {
+                res += 1;
+            }
+        }
+        res
+    }
+
+
 }
 
 impl<'a, T, const N: usize> AsSlice<T> for ConstMapObserver<'a, T, N>
@@ -926,7 +969,7 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
 
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<I, S>,
+    M: MapObserver<Entry = u8> + Observer<I, S> + AsMutSlice<u8>,
     for<'it> M: AsMutIterator<'it, Item = u8>,
 {
     #[inline]
@@ -936,8 +979,10 @@ where
 
     #[inline]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        for elem in self.as_mut_iter() {
-            *elem = COUNT_CLASS_LOOKUP[*elem as usize];
+        let map = self.as_mut_slice();
+        let cnt = map.len();
+        for x in map[0..cnt].iter_mut() {
+            *x = COUNT_CLASS_LOOKUP[*x as usize];
         }
         self.base.post_exec(state, input, exit_kind)
     }
@@ -993,6 +1038,17 @@ where
     #[inline]
     fn get_mut(&mut self, idx: usize) -> &mut u8 {
         self.base.get_mut(idx)
+    }
+
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        self.base.count_bytes()
+    }
+
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        self.base.reset_map()
     }
 
     fn hash(&self) -> u64 {
