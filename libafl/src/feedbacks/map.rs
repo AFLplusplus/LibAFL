@@ -387,7 +387,7 @@ where
         assert!(size <= len);
         let map = observer.as_slice();
         let history_map = map_state.history_map.as_mut_slice();
-        
+
         for i in 0..size {
             let history = history_map[i];
             let item = map[i];
