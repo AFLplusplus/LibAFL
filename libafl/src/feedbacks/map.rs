@@ -355,6 +355,7 @@ where
     }
 
     #[allow(clippy::wrong_self_convention)]
+    #[allow(clippy::needless_range_loop)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
