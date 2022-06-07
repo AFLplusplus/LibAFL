@@ -1668,8 +1668,8 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use super::{
-        AsMutIterator, AsRefIterator, Debug, Error, HasLen, Iter, IterMut, MapObserver, Named,
-        Observer, OwnedMapObserver, StdMapObserver, String, Vec,
+        AsMutIterator, AsMutSlice, AsRefIterator, AsSlice, Debug, Error, HasLen, Iter, IterMut,
+        MapObserver, Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
     use crate::observers::pybind::PythonObserver;
     use concat_idents::concat_idents;
@@ -1921,6 +1921,18 @@ pub mod pybind {
                 }
             }
 
+            impl<T> AsSlice<T> for $struct_name_trait {
+                fn as_slice(&self) -> & [T] {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe {m.as_slice()}} )
+                }
+            }
+
+            impl<T> AsMutSlice<T> for $struct_name_trait {
+                fn as_mut_slice(&mut self) -> &mut [T] {
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe {m.as_mut_slice()}} )
+                }
+            }
+
             impl MapObserver for $struct_name_trait {
                 type Entry = $datatype;
 
@@ -1936,6 +1948,10 @@ pub mod pybind {
                     unsafe { ptr.as_mut().unwrap() }
                 }
 
+                #[inline]
+                fn count_bytes(&self) -> u64 {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.count_bytes() })
+                }
                 #[inline]
                 fn usable_count(&self) -> usize {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.usable_count() })
@@ -1961,8 +1977,19 @@ pub mod pybind {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.set_initial(initial) });
                 }
 
+                #[inline]
+                fn reset_map(&mut self) -> Result<(), Error> {
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.reset_map() })
+                }
+
+                #[inline]
                 fn to_vec(&self) -> Vec<$datatype> {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.to_vec() })
+                }
+
+                #[inline]
+                fn how_many_set(&self, indexes: &[usize]) -> usize {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.how_many_set(indexes) })
                 }
             }
 
