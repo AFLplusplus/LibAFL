@@ -389,12 +389,11 @@ where
         let map = observer.as_slice();
         let history_map = map_state.history_map.as_mut_slice();
 
-        for i in 0..size {
-            let history = history_map[i];
+        for (i, history) in history_map.iter_mut().enumerate() {
             let item = map[i];
-            let reduced = R::reduce(history, item);
-            if N::is_novel(history, reduced) {
-                history_map[i] = reduced;
+            let reduced = R::reduce(*history, item);
+            if N::is_novel(*history, reduced) {
+                *history = reduced;
                 interesting = true;
                 if self.novelties.is_some() {
                     self.novelties.as_mut().unwrap().push(i);

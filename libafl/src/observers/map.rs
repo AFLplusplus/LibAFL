@@ -1023,8 +1023,8 @@ where
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let map = self.as_mut_slice();
         let cnt = map.len();
-        for x in map[0..cnt].iter_mut() {
-            *x = COUNT_CLASS_LOOKUP[*x as usize];
+        for i in 0..cnt {
+            map[i] = COUNT_CLASS_LOOKUP[map[i] as usize];
         }
         self.base.post_exec(state, input, exit_kind)
     }
