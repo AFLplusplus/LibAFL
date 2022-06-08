@@ -102,7 +102,7 @@ exec_sec = {}
             drop(file);
         }
 
-        self.base.display(event_msg, sender_id)
+        self.base.display(event_msg, sender_id);
     }
 }
 
@@ -110,7 +110,7 @@ impl<M> OnDiskTOMLMonitor<M>
 where
     M: Monitor,
 {
-    /// Create new [`OnDiskMonitor`]
+    /// Create new [`OnDiskTOMLMonitor`]
     #[must_use]
     pub fn new<P>(filename: P, base: M) -> Self
     where
@@ -125,7 +125,7 @@ where
 }
 
 impl OnDiskTOMLMonitor<NopMonitor> {
-    /// Create new [`OnDiskMonitor`] without a base
+    /// Create new [`OnDiskTOMLMonitor`] without a base
     #[must_use]
     pub fn nop<P>(filename: P) -> Self
     where
