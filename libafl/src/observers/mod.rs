@@ -816,7 +816,7 @@ pub mod pybind {
         #[allow(clippy::borrow_deref_ref)]
         fn pymatch_name(&self, name: &str) -> Option<PythonObserver> {
             for ob in &self.list {
-                if ob.name() == name {
+                if *ob.name() == *name {
                     return Some(ob.clone());
                 }
             }
