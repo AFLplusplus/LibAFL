@@ -1474,6 +1474,14 @@ where
 
                     match res {
                         WaitStatus::Signaled(_, _, _) => Ok(ExitKind::Crash),
+                        WaitStatus::Exited(_, code) => {
+                            if code > 128 && code < 160 {
+                                // Signal exit codes
+                                Ok(ExitKind::Crash)
+                            } else {
+                                Ok(ExitKind::Ok)
+                            }
+                        }
                         _ => Ok(ExitKind::Ok),
                     }
                 }
@@ -1586,7 +1594,8 @@ pub mod child_signal_handlers {
                     .post_exec_child_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
 
-                std::process::abort();
+                // std::process::abort();
+                unsafe { libc::_exit(128 + 6) }; // ABORT exit code
             }
         }));
     }
@@ -1617,7 +1626,7 @@ pub mod child_signal_handlers {
                 .expect("Failed to run post_exec on observers");
         }
 
-        //libc::_exit(128 + (_signal as i32));
+        libc::_exit(128 + (_signal as i32));
     }
 }
 
