@@ -354,9 +354,241 @@ where
         Ok(())
     }
 
+    #[rustversion::nightly]
+    default fn is_interesting<EM, OT>(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        self.is_interesting_default(state, manager, input, observers, exit_kind)
+    }
+
+    #[rustversion::not(nightly)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        self.is_interesting_default(state, manager, input, observers, exit_kind)
+    }
+
+    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        if let Some(v) = self.indexes.as_mut() {
+            let meta = MapIndexesMetadata::new(core::mem::take(v));
+            testcase.add_metadata(meta);
+        };
+        if let Some(v) = self.novelties.as_mut() {
+            let meta = MapNoveltiesMetadata::new(core::mem::take(v));
+            testcase.add_metadata(meta);
+        };
+        Ok(())
+    }
+
+    /// Discard the stored metadata in case that the testcase is not added to the corpus
+    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+        if let Some(v) = self.indexes.as_mut() {
+            v.clear();
+        }
+        if let Some(v) = self.novelties.as_mut() {
+            v.clear();
+        }
+        Ok(())
+    }
+}
+
+/// Specialize for the common coverage map size, maximization of u8s
+#[rustversion::nightly]
+impl<I, N, O, S> Feedback<I, S> for MapFeedback<I, N, O, MaxReducer, S, u8>
+where
+    O: MapObserver<Entry = u8> + AsSlice<u8>,
+    for<'it> O: AsRefIterator<'it, Item = u8>,
+    N: IsNovel<u8>,
+    I: Input,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+{
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
     fn is_interesting<EM, OT>(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        let mut interesting = false;
+        // TODO Replace with match_name_type when stable
+        let observer = observers.match_name::<O>(&self.observer_name).unwrap();
+        let size = observer.usable_count();
+        let len = observer.len();
+        let initial = observer.initial();
+
+        let map_state = state
+            .named_metadata_mut()
+            .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
+            .unwrap();
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, u8::default());
+        }
+
+        // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
+
+        assert!(size <= len);
+        let map = observer.as_slice();
+        let history_map = map_state.history_map.as_mut_slice();
+
+        // TODO rewrite thi spart here with SIMD
+
+        for (i, history) in history_map.iter_mut().enumerate() {
+            let item = map[i];
+            let reduced = MaxReducer::reduce(*history, item);
+            if N::is_novel(*history, reduced) {
+                *history = reduced;
+                interesting = true;
+                if self.novelties.is_some() {
+                    self.novelties.as_mut().unwrap().push(i);
+                }
+            }
+        }
+
+        if interesting {
+            let mut filled = 0;
+            for i in 0..size {
+                if history_map[i] != initial {
+                    filled += 1;
+                    if self.indexes.is_some() {
+                        self.indexes.as_mut().unwrap().push(i);
+                    }
+                }
+            }
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: self.name.to_string(),
+                    value: UserStats::Ratio(filled, size as u64),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
+
+        Ok(interesting)
+    }
+}
+
+impl<I, N, O, R, S, T> Named for MapFeedback<I, N, O, R, S, T>
+where
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
+    R: Reducer<T>,
+    N: IsNovel<T>,
+    O: MapObserver<Entry = T>,
+    for<'it> O: AsRefIterator<'it, Item = T>,
+    S: HasNamedMetadata,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<I, N, O, R, S, T> HasObserverName for MapFeedback<I, N, O, R, S, T>
+where
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
+    R: Reducer<T>,
+    N: IsNovel<T>,
+    O: MapObserver<Entry = T>,
+    for<'it> O: AsRefIterator<'it, Item = T>,
+    S: HasNamedMetadata,
+{
+    #[inline]
+    fn observer_name(&self) -> &str {
+        self.observer_name.as_str()
+    }
+}
+
+impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
+where
+    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
+    R: Reducer<T>,
+    O: MapObserver<Entry = T> + AsSlice<T>,
+    for<'it> O: AsRefIterator<'it, Item = T>,
+    N: IsNovel<T>,
+    I: Input,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+{
+    /// Create new `MapFeedback`
+    #[must_use]
+    pub fn new(map_observer: &O) -> Self {
+        Self {
+            indexes: None,
+            novelties: None,
+            name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
+            observer_name: map_observer.name().to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
+    #[must_use]
+    pub fn new_tracking(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
+        Self {
+            indexes: if track_indexes { Some(vec![]) } else { None },
+            novelties: if track_novelties { Some(vec![]) } else { None },
+            name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
+            observer_name: map_observer.name().to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create new `MapFeedback`
+    #[must_use]
+    pub fn with_names(name: &'static str, observer_name: &'static str) -> Self {
+        Self {
+            indexes: None,
+            novelties: None,
+            name: name.to_string(),
+            observer_name: observer_name.to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
+    #[must_use]
+    pub fn with_names_tracking(
+        name: &'static str,
+        observer_name: &'static str,
+        track_indexes: bool,
+        track_novelties: bool,
+    ) -> Self {
+        Self {
+            indexes: if track_indexes { Some(vec![]) } else { None },
+            novelties: if track_novelties { Some(vec![]) } else { None },
+            observer_name: observer_name.to_string(),
+            name: name.to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    #[allow(clippy::wrong_self_convention)]
+    #[allow(clippy::needless_range_loop)]
+    fn is_interesting_default<EM, OT>(
         &mut self,
         state: &mut S,
         manager: &mut EM,
@@ -422,122 +654,6 @@ where
         }
 
         Ok(interesting)
-    }
-
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
-        if let Some(v) = self.indexes.as_mut() {
-            let meta = MapIndexesMetadata::new(core::mem::take(v));
-            testcase.add_metadata(meta);
-        };
-        if let Some(v) = self.novelties.as_mut() {
-            let meta = MapNoveltiesMetadata::new(core::mem::take(v));
-            testcase.add_metadata(meta);
-        };
-        Ok(())
-    }
-
-    /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        if let Some(v) = self.indexes.as_mut() {
-            v.clear();
-        }
-        if let Some(v) = self.novelties.as_mut() {
-            v.clear();
-        }
-        Ok(())
-    }
-}
-
-impl<I, N, O, R, S, T> Named for MapFeedback<I, N, O, R, S, T>
-where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
-    R: Reducer<T>,
-    N: IsNovel<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasNamedMetadata,
-{
-    #[inline]
-    fn name(&self) -> &str {
-        self.name.as_str()
-    }
-}
-
-impl<I, N, O, R, S, T> HasObserverName for MapFeedback<I, N, O, R, S, T>
-where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
-    R: Reducer<T>,
-    N: IsNovel<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasNamedMetadata,
-{
-    #[inline]
-    fn observer_name(&self) -> &str {
-        self.observer_name.as_str()
-    }
-}
-
-impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
-where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
-    R: Reducer<T>,
-    N: IsNovel<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasNamedMetadata,
-{
-    /// Create new `MapFeedback`
-    #[must_use]
-    pub fn new(map_observer: &O) -> Self {
-        Self {
-            indexes: None,
-            novelties: None,
-            name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
-            observer_name: map_observer.name().to_string(),
-            phantom: PhantomData,
-        }
-    }
-
-    /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
-    #[must_use]
-    pub fn new_tracking(map_observer: &O, track_indexes: bool, track_novelties: bool) -> Self {
-        Self {
-            indexes: if track_indexes { Some(vec![]) } else { None },
-            novelties: if track_novelties { Some(vec![]) } else { None },
-            name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
-            observer_name: map_observer.name().to_string(),
-            phantom: PhantomData,
-        }
-    }
-
-    /// Create new `MapFeedback`
-    #[must_use]
-    pub fn with_names(name: &'static str, observer_name: &'static str) -> Self {
-        Self {
-            indexes: None,
-            novelties: None,
-            name: name.to_string(),
-            observer_name: observer_name.to_string(),
-            phantom: PhantomData,
-        }
-    }
-
-    /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
-    #[must_use]
-    pub fn with_names_tracking(
-        name: &'static str,
-        observer_name: &'static str,
-        track_indexes: bool,
-        track_novelties: bool,
-    ) -> Self {
-        Self {
-            indexes: if track_indexes { Some(vec![]) } else { None },
-            novelties: if track_novelties { Some(vec![]) } else { None },
-            observer_name: observer_name.to_string(),
-            name: name.to_string(),
-            phantom: PhantomData,
-        }
     }
 }
 
