@@ -205,7 +205,7 @@ where
 
     fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
         let parts = id.as_str().split(':').collect::<Vec<&str>>();
-        let server_id_str = parts.get(0).unwrap();
+        let server_id_str = parts.first().unwrap();
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
         ))?;
@@ -431,7 +431,8 @@ where
         // It's either running at this point, or we won't be able to spawn it anyway.
         env::set_var(AFL_SHMEM_SERVICE_STARTED, "true");
 
-        match *success {
+        let status = *success;
+        match status {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
                 println!("Started ShMem Service");
