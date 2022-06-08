@@ -156,9 +156,9 @@ where
 }
 
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
-pub type SyncFromDiskFunction = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
+pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
 
-impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction, E, EM, I, S, Z>
+impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
