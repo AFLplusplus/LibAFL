@@ -1921,15 +1921,15 @@ pub mod pybind {
                 }
             }
 
-            impl<T> AsSlice<T> for $struct_name_trait {
-                fn as_slice(&self) -> & [T] {
-                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe {m.as_slice()}} )
+            impl AsSlice<$datatype> for $struct_name_trait {
+                fn as_slice(&self) -> &[$datatype] {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_slice()) }} )
                 }
             }
 
-            impl<T> AsMutSlice<T> for $struct_name_trait {
-                fn as_mut_slice(&mut self) -> &mut [T] {
-                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe {m.as_mut_slice()}} )
+            impl AsMutSlice<$datatype> for $struct_name_trait {
+                fn as_mut_slice(&mut self) -> &mut [$datatype] {
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_mut_slice()) }} )
                 }
             }
 
