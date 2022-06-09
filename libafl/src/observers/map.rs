@@ -1045,7 +1045,7 @@ where
         if (len & 1) != 0 {
             unsafe {
                 *map.get_unchecked_mut(len - 1) =
-                    COUNT_CLASS_LOOKUP[*map.get_unchecked(len - 1) as usize];
+                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
             }
         }
 
@@ -1053,7 +1053,7 @@ where
         let map16 = unsafe { core::slice::from_raw_parts_mut(map.as_mut_ptr() as *mut u16, cnt) };
         for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
             unsafe {
-                *item = COUNT_CLASS_LOOKUP_16[*item as usize];
+                *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
             }
         }
         self.base.post_exec(state, input, exit_kind)
