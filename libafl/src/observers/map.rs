@@ -1042,8 +1042,11 @@ where
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let map = self.as_mut_slice();
         let len = map.len();
-        if len % 2 != 0 {
-            map[len - 1] = COUNT_CLASS_LOOKUP[map[len - 1] as usize];
+        if (len & 1) != 0 {
+            unsafe {
+                *map.get_unchecked_mut(len - 1) =
+                    COUNT_CLASS_LOOKUP[*map16.get_unchecked(len - 1) as usize]
+            };
         }
 
         let cnt = len / 2;
