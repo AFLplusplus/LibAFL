@@ -344,8 +344,8 @@ mod windows {
                     core_ids.push(CoreId { id: i });
                 }
                 Ok(core_ids)
-            },
-            None => Err(Error::unknown("Unable to get logical CPUs count!"))
+            }
+            None => Err(Error::unknown("Unable to get logical CPUs count!")),
         }
     }
 
