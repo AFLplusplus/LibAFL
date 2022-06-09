@@ -1009,6 +1009,25 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
 ];
 
+static mut COUNT_CLASS_LOOKUP_16_INITED: bool = false;
+static mut COUNT_CLASS_LOOKUP_16: Vec<u16> = vec![];
+
+fn init_count_class_16() {
+    unsafe {
+        if COUNT_CLASS_LOOKUP_16_INITED {
+            return;
+        }
+
+        COUNT_CLASS_LOOKUP_16 = vec![0; 65536];
+        for i in 0..256 {
+            for j in 0..256 {
+                COUNT_CLASS_LOOKUP_16[(i << 8) + j] =
+                    ((COUNT_CLASS_LOOKUP[i] as u16) << 8) | (COUNT_CLASS_LOOKUP[j] as u16);
+            }
+        }
+    }
+}
+
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<I, S> + AsMutSlice<u8>,
@@ -1022,9 +1041,13 @@ where
     #[inline]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let map = self.as_mut_slice();
-        let cnt = map.len();
+        let cnt = map.len() / 2;
+        let map16: &mut [u16] = unsafe { core::mem::transmute(map) };
         for i in 0..cnt {
-            map[i] = COUNT_CLASS_LOOKUP[map[i] as usize];
+            unsafe {
+                *map16.get_unchecked_mut(i) =
+                    COUNT_CLASS_LOOKUP_16[*map16.get_unchecked(i) as usize]
+            };
         }
         self.base.post_exec(state, input, exit_kind)
     }
@@ -1130,6 +1153,7 @@ where
 {
     /// Creates a new [`MapObserver`]
     pub fn new(base: M) -> Self {
+        init_count_class_16();
         Self { base }
     }
 }

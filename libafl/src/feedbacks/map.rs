@@ -435,8 +435,8 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
-        use std::simd::u8x16;
-        type VectorType = u8x16;
+        // 128 bits vectors
+        type VectorType = std::simd::u8x16;
 
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -480,11 +480,14 @@ where
 
             if items.max(history) != history {
                 interesting = true;
-                for j in i..(i + VectorType::LANES) {
-                    if map[j] > history_map[j] {
-                        history_map[j] = map[j];
-                        if self.novelties.is_some() {
-                            self.novelties.as_mut().unwrap().push(j);
+                unsafe {
+                    for j in i..(i + VectorType::LANES) {
+                        let item = *map.get_unchecked(j);
+                        if item > *history_map.get_unchecked(j) {
+                            *history_map.get_unchecked_mut(j) = item;
+                            if self.novelties.is_some() {
+                                self.novelties.as_mut().unwrap().push(j);
+                            }
                         }
                     }
                 }
@@ -492,11 +495,14 @@ where
         }
 
         for j in (size - left)..size {
-            if map[j] > history_map[j] {
-                interesting = true;
-                history_map[j] = map[j];
-                if self.novelties.is_some() {
-                    self.novelties.as_mut().unwrap().push(j);
+            unsafe {
+                let item = *map.get_unchecked(j);
+                if item > *history_map.get_unchecked(j) {
+                    interesting = true;
+                    *history_map.get_unchecked_mut(j) = item;
+                    if self.novelties.is_some() {
+                        self.novelties.as_mut().unwrap().push(j);
+                    }
                 }
             }
         }
