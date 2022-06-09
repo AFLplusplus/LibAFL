@@ -335,6 +335,8 @@ where
     name: String,
     /// Name identifier of the observer
     observer_name: String,
+    /// Name of the feedback as shown in the `UserStats`
+    stats_name: String,
     /// Phantom Data of Reducer
     phantom: PhantomData<(I, N, S, R, O, T)>,
 }
@@ -482,7 +484,7 @@ where
             manager.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: self.name.to_string(),
+                    name: self.stats_name.to_string(),
                     value: UserStats::Ratio(filled, size as u64),
                     phantom: PhantomData,
                 },
@@ -523,6 +525,10 @@ where
     }
 }
 
+fn create_stats_name(name: &str) -> String {
+    name.to_lowercase()
+}
+
 impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
@@ -541,6 +547,7 @@ where
             novelties: None,
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
+            stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
     }
@@ -553,6 +560,7 @@ where
             novelties: if track_novelties { Some(vec![]) } else { None },
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
+            stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
     }
@@ -565,6 +573,7 @@ where
             novelties: None,
             name: name.to_string(),
             observer_name: observer_name.to_string(),
+            stats_name: create_stats_name(name),
             phantom: PhantomData,
         }
     }
@@ -581,6 +590,7 @@ where
             indexes: if track_indexes { Some(vec![]) } else { None },
             novelties: if track_novelties { Some(vec![]) } else { None },
             observer_name: observer_name.to_string(),
+            stats_name: create_stats_name(name),
             name: name.to_string(),
             phantom: PhantomData,
         }

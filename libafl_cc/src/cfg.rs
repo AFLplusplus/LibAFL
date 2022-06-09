@@ -381,7 +381,7 @@ mod tests {
         edge = cfg.get_edge((41864 >> 1) ^ 26911).unwrap();
         assert_eq!(edge.calling_func, "main");
         assert_eq!(edge.successor_edges.len(), 2);
-        assert_eq!(*edge.successor_edges.get(0).unwrap(), (26911 >> 1) ^ 52706);
+        assert_eq!(*edge.successor_edges.first().unwrap(), (26911 >> 1) ^ 52706);
 
         assert!(cfg.get_edge(26911).is_none());
         assert!(cfg.get_edge(41864).is_some());

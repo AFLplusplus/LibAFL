@@ -155,8 +155,10 @@ where
     }
 }
 
-impl<E, EM, I, S, Z>
-    SyncFromDiskStage<fn(&mut Z, &mut S, &Path) -> Result<I, Error>, E, EM, I, S, Z>
+/// Function type when the callback in `SyncFromDiskStage` is not a lambda
+pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
+
+impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
