@@ -436,7 +436,7 @@ where
         OT: ObserversTuple<I, S>,
     {
         // 128 bits vectors
-        type VectorType = std::simd::u8x16;
+        type VectorType = core::simd::u8x16;
 
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
