@@ -1022,7 +1022,7 @@ fn init_count_class_16() {
         for i in 0..256 {
             for j in 0..256 {
                 COUNT_CLASS_LOOKUP_16[(i << 8) + j] =
-                    ((COUNT_CLASS_LOOKUP[i] as u16) << 8) | (COUNT_CLASS_LOOKUP[j] as u16);
+                    (u16::from(COUNT_CLASS_LOOKUP[i]) << 8) | u16::from(COUNT_CLASS_LOOKUP[j]);
             }
         }
     }
@@ -1045,17 +1045,17 @@ where
         if (len & 1) != 0 {
             unsafe {
                 *map.get_unchecked_mut(len - 1) =
-                    COUNT_CLASS_LOOKUP[*map.get_unchecked(len - 1) as usize]
-            };
+                    COUNT_CLASS_LOOKUP[*map.get_unchecked(len - 1) as usize];
+            }
         }
 
         let cnt = len / 2;
-        let map16: &mut [u16] = unsafe { core::mem::transmute(map) };
+        let map16 = unsafe { &mut *(map as *mut [u8] as *mut [u16]) };
         for i in 0..cnt {
             unsafe {
                 *map16.get_unchecked_mut(i) =
-                    COUNT_CLASS_LOOKUP_16[*map16.get_unchecked(i) as usize]
-            };
+                    COUNT_CLASS_LOOKUP_16[*map16.get_unchecked(i) as usize];
+            }
         }
         self.base.post_exec(state, input, exit_kind)
     }
