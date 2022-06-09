@@ -343,7 +343,7 @@ impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<Entry = T> + AsSlice<T>,
+    O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
@@ -412,11 +412,10 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<I, N, O, S> Feedback<I, S> for MapFeedback<I, N, O, MaxReducer, S, u8>
+impl<I, O, S> Feedback<I, S> for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
     for<'it> O: AsRefIterator<'it, Item = u8>,
-    N: IsNovel<u8>,
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
@@ -437,7 +436,6 @@ where
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
-        let size = observer.usable_count();
         let len = observer.len();
         let initial = observer.initial();
 
@@ -449,18 +447,15 @@ where
             map_state.history_map.resize(len, u8::default());
         }
 
-        // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
-
-        assert!(size <= len);
         let map = observer.as_slice();
         let history_map = map_state.history_map.as_mut_slice();
 
-        // TODO rewrite thi spart here with SIMD
+        // TODO rewrite this part here with SIMD
 
         for (i, history) in history_map.iter_mut().enumerate() {
             let item = map[i];
             let reduced = MaxReducer::reduce(*history, item);
-            if N::is_novel(*history, reduced) {
+            if DifferentIsNovel::is_novel(*history, reduced) {
                 *history = reduced;
                 interesting = true;
                 if self.novelties.is_some() {
@@ -470,8 +465,9 @@ where
         }
 
         if interesting {
+            let len = history_map.len();
             let mut filled = 0;
-            for i in 0..size {
+            for i in 0..len {
                 if history_map[i] != initial {
                     filled += 1;
                     if self.indexes.is_some() {
@@ -483,7 +479,7 @@ where
                 state,
                 Event::UpdateUserStats {
                     name: self.name.to_string(),
-                    value: UserStats::Ratio(filled, size as u64),
+                    value: UserStats::Ratio(filled, len as u64),
                     phantom: PhantomData,
                 },
             )?;
@@ -527,7 +523,7 @@ impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<Entry = T> + AsSlice<T>,
+    O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
@@ -603,7 +599,6 @@ where
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
-        let size = observer.usable_count();
         let len = observer.len();
         let initial = observer.initial();
 
@@ -615,27 +610,33 @@ where
             map_state.history_map.resize(len, T::default());
         }
 
-        // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
-
-        assert!(size <= len);
-        let map = observer.as_slice();
         let history_map = map_state.history_map.as_mut_slice();
 
-        for (i, history) in history_map.iter_mut().enumerate() {
-            let item = map[i];
-            let reduced = R::reduce(*history, item);
-            if N::is_novel(*history, reduced) {
-                *history = reduced;
-                interesting = true;
-                if self.novelties.is_some() {
+        if self.novelties.is_some() {
+            for (i, &item) in observer.as_ref_iter().enumerate() {
+                let history = history_map[i];
+                let reduced = R::reduce(history, item);
+                if N::is_novel(history, reduced) {
+                    history_map[i] = reduced;
+                    interesting = true;
                     self.novelties.as_mut().unwrap().push(i);
+                }
+            }
+        } else {
+            for (i, &item) in observer.as_ref_iter().enumerate() {
+                let history = history_map[i];
+                let reduced = R::reduce(history, item);
+                if N::is_novel(history, reduced) {
+                    history_map[i] = reduced;
+                    interesting = true;
                 }
             }
         }
 
         if interesting {
+            let len = history_map.len();
             let mut filled = 0;
-            for i in 0..size {
+            for i in 0..len {
                 if history_map[i] != initial {
                     filled += 1;
                     if self.indexes.is_some() {
@@ -647,7 +648,7 @@ where
                 state,
                 Event::UpdateUserStats {
                     name: self.name.to_string(),
-                    value: UserStats::Ratio(filled, size as u64),
+                    value: UserStats::Ratio(filled, len as u64),
                     phantom: PhantomData,
                 },
             )?;
