@@ -664,7 +664,11 @@ where
 
         let history_map = map_state.history_map.as_mut_slice();
 
-        for (i, (item, history)) in observer.as_ref_iter().zip(history_map.iter_mut()).enumerate() {
+        for (i, (item, history)) in observer
+            .as_ref_iter()
+            .zip(history_map.iter_mut())
+            .enumerate()
+        {
             let reduced = R::reduce(*history, *item);
             if N::is_novel(*history, reduced) {
                 *history = reduced;
