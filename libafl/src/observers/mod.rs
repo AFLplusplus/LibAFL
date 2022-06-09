@@ -813,9 +813,10 @@ pub mod pybind {
         }
 
         #[pyo3(name = "match_name")]
+        #[allow(clippy::all)]
         fn pymatch_name(&self, name: &str) -> Option<PythonObserver> {
             for ob in &self.list {
-                if ob.name() == name {
+                if *ob.name() == *name {
                     return Some(ob.clone());
                 }
             }

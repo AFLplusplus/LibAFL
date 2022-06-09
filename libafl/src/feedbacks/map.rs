@@ -335,6 +335,8 @@ where
     name: String,
     /// Name identifier of the observer
     observer_name: String,
+    /// Name of the feedback as shown in the `UserStats`
+    stats_name: String,
     /// Phantom Data of Reducer
     phantom: PhantomData<(I, N, S, R, O, T)>,
 }
@@ -436,18 +438,20 @@ where
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
-        let len = observer.len();
-        let initial = observer.initial();
 
         let map_state = state
             .named_metadata_mut()
             .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
             .unwrap();
-        if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, u8::default());
+
+        let size = observer.usable_count();
+        if map_state.history_map.len() < size {
+            map_state.history_map.resize(size, u8::default());
         }
 
         let map = observer.as_slice();
+        debug_assert!(map.len() >= size);
+
         let history_map = map_state.history_map.as_mut_slice();
 
         // TODO rewrite this part here with SIMD
@@ -464,6 +468,7 @@ where
             }
         }
 
+        let initial = observer.initial();
         if interesting {
             let len = history_map.len();
             let mut filled = 0;
@@ -478,7 +483,7 @@ where
             manager.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: self.name.to_string(),
+                    name: self.stats_name.to_string(),
                     value: UserStats::Ratio(filled, len as u64),
                     phantom: PhantomData,
                 },
@@ -519,6 +524,10 @@ where
     }
 }
 
+fn create_stats_name(name: &str) -> String {
+    name.to_lowercase()
+}
+
 impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
@@ -537,6 +546,7 @@ where
             novelties: None,
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
+            stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
     }
@@ -549,6 +559,7 @@ where
             novelties: if track_novelties { Some(vec![]) } else { None },
             name: MAPFEEDBACK_PREFIX.to_string() + map_observer.name(),
             observer_name: map_observer.name().to_string(),
+            stats_name: create_stats_name(map_observer.name()),
             phantom: PhantomData,
         }
     }
@@ -561,6 +572,7 @@ where
             novelties: None,
             name: name.to_string(),
             observer_name: observer_name.to_string(),
+            stats_name: create_stats_name(name),
             phantom: PhantomData,
         }
     }
@@ -577,6 +589,7 @@ where
             indexes: if track_indexes { Some(vec![]) } else { None },
             novelties: if track_novelties { Some(vec![]) } else { None },
             observer_name: observer_name.to_string(),
+            stats_name: create_stats_name(name),
             name: name.to_string(),
             phantom: PhantomData,
         }
@@ -584,6 +597,7 @@ where
 
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_interesting_default<EM, OT>(
         &mut self,
         state: &mut S,
@@ -599,15 +613,14 @@ where
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
-        let len = observer.len();
-        let initial = observer.initial();
 
         let map_state = state
             .named_metadata_mut()
             .get_mut::<MapFeedbackMetadata<T>>(&self.name)
             .unwrap();
-        if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, T::default());
+        let size = observer.usable_count();
+        if map_state.history_map.len() < size {
+            map_state.history_map.resize(size, T::default());
         }
 
         let history_map = map_state.history_map.as_mut_slice();
@@ -633,6 +646,7 @@ where
             }
         }
 
+        let initial = observer.initial();
         if interesting {
             let len = history_map.len();
             let mut filled = 0;
@@ -647,7 +661,7 @@ where
             manager.fire(
                 state,
                 Event::UpdateUserStats {
-                    name: self.name.to_string(),
+                    name: self.stats_name.to_string(),
                     value: UserStats::Ratio(filled, len as u64),
                     phantom: PhantomData,
                 },

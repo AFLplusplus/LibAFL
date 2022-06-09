@@ -7,6 +7,11 @@ pub use multi::MultiMonitor;
 #[allow(missing_docs)]
 pub mod tui;
 
+#[cfg(feature = "std")]
+pub mod disk;
+#[cfg(feature = "std")]
+pub use disk::OnDiskTOMLMonitor;
+
 use alloc::{string::String, vec::Vec};
 
 #[cfg(feature = "introspection")]
