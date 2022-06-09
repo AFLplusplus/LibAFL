@@ -343,7 +343,7 @@ impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<Entry = T> + AsSlice<T>,
+    O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
@@ -414,7 +414,7 @@ where
 #[rustversion::nightly]
 impl<I, N, O, S> Feedback<I, S> for MapFeedback<I, N, O, MaxReducer, S, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<u8>,
+    O: MapObserver<Entry = u8>,
     for<'it> O: AsRefIterator<'it, Item = u8>,
     N: IsNovel<u8>,
     I: Input,
@@ -455,7 +455,11 @@ where
 
         // TODO rewrite thi spart here with SIMD
 
-        for (i, (item, history)) in observer.as_ref_iter().zip(history_map.iter_mut()).enumerate() {
+        for (i, (item, history)) in observer
+            .as_ref_iter()
+            .zip(history_map.iter_mut())
+            .enumerate()
+        {
             let reduced = MaxReducer::reduce(*history, *item);
             if N::is_novel(*history, reduced) {
                 *history = reduced;
@@ -524,7 +528,7 @@ impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<Entry = T> + AsSlice<T>,
+    O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
@@ -614,13 +618,16 @@ where
 
         // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
 
-        assert!(size <= len);
-        let map = observer.as_slice();
         let history_map = map_state.history_map.as_mut_slice();
 
-        for (i, history) in history_map.iter_mut().enumerate() {
-            let item = map[i];
-            let reduced = R::reduce(*history, item);
+        // TODO rewrite thi spart here with SIMD
+
+        for (i, (item, history)) in observer
+            .as_ref_iter()
+            .zip(history_map.iter_mut())
+            .enumerate()
+        {
+            let reduced = R::reduce(*history, *item);
             if N::is_novel(*history, reduced) {
                 *history = reduced;
                 interesting = true;
