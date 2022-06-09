@@ -438,15 +438,14 @@ where
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
         let size = observer.usable_count();
-        let len = observer.len();
         let initial = observer.initial();
 
         let map_state = state
             .named_metadata_mut()
             .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
             .unwrap();
-        if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, u8::default());
+        if map_state.history_map.len() < size {
+            map_state.history_map.resize(size, u8::default());
         }
 
         // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
@@ -605,15 +604,14 @@ where
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
         let size = observer.usable_count();
-        let len = observer.len();
         let initial = observer.initial();
 
         let map_state = state
             .named_metadata_mut()
             .get_mut::<MapFeedbackMetadata<T>>(&self.name)
             .unwrap();
-        if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, T::default());
+        if map_state.history_map.len() < size {
+            map_state.history_map.resize(size, T::default());
         }
 
         // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
