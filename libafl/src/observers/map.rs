@@ -1039,6 +1039,7 @@ where
     }
 
     #[inline]
+    #[allow(clippy::cast_ptr_alignment)]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let map = self.as_mut_slice();
         let len = map.len();
@@ -1051,10 +1052,9 @@ where
 
         let cnt = len / 2;
         let map16 = unsafe { core::slice::from_raw_parts_mut(map.as_mut_ptr() as *mut u16, cnt) };
-        for i in 0..cnt {
+        for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
             unsafe {
-                *map16.get_unchecked_mut(i) =
-                    COUNT_CLASS_LOOKUP_16[*map16.get_unchecked(i) as usize];
+                *item = COUNT_CLASS_LOOKUP_16[*item as usize];
             }
         }
         self.base.post_exec(state, input, exit_kind)
