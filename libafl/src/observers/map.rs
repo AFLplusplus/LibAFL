@@ -1050,7 +1050,7 @@ where
         }
 
         let cnt = len / 2;
-        let map16 = unsafe { &mut *(map as *mut [u8] as *mut [u16]) };
+        let map16 = unsafe { core::slice::from_raw_parts_mut(map.as_mut_ptr() as *mut u16, cnt) };
         for i in 0..cnt {
             unsafe {
                 *map16.get_unchecked_mut(i) =
