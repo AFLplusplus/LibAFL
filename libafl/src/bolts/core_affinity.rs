@@ -334,17 +334,19 @@ mod windows {
     use crate::bolts::core_affinity::{CoreId, Error};
     use alloc::vec::Vec;
     use windows::Win32::System::SystemInformation::GROUP_AFFINITY;
-    use windows::Win32::System::Threading::{
-        GetCurrentThread, SetThreadGroupAffinity,
-    };
+    use windows::Win32::System::Threading::{GetCurrentThread, SetThreadGroupAffinity};
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         let mut core_ids: Vec<CoreId> = Vec::new();
-        let total_cores = get_num_logical_cpus_ex_windows().unwrap();
-        for i in 0..total_cores {
-            core_ids.push(CoreId { id: i });
+        match get_num_logical_cpus_ex_windows() {
+            Some(total_cores) => {
+                for i in 0..total_cores {
+                    core_ids.push(CoreId { id: i });
+                }
+                Ok(core_ids)
+            },
+            None => Err(Error::unknown("Unable to get logical CPUs count!"))
         }
-        Ok(core_ids)
     }
 
     pub fn set_for_current(id: CoreId) -> Result<(), Error> {
