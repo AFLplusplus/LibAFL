@@ -1041,7 +1041,12 @@ where
     #[inline]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let map = self.as_mut_slice();
-        let cnt = map.len() / 2;
+        let len = map.len();
+        if len % 2 != 0 {
+            map[len - 1] = COUNT_CLASS_LOOKUP[map[len - 1] as usize];
+        }
+
+        let cnt = len / 2;
         let map16: &mut [u16] = unsafe { core::mem::transmute(map) };
         for i in 0..cnt {
             unsafe {
