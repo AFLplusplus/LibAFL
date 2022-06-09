@@ -598,6 +598,7 @@ where
 
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_interesting_default<EM, OT>(
         &mut self,
         state: &mut S,
