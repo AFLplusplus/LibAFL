@@ -435,6 +435,9 @@ where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
+        use std::simd::u8x16;
+        type VectorType = u8x16;
+
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.observer_name).unwrap();
@@ -454,9 +457,8 @@ where
 
         let history_map = map_state.history_map.as_mut_slice();
 
-        // TODO rewrite this part here with SIMD
-
-        for (i, history) in history_map.iter_mut().enumerate() {
+        // Non vector implementation for reference
+        /*for (i, history) in history_map.iter_mut().enumerate() {
             let item = map[i];
             let reduced = MaxReducer::reduce(*history, item);
             if DifferentIsNovel::is_novel(*history, reduced) {
@@ -464,6 +466,37 @@ where
                 interesting = true;
                 if self.novelties.is_some() {
                     self.novelties.as_mut().unwrap().push(i);
+                }
+            }
+        }*/
+
+        let steps = size / VectorType::LANES;
+        let left = size % VectorType::LANES;
+
+        for step in 0..steps {
+            let i = step * VectorType::LANES;
+            let history = VectorType::from_slice(&history_map[i..]);
+            let items = VectorType::from_slice(&map[i..]);
+
+            if items.max(history) != history {
+                interesting = true;
+                for j in i..(i + VectorType::LANES) {
+                    if map[j] > history_map[j] {
+                        history_map[j] = map[j];
+                        if self.novelties.is_some() {
+                            self.novelties.as_mut().unwrap().push(j);
+                        }
+                    }
+                }
+            }
+        }
+
+        for j in (size - left)..size {
+            if map[j] > history_map[j] {
+                interesting = true;
+                history_map[j] = map[j];
+                if self.novelties.is_some() {
+                    self.novelties.as_mut().unwrap().push(j);
                 }
             }
         }
