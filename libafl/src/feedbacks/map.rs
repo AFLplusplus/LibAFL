@@ -451,15 +451,12 @@ where
 
         // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
 
-        assert!(size <= len);
-        let map = observer.as_slice();
         let history_map = map_state.history_map.as_mut_slice();
 
         // TODO rewrite thi spart here with SIMD
 
-        for (i, history) in history_map.iter_mut().enumerate() {
-            let item = map[i];
-            let reduced = MaxReducer::reduce(*history, item);
+        for (i, (item, history)) in observer.as_ref_iter().zip(history_map.iter_mut()).enumerate() {
+            let reduced = MaxReducer::reduce(*history, *item);
             if N::is_novel(*history, reduced) {
                 *history = reduced;
                 interesting = true;
