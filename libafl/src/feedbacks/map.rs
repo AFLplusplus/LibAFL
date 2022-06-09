@@ -664,23 +664,13 @@ where
 
         let history_map = map_state.history_map.as_mut_slice();
 
-        if self.novelties.is_some() {
-            for (i, &item) in observer.as_ref_iter().enumerate() {
-                let history = history_map[i];
-                let reduced = R::reduce(history, item);
-                if N::is_novel(history, reduced) {
-                    history_map[i] = reduced;
-                    interesting = true;
+        for (i, (item, history)) in observer.as_ref_iter().zip(history_map.iter_mut()).enumerate() {
+            let reduced = R::reduce(*history, *item);
+            if N::is_novel(*history, reduced) {
+                *history = reduced;
+                interesting = true;
+                if self.novelties.is_some() {
                     self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        } else {
-            for (i, &item) in observer.as_ref_iter().enumerate() {
-                let history = history_map[i];
-                let reduced = R::reduce(history, item);
-                if N::is_novel(history, reduced) {
-                    history_map[i] = reduced;
-                    interesting = true;
                 }
             }
         }
