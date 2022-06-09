@@ -331,28 +331,19 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(target_os = "windows")]
 mod windows {
-    use core::ptr::addr_of_mut;
-
     use crate::bolts::core_affinity::{CoreId, Error};
-    use alloc::{string::ToString, vec::Vec};
+    use alloc::vec::Vec;
     use windows::Win32::System::SystemInformation::GROUP_AFFINITY;
     use windows::Win32::System::Threading::{
-        GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadGroupAffinity,
+        GetCurrentThread, SetThreadGroupAffinity,
     };
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
-        let mask = get_affinity_mask()?;
-        // Find all active cores in the bitmask.
         let mut core_ids: Vec<CoreId> = Vec::new();
-
-        for i in 0..64 {
-            let test_mask = 1 << i;
-
-            if (mask & test_mask) == test_mask {
-                core_ids.push(CoreId { id: i });
-            }
+        let total_cores = get_num_logical_cpus_ex_windows().unwrap();
+        for i in 0..total_cores {
+            core_ids.push(CoreId { id: i });
         }
-
         Ok(core_ids)
     }
 
@@ -386,37 +377,6 @@ mod windows {
             } else {
                 Ok(())
             }
-        }
-    }
-
-    fn get_affinity_mask() -> Result<u64, Error> {
-        #[cfg(target_pointer_width = "64")]
-        let mut process_mask: u64 = 0;
-        #[cfg(target_pointer_width = "32")]
-        let mut process_mask: u32 = 0;
-        #[cfg(target_pointer_width = "64")]
-        let mut system_mask: u64 = 0;
-        #[cfg(target_pointer_width = "32")]
-        let mut system_mask: u32 = 0;
-
-        let res = unsafe {
-            GetProcessAffinityMask(
-                GetCurrentProcess(),
-                addr_of_mut!(process_mask) as _,
-                addr_of_mut!(system_mask) as _,
-            )
-        };
-
-        // Successfully retrieved affinity mask
-        if res.as_bool() {
-            #[allow(trivial_numeric_casts)]
-            Ok(process_mask as _)
-        }
-        // Failed to retrieve affinity mask
-        else {
-            Err(Error::unknown(
-                "Could not get affinity mask, GetProcessAffinityMask failed.".to_string(),
-            ))
         }
     }
 
