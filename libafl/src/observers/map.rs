@@ -1045,7 +1045,7 @@ where
         if (len & 1) != 0 {
             unsafe {
                 *map.get_unchecked_mut(len - 1) =
-                    COUNT_CLASS_LOOKUP[*map16.get_unchecked(len - 1) as usize]
+                    COUNT_CLASS_LOOKUP[*map.get_unchecked(len - 1) as usize]
             };
         }
 
