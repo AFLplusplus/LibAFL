@@ -1009,12 +1009,11 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
 ];
 
-static mut COUNT_CLASS_LOOKUP_16_INITED: bool = false;
 static mut COUNT_CLASS_LOOKUP_16: Vec<u16> = vec![];
 
 fn init_count_class_16() {
     unsafe {
-        if COUNT_CLASS_LOOKUP_16_INITED {
+        if !COUNT_CLASS_LOOKUP_16.is_empty() {
             return;
         }
 
