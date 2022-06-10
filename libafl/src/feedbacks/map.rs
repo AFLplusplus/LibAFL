@@ -308,7 +308,10 @@ where
 
     /// Reset the map
     pub fn reset(&mut self) -> Result<(), Error> {
-        self.history_map.iter_mut().for_each(|x| *x = T::default());
+        let cnt = self.history_map.len();
+        for i in 0..cnt {
+            self.history_map[i] = T::default();
+        }
         Ok(())
     }
 }
@@ -353,79 +356,36 @@ where
         Ok(())
     }
 
-    #[allow(clippy::wrong_self_convention)]
-    fn is_interesting<EM, OT>(
+    #[rustversion::nightly]
+    default fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        _input: &I,
+        input: &I,
         observers: &OT,
-        _exit_kind: &ExitKind,
+        exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
     {
-        let mut interesting = false;
-        // TODO Replace with match_name_type when stable
-        let observer = observers.match_name::<O>(&self.observer_name).unwrap();
-        let size = observer.usable_count();
-        let initial = observer.initial();
+        self.is_interesting_default(state, manager, input, observers, exit_kind)
+    }
 
-        let map_state = state
-            .named_metadata_mut()
-            .get_mut::<MapFeedbackMetadata<T>>(&self.name)
-            .unwrap();
-        if map_state.history_map.len() < observer.len() {
-            map_state.history_map.resize(observer.len(), T::default());
-        }
-
-        // assert!(size <= map_state.history_map.len(), "The size of the associated map observer cannot exceed the size of the history map of the feedback. If you are running multiple instances of slightly different fuzzers (e.g. one with ASan and another without) synchronized using LLMP please check the `configuration` field of the LLMP manager.");
-
-        assert!(size <= observer.len());
-
-        if self.novelties.is_some() {
-            for (i, &item) in observer.as_ref_iter().enumerate() {
-                let history = map_state.history_map[i];
-                let reduced = R::reduce(history, item);
-                if N::is_novel(history, reduced) {
-                    map_state.history_map[i] = reduced;
-                    interesting = true;
-                    self.novelties.as_mut().unwrap().push(i);
-                }
-            }
-        } else {
-            for (i, &item) in observer.as_ref_iter().enumerate() {
-                let history = map_state.history_map[i];
-                let reduced = R::reduce(history, item);
-                if N::is_novel(history, reduced) {
-                    map_state.history_map[i] = reduced;
-                    interesting = true;
-                }
-            }
-        }
-
-        if interesting {
-            let mut filled = 0;
-            for i in 0..size {
-                if map_state.history_map[i] != initial {
-                    filled += 1;
-                    if self.indexes.is_some() {
-                        self.indexes.as_mut().unwrap().push(i);
-                    }
-                }
-            }
-            manager.fire(
-                state,
-                Event::UpdateUserStats {
-                    name: self.stats_name.to_string(),
-                    value: UserStats::Ratio(filled, size as u64),
-                    phantom: PhantomData,
-                },
-            )?;
-        }
-
-        Ok(interesting)
+    #[rustversion::not(nightly)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        input: &I,
+        observers: &OT,
+        exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
     fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
@@ -449,6 +409,127 @@ where
             v.clear();
         }
         Ok(())
+    }
+}
+
+/// Specialize for the common coverage map size, maximization of u8s
+#[rustversion::nightly]
+impl<I, O, S> Feedback<I, S> for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
+where
+    O: MapObserver<Entry = u8> + AsSlice<u8>,
+    for<'it> O: AsRefIterator<'it, Item = u8>,
+    I: Input,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+{
+    #[allow(clippy::wrong_self_convention)]
+    #[allow(clippy::needless_range_loop)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        // 128 bits vectors
+        type VectorType = core::simd::u8x16;
+
+        let mut interesting = false;
+        // TODO Replace with match_name_type when stable
+        let observer = observers.match_name::<O>(&self.observer_name).unwrap();
+
+        let map_state = state
+            .named_metadata_mut()
+            .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
+            .unwrap();
+
+        let size = observer.usable_count();
+        if map_state.history_map.len() < size {
+            map_state.history_map.resize(size, u8::default());
+        }
+
+        let map = observer.as_slice();
+        debug_assert!(map.len() >= size);
+
+        let history_map = map_state.history_map.as_mut_slice();
+
+        // Non vector implementation for reference
+        /*for (i, history) in history_map.iter_mut().enumerate() {
+            let item = map[i];
+            let reduced = MaxReducer::reduce(*history, item);
+            if DifferentIsNovel::is_novel(*history, reduced) {
+                *history = reduced;
+                interesting = true;
+                if self.novelties.is_some() {
+                    self.novelties.as_mut().unwrap().push(i);
+                }
+            }
+        }*/
+
+        let steps = size / VectorType::LANES;
+        let left = size % VectorType::LANES;
+
+        for step in 0..steps {
+            let i = step * VectorType::LANES;
+            let history = VectorType::from_slice(&history_map[i..]);
+            let items = VectorType::from_slice(&map[i..]);
+
+            if items.max(history) != history {
+                interesting = true;
+                unsafe {
+                    for j in i..(i + VectorType::LANES) {
+                        let item = *map.get_unchecked(j);
+                        if item > *history_map.get_unchecked(j) {
+                            *history_map.get_unchecked_mut(j) = item;
+                            if self.novelties.is_some() {
+                                self.novelties.as_mut().unwrap().push(j);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for j in (size - left)..size {
+            unsafe {
+                let item = *map.get_unchecked(j);
+                if item > *history_map.get_unchecked(j) {
+                    interesting = true;
+                    *history_map.get_unchecked_mut(j) = item;
+                    if self.novelties.is_some() {
+                        self.novelties.as_mut().unwrap().push(j);
+                    }
+                }
+            }
+        }
+
+        let initial = observer.initial();
+        if interesting {
+            let len = history_map.len();
+            let mut filled = 0;
+            for i in 0..len {
+                if history_map[i] != initial {
+                    filled += 1;
+                    if self.indexes.is_some() {
+                        self.indexes.as_mut().unwrap().push(i);
+                    }
+                }
+            }
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: self.stats_name.to_string(),
+                    value: UserStats::Ratio(filled, len as u64),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
+
+        Ok(interesting)
     }
 }
 
@@ -490,10 +571,11 @@ impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    N: IsNovel<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsRefIterator<'it, Item = T>,
-    S: HasNamedMetadata,
+    N: IsNovel<T>,
+    I: Input,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -550,6 +632,76 @@ where
             name: name.to_string(),
             phantom: PhantomData,
         }
+    }
+
+    #[allow(clippy::wrong_self_convention)]
+    #[allow(clippy::needless_range_loop)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    fn is_interesting_default<EM, OT>(
+        &mut self,
+        state: &mut S,
+        manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        let mut interesting = false;
+        // TODO Replace with match_name_type when stable
+        let observer = observers.match_name::<O>(&self.observer_name).unwrap();
+
+        let map_state = state
+            .named_metadata_mut()
+            .get_mut::<MapFeedbackMetadata<T>>(&self.name)
+            .unwrap();
+        let size = observer.usable_count();
+        if map_state.history_map.len() < size {
+            map_state.history_map.resize(size, T::default());
+        }
+
+        let history_map = map_state.history_map.as_mut_slice();
+
+        for (i, (item, history)) in observer
+            .as_ref_iter()
+            .zip(history_map.iter_mut())
+            .enumerate()
+        {
+            let reduced = R::reduce(*history, *item);
+            if N::is_novel(*history, reduced) {
+                *history = reduced;
+                interesting = true;
+                if self.novelties.is_some() {
+                    self.novelties.as_mut().unwrap().push(i);
+                }
+            }
+        }
+
+        let initial = observer.initial();
+        if interesting {
+            let len = history_map.len();
+            let mut filled = 0;
+            for i in 0..len {
+                if history_map[i] != initial {
+                    filled += 1;
+                    if self.indexes.is_some() {
+                        self.indexes.as_mut().unwrap().push(i);
+                    }
+                }
+            }
+            manager.fire(
+                state,
+                Event::UpdateUserStats {
+                    name: self.stats_name.to_string(),
+                    value: UserStats::Ratio(filled, len as u64),
+                    phantom: PhantomData,
+                },
+            )?;
+        }
+
+        Ok(interesting)
     }
 }
 

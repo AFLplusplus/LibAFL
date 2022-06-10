@@ -58,17 +58,7 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     fn usable_count(&self) -> usize;
 
     /// Count the set bytes in the map
-    fn count_bytes(&self) -> u64 {
-        let initial = self.initial();
-        let cnt = self.usable_count();
-        let mut res = 0;
-        for i in 0..cnt {
-            if *self.get(i) != initial {
-                res += 1;
-            }
-        }
-        res
-    }
+    fn count_bytes(&self) -> u64;
 
     /// Compute the hash of the map
     fn hash(&self) -> u64;
@@ -85,39 +75,13 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     }
 
     /// Reset the map
-    #[inline]
-    fn reset_map(&mut self) -> Result<(), Error> {
-        // Normal memset, see https://rust.godbolt.org/z/Trs5hv
-        let initial = self.initial();
-        let cnt = self.usable_count();
-        for i in 0..cnt {
-            *self.get_mut(i) = initial;
-        }
-        Ok(())
-    }
+    fn reset_map(&mut self) -> Result<(), Error>;
 
     /// Get these observer's contents as [`Vec`]
-    fn to_vec(&self) -> Vec<Self::Entry> {
-        let cnt = self.usable_count();
-        let mut res = Vec::with_capacity(cnt);
-        for i in 0..cnt {
-            res.push(*self.get(i));
-        }
-        res
-    }
+    fn to_vec(&self) -> Vec<Self::Entry>;
 
     /// Get the number of set entries with the specified indexes
-    fn how_many_set(&self, indexes: &[usize]) -> usize {
-        let initial = self.initial();
-        let cnt = self.usable_count();
-        let mut res = 0;
-        for i in indexes {
-            if *i < cnt && *self.get(*i) != initial {
-                res += 1;
-            }
-        }
-        res
-    }
+    fn how_many_set(&self, indexes: &[usize]) -> usize;
 }
 
 /// A Simple iterator calling `MapObserver::get`
@@ -333,6 +297,20 @@ where
         &mut self.as_mut_slice()[idx]
     }
 
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for x in map[0..cnt].iter() {
+            if *x != initial {
+                res += 1;
+            }
+        }
+        res
+    }
+
     #[inline]
     fn usable_count(&self) -> usize {
         self.as_slice().len()
@@ -354,6 +332,32 @@ where
 
     fn to_vec(&self) -> Vec<T> {
         self.as_slice().to_vec()
+    }
+
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        // Normal memset, see https://rust.godbolt.org/z/Trs5hv
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_mut_slice();
+        for x in map[0..cnt].iter_mut() {
+            *x = initial;
+        }
+        Ok(())
+    }
+
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && map[*i] != initial {
+                res += 1;
+            }
+        }
+        res
     }
 }
 
@@ -598,6 +602,20 @@ where
         &mut self.as_mut_slice()[idx]
     }
 
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for x in map[0..cnt].iter() {
+            if *x != initial {
+                res += 1;
+            }
+        }
+        res
+    }
+
     fn usable_count(&self) -> usize {
         self.as_slice().len()
     }
@@ -606,8 +624,35 @@ where
         hash_slice(self.as_slice())
     }
 
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        // Normal memset, see https://rust.godbolt.org/z/Trs5hv
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_mut_slice();
+        for x in map[0..cnt].iter_mut() {
+            *x = initial;
+        }
+        Ok(())
+    }
+
     fn to_vec(&self) -> Vec<T> {
         self.as_slice().to_vec()
+    }
+
+    /// Get the number of set entries with the specified indexes
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && map[*i] != initial {
+                res += 1;
+            }
+        }
+        res
     }
 }
 
@@ -831,11 +876,51 @@ where
         &mut self.map.as_mut_slice()[idx]
     }
 
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for x in map[0..cnt].iter() {
+            if *x != initial {
+                res += 1;
+            }
+        }
+        res
+    }
     fn hash(&self) -> u64 {
         hash_slice(self.as_slice())
     }
+
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        // Normal memset, see https://rust.godbolt.org/z/Trs5hv
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_mut_slice();
+        for x in map[0..cnt].iter_mut() {
+            *x = initial;
+        }
+        Ok(())
+    }
+
     fn to_vec(&self) -> Vec<T> {
         self.as_slice().to_vec()
+    }
+
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && map[*i] != initial {
+                res += 1;
+            }
+        }
+        res
     }
 }
 
@@ -924,9 +1009,27 @@ static COUNT_CLASS_LOOKUP: [u8; 256] = [
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
 ];
 
+static mut COUNT_CLASS_LOOKUP_16: Vec<u16> = vec![];
+
+fn init_count_class_16() {
+    unsafe {
+        if !COUNT_CLASS_LOOKUP_16.is_empty() {
+            return;
+        }
+
+        COUNT_CLASS_LOOKUP_16 = vec![0; 65536];
+        for i in 0..256 {
+            for j in 0..256 {
+                COUNT_CLASS_LOOKUP_16[(i << 8) + j] =
+                    (u16::from(COUNT_CLASS_LOOKUP[i]) << 8) | u16::from(COUNT_CLASS_LOOKUP[j]);
+            }
+        }
+    }
+}
+
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<I, S>,
+    M: MapObserver<Entry = u8> + Observer<I, S> + AsMutSlice<u8>,
     for<'it> M: AsMutIterator<'it, Item = u8>,
 {
     #[inline]
@@ -935,9 +1038,23 @@ where
     }
 
     #[inline]
+    #[allow(clippy::cast_ptr_alignment)]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        for elem in self.as_mut_iter() {
-            *elem = COUNT_CLASS_LOOKUP[*elem as usize];
+        let map = self.as_mut_slice();
+        let len = map.len();
+        if (len & 1) != 0 {
+            unsafe {
+                *map.get_unchecked_mut(len - 1) =
+                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
+            }
+        }
+
+        let cnt = len / 2;
+        let map16 = unsafe { core::slice::from_raw_parts_mut(map.as_mut_ptr() as *mut u16, cnt) };
+        for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
+            unsafe {
+                *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
+            }
         }
         self.base.post_exec(state, input, exit_kind)
     }
@@ -995,11 +1112,26 @@ where
         self.base.get_mut(idx)
     }
 
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        self.base.count_bytes()
+    }
+
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        self.base.reset_map()
+    }
+
     fn hash(&self) -> u64 {
         self.base.hash()
     }
     fn to_vec(&self) -> Vec<u8> {
         self.base.to_vec()
+    }
+
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        self.base.how_many_set(indexes)
     }
 }
 
@@ -1028,6 +1160,7 @@ where
 {
     /// Creates a new [`MapObserver`]
     pub fn new(base: M) -> Self {
+        init_count_class_16();
         Self { base }
     }
 }
@@ -1206,6 +1339,28 @@ where
 
     fn usable_count(&self) -> usize {
         self.len()
+    }
+
+    fn to_vec(&self) -> Vec<Self::Entry> {
+        let cnt = self.usable_count();
+        let mut res = Vec::with_capacity(cnt);
+        for i in 0..cnt {
+            res.push(*self.get(i));
+        }
+        res
+    }
+
+    /// Get the number of set entries with the specified indexes
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && *self.get(*i) != initial {
+                res += 1;
+            }
+        }
+        res
     }
 }
 
@@ -1434,6 +1589,20 @@ where
         &mut self.as_mut_slice()[idx]
     }
 
+    /// Count the set bytes in the map
+    fn count_bytes(&self) -> u64 {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for x in map[0..cnt].iter() {
+            if *x != initial {
+                res += 1;
+            }
+        }
+        res
+    }
+
     #[inline]
     fn usable_count(&self) -> usize {
         self.as_slice().len()
@@ -1458,8 +1627,33 @@ where
         self.initial = initial;
     }
 
+    /// Reset the map
+    #[inline]
+    fn reset_map(&mut self) -> Result<(), Error> {
+        // Normal memset, see https://rust.godbolt.org/z/Trs5hv
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_mut_slice();
+        for x in map[0..cnt].iter_mut() {
+            *x = initial;
+        }
+        Ok(())
+    }
     fn to_vec(&self) -> Vec<T> {
         self.as_slice().to_vec()
+    }
+
+    fn how_many_set(&self, indexes: &[usize]) -> usize {
+        let initial = self.initial();
+        let cnt = self.usable_count();
+        let map = self.as_slice();
+        let mut res = 0;
+        for i in indexes {
+            if *i < cnt && map[*i] != initial {
+                res += 1;
+            }
+        }
+        res
     }
 }
 
@@ -1505,8 +1699,8 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use super::{
-        AsMutIterator, AsRefIterator, Debug, Error, HasLen, Iter, IterMut, MapObserver, Named,
-        Observer, OwnedMapObserver, StdMapObserver, String, Vec,
+        AsMutIterator, AsMutSlice, AsRefIterator, AsSlice, Debug, Error, HasLen, Iter, IterMut,
+        MapObserver, Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
     use crate::observers::pybind::PythonObserver;
     use concat_idents::concat_idents;
@@ -1758,6 +1952,18 @@ pub mod pybind {
                 }
             }
 
+            impl AsSlice<$datatype> for $struct_name_trait {
+                fn as_slice(&self) -> &[$datatype] {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_slice()) }} )
+                }
+            }
+
+            impl AsMutSlice<$datatype> for $struct_name_trait {
+                fn as_mut_slice(&mut self) -> &mut [$datatype] {
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_mut_slice()) }} )
+                }
+            }
+
             impl MapObserver for $struct_name_trait {
                 type Entry = $datatype;
 
@@ -1773,6 +1979,10 @@ pub mod pybind {
                     unsafe { ptr.as_mut().unwrap() }
                 }
 
+                #[inline]
+                fn count_bytes(&self) -> u64 {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.count_bytes() })
+                }
                 #[inline]
                 fn usable_count(&self) -> usize {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.usable_count() })
@@ -1798,8 +2008,19 @@ pub mod pybind {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.set_initial(initial) });
                 }
 
+                #[inline]
+                fn reset_map(&mut self) -> Result<(), Error> {
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.reset_map() })
+                }
+
+                #[inline]
                 fn to_vec(&self) -> Vec<$datatype> {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.to_vec() })
+                }
+
+                #[inline]
+                fn how_many_set(&self, indexes: &[usize]) -> usize {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.how_many_set(indexes) })
                 }
             }
 

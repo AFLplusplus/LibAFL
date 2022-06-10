@@ -8,6 +8,8 @@ Welcome to `LibAFL`
 #![cfg_attr(unstable_feature, feature(specialization))]
 // For `type_id` and owned things
 #![cfg_attr(unstable_feature, feature(intrinsics))]
+// For `std::simd`
+#![cfg_attr(unstable_feature, feature(portable_simd))]
 #![warn(clippy::cargo)]
 #![deny(clippy::cargo_common_metadata)]
 #![deny(rustdoc::broken_intra_doc_links)]
@@ -68,6 +70,8 @@ Welcome to `LibAFL`
         while_true
     )
 )]
+// Till they fix this buggy lint in clippy
+#![allow(clippy::borrow_deref_ref)]
 
 #[cfg(feature = "std")]
 #[macro_use]
