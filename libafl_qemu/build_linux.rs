@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "d840462c2e4cdda4428d99cd4003ddda95c5a2dc";
+const QEMU_REVISION: &str = "6a9a929222cbc8b10adfb048aa24f73486e0a886";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -141,80 +141,21 @@ pub fn build() {
     let build_dir = qemu_path.join("build");
     let output_lib = build_dir.join(&format!("libqemu-{}.so", cpu_target));
     if !output_lib.is_file() {
-        drop(
+        /*drop(
             Command::new("make")
                 .current_dir(&qemu_path)
                 .arg("distclean")
                 .status(),
-        );
+        );*/
         Command::new("./configure")
             .current_dir(&qemu_path)
             //.arg("--as-static-lib")
             .arg("--as-shared-lib")
             .arg(&format!("--target-list={}-linux-user", cpu_target))
             .args(&[
-                "--audio-drv-list=",
                 "--disable-blobs",
-                "--disable-bochs",
-                "--disable-brlapi",
                 "--disable-bsd-user",
-                "--disable-bzip2",
-                "--disable-cap-ng",
-                "--disable-cloop",
-                "--disable-curl",
-                "--disable-curses",
-                "--disable-dmg",
                 "--disable-fdt",
-                "--disable-gcrypt",
-                "--disable-glusterfs",
-                "--disable-gnutls",
-                "--disable-gtk",
-                "--disable-guest-agent",
-                "--disable-iconv",
-                "--disable-libiscsi",
-                "--disable-libnfs",
-                "--disable-libssh",
-                "--disable-libusb",
-                "--disable-linux-aio",
-                "--disable-live-block-migration",
-                "--disable-lzo",
-                "--disable-nettle",
-                "--disable-numa",
-                "--disable-opengl",
-                "--disable-parallels",
-                "--disable-plugins",
-                "--disable-qcow1",
-                "--disable-qed",
-                "--disable-rbd",
-                "--disable-rdma",
-                "--disable-replication",
-                "--disable-sdl",
-                "--disable-seccomp",
-                "--disable-smartcard",
-                "--disable-snappy",
-                "--disable-spice",
-                "--disable-system",
-                "--disable-tools",
-                "--disable-tpm",
-                "--disable-usb-redir",
-                "--disable-vde",
-                "--disable-vdi",
-                "--disable-vhost-crypto",
-                "--disable-vhost-kernel",
-                "--disable-vhost-net",
-                "--disable-vhost-scsi",
-                "--disable-vhost-user",
-                "--disable-vhost-vdpa",
-                "--disable-vhost-vsock",
-                "--disable-virglrenderer",
-                "--disable-virtfs",
-                "--disable-vnc",
-                "--disable-vnc-jpeg",
-                "--disable-vnc-sasl",
-                "--disable-vte",
-                "--disable-vvfat",
-                "--disable-xen",
-                "--disable-xen-pci-passthrough",
             ])
             .status()
             .expect("Configure failed");

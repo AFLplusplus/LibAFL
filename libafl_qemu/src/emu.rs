@@ -248,6 +248,12 @@ extern "C" {
         unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
     static mut libafl_post_syscall_hook:
         unsafe extern "C" fn(u64, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> u64;
+
+    fn libafl_qemu_add_gdb_cmd(
+        callback: extern "C" fn(*const u8, usize, *const ()) -> i32,
+        data: *const (),
+    );
+    fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 }
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
@@ -305,6 +311,24 @@ impl Drop for GuestMaps {
     fn drop(&mut self) {
         unsafe {
             free_self_maps(self.orig_c_iter);
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FatPtr(*const c_void, *const c_void);
+
+static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
+
+extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
+    unsafe {
+        let closure: &mut Box<dyn FnMut(&str) -> bool> = core::mem::transmute(data);
+        let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
+        if closure(cmd) {
+            1
+        } else {
+            0
         }
     }
 }
@@ -703,6 +727,20 @@ impl Emulator {
         unsafe {
             libafl_post_syscall_hook = hook;
         }
+    }
+
+    pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&str) -> bool>) {
+        unsafe {
+            GDB_COMMANDS.push(core::mem::transmute(callback));
+            libafl_qemu_add_gdb_cmd(
+                gdb_cmd,
+                GDB_COMMANDS.last().unwrap() as *const _ as *const (),
+            );
+        }
+    }
+
+    pub fn gdb_reply(&self, output: &str) {
+        unsafe { libafl_qemu_gdb_reply(output.as_bytes().as_ptr(), output.len()) };
     }
 }
 
