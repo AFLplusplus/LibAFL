@@ -747,7 +747,6 @@ impl Emulator {
 #[cfg(feature = "python")]
 pub mod pybind {
     use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
-    use core::mem::transmute;
     use pyo3::exceptions::PyValueError;
     use pyo3::{prelude::*, types::PyInt};
     use std::convert::TryFrom;
