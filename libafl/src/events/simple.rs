@@ -497,16 +497,16 @@ pub mod pybind {
     use crate::events::pybind::PythonEventManager;
     use crate::events::SimpleEventManager;
     use crate::inputs::BytesInput;
+    use crate::state::pybind::PythonStdState;
     use crate::monitors::pybind::PythonMonitor;
-    use crate::state::StdState;
     use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "SimpleEventManager")]
-    #[derive(Debug, Clone)]
+    #[derive(Debug)]
     /// Python class for SimpleEventManager
     pub struct PythonSimpleEventManager {
         /// Rust wrapped SimpleEventManager object
-        pub inner: SimpleEventManager<BytesInput, PythonMonitor>,
+        pub inner: SimpleEventManager<BytesInput, PythonMonitor, PythonStdState>
     }
 
     #[pymethods]
