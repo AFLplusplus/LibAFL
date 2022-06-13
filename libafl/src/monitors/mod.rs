@@ -12,7 +12,7 @@ pub mod disk;
 #[cfg(feature = "std")]
 pub use disk::OnDiskTOMLMonitor;
 
-use alloc::{string::String, vec::Vec};
+use alloc::{fmt::Debug, string::String, vec::Vec};
 
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
@@ -282,7 +282,7 @@ impl Default for NopMonitor {
 }
 
 /// Tracking monitor during fuzzing.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SimpleMonitor<F>
 where
     F: FnMut(String),
@@ -290,6 +290,18 @@ where
     print_fn: F,
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+}
+
+impl<F> Debug for SimpleMonitor<F>
+where
+    F: FnMut(String),
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SimpleMonitor")
+            .field("start_time", &self.start_time)
+            .field("client_stats", &self.client_stats)
+            .finish()
+    }
 }
 
 impl<F> Monitor for SimpleMonitor<F>
