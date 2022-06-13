@@ -155,9 +155,15 @@ where
                 .unwrap()
                 .history_map;
 
-            for j in 0..map_len {
-                if map_first[j] != map[j] && history_map[j] != O::Entry::max_value() {
-                    history_map[j] = O::Entry::max_value();
+            if history_map.len() < map_len {
+                history_map.resize(map_len, O::Entry::default());
+            }
+
+            for (first, (cur, history)) in
+                map_first.iter().zip(map.iter().zip(history_map.iter_mut()))
+            {
+                if *first != *cur && *history != O::Entry::max_value() {
+                    *history = O::Entry::max_value();
                     unstable_entries += 1;
                 };
             }
