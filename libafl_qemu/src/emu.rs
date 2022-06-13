@@ -3,7 +3,7 @@
 use core::{
     convert::Into,
     ffi::c_void,
-    mem::{transmute, MaybeUninit},
+    mem::MaybeUninit,
     ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
 };
 use libc::c_int;
@@ -475,7 +475,7 @@ impl Emulator {
 
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
-        unsafe { transmute(addr as usize + guest_base) }
+        unsafe { (addr as usize + guest_base) as *mut T }
     }
 
     #[must_use]
@@ -858,7 +858,7 @@ pub mod pybind {
         }
 
         fn h2g(&self, addr: u64) -> GuestAddr {
-            self.emu.h2g(unsafe { transmute::<_, *const u8>(addr) })
+            self.emu.h2g(addr as *const u8)
         }
 
         fn binary_path(&self) -> String {
