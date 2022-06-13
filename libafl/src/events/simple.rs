@@ -5,7 +5,6 @@ use crate::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
     },
-    executors::Executor,
     inputs::Input,
     monitors::Monitor,
     Error,
@@ -29,6 +28,7 @@ use crate::bolts::os::{fork, ForkResult};
 use crate::{
     bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
     corpus::Corpus,
+    executors::Executor,
     state::{HasCorpus, HasSolutions},
 };
 
@@ -332,6 +332,7 @@ where
 {
 }
 
+#[cfg(feature = "std")]
 impl<I, MT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
