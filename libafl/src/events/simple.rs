@@ -494,11 +494,10 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::events::pybind::PythonEventManager;
-    use crate::events::SimpleEventManager;
-    use crate::inputs::BytesInput;
-    use crate::monitors::pybind::PythonMonitor;
-    use crate::state::pybind::PythonStdState;
+    use crate::{
+        events::pybind::PythonEventManager, events::SimpleEventManager, inputs::BytesInput,
+        monitors::pybind::PythonMonitor, state::pybind::PythonStdState,
+    };
     use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "SimpleEventManager")]

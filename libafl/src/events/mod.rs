@@ -582,16 +582,17 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::events::simple::pybind::PythonSimpleEventManager;
-    use crate::events::{
-        Event, EventFirer, EventManager, EventManagerId, EventProcessor, EventRestarter,
-        HasEventManagerId, ProgressReporter,
+    use crate::{
+        events::{
+            simple::pybind::PythonSimpleEventManager, Event, EventFirer, EventManager,
+            EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
+        },
+        executors::pybind::PythonExecutor,
+        fuzzer::pybind::PythonStdFuzzer,
+        inputs::BytesInput,
+        state::pybind::PythonStdState,
+        Error,
     };
-    use crate::executors::pybind::PythonExecutor;
-    use crate::fuzzer::pybind::PythonStdFuzzer;
-    use crate::inputs::BytesInput;
-    use crate::state::pybind::PythonStdState;
-    use crate::Error;
     use pyo3::prelude::*;
 
     #[derive(Debug, Clone)]

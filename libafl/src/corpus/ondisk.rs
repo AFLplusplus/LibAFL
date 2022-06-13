@@ -208,9 +208,10 @@ where
 #[cfg(feature = "python")]
 /// `OnDiskCorpus` Python bindings
 pub mod pybind {
-    use crate::corpus::pybind::PythonCorpus;
-    use crate::corpus::OnDiskCorpus;
-    use crate::inputs::BytesInput;
+    use crate::{
+        corpus::{pybind::PythonCorpus, OnDiskCorpus},
+        inputs::BytesInput,
+    };
     use alloc::string::String;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
