@@ -45,7 +45,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
-use super::CustomBufEventResult;
+use super::{CustomBufEventResult, CustomBufHandlerFn};
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: Tag = 0x2C11E471;
@@ -252,8 +252,7 @@ where
 {
     llmp: LlmpClient<SP>,
     /// The custom buf handler
-    custom_buf_handlers:
-        Vec<Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>>,
+    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     configuration: EventConfig,
@@ -267,10 +266,12 @@ where
     SP: ShMemProvider + 'static,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("LlmpEventManager")
-            .field("llmp", &self.llmp)
-            //.field("custom_buf_handlers", &self.custom_buf_handlers)
-            .field("compressor", &self.compressor)
+        let mut debug_struct = f.debug_struct("LlmpEventManager");
+        let debug = debug_struct.field("llmp", &self.llmp);
+        //.field("custom_buf_handlers", &self.custom_buf_handlers)
+        #[cfg(feature = "llmp_compression")]
+        let debug = debug.field("compressor", &self.compressor);
+        debug
             .field("configuration", &self.configuration)
             .field("phantom", &self.phantom)
             .finish_non_exhaustive()

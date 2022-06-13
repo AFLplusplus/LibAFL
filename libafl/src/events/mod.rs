@@ -37,8 +37,6 @@ pub struct EventManagerId {
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "introspection")]
-use alloc::boxed::Box;
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -469,13 +467,14 @@ where
 {
 }
 
+/// The handler function for custom buffers exchanged via [`EventManager`]
+type CustomBufHandlerFn<S> =
+    dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
+
 /// Supports custom buf handlers to handle `CustomBuf` events.
 pub trait HasCustomBufHandlers<S> {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    fn add_custom_buf_handler(
-        &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
-    );
+    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>);
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.

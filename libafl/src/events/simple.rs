@@ -32,7 +32,7 @@ use crate::{
     state::{HasCorpus, HasSolutions},
 };
 
-use super::{CustomBufEventResult, HasCustomBufHandlers, ProgressReporter};
+use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
 
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
@@ -51,8 +51,7 @@ where
     /// The events that happened since the last handle_in_broker
     events: Vec<Event<I>>,
     /// The custom buf handler
-    custom_buf_handlers:
-        Vec<Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>>,
+    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     phantom: PhantomData<S>,
 }
 
@@ -498,6 +497,7 @@ pub mod pybind {
     use crate::events::SimpleEventManager;
     use crate::inputs::BytesInput;
     use crate::monitors::pybind::PythonMonitor;
+    use crate::state::StdState;
     use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "SimpleEventManager")]
