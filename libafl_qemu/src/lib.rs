@@ -50,7 +50,7 @@ pub use snapshot::QemuSnapshotHelper;
 pub mod asan;
 pub use asan::{init_with_asan, QemuAsanHelper};
 
-// pub mod calls;
+pub mod calls;
 
 pub mod executor;
 pub use executor::{QemuExecutor, QemuForkExecutor};

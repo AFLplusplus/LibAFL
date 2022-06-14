@@ -189,8 +189,14 @@ extern "C" {
     fn libafl_qemu_set_breakpoint(addr: u64) -> i32;
     fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
     fn libafl_flush_jit();
-    fn libafl_qemu_set_hook(addr: u64, callback: extern "C" fn(u64), data: u64) -> usize;
-    fn libafl_qemu_remove_hook(addr: u64) -> i32;
+    fn libafl_qemu_set_hook(
+        addr: GuestAddr,
+        callback: extern "C" fn(GuestAddr, u64),
+        data: u64,
+        invalidate_block: i32,
+    ) -> usize;
+    fn libafl_qemu_remove_hook(num: usize, invalidate_block: i32) -> i32;
+    fn libafl_qemu_remove_hooks_at(addr: GuestAddr, invalidate_block: i32) -> usize;
     fn libafl_qemu_run() -> i32;
     fn libafl_load_addr() -> u64;
     fn libafl_get_brk() -> u64;
@@ -490,16 +496,18 @@ impl Emulator {
         }
     }
 
-    pub fn set_hook(&self, addr: GuestAddr, callback: extern "C" fn(u64), data: u64) {
-        unsafe {
-            libafl_qemu_set_hook(addr.into(), callback, data);
-        }
+    pub fn set_hook(
+        &self,
+        addr: GuestAddr,
+        callback: extern "C" fn(GuestAddr, u64),
+        data: u64,
+        invalidate_block: bool,
+    ) -> usize {
+        unsafe { libafl_qemu_set_hook(addr.into(), callback, data, invalidate_block as i32) }
     }
 
-    pub fn remove_hook(&self, addr: GuestAddr) {
-        unsafe {
-            libafl_qemu_remove_hook(addr.into());
-        }
+    pub fn remove_hook(&self, addr: GuestAddr, invalidate_block: bool) -> usize {
+        unsafe { libafl_qemu_remove_hooks_at(addr.into(), invalidate_block as i32) }
     }
 
     /// This function will run the emulator until the next breakpoint, or until finish.

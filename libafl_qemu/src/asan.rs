@@ -605,8 +605,7 @@ pub fn trace_write_n_asan<I, QT, S>(
 
 #[allow(clippy::too_many_arguments)]
 pub fn qasan_fake_syscall<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     sys_num: i32,
     a0: u64,
@@ -623,39 +622,40 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     if sys_num == QASAN_FAKESYS_NR {
-        let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
+        let emulator = hooks.emulator().clone();
+        let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
         let mut r = 0;
         match QasanAction::try_from(a0).expect("Invalid QASan action number") {
             QasanAction::CheckLoad => {
-                h.read_n(emulator, a1 as GuestAddr, a2 as usize);
+                h.read_n(&emulator, a1 as GuestAddr, a2 as usize);
             }
             QasanAction::CheckStore => {
-                h.write_n(emulator, a1 as GuestAddr, a2 as usize);
+                h.write_n(&emulator, a1 as GuestAddr, a2 as usize);
             }
             QasanAction::Poison => {
                 h.poison(
-                    emulator,
+                    &emulator,
                     a1 as GuestAddr,
                     a2 as usize,
                     PoisonKind::try_from(a3 as u8).unwrap(),
                 );
             }
             QasanAction::UserPoison => {
-                h.poison(emulator, a1 as GuestAddr, a2 as usize, PoisonKind::User);
+                h.poison(&emulator, a1 as GuestAddr, a2 as usize, PoisonKind::User);
             }
             QasanAction::UnPoison => {
-                h.unpoison(emulator, a1 as GuestAddr, a2 as usize);
+                h.unpoison(&emulator, a1 as GuestAddr, a2 as usize);
             }
             QasanAction::IsPoison => {
-                if h.is_poisoned(emulator, a1 as GuestAddr, a2 as usize) {
+                if h.is_poisoned(&emulator, a1 as GuestAddr, a2 as usize) {
                     r = 1;
                 }
             }
             QasanAction::Alloc => {
-                h.alloc(emulator, a1, a2);
+                h.alloc(&emulator, a1, a2);
             }
             QasanAction::Dealloc => {
-                h.dealloc(emulator, a1);
+                h.dealloc(&emulator, a1);
             }
             QasanAction::Enable => {
                 h.set_enabled(true);

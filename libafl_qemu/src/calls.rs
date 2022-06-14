@@ -1,10 +1,8 @@
 use capstone::prelude::*;
-use libafl::{inputs::Input, state::HasMetadata};
-use std::pin::Pin;
+use libafl::inputs::Input;
 
 use crate::{
     capstone,
-    emu::Emulator,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
     GuestAddr,
@@ -40,27 +38,33 @@ impl Default for QemuCallTracerHelper {
 impl<I, S> QemuHelper<I, S> for QemuCallTracerHelper
 where
     I: Input,
-    S: HasMetadata,
 {
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'a, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
-        hooks.block_generation(gen_blocks_calls::<I, QT, S>);
+        hooks.blocks(Some(gen_blocks_calls::<I, QT, S>), None);
     }
 }
 
-extern "C" fn on_call(pc: u64) {
-    eprintln!("CALL @ 0x{:#x}", pc)
+pub fn on_call<I, QT, S>(hooks: &mut QemuHooks<'_, I, QT, S>, _state: Option<&mut S>, pc: GuestAddr)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    //eprintln!("CALL @ 0x{:#x}", pc)
 }
 
-extern "C" fn on_ret(pc: u64) {
-    eprintln!("RET @ 0x{:#x}", pc)
+pub fn on_ret<I, QT, S>(hooks: &mut QemuHooks<'_, I, QT, S>, _state: Option<&mut S>, pc: GuestAddr)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    //eprintln!("RET @ 0x{:#x}", pc)
 }
 
 pub fn gen_blocks_calls<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     pc: u64,
 ) -> Option<u64>
@@ -68,12 +72,13 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuCallTracerHelper>() {
+    let emu = hooks.emulator();
+    if let Some(h) = hooks.helpers().match_first_type::<QemuCallTracerHelper>() {
         if !h.must_instrument(pc) {
             return None;
         }
 
-        let mut code = unsafe { std::slice::from_raw_parts(emulator.g2h(pc), 512) };
+        let mut code = unsafe { std::slice::from_raw_parts(emu.g2h(pc), 512) };
         let mut iaddr = pc;
 
         'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr, 1) {
@@ -85,10 +90,10 @@ where
             for detail in insn_detail.groups() {
                 match detail.0 as u32 {
                     capstone::InsnGroupType::CS_GRP_CALL => {
-                        emulator.set_hook(insn.address() as GuestAddr, on_call, insn.address());
+                        hooks.instruction(insn.address() as GuestAddr, on_call, false);
                     }
                     capstone::InsnGroupType::CS_GRP_RET => {
-                        emulator.set_hook(insn.address() as GuestAddr, on_ret, insn.address());
+                        hooks.instruction(insn.address() as GuestAddr, on_ret, false);
                         break 'disasm;
                     }
                     capstone::InsnGroupType::CS_GRP_INVALID
@@ -101,7 +106,7 @@ where
             }
 
             iaddr += insn.bytes().len() as u64;
-            code = unsafe { std::slice::from_raw_parts(emulator.g2h(iaddr), 512) };
+            code = unsafe { std::slice::from_raw_parts(emu.g2h(iaddr), 512) };
         }
     }
 
