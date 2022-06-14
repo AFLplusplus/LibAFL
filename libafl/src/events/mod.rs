@@ -253,11 +253,11 @@ where
     },*/
 }
 
-impl<'a, I> Event<I>
+impl<I> Event<I>
 where
     I: Input,
 {
-    fn name(&self) -> &'a str {
+    fn name(&self) -> &str {
         match self {
             Event::NewTestcase {
                 input: _,
