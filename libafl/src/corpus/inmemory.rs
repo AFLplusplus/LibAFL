@@ -91,9 +91,10 @@ where
 /// `InMemoryCorpus` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::corpus::pybind::PythonCorpus;
-    use crate::corpus::InMemoryCorpus;
-    use crate::inputs::BytesInput;
+    use crate::{
+        corpus::{pybind::PythonCorpus, InMemoryCorpus},
+        inputs::BytesInput,
+    };
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 

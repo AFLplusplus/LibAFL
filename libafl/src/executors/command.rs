@@ -674,7 +674,7 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_builder() {
-        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+        let mut mgr = SimpleEventManager::<BytesInput, _, ()>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
 
@@ -700,7 +700,7 @@ mod tests {
     fn test_parse_afl_cmdline() {
         use alloc::string::ToString;
 
-        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+        let mut mgr = SimpleEventManager::<BytesInput, _, ()>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
 

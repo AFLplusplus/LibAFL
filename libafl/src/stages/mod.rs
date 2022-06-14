@@ -261,13 +261,14 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::events::pybind::PythonEventManager;
-    use crate::executors::pybind::PythonExecutor;
-    use crate::fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper};
-    use crate::stages::mutational::pybind::PythonStdMutationalStage;
-    use crate::stages::{Stage, StagesTuple};
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
-    use crate::Error;
+    use crate::{
+        events::pybind::PythonEventManager,
+        executors::pybind::PythonExecutor,
+        fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
+        stages::{mutational::pybind::PythonStdMutationalStage, Stage, StagesTuple},
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
     use alloc::vec::Vec;
     use pyo3::prelude::*;
 

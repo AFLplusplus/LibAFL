@@ -20,7 +20,7 @@ use crate::{
     },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
+        EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -29,7 +29,11 @@ use crate::{
     observers::ObserversTuple,
     Error,
 };
-use alloc::string::ToString;
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{marker::PhantomData, time::Duration};
@@ -40,6 +44,8 @@ use serde::Serialize;
 use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
+
+use super::{CustomBufEventResult, CustomBufHandlerFn};
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: Tag = 0x2C11E471;
@@ -228,14 +234,15 @@ where
                 #[cfg(feature = "std")]
                 println!("[LOG {}]: {}", severity_level, message);
                 Ok(BrokerEventResult::Handled)
-            } //_ => Ok(BrokerEventResult::Forward),
+            }
+            Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
+            //_ => Ok(BrokerEventResult::Forward),
         }
     }
 }
 
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, [`crate::bolts::llmp`].
-#[derive(Debug)]
 pub struct LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
@@ -244,10 +251,31 @@ where
     //CE: CustomEvent<I>,
 {
     llmp: LlmpClient<SP>,
+    /// The custom buf handler
+    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     configuration: EventConfig,
     phantom: PhantomData<(I, OT, S)>,
+}
+
+impl<I, OT, S, SP> core::fmt::Debug for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider + 'static,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut debug_struct = f.debug_struct("LlmpEventManager");
+        let debug = debug_struct.field("llmp", &self.llmp);
+        //.field("custom_buf_handlers", &self.custom_buf_handlers)
+        #[cfg(feature = "llmp_compression")]
+        let debug = debug.field("compressor", &self.compressor);
+        debug
+            .field("configuration", &self.configuration)
+            .field("phantom", &self.phantom)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<I, OT, S, SP> Drop for LlmpEventManager<I, OT, S, SP>
@@ -276,6 +304,7 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
         })
     }
 
@@ -294,6 +323,7 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
         })
     }
 
@@ -310,6 +340,7 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
         })
     }
 
@@ -330,6 +361,7 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
         })
     }
 
@@ -381,6 +413,14 @@ where
                 #[cfg(feature = "std")]
                 if let Some(item) = _res.1 {
                     println!("Added received Testcase as item #{}", item);
+                }
+                Ok(())
+            }
+            Event::CustomBuf { tag, buf } => {
+                for handler in &mut self.custom_buf_handlers {
+                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
+                        break;
+                    }
                 }
                 Ok(())
             }
@@ -494,6 +534,20 @@ where
     SP: ShMemProvider,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
+}
+
+impl<I, OT, S, SP> HasCustomBufHandlers<S> for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    fn add_custom_buf_handler(
+        &mut self,
+        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+    ) {
+        self.custom_buf_handlers.push(handler);
+    }
 }
 
 impl<I, OT, S, SP> ProgressReporter<I> for LlmpEventManager<I, OT, S, SP>

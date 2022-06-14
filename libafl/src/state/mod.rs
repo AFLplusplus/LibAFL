@@ -655,22 +655,22 @@ where
 #[allow(missing_docs)]
 /// `State` Python bindings
 pub mod pybind {
-    use crate::bolts::ownedref::OwnedPtrMut;
-    use crate::bolts::rands::pybind::PythonRand;
-    use crate::corpus::pybind::PythonCorpus;
-    use crate::events::pybind::PythonEventManager;
-    use crate::executors::pybind::PythonExecutor;
-    use crate::feedbacks::pybind::PythonFeedback;
-    use crate::fuzzer::pybind::PythonStdFuzzerWrapper;
-    use crate::generators::pybind::PythonGenerator;
-    use crate::inputs::BytesInput;
-    use crate::pybind::PythonMetadata;
-    use crate::state::{
-        HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,
+    use crate::{
+        bolts::{ownedref::OwnedPtrMut, rands::pybind::PythonRand},
+        corpus::pybind::PythonCorpus,
+        events::pybind::PythonEventManager,
+        executors::pybind::PythonExecutor,
+        feedbacks::pybind::PythonFeedback,
+        fuzzer::pybind::PythonStdFuzzerWrapper,
+        generators::pybind::PythonGenerator,
+        inputs::BytesInput,
+        pybind::PythonMetadata,
+        state::{
+            HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,
+        },
     };
     use alloc::{boxed::Box, vec::Vec};
-    use pyo3::prelude::*;
-    use pyo3::types::PyDict;
+    use pyo3::{prelude::*, types::PyDict};
     use std::path::PathBuf;
 
     /// `StdState` with fixed generics

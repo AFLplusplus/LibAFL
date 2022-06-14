@@ -351,12 +351,13 @@ crate::impl_serdeany!(SchedulerTestcaseMetaData);
 /// `Testcase` Python bindings
 pub mod pybind {
     use super::{HasMetadata, Testcase};
-    use crate::bolts::ownedref::OwnedPtrMut;
-    use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::pybind::PythonMetadata;
+    use crate::{
+        bolts::ownedref::OwnedPtrMut,
+        inputs::{BytesInput, HasBytesVec},
+        pybind::PythonMetadata,
+    };
     use alloc::{boxed::Box, vec::Vec};
-    use pyo3::prelude::*;
-    use pyo3::types::PyDict;
+    use pyo3::{prelude::*, types::PyDict};
 
     /// `PythonTestcase` with fixed generics
     pub type PythonTestcase = Testcase<BytesInput>;
