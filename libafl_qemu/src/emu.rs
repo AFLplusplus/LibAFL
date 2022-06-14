@@ -3,7 +3,7 @@
 use core::{
     convert::Into,
     ffi::c_void,
-    mem::{transmute, MaybeUninit},
+    mem::MaybeUninit,
     ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
 };
 use libc::c_int;
@@ -248,6 +248,12 @@ extern "C" {
         unsafe extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult;
     static mut libafl_post_syscall_hook:
         unsafe extern "C" fn(u64, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> u64;
+
+    fn libafl_qemu_add_gdb_cmd(
+        callback: extern "C" fn(*const u8, usize, *const ()) -> i32,
+        data: *const (),
+    );
+    fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 }
 
 #[cfg_attr(feature = "python", pyclass(unsendable))]
@@ -305,6 +311,25 @@ impl Drop for GuestMaps {
     fn drop(&mut self) {
         unsafe {
             free_self_maps(self.orig_c_iter);
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) struct FatPtr(*const c_void, *const c_void);
+
+static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
+
+extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
+    unsafe {
+        let closure =
+            &mut *(data as *mut std::boxed::Box<dyn for<'r> std::ops::FnMut(&'r str) -> bool>);
+        let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
+        if closure(cmd) {
+            1
+        } else {
+            0
         }
     }
 }
@@ -451,7 +476,7 @@ impl Emulator {
 
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
-        unsafe { transmute(addr as usize + guest_base) }
+        unsafe { (addr as usize + guest_base) as *mut T }
     }
 
     #[must_use]
@@ -704,12 +729,25 @@ impl Emulator {
             libafl_post_syscall_hook = hook;
         }
     }
+
+    pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&str) -> bool>) {
+        unsafe {
+            GDB_COMMANDS.push(core::mem::transmute(callback));
+            libafl_qemu_add_gdb_cmd(
+                gdb_cmd,
+                GDB_COMMANDS.last().unwrap() as *const _ as *const (),
+            );
+        }
+    }
+
+    pub fn gdb_reply(&self, output: &str) {
+        unsafe { libafl_qemu_gdb_reply(output.as_bytes().as_ptr(), output.len()) };
+    }
 }
 
 #[cfg(feature = "python")]
 pub mod pybind {
     use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
-    use core::mem::transmute;
     use pyo3::exceptions::PyValueError;
     use pyo3::{prelude::*, types::PyInt};
     use std::convert::TryFrom;
@@ -820,7 +858,7 @@ pub mod pybind {
         }
 
         fn h2g(&self, addr: u64) -> GuestAddr {
-            self.emu.h2g(unsafe { transmute::<_, *const u8>(addr) })
+            self.emu.h2g(addr as *const u8)
         }
 
         fn binary_path(&self) -> String {

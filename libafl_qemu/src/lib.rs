@@ -7,6 +7,8 @@
     allow(clippy::useless_conversion)
 )]
 #![allow(clippy::needless_pass_by_value)]
+// Till they fix this buggy lint in clippy
+#![allow(clippy::borrow_deref_ref)]
 
 use std::env;
 

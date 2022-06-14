@@ -14,14 +14,10 @@ use libafl::{executors::inprocess::inprocess_get_state, inputs::Input};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
-    emu::{Emulator, SKIP_EXEC_HOOK},
+    emu::{Emulator, FatPtr, SKIP_EXEC_HOOK},
     helper::{QemuHelper, QemuHelperTuple},
     GuestAddr,
 };
-
-#[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
-struct FatPtr(*const c_void, *const c_void);
 
 // all kinds of hooks
 #[derive(Clone, Copy, PartialEq, Eq)]
