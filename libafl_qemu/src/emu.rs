@@ -189,7 +189,7 @@ extern "C" {
     fn libafl_qemu_set_breakpoint(addr: u64) -> i32;
     fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
     fn libafl_flush_jit();
-    fn libafl_qemu_set_hook(addr: u64, callback: extern "C" fn(u64), val: u64) -> i32;
+    fn libafl_qemu_set_hook(addr: u64, callback: extern "C" fn(u64), val: u64) -> usize;
     fn libafl_qemu_remove_hook(addr: u64) -> i32;
     fn libafl_qemu_run() -> i32;
     fn libafl_load_addr() -> u64;
@@ -217,10 +217,19 @@ extern "C" {
     static guest_base: usize;
     static mut mmap_next_start: GuestAddr;
 
-    static mut libafl_exec_edge_hook: unsafe extern "C" fn(u64);
-    static mut libafl_gen_edge_hook: unsafe extern "C" fn(u64, u64) -> u64;
-    static mut libafl_exec_block_hook: unsafe extern "C" fn(u64);
-    static mut libafl_gen_block_hook: unsafe extern "C" fn(u64) -> u64;
+    // void libafl_add_edge_hook(uint64_t (*gen)(target_ulong src, target_ulong dst), void (*exec)(uint64_t id));
+    fn libafl_add_edge_hook(
+        gen: Option<extern "C" fn(GuestAddr, GuestAddr, u64) -> u64>,
+        exec: Option<extern "C" fn(u64, u64)>,
+        data: u64,
+    );
+
+    // void libafl_add_block_hook(uint64_t (*gen)(target_ulong pc), void (*exec)(uint64_t id));
+    fn libafl_add_block_hook(
+        gen: Option<extern "C" fn(GuestAddr, u64) -> u64>,
+        exec: Option<extern "C" fn(u64, u64)>,
+        data: u64,
+    );
 
     static mut libafl_exec_read_hook1: unsafe extern "C" fn(u64, u64);
     static mut libafl_exec_read_hook2: unsafe extern "C" fn(u64, u64);
@@ -323,8 +332,7 @@ static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
 
 extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
     unsafe {
-        let closure =
-            &mut *(data as *mut std::boxed::Box<dyn for<'r> std::ops::FnMut(&'r str) -> bool>);
+        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         if closure(cmd) {
             1
@@ -577,30 +585,22 @@ impl Emulator {
         }
     }
 
-    // TODO add has_X_hook() and panic when setting a hook for the second time
-
-    pub fn set_exec_edge_hook(&self, hook: extern "C" fn(id: u64)) {
-        unsafe {
-            libafl_exec_edge_hook = hook;
-        }
+    pub fn add_edge_hooks(
+        &self,
+        gen: Option<extern "C" fn(GuestAddr, GuestAddr, u64) -> u64>,
+        exec: Option<extern "C" fn(u64, u64)>,
+        data: u64,
+    ) {
+        unsafe { libafl_add_edge_hook(gen, exec, data) }
     }
 
-    pub fn set_gen_edge_hook(&self, hook: extern "C" fn(src: u64, dest: u64) -> u64) {
-        unsafe {
-            libafl_gen_edge_hook = hook;
-        }
-    }
-
-    pub fn set_exec_block_hook(&self, hook: extern "C" fn(pc: u64)) {
-        unsafe {
-            libafl_exec_block_hook = hook;
-        }
-    }
-
-    pub fn set_gen_block_hook(&self, hook: extern "C" fn(pc: u64) -> u64) {
-        unsafe {
-            libafl_gen_block_hook = hook;
-        }
+    pub fn add_block_hooks(
+        &self,
+        gen: Option<extern "C" fn(GuestAddr, u64) -> u64>,
+        exec: Option<extern "C" fn(u64, u64)>,
+        data: u64,
+    ) {
+        unsafe { libafl_add_block_hook(gen, exec, data) }
     }
 
     pub fn set_exec_read1_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {

@@ -59,3 +59,8 @@ impl IntoPy<PyObject> for Regs {
         n.into_py(py)
     }
 }
+
+/// Return an ARM64 ArchCapstoneBuilder
+pub fn capstone() -> capstone::arch::arm64::ArchCapstoneBuilder {
+    capstone::Capstone::new().arm()
+}

@@ -57,7 +57,127 @@ where
     )
 }
 
-static mut GEN_EDGE_HOOK: Hook = Hook::Empty;
+static mut EDGE_HOOKS: Vec<(Hook, Hook)> = vec![];
+
+extern "C" fn gen_edge_hook_wrapper<I, QT, S>(src: GuestAddr, dst: GuestAddr, index: u64) -> u64
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    unsafe {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (gen, _) = &mut EDGE_HOOKS[index as usize];
+        match gen {
+            Hook::Function(ptr) => {
+                let func: fn(
+                    Pin<&mut QemuHooks<'_, I, QT, S>>,
+                    Option<&mut S>,
+                    GuestAddr,
+                    GuestAddr,
+                ) -> Option<u64> = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
+            }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(
+                        Pin<&mut QemuHooks<'_, I, QT, S>>,
+                        Option<&mut S>,
+                        GuestAddr,
+                        GuestAddr,
+                    ) -> Option<u64>,
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
+            }
+            _ => 0,
+        }
+    }
+}
+
+extern "C" fn exec_edge_hook_wrapper<I, QT, S>(id: u64, index: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    unsafe {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (_, exec) = &mut EDGE_HOOKS[index as usize];
+        match exec {
+            Hook::Function(ptr) => {
+                let func: fn(Pin<&mut QemuHooks<'_, I, QT, S>>, Option<&mut S>, u64) =
+                    transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), id);
+            }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(Pin<&mut QemuHooks<'_, I, QT, S>>, Option<&mut S>, u64),
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), id);
+            }
+            _ => (),
+        }
+    }
+}
+
+static mut BLOCK_HOOKS: Vec<(Hook, Hook)> = vec![];
+
+extern "C" fn gen_block_hook_wrapper<I, QT, S>(pc: GuestAddr, index: u64) -> u64
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    unsafe {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (gen, _) = &mut BLOCK_HOOKS[index as usize];
+        match gen {
+            Hook::Function(ptr) => {
+                let func: fn(
+                    Pin<&mut QemuHooks<'_, I, QT, S>>,
+                    Option<&mut S>,
+                    GuestAddr,
+                ) -> Option<u64> = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
+            }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(
+                        Pin<&mut QemuHooks<'_, I, QT, S>>,
+                        Option<&mut S>,
+                        GuestAddr,
+                    ) -> Option<u64>,
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
+            }
+            _ => 0,
+        }
+    }
+}
+
+extern "C" fn exec_block_hook_wrapper<I, QT, S>(id: u64, index: u64)
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    unsafe {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (_, exec) = &mut BLOCK_HOOKS[index as usize];
+        match exec {
+            Hook::Function(ptr) => {
+                let func: fn(Pin<&mut QemuHooks<'_, I, QT, S>>, Option<&mut S>, u64) =
+                    transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), id);
+            }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(Pin<&mut QemuHooks<'_, I, QT, S>>, Option<&mut S>, u64),
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), id);
+            }
+            _ => (),
+        }
+    }
+}
+
+/*static mut GEN_EDGE_HOOK: Hook = Hook::Empty;
 extern "C" fn gen_edge_hook_wrapper<I, QT, S>(src: u64, dst: u64) -> u64
 where
     I: Input,
@@ -175,6 +295,7 @@ where
         }
     }
 }
+*/
 
 static mut GEN_READ_HOOK: Hook = Hook::Empty;
 extern "C" fn gen_read_hook_wrapper<I, QT, S>(size: u32) -> u64
@@ -1149,86 +1270,186 @@ where
         &mut self.helpers
     }
 
-    pub fn edge_generation(
+    pub fn edges(
         &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, src: u64, dest: u64) -> Option<u64>,
+        generation_hook: Option<
+            fn(Pin<&mut Self>, Option<&mut S>, src: GuestAddr, dest: GuestAddr) -> Option<u64>,
+        >,
+        execution_hook: Option<fn(Pin<&mut Self>, Option<&mut S>, id: u64)>,
     ) {
         unsafe {
-            GEN_EDGE_HOOK = Hook::Function(hook as *const libc::c_void);
+            let index = EDGE_HOOKS.len();
+            self.emulator.add_edge_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_edge_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook.is_none() {
+                    None
+                } else {
+                    Some(exec_edge_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            EDGE_HOOKS.push((
+                generation_hook
+                    .map(|hook| Hook::Function(hook as *const libc::c_void))
+                    .unwrap_or(Hook::Empty),
+                execution_hook
+                    .map(|hook| Hook::Function(hook as *const libc::c_void))
+                    .unwrap_or(Hook::Empty),
+            ));
         }
-        self.emulator
-            .set_gen_edge_hook(gen_edge_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn edge_generation_closure(
+    pub fn edges_closures(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u64) -> Option<u64>>,
+        generation_hook: Option<
+            Box<dyn FnMut(Pin<&mut Self>, Option<&mut S>, GuestAddr, GuestAddr) -> Option<u64>>,
+        >,
+        execution_hook: Option<Box<dyn FnMut(Pin<&mut Self>, Option<&mut S>, u64)>>,
     ) {
         unsafe {
-            GEN_EDGE_HOOK = Hook::Closure(transmute(hook));
+            let index = EDGE_HOOKS.len();
+            self.emulator.add_edge_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_edge_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook.is_none() {
+                    None
+                } else {
+                    Some(exec_edge_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            EDGE_HOOKS.push((
+                generation_hook
+                    .map(|hook| Hook::Closure(transmute(hook)))
+                    .unwrap_or(Hook::Empty),
+                execution_hook
+                    .map(|hook| Hook::Closure(transmute(hook)))
+                    .unwrap_or(Hook::Empty),
+            ));
         }
-        self.emulator
-            .set_gen_edge_hook(gen_edge_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn edge_execution(&self, hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64)) {
-        unsafe {
-            EDGE_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_edge_hook(edge_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn edge_execution_closure(
+    pub fn edges_raw(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64)>,
+        generation_hook: Option<
+            fn(Pin<&mut Self>, Option<&mut S>, src: GuestAddr, dest: GuestAddr) -> Option<u64>,
+        >,
+        execution_hook: Option<extern "C" fn(id: u64, data: u64)>,
     ) {
         unsafe {
-            EDGE_HOOKS.push(Hook::Closure(transmute(hook)));
+            let index = EDGE_HOOKS.len();
+            self.emulator.add_edge_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_edge_hook_wrapper::<I, QT, S>)
+                },
+                execution_hook,
+                index as u64,
+            );
+            EDGE_HOOKS.push((
+                generation_hook
+                    .map(|hook| Hook::Function(hook as *const libc::c_void))
+                    .unwrap_or(Hook::Empty),
+                Hook::Empty,
+            ));
         }
-        self.emulator
-            .set_exec_edge_hook(edge_hooks_wrapper::<I, QT, S>);
     }
 
-    pub fn block_generation(
+    pub fn blocks(
         &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, pc: u64) -> Option<u64>,
+        generation_hook: Option<fn(Pin<&mut Self>, Option<&mut S>, pc: GuestAddr) -> Option<u64>>,
+        execution_hook: Option<fn(Pin<&mut Self>, Option<&mut S>, id: u64)>,
     ) {
         unsafe {
-            GEN_BLOCK_HOOK = Hook::Function(hook as *const libc::c_void);
+            let index = BLOCK_HOOKS.len();
+            self.emulator.add_block_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_block_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook.is_none() {
+                    None
+                } else {
+                    Some(exec_block_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            BLOCK_HOOKS.push((
+                generation_hook
+                    .map(|hook| Hook::Function(hook as *const libc::c_void))
+                    .unwrap_or(Hook::Empty),
+                execution_hook
+                    .map(|hook| Hook::Function(hook as *const libc::c_void))
+                    .unwrap_or(Hook::Empty),
+            ));
         }
-        self.emulator
-            .set_gen_block_hook(gen_block_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn block_generation_closure(
+    pub fn blocks_closures(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64) -> Option<u64>>,
+        generation_hook: Option<
+            Box<dyn FnMut(Pin<&mut Self>, Option<&mut S>, GuestAddr) -> Option<u64>>,
+        >,
+        execution_hook: Option<Box<dyn FnMut(Pin<&mut Self>, Option<&mut S>, u64)>>,
     ) {
         unsafe {
-            GEN_BLOCK_HOOK = Hook::Closure(transmute(hook));
+            let index = BLOCK_HOOKS.len();
+            self.emulator.add_block_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_block_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook.is_none() {
+                    None
+                } else {
+                    Some(exec_block_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            BLOCK_HOOKS.push((
+                generation_hook
+                    .map(|hook| Hook::Closure(transmute(hook)))
+                    .unwrap_or(Hook::Empty),
+                execution_hook
+                    .map(|hook| Hook::Closure(transmute(hook)))
+                    .unwrap_or(Hook::Empty),
+            ));
         }
-        self.emulator
-            .set_gen_block_hook(gen_block_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn block_execution(&self, hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64)) {
-        unsafe {
-            BLOCK_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_block_hook(block_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn block_execution_closure(
+    pub fn blocks_raw(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64)>,
+        generation_hook: Option<fn(Pin<&mut Self>, Option<&mut S>, pc: GuestAddr) -> Option<u64>>,
+        execution_hook: Option<extern "C" fn(id: u64, data: u64)>,
     ) {
         unsafe {
-            BLOCK_HOOKS.push(Hook::Closure(transmute(hook)));
+            let index = BLOCK_HOOKS.len();
+            self.emulator.add_block_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_block_hook_wrapper::<I, QT, S>)
+                },
+                execution_hook,
+                index as u64,
+            );
+            BLOCK_HOOKS.push((
+                generation_hook
+                    .map(|hook| Hook::Function(hook as *const libc::c_void))
+                    .unwrap_or(Hook::Empty),
+                Hook::Empty,
+            ));
         }
-        self.emulator
-            .set_exec_block_hook(block_hooks_wrapper::<I, QT, S>);
     }
 
     pub fn read_generation(
