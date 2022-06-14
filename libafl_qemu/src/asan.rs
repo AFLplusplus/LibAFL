@@ -1,6 +1,6 @@
 use libafl::{inputs::Input, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::{env, fs, pin::Pin, ptr};
+use std::{env, fs, ptr};
 
 use crate::{
     emu::{Emulator, SyscallHookResult},
@@ -413,7 +413,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -444,7 +444,7 @@ where
 }
 
 pub fn gen_readwrite_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     pc: u64,
     _size: usize,
@@ -462,7 +462,7 @@ where
 }
 
 pub fn trace_read1_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -476,7 +476,7 @@ pub fn trace_read1_asan<I, QT, S>(
 }
 
 pub fn trace_read2_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -490,7 +490,7 @@ pub fn trace_read2_asan<I, QT, S>(
 }
 
 pub fn trace_read4_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -504,7 +504,7 @@ pub fn trace_read4_asan<I, QT, S>(
 }
 
 pub fn trace_read8_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -518,7 +518,7 @@ pub fn trace_read8_asan<I, QT, S>(
 }
 
 pub fn trace_read_n_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -533,7 +533,7 @@ pub fn trace_read_n_asan<I, QT, S>(
 }
 
 pub fn trace_write1_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -547,7 +547,7 @@ pub fn trace_write1_asan<I, QT, S>(
 }
 
 pub fn trace_write2_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -561,7 +561,7 @@ pub fn trace_write2_asan<I, QT, S>(
 }
 
 pub fn trace_write4_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -575,7 +575,7 @@ pub fn trace_write4_asan<I, QT, S>(
 }
 
 pub fn trace_write8_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -589,7 +589,7 @@ pub fn trace_write8_asan<I, QT, S>(
 }
 
 pub fn trace_write_n_asan<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,

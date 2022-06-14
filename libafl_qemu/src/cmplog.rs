@@ -1,4 +1,3 @@
-use core::pin::Pin;
 use hashbrown::HashMap;
 use libafl::{inputs::Input, state::HasMetadata};
 pub use libafl_targets::{
@@ -58,7 +57,7 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -102,7 +101,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -117,7 +116,7 @@ where
 }
 
 pub fn gen_unique_cmp_ids<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     state: Option<&mut S>,
     pc: u64,
     _size: usize,
@@ -149,7 +148,7 @@ where
 }
 
 pub fn gen_hashed_cmp_ids<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     pc: u64,
     _size: usize,

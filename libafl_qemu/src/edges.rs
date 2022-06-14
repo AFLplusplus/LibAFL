@@ -4,7 +4,7 @@ pub use libafl_targets::{
     edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
 use serde::{Deserialize, Serialize};
-use std::{cell::UnsafeCell, cmp::max, pin::Pin};
+use std::{cell::UnsafeCell, cmp::max};
 
 use crate::{
     emu::GuestAddr,
@@ -70,7 +70,7 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -132,7 +132,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -153,7 +153,7 @@ where
 thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
 
 pub fn gen_unique_edge_ids<I, QT, S>(
-    hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
@@ -211,7 +211,7 @@ pub extern "C" fn trace_edge_single(id: u64, _data: u64) {
 }
 
 pub fn gen_hashed_edge_ids<I, QT, S>(
-    hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
@@ -246,7 +246,7 @@ pub extern "C" fn trace_edge_single_ptr(id: u64, _data: u64) {
 }
 
 pub fn gen_addr_block_ids<I, QT, S>(
-    _hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    _hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
@@ -258,7 +258,7 @@ where
 }
 
 pub fn gen_hashed_block_ids<I, QT, S>(
-    _hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    _hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>

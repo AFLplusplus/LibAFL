@@ -1,8 +1,5 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
-use core::{
-    fmt::{self, Debug, Formatter},
-    pin::Pin,
-};
+use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
     bolts::shmem::ShMemProvider,
@@ -26,7 +23,7 @@ where
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
 {
-    hooks: Pin<Box<QemuHooks<'a, I, QT, S>>>,
+    hooks: Box<QemuHooks<'a, I, QT, S>>,
     inner: InProcessExecutor<'a, H, I, OT, S>,
 }
 
@@ -53,7 +50,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     pub fn new<EM, OF, Z>(
-        hooks: Pin<Box<QemuHooks<'a, I, QT, S>>>,
+        hooks: Box<QemuHooks<'a, I, QT, S>>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -80,11 +77,11 @@ where
         &mut self.inner
     }
 
-    pub fn hooks(&self) -> &Pin<Box<QemuHooks<'a, I, QT, S>>> {
+    pub fn hooks(&self) -> &QemuHooks<'a, I, QT, S> {
         &self.hooks
     }
 
-    pub fn hooks_mut(&mut self) -> &mut Pin<Box<QemuHooks<'a, I, QT, S>>> {
+    pub fn hooks_mut(&mut self) -> &mut QemuHooks<'a, I, QT, S> {
         &mut self.hooks
     }
 
@@ -108,21 +105,9 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
-        unsafe {
-            self.hooks
-                .as_mut()
-                .get_unchecked_mut()
-                .helpers_mut()
-                .pre_exec_all(&emu, input);
-        }
+        self.hooks.helpers_mut().pre_exec_all(&emu, input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
-        unsafe {
-            self.hooks
-                .as_mut()
-                .get_unchecked_mut()
-                .helpers_mut()
-                .post_exec_all(&emu, input);
-        }
+        self.hooks.helpers_mut().post_exec_all(&emu, input);
         r
     }
 }
@@ -153,7 +138,7 @@ where
     QT: QemuHelperTuple<I, S>,
     SP: ShMemProvider,
 {
-    hooks: Pin<Box<QemuHooks<'a, I, QT, S>>>,
+    hooks: Box<QemuHooks<'a, I, QT, S>>,
     inner: InProcessForkExecutor<'a, H, I, OT, S, SP>,
 }
 
@@ -182,7 +167,7 @@ where
     SP: ShMemProvider,
 {
     pub fn new<EM, OF, Z>(
-        hooks: Pin<Box<QemuHooks<'a, I, QT, S>>>,
+        hooks: Box<QemuHooks<'a, I, QT, S>>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -219,11 +204,11 @@ where
         &mut self.inner
     }
 
-    pub fn hooks(&self) -> &Pin<Box<QemuHooks<'a, I, QT, S>>> {
+    pub fn hooks(&self) -> &QemuHooks<'a, I, QT, S> {
         &self.hooks
     }
 
-    pub fn hooks_mut(&mut self) -> &mut Pin<Box<QemuHooks<'a, I, QT, S>>> {
+    pub fn hooks_mut(&mut self) -> &mut QemuHooks<'a, I, QT, S> {
         &mut self.hooks
     }
 
@@ -249,21 +234,9 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
-        unsafe {
-            self.hooks
-                .as_mut()
-                .get_unchecked_mut()
-                .helpers_mut()
-                .pre_exec_all(&emu, input);
-        }
+        self.hooks.helpers_mut().pre_exec_all(&emu, input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
-        unsafe {
-            self.hooks
-                .as_mut()
-                .get_unchecked_mut()
-                .helpers_mut()
-                .post_exec_all(&emu, input);
-        }
+        self.hooks.helpers_mut().post_exec_all(&emu, input);
         r
     }
 }

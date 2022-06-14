@@ -3,7 +3,6 @@ use libafl::{inputs::Input, state::HasMetadata};
 use std::{
     cell::UnsafeCell,
     collections::{HashMap, HashSet},
-    pin::Pin,
     sync::Mutex,
 };
 use thread_local::ThreadLocal;
@@ -197,7 +196,7 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -223,7 +222,7 @@ where
 }
 
 pub fn trace_write1_snapshot<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -236,7 +235,7 @@ pub fn trace_write1_snapshot<I, QT, S>(
 }
 
 pub fn trace_write2_snapshot<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -249,7 +248,7 @@ pub fn trace_write2_snapshot<I, QT, S>(
 }
 
 pub fn trace_write4_snapshot<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -262,7 +261,7 @@ pub fn trace_write4_snapshot<I, QT, S>(
 }
 
 pub fn trace_write8_snapshot<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -275,7 +274,7 @@ pub fn trace_write8_snapshot<I, QT, S>(
 }
 
 pub fn trace_write_n_snapshot<I, QT, S>(
-    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
