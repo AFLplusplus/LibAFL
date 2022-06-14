@@ -323,7 +323,8 @@ static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
 
 extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
     unsafe {
-        let closure: &mut Box<dyn FnMut(&str) -> bool> = core::mem::transmute(data);
+        let closure =
+            &mut *(data as *mut std::boxed::Box<dyn for<'r> std::ops::FnMut(&'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         if closure(cmd) {
             1
