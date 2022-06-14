@@ -189,7 +189,7 @@ extern "C" {
     fn libafl_qemu_set_breakpoint(addr: u64) -> i32;
     fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
     fn libafl_flush_jit();
-    fn libafl_qemu_set_hook(addr: u64, callback: extern "C" fn(u64), val: u64) -> usize;
+    fn libafl_qemu_set_hook(addr: u64, callback: extern "C" fn(u64), data: u64) -> usize;
     fn libafl_qemu_remove_hook(addr: u64) -> i32;
     fn libafl_qemu_run() -> i32;
     fn libafl_load_addr() -> u64;
@@ -231,25 +231,54 @@ extern "C" {
         data: u64,
     );
 
-    static mut libafl_exec_read_hook1: unsafe extern "C" fn(u64, u64);
-    static mut libafl_exec_read_hook2: unsafe extern "C" fn(u64, u64);
-    static mut libafl_exec_read_hook4: unsafe extern "C" fn(u64, u64);
-    static mut libafl_exec_read_hook8: unsafe extern "C" fn(u64, u64);
-    static mut libafl_exec_read_hookN: unsafe extern "C" fn(u64, u64, u32);
-    static mut libafl_gen_read_hook: unsafe extern "C" fn(u32) -> u64;
+    // void libafl_add_read_hook(uint64_t (*gen)(target_ulong pc, size_t size, uint64_t data),
+    //                      void (*exec1)(uint64_t id, target_ulong addr, uint64_t data),
+    //                      void (*exec2)(uint64_t id, target_ulong addr, uint64_t data),
+    //                      void (*exec4)(uint64_t id, target_ulong addr, uint64_t data),
+    //                      void (*exec8)(uint64_t id, target_ulong addr, uint64_t data),
+    //                      void (*exec_n)(uint64_t id, target_ulong addr, size_t size, uint64_t data),
+    //                      uint64_t data);
+    fn libafl_add_read_hook(
+        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec8: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec_n: Option<extern "C" fn(u64, GuestAddr, usize, u64)>,
+        data: u64,
+    );
 
-    static mut libafl_exec_write_hook1: unsafe extern "C" fn(u64, u64);
-    static mut libafl_exec_write_hook2: unsafe extern "C" fn(u64, u64);
-    static mut libafl_exec_write_hook4: unsafe extern "C" fn(u64, u64);
-    static mut libafl_exec_write_hook8: unsafe extern "C" fn(u64, u64);
-    static mut libafl_exec_write_hookN: unsafe extern "C" fn(u64, u64, u32);
-    static mut libafl_gen_write_hook: unsafe extern "C" fn(u32) -> u64;
+    // void libafl_add_write_hook(uint64_t (*gen)(target_ulong pc, size_t size, uint64_t data),
+    //                      void (*exec1)(uint64_t id, target_ulong addr, uint64_t data),
+    //                      void (*exec2)(uint64_t id, target_ulong addr, uint64_t data),
+    //                      void (*exec4)(uint64_t id, target_ulong addr, uint64_t data),
+    //                      void (*exec8)(uint64_t id, target_ulong addr, uint64_t data),
+    //                      void (*exec_n)(uint64_t id, target_ulong addr, size_t size, uint64_t data),
+    //                      uint64_t data);
+    fn libafl_add_write_hook(
+        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec8: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec_n: Option<extern "C" fn(u64, GuestAddr, usize, u64)>,
+        data: u64,
+    );
 
-    static mut libafl_exec_cmp_hook1: unsafe extern "C" fn(u64, u8, u8);
-    static mut libafl_exec_cmp_hook2: unsafe extern "C" fn(u64, u16, u16);
-    static mut libafl_exec_cmp_hook4: unsafe extern "C" fn(u64, u32, u32);
-    static mut libafl_exec_cmp_hook8: unsafe extern "C" fn(u64, u64, u64);
-    static mut libafl_gen_cmp_hook: unsafe extern "C" fn(u64, u32) -> u64;
+    // void libafl_add_cmp_hook(uint64_t (*gen)(target_ulong pc, size_t size, uint64_t data),
+    //                      void (*exec1)(uint64_t id, uint8_t v0, uint8_t v1, uint64_t data),
+    //                      void (*exec2)(uint64_t id, uint16_t v0, uint16_t v1, uint64_t data),
+    //                      void (*exec4)(uint64_t id, uint32_t v0, uint32_t v1, uint64_t data),
+    //                      void (*exec8)(uint64_t id, uint64_t v0, uint64_t v1, uint64_t data),
+    //                      uint64_t data);
+    fn libafl_add_cmp_hook(
+        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        exec1: Option<extern "C" fn(u64, u8, u8, u64)>,
+        exec2: Option<extern "C" fn(u64, u16, u16, u64)>,
+        exec4: Option<extern "C" fn(u64, u32, u32, u64)>,
+        exec8: Option<extern "C" fn(u64, u64, u64, u64)>,
+        data: u64,
+    );
 
     static mut libafl_on_thread_hook: unsafe extern "C" fn(u32);
 
@@ -344,7 +373,7 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
 
 static mut EMULATOR_IS_INITIALIZED: bool = false;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Emulator {
     _private: (),
 }
@@ -461,9 +490,9 @@ impl Emulator {
         }
     }
 
-    pub fn set_hook(&self, addr: GuestAddr, callback: extern "C" fn(u64), val: u64) {
+    pub fn set_hook(&self, addr: GuestAddr, callback: extern "C" fn(u64), data: u64) {
         unsafe {
-            libafl_qemu_set_hook(addr.into(), callback, val);
+            libafl_qemu_set_hook(addr.into(), callback, data);
         }
     }
 
@@ -603,107 +632,42 @@ impl Emulator {
         unsafe { libafl_add_block_hook(gen, exec, data) }
     }
 
-    pub fn set_exec_read1_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
-        unsafe {
-            libafl_exec_read_hook1 = hook;
-        }
+    pub fn add_read_hooks(
+        &self,
+        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec8: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec_n: Option<extern "C" fn(u64, GuestAddr, usize, u64)>,
+        data: u64,
+    ) {
+        unsafe { libafl_add_read_hook(gen, exec1, exec2, exec4, exec8, exec_n, data) }
     }
 
-    pub fn set_exec_read2_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
-        unsafe {
-            libafl_exec_read_hook2 = hook;
-        }
+    pub fn add_write_hooks(
+        &self,
+        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec8: Option<extern "C" fn(u64, GuestAddr, u64)>,
+        exec_n: Option<extern "C" fn(u64, GuestAddr, usize, u64)>,
+        data: u64,
+    ) {
+        unsafe { libafl_add_write_hook(gen, exec1, exec2, exec4, exec8, exec_n, data) }
     }
 
-    pub fn set_exec_read4_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
-        unsafe {
-            libafl_exec_read_hook4 = hook;
-        }
-    }
-
-    pub fn set_exec_read8_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
-        unsafe {
-            libafl_exec_read_hook8 = hook;
-        }
-    }
-
-    pub fn set_exec_read_n_hook(&self, hook: extern "C" fn(id: u64, addr: u64, size: u32)) {
-        unsafe {
-            libafl_exec_read_hookN = hook;
-        }
-    }
-
-    pub fn set_gen_read_hook(&self, hook: extern "C" fn(size: u32) -> u64) {
-        unsafe {
-            libafl_gen_read_hook = hook;
-        }
-    }
-
-    pub fn set_exec_write1_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
-        unsafe {
-            libafl_exec_write_hook1 = hook;
-        }
-    }
-
-    pub fn set_exec_write2_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
-        unsafe {
-            libafl_exec_write_hook2 = hook;
-        }
-    }
-
-    pub fn set_exec_write4_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
-        unsafe {
-            libafl_exec_write_hook4 = hook;
-        }
-    }
-
-    pub fn set_exec_write8_hook(&self, hook: extern "C" fn(id: u64, addr: u64)) {
-        unsafe {
-            libafl_exec_write_hook8 = hook;
-        }
-    }
-
-    pub fn set_exec_write_n_hook(&self, hook: extern "C" fn(id: u64, addr: u64, size: u32)) {
-        unsafe {
-            libafl_exec_write_hookN = hook;
-        }
-    }
-
-    // TODO add pc arg
-    pub fn set_gen_write_hook(&self, hook: extern "C" fn(size: u32) -> u64) {
-        unsafe {
-            libafl_gen_write_hook = hook;
-        }
-    }
-
-    pub fn set_exec_cmp1_hook(&self, hook: extern "C" fn(id: u64, v0: u8, v1: u8)) {
-        unsafe {
-            libafl_exec_cmp_hook1 = hook;
-        }
-    }
-
-    pub fn set_exec_cmp2_hook(&self, hook: extern "C" fn(id: u64, v0: u16, v1: u16)) {
-        unsafe {
-            libafl_exec_cmp_hook2 = hook;
-        }
-    }
-
-    pub fn set_exec_cmp4_hook(&self, hook: extern "C" fn(id: u64, v0: u32, v1: u32)) {
-        unsafe {
-            libafl_exec_cmp_hook4 = hook;
-        }
-    }
-
-    pub fn set_exec_cmp8_hook(&self, hook: extern "C" fn(id: u64, v0: u64, v1: u64)) {
-        unsafe {
-            libafl_exec_cmp_hook8 = hook;
-        }
-    }
-
-    pub fn set_gen_cmp_hook(&self, hook: extern "C" fn(pc: u64, size: u32) -> u64) {
-        unsafe {
-            libafl_gen_cmp_hook = hook;
-        }
+    pub fn add_cmp_hooks(
+        &self,
+        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        exec1: Option<extern "C" fn(u64, u8, u8, u64)>,
+        exec2: Option<extern "C" fn(u64, u16, u16, u64)>,
+        exec4: Option<extern "C" fn(u64, u32, u32, u64)>,
+        exec8: Option<extern "C" fn(u64, u64, u64, u64)>,
+        data: u64,
+    ) {
+        unsafe { libafl_add_cmp_hook(gen, exec1, exec2, exec4, exec8, data) }
     }
 
     pub fn set_on_thread_hook(&self, hook: extern "C" fn(tid: u32)) {

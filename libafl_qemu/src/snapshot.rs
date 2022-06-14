@@ -201,11 +201,14 @@ where
     where
         QT: QemuHelperTuple<I, S>,
     {
-        hooks.write8_execution(trace_write8_snapshot::<I, QT, S>);
-        hooks.write4_execution(trace_write4_snapshot::<I, QT, S>);
-        hooks.write2_execution(trace_write2_snapshot::<I, QT, S>);
-        hooks.write1_execution(trace_write1_snapshot::<I, QT, S>);
-        hooks.write_n_execution(trace_write_n_snapshot::<I, QT, S>);
+        hooks.writes(
+            None,
+            Some(trace_write1_snapshot::<I, QT, S>),
+            Some(trace_write2_snapshot::<I, QT, S>),
+            Some(trace_write4_snapshot::<I, QT, S>),
+            Some(trace_write8_snapshot::<I, QT, S>),
+            Some(trace_write_n_snapshot::<I, QT, S>),
+        );
 
         hooks.after_syscalls(trace_mmap_snapshot::<I, QT, S>);
     }
@@ -220,8 +223,7 @@ where
 }
 
 pub fn trace_write1_snapshot<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -229,15 +231,12 @@ pub fn trace_write1_snapshot<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers
-        .match_first_type_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 1);
 }
 
 pub fn trace_write2_snapshot<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -245,15 +244,12 @@ pub fn trace_write2_snapshot<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers
-        .match_first_type_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 2);
 }
 
 pub fn trace_write4_snapshot<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -261,15 +257,12 @@ pub fn trace_write4_snapshot<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers
-        .match_first_type_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 4);
 }
 
 pub fn trace_write8_snapshot<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -277,15 +270,12 @@ pub fn trace_write8_snapshot<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers
-        .match_first_type_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 8);
 }
 
 pub fn trace_write_n_snapshot<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -294,9 +284,7 @@ pub fn trace_write_n_snapshot<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers
-        .match_first_type_mut::<QemuSnapshotHelper>()
-        .unwrap();
+    let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, size);
 }
 

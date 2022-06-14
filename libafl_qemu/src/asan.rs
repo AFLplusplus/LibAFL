@@ -417,19 +417,23 @@ where
     where
         QT: QemuHelperTuple<I, S>,
     {
-        //hooks.read_generation(gen_readwrite_asan::<I, QT, S>);
-        hooks.read8_execution(trace_read8_asan::<I, QT, S>);
-        hooks.read4_execution(trace_read4_asan::<I, QT, S>);
-        hooks.read2_execution(trace_read2_asan::<I, QT, S>);
-        hooks.read1_execution(trace_read1_asan::<I, QT, S>);
-        hooks.read_n_execution(trace_read_n_asan::<I, QT, S>);
+        hooks.reads(
+            Some(gen_readwrite_asan::<I, QT, S>),
+            Some(trace_read1_asan::<I, QT, S>),
+            Some(trace_read2_asan::<I, QT, S>),
+            Some(trace_read4_asan::<I, QT, S>),
+            Some(trace_read8_asan::<I, QT, S>),
+            Some(trace_read_n_asan::<I, QT, S>),
+        );
 
-        //hooks.write_generation(gen_readwrite_asan::<I, QT, S>);
-        hooks.write8_execution(trace_write8_asan::<I, QT, S>);
-        hooks.write4_execution(trace_write4_asan::<I, QT, S>);
-        hooks.write2_execution(trace_write2_asan::<I, QT, S>);
-        hooks.write1_execution(trace_write1_asan::<I, QT, S>);
-        hooks.write_n_execution(trace_write_n_asan::<I, QT, S>);
+        hooks.writes(
+            Some(gen_readwrite_asan::<I, QT, S>),
+            Some(trace_write1_asan::<I, QT, S>),
+            Some(trace_write2_asan::<I, QT, S>),
+            Some(trace_write4_asan::<I, QT, S>),
+            Some(trace_write8_asan::<I, QT, S>),
+            Some(trace_write_n_asan::<I, QT, S>),
+        );
 
         hooks.syscalls(qasan_fake_syscall::<I, QT, S>);
     }
@@ -439,11 +443,8 @@ where
     }
 }
 
-/*
-// TODO add pc to generation hooks
 pub fn gen_readwrite_asan<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     pc: u64,
     _size: usize,
@@ -452,18 +453,16 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
     if h.must_instrument(pc) {
         Some(pc)
     } else {
         None
     }
 }
-*/
 
 pub fn trace_read1_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -471,13 +470,13 @@ pub fn trace_read1_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_1(emulator, addr);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.read_1(&emulator, addr);
 }
 
 pub fn trace_read2_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -485,13 +484,13 @@ pub fn trace_read2_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_2(emulator, addr);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.read_2(&emulator, addr);
 }
 
 pub fn trace_read4_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -499,13 +498,13 @@ pub fn trace_read4_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_4(emulator, addr);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.read_4(&emulator, addr);
 }
 
 pub fn trace_read8_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -513,13 +512,13 @@ pub fn trace_read8_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_8(emulator, addr);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.read_8(&emulator, addr);
 }
 
 pub fn trace_read_n_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -528,13 +527,13 @@ pub fn trace_read_n_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(emulator, addr, size);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.read_n(&emulator, addr, size);
 }
 
 pub fn trace_write1_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -542,13 +541,13 @@ pub fn trace_write1_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_1(emulator, addr);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.write_1(&emulator, addr);
 }
 
 pub fn trace_write2_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -556,13 +555,13 @@ pub fn trace_write2_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_2(emulator, addr);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.write_2(&emulator, addr);
 }
 
 pub fn trace_write4_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -570,13 +569,13 @@ pub fn trace_write4_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_4(emulator, addr);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.write_4(&emulator, addr);
 }
 
 pub fn trace_write8_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -584,13 +583,13 @@ pub fn trace_write8_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.write_8(emulator, addr);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.write_8(&emulator, addr);
 }
 
 pub fn trace_write_n_asan<I, QT, S>(
-    emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
@@ -599,8 +598,9 @@ pub fn trace_write_n_asan<I, QT, S>(
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    let h = helpers.match_first_type_mut::<QemuAsanHelper>().unwrap();
-    h.read_n(emulator, addr, size);
+    let emulator = hooks.emulator().clone();
+    let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
+    h.read_n(&emulator, addr, size);
 }
 
 #[allow(clippy::too_many_arguments)]

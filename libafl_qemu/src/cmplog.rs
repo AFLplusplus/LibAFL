@@ -8,7 +8,6 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu::Emulator,
     helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
 };
@@ -63,11 +62,13 @@ where
     where
         QT: QemuHelperTuple<I, S>,
     {
-        hooks.cmp_generation(gen_unique_cmp_ids::<I, QT, S>);
-        hooks.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
-        hooks.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
-        hooks.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
-        hooks.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
+        hooks.cmps_raw(
+            Some(gen_unique_cmp_ids::<I, QT, S>),
+            Some(trace_cmp1_cmplog),
+            Some(trace_cmp2_cmplog),
+            Some(trace_cmp4_cmplog),
+            Some(trace_cmp8_cmplog),
+        );
     }
 }
 
@@ -105,17 +106,18 @@ where
     where
         QT: QemuHelperTuple<I, S>,
     {
-        hooks.cmp_generation(gen_hashed_cmp_ids::<I, QT, S>);
-        hooks.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
-        hooks.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
-        hooks.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
-        hooks.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
+        hooks.cmps_raw(
+            Some(gen_hashed_cmp_ids::<I, QT, S>),
+            Some(trace_cmp1_cmplog),
+            Some(trace_cmp2_cmplog),
+            Some(trace_cmp4_cmplog),
+            Some(trace_cmp8_cmplog),
+        );
     }
 }
 
 pub fn gen_unique_cmp_ids<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     state: Option<&mut S>,
     pc: u64,
     _size: usize,
@@ -125,7 +127,7 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuCmpLogHelper>() {
+    if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
         if !h.must_instrument(pc) {
             return None;
         }
@@ -147,8 +149,7 @@ where
 }
 
 pub fn gen_hashed_cmp_ids<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    mut hooks: Pin<&mut QemuHooks<'_, I, QT, S>>,
     _state: Option<&mut S>,
     pc: u64,
     _size: usize,
@@ -158,7 +159,7 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuCmpLogChildHelper>() {
+    if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {
         if !h.must_instrument(pc) {
             return None;
         }
@@ -166,25 +167,25 @@ where
     Some(hash_me(pc) & (CMPLOG_MAP_W as u64 - 1))
 }
 
-pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8) {
+pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 1, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16) {
+pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 2, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32) {
+pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 4, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64) {
+pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1);
     }
