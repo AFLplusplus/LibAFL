@@ -62,7 +62,7 @@ impl fmt::Display for LogSeverity {
     }
 }
 
-/// The result of a custom buf handler added using [`HasCustomBufHandler::add_custom_buf_handler`]
+/// The result of a custom buf handler added using [`HasCustomBufHandlers::add_custom_buf_handler`]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CustomBufEventResult {
     /// Exit early from event handling
