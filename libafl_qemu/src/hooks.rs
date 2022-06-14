@@ -38,13 +38,6 @@ type DynamicLenHookCl<QT, S> =
     Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr, usize)>;
 */
 
-static mut QEMU_HELPERS_PTR: *const c_void = ptr::null();
-unsafe fn get_qemu_helpers<'a, QT>() -> &'a mut QT {
-    (QEMU_HELPERS_PTR as *mut QT)
-        .as_mut()
-        .expect("A high-level hook is installed but QemuHooks is not initialized")
-}
-
 static mut QEMU_HOOKS_PTR: *const c_void = ptr::null();
 unsafe fn get_qemu_hooks<'a, I, QT, S>() -> &'a mut QemuHooks<'a, I, QT, S>
 where
@@ -412,29 +405,27 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let emu = Emulator::new_empty();
         for hook in &mut ON_THREAD_HOOKS {
             let hooks = get_qemu_hooks::<I, QT, S>();
             match hook {
                 Hook::Function(ptr) => {
-                    let func: fn(&Emulator, &mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32) =
+                    let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32) =
                         transmute(*ptr);
-                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
+                    (func)(hooks, inprocess_get_state::<S>(), tid);
                 }
                 Hook::Closure(ptr) => {
                     let mut func: Box<
-                        dyn FnMut(&Emulator, &mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32),
+                        dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32),
                     > = transmute(*ptr);
-                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
+                    (func)(hooks, inprocess_get_state::<S>(), tid);
 
                     // Forget the closure so that drop is not called on captured variables.
                     core::mem::forget(func);
                 }
                 Hook::Once(ptr) => {
-                    let func: Box<
-                        dyn FnOnce(&Emulator, &mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32),
-                    > = transmute(*ptr);
-                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
+                    let func: Box<dyn FnOnce(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32)> =
+                        transmute(*ptr);
+                    (func)(hooks, inprocess_get_state::<S>(), tid);
                     *hook = Hook::Empty;
                 }
                 Hook::Empty => (),
@@ -460,16 +451,14 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
+        let hooks = get_qemu_hooks::<I, QT, S>();
         let mut res = SyscallHookResult::new(None);
         for hook in &SYSCALL_HOOKS {
             match hook {
                 Hook::Function(ptr) => {
                     #[allow(clippy::type_complexity)]
                     let func: fn(
-                        &Emulator,
-                        &mut QT,
+                        &mut QemuHooks<'_, I, QT, S>,
                         Option<&mut S>,
                         i32,
                         u64,
@@ -482,8 +471,7 @@ where
                         u64,
                     ) -> SyscallHookResult = transmute(*ptr);
                     let r = (func)(
-                        &emulator,
-                        helpers,
+                        hooks,
                         inprocess_get_state::<S>(),
                         sys_num,
                         a0,
@@ -504,8 +492,7 @@ where
                     #[allow(clippy::type_complexity)]
                     let mut func: Box<
                         dyn FnMut(
-                            &Emulator,
-                            &mut QT,
+                            &mut QemuHooks<'_, I, QT, S>,
                             Option<&mut S>,
                             i32,
                             u64,
@@ -519,8 +506,7 @@ where
                         ) -> SyscallHookResult,
                     > = transmute(*ptr);
                     let r = (func)(
-                        &emulator,
-                        helpers,
+                        hooks,
                         inprocess_get_state::<S>(),
                         sys_num,
                         a0,
@@ -566,16 +552,14 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
+        let hooks = get_qemu_hooks::<I, QT, S>();
         let mut res = result;
         for hook in &SYSCALL_POST_HOOKS {
             match hook {
                 Hook::Function(ptr) => {
                     #[allow(clippy::type_complexity)]
                     let func: fn(
-                        &Emulator,
-                        &mut QT,
+                        &mut QemuHooks<'_, I, QT, S>,
                         Option<&mut S>,
                         u64,
                         i32,
@@ -589,8 +573,7 @@ where
                         u64,
                     ) -> u64 = transmute(*ptr);
                     res = (func)(
-                        &emulator,
-                        helpers,
+                        hooks,
                         inprocess_get_state::<S>(),
                         res,
                         sys_num,
@@ -608,8 +591,7 @@ where
                     #[allow(clippy::type_complexity)]
                     let mut func: Box<
                         dyn FnMut(
-                            &Emulator,
-                            &mut QT,
+                            &mut QemuHooks<'_, I, QT, S>,
                             Option<&mut S>,
                             u64,
                             i32,
@@ -624,8 +606,7 @@ where
                         ) -> u64,
                     > = transmute(*ptr);
                     res = (func)(
-                        &emulator,
-                        helpers,
+                        hooks,
                         inprocess_get_state::<S>(),
                         res,
                         sys_num,
@@ -696,7 +677,6 @@ where
         });
         slf.helpers.init_hooks_all(&slf);
         unsafe {
-            QEMU_HELPERS_PTR = addr_of!(slf.helpers) as *const c_void;
             QEMU_HOOKS_PTR = addr_of!(*slf) as *const c_void;
         }
         slf
@@ -1150,7 +1130,7 @@ where
         }
     }
 
-    pub fn thread_creation(&self, hook: fn(&Emulator, &mut Self, Option<&mut S>, tid: u32)) {
+    pub fn thread_creation(&self, hook: fn(&mut Self, Option<&mut S>, tid: u32)) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
@@ -1160,7 +1140,7 @@ where
 
     pub fn thread_creation_closure(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut Self, Option<&mut S>, u32) + 'a>,
+        hook: Box<dyn FnMut(&mut Self, Option<&mut S>, u32) + 'a>,
     ) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Closure(transmute(hook)));
@@ -1169,10 +1149,7 @@ where
             .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
     }
 
-    pub fn thread_creation_once(
-        &self,
-        hook: Box<dyn FnOnce(&Emulator, &mut Self, Option<&mut S>, u32) + 'a>,
-    ) {
+    pub fn thread_creation_once(&self, hook: Box<dyn FnOnce(&mut Self, Option<&mut S>, u32) + 'a>) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Once(transmute(hook)));
         }

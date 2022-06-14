@@ -23,7 +23,7 @@ where
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
 {
-    hooks: Box<QemuHooks<'a, I, QT, S>>,
+    hooks: &'a mut QemuHooks<'a, I, QT, S>,
     inner: InProcessExecutor<'a, H, I, OT, S>,
 }
 
@@ -50,7 +50,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     pub fn new<EM, OF, Z>(
-        hooks: Box<QemuHooks<'a, I, QT, S>>,
+        hooks: &'a mut QemuHooks<'a, I, QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -78,11 +78,11 @@ where
     }
 
     pub fn hooks(&self) -> &QemuHooks<'a, I, QT, S> {
-        &self.hooks
+        self.hooks
     }
 
     pub fn hooks_mut(&mut self) -> &mut QemuHooks<'a, I, QT, S> {
-        &mut self.hooks
+        self.hooks
     }
 
     pub fn emulator(&self) -> &Emulator {
@@ -138,7 +138,7 @@ where
     QT: QemuHelperTuple<I, S>,
     SP: ShMemProvider,
 {
-    hooks: Box<QemuHooks<'a, I, QT, S>>,
+    hooks: &'a mut QemuHooks<'a, I, QT, S>,
     inner: InProcessForkExecutor<'a, H, I, OT, S, SP>,
 }
 
@@ -167,7 +167,7 @@ where
     SP: ShMemProvider,
 {
     pub fn new<EM, OF, Z>(
-        hooks: Box<QemuHooks<'a, I, QT, S>>,
+        hooks: &'a mut QemuHooks<'a, I, QT, S>,
         harness_fn: &'a mut H,
         observers: OT,
         fuzzer: &mut Z,
@@ -205,11 +205,11 @@ where
     }
 
     pub fn hooks(&self) -> &QemuHooks<'a, I, QT, S> {
-        &self.hooks
+        self.hooks
     }
 
     pub fn hooks_mut(&mut self) -> &mut QemuHooks<'a, I, QT, S> {
-        &mut self.hooks
+        self.hooks
     }
 
     pub fn emulator(&self) -> &Emulator {
