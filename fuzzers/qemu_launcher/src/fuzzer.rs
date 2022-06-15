@@ -161,7 +161,7 @@ pub fn fuzz() {
 
         // Create a QEMU in-process executor
         let executor = QemuExecutor::new(
-            hooks,
+            &mut hooks,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

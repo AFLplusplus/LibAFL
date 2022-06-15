@@ -195,7 +195,7 @@ extern "C" {
         data: u64,
         invalidate_block: i32,
     ) -> usize;
-    fn libafl_qemu_remove_hook(num: usize, invalidate_block: i32) -> i32;
+    // fn libafl_qemu_remove_hook(num: usize, invalidate_block: i32) -> i32;
     fn libafl_qemu_remove_hooks_at(addr: GuestAddr, invalidate_block: i32) -> usize;
     fn libafl_qemu_run() -> i32;
     fn libafl_load_addr() -> u64;

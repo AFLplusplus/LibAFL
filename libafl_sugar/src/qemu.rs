@@ -216,7 +216,7 @@ where
                 );
 
                 let executor = QemuExecutor::new(
-                    hooks,
+                    &mut hooks,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,
@@ -320,7 +320,7 @@ where
                     QemuHooks::new(emulator, tuple_list!(QemuEdgeCoverageHelper::default()));
 
                 let executor = QemuExecutor::new(
-                    hooks,
+                    &mut hooks,
                     &mut harness,
                     tuple_list!(edges_observer, time_observer),
                     &mut fuzzer,

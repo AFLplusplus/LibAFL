@@ -5,7 +5,7 @@ use crate::{
     capstone,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
-    GuestAddr, Regs,
+    Emulator, GuestAddr, Regs,
 };
 
 #[derive(Debug)]
@@ -34,7 +34,7 @@ impl QemuCallTracerHelper {
         &self.callstack
     }
 
-    pub fn reset(&self) {
+    pub fn reset(&mut self) {
         self.callstack.clear()
     }
 }
@@ -68,7 +68,7 @@ where
 {
 }*/
 
-pub fn on_ret<I, QT, S>(hooks: &mut QemuHooks<'_, I, QT, S>, _state: Option<&mut S>, pc: GuestAddr)
+pub fn on_ret<I, QT, S>(hooks: &mut QemuHooks<'_, I, QT, S>, _state: Option<&mut S>, _pc: GuestAddr)
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
@@ -141,7 +141,7 @@ where
                     capstone::InsnGroupType::CS_GRP_CALL => {
                         // hooks.instruction_closure(insn.address() as GuestAddr, on_call, false);
                         let call_len = insn.bytes().len() as GuestAddr;
-                        let call_cb = move |hooks, _, pc| {
+                        let call_cb = move |hooks: &mut QemuHooks<'_, I, QT, S>, _, pc| {
                             // eprintln!("CALL @ 0x{:#x}", pc + call_len);
                             if let Some(h) = hooks
                                 .helpers_mut()
