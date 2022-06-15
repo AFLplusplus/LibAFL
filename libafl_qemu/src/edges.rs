@@ -70,7 +70,7 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -132,7 +132,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {

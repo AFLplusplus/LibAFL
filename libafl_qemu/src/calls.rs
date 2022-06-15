@@ -36,7 +36,7 @@ impl QemuCallTracerHelper {
     }
 
     pub fn reset(&mut self) {
-        self.callstack.clear()
+        self.callstack.clear();
     }
 }
 

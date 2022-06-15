@@ -11,7 +11,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
-    fn init_hooks<'a, QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
+    fn init_hooks<QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -28,7 +28,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
-    fn init_hooks_all<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>;
 
@@ -43,7 +43,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks_all<'a, QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
+    fn init_hooks_all<QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -62,7 +62,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
 
-    fn init_hooks_all<'a, QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {

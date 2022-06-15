@@ -896,11 +896,11 @@ pub mod pybind {
             }
         }
 
-        fn remove_hook(&self, addr: GuestAddr) {
+        fn remove_hook(&self, addr: GuestAddr) -> usize {
             unsafe {
                 PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
             }
-            self.emu.remove_hook(addr, true);
+            self.emu.remove_hook(addr, true)
         }
     }
 }
