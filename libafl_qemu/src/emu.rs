@@ -763,7 +763,7 @@ pub mod pybind {
         )
     }
 
-    extern "C" fn py_generic_hook_wrapper(idx: u64) {
+    extern "C" fn py_generic_hook_wrapper(pc: GuestAddr, idx: u64) {
         let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
         Python::with_gil(|py| {
             obj.call0(py).expect("Error in the hook");
@@ -890,7 +890,8 @@ pub mod pybind {
             unsafe {
                 let idx = PY_GENERIC_HOOKS.len();
                 PY_GENERIC_HOOKS.push((addr, hook));
-                self.emu.set_hook(addr, py_generic_hook_wrapper, idx as u64);
+                self.emu
+                    .set_hook(addr, py_generic_hook_wrapper, idx as u64, true);
             }
         }
 
@@ -898,7 +899,7 @@ pub mod pybind {
             unsafe {
                 PY_GENERIC_HOOKS.retain(|(a, _)| *a != addr);
             }
-            self.emu.remove_hook(addr);
+            self.emu.remove_hook(addr, true);
         }
     }
 }
