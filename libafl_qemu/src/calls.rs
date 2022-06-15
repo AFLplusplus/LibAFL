@@ -141,8 +141,14 @@ where
                     capstone::InsnGroupType::CS_GRP_CALL => {
                         // hooks.instruction_closure(insn.address() as GuestAddr, on_call, false);
                         let call_len = insn.bytes().len() as GuestAddr;
-                        let call_cb = move |_, _, pc| {
+                        let call_cb = move |hooks, _, pc| {
                             // eprintln!("CALL @ 0x{:#x}", pc + call_len);
+                            if let Some(h) = hooks
+                                .helpers_mut()
+                                .match_first_type_mut::<QemuCallTracerHelper>()
+                            {
+                                h.callstack.push(pc + call_len);
+                            }
                         };
                         unsafe {
                             hooks.instruction_closure(
