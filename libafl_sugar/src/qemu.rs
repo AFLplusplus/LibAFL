@@ -207,7 +207,7 @@ where
             };
 
             if self.use_cmplog.unwrap_or(false) {
-                let hooks = QemuHooks::new(
+                let mut hooks = QemuHooks::new(
                     emulator,
                     tuple_list!(
                         QemuEdgeCoverageHelper::default(),
@@ -316,7 +316,7 @@ where
                     }
                 }
             } else {
-                let hooks =
+                let mut hooks =
                     QemuHooks::new(emulator, tuple_list!(QemuEdgeCoverageHelper::default()));
 
                 let executor = QemuExecutor::new(

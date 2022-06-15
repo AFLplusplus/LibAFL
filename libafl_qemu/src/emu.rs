@@ -763,7 +763,7 @@ pub mod pybind {
         )
     }
 
-    extern "C" fn py_generic_hook_wrapper(pc: GuestAddr, idx: u64) {
+    extern "C" fn py_generic_hook_wrapper(_pc: GuestAddr, idx: u64) {
         let obj = unsafe { &PY_GENERIC_HOOKS[idx as usize].1 };
         Python::with_gil(|py| {
             obj.call0(py).expect("Error in the hook");
