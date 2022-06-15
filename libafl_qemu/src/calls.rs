@@ -30,6 +30,7 @@ impl QemuCallTracerHelper {
         self.filter.allowed(addr)
     }
 
+    #[must_use]
     pub fn callstack(&self) -> &[GuestAddr] {
         &self.callstack
     }
@@ -137,7 +138,7 @@ where
             let insn = insns.first().unwrap();
             let insn_detail: InsnDetail = h.cs.insn_detail(insn).unwrap();
             for detail in insn_detail.groups() {
-                match detail.0 as u32 {
+                match u32::from(detail.0) {
                     capstone::InsnGroupType::CS_GRP_CALL => {
                         // hooks.instruction_closure(insn.address() as GuestAddr, on_call, false);
                         let call_len = insn.bytes().len() as GuestAddr;

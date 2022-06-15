@@ -794,12 +794,12 @@ where
                 index as u64,
             );
             EDGE_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
             ));
         }
     }
@@ -826,12 +826,8 @@ where
             index as u64,
         );
         EDGE_HOOKS.push((
-            generation_hook
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
         ));
     }
 
@@ -854,9 +850,9 @@ where
                 index as u64,
             );
             EDGE_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
                 Hook::Empty,
             ));
         }
@@ -883,12 +879,12 @@ where
                 index as u64,
             );
             BLOCK_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
             ));
         }
     }
@@ -915,12 +911,8 @@ where
             index as u64,
         );
         BLOCK_HOOKS.push((
-            generation_hook
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
         ));
     }
 
@@ -941,9 +933,9 @@ where
                 index as u64,
             );
             BLOCK_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
                 Hook::Empty,
             ));
         }
@@ -998,24 +990,24 @@ where
                 index as u64,
             );
             READ_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook1
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook2
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook4
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook8
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook_n
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook1.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook2.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook4.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook8.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook_n.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
             ));
         }
     }
@@ -1068,24 +1060,12 @@ where
             index as u64,
         );
         READ_HOOKS.push((
-            generation_hook
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook1
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook2
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook4
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook8
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook_n
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook1.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook2.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook4.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook8.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook_n.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
         ));
     }
 
@@ -1116,9 +1096,9 @@ where
                 index as u64,
             );
             READ_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
                 Hook::Empty,
                 Hook::Empty,
                 Hook::Empty,
@@ -1177,24 +1157,24 @@ where
                 index as u64,
             );
             WRITE_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook1
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook2
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook4
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook8
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook_n
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook1.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook2.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook4.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook8.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook_n.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
             ));
         }
     }
@@ -1247,24 +1227,12 @@ where
             index as u64,
         );
         WRITE_HOOKS.push((
-            generation_hook
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook1
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook2
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook4
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook8
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook_n
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook1.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook2.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook4.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook8.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook_n.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
         ));
     }
 
@@ -1295,9 +1263,9 @@ where
                 index as u64,
             );
             WRITE_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
                 Hook::Empty,
                 Hook::Empty,
                 Hook::Empty,
@@ -1348,21 +1316,21 @@ where
                 index as u64,
             );
             CMP_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook1
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook2
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook4
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
-                execution_hook8
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook1.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook2.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook4.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook8.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
             ));
         }
     }
@@ -1407,21 +1375,11 @@ where
             index as u64,
         );
         CMP_HOOKS.push((
-            generation_hook
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook1
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook2
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook4
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
-            execution_hook8
-                .map(|hook| Hook::Closure(transmute(hook)))
-                .unwrap_or(Hook::Empty),
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook1.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook2.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook4.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook8.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
         ));
     }
 
@@ -1450,9 +1408,9 @@ where
                 index as u64,
             );
             CMP_HOOKS.push((
-                generation_hook
-                    .map(|hook| Hook::Function(hook as *const libc::c_void))
-                    .unwrap_or(Hook::Empty),
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
                 Hook::Empty,
                 Hook::Empty,
                 Hook::Empty,

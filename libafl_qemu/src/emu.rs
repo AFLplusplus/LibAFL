@@ -503,11 +503,12 @@ impl Emulator {
         data: u64,
         invalidate_block: bool,
     ) -> usize {
-        unsafe { libafl_qemu_set_hook(addr.into(), callback, data, invalidate_block as i32) }
+        unsafe { libafl_qemu_set_hook(addr.into(), callback, data, i32::from(invalidate_block)) }
     }
 
+    #[must_use]
     pub fn remove_hook(&self, addr: GuestAddr, invalidate_block: bool) -> usize {
-        unsafe { libafl_qemu_remove_hooks_at(addr.into(), invalidate_block as i32) }
+        unsafe { libafl_qemu_remove_hooks_at(addr.into(), i32::from(invalidate_block)) }
     }
 
     /// This function will run the emulator until the next breakpoint, or until finish.

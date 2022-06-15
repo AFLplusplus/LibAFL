@@ -46,7 +46,8 @@ impl IntoPy<PyObject> for Regs {
     }
 }
 
-/// Return an X86 ArchCapstoneBuilder
+/// Return an X86 `ArchCapstoneBuilder`
+#[must_use]
 pub fn capstone() -> capstone::arch::x86::ArchCapstoneBuilder {
     capstone::Capstone::new()
         .x86()
