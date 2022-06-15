@@ -758,7 +758,7 @@ where
     pub unsafe fn instruction_closure(
         &self,
         addr: GuestAddr,
-        hook: Box<dyn FnMut(&mut Self, Option<&mut S>, GuestAddr)>,
+        hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
         invalidate_block: bool,
     ) {
         let index = GENERIC_HOOKS.len();
@@ -807,9 +807,9 @@ where
     pub unsafe fn edges_closures(
         &self,
         generation_hook: Option<
-            Box<dyn FnMut(&mut Self, Option<&mut S>, GuestAddr, GuestAddr) -> Option<u64>>,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, GuestAddr) -> Option<u64>>,
         >,
-        execution_hook: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64)>>,
+        execution_hook: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>>,
     ) {
         let index = EDGE_HOOKS.len();
         self.emulator.add_edge_hooks(
@@ -896,9 +896,9 @@ where
     pub unsafe fn blocks_closures(
         &self,
         generation_hook: Option<
-            Box<dyn FnMut(&mut Self, Option<&mut S>, GuestAddr) -> Option<u64>>,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr) -> Option<u64>>,
         >,
-        execution_hook: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64)>>,
+        execution_hook: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>>,
     ) {
         let index = BLOCK_HOOKS.len();
         self.emulator.add_block_hooks(
@@ -1023,13 +1023,15 @@ where
     pub unsafe fn reads_closures(
         &self,
         generation_hook: Option<
-            Box<dyn FnMut(&mut Self, Option<&mut S>, GuestAddr, usize) -> Option<u64>>,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
         >,
-        execution_hook1: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr)>>,
-        execution_hook2: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr)>>,
-        execution_hook4: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr)>>,
-        execution_hook8: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr)>>,
-        execution_hook_n: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr, usize)>>,
+        execution_hook1: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook2: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook4: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook8: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook_n: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
+        >,
     ) {
         let index = READ_HOOKS.len();
         self.emulator.add_read_hooks(
@@ -1200,13 +1202,15 @@ where
     pub unsafe fn writes_closures(
         &self,
         generation_hook: Option<
-            Box<dyn FnMut(&mut Self, Option<&mut S>, GuestAddr, usize) -> Option<u64>>,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
         >,
-        execution_hook1: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr)>>,
-        execution_hook2: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr)>>,
-        execution_hook4: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr)>>,
-        execution_hook8: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr)>>,
-        execution_hook_n: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, GuestAddr, usize)>>,
+        execution_hook1: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook2: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook4: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook8: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook_n: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
+        >,
     ) {
         let index = WRITE_HOOKS.len();
         self.emulator.add_write_hooks(
@@ -1366,12 +1370,12 @@ where
     pub unsafe fn cmps_closures(
         &self,
         generation_hook: Option<
-            Box<dyn FnMut(&mut Self, Option<&mut S>, GuestAddr, usize) -> Option<u64>>,
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
         >,
-        execution_hook1: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, u8, u8)>>,
-        execution_hook2: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, u16, u16)>>,
-        execution_hook4: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, u32, u32)>>,
-        execution_hook8: Option<Box<dyn FnMut(&mut Self, Option<&mut S>, u64, u64, u64)>>,
+        execution_hook1: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u8, u8)>>,
+        execution_hook2: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u16, u16)>>,
+        execution_hook4: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u32, u32)>>,
+        execution_hook8: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u64, u64)>>,
     ) {
         let index = CMP_HOOKS.len();
         self.emulator.add_cmp_hooks(
@@ -1467,7 +1471,7 @@ where
 
     pub fn thread_creation_closure(
         &self,
-        hook: Box<dyn FnMut(&mut Self, Option<&mut S>, u32) + 'a>,
+        hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u32) + 'a>,
     ) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Closure(transmute(hook)));
