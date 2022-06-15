@@ -367,9 +367,10 @@ static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
 
 extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
     unsafe {
-        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&'r str) -> bool>);
+        let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Emulator, &'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
-        if closure(cmd) {
+        let emu = Emulator::new_empty();
+        if closure(&emu, cmd) {
             1
         } else {
             0
@@ -703,7 +704,7 @@ impl Emulator {
         }
     }
 
-    pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&str) -> bool>) {
+    pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         unsafe {
             GDB_COMMANDS.push(core::mem::transmute(callback));
             libafl_qemu_add_gdb_cmd(
