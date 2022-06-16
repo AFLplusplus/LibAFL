@@ -157,11 +157,11 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default(),));
+        let mut hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default()));
 
         // Create a QEMU in-process executor
         let executor = QemuExecutor::new(
-            hooks,
+            &mut hooks,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

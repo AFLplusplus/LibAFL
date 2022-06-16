@@ -7,8 +7,12 @@
     allow(clippy::useless_conversion)
 )]
 #![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::transmute_ptr_to_ptr)]
+#![allow(clippy::too_many_arguments)]
 // Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_deref_ref)]
+#![allow(clippy::borrow_as_ptr)]
+// Allow only ATM, it will be evetually removed
+#![allow(clippy::missing_safety_doc)]
 
 use std::env;
 
@@ -49,6 +53,8 @@ pub mod snapshot;
 pub use snapshot::QemuSnapshotHelper;
 pub mod asan;
 pub use asan::{init_with_asan, QemuAsanHelper};
+
+pub mod calls;
 
 pub mod executor;
 pub use executor::{QemuExecutor, QemuForkExecutor};

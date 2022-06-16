@@ -332,7 +332,7 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let hooks = QemuHooks::new(
+    let mut hooks = QemuHooks::new(
         &emu,
         tuple_list!(
             QemuEdgeCoverageHelper::default(),
@@ -343,7 +343,7 @@ fn fuzz(
     );
 
     let executor = QemuExecutor::new(
-        hooks,
+        &mut hooks,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
