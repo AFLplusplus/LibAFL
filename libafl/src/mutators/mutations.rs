@@ -271,7 +271,7 @@ where
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut());
-            *byte = !*byte;
+            *byte = (-(*byte as i16)) as u8;
             Ok(MutationResult::Mutated)
         }
     }
