@@ -72,6 +72,7 @@ Welcome to `LibAFL`
 )]
 // Till they fix this buggy lint in clippy
 #![allow(clippy::borrow_as_ptr)]
+#![allow(clippy::borrow_deref_ref)]
 
 #[cfg(feature = "std")]
 #[macro_use]
