@@ -3,9 +3,11 @@
 use core::{
     convert::Into,
     ffi::c_void,
-    mem::MaybeUninit,
-    ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
+    ptr::{addr_of, addr_of_mut, null},
 };
+#[cfg(feature = "usermode")]
+use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
+#[cfg(feature = "usermode")]
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
@@ -186,6 +188,8 @@ impl MapInfo {
 extern "C" {
     fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
 
+    fn libafl_qemu_run() -> i32;
+
     fn libafl_load_addr() -> u64;
     fn libafl_get_brk() -> u64;
     fn libafl_set_brk(brk: u64) -> u64;
@@ -220,16 +224,35 @@ extern "C" {
 #[cfg(not(feature = "usermode"))]
 extern "C" {
     fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
-    
+
+    fn qemu_main_loop();
+    fn qemu_cleanup();
+
     // int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
     //                     uint8_t *buf, int len, int is_write);
-    fn cpu_memory_rw_debug(cpu: CPUStatePtr, addr: GuestAddr, buf: *mut u8, len: i32, is_write: i32);
+    fn cpu_memory_rw_debug(
+        cpu: CPUStatePtr,
+        addr: GuestAddr,
+        buf: *mut u8,
+        len: i32,
+        is_write: i32,
+    );
+}
+
+#[cfg(not(feature = "usermode"))]
+extern "C" fn qemu_cleanup_atexit() {
+    unsafe {
+        qemu_cleanup();
+    }
 }
 
 extern "C" {
     // CPUState* libafl_qemu_get_cpu(int cpu_index);
+    fn libafl_qemu_get_cpu(cpu_index: i32) -> CPUStatePtr;
     // int libafl_qemu_num_cpus(void);
+    fn libafl_qemu_num_cpus() -> i32;
     // CPUState* libafl_qemu_current_cpu(void);
+    fn libafl_qemu_current_cpu() -> CPUStatePtr;
 
     fn libafl_qemu_write_reg(cpu: CPUStatePtr, reg: i32, val: *const u8) -> i32;
     fn libafl_qemu_read_reg(cpu: CPUStatePtr, reg: i32, val: *mut u8) -> i32;
@@ -247,7 +270,6 @@ extern "C" {
     ) -> usize;
     // fn libafl_qemu_remove_hook(num: usize, invalidate_block: i32) -> i32;
     fn libafl_qemu_remove_hooks_at(addr: GuestAddr, invalidate_block: i32) -> usize;
-    fn libafl_qemu_run() -> i32;
 
     fn strlen(s: *const u8) -> usize;
 
@@ -406,32 +428,19 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
 #[derive(Debug)]
 pub struct CPU {
     ptr: CPUStatePtr,
-    index: i32
 }
 
 impl CPU {
-    /// Write a value to a guest address.
-    ///
-    /// # Safety
-    /// This will write to a translated guest address (using `g2h`).
-    /// It just adds `guest_base` and writes to that location, without checking the bounds.
-    /// This may only be safely used for valid guest addresses!
     #[cfg(feature = "usermode")]
-    pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        let host_addr = Emulator::new_emtpy().g2h(addr);
-        copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
+    #[must_use]
+    pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
+        unsafe { (addr as usize + guest_base) as *mut T }
     }
 
-    /// Read a value from a guest address.
-    ///
-    /// # Safety
-    /// This will read from a translated guest address (using `g2h`).
-    /// It just adds `guest_base` and writes to that location, without checking the bounds.
-    /// This may only be safely used for valid guest addresses!
     #[cfg(feature = "usermode")]
-    pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
-        let host_addr = Emulator::new_emtpy().g2h(addr);
-        copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
+    #[must_use]
+    pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
+        unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
     /// Write a value to a guest address.
@@ -440,8 +449,13 @@ impl CPU {
     /// This will write to a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    #[cfg(not(feature = "usermode"))]
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
+        #[cfg(feature = "usermode")]
+        {
+            let host_addr = Emulator::new_empty().g2h(addr);
+            copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
+        }
+        #[cfg(not(feature = "usermode"))]
         cpu_memory_rw_debug(self.ptr, addr, buf.as_ptr() as *mut u8, buf.len() as i32, 1);
     }
 
@@ -451,9 +465,14 @@ impl CPU {
     /// This will read from a translated guest address (using `g2h`).
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
-    #[cfg(not(feature = "usermode"))]
     pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
-        cpu_memory_rw_debug(self.ptr, addr, buf, buf.len() as i32, 0);
+        #[cfg(feature = "usermode")]
+        {
+            let host_addr = Emulator::new_empty().g2h(addr);
+            copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
+        }
+        #[cfg(not(feature = "usermode"))]
+        cpu_memory_rw_debug(self.ptr, addr, buf.as_mut_ptr(), buf.len() as i32, 0);
     }
 
     #[must_use]
@@ -489,7 +508,6 @@ impl CPU {
             Ok(val)
         }
     }
-
 }
 
 static mut EMULATOR_IS_INITIALIZED: bool = false;
@@ -529,11 +547,14 @@ impl Emulator {
                 envp.as_ptr() as *const *const u8,
             );
             #[cfg(not(feature = "usermode"))]
-            qemu_init(
-                argc,
-                argv.as_ptr() as *const *const u8,
-                envp.as_ptr() as *const *const u8,
-            );
+            {
+                qemu_init(
+                    argc,
+                    argv.as_ptr() as *const *const u8,
+                    envp.as_ptr() as *const *const u8,
+                );
+                libc::atexit(qemu_cleanup_atexit);
+            }
             EMULATOR_IS_INITIALIZED = true;
         }
         Emulator { _private: () }
@@ -549,6 +570,69 @@ impl Emulator {
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
         GuestMaps::new()
+    }
+
+    pub fn num_cpus(&self) -> usize {
+        unsafe { libafl_qemu_num_cpus() as usize }
+    }
+
+    pub fn current_cpu(&self) -> Option<CPU> {
+        let ptr = unsafe { libafl_qemu_current_cpu() };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(CPU {
+                ptr,
+            })
+        }
+    }
+
+    pub fn cpu_from_index(&self, index: usize) -> CPU {
+        unsafe {
+            CPU {
+                ptr: libafl_qemu_get_cpu(index as i32),
+            }
+        }
+    }
+
+    #[cfg(feature = "usermode")]
+    #[must_use]
+    pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
+        unsafe { (addr as usize + guest_base) as *mut T }
+    }
+
+    #[cfg(feature = "usermode")]
+    #[must_use]
+    pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
+        unsafe { (addr as usize - guest_base) as GuestAddr }
+    }
+
+    pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
+        self.current_cpu().unwrap().write_mem(addr, buf);
+    }
+
+    pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
+        self.current_cpu().unwrap().read_mem(addr, buf);
+    }
+
+    pub fn num_regs(&self) -> i32 {
+        self.current_cpu().unwrap().num_regs()
+    }
+
+    pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
+    where
+        T: Num + PartialOrd + Copy,
+        R: Into<i32>,
+    {
+        self.current_cpu().unwrap().write_reg(reg, val)
+    }
+
+    pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
+    where
+        T: Num + PartialOrd + Copy,
+        R: Into<i32>,
+    {
+        self.current_cpu().unwrap().read_reg(reg)
     }
 
     pub fn set_breakpoint(&self, addr: GuestAddr) {
@@ -584,17 +668,10 @@ impl Emulator {
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(&self) {
+        #[cfg(feature = "usermode")]
         libafl_qemu_run();
-    }
-
-    #[must_use]
-    pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
-        unsafe { (addr as usize + guest_base) as *mut T }
-    }
-
-    #[must_use]
-    pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
-        unsafe { (addr as usize - guest_base) as GuestAddr }
+        #[cfg(not(feature = "usermode"))]
+        qemu_main_loop();
     }
 
     #[cfg(feature = "usermode")]

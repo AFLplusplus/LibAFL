@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "03e283c85800496b60fb757d68a7df2821fb7a90";
+const QEMU_REVISION: &str = "99474a7846a20808478495b1664fe028589b34e9";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -67,6 +67,8 @@ pub fn build() {
         return; // only build when we're not generating docs
     }
 
+    let custum_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
+
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
     let out_dir_path = Path::new(&out_dir);
@@ -79,51 +81,57 @@ pub fn build() {
 
     build_dep_check(&["git", "make"]);
 
-    let qemu_rev = out_dir_path.join("QEMU_REVISION");
-    let qemu_path = out_dir_path.join(QEMU_DIRNAME);
+    let qemu_path = if let Some(qemu_dir) = custum_qemu_dir.as_ref() {
+        Path::new(&qemu_dir).to_path_buf()
+    } else {
+        let qemu_path = out_dir_path.join(QEMU_DIRNAME);
 
-    if qemu_rev.exists()
-        && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != QEMU_REVISION
-    {
-        drop(fs::remove_dir_all(&qemu_path));
-    }
+        let qemu_rev = out_dir_path.join("QEMU_REVISION");
+        if qemu_rev.exists()
+            && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != QEMU_REVISION
+        {
+            drop(fs::remove_dir_all(&qemu_path));
+        }
 
-    if !qemu_path.is_dir() {
-        println!(
-            "cargo:warning=Qemu not found, cloning with git ({})...",
-            QEMU_REVISION
-        );
-        fs::create_dir_all(&qemu_path).unwrap();
-        Command::new("git")
-            .current_dir(&qemu_path)
-            .arg("init")
-            .status()
-            .unwrap();
-        Command::new("git")
-            .current_dir(&qemu_path)
-            .arg("remote")
-            .arg("add")
-            .arg("origin")
-            .arg(QEMU_URL)
-            .status()
-            .unwrap();
-        Command::new("git")
-            .current_dir(&qemu_path)
-            .arg("fetch")
-            .arg("--depth")
-            .arg("1")
-            .arg("origin")
-            .arg(QEMU_REVISION)
-            .status()
-            .unwrap();
-        Command::new("git")
-            .current_dir(&qemu_path)
-            .arg("checkout")
-            .arg("FETCH_HEAD")
-            .status()
-            .unwrap();
-        fs::write(&qemu_rev, QEMU_REVISION).unwrap();
-    }
+        if !qemu_path.is_dir() {
+            println!(
+                "cargo:warning=Qemu not found, cloning with git ({})...",
+                QEMU_REVISION
+            );
+            fs::create_dir_all(&qemu_path).unwrap();
+            Command::new("git")
+                .current_dir(&qemu_path)
+                .arg("init")
+                .status()
+                .unwrap();
+            Command::new("git")
+                .current_dir(&qemu_path)
+                .arg("remote")
+                .arg("add")
+                .arg("origin")
+                .arg(QEMU_URL)
+                .status()
+                .unwrap();
+            Command::new("git")
+                .current_dir(&qemu_path)
+                .arg("fetch")
+                .arg("--depth")
+                .arg("1")
+                .arg("origin")
+                .arg(QEMU_REVISION)
+                .status()
+                .unwrap();
+            Command::new("git")
+                .current_dir(&qemu_path)
+                .arg("checkout")
+                .arg("FETCH_HEAD")
+                .status()
+                .unwrap();
+            fs::write(&qemu_rev, QEMU_REVISION).unwrap();
+        }
+
+        qemu_path
+    };
 
     #[cfg(feature = "usermode")]
     let target_suffix = "linux-user";
@@ -131,8 +139,14 @@ pub fn build() {
     let target_suffix = "softmmu";
 
     let build_dir = qemu_path.join("build");
+    #[cfg(feature = "usermode")]
     let output_lib = build_dir.join(&format!("libqemu-{}.so", cpu_target));
-    if !output_lib.is_file() {
+    #[cfg(not(feature = "usermode"))]
+    let output_lib = build_dir.join(&format!("libqemu-system-{}.so", cpu_target));
+
+    println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy().to_string());
+
+    if !output_lib.is_file() || custum_qemu_dir.is_some() {
         /*drop(
             Command::new("make")
                 .current_dir(&qemu_path)
@@ -264,14 +278,13 @@ pub fn build() {
         .status()
         .expect("Partial linked failure");
 
-    drop(
-        Command::new("ar")
-            .current_dir(&out_dir_path)
-            .arg("crus")
-            .arg("libqemu-partially-linked.a")
-            .arg("libqemu-partially-linked.o")
-            .status(),
-    );
+    Command::new("ar")
+        .current_dir(&out_dir_path)
+        .arg("crus")
+        .arg("libqemu-partially-linked.a")
+        .arg("libqemu-partially-linked.o")
+        .status()
+        .expect("Ar creation");
 
     println!("cargo:rustc-link-search=native={}", out_dir);
     println!("cargo:rustc-link-lib=static=qemu-partially-linked");
@@ -294,6 +307,19 @@ pub fn build() {
         println!("cargo:rustc-link-lib=cairo");
         println!("cargo:rustc-link-lib=gdk_pixbuf-2.0");
         println!("cargo:rustc-link-lib=X11");
+        println!("cargo:rustc-link-lib=epoxy");
+        println!("cargo:rustc-link-lib=pixman-1");
+
+        fs::create_dir_all(target_dir.join("pc-bios")).unwrap();
+        for path in fs::read_dir(build_dir.join("pc-bios")).unwrap() {
+            let path = path.unwrap().path();
+            if path.is_file() {
+                if let Some(name) = path.file_name() {
+                    fs::copy(&path, target_dir.join("pc-bios").join(name))
+                        .expect("Failed to copy a pc-bios folder file");
+                }
+            }
+        }
     }
 
     println!("cargo:rustc-link-lib=rt");
