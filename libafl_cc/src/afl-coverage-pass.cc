@@ -595,7 +595,7 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       LoadInst *PrevLoc = IRB.CreateLoad(
 #if LLVM_VERSION_MAJOR >= 14
-          PrevLocTy,
+          IRB.getInt32Ty(),
 #endif
           AFLPrevLoc);
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
