@@ -446,10 +446,10 @@ where
             .named_metadata_mut()
             .get_mut::<MapFeedbackMetadata<u8>>(&self.name)
             .unwrap();
-
         let size = observer.usable_count();
-        if map_state.history_map.len() < size {
-            map_state.history_map.resize(size, u8::default());
+        let len = observer.len();
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, u8::default());
         }
 
         let map = observer.as_slice();
@@ -657,9 +657,9 @@ where
             .named_metadata_mut()
             .get_mut::<MapFeedbackMetadata<T>>(&self.name)
             .unwrap();
-        let size = observer.usable_count();
-        if map_state.history_map.len() < size {
-            map_state.history_map.resize(size, T::default());
+        let len = observer.len();
+        if map_state.history_map.len() < len {
+            map_state.history_map.resize(len, T::default());
         }
 
         let history_map = map_state.history_map.as_mut_slice();
