@@ -5,7 +5,7 @@ cd "$SCRIPT_DIR/.." || exit 1
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
-fuzzers=$(find ./fuzzers/* -maxdepth 0 -type d | grep -v "backtrace_baby_fuzzers")
+fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 
 libafl=$(pwd)
