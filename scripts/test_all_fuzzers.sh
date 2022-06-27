@@ -5,7 +5,7 @@ cd "$SCRIPT_DIR/.." || exit 1
 
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
-fuzzers=$(find ./fuzzers -maxdepth 1 -type d)
+fuzzers=$(find ./fuzzers/* -maxdepth 0 -type d)
 backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -maxdepth 1 -type d)
 
 libafl=$(pwd)
@@ -34,7 +34,7 @@ do
     if [ "$1" != "--no-fmt" ]; then
         
         echo "[*] Checking fmt for $fuzzer"
-        cargo fmt --all -- --check || exit 1
+        cargo fmt --check || exit 1
         echo "[*] Running clippy for $fuzzer"
         cargo clippy || exit 1
     else
