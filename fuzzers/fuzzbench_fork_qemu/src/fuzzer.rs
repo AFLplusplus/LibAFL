@@ -319,7 +319,7 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let hooks = QemuHooks::new(
+    let mut hooks = QemuHooks::new(
         &emu,
         tuple_list!(
             QemuEdgeCoverageChildHelper::default(),
