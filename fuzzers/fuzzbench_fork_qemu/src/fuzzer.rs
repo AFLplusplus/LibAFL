@@ -328,7 +328,7 @@ fn fuzz(
     );
 
     let executor = QemuForkExecutor::new(
-        hooks,
+        &mut hooks,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
