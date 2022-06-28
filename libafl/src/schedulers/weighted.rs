@@ -11,7 +11,7 @@ use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
     inputs::Input,
     schedulers::{
-        powersched::SchedulerMetadata,
+        powersched::{SchedulerMetadata, PowerSchedule},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
@@ -20,8 +20,6 @@ use crate::{
 };
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
-
-use super::powersched::PowerSchedule;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 
