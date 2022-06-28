@@ -21,6 +21,8 @@ use crate::{
 use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
+use super::powersched::PowerSchedule;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 
 /// The Metadata for `WeightedScheduler`
@@ -89,18 +91,8 @@ crate::impl_serdeany!(WeightedScheduleMetadata);
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
 pub struct WeightedScheduler<F, I, S> {
+    strat: Option<PowerSchedule>,
     phantom: PhantomData<(F, I, S)>,
-}
-
-impl<F, I, S> Default for WeightedScheduler<F, I, S>
-where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
-{
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl<F, I, S> WeightedScheduler<F, I, S>
@@ -111,8 +103,9 @@ where
 {
     /// Create a new [`WeightedScheduler`]
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(strat: Option<PowerSchedule>) -> Self {
         Self {
+            strat,
             phantom: PhantomData,
         }
     }
@@ -216,7 +209,7 @@ where
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata(SchedulerMetadata::new(None));
+            state.add_metadata(SchedulerMetadata::new(self.strat));
         }
 
         if !state.has_metadata::<WeightedScheduleMetadata>() {
@@ -294,6 +287,21 @@ where
                 psmeta.set_queue_cycles(psmeta.queue_cycles() + 1);
             }
             *state.corpus_mut().current_mut() = Some(idx);
+
+            // Update the handicap
+            let mut testcase = state.corpus().get(idx)?.borrow_mut();
+            let tcmeta = testcase
+                .metadata_mut()
+                .get_mut::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| {
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                })?;
+
+            if tcmeta.handicap() >= 4 {
+                tcmeta.set_handicap(tcmeta.handicap() - 4);
+            } else if tcmeta.handicap() > 0 {
+                tcmeta.set_handicap(tcmeta.handicap() - 1);
+            }
             Ok(idx)
         }
     }
