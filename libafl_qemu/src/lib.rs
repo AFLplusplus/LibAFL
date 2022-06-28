@@ -12,7 +12,6 @@
 // Till they fix this buggy lint in clippy
 #![allow(clippy::borrow_as_ptr)]
 #![allow(clippy::borrow_deref_ref)]
-
 // Allow only ATM, it will be evetually removed
 #![allow(clippy::missing_safety_doc)]
 
