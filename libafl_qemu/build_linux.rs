@@ -253,29 +253,25 @@ pub fn build() {
         println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
     } */
 
-    drop(
-        assert!(Command::new("make")
-            .current_dir(&out_dir_path)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .arg("clean")
-            .status()
-            .expect("make failed")
-            .success())
-    );
-    drop(
-        assert!(Command::new("make")
-            .current_dir(&out_dir_path)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .status()
-            .expect("make failed")
-            .success())
-    );
+    assert!(Command::new("make")
+        .current_dir(&out_dir_path)
+        .env("CC", &cross_cc)
+        .env("OUT_DIR", &target_dir)
+        .arg("-C")
+        .arg(&qasan_dir)
+        .arg("clean")
+        .status()
+        .expect("make failed")
+        .success());
+    assert!(Command::new("make")
+        .current_dir(&out_dir_path)
+        .env("CC", &cross_cc)
+        .env("OUT_DIR", &target_dir)
+        .arg("-C")
+        .arg(&qasan_dir)
+        .status()
+        .expect("make failed")
+        .success());
 
     cc::Build::new()
         .warnings(false)
