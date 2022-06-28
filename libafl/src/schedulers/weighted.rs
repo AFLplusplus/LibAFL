@@ -11,7 +11,7 @@ use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
     inputs::Input,
     schedulers::{
-        powersched::{SchedulerMetadata, PowerSchedule},
+        powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
