@@ -254,23 +254,27 @@ pub fn build() {
     } */
 
     drop(
-        Command::new("make")
+        assert!(Command::new("make")
             .current_dir(&out_dir_path)
             .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)
             .arg("-C")
             .arg(&qasan_dir)
             .arg("clean")
-            .status(),
+            .status()
+            .expect("make failed")
+            .success())
     );
     drop(
-        Command::new("make")
+        assert!(Command::new("make")
             .current_dir(&out_dir_path)
             .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)
             .arg("-C")
             .arg(&qasan_dir)
-            .status(),
+            .status()
+            .expect("make failed")
+            .success())
     );
 
     cc::Build::new()
