@@ -855,7 +855,7 @@ pub struct BytesSwapMutator;
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I> + HasMaxSize,
+    S: HasRand,
 {
     fn mutate(
         &mut self,
