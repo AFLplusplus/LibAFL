@@ -228,6 +228,9 @@ extern "C" {
     fn qemu_main_loop();
     fn qemu_cleanup();
 
+    // void libafl_cpu_thread_fn(CPUState *cpu)
+    fn libafl_cpu_thread_fn(cpu: CPUStatePtr);
+
     // int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
     //                     uint8_t *buf, int len, int is_write);
     fn cpu_memory_rw_debug(
@@ -237,6 +240,8 @@ extern "C" {
         len: i32,
         is_write: i32,
     );
+    
+    static mut libafl_start_vcpu: extern "C" fn (cpu: CPUStatePtr);
 }
 
 #[cfg(not(feature = "usermode"))]
@@ -253,6 +258,8 @@ extern "C" {
     fn libafl_qemu_num_cpus() -> i32;
     // CPUState* libafl_qemu_current_cpu(void);
     fn libafl_qemu_current_cpu() -> CPUStatePtr;
+    
+    fn libafl_qemu_cpu_index(cpu: CPUStatePtr) -> i32;
 
     fn libafl_qemu_write_reg(cpu: CPUStatePtr, reg: i32, val: *const u8) -> i32;
     fn libafl_qemu_read_reg(cpu: CPUStatePtr, reg: i32, val: *mut u8) -> i32;
@@ -426,11 +433,20 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
 }
 
 #[derive(Debug)]
+#[repr(C)]
 pub struct CPU {
     ptr: CPUStatePtr,
 }
 
 impl CPU {
+    pub fn emulator(&self) -> Emulator {
+        Emulator::new_empty()
+    }
+
+    pub fn index(&self) -> usize {
+        unsafe { libafl_qemu_cpu_index(self.ptr) as usize }
+    }
+
     #[cfg(feature = "usermode")]
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
@@ -563,6 +579,11 @@ impl Emulator {
     #[must_use]
     pub(crate) fn new_empty() -> Emulator {
         Emulator { _private: () }
+    }
+
+    #[cfg(not(feature = "usermode"))]
+    pub fn start(&self, cpu: &CPU) {
+        unsafe { libafl_cpu_thread_fn(cpu.ptr); }
     }
 
     /// This function gets the memory mappings from the emulator.
@@ -832,6 +853,13 @@ impl Emulator {
         data: u64,
     ) {
         unsafe { libafl_add_cmp_hook(gen, exec1, exec2, exec4, exec8, data) }
+    }
+
+    #[cfg(not(feature = "usermode"))]
+    pub fn set_vcpu_start(&self, hook: extern "C" fn(cpu: CPU)) {
+        unsafe {
+            libafl_start_vcpu = core::mem::transmute(hook);
+        }
     }
 
     #[cfg(feature = "usermode")]
