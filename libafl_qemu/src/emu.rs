@@ -240,8 +240,8 @@ extern "C" {
         len: i32,
         is_write: i32,
     );
-    
-    static mut libafl_start_vcpu: extern "C" fn (cpu: CPUStatePtr);
+
+    static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 }
 
 #[cfg(not(feature = "usermode"))]
@@ -258,7 +258,7 @@ extern "C" {
     fn libafl_qemu_num_cpus() -> i32;
     // CPUState* libafl_qemu_current_cpu(void);
     fn libafl_qemu_current_cpu() -> CPUStatePtr;
-    
+
     fn libafl_qemu_cpu_index(cpu: CPUStatePtr) -> i32;
 
     fn libafl_qemu_write_reg(cpu: CPUStatePtr, reg: i32, val: *const u8) -> i32;
@@ -342,6 +342,10 @@ extern "C" {
         exec8: Option<extern "C" fn(u64, u64, u64, u64)>,
         data: u64,
     );
+
+    // void libafl_add_backdoor_hook(void (*exec)(uint64_t id, uint64_t data),
+    //                           uint64_t data)
+    fn libafl_add_backdoor_hook(exec: extern "C" fn(GuestAddr, u64), data: u64);
 
     fn libafl_qemu_add_gdb_cmd(
         callback: extern "C" fn(*const u8, usize, *const ()) -> i32,
@@ -583,7 +587,9 @@ impl Emulator {
 
     #[cfg(not(feature = "usermode"))]
     pub fn start(&self, cpu: &CPU) {
-        unsafe { libafl_cpu_thread_fn(cpu.ptr); }
+        unsafe {
+            libafl_cpu_thread_fn(cpu.ptr);
+        }
     }
 
     /// This function gets the memory mappings from the emulator.
@@ -602,9 +608,7 @@ impl Emulator {
         if ptr.is_null() {
             None
         } else {
-            Some(CPU {
-                ptr,
-            })
+            Some(CPU { ptr })
         }
     }
 
@@ -853,6 +857,10 @@ impl Emulator {
         data: u64,
     ) {
         unsafe { libafl_add_cmp_hook(gen, exec1, exec2, exec4, exec8, data) }
+    }
+
+    pub fn add_backdoor_hook(&self, exec: extern "C" fn(GuestAddr, u64), data: u64) {
+        unsafe { libafl_add_backdoor_hook(exec, data) };
     }
 
     #[cfg(not(feature = "usermode"))]
