@@ -144,7 +144,10 @@ pub fn build() {
     #[cfg(not(feature = "usermode"))]
     let output_lib = build_dir.join(&format!("libqemu-system-{}.so", cpu_target));
 
-    println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy().to_string());
+    println!(
+        "cargo:rerun-if-changed={}",
+        output_lib.to_string_lossy().to_string()
+    );
 
     if !output_lib.is_file() || custum_qemu_dir.is_some() {
         /*drop(
@@ -350,25 +353,23 @@ pub fn build() {
         let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
         let src_dir = Path::new("src");
 
-        assert!(
-            Command::new("make")
-                .current_dir(&out_dir_path)
-                .env("CC", &cross_cc)
-                .env("OUT_DIR", &target_dir)
-                .arg("-C")
-                .arg(&qasan_dir)
-                .arg("clean")
-                .status(),
-        );
-        assert!(
-            Command::new("make")
-                .current_dir(&out_dir_path)
-                .env("CC", &cross_cc)
-                .env("OUT_DIR", &target_dir)
-                .arg("-C")
-                .arg(&qasan_dir)
-                .status(),
-        );
+        assert!(Command::new("make")
+            .current_dir(&out_dir_path)
+            .env("CC", &cross_cc)
+            .env("OUT_DIR", &target_dir)
+            .arg("-C")
+            .arg(&qasan_dir)
+            .arg("clean")
+            .status()
+            .success(),);
+        assert!(Command::new("make")
+            .current_dir(&out_dir_path)
+            .env("CC", &cross_cc)
+            .env("OUT_DIR", &target_dir)
+            .arg("-C")
+            .arg(&qasan_dir)
+            .status()
+            .success(),);
 
         cc::Build::new()
             .warnings(false)
