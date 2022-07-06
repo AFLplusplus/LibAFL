@@ -361,7 +361,8 @@ pub fn build() {
             .arg(&qasan_dir)
             .arg("clean")
             .status()
-            .success(),);
+            .expect("make failed")
+            .success());
         assert!(Command::new("make")
             .current_dir(&out_dir_path)
             .env("CC", &cross_cc)
@@ -369,7 +370,8 @@ pub fn build() {
             .arg("-C")
             .arg(&qasan_dir)
             .status()
-            .success(),);
+            .expect("make failed")
+            .success());
 
         cc::Build::new()
             .warnings(false)
