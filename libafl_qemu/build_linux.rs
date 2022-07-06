@@ -262,6 +262,10 @@ pub fn build() {
             "{}/subprojects/libvhost-user/libvhost-user.a",
             build_dir.display()
         ))
+        .arg(format!(
+            "{}/subprojects/libvduse/libvduse.a",
+            build_dir.display()
+        ))
         .arg(format!("{}/libfdt.a", build_dir.display()))
         .arg(format!("{}/libslirp.a", build_dir.display()))
         .arg(format!("{}/libmigration.fa", build_dir.display()))

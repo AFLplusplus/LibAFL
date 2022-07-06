@@ -128,6 +128,7 @@ where
             return None;
         }
 
+        #[allow(unused_mut)]
         let mut code = {
             #[cfg(feature = "usermode")]
             unsafe {
