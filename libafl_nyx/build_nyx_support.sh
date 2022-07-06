@@ -4,21 +4,6 @@ echo "           Nyx build script"
 echo "================================================="
 echo
 
-echo "[*] Performing basic sanity checks..."
-
-if [ ! "$(uname -m)" = "Linux" ]; then
-
-  echo "[-] Error: Nyx mode is only available on Linux."
-  exit 0
-
-fi
-
-if [ ! "$(uname -m)" = "x86_64" ]; then
-
-  echo "[-] Error: Nyx mode is only available on x86_64 (yet)."
-  exit 0
-
-fi
 
 echo "[*] Making sure all Nyx is checked out"
 
@@ -49,13 +34,6 @@ if [ ! -f "QEMU-Nyx/x86_64-softmmu/qemu-system-x86_64" ]; then
     cd ..
 fi
 
-echo "[*] Checking libnyx.so ..."
-if [ -f "../target/release/liblibnyx.so" ]; then
-  cp -v ../target/debug/liblibnyx.so ../libnyx.so || exit 1
-elif [ -f "../target/release/liblibnyx.so" ]; then
-  cp -v ../target/debug/liblibnyx.so ../libnyx.so || exit 1
-  exit 1
-fi
 echo "[+] All done for nyx_mode, enjoy!"
 
 exit 0

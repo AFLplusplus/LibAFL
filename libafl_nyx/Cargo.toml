@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 libnyx = {git = "https://github.com/nyx-fuzz/libnyx.git"}
+libafl = { path = "../libafl", version = "0.7.1", features = ["std", "libafl_derive", "frida_cli"] }
+libafl_targets = { path = "../libafl_targets", version = "0.7.1", features = ["std", "sancov_cmplog"] }
