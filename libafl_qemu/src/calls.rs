@@ -128,7 +128,7 @@ where
             return None;
         }
 
-        let code = {
+        let mut code = {
             #[cfg(feature = "usermode")]
             unsafe {
                 std::slice::from_raw_parts(emu.g2h(pc), 512)
