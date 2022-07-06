@@ -51,6 +51,11 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/FormatVariadic.h"
 
+// Without this, Can't build with llvm-14 & old PM
+#if LLVM_VERSION_MAJOR >= 14 && !defined(USE_NEW_PM)
+  #include "llvm/Pass.h"
+#endif
+
 #if LLVM_VERSION_MAJOR > 3 || \
     (LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 4)
   #include "llvm/IR/DebugInfo.h"
@@ -593,11 +598,21 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       /* Load prev_loc */
 
-      LoadInst *PrevLoc = IRB.CreateLoad(
+      LoadInst *PrevLoc;
+
+      if (Ngram) {
+        PrevLoc = IRB.CreateLoad(
 #if LLVM_VERSION_MAJOR >= 14
-          PrevLocTy,
+            PrevLocTy,
 #endif
-          AFLPrevLoc);
+            AFLPrevLoc);
+      } else {
+        PrevLoc = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+            IRB.getInt32Ty(),
+#endif
+            AFLPrevLoc);
+      }
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
       Value *PrevLocTrans;
 

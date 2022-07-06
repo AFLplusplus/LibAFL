@@ -350,7 +350,7 @@ pub fn build() {
         let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
         let src_dir = Path::new("src");
 
-        drop(
+        assert!(
             Command::new("make")
                 .current_dir(&out_dir_path)
                 .env("CC", &cross_cc)
@@ -360,7 +360,7 @@ pub fn build() {
                 .arg("clean")
                 .status(),
         );
-        drop(
+        assert!(
             Command::new("make")
                 .current_dir(&out_dir_path)
                 .env("CC", &cross_cc)

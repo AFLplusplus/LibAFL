@@ -132,14 +132,12 @@ impl TuiUI {
         let tabs = Tabs::new(titles)
             .block(
                 Block::default()
-                    .title(
-                        Span::styled(
-                            "charts (`g` switch)",
-                            Style::default()
-                                .fg(Color::LightCyan)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                    )
+                    .title(Span::styled(
+                        "charts (`g` switch)",
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))
                     .borders(Borders::ALL),
             )
             .highlight_style(Style::default().fg(Color::LightYellow))
@@ -277,14 +275,12 @@ impl TuiUI {
         let chart = Chart::new(datasets)
             .block(
                 Block::default()
-                    .title(
-                        Span::styled(
-                            title,
-                            Style::default()
-                                .fg(Color::LightCyan)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                    )
+                    .title(Span::styled(
+                        title,
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))
                     .borders(Borders::ALL),
             )
             .x_axis(
@@ -361,14 +357,12 @@ impl TuiUI {
         let table = Table::new(items)
             .block(
                 Block::default()
-                    .title(
-                        Span::styled(
-                            "generic",
-                            Style::default()
-                                .fg(Color::LightCyan)
-                                .add_modifier(Modifier::BOLD),
-                        ),
-                    )
+                    .title(Span::styled(
+                        "generic",
+                        Style::default()
+                            .fg(Color::LightCyan)
+                            .add_modifier(Modifier::BOLD),
+                    ))
                     .borders(Borders::ALL),
             )
             .widths(&[Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
@@ -474,19 +468,18 @@ impl TuiUI {
                 };
             }
 
-            let table =
-                Table::new(items)
-                    .block(
-                        Block::default()
-                            .title(Span::styled(
-                                "introspection",
-                                Style::default()
-                                    .fg(Color::LightCyan)
-                                    .add_modifier(Modifier::BOLD),
-                            ))
-                            .borders(Borders::ALL),
-                    )
-                    .widths(&[Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
+            let table = Table::new(items)
+                .block(
+                    Block::default()
+                        .title(Span::styled(
+                            "introspection",
+                            Style::default()
+                                .fg(Color::LightCyan)
+                                .add_modifier(Modifier::BOLD),
+                        ))
+                        .borders(Borders::ALL),
+                )
+                .widths(&[Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]);
             f.render_widget(table, client_chunks[1]);
         }
     }
@@ -503,14 +496,12 @@ impl TuiUI {
             .map(|msg| ListItem::new(Span::raw(msg)))
             .collect();
         let logs = List::new(logs).block(
-            Block::default().borders(Borders::ALL).title(
-                Span::styled(
-                    "clients logs (`t` to show/hide)",
-                    Style::default()
-                        .fg(Color::LightCyan)
-                        .add_modifier(Modifier::BOLD),
-                ),
-            ),
+            Block::default().borders(Borders::ALL).title(Span::styled(
+                "clients logs (`t` to show/hide)",
+                Style::default()
+                    .fg(Color::LightCyan)
+                    .add_modifier(Modifier::BOLD),
+            )),
         );
         f.render_widget(logs, area);
     }

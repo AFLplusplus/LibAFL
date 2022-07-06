@@ -889,6 +889,7 @@ impl Emulator {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn add_gdb_cmd(&self, callback: Box<dyn FnMut(&Self, &str) -> bool>) {
         unsafe {
             GDB_COMMANDS.push(core::mem::transmute(callback));

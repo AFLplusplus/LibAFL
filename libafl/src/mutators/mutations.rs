@@ -271,7 +271,7 @@ where
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut());
-            *byte = !*byte;
+            *byte = (!(*byte)).wrapping_add(1);
             Ok(MutationResult::Mutated)
         }
     }
@@ -855,7 +855,7 @@ pub struct BytesSwapMutator;
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I> + HasMaxSize,
+    S: HasRand,
 {
     fn mutate(
         &mut self,
