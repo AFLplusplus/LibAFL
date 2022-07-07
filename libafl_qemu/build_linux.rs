@@ -144,10 +144,7 @@ pub fn build() {
     #[cfg(not(feature = "usermode"))]
     let output_lib = build_dir.join(&format!("libqemu-system-{}.so", cpu_target));
 
-    println!(
-        "cargo:rerun-if-changed={}",
-        output_lib.to_string_lossy().to_string()
-    );
+    println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
 
     if !output_lib.is_file() || custum_qemu_dir.is_some() {
         /*drop(
@@ -344,7 +341,7 @@ pub fn build() {
 
         println!(
             "cargo:rustc-link-search=native={}",
-            &target_dir.to_string_lossy().to_string()
+            &target_dir.to_string_lossy()
         );
         println!("cargo:rustc-link-lib=qemu-{}", cpu_target);
 
