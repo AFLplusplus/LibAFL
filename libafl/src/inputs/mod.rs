@@ -52,7 +52,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
 /// An input for the target
 #[cfg(feature = "std")]
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
     where

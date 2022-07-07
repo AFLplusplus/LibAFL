@@ -43,17 +43,16 @@ void __libqasan_print_maps(void) {
   int   i;
   char *line = NULL;
   for (i = 0; i < len; i++) {
-    if (!line) line = { &buf[i];
+    if (!line) line = &buf[i];
+    if (buf[i] == '\n') {
+      buf[i] = 0;
+      QASAN_LOG("%s\n", line);
+      line = NULL;
+    }
   }
-  if (buf[i] == '\n') {
-    buf[i] = 0;
-    QASAN_LOG("%s\n", line);
-    line = NULL;
-  }
-}
 
-if (line) { QASAN_LOG("%s\n", line); }
-QASAN_LOG("\n");
+  if (line) { QASAN_LOG("%s\n", line); }
+  QASAN_LOG("\n");
 }
 
 int __libqasan_is_initialized = 0;

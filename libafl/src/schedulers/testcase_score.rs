@@ -266,7 +266,7 @@ where
         }
 
         if let Some(strat) = psmeta.strat() {
-            if strat == PowerSchedule::EXPLORE {
+            if strat != PowerSchedule::EXPLORE {
                 if factor > MAX_FACTOR {
                     factor = MAX_FACTOR;
                 }

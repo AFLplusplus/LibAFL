@@ -41,8 +41,8 @@ use super::HasObservers;
 /// `StdIn`: The traget reads from stdin
 /// `File`: The target reads from the specified [`InputFile`]
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum InputLocation {
-    /// Mutate a commandline argument to deliver an input
+pub enum InputLocation {
+    /// Mutate a command line argument to deliver an input
     Arg {
         /// The offset of the argument to mutate
         argnum: usize,
@@ -674,7 +674,7 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_builder() {
-        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+        let mut mgr = SimpleEventManager::<BytesInput, _, ()>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
 
@@ -700,7 +700,7 @@ mod tests {
     fn test_parse_afl_cmdline() {
         use alloc::string::ToString;
 
-        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+        let mut mgr = SimpleEventManager::<BytesInput, _, ()>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
 

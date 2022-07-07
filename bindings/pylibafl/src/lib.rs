@@ -1,4 +1,5 @@
 use libafl;
+#[cfg(target_os = "linux")]
 use libafl_qemu;
 use libafl_sugar;
 use pyo3::prelude::*;
@@ -92,10 +93,14 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
 
     modules.set_item("pylibafl.sugar", sugar_module)?;
 
+    #[cfg(target_os = "linux")]
     let qemu_module = PyModule::new(py, "qemu")?;
+    #[cfg(target_os = "linux")]
     libafl_qemu::python_module(py, qemu_module)?;
+    #[cfg(target_os = "linux")]
     m.add_submodule(qemu_module)?;
 
+    #[cfg(target_os = "linux")]
     modules.set_item("pylibafl.qemu", qemu_module)?;
 
     let libafl_module = PyModule::new(py, "libafl")?;

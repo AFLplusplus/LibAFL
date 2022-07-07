@@ -56,17 +56,18 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::corpus::inmemory::pybind::PythonInMemoryCorpus;
-    use crate::corpus::testcase::pybind::PythonTestcaseWrapper;
-    use crate::corpus::{Corpus, Testcase};
-    use crate::inputs::BytesInput;
-    use crate::Error;
+    use crate::{
+        corpus::{
+            cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
+            ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
+            Testcase,
+        },
+        inputs::BytesInput,
+        Error,
+    };
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
     use std::cell::RefCell;
-
-    use super::cached::pybind::PythonCachedOnDiskCorpus;
-    use super::ondisk::pybind::PythonOnDiskCorpus;
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     enum PythonCorpusWrapper {

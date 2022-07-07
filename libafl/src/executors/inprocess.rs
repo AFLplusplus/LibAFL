@@ -1474,6 +1474,14 @@ where
 
                     match res {
                         WaitStatus::Signaled(_, _, _) => Ok(ExitKind::Crash),
+                        WaitStatus::Exited(_, code) => {
+                            if code > 128 && code < 160 {
+                                // Signal exit codes
+                                Ok(ExitKind::Crash)
+                            } else {
+                                Ok(ExitKind::Ok)
+                            }
+                        }
                         _ => Ok(ExitKind::Ok),
                     }
                 }
@@ -1586,7 +1594,8 @@ pub mod child_signal_handlers {
                     .post_exec_child_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
 
-                std::process::abort();
+                // std::process::abort();
+                unsafe { libc::_exit(128 + 6) }; // ABORT exit code
             }
         }));
     }
@@ -1617,13 +1626,14 @@ pub mod child_signal_handlers {
                 .expect("Failed to run post_exec on observers");
         }
 
-        //libc::_exit(128 + (_signal as i32));
+        libc::_exit(128 + (_signal as i32));
     }
 }
 
 #[cfg(test)]
 mod tests {
     use core::marker::PhantomData;
+    use serial_test::serial;
 
     #[cfg(all(feature = "std", feature = "fork", unix))]
     use crate::{
@@ -1653,6 +1663,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         use crate::executors::inprocess::InChildProcessHandlers;
@@ -1678,16 +1689,16 @@ mod tests {
 #[allow(missing_docs)]
 /// `InProcess` Python bindings
 pub mod pybind {
-    use crate::events::pybind::PythonEventManager;
-    use crate::executors::pybind::PythonExecutor;
-    use crate::executors::{inprocess::OwnedInProcessExecutor, ExitKind};
-    use crate::fuzzer::pybind::PythonStdFuzzerWrapper;
-    use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::observers::pybind::PythonObserversTuple;
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use crate::{
+        events::pybind::PythonEventManager,
+        executors::{inprocess::OwnedInProcessExecutor, pybind::PythonExecutor, ExitKind},
+        fuzzer::pybind::PythonStdFuzzerWrapper,
+        inputs::{BytesInput, HasBytesVec},
+        observers::pybind::PythonObserversTuple,
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+    };
     use alloc::boxed::Box;
-    use pyo3::prelude::*;
-    use pyo3::types::PyBytes;
+    use pyo3::{prelude::*, types::PyBytes};
 
     #[pyclass(unsendable, name = "InProcessExecutor")]
     #[derive(Debug)]

@@ -5,9 +5,9 @@ use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
+        core_affinity::Cores,
         current_nanos,
         launcher::Launcher,
-        os::Cores,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
@@ -294,7 +294,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 #[cfg(feature = "python")]
 pub mod pybind {
     use crate::forkserver;
-    use libafl::bolts::os::Cores;
+    use libafl::bolts::core_affinity::Cores;
     use pyo3::prelude::*;
     use std::path::PathBuf;
 

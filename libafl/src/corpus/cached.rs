@@ -137,9 +137,7 @@ where
 /// ``CachedOnDiskCorpus`` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::corpus::pybind::PythonCorpus;
-    use crate::corpus::CachedOnDiskCorpus;
-    use crate::inputs::BytesInput;
+    use crate::{corpus::pybind::PythonCorpus, corpus::CachedOnDiskCorpus, inputs::BytesInput};
     use alloc::string::String;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};

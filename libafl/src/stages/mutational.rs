@@ -166,14 +166,15 @@ where
 #[allow(missing_docs)]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
-    use crate::events::pybind::PythonEventManager;
-    use crate::executors::pybind::PythonExecutor;
-    use crate::fuzzer::pybind::PythonStdFuzzer;
-    use crate::inputs::BytesInput;
-    use crate::mutators::pybind::PythonMutator;
-    use crate::stages::pybind::PythonStage;
-    use crate::stages::StdMutationalStage;
-    use crate::state::pybind::PythonStdState;
+    use crate::{
+        events::pybind::PythonEventManager,
+        executors::pybind::PythonExecutor,
+        fuzzer::pybind::PythonStdFuzzer,
+        inputs::BytesInput,
+        mutators::pybind::PythonMutator,
+        stages::{pybind::PythonStage, StdMutationalStage},
+        state::pybind::PythonStdState,
+    };
     use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "StdMutationalStage")]

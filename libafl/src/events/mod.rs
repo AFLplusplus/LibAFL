@@ -7,6 +7,7 @@ pub use llmp::*;
 
 use ahash::AHasher;
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
@@ -36,8 +37,6 @@ pub struct EventManagerId {
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "introspection")]
-use alloc::boxed::Box;
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -61,6 +60,15 @@ impl fmt::Display for LogSeverity {
             LogSeverity::Error => write!(f, "Error"),
         }
     }
+}
+
+/// The result of a custom buf handler added using [`HasCustomBufHandlers::add_custom_buf_handler`]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CustomBufEventResult {
+    /// Exit early from event handling
+    Handled,
+    /// Call the next handler, if available
+    Next,
 }
 
 /// Indicate if an event worked or not
@@ -231,6 +239,13 @@ where
         /// `PhantomData`
         phantom: PhantomData<I>,
     },
+    /// Sends a custom buffer to other clients
+    CustomBuf {
+        /// The buffer
+        buf: Vec<u8>,
+        /// Tag of this buffer
+        tag: String,
+    },
     /*/// A custom type
     Custom {
         // TODO: Allow custom events
@@ -270,12 +285,13 @@ where
                 introspection_monitor: _,
                 phantom: _,
             } => "PerfMonitor",
-            Event::Objective { objective_size: _ } => "Objective",
+            Event::Objective { .. } => "Objective",
             Event::Log {
                 severity_level: _,
                 message: _,
                 phantom: _,
             } => "Log",
+            Event::CustomBuf { .. } => "CustomBuf",
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
@@ -451,6 +467,16 @@ where
 {
 }
 
+/// The handler function for custom buffers exchanged via [`EventManager`]
+type CustomBufHandlerFn<S> =
+    dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
+
+/// Supports custom buf handlers to handle `CustomBuf` events.
+pub trait HasCustomBufHandlers<S> {
+    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
+    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>);
+}
+
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
 pub struct NopEventManager {}
@@ -478,6 +504,14 @@ impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
 }
 
 impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
+
+impl<S> HasCustomBufHandlers<S> for NopEventManager {
+    fn add_custom_buf_handler(
+        &mut self,
+        _handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+    ) {
+    }
+}
 
 impl<I> ProgressReporter<I> for NopEventManager where I: Input {}
 
@@ -548,16 +582,17 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::events::simple::pybind::PythonSimpleEventManager;
-    use crate::events::{
-        Event, EventFirer, EventManager, EventManagerId, EventProcessor, EventRestarter,
-        HasEventManagerId, ProgressReporter,
+    use crate::{
+        events::{
+            simple::pybind::PythonSimpleEventManager, Event, EventFirer, EventManager,
+            EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
+        },
+        executors::pybind::PythonExecutor,
+        fuzzer::pybind::PythonStdFuzzer,
+        inputs::BytesInput,
+        state::pybind::PythonStdState,
+        Error,
     };
-    use crate::executors::pybind::PythonExecutor;
-    use crate::fuzzer::pybind::PythonStdFuzzer;
-    use crate::inputs::BytesInput;
-    use crate::state::pybind::PythonStdState;
-    use crate::Error;
     use pyo3::prelude::*;
 
     #[derive(Debug, Clone)]

@@ -248,6 +248,8 @@ fn main() {
 pub const CLANG_PATH: &str = \"clang\";
 /// The path to the `clang++` executable
 pub const CLANGXX_PATH: &str = \"clang++\";
+/// The llvm version used to build llvm passes
+pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     "
         )
         .expect("Could not write file");

@@ -8,6 +8,8 @@ Welcome to `LibAFL`
 #![cfg_attr(unstable_feature, feature(specialization))]
 // For `type_id` and owned things
 #![cfg_attr(unstable_feature, feature(intrinsics))]
+// For `std::simd`
+#![cfg_attr(unstable_feature, feature(portable_simd))]
 #![warn(clippy::cargo)]
 #![deny(clippy::cargo_common_metadata)]
 #![deny(rustdoc::broken_intra_doc_links)]
@@ -68,6 +70,9 @@ Welcome to `LibAFL`
         while_true
     )
 )]
+// Till they fix this buggy lint in clippy
+#![allow(clippy::borrow_as_ptr)]
+#![allow(clippy::borrow_deref_ref)]
 
 #[cfg(feature = "std")]
 #[macro_use]
@@ -161,6 +166,8 @@ pub enum Error {
     IllegalState(String, ErrorBacktrace),
     /// The argument passed to this method or function is not valid
     IllegalArgument(String, ErrorBacktrace),
+    /// The performed action is not supported on the current platform
+    Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
@@ -249,6 +256,14 @@ impl Error {
     pub fn shutting_down() -> Self {
         Error::ShuttingDown
     }
+    /// This operation is not supported on the current architecture or platform
+    #[must_use]
+    pub fn unsupported<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Unsupported(arg.into(), ErrorBacktrace::new())
+    }
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -302,6 +317,14 @@ impl fmt::Display for Error {
             }
             Self::IllegalArgument(s, b) => {
                 write!(f, "Illegal argument: {0}", &s)?;
+                display_error_backtrace(f, b)
+            }
+            Self::Unsupported(s, b) => {
+                write!(
+                    f,
+                    "The operation is not supported on the current platform: {0}",
+                    &s
+                )?;
                 display_error_backtrace(f, b)
             }
             Self::ShuttingDown => write!(f, "Shutting down!"),
