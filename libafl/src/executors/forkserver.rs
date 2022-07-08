@@ -44,6 +44,7 @@ const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
+/// The length of header bytes which tells shmem size
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
 
@@ -870,7 +871,7 @@ where
                 let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
-                map.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
+                map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE].copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
                 map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                     .copy_from_slice(target_bytes.as_slice());
             }
