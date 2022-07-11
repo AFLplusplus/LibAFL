@@ -1,6 +1,6 @@
 // adapted from libnyx::FFI, change the C-style FFI function into pure rust
 
-use libnyx::ffi::{NYX_ABORT, NYX_CRASH, NYX_HPRINTF};
+use libnyx::ffi::{nyx_set_afl_input, NYX_ABORT, NYX_CRASH, NYX_HPRINTF};
 use libnyx::NyxConfig;
 pub use libnyx::NyxProcess;
 
