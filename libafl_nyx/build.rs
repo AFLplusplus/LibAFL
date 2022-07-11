@@ -16,5 +16,5 @@ fn main() {
 
 #[cfg(not(target_os = "linux"))]
 fn main() {
-    panic("NYX node is only avaliable on Linux");
+    println!("cargo:warning=NYX node is only avaliable on Linux");
 }
