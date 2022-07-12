@@ -112,7 +112,11 @@ impl CompilerWrapper for ClangWrapper {
 
         self.name = args[0].as_ref().to_string();
         // Detect C++ compiler looking at the wrapper name
-        self.is_cpp = self.is_cpp || self.name.ends_with("++");
+        self.is_cpp = if cfg!(windows) {
+            self.is_cpp || self.name.ends_with("++.exe")
+        } else {
+            self.is_cpp || self.name.ends_with("++")
+        };
 
         // Sancov flag
         // new_args.push("-fsanitize-coverage=trace-pc-guard".into());
@@ -252,21 +256,22 @@ impl CompilerWrapper for ClangWrapper {
     where
         S: AsRef<str>,
     {
-        if cfg!(target_vendor = "apple") {
-            //self.add_link_arg("-force_load".into())?;
+        let lib_file = dir
+            .join(format!("{}{}.{}", LIB_PREFIX, name.as_ref(), LIB_EXT))
+            .into_os_string()
+            .into_string()
+            .unwrap();
+
+        if cfg!(unix) {
+            if cfg!(target_vendor = "apple") {
+                self.add_link_arg(lib_file)
+            } else {
+                self.add_link_arg("-Wl,--whole-archive")
+                    .add_link_arg(lib_file)
+                    .add_link_arg("-Wl,--no-whole-archive")
+            }
         } else {
-            self.add_link_arg("-Wl,--whole-archive");
-        }
-        self.add_link_arg(
-            dir.join(format!("{}{}.{}", LIB_PREFIX, name.as_ref(), LIB_EXT))
-                .into_os_string()
-                .into_string()
-                .unwrap(),
-        );
-        if cfg!(target_vendor = "apple") {
-            self
-        } else {
-            self.add_link_arg("-Wl,-no-whole-archive")
+            self.add_link_arg(format!("-Wl,-wholearchive:{}", lib_file))
         }
     }
 
