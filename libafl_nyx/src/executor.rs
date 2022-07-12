@@ -1,7 +1,7 @@
 use std::{
     ffi::OsString,
     fmt::{self, Debug},
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, marker::PhantomData,
 };
 
 use libafl::{
@@ -20,9 +20,9 @@ use super::nyx_bridge::NyxProcess;
 pub struct NyxHelper {
     nyx_process: NyxProcess,
     real_map_size: usize,
-    map_size: usize,
+    pub map_size: usize,
     //shared memory with instruction bitmaps
-    trace_bits: *mut u8,
+    pub trace_bits: *mut u8,
 }
 
 const MAX_FILE: u32 = 1 * 1024 * 1024;
@@ -36,7 +36,7 @@ impl NyxHelper {
     pub fn new(
         target_dir: PathBuf,
         cpu_id: u32,
-        enable_snap_mode: bool,
+        snap_mode: bool,
         nyx_type: NyxProcessType,
     ) -> NyxResult<Self> {
         let sharedir = target_dir.to_str().unwrap();
@@ -50,7 +50,7 @@ impl NyxHelper {
         let real_map_size = nyx_process.bitmap_buffer_size();
         let map_size = ((real_map_size + 63) >> 6) << 6;
         let trace_bits = nyx_process.bitmap_buffer_mut().as_mut_ptr();
-        nyx_process.option_set_reload_mode(enable_snap_mode);
+        nyx_process.option_set_reload_mode(snap_mode);
         nyx_process.option_apply();
         nyx_process.option_set_timeout(2, 0);
         nyx_process.option_apply();
@@ -95,38 +95,24 @@ impl Debug for NyxHelper {
         f.debug_struct("NyxInprocessHelper").finish()
     }
 }
-struct NyxInprocessExecutor<I, OT, S>
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
+pub struct NyxInprocessExecutor
 {
     /// implement nyx function
-    helper: NyxHelper,
-    map_size: u32,
-    real_map_size: u32,
-    Input: I,
-    State: S,
-    /// record all observers
-    observers: OT,
+    pub helper: NyxHelper,
 }
 
-impl<I, OT, S> Debug for NyxInprocessExecutor<I, OT, S>
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
+impl Debug for NyxInprocessExecutor
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NyxInprocessExecutor")
             .field("helper", &self.helper)
-            .field("observers", &self.observers)
             .finish()
     }
 }
 
-impl<EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxInprocessExecutor<I, OT, S>
+impl<EM, I, S, Z> Executor<EM, I, S, Z> for NyxInprocessExecutor
 where
-    I: Input + fmt::Debug + HasBytesVec,
-    OT: ObserversTuple<I, S>,
+    I: Input + HasBytesVec
 {
     fn post_run_reset(&mut self) {}
 
@@ -166,3 +152,20 @@ where
         }
     }
 }
+
+
+impl NyxInprocessExecutor{
+        pub fn new(target_dir:PathBuf, cpu_id:u32, snap_mode:bool) -> NyxResult<Self>{
+            let helper = NyxHelper::new(target_dir, cpu_id, snap_mode, NyxProcessType::ALONE)?;
+            Ok(Self{
+                helper,
+            })
+
+        }
+
+        pub fn get_trace_bits(self) -> &'static mut [u8]{
+            unsafe{
+            std::slice::from_raw_parts_mut(self.helper.trace_bits, self.helper.real_map_size)            
+            }
+        }
+    }
