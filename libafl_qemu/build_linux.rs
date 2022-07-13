@@ -68,6 +68,7 @@ pub fn build() {
     }
 
     let custum_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
+    let custum_qemu_no_build = env::var("CUSTOM_QEMU_NO_BUILD").is_ok();
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
@@ -146,7 +147,7 @@ pub fn build() {
 
     println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
 
-    if !output_lib.is_file() || custum_qemu_dir.is_some() {
+    if !output_lib.is_file() || (custum_qemu_dir.is_some() && !custum_qemu_no_build) {
         /*drop(
             Command::new("make")
                 .current_dir(&qemu_path)

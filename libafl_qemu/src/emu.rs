@@ -2,7 +2,7 @@
 
 use core::{
     convert::Into,
-    ffi::c_void,
+    ffi::{c_void},
     ptr::{addr_of, addr_of_mut, null},
 };
 #[cfg(feature = "usermode")]
@@ -11,7 +11,7 @@ use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{ffi::CString, slice::from_raw_parts, str::from_utf8_unchecked};
 use strum_macros::EnumIter;
 
 #[cfg(not(any(cpu_target = "x86_64", cpu_target = "aarch64")))]
@@ -242,6 +242,9 @@ extern "C" {
     );
 
     static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
+
+    fn libafl_save_qemu_snapshot(name: *const u8);
+    fn libafl_load_qemu_snapshot(name: *const u8);
 }
 
 #[cfg(not(feature = "usermode"))]
@@ -268,6 +271,7 @@ extern "C" {
     fn libafl_qemu_set_breakpoint(addr: u64) -> i32;
     fn libafl_qemu_remove_breakpoint(addr: u64) -> i32;
     fn libafl_flush_jit();
+    fn libafl_qemu_trigger_breakpoint(cpu: CPUStatePtr);
 
     fn libafl_qemu_set_hook(
         addr: GuestAddr,
@@ -451,6 +455,10 @@ impl CPU {
         unsafe { libafl_qemu_cpu_index(self.ptr) as usize }
     }
 
+    pub fn trigger_breakpoint(&self) {
+        unsafe { libafl_qemu_trigger_breakpoint(self.ptr); }
+    }
+
     #[cfg(feature = "usermode")]
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
@@ -573,7 +581,7 @@ impl Emulator {
                     argv.as_ptr() as *const *const u8,
                     envp.as_ptr() as *const *const u8,
                 );
-                libc::atexit(qemu_cleanup_atexit);
+                libc::atexit(qemu_cleanup_atexit); 
             }
             EMULATOR_IS_INITIALIZED = true;
         }
@@ -875,6 +883,20 @@ impl Emulator {
         unsafe {
             libafl_on_thread_hook = hook;
         }
+    }
+
+    #[cfg(not(feature = "usermode"))]
+    pub fn save_snapshot(&self, name: &str) {
+        let s = CString::new(name).expect("Invalid snapshot name");
+        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _) };
+        println!("asd {:?}", &s);
+    }
+
+    #[cfg(not(feature = "usermode"))]
+    pub fn load_snapshot(&self, name: &str) {
+        let s = CString::new(name).expect("Invalid snapshot name");
+        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _) };
+        println!("ttt {:?}", &s);
     }
 
     #[cfg(feature = "usermode")]
