@@ -29,7 +29,7 @@ pub enum NyxProcessType {
     PARENT,
     CHILD,
 }
-impl NyxHelper {
+impl NyxHelper{
     pub fn new(
         target_dir: PathBuf,
         cpu_id: u32,
@@ -95,14 +95,14 @@ impl Debug for NyxHelper {
     }
 }
 
-pub struct NyxInprocessExecutor<I, S, OT> {
+pub struct NyxInprocessExecutor<'a, I, S, OT> {
     /// implement nyx function
-    pub helper: NyxHelper,
+    pub helper: &'a mut NyxHelper,
     observers: OT,
     phantom: PhantomData<(I, S)>,
 }
 
-impl<I, S, OT> Debug for NyxInprocessExecutor<I, S, OT> {
+impl<'a, I, S, OT> Debug for NyxInprocessExecutor<'a, I, S, OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NyxInprocessExecutor")
             .field("helper", &self.helper)
@@ -110,7 +110,7 @@ impl<I, S, OT> Debug for NyxInprocessExecutor<I, S, OT> {
     }
 }
 
-impl<EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxInprocessExecutor<I, S, OT>
+impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxInprocessExecutor<'a, I, S, OT>
 where
     I: Input + HasBytesVec,
 {
@@ -153,14 +153,11 @@ where
     }
 }
 
-impl<I, S, OT> NyxInprocessExecutor<I, S, OT> {
+impl<'a, I, S, OT> NyxInprocessExecutor<'a, I, S, OT> {
     pub fn new(
-        target_dir: PathBuf,
-        cpu_id: u32,
-        snap_mode: bool,
+        helper: &'a mut NyxHelper,
         observers: OT,
     ) -> NyxResult<Self> {
-        let helper = NyxHelper::new(target_dir, cpu_id, snap_mode, NyxProcessType::ALONE)?;
         Ok(Self {
             helper,
             observers,
@@ -173,7 +170,7 @@ impl<I, S, OT> NyxInprocessExecutor<I, S, OT> {
     }
 }
 
-impl<I, S, OT> HasObservers<I, OT, S> for NyxInprocessExecutor<I, S, OT>
+impl<'a, I, S, OT> HasObservers<I, OT, S> for NyxInprocessExecutor<'a, I, S, OT>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
