@@ -12,13 +12,16 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
-    monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
+#[cfg(not(feature = "tui"))]
+use libafl::monitors::SimpleMonitor;
+#[cfg(feature = "tui")]
+use libafl::monitors::tui::TuiMonitor;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -85,7 +88,10 @@ pub fn main() {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
+    #[cfg(not(feature = "tui"))]
     let mon = SimpleMonitor::new(|s| println!("{}", s));
+    #[cfg(feature = "tui")]
+    let mon = TuiMonitor::new(String::from("Baby Fuzzer"), false);
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus

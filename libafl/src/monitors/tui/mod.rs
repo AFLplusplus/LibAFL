@@ -1,6 +1,7 @@
 //! Monitor based on tui-rs
 
 use crossterm::{
+    cursor::{Show, EnableBlinking},
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -26,6 +27,10 @@ use crate::{
     bolts::{current_time, format_duration_hms},
     monitors::{ClientStats, Monitor, UserStats},
 };
+
+// Catching panics because the main thread dies
+use std::panic;
+use alloc::boxed::Box;
 
 mod ui;
 use ui::TuiUI;
@@ -361,6 +366,22 @@ fn run_tui_thread(
 
         let mut last_tick = Instant::now();
         let mut cnt = 0;
+
+        // Catching panics when the main thread dies
+        let old_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |panic_info| {
+            disable_raw_mode().unwrap();
+            execute!(
+                io::stdout(),
+                LeaveAlternateScreen,
+                DisableMouseCapture,
+                Show,
+                EnableBlinking,
+            ).unwrap();
+            println!("Custom panic hook");
+            old_hook(panic_info);
+        }));
+
         loop {
             // to avoid initial ui glitches
             if cnt < 8 {
