@@ -1,21 +1,18 @@
 use std::{
-    ffi::OsString,
     fmt::{self, Debug},
-    path::{Path, PathBuf}, marker::PhantomData,
+    marker::PhantomData,
+    path::{PathBuf},
 };
+
 
 use libafl::{
-    bolts::ownedref::IntoOwned,
-    executors::{with_observers, Executor, ExitKind},
-    inputs::{HasBytesVec, HasTargetBytes, Input},
+    executors::{Executor, ExitKind, HasObservers},
+    inputs::{HasBytesVec, Input},
     observers::ObserversTuple,
 };
-use libnyx::NyxReturnValue;
+use libnyx::{NyxProcess, NyxReturnValue};
 
-use crate::nyx_bridge::{nyx_new, nyx_new_child, nyx_new_parent, NyxResult};
-
-// don't use libnyx!!! use nyx_bridge instead to avoid confusion
-use super::nyx_bridge::NyxProcess;
+pub type NyxResult<T> = Result<T, String>;
 
 pub struct NyxHelper {
     nyx_process: NyxProcess,
@@ -25,7 +22,7 @@ pub struct NyxHelper {
     pub trace_bits: *mut u8,
 }
 
-const MAX_FILE: u32 = 1 * 1024 * 1024;
+const MAX_FILE: u32 = 1024 * 1024;
 pub enum NyxProcessType {
     // stand alone mode
     ALONE,
@@ -43,9 +40,11 @@ impl NyxHelper {
         let workdir = target_dir.join("workdir");
         let workdir = workdir.to_str().unwrap();
         let mut nyx_process = match nyx_type {
-            NyxProcessType::ALONE => nyx_new(sharedir, workdir, cpu_id, MAX_FILE, true)?,
-            NyxProcessType::PARENT => nyx_new_parent(sharedir, workdir, cpu_id, MAX_FILE, true)?,
-            NyxProcessType::CHILD => nyx_new_child(sharedir, workdir, cpu_id, MAX_FILE)?,
+            NyxProcessType::ALONE => NyxProcess::new(sharedir, workdir, cpu_id, MAX_FILE, true)?,
+            NyxProcessType::PARENT => {
+                NyxProcess::new_parent(sharedir, workdir, cpu_id, MAX_FILE, true)?
+            }
+            NyxProcessType::CHILD => NyxProcess::new_child(sharedir, workdir, cpu_id, MAX_FILE)?,
         };
         let real_map_size = nyx_process.bitmap_buffer_size();
         let map_size = ((real_map_size + 63) >> 6) << 6;
@@ -95,14 +94,15 @@ impl Debug for NyxHelper {
         f.debug_struct("NyxInprocessHelper").finish()
     }
 }
-pub struct NyxInprocessExecutor
-{
+
+pub struct NyxInprocessExecutor<I, S, OT> {
     /// implement nyx function
     pub helper: NyxHelper,
+    observers: OT,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl Debug for NyxInprocessExecutor
-{
+impl<I, S, OT> Debug for NyxInprocessExecutor<I, S, OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NyxInprocessExecutor")
             .field("helper", &self.helper)
@@ -110,17 +110,17 @@ impl Debug for NyxInprocessExecutor
     }
 }
 
-impl<EM, I, S, Z> Executor<EM, I, S, Z> for NyxInprocessExecutor
+impl<EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxInprocessExecutor<I, S, OT>
 where
-    I: Input + HasBytesVec
+    I: Input + HasBytesVec,
 {
     fn post_run_reset(&mut self) {}
 
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
         input: &I,
     ) -> Result<libafl::executors::ExitKind, libafl::Error> {
         let input = input.bytes();
@@ -128,44 +128,61 @@ where
 
         let ret_val = self.helper.nyx_process.exec();
         match ret_val {
-            NyxReturnValue::Normal => return Ok(ExitKind::Ok),
-            NyxReturnValue::Crash | NyxReturnValue::Asan => return Ok(ExitKind::Crash),
-            NyxReturnValue::Timeout => return Ok(ExitKind::Timeout),
+            NyxReturnValue::Normal => Ok(ExitKind::Ok),
+            NyxReturnValue::Crash | NyxReturnValue::Asan => Ok(ExitKind::Crash),
+            NyxReturnValue::Timeout => Ok(ExitKind::Timeout),
             NyxReturnValue::InvalidWriteToPayload => {
                 println!("FixMe: Nyx InvalidWriteToPayload handler is missing");
-                return Err(libafl::Error::ShuttingDown);
+                Err(libafl::Error::ShuttingDown)
             }
             NyxReturnValue::Error => {
                 println!("Error: Nyx runtime error has occured...");
-                return Err(libafl::Error::ShuttingDown);
+                Err(libafl::Error::ShuttingDown)
             }
             NyxReturnValue::IoError => {
                 // todo! *stop_soon_p = 0
                 println!("Error: QEMU-nyx died...");
-                return Err(libafl::Error::ShuttingDown);
+                Err(libafl::Error::ShuttingDown)
             }
             NyxReturnValue::Abort => {
                 self.helper.nyx_process.shutdown();
                 println!("Error: Nyx abort occured...");
-                return Err(libafl::Error::ShuttingDown);
+                Err(libafl::Error::ShuttingDown)
             }
         }
     }
 }
 
-
-impl NyxInprocessExecutor{
-        pub fn new(target_dir:PathBuf, cpu_id:u32, snap_mode:bool) -> NyxResult<Self>{
-            let helper = NyxHelper::new(target_dir, cpu_id, snap_mode, NyxProcessType::ALONE)?;
-            Ok(Self{
-                helper,
-            })
-
-        }
-
-        pub fn get_trace_bits(self) -> &'static mut [u8]{
-            unsafe{
-            std::slice::from_raw_parts_mut(self.helper.trace_bits, self.helper.real_map_size)            
-            }
-        }
+impl<I, S, OT> NyxInprocessExecutor<I, S, OT> {
+    pub fn new(
+        target_dir: PathBuf,
+        cpu_id: u32,
+        snap_mode: bool,
+        observers: OT,
+    ) -> NyxResult<Self> {
+        let helper = NyxHelper::new(target_dir, cpu_id, snap_mode, NyxProcessType::ALONE)?;
+        Ok(Self {
+            helper,
+            observers,
+            phantom: PhantomData,
+        })
     }
+
+    pub fn get_trace_bits(self) -> &'static mut [u8] {
+        unsafe { std::slice::from_raw_parts_mut(self.helper.trace_bits, self.helper.real_map_size) }
+    }
+}
+
+impl<I, S, OT> HasObservers<I, OT, S> for NyxInprocessExecutor<I, S, OT>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
+    }
+}
