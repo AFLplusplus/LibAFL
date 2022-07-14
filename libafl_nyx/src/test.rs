@@ -36,7 +36,7 @@ use std::{
 #[cfg(not(test))]
 #[test]
 fn test_nyxhelper() {
-    let share_dir = PathBuf::from_str("/tmp/nyx_libxml2/").unwrap();
+    let share_dir = Path::new("/tmp/nyx_libxml2/");
     let cpu_id = 0;
     let snap_mode = true;
     let nyx_type = crate::executor::NyxProcessType::ALONE;
@@ -46,7 +46,7 @@ fn test_nyxhelper() {
 #[cfg(not(fuzz))]
 #[test]
 fn test_executor() {
-    let share_dir = PathBuf::from_str("/tmp/nyx_libxml2/").unwrap();
+    let share_dir = Path::new("/tmp/nyx_libxml2/");
     let cpu_id = 0;
     let input = BytesInput::new(b"22".to_vec());
     let rand = Xoshiro256StarRand::new();

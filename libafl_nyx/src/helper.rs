@@ -1,7 +1,7 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
 use std::{
     fmt::{self, Debug},
-    path::PathBuf,
+    path::Path,
 };
 
 use libnyx::{NyxProcess, NyxReturnValue};
@@ -19,6 +19,7 @@ pub struct NyxHelper {
 }
 
 const MAX_FILE: u32 = 1024 * 1024;
+#[derive(Clone, Copy)]
 pub enum NyxProcessType {
     /// stand alone mode
     ALONE,
@@ -28,9 +29,9 @@ pub enum NyxProcessType {
     CHILD,
 }
 impl NyxHelper {
-    /// create NyxProcess and do basic settings
+    /// create `NyxProcess` and do basic settings
     pub fn new(
-        target_dir: PathBuf,
+        target_dir: &Path,
         cpu_id: u32,
         snap_mode: bool,
         nyx_type: NyxProcessType,

@@ -42,7 +42,7 @@ where
         let input = input.bytes();
         self.helper.nyx_process.set_input(input, input.len() as u32);
 
-        /// exec will take care of trace_bits, so no need to reset
+        // exec will take care of trace_bits, so no need to reset
         let ret_val = self.helper.nyx_process.exec();
         match ret_val {
             NyxReturnValue::Normal => Ok(ExitKind::Ok),
@@ -79,7 +79,7 @@ impl<'a, I, S, OT> NyxStandaloneExecutor<'a, I, S, OT> {
         })
     }
 
-    /// convert trace_bits ptr into real trace map
+    /// convert `trace_bits` ptr into real trace map
     pub fn get_trace_bits(self) -> &'static mut [u8] {
         unsafe { std::slice::from_raw_parts_mut(self.helper.trace_bits, self.helper.real_map_size) }
     }
