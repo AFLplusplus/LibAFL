@@ -1,7 +1,7 @@
 //! Monitor based on tui-rs
 
 use crossterm::{
-    cursor::{Show, EnableBlinking},
+    cursor::{EnableBlinking, Show},
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -29,8 +29,8 @@ use crate::{
 };
 
 // Catching panics because the main thread dies
-use std::panic;
 use alloc::boxed::Box;
+use std::panic;
 
 mod ui;
 use ui::TuiUI;
@@ -377,7 +377,8 @@ fn run_tui_thread(
                 DisableMouseCapture,
                 Show,
                 EnableBlinking,
-            ).unwrap();
+            )
+            .unwrap();
             println!("Custom panic hook");
             old_hook(panic_info);
         }));

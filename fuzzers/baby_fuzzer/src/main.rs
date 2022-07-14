@@ -3,6 +3,10 @@ use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 
+#[cfg(feature = "tui")]
+use libafl::monitors::tui::TuiMonitor;
+#[cfg(not(feature = "tui"))]
+use libafl::monitors::SimpleMonitor;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -18,10 +22,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-#[cfg(not(feature = "tui"))]
-use libafl::monitors::SimpleMonitor;
-#[cfg(feature = "tui")]
-use libafl::monitors::tui::TuiMonitor;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
