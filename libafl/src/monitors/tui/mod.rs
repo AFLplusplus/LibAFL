@@ -13,6 +13,7 @@ use std::{
     collections::VecDeque,
     fmt::Write,
     io::{self, BufRead},
+    panic,
     string::String,
     sync::{Arc, RwLock},
     thread,
@@ -28,9 +29,7 @@ use crate::{
     monitors::{ClientStats, Monitor, UserStats},
 };
 
-// Catching panics because the main thread dies
 use alloc::boxed::Box;
-use std::panic;
 
 mod ui;
 use ui::TuiUI;
@@ -379,7 +378,6 @@ fn run_tui_thread(
                 EnableBlinking,
             )
             .unwrap();
-            println!("Custom panic hook");
             old_hook(panic_info);
         }));
 

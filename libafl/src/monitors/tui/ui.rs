@@ -62,15 +62,15 @@ impl TuiUI {
     //pub fn on_down(&mut self) {}
 
     pub fn on_right(&mut self) {
-        // never 0
         if self.clients != 0 {
+            // clients_idx never 0
             self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
         }
     }
 
     pub fn on_left(&mut self) {
-        // never 0
         if self.clients != 0 {
+            // clients_idx never 0
             if self.clients_idx == 1 {
                 self.clients_idx = self.clients - 1;
             } else {
