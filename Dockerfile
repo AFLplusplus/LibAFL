@@ -63,7 +63,7 @@ COPY scripts/dummy.rs libafl_concolic/symcc_runtime/src/lib.rs
 COPY libafl_concolic/symcc_libafl/Cargo.toml libafl_concolic/symcc_libafl/
 COPY scripts/dummy.rs libafl_concolic/symcc_libafl/src/lib.rs
 
-COPY libafl_nyx/Cargo.toml libafl_nyx
+COPY libafl_nyx/Cargo.toml libafl_nyx/build.rs libafl_nyx/
 COPY scripts/dummy.rs libafl_nyx/src/lib.rs
 
 COPY utils utils
