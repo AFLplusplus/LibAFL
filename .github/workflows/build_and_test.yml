@@ -52,7 +52,7 @@ jobs:
     - name: set mold linker as default linker
       uses: rui314/setup-mold@v1
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang ninja-build clang-format-13 shellcheck
+      run: sudo apt-get install -y llvm llvm-dev clang ninja-build clang-format-13 shellcheck gtk3-devel
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -229,7 +229,7 @@ jobs:
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Install deps
-      run: brew install z3
+      run: brew install z3 gtk+-3.0
     - uses: actions/checkout@v2
     - name: MacOS Build
       run: cargo build --verbose
