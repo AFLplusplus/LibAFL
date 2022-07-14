@@ -9,17 +9,17 @@ use libafl::{
         rands::{RandomSeed, Xoshiro256StarRand},
         shmem::StdShMemProvider, tuples::tuple_list,
     },
-    corpus::{self, Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{self, Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     events::{SimpleEventManager, NopEventManager},
     executors::{Executor, InProcessExecutor},
     feedbacks::{CrashFeedback, MapFeedback, MaxMapFeedback},
     fuzzer,
     inputs::{BytesInput, Input, HasBytesVec},
-    monitors::{Monitor, MultiMonitor, NopMonitor, SimpleMonitor},
+    monitors::{Monitor, MultiMonitor, NopMonitor, SimpleMonitor, tui::TuiMonitor},
     observers::{Observer, StdMapObserver},
     schedulers::{RandScheduler, Scheduler},
     state::StdState,
-    StdFuzzer, ExecutesInput,
+    StdFuzzer, ExecutesInput, Fuzzer, mutators::{StdScheduledMutator, ByteDecMutator, havoc_mutations}, stages::StdMutationalStage,
 };
 
 use crate::executor::{NyxHelper, NyxInprocessExecutor};
@@ -41,8 +41,10 @@ fn test_executor() {
 
     // prepare state
     let mut input = BytesInput::new(b"ss".to_vec());
-    let rand = Xoshiro256StarRand::new();
-    let corpus = InMemoryCorpus::<BytesInput>::new();
+    let rand
+     = Xoshiro256StarRand::new();
+    let mut corpus = InMemoryCorpus::<BytesInput>::new();
+    corpus.add(Testcase::new(input));
     let solutions = OnDiskCorpus::<BytesInput>::new(PathBuf::from("./crashes")).unwrap();
 
     let mut helper = NyxHelper::new(share_dir,cpu_id,true,crate::executor::NyxProcessType::ALONE).unwrap();
@@ -54,9 +56,17 @@ fn test_executor() {
 
     let scheduler = RandScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-    let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
-    let mut mgr:SimpleEventManager<BytesInput, _, BytesInput> = SimpleEventManager::new(monitor);
+    // let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
+    let monitor = TuiMonitor::new("test_fuzz",true);
+    let mut mgr:SimpleEventManager<BytesInput, _, _> = SimpleEventManager::new(monitor);
     // prepare
     let mut executor = NyxInprocessExecutor::new(&mut helper,tuple_list!(observer)).unwrap();
-    fuzzer.execute_input(&mut state,&mut executor,&mut mgr,&mut input);
+    // fuzzer.execute_input(&mut state,&mut executor,&mut mgr,&mut input);
+
+    let mutator = StdScheduledMutator::new(havoc_mutations());
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
+    
+    fuzzer.fuzz_loop(&mut stages,&mut executor,&mut state,&mut mgr).expect("error when fuzz");
 }
+
+
