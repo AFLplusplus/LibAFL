@@ -63,6 +63,9 @@ COPY scripts/dummy.rs libafl_concolic/symcc_runtime/src/lib.rs
 COPY libafl_concolic/symcc_libafl/Cargo.toml libafl_concolic/symcc_libafl/
 COPY scripts/dummy.rs libafl_concolic/symcc_libafl/src/lib.rs
 
+COPY libafl_nyx/Cargo.toml libafl_nyx
+COPY scripts/dummy.rs libafl_nyx/src/lib.rs
+
 COPY utils utils
 
 RUN cargo build && cargo build --release
@@ -94,6 +97,8 @@ RUN touch libafl_frida/src/lib.rs
 COPY libafl_concolic/symcc_libafl libafl_concolic/symcc_libafl
 COPY libafl_concolic/symcc_runtime libafl_concolic/symcc_runtime
 COPY libafl_concolic/test libafl_concolic/test
+COPY libafl_nyx/src libafl_nyx/src
+RUN touch libafl_nyx/src/lib.rs
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over
