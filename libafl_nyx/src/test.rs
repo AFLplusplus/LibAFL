@@ -1,29 +1,39 @@
+#[allow(unused_imports)]
+use crate::executor::NyxStandaloneExecutor;
+#[allow(unused_imports)]
+use crate::helper::{NyxHelper, NyxProcessType};
+#[allow(unused_imports)]
+use libafl::{
+    bolts::{
+        rands::{RandomSeed, Xoshiro256StarRand},
+        shmem::StdShMemProvider,
+        tuples::tuple_list,
+    },
+    corpus::{self, Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
+    events::{NopEventManager, SimpleEventManager},
+    executors::{Executor, InProcessExecutor},
+    feedbacks::{CrashFeedback, MapFeedback, MaxMapFeedback},
+    fuzzer,
+    inputs::{BytesInput, HasBytesVec, Input},
+    monitors::{tui::TuiMonitor, Monitor, MultiMonitor, NopMonitor, SimpleMonitor},
+    mutators::{havoc_mutations, ByteDecMutator, StdScheduledMutator},
+    observers::{Observer, StdMapObserver},
+    schedulers::{RandScheduler, Scheduler},
+    stages::StdMutationalStage,
+    state::StdState,
+    ExecutesInput, Fuzzer, StdFuzzer,
+};
+/// contains function for local test and shouldn't run in CI.
+/// To enable in local, please unset `test` feature in your IDE(e.g. 'Rust-analyzer>Cargo: Unset Test' in VSCODE)
+
+#[allow(unused_imports)]
 use std::{
     ffi::OsString,
     path::{Path, PathBuf},
     str::FromStr,
 };
 
-use libafl::{
-    bolts::{
-        rands::{RandomSeed, Xoshiro256StarRand},
-        shmem::StdShMemProvider, tuples::tuple_list,
-    },
-    corpus::{self, Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
-    events::{SimpleEventManager, NopEventManager},
-    executors::{Executor, InProcessExecutor},
-    feedbacks::{CrashFeedback, MapFeedback, MaxMapFeedback},
-    fuzzer,
-    inputs::{BytesInput, Input, HasBytesVec},
-    monitors::{Monitor, MultiMonitor, NopMonitor, SimpleMonitor, tui::TuiMonitor},
-    observers::{Observer, StdMapObserver},
-    schedulers::{RandScheduler, Scheduler},
-    state::StdState,
-    StdFuzzer, ExecutesInput, Fuzzer, mutators::{StdScheduledMutator, ByteDecMutator, havoc_mutations}, stages::StdMutationalStage,
-};
-
-use crate::executor::{NyxHelper, NyxInprocessExecutor};
-
+#[cfg(not(test))]
 #[test]
 fn test_nyxhelper() {
     let share_dir = PathBuf::from_str("/tmp/nyx_libxml2/").unwrap();
@@ -33,40 +43,42 @@ fn test_nyxhelper() {
     let helper = NyxHelper::new(share_dir, cpu_id, snap_mode, nyx_type);
 }
 
+#[cfg(not(fuzz))]
 #[test]
 fn test_executor() {
     let share_dir = PathBuf::from_str("/tmp/nyx_libxml2/").unwrap();
     let cpu_id = 0;
-    let snap_mode = true;
-
-    // prepare state
-    let mut input = BytesInput::new(b"ss".to_vec());
-    let rand
-     = Xoshiro256StarRand::new();
+    let input = BytesInput::new(b"22".to_vec());
+    let rand = Xoshiro256StarRand::new();
     let mut corpus = InMemoryCorpus::<BytesInput>::new();
-    corpus.add(Testcase::new(input));
+    corpus
+        .add(Testcase::new(input))
+        .expect("error in adding corpus");
     let solutions = OnDiskCorpus::<BytesInput>::new(PathBuf::from("./crashes")).unwrap();
 
-    let mut helper = NyxHelper::new(share_dir,cpu_id,true,crate::executor::NyxProcessType::ALONE).unwrap();
-    let mut trace_bits = unsafe {std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size)};
-    let mut observer = StdMapObserver::new("trace", trace_bits);
+    // nyx stuff
+    let mut helper = NyxHelper::new(share_dir, cpu_id, true, NyxProcessType::ALONE).unwrap();
+    let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
+    let observer = StdMapObserver::new("trace", trace_bits);
+
+    // libafl stuff
     let mut feedback = MaxMapFeedback::new(&observer);
     let mut objective = CrashFeedback::new();
     let mut state = StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
-
     let scheduler = RandScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
-    // let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
-    let monitor = TuiMonitor::new("test_fuzz",true);
-    let mut mgr:SimpleEventManager<BytesInput, _, _> = SimpleEventManager::new(monitor);
-    // prepare
-    let mut executor = NyxInprocessExecutor::new(&mut helper,tuple_list!(observer)).unwrap();
-    // fuzzer.execute_input(&mut state,&mut executor,&mut mgr,&mut input);
 
+    // switch monitor if you want
+    // let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
+    let monitor = TuiMonitor::new("test_fuzz".to_string(), true);
+
+    let mut mgr: SimpleEventManager<BytesInput, _, _> = SimpleEventManager::new(monitor);
+    let mut executor = NyxStandaloneExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
-    
-    fuzzer.fuzz_loop(&mut stages,&mut executor,&mut state,&mut mgr).expect("error when fuzz");
+
+    // start fuzz
+    fuzzer
+        .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
+        .expect("error when fuzz");
 }
-
-
