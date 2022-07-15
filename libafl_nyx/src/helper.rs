@@ -51,8 +51,12 @@ impl NyxHelper {
         let trace_bits = nyx_process.bitmap_buffer_mut().as_mut_ptr();
         nyx_process.option_set_reload_mode(snap_mode);
         nyx_process.option_apply();
+
+        // default timeout for initial dry-run
         nyx_process.option_set_timeout(2, 0);
         nyx_process.option_apply();
+
+        // dry run to test the connection
         nyx_process.set_input(b"INIT", 4);
         match nyx_process.exec() {
             NyxReturnValue::Error => {
@@ -77,6 +81,12 @@ impl NyxHelper {
             map_size,
             trace_bits,
         })
+    }
+
+    /// set timeout time to (`sec` + 10^(-6)*`micro_sec`) sec
+    pub fn set_timeout(mut self, sec: u8, micro_sec: u32) {
+        self.nyx_process.option_set_timeout(sec, micro_sec);
+        self.nyx_process.option_apply();
     }
 }
 

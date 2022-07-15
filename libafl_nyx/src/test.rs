@@ -40,7 +40,9 @@ fn test_nyxhelper() {
     let cpu_id = 0;
     let snap_mode = true;
     let nyx_type = crate::executor::NyxProcessType::ALONE;
-    let helper = NyxHelper::new(share_dir, cpu_id, snap_mode, nyx_type);
+    let helper = NyxHelper::new(share_dir, cpu_id, snap_mode, nyx_type)
+        .expect("error when create Nyxhelper");
+    helper.set_timeout(10, 0);
 }
 
 #[cfg(not(fuzz))]
