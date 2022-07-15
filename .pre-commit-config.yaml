@@ -1,0 +1,24 @@
+repos:
+- repo: https://github.com/doublify/pre-commit-rust
+  rev: v1.0
+  hooks:
+  - id: fmt
+    require_serial: true
+  - id: cargo-check
+    require_serial: true
+  # - id: clippy
+  #   require_serial: true
+  #   args: ["--all","--all-features","--release","--tests","--","-Z","macro-backtrace",
+  #   "-D","clippy::all",
+  #   "-D","clippy::pedantic",
+  #   "-W","clippy::similar_names",
+  #   "-A","clippy::type_repetition_in_bounds",
+  #   "-A","clippy::missing-errors-doc", 
+  #   "-A","clippy::cast-possible-truncation" ,
+  #   "-A","clippy::used-underscore-binding" ,
+  #   "-A","clippy::ptr-as-ptr" ,
+  #   "-A","clippy::missing-panics-doc" ,
+  #   "-A","clippy::missing-docs-in-private-items" ,
+  #   "-A","clippy::unseparated-literal-suffix" ,
+  #   "-A","clippy::module-name-repetitions" ,
+  #   "-A","clippy::unreadable-literal",]
