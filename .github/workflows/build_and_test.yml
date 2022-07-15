@@ -59,8 +59,29 @@ jobs:
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-    - uses: actions/checkout@v2
+
+
+    # ---- format check ----
+    # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
+    - name: Check pcguard edges
+      run: cargo check --features=sancov_pcguard_edges
+    - name: Format
+      run: cargo fmt -- --check
+    - name: Run clang-format style check for C/C++ programs.
+      run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c' | grep -v 'QEMU-Nyx')
     - name: Run a normal build
+    - name: run shellcheck
+      run: shellcheck ./scripts/*.sh
+    - name: Run clippy
+      run: ./scripts/clippy.sh
+      
+    # ---- doc check ----
+    - name: Build Docs
+      run: cargo doc
+    - name: Test Docs
+      run: cargo +nightly test --doc --all-features
+
+    # ---- build and feature check ----
       run: cargo build --verbose
     # cargo-hack tests/checks each crate in the workspace
     #- name: Run tests
@@ -68,26 +89,13 @@ jobs:
     # cargo-hack's --feature-powerset would be nice here but libafl has a too many knobs
     - name: Check each feature
       # Skipping python as it has to be built with the `maturin` tool
-      run: cargo hack check --feature-powerset --depth=2 --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386 --no-dev-deps
-    # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
-    - name: Check pcguard edges
-      run: cargo check --features=sancov_pcguard_edges
+      run: cargo hack check --feature-powerset --depth=2 --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386 --no-dev-deps    
     - name: Build examples
       run: cargo build --examples --verbose
-    - uses: actions/checkout@v2
-    - name: Format
-      run: cargo fmt -- --check
-    - name: Run clang-format style check for C/C++ programs.
-      run: clang-format-13 -n -Werror --style=file $(find . -type f \( -name '*.cpp' -o -iname '*.hpp' -o -name '*.cc' -o -name '*.cxx' -o -name '*.cc' -o -name '*.h' \) | grep -v '/target/' | grep -v 'libpng-1\.6\.37' | grep -v 'stb_image\.h' | grep -v 'dlmalloc\.c')
-    - name: run shellcheck
-      run: shellcheck ./scripts/*.sh
-    - uses: actions/checkout@v2
-    - name: Build Docs
-      run: cargo doc
-    - name: Test Docs
-      run: cargo +nightly test --doc --all-features
-    - name: Run clippy
-      run: ./scripts/clippy.sh
+
+
+
+
 
   ubuntu-concolic:
     runs-on: ubuntu-latest
