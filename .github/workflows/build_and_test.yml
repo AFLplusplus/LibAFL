@@ -59,7 +59,7 @@ jobs:
       run: curl -LsSf https://github.com/taiki-e/cargo-hack/releases/latest/download/cargo-hack-x86_64-unknown-linux-gnu.tar.gz | tar xzf - -C ~/.cargo/bin
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
-
+    - uses: actions/checkout@v2
 
     # ---- format check ----
     # pcguard edges and pcguard hitcounts are not compatible and we need to build them seperately
