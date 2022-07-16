@@ -1,6 +1,6 @@
 # Variables
 [env]
-FUZZER_NAME='fuzzer_libpng'
+FUZZER_NAME='fuzzer_libpng_launcher'
 LIBAFL_CC = './target/release/libafl_cc'
 LIBAFL_CXX = './target/release/libafl_cxx'
 FUZZER = './target/release/${FUZZER_NAME}'
