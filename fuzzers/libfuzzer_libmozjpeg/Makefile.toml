@@ -53,7 +53,7 @@ windows_alias = "unsupported"
 
 [tasks.lib_unix]
 script='''
-cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DCMAKE_C_COMPILER="${PROJECT_DIR}/${LIBAFL_CC}" -DCMAKE_CXX_COMPILER="${PROJECT_DIR}/${LIBAFL_CXX}" -G "Unix Makefiles"
+cd mozjpeg-4.0.3 && cmake . -DENABLE_SHARED=false -DPNG_SUPPORTED=false -DCMAKE_C_COMPILER="${PROJECT_DIR}/${LIBAFL_CC}" -DCMAKE_CXX_COMPILER="${PROJECT_DIR}/${LIBAFL_CXX}" -G "Unix Makefiles"
 cd "${PROJECT_DIR}"
 make -C mozjpeg-4.0.3
 '''
