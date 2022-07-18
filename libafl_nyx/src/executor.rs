@@ -11,7 +11,7 @@ use std::marker::PhantomData;
 use crate::helper::{NyxHelper, NyxResult};
 
 /// executor for nyx standalone mode
-pub struct NyxStandaloneExecutor<'a, I, S, OT> {
+pub struct NyxExecutor<'a, I, S, OT> {
     /// implement nyx function
     pub helper: &'a mut NyxHelper,
     /// observers
@@ -20,7 +20,7 @@ pub struct NyxStandaloneExecutor<'a, I, S, OT> {
     phantom: PhantomData<(I, S)>,
 }
 
-impl<'a, I, S, OT> Debug for NyxStandaloneExecutor<'a, I, S, OT> {
+impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NyxInprocessExecutor")
             .field("helper", &self.helper)
@@ -28,7 +28,7 @@ impl<'a, I, S, OT> Debug for NyxStandaloneExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxStandaloneExecutor<'a, I, S, OT>
+impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxExecutor<'a, I, S, OT>
 where
     I: Input + HasBytesVec,
 {
@@ -70,7 +70,7 @@ where
     }
 }
 
-impl<'a, I, S, OT> NyxStandaloneExecutor<'a, I, S, OT> {
+impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
     pub fn new(helper: &'a mut NyxHelper, observers: OT) -> NyxResult<Self> {
         Ok(Self {
             helper,
@@ -85,7 +85,7 @@ impl<'a, I, S, OT> NyxStandaloneExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, I, S, OT> HasObservers<I, OT, S> for NyxStandaloneExecutor<'a, I, S, OT>
+impl<'a, I, S, OT> HasObservers<I, OT, S> for NyxExecutor<'a, I, S, OT>
 where
     I: Input,
     OT: ObserversTuple<I, S>,

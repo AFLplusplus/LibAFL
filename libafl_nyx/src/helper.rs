@@ -1,13 +1,14 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
 use std::{
     fmt::{self, Debug},
-    path::Path,
+    path::Path, sync::{atomic::{AtomicU32, Ordering}, Arc, Mutex}, slice::SliceIndex,
 };
 
 use libnyx::{NyxProcess, NyxReturnValue};
 
 pub type NyxResult<T> = Result<T, String>;
 
+static mut NYX_PROCESS_NUM: AtomicU32= AtomicU32::new(0);
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
     /// real size of trace_bits
@@ -30,22 +31,48 @@ pub enum NyxProcessType {
 }
 impl NyxHelper {
     /// create `NyxProcess` and do basic settings
+    /// It will convert instance to parent or child when set`parallel_mode`
     pub fn new(
         target_dir: &Path,
         cpu_id: u32,
         snap_mode: bool,
-        nyx_type: NyxProcessType,
+        parallel_mode: bool,
     ) -> NyxResult<Self> {
         let sharedir = target_dir.to_str().unwrap();
         let workdir = target_dir.join("workdir");
         let workdir = workdir.to_str().unwrap();
+        let mut child_work_id:Option<u32> = None;
+        let nyx_type = match parallel_mode{
+            true =>{
+                unsafe{
+                    let process_num = NYX_PROCESS_NUM.fetch_add(1, Ordering::SeqCst);
+                if process_num == 0{
+                    println!("parent!");
+                    NyxProcessType::PARENT
+                }else{
+                    println!("child!");
+                    child_work_id = Some(process_num);
+                    NyxProcessType::CHILD
+                }
+            }
+            }
+            false => NyxProcessType::ALONE
+        };
         let mut nyx_process = match nyx_type {
             NyxProcessType::ALONE => NyxProcess::new(sharedir, workdir, cpu_id, MAX_FILE, true)?,
             NyxProcessType::PARENT => {
                 NyxProcess::new_parent(sharedir, workdir, cpu_id, MAX_FILE, true)?
             }
-            NyxProcessType::CHILD => NyxProcess::new_child(sharedir, workdir, cpu_id, MAX_FILE)?,
+            NyxProcessType::CHILD => 
+            {
+                if let Some(worker_id) = child_work_id {
+                NyxProcess::new_child(sharedir, workdir, cpu_id, worker_id)?
+                }else{
+                    return Err("can't get worker id".to_string())
+                }
+            }
         };
+
         let real_map_size = nyx_process.bitmap_buffer_size();
         let map_size = ((real_map_size + 63) >> 6) << 6;
         let trace_bits = nyx_process.bitmap_buffer_mut().as_mut_ptr();
