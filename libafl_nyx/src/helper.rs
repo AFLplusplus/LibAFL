@@ -1,14 +1,13 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
 use std::{
     fmt::{self, Debug},
-    path::Path, sync::{atomic::{AtomicU32, Ordering}, Arc, Mutex}, slice::SliceIndex,
+    path::Path,
 };
 
 use libnyx::{NyxProcess, NyxReturnValue};
 
 pub type NyxResult<T> = Result<T, String>;
 
-static mut NYX_PROCESS_NUM: AtomicU32= AtomicU32::new(0);
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
     /// real size of trace_bits
@@ -31,46 +30,40 @@ pub enum NyxProcessType {
 }
 impl NyxHelper {
     /// create `NyxProcess` and do basic settings
-    /// It will convert instance to parent or child when set`parallel_mode`
+    /// It will convert instance to parent or child using `parent_cpu_id` when set`parallel_mode`
     pub fn new(
         target_dir: &Path,
         cpu_id: u32,
         snap_mode: bool,
         parallel_mode: bool,
+        parent_cpu_id: Option<u32>,
     ) -> NyxResult<Self> {
         let sharedir = target_dir.to_str().unwrap();
         let workdir = target_dir.join("workdir");
         let workdir = workdir.to_str().unwrap();
-        let mut child_work_id:Option<u32> = None;
-        let nyx_type = match parallel_mode{
-            true =>{
-                unsafe{
-                    let process_num = NYX_PROCESS_NUM.fetch_add(1, Ordering::SeqCst);
-                if process_num == 0{
+        let nyx_type = match parallel_mode {
+            true => {
+                let parent_cpu_id = match parent_cpu_id {
+                    None => return Err("please set parent_cpu_id in nyx parallel mode".to_string()),
+                    Some(x) => x,
+                };
+                if cpu_id == parent_cpu_id {
                     println!("parent!");
                     NyxProcessType::PARENT
-                }else{
+                } else {
                     println!("child!");
-                    child_work_id = Some(process_num);
                     NyxProcessType::CHILD
                 }
             }
-            }
-            false => NyxProcessType::ALONE
+            false => NyxProcessType::ALONE,
         };
+
         let mut nyx_process = match nyx_type {
             NyxProcessType::ALONE => NyxProcess::new(sharedir, workdir, cpu_id, MAX_FILE, true)?,
             NyxProcessType::PARENT => {
                 NyxProcess::new_parent(sharedir, workdir, cpu_id, MAX_FILE, true)?
             }
-            NyxProcessType::CHILD => 
-            {
-                if let Some(worker_id) = child_work_id {
-                NyxProcess::new_child(sharedir, workdir, cpu_id, worker_id)?
-                }else{
-                    return Err("can't get worker id".to_string())
-                }
-            }
+            NyxProcessType::CHILD => NyxProcess::new_child(sharedir, workdir, cpu_id, cpu_id)?,
         };
 
         let real_map_size = nyx_process.bitmap_buffer_size();
@@ -83,7 +76,7 @@ impl NyxHelper {
         nyx_process.option_set_timeout(2, 0);
         nyx_process.option_apply();
 
-        // dry run to test the connection
+        // dry run to check if qemu is spawned
         nyx_process.set_input(b"INIT", 4);
         match nyx_process.exec() {
             NyxReturnValue::Error => {

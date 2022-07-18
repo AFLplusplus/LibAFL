@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-use crate::executor::NyxStandaloneExecutor;
+use crate::executor::NyxExecutor;
 #[allow(unused_imports)]
 use crate::helper::{NyxHelper, NyxProcessType};
 #[allow(unused_imports)]
@@ -25,7 +25,7 @@ use libafl::{
 };
 /// contains function for local test and shouldn't run in CI.
 /// To enable in local, please unset `test` feature in your IDE(e.g. 'Rust-analyzer>Cargo: Unset Test' in VSCODE)
-
+/// then you need to follow https://github.com/AFLplusplus/AFLplusplus/tree/stable/nyx_mode to set up libxml2 in /tmp/nyx_libxml2/
 #[allow(unused_imports)]
 use std::{
     ffi::OsString,
@@ -45,11 +45,18 @@ fn test_nyxhelper() {
     helper.set_timeout(10, 0);
 }
 
-#[cfg(not(fuzz))]
+#[cfg(not(test))]
 #[test]
-fn test_executor() {
+fn test_standalone_executor() {
     let share_dir = Path::new("/tmp/nyx_libxml2/");
     let cpu_id = 0;
+    let parallel_mode = false;
+
+    // nyx stuff
+    let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap();
+    let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
+    let observer = StdMapObserver::new("trace", trace_bits);
+
     let input = BytesInput::new(b"22".to_vec());
     let rand = Xoshiro256StarRand::new();
     let mut corpus = InMemoryCorpus::<BytesInput>::new();
@@ -57,11 +64,6 @@ fn test_executor() {
         .add(Testcase::new(input))
         .expect("error in adding corpus");
     let solutions = OnDiskCorpus::<BytesInput>::new(PathBuf::from("./crashes")).unwrap();
-
-    // nyx stuff
-    let mut helper = NyxHelper::new(share_dir, cpu_id, true, NyxProcessType::ALONE).unwrap();
-    let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
-    let observer = StdMapObserver::new("trace", trace_bits);
 
     // libafl stuff
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -75,7 +77,7 @@ fn test_executor() {
     let monitor = TuiMonitor::new("test_fuzz".to_string(), true);
 
     let mut mgr: SimpleEventManager<BytesInput, _, _> = SimpleEventManager::new(monitor);
-    let mut executor = NyxStandaloneExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
+    let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
