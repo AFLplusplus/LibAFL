@@ -41,21 +41,20 @@ impl NyxHelper {
         let sharedir = target_dir.to_str().unwrap();
         let workdir = target_dir.join("workdir");
         let workdir = workdir.to_str().unwrap();
-        let nyx_type = match parallel_mode {
-            true => {
-                let parent_cpu_id = match parent_cpu_id {
-                    None => return Err("please set parent_cpu_id in nyx parallel mode".to_string()),
-                    Some(x) => x,
-                };
-                if cpu_id == parent_cpu_id {
-                    println!("parent!");
-                    NyxProcessType::PARENT
-                } else {
-                    println!("child!");
-                    NyxProcessType::CHILD
-                }
+        let nyx_type = if parallel_mode {
+            let parent_cpu_id = match parent_cpu_id {
+                None => return Err("please set parent_cpu_id in nyx parallel mode".to_string()),
+                Some(x) => x,
+            };
+            if cpu_id == parent_cpu_id {
+                println!("parent!");
+                NyxProcessType::PARENT
+            } else {
+                println!("child!");
+                NyxProcessType::CHILD
             }
-            false => NyxProcessType::ALONE,
+        } else {
+            NyxProcessType::ALONE
         };
 
         let mut nyx_process = match nyx_type {
