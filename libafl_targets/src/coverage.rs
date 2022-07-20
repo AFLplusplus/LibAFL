@@ -46,9 +46,8 @@ pub use __afl_area_ptr as EDGES_MAP_PTR;
 pub fn autotokens() -> Result<Tokens, Error> {
     unsafe {
         if __token_start.is_null() || __token_stop.is_null() {
-            Err(Error::illegal_state(
-                "AutoTokens section not found, likely the target is not compiled with AutoTokens",
-            ))
+            println!("AutoTokens section not found, likely the target is not compiled with AutoTokens. Or there are simply no tokens.");
+            Ok(Tokens::default())
         } else {
             // we can safely unwrap
             Tokens::from_ptrs(__token_start, __token_stop)
