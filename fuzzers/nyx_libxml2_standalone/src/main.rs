@@ -1,7 +1,7 @@
-use libafl::events::{SimpleEventManager};
+use libafl::corpus::Corpus;
+use libafl::events::SimpleEventManager;
 use libafl::inputs::BytesInput;
 use libafl::monitors::tui::TuiMonitor;
-use libafl::corpus::Corpus;
 use libafl::{
     bolts::{
         rands::{RandomSeed, Xoshiro256StarRand},
@@ -10,10 +10,11 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus, Testcase},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     mutators::{havoc_mutations, StdScheduledMutator},
-    observers::{StdMapObserver},
-    schedulers::{RandScheduler},
+    observers::StdMapObserver,
+    schedulers::RandScheduler,
     stages::StdMutationalStage,
-    state::StdState, Fuzzer, StdFuzzer,
+    state::StdState,
+    Fuzzer, StdFuzzer,
 };
 use libafl_nyx::executor::NyxExecutor;
 use libafl_nyx::helper::NyxHelper;

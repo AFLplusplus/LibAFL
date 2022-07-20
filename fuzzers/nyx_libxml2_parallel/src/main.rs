@@ -11,13 +11,14 @@ use libafl::{
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     feedbacks::{CrashFeedback, MaxMapFeedback},
-    inputs::{BytesInput},
-    monitors::{MultiMonitor},
+    inputs::BytesInput,
+    monitors::MultiMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
-    observers::{StdMapObserver},
-    schedulers::{RandScheduler},
+    observers::StdMapObserver,
+    schedulers::RandScheduler,
     stages::StdMutationalStage,
-    state::StdState, Fuzzer, StdFuzzer,
+    state::StdState,
+    Fuzzer, StdFuzzer,
 };
 use libafl_nyx::executor::NyxExecutor;
 use libafl_nyx::helper::NyxHelper;
