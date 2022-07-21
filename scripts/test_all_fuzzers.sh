@@ -44,6 +44,7 @@ do
     # skip test for nyx
     if [[ $fuzzer == *"nyx_"* ]];then
         continue
+        cd "$libafl" || exit 1
     fi
 
     if [ -e ./Makefile.toml ]; then
