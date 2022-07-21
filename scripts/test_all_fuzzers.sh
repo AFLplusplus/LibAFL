@@ -28,6 +28,11 @@ declare -A time_record || (echo "declare -A not avaliable, please update your ba
 # shellcheck disable=SC2116
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
+    # skip test for nyx(also skip fmt check, fmt check won't pass in macos)
+    if [[ $fuzzer == *"nyx_"* ]];then
+        continue
+    fi
+
     cd "$fuzzer" || exit 1
     start=$(date +%s)
     # Clippy checks
@@ -41,12 +46,6 @@ do
         echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
     fi
     
-    # skip test for nyx
-    if [[ $fuzzer == *"nyx_"* ]];then
-        continue
-        cd "$libafl" || exit 1
-    fi
-
     if [ -e ./Makefile.toml ]; then
         echo "[*] Testing $fuzzer"
         cargo make test || exit 1
