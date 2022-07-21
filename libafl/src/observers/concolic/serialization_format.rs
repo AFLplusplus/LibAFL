@@ -383,6 +383,8 @@ impl<W: Write + Seek> MessageFileWriter<W> {
 mod serialization_tests {
     use std::io::Cursor;
 
+    use alloc::vec::Vec;
+
     use super::{MessageFileReader, MessageFileWriter, SymExpr};
 
     /// This test intends to ensure that the serialization format can efficiently encode the required information.

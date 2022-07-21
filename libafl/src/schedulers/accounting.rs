@@ -188,7 +188,7 @@ where
                         let mut old = state.corpus().get(*old_idx)?.borrow_mut();
                         let must_remove = {
                             let old_meta = old.metadata_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
-                                Error::KeyNotFound(format!(
+                                Error::key_not_found(format!(
                                     "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{}",
                                     old_idx
                                 ))

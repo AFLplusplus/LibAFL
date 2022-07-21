@@ -1,5 +1,7 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
+#[cfg(feature = "std")]
+use crate::bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
@@ -18,7 +20,7 @@ use crate::{
     },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
-        EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
+        EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -27,12 +29,14 @@ use crate::{
     observers::ObserversTuple,
     Error,
 };
-use alloc::string::ToString;
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{marker::PhantomData, time::Duration};
-#[cfg(feature = "std")]
-use core_affinity::CoreId;
 use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use serde::Serialize;
@@ -40,6 +44,8 @@ use serde::Serialize;
 use std::net::{SocketAddr, ToSocketAddrs};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
+
+use super::{CustomBufEventResult, CustomBufHandlerFn};
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: Tag = 0x2C11E471;
@@ -228,14 +234,15 @@ where
                 #[cfg(feature = "std")]
                 println!("[LOG {}]: {}", severity_level, message);
                 Ok(BrokerEventResult::Handled)
-            } //_ => Ok(BrokerEventResult::Forward),
+            }
+            Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
+            //_ => Ok(BrokerEventResult::Forward),
         }
     }
 }
 
 /// An [`EventManager`] that forwards all events to other attached fuzzers on shared maps or via tcp,
 /// using low-level message passing, [`crate::bolts::llmp`].
-#[derive(Debug)]
 pub struct LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
@@ -244,10 +251,31 @@ where
     //CE: CustomEvent<I>,
 {
     llmp: LlmpClient<SP>,
+    /// The custom buf handler
+    custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
     #[cfg(feature = "llmp_compression")]
     compressor: GzipCompressor,
     configuration: EventConfig,
     phantom: PhantomData<(I, OT, S)>,
+}
+
+impl<I, OT, S, SP> core::fmt::Debug for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider + 'static,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut debug_struct = f.debug_struct("LlmpEventManager");
+        let debug = debug_struct.field("llmp", &self.llmp);
+        //.field("custom_buf_handlers", &self.custom_buf_handlers)
+        #[cfg(feature = "llmp_compression")]
+        let debug = debug.field("compressor", &self.compressor);
+        debug
+            .field("configuration", &self.configuration)
+            .field("phantom", &self.phantom)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<I, OT, S, SP> Drop for LlmpEventManager<I, OT, S, SP>
@@ -276,6 +304,7 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
         })
     }
 
@@ -294,6 +323,7 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
         })
     }
 
@@ -310,6 +340,7 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
         })
     }
 
@@ -330,6 +361,7 @@ where
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
             phantom: PhantomData,
+            custom_buf_handlers: vec![],
         })
     }
 
@@ -384,7 +416,15 @@ where
                 }
                 Ok(())
             }
-            _ => Err(Error::Unknown(format!(
+            Event::CustomBuf { tag, buf } => {
+                for handler in &mut self.custom_buf_handlers {
+                    if handler(state, &tag, &buf)? == CustomBufEventResult::Handled {
+                        break;
+                    }
+                }
+                Ok(())
+            }
+            _ => Err(Error::unknown(format!(
                 "Received illegal message that message should not have arrived: {:?}.",
                 event.name()
             ))),
@@ -494,6 +534,20 @@ where
     SP: ShMemProvider,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
 {
+}
+
+impl<I, OT, S, SP> HasCustomBufHandlers<S> for LlmpEventManager<I, OT, S, SP>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    fn add_custom_buf_handler(
+        &mut self,
+        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+    ) {
+        self.custom_buf_handlers.push(handler);
+    }
 }
 
 impl<I, OT, S, SP> ProgressReporter<I> for LlmpEventManager<I, OT, S, SP>
@@ -694,7 +748,6 @@ pub fn setup_restarting_mgr_std<I, MT, OT, S>(
 >
 where
     I: Input,
-    S: DeserializeOwned,
     MT: Monitor + Clone,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
@@ -790,7 +843,7 @@ where
 
                             broker_things(event_broker, self.remote_broker_addr)?;
 
-                            return Err(Error::ShuttingDown);
+                            return Err(Error::shutting_down());
                         }
                         LlmpConnection::IsClient { client } => {
                             let mgr =
@@ -808,7 +861,7 @@ where
 
                     broker_things(event_broker, self.remote_broker_addr)?;
 
-                    return Err(Error::ShuttingDown);
+                    return Err(Error::shutting_down());
                 }
                 ManagerKind::Client { cpu_core } => {
                     // We are a client
@@ -823,8 +876,9 @@ where
             };
 
             if let Some(core_id) = core_id {
+                let core_id: CoreId = core_id;
                 println!("Setting core affinity to {:?}", core_id);
-                core_affinity::set_for_current(core_id);
+                core_id.set_affinity()?;
             }
 
             // We are the fuzzer respawner in a llmp client
@@ -839,7 +893,7 @@ where
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                dbg!("Spawning next client (id {})", ctr);
+                println!("Spawning next client (id {})", ctr);
 
                 // On Unix, we fork
                 #[cfg(all(unix, feature = "fork"))]
@@ -892,7 +946,8 @@ where
         };
 
         if let Some(core_id) = core_id {
-            core_affinity::set_for_current(core_id);
+            let core_id: CoreId = core_id;
+            core_id.set_affinity()?;
         }
 
         // If we're restarting, deserialize the old state.
@@ -968,13 +1023,14 @@ mod tests {
 
         let solutions = InMemoryCorpus::<BytesInput>::new();
 
-        let mut state = StdState::new(rand, corpus, solutions, tuple_list!());
+        let mut state = StdState::new(rand, corpus, solutions, &mut (), &mut ()).unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
 
         let mut llmp_client = LlmpClient::new(
             shmem_provider.clone(),
             LlmpSharedMap::new(0, shmem_provider.new_shmem(1024).unwrap()),
+            0,
         )
         .unwrap();
 

@@ -5,9 +5,9 @@ use std::{env, path::PathBuf, process};
 
 use libafl::{
     bolts::{
+        core_affinity::Cores,
         current_nanos,
         launcher::Launcher,
-        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::tuple_list,
@@ -17,7 +17,7 @@ use libafl::{
     events::EventConfig,
     executors::{ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -50,7 +50,7 @@ pub fn fuzz() {
     let broker_port = 1337;
     let cores = Cores::from_cmdline("0-11").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
-    let objective_dir = PathBuf::from("./crashes");
+    let mut objective_dir = PathBuf::from("./crashes");
 
     // Initialize QEMU
     env::remove_var("LD_LIBRARY_PATH");
@@ -120,20 +120,17 @@ pub fn fuzz() {
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
 
-        // The state of the edges feedback.
-        let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
-        let feedback = feedback_or!(
+        let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+            MaxMapFeedback::new_tracking(&edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::new_with_observer(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
-        let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
@@ -146,9 +143,12 @@ pub fn fuzz() {
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(objective_dir.clone()).unwrap(),
                 // States of the feedbacks.
-                // They are the data related to the feedbacks that you want to persist in the State.
-                tuple_list!(feedback_state),
+                // The feedbacks can report the data that should persist in the State.
+                &mut feedback,
+                // Same for objective feedbacks
+                &mut objective,
             )
+            .unwrap()
         });
 
         // A minimization+queue policy to get testcasess from the corpus
@@ -157,11 +157,11 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default(),));
+        let mut hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default()));
 
         // Create a QEMU in-process executor
         let executor = QemuExecutor::new(
-            hooks,
+            &mut hooks,
             &mut harness,
             tuple_list!(edges_observer, time_observer),
             &mut fuzzer,

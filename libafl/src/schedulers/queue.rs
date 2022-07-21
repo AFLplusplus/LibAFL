@@ -16,7 +16,7 @@ where
     /// Gets the next entry in the queue
     fn next(&self, state: &mut S) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_owned()))
+            Err(Error::empty("No entries in corpus".to_owned()))
         } else {
             let id = match state.corpus().current() {
                 Some(cur) => {
@@ -79,7 +79,7 @@ mod tests {
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))
                 .unwrap();
 
-        let mut state = StdState::new(rand, q, objective_q, ());
+        let mut state = StdState::new(rand, q, objective_q, &mut (), &mut ()).unwrap();
 
         let next_idx = scheduler.next(&mut state).unwrap();
         let filename = state

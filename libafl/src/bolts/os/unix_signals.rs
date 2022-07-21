@@ -67,8 +67,8 @@ pub struct mcontext_t {
     pub fault_address: c_ulong,
 }
 
-/// User Context Struct
-#[cfg(target_arch = "arm")]
+/// User Context Struct on `arm` `linux`
+#[cfg(all(target_os = "linux", target_arch = "arm"))]
 #[derive(Debug)]
 #[allow(non_camel_case_types)]
 #[repr(C)]
@@ -85,9 +85,165 @@ pub struct ucontext_t {
     pub uc_sigmask: libc::sigset_t,
 }
 
-#[cfg(not(target_arch = "arm"))]
+/// # Internal representation
+///
+/// ```c
+/// _STRUCT_ARM_EXCEPTION_STATE64
+/// {
+///    __uint64_t far;         /* Virtual Fault Address */
+///    __uint32_t esr;         /* Exception syndrome */
+///    __uint32_t exception;   /* number of arm exception taken */
+/// };
+/// ```
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[derive(Debug)]
+#[repr(C)]
+pub struct arm_exception_state64 {
+    /// Virtual Fault Address
+    pub __far: u64,
+    /// Exception syndrome
+    pub __esr: u32,
+    /// number of arm exception taken
+    pub __exception: u32,
+}
+
+/// ```c
+/// _STRUCT_ARM_THREAD_STATE64
+/// {
+/// __uint64_t __x[29]; /* General purpose registers x0-x28 */
+/// __uint64_t __fp;    /* Frame pointer x29 */
+/// __uint64_t __lr;    /* Link register x30 */
+/// __uint64_t __sp;    /* Stack pointer x31 */
+/// __uint64_t __pc;    /* Program counter */
+/// __uint32_t __cpsr;  /* Current program status register */
+/// __uint32_t __pad;   /* Same size for 32-bit or 64-bit clients */
+/// };
+/// ```
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[derive(Debug)]
+#[repr(C)]
+pub struct arm_thread_state64 {
+    /// General purpose registers x0-x28
+    pub __x: [u64; 29],
+    /// Frame pointer x29
+    pub __fp: u64,
+    /// Link register x30
+    pub __lr: u64,
+    /// Stack pointer x31
+    pub __sp: u64,
+    /// Program counter
+    pub __pc: u64,
+    /// Current program status register
+    pub __cpsr: u32,
+    /// Same size for 32-bit or 64-bit clients
+    pub __pad: u32,
+}
+
+/// ```c
+/// _STRUCT_ARM_NEON_STATE64
+/// {
+/// char opaque[(32 * 16) + (2 * sizeof(__uint32_t))];
+/// } __attribute__((aligned(16)));
+/// ````
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+#[repr(C, align(16))]
+//#[repr(align(16))]
+pub struct arm_neon_state64 {
+    /// opaque
+    pub opaque: [u8; (32 * 16) + (2 * mem::size_of::<u32>())],
+}
+
+/// ```c
+/// _STRUCT_MCONTEXT64
+/// {
+///    _STRUCT_ARM_EXCEPTION_STATE64   es;
+///    _STRUCT_ARM_THREAD_STATE64      ss;
+///    _STRUCT_ARM_NEON_STATE64        ns;
+///};
+/// ```
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[allow(non_camel_case_types)]
+#[derive(Debug)]
+#[repr(C)]
+pub struct mcontext64 {
+    /// _STRUCT_ARM_EXCEPTION_STATE64
+    pub __es: arm_exception_state64,
+    /// _STRUCT_ARM_THREAD_STATE64
+    pub __ss: arm_thread_state64,
+    /// _STRUCT_ARM_NEON_STATE64
+    pub __ns: arm_neon_state64,
+}
+
+/// ```c
+/// _STRUCT_SIGALTSTACK
+/// {
+/// void            *ss_sp;         /* signal stack base */
+/// __darwin_size_t ss_size;        /* signal stack length */
+/// int             ss_flags;       /* SA_DISABLE and/or SA_ONSTACK */
+/// };
+/// ````
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+#[repr(C)]
+pub struct sigaltstack {
+    /// signal stack base
+    pub ss_sp: *mut c_void,
+    /// signal stack length
+    pub ss_size: libc::size_t,
+    /// SA_DISABLE and/or SA_ONSTACK
+    pub ss_flags: c_int,
+}
+
+/// User Context Struct on apple `aarch64`
+///
+/// ```c
+/// _STRUCT_UCONTEXT
+/// {
+///    int                     uc_onstack;
+///    __darwin_sigset_t       uc_sigmask;     /* signal mask used by this context */
+///    _STRUCT_SIGALTSTACK     uc_stack;       /* stack used by this context */
+///    _STRUCT_UCONTEXT        *uc_link;       /* pointer to resuming context */
+///    __darwin_size_t         uc_mcsize;      /* size of the machine context passed in */
+///    _STRUCT_MCONTEXT        *uc_mcontext;   /* pointer to machine specific context */
+/// #ifdef _XOPEN_SOURCE
+///    _STRUCT_MCONTEXT        __mcontext_data;
+/// #endif /* _XOPEN_SOURCE */
+/// };
+/// ```
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+#[derive(Debug)]
+#[allow(non_camel_case_types)]
+#[repr(C)]
+pub struct ucontext_t {
+    /// onstack
+    pub uc_onstack: c_int,
+    /// signal mask used by this context
+    pub uc_sigmask: u32,
+    /// stack used by this context
+    pub uc_stack: sigaltstack,
+    /// pointer to resuming context
+    pub uc_link: *mut c_void,
+    /// size of the machine context passed in
+    pub uc_mcsize: ssize_t,
+    /// pointer to machine specific context
+    pub uc_mcontext: *mut mcontext64,
+    /// The mcontext data in multiple steps.
+    pub mcontext_data: mcontext64,
+}
+
+pub use libc::{c_void, siginfo_t};
+
+#[cfg(not(any(
+    all(target_os = "linux", target_arch = "arm"),
+    all(target_vendor = "apple", target_arch = "aarch64")
+)))]
 pub use libc::ucontext_t;
 
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+use libc::ssize_t;
 use libc::{
     c_int, malloc, sigaction, sigaddset, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
     SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
@@ -97,9 +253,10 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::Error;
 
-pub use libc::{c_void, siginfo_t};
-
 extern "C" {
+    /// The `libc` `getcontext`
+    /// For some reason, it's not available on MacOS.
+    ///
     fn getcontext(ucp: *mut ucontext_t) -> c_int;
 }
 
@@ -266,7 +423,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
                 let err_str = CString::new(format!("Failed to setup {} handler", sig)).unwrap();
                 libc::perror(err_str.as_ptr());
             }
-            return Err(Error::Unknown(format!("Could not set up {} handler", sig)));
+            return Err(Error::unknown(format!("Could not set up {} handler", sig)));
         }
     }
     compiler_fence(Ordering::SeqCst);
@@ -293,10 +450,10 @@ pub fn ucontext() -> Result<ucontext_t, Error> {
             libc::perror(b"Failed to get ucontext\n".as_ptr() as _);
         };
         #[cfg(not(feature = "std"))]
-        return Err(Error::Unknown("Failed to get ucontex".into()));
+        return Err(Error::unknown("Failed to get ucontex"));
 
         #[cfg(feature = "std")]
-        Err(Error::Unknown(format!(
+        Err(Error::unknown(format!(
             "Failed to get ucontext: {:?}",
             Errno::from_i32(errno())
         )))

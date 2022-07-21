@@ -1,6 +1,7 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
 //!
 //!
+#![no_std]
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(clippy::all)]
 #![deny(clippy::pedantic)]
@@ -58,6 +59,9 @@
     )
 )]
 
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate alloc;
@@ -95,3 +99,8 @@ pub use cmplog::*;
 
 #[cfg(feature = "std")]
 pub mod drcov;
+
+#[cfg(target_os = "linux")]
+pub mod forkserver;
+#[cfg(target_os = "linux")]
+pub use forkserver::*;

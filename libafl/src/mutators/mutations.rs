@@ -271,7 +271,7 @@ where
             Ok(MutationResult::Skipped)
         } else {
             let byte = state.rand_mut().choose(input.bytes_mut());
-            *byte = !*byte;
+            *byte = (!(*byte)).wrapping_add(1);
             Ok(MutationResult::Mutated)
         }
     }
@@ -855,7 +855,7 @@ pub struct BytesSwapMutator;
 impl<I, S> Mutator<I, S> for BytesSwapMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I> + HasMaxSize,
+    S: HasRand,
 {
     fn mutate(
         &mut self,
@@ -1127,7 +1127,7 @@ fn from_hex(hex: u8) -> Result<u8, Error> {
         48..=57 => Ok(hex - 48),
         65..=70 => Ok(hex - 55),
         97..=102 => Ok(hex - 87),
-        _ => Err(Error::IllegalArgument("Invalid hex character".to_owned())),
+        _ => Err(Error::illegal_argument("Invalid hex character".to_owned())),
     }
 }
 
@@ -1230,7 +1230,8 @@ mod tests {
             .add(BytesInput::new(vec![0x42; 0x1337]).into())
             .unwrap();
 
-        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
+        let mut state =
+            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
 
         let mut mutations = test_mutations();
         for _ in 0..2 {

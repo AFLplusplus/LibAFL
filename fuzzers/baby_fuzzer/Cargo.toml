@@ -6,6 +6,7 @@ edition = "2021"
 
 [features]
 default = ["std"]
+tui = []
 std = []
 
 [profile.dev]

@@ -72,6 +72,7 @@ pub struct ClangWrapper {
     bit_mode: u32,
     need_libafl_arg: bool,
     has_libafl_arg: bool,
+    use_new_pm: bool,
 
     parse_args_called: bool,
     base_args: Vec<String>,
@@ -174,7 +175,10 @@ impl CompilerWrapper for ClangWrapper {
             new_args.push(args[i].as_ref().to_string());
             i += 1;
         }
-        if linking && suppress_linking >= 0 && suppress_linking < 1337 {
+        if linking
+            && (suppress_linking > 0 || (self.has_libafl_arg && suppress_linking == 0))
+            && suppress_linking < 1337
+        {
             linking = false;
             new_args.push(
                 PathBuf::from(env!("OUT_DIR"))
@@ -278,14 +282,23 @@ impl CompilerWrapper for ClangWrapper {
             return Ok(args);
         }
 
-        if !self.passes.is_empty() {
-            args.push("-fno-experimental-new-pass-manager".into());
+        if self.use_new_pm {
+            args.push("-fexperimental-new-pass-manager".into());
+        } else {
+            args.push("-flegacy-pass-manager".into());
         }
         for pass in &self.passes {
-            args.push("-Xclang".into());
-            args.push("-load".into());
-            args.push("-Xclang".into());
-            args.push(pass.path().into_os_string().into_string().unwrap());
+            if self.use_new_pm {
+                args.push(format!(
+                    "-fpass-plugin={}",
+                    pass.path().into_os_string().into_string().unwrap()
+                ));
+            } else {
+                args.push("-Xclang".into());
+                args.push("-load".into());
+                args.push("-Xclang".into());
+                args.push(pass.path().into_os_string().into_string().unwrap());
+            }
         }
         for passes_arg in &self.passes_args {
             args.push("-mllvm".into());
@@ -336,6 +349,14 @@ impl ClangWrapper {
     /// Create a new Clang Wrapper
     #[must_use]
     pub fn new() -> Self {
+        #[cfg(unix)]
+        let use_new_pm = match LIBAFL_CC_LLVM_VERSION {
+            Some(ver) => ver >= 14,
+            None => false,
+        };
+        #[cfg(not(unix))]
+        let use_new_pm = false;
+
         Self {
             optimize: true,
             wrapped_cc: CLANG_PATH.into(),
@@ -348,6 +369,7 @@ impl ClangWrapper {
             bit_mode: 0,
             need_libafl_arg: false,
             has_libafl_arg: false,
+            use_new_pm,
             parse_args_called: false,
             base_args: vec![],
             cc_args: vec![],
@@ -406,6 +428,12 @@ impl ClangWrapper {
     /// Set if it needs the --libafl arg to add the custom arguments to clang
     pub fn need_libafl_arg(&mut self, value: bool) -> &'_ mut Self {
         self.need_libafl_arg = value;
+        self
+    }
+
+    /// Set if use new llvm pass manager.
+    pub fn use_new_pm(&mut self, value: bool) -> &'_ mut Self {
+        self.use_new_pm = value;
         self
     }
 }

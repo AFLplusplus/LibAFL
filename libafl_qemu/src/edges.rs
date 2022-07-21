@@ -4,17 +4,17 @@ pub use libafl_targets::{
     edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
 use serde::{Deserialize, Serialize};
-use std::{cell::UnsafeCell, cmp::max, pin::Pin};
+use std::{cell::UnsafeCell, cmp::max};
 
 use crate::{
-    emu::Emulator,
+    emu::GuestAddr,
     helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuEdgesMapMetadata {
-    pub map: HashMap<(u64, u64), u64>,
+    pub map: HashMap<(GuestAddr, GuestAddr), u64>,
     pub current_id: u64,
 }
 
@@ -70,15 +70,20 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
-        hooks.edge_generation(gen_unique_edge_ids::<I, QT, S>);
         if self.use_hitcounts {
-            hooks.emulator().set_exec_edge_hook(trace_edge_hitcount);
+            hooks.edges_raw(
+                Some(gen_unique_edge_ids::<I, QT, S>),
+                Some(trace_edge_hitcount),
+            );
         } else {
-            hooks.emulator().set_exec_edge_hook(trace_edge_single);
+            hooks.edges_raw(
+                Some(gen_unique_edge_ids::<I, QT, S>),
+                Some(trace_edge_single),
+            );
         }
     }
 }
@@ -127,15 +132,20 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
-        hooks.edge_generation(gen_hashed_edge_ids::<I, QT, S>);
         if self.use_hitcounts {
-            hooks.emulator().set_exec_edge_hook(trace_edge_hitcount_ptr);
+            hooks.edges_raw(
+                Some(gen_hashed_edge_ids::<I, QT, S>),
+                Some(trace_edge_hitcount_ptr),
+            );
         } else {
-            hooks.emulator().set_exec_edge_hook(trace_edge_single_ptr);
+            hooks.edges_raw(
+                Some(gen_hashed_edge_ids::<I, QT, S>),
+                Some(trace_edge_single_ptr),
+            );
         }
     }
 }
@@ -143,18 +153,17 @@ where
 thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
 
 pub fn gen_unique_edge_ids<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     state: Option<&mut S>,
-    src: u64,
-    dest: u64,
+    src: GuestAddr,
+    dest: GuestAddr,
 ) -> Option<u64>
 where
     S: HasMetadata,
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuEdgeCoverageHelper>() {
+    if let Some(h) = hooks.helpers().match_first_type::<QemuEdgeCoverageHelper>() {
         if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
@@ -189,45 +198,47 @@ where
     }
 }
 
-pub extern "C" fn trace_edge_hitcount(id: u64) {
+pub extern "C" fn trace_edge_hitcount(id: u64, _data: u64) {
     unsafe {
         EDGES_MAP[id as usize] = EDGES_MAP[id as usize].wrapping_add(1);
     }
 }
 
-pub extern "C" fn trace_edge_single(id: u64) {
+pub extern "C" fn trace_edge_single(id: u64, _data: u64) {
     unsafe {
         EDGES_MAP[id as usize] = 1;
     }
 }
 
 pub fn gen_hashed_edge_ids<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
-    src: u64,
-    dest: u64,
+    src: GuestAddr,
+    dest: GuestAddr,
 ) -> Option<u64>
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuEdgeCoverageChildHelper>() {
+    if let Some(h) = hooks
+        .helpers()
+        .match_first_type::<QemuEdgeCoverageChildHelper>()
+    {
         if !h.must_instrument(src) && !h.must_instrument(dest) {
             return None;
         }
     }
-    Some((hash_me(src) ^ hash_me(dest)) & (unsafe { EDGES_MAP_PTR_SIZE } as u64 - 1))
+    Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (unsafe { EDGES_MAP_PTR_SIZE } as u64 - 1))
 }
 
-pub extern "C" fn trace_edge_hitcount_ptr(id: u64) {
+pub extern "C" fn trace_edge_hitcount_ptr(id: u64, _data: u64) {
     unsafe {
         let ptr = EDGES_MAP_PTR.add(id as usize);
         *ptr = (*ptr).wrapping_add(1);
     }
 }
 
-pub extern "C" fn trace_edge_single_ptr(id: u64) {
+pub extern "C" fn trace_edge_single_ptr(id: u64, _data: u64) {
     unsafe {
         let ptr = EDGES_MAP_PTR.add(id as usize);
         *ptr = 1;
@@ -235,24 +246,30 @@ pub extern "C" fn trace_edge_single_ptr(id: u64) {
 }
 
 pub fn gen_addr_block_ids<I, QT, S>(
-    _emulator: &Emulator,
-    _helpers: &mut QT,
+    _hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
-    pc: u64,
-) -> Option<u64> {
-    Some(pc)
+    pc: GuestAddr,
+) -> Option<u64>
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    Some(pc as u64)
 }
 
 pub fn gen_hashed_block_ids<I, QT, S>(
-    _emulator: &Emulator,
-    _helpers: &mut QT,
+    _hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
-    pc: u64,
-) -> Option<u64> {
-    Some(hash_me(pc))
+    pc: GuestAddr,
+) -> Option<u64>
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    Some(hash_me(pc as u64))
 }
 
-pub extern "C" fn trace_block_transition_hitcount(id: u64) {
+pub extern "C" fn trace_block_transition_hitcount(id: u64, _data: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
             let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_SIZE - 1);
@@ -263,7 +280,7 @@ pub extern "C" fn trace_block_transition_hitcount(id: u64) {
     }
 }
 
-pub extern "C" fn trace_block_transition_single(id: u64) {
+pub extern "C" fn trace_block_transition_single(id: u64, _data: u64) {
     unsafe {
         PREV_LOC.with(|prev_loc| {
             let x = ((*prev_loc.get() ^ id) as usize) & (EDGES_MAP_PTR_SIZE - 1);

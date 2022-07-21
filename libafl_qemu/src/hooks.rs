@@ -4,9 +4,8 @@
 use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
-    marker::{PhantomData, PhantomPinned},
+    marker::PhantomData,
     mem::transmute,
-    pin::Pin,
     ptr::{self, addr_of},
 };
 
@@ -14,17 +13,13 @@ use libafl::{executors::inprocess::inprocess_get_state, inputs::Input};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
-    emu::{Emulator, SKIP_EXEC_HOOK},
-    helper::{QemuHelper, QemuHelperTuple},
+    emu::{Emulator, FatPtr, SKIP_EXEC_HOOK},
+    helper::QemuHelperTuple,
     GuestAddr,
 };
 
-#[repr(C)]
-#[derive(PartialEq, Clone, Copy)]
-struct FatPtr(*const c_void, *const c_void);
-
 // all kinds of hooks
-#[derive(PartialEq, Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum Hook {
     Function(*const c_void),
     Closure(FatPtr),
@@ -32,6 +27,7 @@ enum Hook {
     Empty,
 }
 
+/*
 // function signature for Read or Write hook functions with known length (1, 2, 4, 8)
 type FixedLenHookFn<QT, S> = fn(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr);
 type FixedLenHookCl<QT, S> = Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr)>;
@@ -40,772 +36,394 @@ type FixedLenHookCl<QT, S> = Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u
 type DynamicLenHookFn<QT, S> = fn(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr, usize);
 type DynamicLenHookCl<QT, S> =
     Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, GuestAddr, usize)>;
+*/
 
-static mut QEMU_HELPERS_PTR: *const c_void = ptr::null();
-unsafe fn get_qemu_helpers<'a, QT>() -> &'a mut QT {
-    (QEMU_HELPERS_PTR as *mut QT)
+static mut QEMU_HOOKS_PTR: *const c_void = ptr::null();
+unsafe fn get_qemu_hooks<'a, I, QT, S>() -> &'a mut QemuHooks<'a, I, QT, S>
+where
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    (QEMU_HOOKS_PTR as *mut QemuHooks<'a, I, QT, S>)
         .as_mut()
         .expect("A high-level hook is installed but QemuHooks is not initialized")
 }
 
-static mut QEMU_HOOKS_PTR: *const c_void = ptr::null();
-unsafe fn get_qemu_hooks<'a, I, QT, S>() -> Pin<&'a mut QemuHooks<'a, I, QT, S>>
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    Pin::new_unchecked(
-        (QEMU_HOOKS_PTR as *mut QemuHooks<'a, I, QT, S>)
-            .as_mut()
-            .expect("A high-level hook is installed but QemuHooks is not initialized"),
-    )
-}
+static mut GENERIC_HOOKS: Vec<Hook> = vec![];
 
-static mut GEN_EDGE_HOOK: Hook = Hook::Empty;
-extern "C" fn gen_edge_hook_wrapper<I, QT, S>(src: u64, dst: u64) -> u64
+extern "C" fn generic_hook_wrapper<I, QT, S>(pc: GuestAddr, index: u64)
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        match &GEN_EDGE_HOOK {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hook = &mut GENERIC_HOOKS[index as usize];
+        match hook {
             Hook::Function(ptr) => {
-                let func: fn(&Emulator, &mut QT, Option<&mut S>, u64, u64) -> Option<u64> =
+                let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, GuestAddr) =
                     transmute(*ptr);
-                (func)(&emulator, helpers, inprocess_get_state::<S>(), src, dst)
-                    .map_or(SKIP_EXEC_HOOK, |id| id)
+                (func)(hooks, inprocess_get_state::<S>(), pc);
             }
             Hook::Closure(ptr) => {
-                let mut func: Box<
-                    dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u64) -> Option<u64>,
-                > = transmute(*ptr);
-                (func)(&emulator, helpers, inprocess_get_state::<S>(), src, dst)
-                    .map_or(SKIP_EXEC_HOOK, |id| id)
+                let func: &mut Box<
+                    dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, GuestAddr),
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc);
             }
-            _ => SKIP_EXEC_HOOK,
+            _ => (),
         }
     }
 }
 
-static mut EDGE_HOOKS: Vec<Hook> = vec![];
-extern "C" fn edge_hooks_wrapper<I, QT, S>(id: u64)
+static mut EDGE_HOOKS: Vec<(Hook, Hook)> = vec![];
+
+extern "C" fn gen_edge_hook_wrapper<I, QT, S>(src: GuestAddr, dst: GuestAddr, index: u64) -> u64
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &EDGE_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: fn(&Emulator, &mut QT, Option<&mut S>, u64) = transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id);
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64)> =
-                        transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id);
-
-                    // Forget the closure so that drop is not called on captured variables.
-                    core::mem::forget(func);
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut GEN_BLOCK_HOOK: Hook = Hook::Empty;
-extern "C" fn gen_block_hook_wrapper<I, QT, S>(pc: u64) -> u64
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        match &GEN_BLOCK_HOOK {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (gen, _) = &mut EDGE_HOOKS[index as usize];
+        match gen {
             Hook::Function(ptr) => {
-                let func: fn(&Emulator, &mut QT, Option<&mut S>, u64) -> Option<u64> =
-                    transmute(*ptr);
-                (func)(&emulator, helpers, inprocess_get_state::<S>(), pc)
-                    .map_or(SKIP_EXEC_HOOK, |id| id)
+                let func: fn(
+                    &mut QemuHooks<'_, I, QT, S>,
+                    Option<&mut S>,
+                    GuestAddr,
+                    GuestAddr,
+                ) -> Option<u64> = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
-                let mut func: Box<
-                    dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64) -> Option<u64>,
-                > = transmute(*ptr);
-                let ret = (func)(&emulator, helpers, inprocess_get_state::<S>(), pc)
-                    .map_or(SKIP_EXEC_HOOK, |id| id);
-
-                // Forget the closure so that drop is not called on captured variables.
-                core::mem::forget(func);
-
-                ret
+                let func: &mut Box<
+                    dyn FnMut(
+                        &mut QemuHooks<'_, I, QT, S>,
+                        Option<&mut S>,
+                        GuestAddr,
+                        GuestAddr,
+                    ) -> Option<u64>,
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), src, dst).map_or(SKIP_EXEC_HOOK, |id| id)
             }
-            _ => SKIP_EXEC_HOOK,
+            _ => 0,
         }
     }
 }
 
-static mut BLOCK_HOOKS: Vec<Hook> = vec![];
-extern "C" fn block_hooks_wrapper<I, QT, S>(id: u64)
+extern "C" fn exec_edge_hook_wrapper<I, QT, S>(id: u64, index: u64)
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &BLOCK_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: fn(&Emulator, &mut QT, Option<&mut S>, u64) = transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id);
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64)> =
-                        transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id);
-
-                    // Forget the closure so that drop is not called on captured variables.
-                    core::mem::forget(func);
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut GEN_READ_HOOK: Hook = Hook::Empty;
-extern "C" fn gen_read_hook_wrapper<I, QT, S>(size: u32) -> u64
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        match &GEN_READ_HOOK {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (_, exec) = &mut EDGE_HOOKS[index as usize];
+        match exec {
             Hook::Function(ptr) => {
-                let func: fn(&Emulator, &mut QT, Option<&mut S>, usize) -> Option<u64> =
-                    transmute(*ptr);
-                (func)(
-                    &emulator,
-                    helpers,
-                    inprocess_get_state::<S>(),
-                    size as usize,
-                )
-                .map_or(SKIP_EXEC_HOOK, |id| id)
+                let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), id);
             }
             Hook::Closure(ptr) => {
-                let mut func: Box<
-                    dyn FnMut(&Emulator, &mut QT, Option<&mut S>, usize) -> Option<u64>,
-                > = transmute(*ptr);
-                let ret = (func)(
-                    &emulator,
-                    helpers,
-                    inprocess_get_state::<S>(),
-                    size as usize,
-                )
-                .map_or(SKIP_EXEC_HOOK, |id| id);
-
-                // Forget the closure so that drop is not called on captured variables.
-                core::mem::forget(func);
-
-                ret
+                let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64)> =
+                    transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), id);
             }
-            _ => SKIP_EXEC_HOOK,
+            _ => (),
         }
     }
 }
 
-static mut GEN_WRITE_HOOK: Hook = Hook::Empty;
-extern "C" fn gen_write_hook_wrapper<I, QT, S>(size: u32) -> u64
+static mut BLOCK_HOOKS: Vec<(Hook, Hook)> = vec![];
+
+extern "C" fn gen_block_hook_wrapper<I, QT, S>(pc: GuestAddr, index: u64) -> u64
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        match &GEN_WRITE_HOOK {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (gen, _) = &mut BLOCK_HOOKS[index as usize];
+        match gen {
             Hook::Function(ptr) => {
-                let func: fn(&Emulator, &mut QT, Option<&mut S>, usize) -> Option<u64> =
-                    transmute(*ptr);
-                (func)(
-                    &emulator,
-                    helpers,
-                    inprocess_get_state::<S>(),
-                    size as usize,
-                )
-                .map_or(SKIP_EXEC_HOOK, |id| id)
+                let func: fn(
+                    &mut QemuHooks<'_, I, QT, S>,
+                    Option<&mut S>,
+                    GuestAddr,
+                ) -> Option<u64> = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
-                let mut func: Box<
-                    dyn FnMut(&Emulator, &mut QT, Option<&mut S>, usize) -> Option<u64>,
-                > = transmute(*ptr);
-                let ret = (func)(
-                    &emulator,
-                    helpers,
-                    inprocess_get_state::<S>(),
-                    size as usize,
-                )
-                .map_or(SKIP_EXEC_HOOK, |id| id);
-
-                // Forget the closure so that drop is not called on captured variables.
-                core::mem::forget(func);
-
-                ret
+                let func: &mut Box<
+                    dyn FnMut(
+                        &mut QemuHooks<'_, I, QT, S>,
+                        Option<&mut S>,
+                        GuestAddr,
+                    ) -> Option<u64>,
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
             }
-            _ => SKIP_EXEC_HOOK,
+            _ => 0,
         }
     }
 }
 
-static mut READ1_HOOKS: Vec<Hook> = vec![];
-extern "C" fn read1_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
+extern "C" fn exec_block_hook_wrapper<I, QT, S>(id: u64, index: u64)
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &READ1_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: FixedLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: FixedLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut READ2_HOOKS: Vec<Hook> = vec![];
-extern "C" fn read2_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &READ2_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: FixedLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: FixedLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut READ4_HOOKS: Vec<Hook> = vec![];
-extern "C" fn read4_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &READ4_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: FixedLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: FixedLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut READ8_HOOKS: Vec<Hook> = vec![];
-extern "C" fn read8_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &READ8_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: FixedLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: FixedLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut READ_N_HOOKS: Vec<Hook> = vec![];
-extern "C" fn read_n_hooks_wrapper<I, QT, S>(id: u64, addr: u64, size: u32)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &READ_N_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: DynamicLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                        size as usize,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: DynamicLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                        size as usize,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut WRITE1_HOOKS: Vec<Hook> = vec![];
-extern "C" fn write1_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &WRITE1_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: FixedLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: FixedLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut WRITE2_HOOKS: Vec<Hook> = vec![];
-extern "C" fn write2_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &WRITE2_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: FixedLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: FixedLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut WRITE4_HOOKS: Vec<Hook> = vec![];
-extern "C" fn write4_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &WRITE4_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: FixedLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: FixedLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut WRITE8_HOOKS: Vec<Hook> = vec![];
-extern "C" fn write8_hooks_wrapper<I, QT, S>(id: u64, addr: u64)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &WRITE8_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: FixedLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: FixedLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut WRITE_N_HOOKS: Vec<Hook> = vec![];
-extern "C" fn write_n_hooks_wrapper<I, QT, S>(id: u64, addr: u64, size: u32)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &WRITE1_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: DynamicLenHookFn<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                        size as usize,
-                    );
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: DynamicLenHookCl<QT, S> = transmute(*ptr);
-                    (func)(
-                        &emulator,
-                        helpers,
-                        inprocess_get_state::<S>(),
-                        id,
-                        addr as GuestAddr,
-                        size as usize,
-                    );
-                }
-                _ => (),
-            }
-        }
-    }
-}
-
-static mut GEN_CMP_HOOK: Hook = Hook::Empty;
-extern "C" fn gen_cmp_hook_wrapper<I, QT, S>(pc: u64, size: u32) -> u64
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        match &GEN_CMP_HOOK {
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (_, exec) = &mut BLOCK_HOOKS[index as usize];
+        match exec {
             Hook::Function(ptr) => {
-                let func: fn(&Emulator, &mut QT, Option<&mut S>, u64, usize) -> Option<u64> =
-                    transmute(*ptr);
-                (func)(
-                    &emulator,
-                    helpers,
-                    inprocess_get_state::<S>(),
-                    pc,
-                    size as usize,
-                )
-                .map_or(SKIP_EXEC_HOOK, |id| id)
+                let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), id);
             }
             Hook::Closure(ptr) => {
-                let mut func: Box<
-                    dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, usize) -> Option<u64>,
-                > = transmute(*ptr);
-                let ret = (func)(
-                    &emulator,
-                    helpers,
-                    inprocess_get_state::<S>(),
-                    pc,
-                    size as usize,
-                )
-                .map_or(SKIP_EXEC_HOOK, |id| id);
-
-                // Forget the closure so that drop is not called on captured variables.
-                core::mem::forget(func);
-
-                ret
+                let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64)> =
+                    transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), id);
             }
-            _ => SKIP_EXEC_HOOK,
+            _ => (),
         }
     }
 }
 
-static mut CMP1_HOOKS: Vec<Hook> = vec![];
-extern "C" fn cmp1_hooks_wrapper<I, QT, S>(id: u64, v0: u8, v1: u8)
+static mut READ_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook, Hook)> = vec![];
+static mut WRITE_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook, Hook)> = vec![];
+
+extern "C" fn gen_read_hook_wrapper<I, QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &CMP1_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: fn(&Emulator, &mut QT, Option<&mut S>, u64, u8, u8) = transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u8, u8)> =
-                        transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
-
-                    // Forget the closure so that drop is not called on captured variables.
-                    core::mem::forget(func);
-                }
-                _ => (),
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (gen, _, _, _, _, _) = &mut READ_HOOKS[index as usize];
+        match gen {
+            Hook::Function(ptr) => {
+                let func: fn(
+                    &mut QemuHooks<'_, I, QT, S>,
+                    Option<&mut S>,
+                    GuestAddr,
+                    usize,
+                ) -> Option<u64> = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
             }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(
+                        &mut QemuHooks<'_, I, QT, S>,
+                        Option<&mut S>,
+                        GuestAddr,
+                        usize,
+                    ) -> Option<u64>,
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+            }
+            _ => 0,
         }
     }
 }
 
-static mut CMP2_HOOKS: Vec<Hook> = vec![];
-extern "C" fn cmp2_hooks_wrapper<I, QT, S>(id: u64, v0: u16, v1: u16)
+extern "C" fn gen_write_hook_wrapper<I, QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &CMP2_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: fn(&Emulator, &mut QT, Option<&mut S>, u64, u16, u16) =
-                        transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: Box<
-                        dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u16, u16),
-                    > = transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
-
-                    // Forget the closure so that drop is not called on captured variables.
-                    core::mem::forget(func);
-                }
-                _ => (),
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (gen, _, _, _, _, _) = &mut WRITE_HOOKS[index as usize];
+        match gen {
+            Hook::Function(ptr) => {
+                let func: fn(
+                    &mut QemuHooks<'_, I, QT, S>,
+                    Option<&mut S>,
+                    GuestAddr,
+                    usize,
+                ) -> Option<u64> = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
             }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(
+                        &mut QemuHooks<'_, I, QT, S>,
+                        Option<&mut S>,
+                        GuestAddr,
+                        usize,
+                    ) -> Option<u64>,
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+            }
+            _ => 0,
         }
     }
 }
 
-static mut CMP4_HOOKS: Vec<Hook> = vec![];
-extern "C" fn cmp4_hooks_wrapper<I, QT, S>(id: u64, v0: u32, v1: u32)
+macro_rules! define_rw_exec_hook {
+    ($name:ident, $field:tt, $global:ident) => {
+        extern "C" fn $name<I, QT, S>(id: u64, addr: GuestAddr, index: u64)
+        where
+            I: Input,
+            QT: QemuHelperTuple<I, S>,
+        {
+            unsafe {
+                let hooks = get_qemu_hooks::<I, QT, S>();
+                let exec = &mut $global[index as usize].$field;
+                match exec {
+                    Hook::Function(ptr) => {
+                        let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64, GuestAddr) =
+                            transmute(*ptr);
+                        (func)(hooks, inprocess_get_state::<S>(), id, addr);
+                    }
+                    Hook::Closure(ptr) => {
+                        let func: &mut Box<
+                            dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64, GuestAddr),
+                        > = transmute(ptr);
+                        (func)(hooks, inprocess_get_state::<S>(), id, addr);
+                    }
+                    _ => (),
+                }
+            }
+        }
+    };
+}
+
+macro_rules! define_rw_exec_hook_n {
+    ($name:ident, $field:tt, $global:ident) => {
+        extern "C" fn $name<I, QT, S>(id: u64, addr: GuestAddr, size: usize, index: u64)
+        where
+            I: Input,
+            QT: QemuHelperTuple<I, S>,
+        {
+            unsafe {
+                let hooks = get_qemu_hooks::<I, QT, S>();
+                let exec = &mut $global[index as usize].$field;
+                match exec {
+                    Hook::Function(ptr) => {
+                        let func: fn(
+                            &mut QemuHooks<'_, I, QT, S>,
+                            Option<&mut S>,
+                            u64,
+                            GuestAddr,
+                            usize,
+                        ) = transmute(*ptr);
+                        (func)(hooks, inprocess_get_state::<S>(), id, addr, size);
+                    }
+                    Hook::Closure(ptr) => {
+                        let func: &mut Box<
+                            dyn FnMut(
+                                &mut QemuHooks<'_, I, QT, S>,
+                                Option<&mut S>,
+                                u64,
+                                GuestAddr,
+                                usize,
+                            ),
+                        > = transmute(ptr);
+                        (func)(hooks, inprocess_get_state::<S>(), id, addr, size);
+                    }
+                    _ => (),
+                }
+            }
+        }
+    };
+}
+
+define_rw_exec_hook!(exec_read1_hook_wrapper, 1, READ_HOOKS);
+define_rw_exec_hook!(exec_read2_hook_wrapper, 2, READ_HOOKS);
+define_rw_exec_hook!(exec_read4_hook_wrapper, 3, READ_HOOKS);
+define_rw_exec_hook!(exec_read8_hook_wrapper, 4, READ_HOOKS);
+define_rw_exec_hook_n!(exec_read_n_hook_wrapper, 5, READ_HOOKS);
+
+define_rw_exec_hook!(exec_write1_hook_wrapper, 1, WRITE_HOOKS);
+define_rw_exec_hook!(exec_write2_hook_wrapper, 2, WRITE_HOOKS);
+define_rw_exec_hook!(exec_write4_hook_wrapper, 3, WRITE_HOOKS);
+define_rw_exec_hook!(exec_write8_hook_wrapper, 4, WRITE_HOOKS);
+define_rw_exec_hook_n!(exec_write_n_hook_wrapper, 5, WRITE_HOOKS);
+
+static mut CMP_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook)> = vec![];
+
+extern "C" fn gen_cmp_hook_wrapper<I, QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &CMP4_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: fn(&Emulator, &mut QT, Option<&mut S>, u64, u32, u32) =
-                        transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
-                }
-                Hook::Closure(ptr) => {
-                    let mut func: Box<
-                        dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u32, u32),
-                    > = transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
-
-                    // Forget the closure so that drop is not called on captured variables.
-                    core::mem::forget(func);
-                }
-                _ => (),
+        let hooks = get_qemu_hooks::<I, QT, S>();
+        let (gen, _, _, _, _) = &mut CMP_HOOKS[index as usize];
+        match gen {
+            Hook::Function(ptr) => {
+                let func: fn(
+                    &mut QemuHooks<'_, I, QT, S>,
+                    Option<&mut S>,
+                    GuestAddr,
+                    usize,
+                ) -> Option<u64> = transmute(*ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
             }
+            Hook::Closure(ptr) => {
+                let func: &mut Box<
+                    dyn FnMut(
+                        &mut QemuHooks<'_, I, QT, S>,
+                        Option<&mut S>,
+                        GuestAddr,
+                        usize,
+                    ) -> Option<u64>,
+                > = transmute(ptr);
+                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+            }
+            _ => 0,
         }
     }
 }
 
-static mut CMP8_HOOKS: Vec<Hook> = vec![];
-extern "C" fn cmp8_hooks_wrapper<I, QT, S>(id: u64, v0: u64, v1: u64)
-where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
-{
-    unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
-        for hook in &CMP8_HOOKS {
-            match hook {
-                Hook::Function(ptr) => {
-                    let func: fn(&Emulator, &mut QT, Option<&mut S>, u64, u64, u64) =
-                        transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
+macro_rules! define_cmp_exec_hook {
+    ($name:ident, $field:tt, $itype:ty) => {
+        extern "C" fn $name<I, QT, S>(id: u64, v0: $itype, v1: $itype, index: u64)
+        where
+            I: Input,
+            QT: QemuHelperTuple<I, S>,
+        {
+            unsafe {
+                let hooks = get_qemu_hooks::<I, QT, S>();
+                let exec = &mut CMP_HOOKS[index as usize].$field;
+                match exec {
+                    Hook::Function(ptr) => {
+                        let func: fn(
+                            &mut QemuHooks<'_, I, QT, S>,
+                            Option<&mut S>,
+                            u64,
+                            $itype,
+                            $itype,
+                        ) = transmute(*ptr);
+                        (func)(hooks, inprocess_get_state::<S>(), id, v0, v1);
+                    }
+                    Hook::Closure(ptr) => {
+                        let func: &mut Box<
+                            dyn FnMut(
+                                &mut QemuHooks<'_, I, QT, S>,
+                                Option<&mut S>,
+                                u64,
+                                $itype,
+                                $itype,
+                            ),
+                        > = transmute(ptr);
+                        (func)(hooks, inprocess_get_state::<S>(), id, v0, v1);
+                    }
+                    _ => (),
                 }
-                Hook::Closure(ptr) => {
-                    let mut func: Box<
-                        dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u64, u64),
-                    > = transmute(*ptr);
-                    (func)(&emulator, helpers, inprocess_get_state::<S>(), id, v0, v1);
-
-                    // Forget the closure so that drop is not called on captured variables.
-                    core::mem::forget(func);
-                }
-                _ => (),
             }
         }
-    }
+    };
 }
+
+define_cmp_exec_hook!(exec_cmp1_hook_wrapper, 1, u8);
+define_cmp_exec_hook!(exec_cmp2_hook_wrapper, 2, u16);
+define_cmp_exec_hook!(exec_cmp4_hook_wrapper, 3, u32);
+define_cmp_exec_hook!(exec_cmp8_hook_wrapper, 4, u64);
 
 static mut ON_THREAD_HOOKS: Vec<Hook> = vec![];
 extern "C" fn on_thread_hooks_wrapper<I, QT, S>(tid: u32)
@@ -814,43 +432,27 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let emu = Emulator::new_empty();
         for hook in &mut ON_THREAD_HOOKS {
             let hooks = get_qemu_hooks::<I, QT, S>();
             match hook {
                 Hook::Function(ptr) => {
-                    let func: fn(
-                        &Emulator,
-                        Pin<&mut QemuHooks<'_, I, QT, S>>,
-                        Option<&mut S>,
-                        u32,
-                    ) = transmute(*ptr);
-                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
+                    let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32) =
+                        transmute(*ptr);
+                    (func)(hooks, inprocess_get_state::<S>(), tid);
                 }
                 Hook::Closure(ptr) => {
                     let mut func: Box<
-                        dyn FnMut(
-                            &Emulator,
-                            Pin<&mut QemuHooks<'_, I, QT, S>>,
-                            Option<&mut S>,
-                            u32,
-                        ),
+                        dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32),
                     > = transmute(*ptr);
-                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
+                    (func)(hooks, inprocess_get_state::<S>(), tid);
 
                     // Forget the closure so that drop is not called on captured variables.
                     core::mem::forget(func);
                 }
                 Hook::Once(ptr) => {
-                    let func: Box<
-                        dyn FnOnce(
-                            &Emulator,
-                            Pin<&mut QemuHooks<'_, I, QT, S>>,
-                            Option<&mut S>,
-                            u32,
-                        ),
-                    > = transmute(*ptr);
-                    (func)(&emu, hooks, inprocess_get_state::<S>(), tid);
+                    let func: Box<dyn FnOnce(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32)> =
+                        transmute(*ptr);
+                    (func)(hooks, inprocess_get_state::<S>(), tid);
                     *hook = Hook::Empty;
                 }
                 Hook::Empty => (),
@@ -876,16 +478,14 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
+        let hooks = get_qemu_hooks::<I, QT, S>();
         let mut res = SyscallHookResult::new(None);
         for hook in &SYSCALL_HOOKS {
             match hook {
                 Hook::Function(ptr) => {
                     #[allow(clippy::type_complexity)]
                     let func: fn(
-                        &Emulator,
-                        &mut QT,
+                        &mut QemuHooks<'_, I, QT, S>,
                         Option<&mut S>,
                         i32,
                         u64,
@@ -898,8 +498,7 @@ where
                         u64,
                     ) -> SyscallHookResult = transmute(*ptr);
                     let r = (func)(
-                        &emulator,
-                        helpers,
+                        hooks,
                         inprocess_get_state::<S>(),
                         sys_num,
                         a0,
@@ -920,8 +519,7 @@ where
                     #[allow(clippy::type_complexity)]
                     let mut func: Box<
                         dyn FnMut(
-                            &Emulator,
-                            &mut QT,
+                            &mut QemuHooks<'_, I, QT, S>,
                             Option<&mut S>,
                             i32,
                             u64,
@@ -935,8 +533,7 @@ where
                         ) -> SyscallHookResult,
                     > = transmute(*ptr);
                     let r = (func)(
-                        &emulator,
-                        helpers,
+                        hooks,
                         inprocess_get_state::<S>(),
                         sys_num,
                         a0,
@@ -982,16 +579,14 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     unsafe {
-        let helpers = get_qemu_helpers::<QT>();
-        let emulator = Emulator::new_empty();
+        let hooks = get_qemu_hooks::<I, QT, S>();
         let mut res = result;
         for hook in &SYSCALL_POST_HOOKS {
             match hook {
                 Hook::Function(ptr) => {
                     #[allow(clippy::type_complexity)]
                     let func: fn(
-                        &Emulator,
-                        &mut QT,
+                        &mut QemuHooks<'_, I, QT, S>,
                         Option<&mut S>,
                         u64,
                         i32,
@@ -1005,8 +600,7 @@ where
                         u64,
                     ) -> u64 = transmute(*ptr);
                     res = (func)(
-                        &emulator,
-                        helpers,
+                        hooks,
                         inprocess_get_state::<S>(),
                         res,
                         sys_num,
@@ -1024,8 +618,7 @@ where
                     #[allow(clippy::type_complexity)]
                     let mut func: Box<
                         dyn FnMut(
-                            &Emulator,
-                            &mut QT,
+                            &mut QemuHooks<'_, I, QT, S>,
                             Option<&mut S>,
                             u64,
                             i32,
@@ -1040,8 +633,7 @@ where
                         ) -> u64,
                     > = transmute(*ptr);
                     res = (func)(
-                        &emulator,
-                        helpers,
+                        hooks,
                         inprocess_get_state::<S>(),
                         res,
                         sys_num,
@@ -1075,7 +667,6 @@ where
     helpers: QT,
     emulator: &'a Emulator,
     phantom: PhantomData<(I, S)>,
-    _pin: PhantomPinned,
 }
 
 impl<'a, I, QT, S> Debug for QemuHooks<'a, I, QT, S>
@@ -1096,7 +687,7 @@ where
     QT: QemuHelperTuple<I, S>,
     I: Input,
 {
-    pub fn new(emulator: &'a Emulator, helpers: QT) -> Pin<Box<Self>> {
+    pub fn new(emulator: &'a Emulator, helpers: QT) -> Box<Self> {
         unsafe {
             assert!(
                 !HOOKS_IS_INITIALIZED,
@@ -1106,39 +697,32 @@ where
         }
         // re-translate blocks with hooks
         emulator.flush_jit();
-        let slf = Box::pin(Self {
+        let slf = Box::new(Self {
             emulator,
             helpers,
             phantom: PhantomData,
-            _pin: PhantomPinned,
         });
-        slf.helpers.init_hooks_all(slf.as_ref());
+        slf.helpers.init_hooks_all(&slf);
         unsafe {
-            QEMU_HELPERS_PTR = addr_of!(slf.helpers) as *const c_void;
             QEMU_HOOKS_PTR = addr_of!(*slf) as *const c_void;
         }
         slf
     }
 
     #[must_use]
-    pub fn match_helper<'b, T>(self: &'b Pin<&mut Self>) -> Option<&'b T>
+    pub fn match_helper<T>(&self) -> Option<&T>
     where
-        T: QemuHelper<I, S>,
+        T: 'static,
     {
         self.helpers.match_first_type::<T>()
     }
 
     #[must_use]
-    pub fn match_helper_mut<'b, T>(self: &'b mut Pin<&mut Self>) -> Option<&'b mut T>
+    pub fn match_helper_mut<T>(&mut self) -> Option<&mut T>
     where
-        T: QemuHelper<I, S>,
+        T: 'static,
     {
-        unsafe {
-            self.as_mut()
-                .get_unchecked_mut()
-                .helpers
-                .match_first_type_mut::<T>()
-        }
+        self.helpers.match_first_type_mut::<T>()
     }
 
     pub fn emulator(&self) -> &Emulator {
@@ -1153,403 +737,689 @@ where
         &mut self.helpers
     }
 
-    pub fn edge_generation(
+    pub fn instruction(
         &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, src: u64, dest: u64) -> Option<u64>,
+        addr: GuestAddr,
+        hook: fn(&mut Self, Option<&mut S>, GuestAddr),
+        invalidate_block: bool,
     ) {
         unsafe {
-            GEN_EDGE_HOOK = Hook::Function(hook as *const libc::c_void);
+            let index = GENERIC_HOOKS.len();
+            self.emulator.set_hook(
+                addr,
+                generic_hook_wrapper::<I, QT, S>,
+                index as u64,
+                invalidate_block,
+            );
+            GENERIC_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
-        self.emulator
-            .set_gen_edge_hook(gen_edge_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn edge_generation_closure(
+    pub unsafe fn instruction_closure(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u64) -> Option<u64>>,
+        addr: GuestAddr,
+        hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr)>,
+        invalidate_block: bool,
+    ) {
+        let index = GENERIC_HOOKS.len();
+        self.emulator.set_hook(
+            addr,
+            generic_hook_wrapper::<I, QT, S>,
+            index as u64,
+            invalidate_block,
+        );
+        GENERIC_HOOKS.push(Hook::Closure(transmute(hook)));
+    }
+
+    pub fn edges(
+        &self,
+        generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, src: GuestAddr, dest: GuestAddr) -> Option<u64>,
+        >,
+        execution_hook: Option<fn(&mut Self, Option<&mut S>, id: u64)>,
     ) {
         unsafe {
-            GEN_EDGE_HOOK = Hook::Closure(transmute(hook));
+            let index = EDGE_HOOKS.len();
+            self.emulator.add_edge_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_edge_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook.is_none() {
+                    None
+                } else {
+                    Some(exec_edge_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            EDGE_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+            ));
         }
-        self.emulator
-            .set_gen_edge_hook(gen_edge_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn edge_execution(&self, hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64)) {
-        unsafe {
-            EDGE_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_edge_hook(edge_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn edge_execution_closure(
+    pub unsafe fn edges_closures(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64)>,
+        generation_hook: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, GuestAddr) -> Option<u64>>,
+        >,
+        execution_hook: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>>,
+    ) {
+        let index = EDGE_HOOKS.len();
+        self.emulator.add_edge_hooks(
+            if generation_hook.is_none() {
+                None
+            } else {
+                Some(gen_edge_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook.is_none() {
+                None
+            } else {
+                Some(exec_edge_hook_wrapper::<I, QT, S>)
+            },
+            index as u64,
+        );
+        EDGE_HOOKS.push((
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+        ));
+    }
+
+    pub fn edges_raw(
+        &self,
+        generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, src: GuestAddr, dest: GuestAddr) -> Option<u64>,
+        >,
+        execution_hook: Option<extern "C" fn(id: u64, data: u64)>,
     ) {
         unsafe {
-            EDGE_HOOKS.push(Hook::Closure(transmute(hook)));
+            let index = EDGE_HOOKS.len();
+            self.emulator.add_edge_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_edge_hook_wrapper::<I, QT, S>)
+                },
+                execution_hook,
+                index as u64,
+            );
+            EDGE_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                Hook::Empty,
+            ));
         }
-        self.emulator
-            .set_exec_edge_hook(edge_hooks_wrapper::<I, QT, S>);
     }
 
-    pub fn block_generation(
+    pub fn blocks(
         &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, pc: u64) -> Option<u64>,
+        generation_hook: Option<fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>>,
+        execution_hook: Option<fn(&mut Self, Option<&mut S>, id: u64)>,
     ) {
         unsafe {
-            GEN_BLOCK_HOOK = Hook::Function(hook as *const libc::c_void);
+            let index = BLOCK_HOOKS.len();
+            self.emulator.add_block_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_block_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook.is_none() {
+                    None
+                } else {
+                    Some(exec_block_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            BLOCK_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+            ));
         }
-        self.emulator
-            .set_gen_block_hook(gen_block_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn block_generation_closure(
+    pub unsafe fn blocks_closures(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64) -> Option<u64>>,
+        generation_hook: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr) -> Option<u64>>,
+        >,
+        execution_hook: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64)>>,
+    ) {
+        let index = BLOCK_HOOKS.len();
+        self.emulator.add_block_hooks(
+            if generation_hook.is_none() {
+                None
+            } else {
+                Some(gen_block_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook.is_none() {
+                None
+            } else {
+                Some(exec_block_hook_wrapper::<I, QT, S>)
+            },
+            index as u64,
+        );
+        BLOCK_HOOKS.push((
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+        ));
+    }
+
+    pub fn blocks_raw(
+        &self,
+        generation_hook: Option<fn(&mut Self, Option<&mut S>, pc: GuestAddr) -> Option<u64>>,
+        execution_hook: Option<extern "C" fn(id: u64, data: u64)>,
     ) {
         unsafe {
-            GEN_BLOCK_HOOK = Hook::Closure(transmute(hook));
+            let index = BLOCK_HOOKS.len();
+            self.emulator.add_block_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_block_hook_wrapper::<I, QT, S>)
+                },
+                execution_hook,
+                index as u64,
+            );
+            BLOCK_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                Hook::Empty,
+            ));
         }
-        self.emulator
-            .set_gen_block_hook(gen_block_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn block_execution(&self, hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64)) {
-        unsafe {
-            BLOCK_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_block_hook(block_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn block_execution_closure(
+    pub fn reads(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64)>,
+        generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+        >,
+        execution_hook1: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
+        execution_hook2: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
+        execution_hook4: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
+        execution_hook8: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
+        execution_hook_n: Option<
+            fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
+        >,
     ) {
         unsafe {
-            BLOCK_HOOKS.push(Hook::Closure(transmute(hook)));
+            let index = READ_HOOKS.len();
+            self.emulator.add_read_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_read_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook1.is_none() {
+                    None
+                } else {
+                    Some(exec_read1_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook2.is_none() {
+                    None
+                } else {
+                    Some(exec_read2_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook4.is_none() {
+                    None
+                } else {
+                    Some(exec_read4_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook8.is_none() {
+                    None
+                } else {
+                    Some(exec_read8_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook_n.is_none() {
+                    None
+                } else {
+                    Some(exec_read_n_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            READ_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook1.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook2.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook4.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook8.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook_n.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+            ));
         }
-        self.emulator
-            .set_exec_block_hook(block_hooks_wrapper::<I, QT, S>);
     }
 
-    pub fn read_generation(
+    pub unsafe fn reads_closures(
         &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, size: usize) -> Option<u64>,
+        generation_hook: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
+        >,
+        execution_hook1: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook2: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook4: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook8: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook_n: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
+        >,
+    ) {
+        let index = READ_HOOKS.len();
+        self.emulator.add_read_hooks(
+            if generation_hook.is_none() {
+                None
+            } else {
+                Some(gen_read_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook1.is_none() {
+                None
+            } else {
+                Some(exec_read1_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook2.is_none() {
+                None
+            } else {
+                Some(exec_read2_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook4.is_none() {
+                None
+            } else {
+                Some(exec_read4_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook8.is_none() {
+                None
+            } else {
+                Some(exec_read8_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook_n.is_none() {
+                None
+            } else {
+                Some(exec_read_n_hook_wrapper::<I, QT, S>)
+            },
+            index as u64,
+        );
+        READ_HOOKS.push((
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook1.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook2.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook4.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook8.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook_n.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+        ));
+    }
+
+    pub fn reads_raw(
+        &self,
+        generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+        >,
+        execution_hook1: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
+        execution_hook2: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
+        execution_hook4: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
+        execution_hook8: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
+        execution_hook_n: Option<extern "C" fn(id: u64, addr: GuestAddr, size: usize, data: u64)>,
     ) {
         unsafe {
-            GEN_READ_HOOK = Hook::Function(hook as *const libc::c_void);
+            let index = READ_HOOKS.len();
+            self.emulator.add_read_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_read_hook_wrapper::<I, QT, S>)
+                },
+                execution_hook1,
+                execution_hook2,
+                execution_hook4,
+                execution_hook8,
+                execution_hook_n,
+                index as u64,
+            );
+            READ_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                Hook::Empty,
+                Hook::Empty,
+                Hook::Empty,
+                Hook::Empty,
+                Hook::Empty,
+            ));
         }
-        self.emulator
-            .set_gen_read_hook(gen_read_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn read_generation_closure(
+    pub fn writes(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, usize) -> Option<u64>>,
+        generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+        >,
+        execution_hook1: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
+        execution_hook2: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
+        execution_hook4: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
+        execution_hook8: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
+        execution_hook_n: Option<
+            fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr, size: usize),
+        >,
     ) {
         unsafe {
-            GEN_READ_HOOK = Hook::Closure(transmute(hook));
+            let index = WRITE_HOOKS.len();
+            self.emulator.add_write_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_write_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook1.is_none() {
+                    None
+                } else {
+                    Some(exec_write1_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook2.is_none() {
+                    None
+                } else {
+                    Some(exec_write2_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook4.is_none() {
+                    None
+                } else {
+                    Some(exec_write4_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook8.is_none() {
+                    None
+                } else {
+                    Some(exec_write8_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook_n.is_none() {
+                    None
+                } else {
+                    Some(exec_write_n_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            WRITE_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook1.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook2.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook4.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook8.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook_n.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+            ));
         }
-        self.emulator
-            .set_gen_read_hook(gen_read_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn read1_execution(&self, hook: FixedLenHookFn<QT, S>) {
-        unsafe {
-            READ1_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_read1_hook(read1_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read1_execution_closure(&self, hook: FixedLenHookCl<QT, S>) {
-        unsafe {
-            READ1_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_read1_hook(read1_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read2_execution(&self, hook: FixedLenHookFn<QT, S>) {
-        unsafe {
-            READ2_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_read2_hook(read2_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read2_execution_closure(&self, hook: FixedLenHookCl<QT, S>) {
-        unsafe {
-            READ2_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_read2_hook(read2_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read4_execution(&self, hook: FixedLenHookFn<QT, S>) {
-        unsafe {
-            READ4_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_read4_hook(read4_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read4_execution_closure(&self, hook: FixedLenHookCl<QT, S>) {
-        unsafe {
-            READ4_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_read4_hook(read4_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read8_execution(&self, hook: FixedLenHookFn<QT, S>) {
-        unsafe {
-            READ8_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_read8_hook(read8_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read8_execution_closure(&self, hook: FixedLenHookCl<QT, S>) {
-        unsafe {
-            READ8_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_read8_hook(read8_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read_n_execution(&self, hook: DynamicLenHookFn<QT, S>) {
-        unsafe {
-            READ_N_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_read_n_hook(read_n_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn read_n_execution_closure(&self, hook: DynamicLenHookCl<QT, S>) {
-        unsafe {
-            READ_N_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_read_n_hook(read_n_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write_generation(
+    pub unsafe fn writes_closures(
         &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, size: usize) -> Option<u64>,
+        generation_hook: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
+        >,
+        execution_hook1: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook2: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook4: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook8: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
+        execution_hook_n: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr, usize)>,
+        >,
+    ) {
+        let index = WRITE_HOOKS.len();
+        self.emulator.add_write_hooks(
+            if generation_hook.is_none() {
+                None
+            } else {
+                Some(gen_write_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook1.is_none() {
+                None
+            } else {
+                Some(exec_write1_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook2.is_none() {
+                None
+            } else {
+                Some(exec_write2_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook4.is_none() {
+                None
+            } else {
+                Some(exec_write4_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook8.is_none() {
+                None
+            } else {
+                Some(exec_write8_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook_n.is_none() {
+                None
+            } else {
+                Some(exec_write_n_hook_wrapper::<I, QT, S>)
+            },
+            index as u64,
+        );
+        WRITE_HOOKS.push((
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook1.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook2.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook4.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook8.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook_n.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+        ));
+    }
+
+    pub fn writes_raw(
+        &self,
+        generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+        >,
+        execution_hook1: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
+        execution_hook2: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
+        execution_hook4: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
+        execution_hook8: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
+        execution_hook_n: Option<extern "C" fn(id: u64, addr: GuestAddr, size: usize, data: u64)>,
     ) {
         unsafe {
-            GEN_WRITE_HOOK = Hook::Function(hook as *const libc::c_void);
+            let index = WRITE_HOOKS.len();
+            self.emulator.add_write_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_write_hook_wrapper::<I, QT, S>)
+                },
+                execution_hook1,
+                execution_hook2,
+                execution_hook4,
+                execution_hook8,
+                execution_hook_n,
+                index as u64,
+            );
+            WRITE_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                Hook::Empty,
+                Hook::Empty,
+                Hook::Empty,
+                Hook::Empty,
+                Hook::Empty,
+            ));
         }
-        self.emulator
-            .set_gen_write_hook(gen_write_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn write_generation_closure(
+    pub fn cmps(
         &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, usize) -> Option<u64>>,
+        generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+        >,
+        execution_hook1: Option<fn(&mut Self, Option<&mut S>, id: u64, v0: u8, v1: u8)>,
+        execution_hook2: Option<fn(&mut Self, Option<&mut S>, id: u64, v0: u16, v1: u16)>,
+        execution_hook4: Option<fn(&mut Self, Option<&mut S>, id: u64, v0: u32, v1: u32)>,
+        execution_hook8: Option<fn(&mut Self, Option<&mut S>, id: u64, v0: u64, v1: u64)>,
     ) {
         unsafe {
-            GEN_WRITE_HOOK = Hook::Closure(transmute(hook));
+            let index = CMP_HOOKS.len();
+            self.emulator.add_cmp_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_cmp_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook1.is_none() {
+                    None
+                } else {
+                    Some(exec_cmp1_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook2.is_none() {
+                    None
+                } else {
+                    Some(exec_cmp2_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook4.is_none() {
+                    None
+                } else {
+                    Some(exec_cmp4_hook_wrapper::<I, QT, S>)
+                },
+                if execution_hook8.is_none() {
+                    None
+                } else {
+                    Some(exec_cmp8_hook_wrapper::<I, QT, S>)
+                },
+                index as u64,
+            );
+            CMP_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook1.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook2.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook4.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                execution_hook8.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+            ));
         }
-        self.emulator
-            .set_gen_write_hook(gen_write_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn write1_execution(&self, hook: FixedLenHookFn<QT, S>) {
-        unsafe {
-            WRITE1_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_write1_hook(write1_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write1_execution_closure(&self, hook: FixedLenHookCl<QT, S>) {
-        unsafe {
-            WRITE1_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_write1_hook(write1_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write2_execution(&self, hook: FixedLenHookFn<QT, S>) {
-        unsafe {
-            WRITE2_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_write2_hook(write2_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write2_execution_closure(&self, hook: FixedLenHookCl<QT, S>) {
-        unsafe {
-            WRITE2_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_write2_hook(write2_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write4_execution(&self, hook: FixedLenHookFn<QT, S>) {
-        unsafe {
-            WRITE4_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_write4_hook(write4_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write4_execution_closure(&self, hook: FixedLenHookCl<QT, S>) {
-        unsafe {
-            WRITE4_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_write4_hook(write4_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write8_execution(&self, hook: FixedLenHookFn<QT, S>) {
-        unsafe {
-            WRITE8_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_write8_hook(write8_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write8_execution_closure(&self, hook: FixedLenHookCl<QT, S>) {
-        unsafe {
-            WRITE8_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_write8_hook(write8_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write_n_execution(&self, hook: DynamicLenHookFn<QT, S>) {
-        unsafe {
-            WRITE_N_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_write_n_hook(write_n_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn write_n_execution_closure(&self, hook: DynamicLenHookCl<QT, S>) {
-        unsafe {
-            WRITE_N_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_write_n_hook(write_n_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp_generation(
+    pub unsafe fn cmps_closures(
         &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, pc: u64, size: usize) -> Option<u64>,
+        generation_hook: Option<
+            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
+        >,
+        execution_hook1: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u8, u8)>>,
+        execution_hook2: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u16, u16)>>,
+        execution_hook4: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u32, u32)>>,
+        execution_hook8: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, u64, u64)>>,
+    ) {
+        let index = CMP_HOOKS.len();
+        self.emulator.add_cmp_hooks(
+            if generation_hook.is_none() {
+                None
+            } else {
+                Some(gen_cmp_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook1.is_none() {
+                None
+            } else {
+                Some(exec_cmp1_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook2.is_none() {
+                None
+            } else {
+                Some(exec_cmp2_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook4.is_none() {
+                None
+            } else {
+                Some(exec_cmp4_hook_wrapper::<I, QT, S>)
+            },
+            if execution_hook8.is_none() {
+                None
+            } else {
+                Some(exec_cmp8_hook_wrapper::<I, QT, S>)
+            },
+            index as u64,
+        );
+        CMP_HOOKS.push((
+            generation_hook.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook1.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook2.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook4.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+            execution_hook8.map_or(Hook::Empty, |hook| Hook::Closure(transmute(hook))),
+        ));
+    }
+
+    pub fn cmps_raw(
+        &self,
+        generation_hook: Option<
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+        >,
+        execution_hook1: Option<extern "C" fn(id: u64, v0: u8, v1: u8, data: u64)>,
+        execution_hook2: Option<extern "C" fn(id: u64, v0: u16, v1: u16, data: u64)>,
+        execution_hook4: Option<extern "C" fn(id: u64, v0: u32, v1: u32, data: u64)>,
+        execution_hook8: Option<extern "C" fn(id: u64, v0: u64, v1: u64, data: u64)>,
     ) {
         unsafe {
-            GEN_CMP_HOOK = Hook::Function(hook as *const libc::c_void);
+            let index = CMP_HOOKS.len();
+            self.emulator.add_cmp_hooks(
+                if generation_hook.is_none() {
+                    None
+                } else {
+                    Some(gen_cmp_hook_wrapper::<I, QT, S>)
+                },
+                execution_hook1,
+                execution_hook2,
+                execution_hook4,
+                execution_hook8,
+                index as u64,
+            );
+            CMP_HOOKS.push((
+                generation_hook.map_or(Hook::Empty, |hook| {
+                    Hook::Function(hook as *const libc::c_void)
+                }),
+                Hook::Empty,
+                Hook::Empty,
+                Hook::Empty,
+                Hook::Empty,
+            ));
         }
-        self.emulator
-            .set_gen_cmp_hook(gen_cmp_hook_wrapper::<I, QT, S>);
     }
 
-    pub fn cmp_generation_closure(
-        &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, usize) -> Option<u64>>,
-    ) {
-        unsafe {
-            GEN_CMP_HOOK = Hook::Closure(transmute(hook));
-        }
-        self.emulator
-            .set_gen_cmp_hook(gen_cmp_hook_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp1_execution(
-        &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64, v0: u8, v1: u8),
-    ) {
-        unsafe {
-            CMP1_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_cmp1_hook(cmp1_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp1_execution_closure(
-        &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u8, u8)>,
-    ) {
-        unsafe {
-            CMP1_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_cmp1_hook(cmp1_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp2_execution(
-        &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64, v0: u16, v1: u16),
-    ) {
-        unsafe {
-            CMP2_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_cmp2_hook(cmp2_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp2_execution_closure(
-        &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u16, u16)>,
-    ) {
-        unsafe {
-            CMP2_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_cmp2_hook(cmp2_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp4_execution(
-        &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64, v0: u32, v1: u32),
-    ) {
-        unsafe {
-            CMP4_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_cmp4_hook(cmp4_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp4_execution_closure(
-        &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u32, u32)>,
-    ) {
-        unsafe {
-            CMP4_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_cmp4_hook(cmp4_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp8_execution(
-        &self,
-        hook: fn(&Emulator, &mut QT, Option<&mut S>, id: u64, v0: u64, v1: u64),
-    ) {
-        unsafe {
-            CMP8_HOOKS.push(Hook::Function(hook as *const libc::c_void));
-        }
-        self.emulator
-            .set_exec_cmp8_hook(cmp8_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn cmp8_execution_closure(
-        &self,
-        hook: Box<dyn FnMut(&Emulator, &mut QT, Option<&mut S>, u64, u64, u64)>,
-    ) {
-        unsafe {
-            CMP8_HOOKS.push(Hook::Closure(transmute(hook)));
-        }
-        self.emulator
-            .set_exec_cmp8_hook(cmp8_hooks_wrapper::<I, QT, S>);
-    }
-
-    pub fn thread_creation(&self, hook: fn(&Emulator, Pin<&mut Self>, Option<&mut S>, tid: u32)) {
+    pub fn thread_creation(&self, hook: fn(&mut Self, Option<&mut S>, tid: u32)) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
@@ -1559,7 +1429,7 @@ where
 
     pub fn thread_creation_closure(
         &self,
-        hook: Box<dyn FnMut(&Emulator, Pin<&mut Self>, Option<&mut S>, u32) + 'a>,
+        hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u32) + 'a>,
     ) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Closure(transmute(hook)));
@@ -1568,10 +1438,7 @@ where
             .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
     }
 
-    pub fn thread_creation_once(
-        &self,
-        hook: Box<dyn FnOnce(&Emulator, Pin<&mut Self>, Option<&mut S>, u32) + 'a>,
-    ) {
+    pub fn thread_creation_once(&self, hook: Box<dyn FnOnce(&mut Self, Option<&mut S>, u32) + 'a>) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Once(transmute(hook)));
         }
@@ -1583,8 +1450,7 @@ where
     pub fn syscalls(
         &self,
         hook: fn(
-            &Emulator,
-            &mut QT,
+            &mut Self,
             Option<&mut S>,
             sys_num: i32,
             u64,
@@ -1609,8 +1475,7 @@ where
         &self,
         hook: Box<
             dyn FnMut(
-                &Emulator,
-                &mut QT,
+                &mut Self,
                 Option<&mut S>,
                 i32,
                 u64,
@@ -1635,8 +1500,7 @@ where
     pub fn after_syscalls(
         &self,
         hook: fn(
-            &Emulator,
-            &mut QT,
+            &mut Self,
             Option<&mut S>,
             result: u64,
             sys_num: i32,
@@ -1662,8 +1526,7 @@ where
         &self,
         hook: Box<
             dyn FnMut(
-                &Emulator,
-                &mut QT,
+                &mut Self,
                 Option<&mut S>,
                 u64,
                 i32,

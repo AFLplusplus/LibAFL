@@ -198,7 +198,7 @@ where
         iters: u64,
     ) -> Result<usize, Error> {
         if iters == 0 {
-            return Err(Error::IllegalArgument(
+            return Err(Error::illegal_argument(
                 "Cannot fuzz for 0 iterations!".to_string(),
             ));
         }
@@ -222,7 +222,7 @@ where
 }
 
 /// The corpus this input should be added to
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExecuteInputResult {
     /// No special input
     None,
@@ -669,197 +669,105 @@ where
 }
 
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 /// `Fuzzer` Python bindings
 pub mod pybind {
-    use crate::feedbacks::{CrashFeedback, MaxMapFeedback};
-    use crate::fuzzer::{Fuzzer, StdFuzzer};
+    use crate::bolts::ownedref::OwnedPtrMut;
+    use crate::events::pybind::PythonEventManager;
+    use crate::executors::pybind::PythonExecutor;
+    use crate::feedbacks::pybind::PythonFeedback;
+    use crate::fuzzer::{Evaluator, Fuzzer, StdFuzzer};
     use crate::inputs::BytesInput;
+    use crate::observers::pybind::PythonObserversTuple;
     use crate::schedulers::QueueScheduler;
+    use crate::stages::pybind::PythonStagesTuple;
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use alloc::{boxed::Box, vec::Vec};
     use pyo3::prelude::*;
 
-    macro_rules! define_python_fuzzer {
-        ($type_name:ident, $struct_name:ident, $py_name:tt, $datatype:ty, $my_std_state_type_name: ident, $std_state_name: ident,
-            $event_manager_name: ident, $map_observer_name: ident, $max_map_feedback_py_name: ident, $executor_name: ident, $stage_tuple_name: ident) => {
-            use crate::events::pybind::$event_manager_name;
-            use crate::executors::pybind::$executor_name;
-            use crate::feedbacks::map::pybind::$max_map_feedback_py_name;
-            use crate::observers::map::pybind::$map_observer_name;
-            use crate::stages::owned::pybind::$stage_tuple_name;
-            use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
+    /// `StdFuzzer` with fixed generics
+    pub type PythonStdFuzzer = StdFuzzer<
+        QueueScheduler,
+        PythonFeedback,
+        BytesInput,
+        PythonFeedback,
+        PythonObserversTuple,
+        PythonStdState,
+    >;
 
-            /// `StdFuzzer` with fixed generics
-            pub type $type_name = StdFuzzer<
-                QueueScheduler,
-                MaxMapFeedback<BytesInput, $map_observer_name, $my_std_state_type_name, $datatype>,
-                BytesInput,
-                CrashFeedback,
-                ($map_observer_name, ()),
-                $my_std_state_type_name,
-            >;
-            /// Python class for StdFuzzer
-            #[pyclass(unsendable, name = $py_name)]
-            #[derive(Debug)]
-            pub struct $struct_name {
-                /// Rust wrapped StdFuzzer object
-                pub std_fuzzer: $type_name,
-            }
-
-            #[pymethods]
-            impl $struct_name {
-                #[new]
-                fn new(py_max_map_feedback: $max_map_feedback_py_name) -> Self {
-                    Self {
-                        std_fuzzer: StdFuzzer::new(
-                            QueueScheduler::new(),
-                            py_max_map_feedback.max_map_feedback,
-                            CrashFeedback::new(),
-                        ),
-                    }
-                }
-
-                fn fuzz_loop(
-                    &mut self,
-                    py_executor: &mut $executor_name,
-                    py_state: &mut $std_state_name,
-                    py_mgr: &mut $event_manager_name,
-                    stage_tuple: &mut $stage_tuple_name,
-                ) {
-                    self.std_fuzzer
-                        .fuzz_loop(
-                            &mut stage_tuple.stages_owned_list,
-                            py_executor,
-                            &mut py_state.std_state,
-                            py_mgr,
-                        )
-                        .expect("Failed to generate the initial corpus".into());
-                }
-            }
-        };
+    /// Python class for StdFuzzer
+    #[pyclass(unsendable, name = "StdFuzzer")]
+    #[derive(Debug)]
+    pub struct PythonStdFuzzerWrapper {
+        /// Rust wrapped StdFuzzer object
+        pub inner: OwnedPtrMut<PythonStdFuzzer>,
     }
 
-    define_python_fuzzer!(
-        MyStdFuzzerI8,
-        PythonStdFuzzerI8,
-        "StdFuzzerI8",
-        i8,
-        MyStdStateI8,
-        PythonStdStateI8,
-        PythonEventManagerI8,
-        PythonMapObserverI8,
-        PythonMaxMapFeedbackI8,
-        PythonExecutorI8,
-        PythonStagesOwnedListI8
-    );
+    impl PythonStdFuzzerWrapper {
+        pub fn wrap(r: &mut PythonStdFuzzer) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
 
-    define_python_fuzzer!(
-        MyStdFuzzerI16,
-        PythonStdFuzzerI16,
-        "StdFuzzerI16",
-        i16,
-        MyStdStateI16,
-        PythonStdStateI16,
-        PythonEventManagerI16,
-        PythonMapObserverI16,
-        PythonMaxMapFeedbackI16,
-        PythonExecutorI16,
-        PythonStagesOwnedListI16
-    );
+        #[must_use]
+        pub fn unwrap(&self) -> &PythonStdFuzzer {
+            self.inner.as_ref()
+        }
 
-    define_python_fuzzer!(
-        MyStdFuzzerI32,
-        PythonStdFuzzerI32,
-        "StdFuzzerI32",
-        i32,
-        MyStdStateI32,
-        PythonStdStateI32,
-        PythonEventManagerI32,
-        PythonMapObserverI32,
-        PythonMaxMapFeedbackI32,
-        PythonExecutorI32,
-        PythonStagesOwnedListI32
-    );
+        pub fn unwrap_mut(&mut self) -> &mut PythonStdFuzzer {
+            self.inner.as_mut()
+        }
+    }
 
-    define_python_fuzzer!(
-        MyStdFuzzerI64,
-        PythonStdFuzzerI64,
-        "StdFuzzerI64",
-        i64,
-        MyStdStateI64,
-        PythonStdStateI64,
-        PythonEventManagerI64,
-        PythonMapObserverI64,
-        PythonMaxMapFeedbackI64,
-        PythonExecutorI64,
-        PythonStagesOwnedListI64
-    );
+    #[pymethods]
+    impl PythonStdFuzzerWrapper {
+        #[new]
+        fn new(py_feedback: PythonFeedback, py_objective: PythonFeedback) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(StdFuzzer::new(
+                    QueueScheduler::new(),
+                    py_feedback,
+                    py_objective,
+                ))),
+            }
+        }
 
-    define_python_fuzzer!(
-        MyStdFuzzerU8,
-        PythonStdFuzzerU8,
-        "StdFuzzerU8",
-        u8,
-        MyStdStateU8,
-        PythonStdStateU8,
-        PythonEventManagerU8,
-        PythonMapObserverU8,
-        PythonMaxMapFeedbackU8,
-        PythonExecutorU8,
-        PythonStagesOwnedListU8
-    );
+        fn add_input(
+            &mut self,
+            py_state: &mut PythonStdStateWrapper,
+            py_executor: &mut PythonExecutor,
+            py_mgr: &mut PythonEventManager,
+            input: Vec<u8>,
+        ) -> usize {
+            self.inner
+                .as_mut()
+                .add_input(
+                    py_state.unwrap_mut(),
+                    py_executor,
+                    py_mgr,
+                    BytesInput::new(input),
+                )
+                .expect("Failed to add input")
+        }
 
-    define_python_fuzzer!(
-        MyStdFuzzerU16,
-        PythonStdFuzzerU16,
-        "StdFuzzerU16",
-        u16,
-        MyStdStateU16,
-        PythonStdStateU16,
-        PythonEventManagerU16,
-        PythonMapObserverU16,
-        PythonMaxMapFeedbackU16,
-        PythonExecutorU16,
-        PythonStagesOwnedListU16
-    );
-
-    define_python_fuzzer!(
-        MyStdFuzzerU32,
-        PythonStdFuzzerU32,
-        "StdFuzzerU32",
-        u32,
-        MyStdStateU32,
-        PythonStdStateU32,
-        PythonEventManagerU32,
-        PythonMapObserverU32,
-        PythonMaxMapFeedbackU32,
-        PythonExecutorU32,
-        PythonStagesOwnedListU32
-    );
-
-    define_python_fuzzer!(
-        MyStdFuzzerU64,
-        PythonStdFuzzerU64,
-        "StdFuzzerU64",
-        u64,
-        MyStdStateU64,
-        PythonStdStateU64,
-        PythonEventManagerU64,
-        PythonMapObserverU64,
-        PythonMaxMapFeedbackU64,
-        PythonExecutorU64,
-        PythonStagesOwnedListU64
-    );
+        fn fuzz_loop(
+            &mut self,
+            py_executor: &mut PythonExecutor,
+            py_state: &mut PythonStdStateWrapper,
+            py_mgr: &mut PythonEventManager,
+            stages_tuple: &mut PythonStagesTuple,
+        ) {
+            self.inner
+                .as_mut()
+                .fuzz_loop(stages_tuple, py_executor, py_state.unwrap_mut(), py_mgr)
+                .expect("Failed to generate the initial corpus");
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonStdFuzzerI8>()?;
-        m.add_class::<PythonStdFuzzerI16>()?;
-        m.add_class::<PythonStdFuzzerI32>()?;
-        m.add_class::<PythonStdFuzzerI64>()?;
-
-        m.add_class::<PythonStdFuzzerU8>()?;
-        m.add_class::<PythonStdFuzzerU16>()?;
-        m.add_class::<PythonStdFuzzerU32>()?;
-        m.add_class::<PythonStdFuzzerU64>()?;
+        m.add_class::<PythonStdFuzzerWrapper>()?;
         Ok(())
     }
 }

@@ -18,12 +18,14 @@ use core::{
 };
 
 use alloc::boxed::Box;
+#[cfg(all(unix, feature = "std"))]
+use alloc::vec::Vec;
 
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
 
 #[cfg(all(feature = "std", unix))]
-use libc::{siginfo_t, ucontext_t};
+use libc::siginfo_t;
 
 #[cfg(all(feature = "std", unix))]
 use nix::{
@@ -42,7 +44,7 @@ use crate::bolts::shmem::ShMemProvider;
 use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(all(feature = "std", unix))]
-use crate::bolts::os::unix_signals::{Handler, Signal};
+use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
 
 use crate::{
     events::{EventFirer, EventRestarter},
@@ -384,15 +386,18 @@ impl InProcessHandlers {
 
 /// The global state of the in-process harness.
 #[derive(Debug)]
-#[allow(missing_docs)]
-pub struct InProcessExecutorHandlerData {
-    pub state_ptr: *mut c_void,
-    pub event_mgr_ptr: *mut c_void,
-    pub fuzzer_ptr: *mut c_void,
-    pub executor_ptr: *const c_void,
+pub(crate) struct InProcessExecutorHandlerData {
+    state_ptr: *mut c_void,
+    event_mgr_ptr: *mut c_void,
+    fuzzer_ptr: *mut c_void,
+    executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
-    pub crash_handler: *const c_void,
-    pub timeout_handler: *const c_void,
+    /// The timeout handler
+    #[allow(unused)] // for no_std
+    crash_handler: *const c_void,
+    /// The timeout handler
+    #[allow(unused)] // for no_std
+    timeout_handler: *const c_void,
     #[cfg(windows)]
     pub tp_timer: *mut c_void,
     #[cfg(windows)]
@@ -446,7 +451,7 @@ impl InProcessExecutorHandlerData {
 }
 
 /// Exception handling needs some nasty unsafe.
-pub static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
+pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
     /// The state ptr for signal handling
     state_ptr: ptr::null_mut(),
     /// The event manager ptr for signal handling
@@ -504,6 +509,8 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
 #[cfg(unix)]
 mod unix_signal_handler {
     use alloc::vec::Vec;
+    #[cfg(feature = "std")]
+    use alloc::{boxed::Box, string::String};
     use core::mem::transmute;
     use libc::siginfo_t;
     #[cfg(feature = "std")]
@@ -527,7 +534,7 @@ mod unix_signal_handler {
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
-    pub type HandlerFuncPtr =
+    pub(crate) type HandlerFuncPtr =
         unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessExecutorHandlerData);
 
     /// A handler that does nothing.
@@ -649,7 +656,7 @@ mod unix_signal_handler {
     }
 
     #[cfg(unix)]
-    pub unsafe fn inproc_timeout_handler<E, EM, I, OF, OT, S, Z>(
+    pub(crate) unsafe fn inproc_timeout_handler<E, EM, I, OF, OT, S, Z>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -729,7 +736,7 @@ mod unix_signal_handler {
     /// Will be used for signal handling.
     /// It will store the current State to shmem, then exit.
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
+    pub(crate) unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
         signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -851,6 +858,9 @@ mod unix_signal_handler {
 
 #[cfg(all(windows, feature = "std"))]
 mod windows_exception_handler {
+    #[cfg(feature = "std")]
+    use alloc::boxed::Box;
+    use alloc::string::String;
     use alloc::vec::Vec;
     use core::ffi::c_void;
     use core::{mem::transmute, ptr};
@@ -880,7 +890,8 @@ mod windows_exception_handler {
     use core::sync::atomic::{compiler_fence, Ordering};
     use windows::Win32::System::Threading::ExitProcess;
 
-    pub type HandlerFuncPtr = unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+    pub(crate) type HandlerFuncPtr =
+        unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
 
     /*pub unsafe fn nop_handler(
         _code: ExceptionCode,
@@ -1085,12 +1096,6 @@ mod windows_exception_handler {
                 compiler_fence(Ordering::SeqCst);
 
                 ExitProcess(1);
-
-                LeaveCriticalSection(
-                    (data.critical as *mut RTL_CRITICAL_SECTION)
-                        .as_mut()
-                        .unwrap(),
-                );
             }
         }
         compiler_fence(Ordering::SeqCst);
@@ -1104,7 +1109,7 @@ mod windows_exception_handler {
     }
 
     #[allow(clippy::too_many_lines)]
-    pub unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
+    pub(crate) unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
@@ -1244,7 +1249,7 @@ mod windows_exception_handler {
 
 /// The signature of the crash handler function
 #[cfg(all(feature = "std", unix))]
-pub type ForkHandlerFuncPtr =
+pub(crate) type ForkHandlerFuncPtr =
     unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut InProcessForkExecutorGlobalData);
 
 /// The inmem fork executor's handlers.
@@ -1306,7 +1311,7 @@ impl InChildProcessHandlers {
 /// The global state of the in-process-fork harness.
 #[cfg(all(feature = "std", unix))]
 #[derive(Debug)]
-pub struct InProcessForkExecutorGlobalData {
+pub(crate) struct InProcessForkExecutorGlobalData {
     /// Stores a pointer to the fork executor struct
     pub executor_ptr: *const c_void,
     /// Stores a pointer to the state
@@ -1349,7 +1354,7 @@ impl InProcessForkExecutorGlobalData {
 
 /// a static variable storing the global state
 #[cfg(all(feature = "std", unix))]
-pub static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
+pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
     InProcessForkExecutorGlobalData {
         executor_ptr: ptr::null(),
         crash_handler: ptr::null(),
@@ -1469,6 +1474,14 @@ where
 
                     match res {
                         WaitStatus::Signaled(_, _, _) => Ok(ExitKind::Crash),
+                        WaitStatus::Exited(_, code) => {
+                            if code > 128 && code < 160 {
+                                // Signal exit codes
+                                Ok(ExitKind::Crash)
+                            } else {
+                                Ok(ExitKind::Ok)
+                            }
+                        }
                         _ => Ok(ExitKind::Ok),
                     }
                 }
@@ -1546,14 +1559,15 @@ where
 /// signal handlers and `panic_hooks` for the child process
 #[cfg(all(feature = "std", unix))]
 pub mod child_signal_handlers {
-    use libc::{siginfo_t, ucontext_t};
+    use alloc::boxed::Box;
+    use libc::siginfo_t;
     use std::panic;
 
     use super::InProcessForkExecutorGlobalData;
 
     use super::FORK_EXECUTOR_GLOBAL_DATA;
     use crate::{
-        bolts::os::unix_signals::Signal,
+        bolts::os::unix_signals::{ucontext_t, Signal},
         executors::{ExitKind, HasObservers},
         inputs::Input,
         observers::ObserversTuple,
@@ -1580,7 +1594,8 @@ pub mod child_signal_handlers {
                     .post_exec_child_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
 
-                std::process::abort();
+                // std::process::abort();
+                unsafe { libc::_exit(128 + 6) }; // ABORT exit code
             }
         }));
     }
@@ -1591,7 +1606,7 @@ pub mod child_signal_handlers {
     /// The function should only be called from a child crash handler.
     /// It will dereference the `data` pointer and assume it's valid.
     #[cfg(unix)]
-    pub unsafe fn child_crash_handler<E, I, OT, S>(
+    pub(crate) unsafe fn child_crash_handler<E, I, OT, S>(
         _signal: Signal,
         _info: siginfo_t,
         _context: &mut ucontext_t,
@@ -1611,13 +1626,14 @@ pub mod child_signal_handlers {
                 .expect("Failed to run post_exec on observers");
         }
 
-        //libc::_exit(128 + (_signal as i32));
+        libc::_exit(128 + (_signal as i32));
     }
 }
 
 #[cfg(test)]
 mod tests {
     use core::marker::PhantomData;
+    use serial_test::serial;
 
     #[cfg(all(feature = "std", feature = "fork", unix))]
     use crate::{
@@ -1647,6 +1663,7 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         use crate::executors::inprocess::InChildProcessHandlers;
@@ -1669,153 +1686,67 @@ mod tests {
 }
 
 #[cfg(feature = "python")]
+#[allow(missing_docs)]
 /// `InProcess` Python bindings
 pub mod pybind {
-    use crate::bolts::tuples::tuple_list;
-    use crate::executors::{inprocess::OwnedInProcessExecutor, ExitKind};
-    use crate::inputs::{BytesInput, HasBytesVec};
-    use pyo3::prelude::*;
-    use pyo3::types::PyBytes;
+    use crate::{
+        events::pybind::PythonEventManager,
+        executors::{inprocess::OwnedInProcessExecutor, pybind::PythonExecutor, ExitKind},
+        fuzzer::pybind::PythonStdFuzzerWrapper,
+        inputs::{BytesInput, HasBytesVec},
+        observers::pybind::PythonObserversTuple,
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+    };
+    use alloc::boxed::Box;
+    use pyo3::{prelude::*, types::PyBytes};
 
-    macro_rules! define_python_in_process_executor {
-        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident, $std_state_name: ident, $event_manager_name: ident, $map_observer_name: ident, $std_fuzzer_name: ident) => {
-            use crate::events::pybind::$event_manager_name;
-            use crate::fuzzer::pybind::$std_fuzzer_name;
-            use crate::observers::pybind::$map_observer_name;
-            use crate::state::pybind::{$my_std_state_type_name, $std_state_name};
-
-            #[pyclass(unsendable, name = $py_name)]
-            #[derive(Debug)]
-            /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
-            pub struct $struct_name {
-                /// Rust wrapped OwnedInProcessExecutor object
-                pub owned_in_process_executor: OwnedInProcessExecutor<
-                    BytesInput,
-                    ($map_observer_name, ()),
-                    $my_std_state_type_name,
-                >,
-            }
-
-            #[pymethods]
-            impl $struct_name {
-                #[new]
-                fn new(
-                    harness: PyObject,
-                    py_observer: $map_observer_name,
-                    py_fuzzer: &mut $std_fuzzer_name,
-                    py_state: &mut $std_state_name,
-                    py_event_manager: &mut $event_manager_name,
-                ) -> Self {
-                    Self {
-                        owned_in_process_executor: OwnedInProcessExecutor::new(
-                            Box::new(move |input: &BytesInput| {
-                                Python::with_gil(|py| -> PyResult<()> {
-                                    let args = (PyBytes::new(py, input.bytes()),);
-                                    harness.call1(py, args)?;
-                                    Ok(())
-                                })
-                                .unwrap();
-                                ExitKind::Ok
-                            }),
-                            tuple_list!(py_observer),
-                            &mut py_fuzzer.std_fuzzer,
-                            &mut py_state.std_state,
-                            py_event_manager,
-                        )
-                        .expect("Failed to create the Executor".into()),
-                    }
-                }
-            }
-        };
+    #[pyclass(unsendable, name = "InProcessExecutor")]
+    #[derive(Debug)]
+    /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
+    pub struct PythonOwnedInProcessExecutor {
+        /// Rust wrapped OwnedInProcessExecutor object
+        pub inner: OwnedInProcessExecutor<BytesInput, PythonObserversTuple, PythonStdState>,
     }
 
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorI8,
-        "OwnedInProcessExecutorI8",
-        MyStdStateI8,
-        PythonStdStateI8,
-        PythonEventManagerI8,
-        PythonMapObserverI8,
-        PythonStdFuzzerI8
-    );
+    #[pymethods]
+    impl PythonOwnedInProcessExecutor {
+        #[new]
+        fn new(
+            harness: PyObject,
+            py_observers: PythonObserversTuple,
+            py_fuzzer: &mut PythonStdFuzzerWrapper,
+            py_state: &mut PythonStdStateWrapper,
+            py_event_manager: &mut PythonEventManager,
+        ) -> Self {
+            Self {
+                inner: OwnedInProcessExecutor::new(
+                    Box::new(move |input: &BytesInput| {
+                        Python::with_gil(|py| -> PyResult<()> {
+                            let args = (PyBytes::new(py, input.bytes()),);
+                            harness.call1(py, args)?;
+                            Ok(())
+                        })
+                        .unwrap();
+                        ExitKind::Ok
+                    }),
+                    py_observers,
+                    py_fuzzer.unwrap_mut(),
+                    py_state.unwrap_mut(),
+                    py_event_manager,
+                )
+                .expect("Failed to create the Executor"),
+            }
+        }
 
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorI16,
-        "OwnedInProcessExecutorI16",
-        MyStdStateI16,
-        PythonStdStateI16,
-        PythonEventManagerI16,
-        PythonMapObserverI16,
-        PythonStdFuzzerI16
-    );
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorI32,
-        "OwnedInProcessExecutorI32",
-        MyStdStateI32,
-        PythonStdStateI32,
-        PythonEventManagerI32,
-        PythonMapObserverI32,
-        PythonStdFuzzerI32
-    );
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorI64,
-        "OwnedInProcessExecutorI64",
-        MyStdStateI64,
-        PythonStdStateI64,
-        PythonEventManagerI64,
-        PythonMapObserverI64,
-        PythonStdFuzzerI64
-    );
-
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorU8,
-        "OwnedInProcessExecutorU8",
-        MyStdStateU8,
-        PythonStdStateU8,
-        PythonEventManagerU8,
-        PythonMapObserverU8,
-        PythonStdFuzzerU8
-    );
-
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorU16,
-        "OwnedInProcessExecutorU16",
-        MyStdStateU16,
-        PythonStdStateU16,
-        PythonEventManagerU16,
-        PythonMapObserverU16,
-        PythonStdFuzzerU16
-    );
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorU32,
-        "OwnedInProcessExecutorU32",
-        MyStdStateU32,
-        PythonStdStateU32,
-        PythonEventManagerU32,
-        PythonMapObserverU32,
-        PythonStdFuzzerU32
-    );
-    define_python_in_process_executor!(
-        PythonOwnedInProcessExecutorU64,
-        "OwnedInProcessExecutorU64",
-        MyStdStateU64,
-        PythonStdStateU64,
-        PythonEventManagerU64,
-        PythonMapObserverU64,
-        PythonStdFuzzerU64
-    );
+        #[must_use]
+        pub fn as_executor(slf: Py<Self>) -> PythonExecutor {
+            PythonExecutor::new_inprocess(slf)
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonOwnedInProcessExecutorI8>()?;
-        m.add_class::<PythonOwnedInProcessExecutorI16>()?;
-        m.add_class::<PythonOwnedInProcessExecutorI32>()?;
-        m.add_class::<PythonOwnedInProcessExecutorI64>()?;
-
-        m.add_class::<PythonOwnedInProcessExecutorU8>()?;
-        m.add_class::<PythonOwnedInProcessExecutorU16>()?;
-        m.add_class::<PythonOwnedInProcessExecutorU32>()?;
-        m.add_class::<PythonOwnedInProcessExecutorU64>()?;
+        m.add_class::<PythonOwnedInProcessExecutor>()?;
         Ok(())
     }
 }

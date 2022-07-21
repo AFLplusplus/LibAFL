@@ -127,88 +127,200 @@ where
 }
 
 /// `Generator` Python bindings
+#[allow(missing_docs)]
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::generators::RandPrintablesGenerator;
+    use crate::generators::{Generator, RandBytesGenerator, RandPrintablesGenerator};
+    use crate::inputs::{BytesInput, HasBytesVec};
+    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
+    use crate::Error;
+    use alloc::vec::Vec;
     use pyo3::prelude::*;
 
-    macro_rules! define_python_event_manager {
-        ($struct_name:ident, $py_name:tt, $my_std_state_type_name: ident) => {
-            use crate::state::pybind::$my_std_state_type_name;
+    #[derive(Clone, Debug)]
+    pub struct PyObjectGenerator {
+        inner: PyObject,
+    }
 
-            #[pyclass(unsendable, name = $py_name)]
-            /// Python class for RandPrintablesGenerator
-            #[derive(Debug)]
-            pub struct $struct_name {
-                /// Rust wrapped SimpleEventManager object
-                pub rand_printable_generator: RandPrintablesGenerator<$my_std_state_type_name>,
+    impl PyObjectGenerator {
+        #[must_use]
+        pub fn new(obj: PyObject) -> Self {
+            PyObjectGenerator { inner: obj }
+        }
+    }
+
+    impl Generator<BytesInput, PythonStdState> for PyObjectGenerator {
+        fn generate(&mut self, state: &mut PythonStdState) -> Result<BytesInput, Error> {
+            let bytes = Python::with_gil(|py| -> PyResult<Vec<u8>> {
+                self.inner
+                    .call_method1(py, "generate", (PythonStdStateWrapper::wrap(state),))?
+                    .extract(py)
+            })
+            .unwrap();
+            Ok(BytesInput::new(bytes))
+        }
+
+        fn generate_dummy(&self, state: &mut PythonStdState) -> BytesInput {
+            let bytes = Python::with_gil(|py| -> PyResult<Vec<u8>> {
+                self.inner
+                    .call_method1(py, "generate_dummy", (PythonStdStateWrapper::wrap(state),))?
+                    .extract(py)
+            })
+            .unwrap();
+            BytesInput::new(bytes)
+        }
+    }
+
+    #[pyclass(unsendable, name = "RandBytesGenerator")]
+    #[derive(Debug, Clone)]
+    /// Python class for RandBytesGenerator
+    pub struct PythonRandBytesGenerator {
+        /// Rust wrapped RandBytesGenerator object
+        pub inner: RandBytesGenerator<PythonStdState>,
+    }
+
+    #[pymethods]
+    impl PythonRandBytesGenerator {
+        #[new]
+        fn new(max_size: usize) -> Self {
+            Self {
+                inner: RandBytesGenerator::new(max_size),
             }
+        }
 
-            #[pymethods]
-            impl $struct_name {
-                #[new]
-                fn new(max_size: usize) -> Self {
-                    Self {
-                        rand_printable_generator: RandPrintablesGenerator::new(max_size),
+        fn generate(&mut self, state: &mut PythonStdStateWrapper) -> Vec<u8> {
+            self.inner
+                .generate(state.unwrap_mut())
+                .expect("PythonRandBytesGenerator::generate failed")
+                .bytes()
+                .to_vec()
+        }
+
+        fn as_generator(slf: Py<Self>) -> PythonGenerator {
+            PythonGenerator::new_rand_bytes(slf)
+        }
+    }
+
+    #[pyclass(unsendable, name = "RandPrintablesGenerator")]
+    #[derive(Debug, Clone)]
+    /// Python class for RandPrintablesGenerator
+    pub struct PythonRandPrintablesGenerator {
+        /// Rust wrapped RandPrintablesGenerator object
+        pub inner: RandPrintablesGenerator<PythonStdState>,
+    }
+
+    #[pymethods]
+    impl PythonRandPrintablesGenerator {
+        #[new]
+        fn new(max_size: usize) -> Self {
+            Self {
+                inner: RandPrintablesGenerator::new(max_size),
+            }
+        }
+
+        fn generate(&mut self, state: &mut PythonStdStateWrapper) -> Vec<u8> {
+            self.inner
+                .generate(state.unwrap_mut())
+                .expect("PythonRandPrintablesGenerator::generate failed")
+                .bytes()
+                .to_vec()
+        }
+
+        fn as_generator(slf: Py<Self>) -> PythonGenerator {
+            PythonGenerator::new_rand_printables(slf)
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    enum PythonGeneratorWrapper {
+        RandBytes(Py<PythonRandBytesGenerator>),
+        RandPrintables(Py<PythonRandPrintablesGenerator>),
+        Python(PyObjectGenerator),
+    }
+
+    /// Rand Trait binding
+    #[pyclass(unsendable, name = "Generator")]
+    #[derive(Debug, Clone)]
+    pub struct PythonGenerator {
+        wrapper: PythonGeneratorWrapper,
+    }
+
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!($wrapper, $name, $body, PythonGeneratorWrapper,
+                { RandBytes, RandPrintables },
+                {
+                    Python(py_wrapper) => {
+                        let $name = py_wrapper;
+                        $body
                     }
                 }
-            }
+            )
         };
     }
 
-    define_python_event_manager!(
-        PythonRandPrintablesGeneratorI8,
-        "RandPrintablesGeneratorI8",
-        MyStdStateI8
-    );
-    define_python_event_manager!(
-        PythonRandPrintablesGeneratorI16,
-        "RandPrintablesGeneratorI16",
-        MyStdStateI16
-    );
-    define_python_event_manager!(
-        PythonRandPrintablesGeneratorI32,
-        "RandPrintablesGeneratorI32",
-        MyStdStateI32
-    );
-    define_python_event_manager!(
-        PythonRandPrintablesGeneratorI64,
-        "RandPrintablesGeneratorI64",
-        MyStdStateI64
-    );
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonGeneratorWrapper,
+                { RandBytes, RandPrintables },
+                {
+                    Python(py_wrapper) => {
+                        let $name = py_wrapper;
+                        $body
+                    }
+                }
+            )
+        };
+    }
 
-    define_python_event_manager!(
-        PythonRandPrintablesGeneratorU8,
-        "RandPrintablesGeneratorU8",
-        MyStdStateU8
-    );
-    define_python_event_manager!(
-        PythonRandPrintablesGeneratorU16,
-        "RandPrintablesGeneratorU16",
-        MyStdStateU16
-    );
-    define_python_event_manager!(
-        PythonRandPrintablesGeneratorU32,
-        "RandPrintablesGeneratorU32",
-        MyStdStateU32
-    );
-    define_python_event_manager!(
-        PythonRandPrintablesGeneratorU64,
-        "RandPrintablesGeneratorU64",
-        MyStdStateU64
-    );
+    #[pymethods]
+    impl PythonGenerator {
+        #[staticmethod]
+        fn new_rand_bytes(py_gen: Py<PythonRandBytesGenerator>) -> Self {
+            Self {
+                wrapper: PythonGeneratorWrapper::RandBytes(py_gen),
+            }
+        }
+
+        #[staticmethod]
+        fn new_rand_printables(py_gen: Py<PythonRandPrintablesGenerator>) -> Self {
+            Self {
+                wrapper: PythonGeneratorWrapper::RandPrintables(py_gen),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_py(obj: PyObject) -> Self {
+            Self {
+                wrapper: PythonGeneratorWrapper::Python(PyObjectGenerator::new(obj)),
+            }
+        }
+
+        #[must_use]
+        pub fn unwrap_py(&self) -> Option<PyObject> {
+            match &self.wrapper {
+                PythonGeneratorWrapper::Python(pyo) => Some(pyo.inner.clone()),
+                _ => None,
+            }
+        }
+    }
+
+    impl Generator<BytesInput, PythonStdState> for PythonGenerator {
+        fn generate(&mut self, state: &mut PythonStdState) -> Result<BytesInput, Error> {
+            unwrap_me_mut!(self.wrapper, g, { g.generate(state) })
+        }
+
+        fn generate_dummy(&self, state: &mut PythonStdState) -> BytesInput {
+            unwrap_me!(self.wrapper, g, { g.generate_dummy(state) })
+        }
+    }
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
-        m.add_class::<PythonRandPrintablesGeneratorI8>()?;
-        m.add_class::<PythonRandPrintablesGeneratorI16>()?;
-        m.add_class::<PythonRandPrintablesGeneratorI32>()?;
-        m.add_class::<PythonRandPrintablesGeneratorI64>()?;
-
-        m.add_class::<PythonRandPrintablesGeneratorU8>()?;
-        m.add_class::<PythonRandPrintablesGeneratorU16>()?;
-        m.add_class::<PythonRandPrintablesGeneratorU32>()?;
-        m.add_class::<PythonRandPrintablesGeneratorU64>()?;
+        m.add_class::<PythonRandBytesGenerator>()?;
+        m.add_class::<PythonRandPrintablesGenerator>()?;
+        m.add_class::<PythonGenerator>()?;
         Ok(())
     }
 }

@@ -98,7 +98,7 @@ impl GramatronInput {
             terms.clone_from_slice(&self.terms[from..to]);
             Ok(Self { terms })
         } else {
-            Err(Error::IllegalArgument("Invalid from or to argument".into()))
+            Err(Error::illegal_argument("Invalid from or to argument"))
         }
     }
 }

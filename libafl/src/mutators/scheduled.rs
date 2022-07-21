@@ -208,9 +208,8 @@ where
     }
 }
 
-/// Get the mutations that compose the Havoc mutator
-#[must_use]
-pub fn havoc_mutations() -> tuple_list_type!(
+/// Tuple type of the mutations that compose the Havoc mutator
+pub type HavocMutationsType = tuple_list_type!(
     BitFlipMutator,
     ByteFlipMutator,
     ByteIncMutator,
@@ -238,7 +237,11 @@ pub fn havoc_mutations() -> tuple_list_type!(
     BytesSwapMutator,
     CrossoverInsertMutator,
     CrossoverReplaceMutator,
-) {
+);
+
+/// Get the mutations that compose the Havoc mutator
+#[must_use]
+pub fn havoc_mutations() -> HavocMutationsType {
     tuple_list!(
         BitFlipMutator::new(),
         ByteFlipMutator::new(),
@@ -447,7 +450,8 @@ mod tests {
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
-        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
+        let mut state =
+            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
 
         rand.set_seed(5);
 
@@ -474,7 +478,8 @@ mod tests {
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 
-        let mut state = StdState::new(rand, corpus, InMemoryCorpus::new(), ());
+        let mut state =
+            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
 
         let mut havoc = StdScheduledMutator::new(havoc_mutations());
 
@@ -493,5 +498,44 @@ mod tests {
             };
             assert_ne!(equal_in_a_row, 5);
         }
+    }
+}
+
+/// `SchedulerMutator` Python bindings
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+pub mod pybind {
+    use super::{havoc_mutations, Debug, HavocMutationsType, StdScheduledMutator};
+    use crate::inputs::BytesInput;
+    use crate::mutators::pybind::PythonMutator;
+    use crate::state::pybind::PythonStdState;
+    use pyo3::prelude::*;
+
+    #[pyclass(unsendable, name = "StdHavocMutator")]
+    #[derive(Debug)]
+    /// Python class for StdHavocMutator
+    pub struct PythonStdHavocMutator {
+        /// Rust wrapped StdHavocMutator object
+        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType, PythonStdState>,
+    }
+
+    #[pymethods]
+    impl PythonStdHavocMutator {
+        #[new]
+        fn new() -> Self {
+            Self {
+                inner: StdScheduledMutator::new(havoc_mutations()),
+            }
+        }
+
+        fn as_mutator(slf: Py<Self>) -> PythonMutator {
+            PythonMutator::new_std_havoc(slf)
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdHavocMutator>()?;
+        Ok(())
     }
 }

@@ -39,7 +39,10 @@ use windows::Win32::{
 use core::{ffi::c_void, ptr::write_volatile};
 
 #[cfg(windows)]
-use core::sync::atomic::{compiler_fence, Ordering};
+use core::{
+    ptr::addr_of_mut,
+    sync::atomic::{compiler_fence, Ordering},
+};
 
 #[repr(C)]
 #[cfg(all(unix, not(target_os = "linux")))]
@@ -235,7 +238,7 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         let tp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),
-                core::ptr::addr_of_mut!(GLOBAL_STATE) as *mut c_void,
+                addr_of_mut!(GLOBAL_STATE) as *mut c_void,
                 &TP_CALLBACK_ENVIRON_V3::default(),
             )
         };
@@ -284,7 +287,7 @@ where
             write_volatile(&mut data.tp_timer, self.tp_timer as *mut _ as *mut c_void);
             write_volatile(
                 &mut data.critical,
-                core::ptr::addr_of_mut!(self.critical) as *mut c_void,
+                addr_of_mut!(self.critical) as *mut c_void,
             );
             write_volatile(
                 &mut data.timeout_input_ptr,

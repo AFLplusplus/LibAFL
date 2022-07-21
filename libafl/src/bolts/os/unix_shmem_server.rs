@@ -12,6 +12,12 @@ use crate::{
     },
     Error,
 };
+
+#[cfg(feature = "std")]
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
 use core::{mem::ManuallyDrop, ptr::addr_of};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -184,6 +190,7 @@ where
         res.id = id;
         Ok(res)
     }
+
     fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
@@ -198,7 +205,7 @@ where
 
     fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
         let parts = id.as_str().split(':').collect::<Vec<&str>>();
-        let server_id_str = parts.get(0).unwrap();
+        let server_id_str = parts.first().unwrap();
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
         ))?;
@@ -424,7 +431,8 @@ where
         // It's either running at this point, or we won't be able to spawn it anyway.
         env::set_var(AFL_SHMEM_SERVICE_STARTED, "true");
 
-        match *success {
+        let status = *success;
+        match status {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
                 println!("Started ShMem Service");
@@ -571,7 +579,7 @@ where
             ServedShMemRequest::Exit => {
                 println!("ShMemService - Exiting");
                 // stopping the server
-                return Err(Error::ShuttingDown);
+                return Err(Error::shutting_down());
             }
         };
         // println!("send ashmem client: {}, response: {:?}", client_id, &response);
@@ -637,7 +645,7 @@ where
                 *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                 cvar.notify_one();
 
-                return Err(Error::Unknown(format!(
+                return Err(Error::unknown(format!(
                     "The ShMem server appears to already be running. We are probably a client. Error: {:?}", err)));
             }
         };
@@ -712,3 +720,25 @@ where
         }
     }
 }
+
+/*
+TODO: Fix test
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    use crate::bolts::{
+        os::unix_shmem_server::ServedShMemProvider,
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    };
+
+    #[test]
+    #[serial]
+    fn test_shmem_server_connection() {
+        let mut sp = ServedShMemProvider::<UnixShMemProvider>::new().unwrap();
+        let map = sp.new_shmem(2 << 14).unwrap();
+        assert!(map.is_empty());
+    }
+}
+*/

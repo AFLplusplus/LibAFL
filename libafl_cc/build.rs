@@ -112,6 +112,18 @@ fn main() {
 
     let llvm_config = find_llvm_config();
 
+    // Get LLVM version.
+    let llvm_version = match llvm_config.split('-').collect::<Vec<&str>>().get(2) {
+        Some(ver) => ver.parse::<usize>().ok(),
+        None => None,
+    };
+
+    if let Some(ver) = llvm_version {
+        if ver >= 14 {
+            custom_flags.push("-DUSE_NEW_PM".to_string());
+        }
+    }
+
     if let Ok(output) = Command::new(&llvm_config).args(&["--bindir"]).output() {
         let llvm_bindir = Path::new(
             str::from_utf8(&output.stdout)
@@ -132,11 +144,15 @@ fn main() {
 
             /// The size of the accounting maps
             pub const ACCOUNTING_MAP_SIZE: usize = {};
+
+            /// The llvm version used to build llvm passes
+            pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = {:?};
             ",
             llvm_bindir.join("clang"),
             llvm_bindir.join("clang++"),
             edges_map_size,
-            acc_map_size
+            acc_map_size,
+            llvm_version,
         )
         .expect("Could not write file");
 
@@ -159,8 +175,8 @@ fn main() {
             .expect("Failed to execute llvm-config");
         let ldflags = str::from_utf8(&output.stdout).expect("Invalid llvm-config output");
 
-        let cxxflags: Vec<&str> = cxxflags.trim().split_whitespace().collect();
-        let mut ldflags: Vec<&str> = ldflags.trim().split_whitespace().collect();
+        let cxxflags: Vec<&str> = cxxflags.split_whitespace().collect();
+        let mut ldflags: Vec<&str> = ldflags.split_whitespace().collect();
 
         let sdk_path;
         if env::var("CARGO_CFG_TARGET_VENDOR").unwrap().as_str() == "apple" {
@@ -232,6 +248,8 @@ fn main() {
 pub const CLANG_PATH: &str = \"clang\";
 /// The path to the `clang++` executable
 pub const CLANGXX_PATH: &str = \"clang++\";
+/// The llvm version used to build llvm passes
+pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     "
         )
         .expect("Could not write file");

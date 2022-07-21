@@ -104,8 +104,8 @@ where
     /// Creates the [`CachedOnDiskCorpus`].
     pub fn new(dir_path: PathBuf, cache_max_len: usize) -> Result<Self, Error> {
         if cache_max_len == 0 {
-            return Err(Error::IllegalArgument(
-                "The max cache len in CachedOnDiskCorpus cannot be 0".into(),
+            return Err(Error::illegal_argument(
+                "The max cache len in CachedOnDiskCorpus cannot be 0",
             ));
         }
         Ok(Self {
@@ -122,8 +122,8 @@ where
         cache_max_len: usize,
     ) -> Result<Self, Error> {
         if cache_max_len == 0 {
-            return Err(Error::IllegalArgument(
-                "The max cache len in CachedOnDiskCorpus cannot be 0".into(),
+            return Err(Error::illegal_argument(
+                "The max cache len in CachedOnDiskCorpus cannot be 0",
             ));
         }
         Ok(Self {
@@ -137,19 +137,18 @@ where
 /// ``CachedOnDiskCorpus`` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use std::path::PathBuf;
-
-    use crate::corpus::CachedOnDiskCorpus;
-    use crate::inputs::BytesInput;
+    use crate::{corpus::pybind::PythonCorpus, corpus::CachedOnDiskCorpus, inputs::BytesInput};
+    use alloc::string::String;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
+    use std::path::PathBuf;
 
     #[pyclass(unsendable, name = "CachedOnDiskCorpus")]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for CachedOnDiskCorpus
     pub struct PythonCachedOnDiskCorpus {
         /// Rust wrapped CachedOnDiskCorpus object
-        pub cached_on_disk_corpus: CachedOnDiskCorpus<BytesInput>,
+        pub inner: CachedOnDiskCorpus<BytesInput>,
     }
 
     #[pymethods]
@@ -157,9 +156,12 @@ pub mod pybind {
         #[new]
         fn new(path: String, cache_max_len: usize) -> Self {
             Self {
-                cached_on_disk_corpus: CachedOnDiskCorpus::new(PathBuf::from(path), cache_max_len)
-                    .unwrap(),
+                inner: CachedOnDiskCorpus::new(PathBuf::from(path), cache_max_len).unwrap(),
             }
+        }
+
+        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
+            PythonCorpus::new_cached_on_disk(slf)
         }
     }
     /// Register the classes to the python module

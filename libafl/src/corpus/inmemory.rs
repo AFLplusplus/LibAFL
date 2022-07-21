@@ -38,7 +38,7 @@ where
     #[inline]
     fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
         if idx >= self.entries.len() {
-            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
+            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
         }
         self.entries[idx] = RefCell::new(testcase);
         Ok(())
@@ -91,8 +91,10 @@ where
 /// `InMemoryCorpus` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::corpus::InMemoryCorpus;
-    use crate::inputs::BytesInput;
+    use crate::{
+        corpus::{pybind::PythonCorpus, InMemoryCorpus},
+        inputs::BytesInput,
+    };
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
@@ -101,7 +103,7 @@ pub mod pybind {
     /// Python class for InMemoryCorpus
     pub struct PythonInMemoryCorpus {
         /// Rust wrapped InMemoryCorpus object
-        pub in_memory_corpus: InMemoryCorpus<BytesInput>,
+        pub inner: InMemoryCorpus<BytesInput>,
     }
 
     #[pymethods]
@@ -109,8 +111,12 @@ pub mod pybind {
         #[new]
         fn new() -> Self {
             Self {
-                in_memory_corpus: InMemoryCorpus::new(),
+                inner: InMemoryCorpus::new(),
             }
+        }
+
+        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
+            PythonCorpus::new_in_memory(slf)
         }
     }
     /// Register the classes to the python module

@@ -71,4 +71,3 @@
   EVAL(MAP_LIST1(f, __VA_ARGS__, ()()(), ()()(), ()()(), 0))
 
 #endif
-

@@ -30,7 +30,7 @@ where
 
     let idx = {
         let meta = state.metadata_mut().get_mut::<GeneralizedIndexesMetadata>().ok_or_else(|| {
-            Error::KeyNotFound("GeneralizedIndexesMetadata needed by extend_with_random_generalized() not found, make sure that you have GeneralizationStage in".into())
+            Error::key_not_found("GeneralizedIndexesMetadata needed by extend_with_random_generalized() not found, make sure that you have GeneralizationStage in")
         })?;
 
         *meta

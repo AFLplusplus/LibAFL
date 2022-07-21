@@ -14,7 +14,7 @@ use libafl::{
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{ExitKind, InProcessForkExecutor},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
@@ -68,14 +68,11 @@ pub fn main() {
     let observer = StdMapObserver::new("signals", signals_clone.as_mut_slice());
     // Create a stacktrace observer to add the observers tuple
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&observer);
-
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -87,9 +84,12 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
     let mon = SimpleMonitor::new(|s| println!("{}", s));

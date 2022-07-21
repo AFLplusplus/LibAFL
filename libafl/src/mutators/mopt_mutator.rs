@@ -233,7 +233,9 @@ impl MOpt {
             if self.probability_now[swarm][self.operator_num - 1] < 0.99
                 || self.probability_now[swarm][self.operator_num - 1] > 1.01
             {
-                return Err(Error::MOpt("Error in pso_update".to_string()));
+                return Err(Error::illegal_state(
+                    "MOpt: Error in pso_update".to_string(),
+                ));
             }
         }
         Ok(())
@@ -301,7 +303,9 @@ impl MOpt {
             if self.probability_now[swarm][self.operator_num - 1] < 0.99
                 || self.probability_now[swarm][self.operator_num - 1] > 1.01
             {
-                return Err(Error::MOpt("Error in pso_update".to_string()));
+                return Err(Error::illegal_state(
+                    "MOpt: Error in pso_update".to_string(),
+                ));
             }
         }
         self.swarm_now = 0;
@@ -340,7 +344,9 @@ impl MOpt {
             || (res + 1 < operator_num
                 && select_prob > self.probability_now[self.swarm_now][res + 1])
         {
-            return Err(Error::MOpt("Error in select_algorithm".to_string()));
+            return Err(Error::illegal_state(
+                "MOpt: Error in select_algorithm".to_string(),
+            ));
         }
         Ok(res)
     }

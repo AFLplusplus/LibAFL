@@ -1,5 +1,6 @@
 use super::{current_time, format_duration_hms, Duration, String, TimedStats, TuiContext};
 
+use alloc::vec::Vec;
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -61,16 +62,20 @@ impl TuiUI {
     //pub fn on_down(&mut self) {}
 
     pub fn on_right(&mut self) {
-        // never 0
-        self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
+        if self.clients != 0 {
+            // clients_idx never 0
+            self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
+        }
     }
 
     pub fn on_left(&mut self) {
-        // never 0
-        if self.clients_idx == 1 {
-            self.clients_idx = self.clients - 1;
-        } else {
-            self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
+        if self.clients != 0 {
+            // clients_idx never 0
+            if self.clients_idx == 1 {
+                self.clients_idx = self.clients - 1;
+            } else {
+                self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
+            }
         }
     }
 

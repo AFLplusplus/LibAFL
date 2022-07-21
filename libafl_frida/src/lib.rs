@@ -86,10 +86,7 @@ pub mod executor;
 pub mod utils;
 
 // for parsing asan and cmplog cores
-use libafl::bolts::os::{CoreId, Cores};
-
-// for getting current core_id
-use core_affinity::get_core_ids;
+use libafl::bolts::core_affinity::{get_core_ids, CoreId, Cores};
 
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -213,7 +210,7 @@ impl FridaOptions {
                         1,
                         "Client should only be bound to a single core"
                     );
-                    let core_id: CoreId = core_ids[0].into();
+                    let core_id: CoreId = core_ids[0];
                     options.enable_asan = asan_cores.ids.contains(&core_id);
                 }
             }
@@ -225,7 +222,7 @@ impl FridaOptions {
                         1,
                         "Client should only be bound to a single core"
                     );
-                    let core_id = core_ids[0].into();
+                    let core_id = core_ids[0];
                     options.enable_cmplog = cmplog_cores.ids.contains(&core_id);
                 }
             }

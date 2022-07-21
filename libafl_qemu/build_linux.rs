@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "17c1f083eefca42088d6a88df04c65713f1cc58a";
+const QEMU_REVISION: &str = "03e283c85800496b60fb757d68a7df2821fb7a90";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -141,82 +141,18 @@ pub fn build() {
     let build_dir = qemu_path.join("build");
     let output_lib = build_dir.join(&format!("libqemu-{}.so", cpu_target));
     if !output_lib.is_file() {
-        drop(
+        /*drop(
             Command::new("make")
                 .current_dir(&qemu_path)
                 .arg("distclean")
                 .status(),
-        );
+        );*/
         Command::new("./configure")
             .current_dir(&qemu_path)
             //.arg("--as-static-lib")
             .arg("--as-shared-lib")
             .arg(&format!("--target-list={}-linux-user", cpu_target))
-            .args(&[
-                "--audio-drv-list=",
-                "--disable-blobs",
-                "--disable-bochs",
-                "--disable-brlapi",
-                "--disable-bsd-user",
-                "--disable-bzip2",
-                "--disable-cap-ng",
-                "--disable-cloop",
-                "--disable-curl",
-                "--disable-curses",
-                "--disable-dmg",
-                "--disable-fdt",
-                "--disable-gcrypt",
-                "--disable-glusterfs",
-                "--disable-gnutls",
-                "--disable-gtk",
-                "--disable-guest-agent",
-                "--disable-iconv",
-                "--disable-libiscsi",
-                "--disable-libnfs",
-                "--disable-libssh",
-                "--disable-libusb",
-                "--disable-linux-aio",
-                "--disable-live-block-migration",
-                "--disable-lzo",
-                "--disable-nettle",
-                "--disable-numa",
-                "--disable-opengl",
-                "--disable-parallels",
-                "--disable-plugins",
-                "--disable-qcow1",
-                "--disable-qed",
-                "--disable-rbd",
-                "--disable-rdma",
-                "--disable-replication",
-                "--disable-sdl",
-                "--disable-seccomp",
-                "--disable-smartcard",
-                "--disable-snappy",
-                "--disable-spice",
-                "--disable-system",
-                "--disable-tools",
-                "--disable-tpm",
-                "--disable-usb-redir",
-                "--disable-vde",
-                "--disable-vdi",
-                "--disable-vhost-crypto",
-                "--disable-vhost-kernel",
-                "--disable-vhost-net",
-                "--disable-vhost-scsi",
-                "--disable-vhost-user",
-                "--disable-vhost-vdpa",
-                "--disable-vhost-vsock",
-                "--disable-virglrenderer",
-                "--disable-virtfs",
-                "--disable-vnc",
-                "--disable-vnc-jpeg",
-                "--disable-vnc-png",
-                "--disable-vnc-sasl",
-                "--disable-vte",
-                "--disable-vvfat",
-                "--disable-xen",
-                "--disable-xen-pci-passthrough",
-            ])
+            .args(&["--disable-blobs", "--disable-bsd-user", "--disable-fdt"])
             .status()
             .expect("Configure failed");
         if let Ok(j) = jobs {
@@ -236,77 +172,71 @@ pub fn build() {
         //let _ = remove_file(build_dir.join(&format!("libqemu-{}.so", cpu_target)));
     }
 
-    #[cfg(feature = "python")]
-    {
-        let mut objects = vec![];
-        for dir in &[
-            build_dir.join("libcommon.fa.p"),
-            build_dir.join(&format!("libqemu-{}-linux-user.fa.p", cpu_target)),
-            //build_dir.join("libcommon-user.fa.p"),
-            //build_dir.join("libqemuutil.a.p"),
-            //build_dir.join("libqom.fa.p"),
-            //build_dir.join("libhwcore.fa.p"),
-            //build_dir.join("libcapstone.a.p"),
-        ] {
-            for path in fs::read_dir(dir).unwrap() {
-                let path = path.unwrap().path();
-                if path.is_file() {
-                    if let Some(name) = path.file_name() {
-                        if name.to_string_lossy().starts_with("stubs") {
-                            continue;
-                        } else if let Some(ext) = path.extension() {
-                            if ext == "o" {
-                                objects.push(path);
-                            }
+    let mut objects = vec![];
+    for dir in &[
+        build_dir.join("libcommon.fa.p"),
+        build_dir.join(&format!("libqemu-{}-linux-user.fa.p", cpu_target)),
+        //build_dir.join("libcommon-user.fa.p"),
+        //build_dir.join("libqemuutil.a.p"),
+        //build_dir.join("libqom.fa.p"),
+        //build_dir.join("libhwcore.fa.p"),
+    ] {
+        for path in fs::read_dir(dir).unwrap() {
+            let path = path.unwrap().path();
+            if path.is_file() {
+                if let Some(name) = path.file_name() {
+                    if name.to_string_lossy().starts_with("stubs") {
+                        continue;
+                    } else if let Some(ext) = path.extension() {
+                        if ext == "o" {
+                            objects.push(path);
                         }
                     }
                 }
             }
         }
-
-        for obj in &objects {
-            println!("cargo:rustc-cdylib-link-arg={}", obj.display());
-        }
-
-        println!("cargo:rustc-cdylib-link-arg=-Wl,--start-group");
-
-        println!("cargo:rustc-cdylib-link-arg=-Wl,--whole-archive");
-        println!(
-            "cargo:rustc-cdylib-link-arg={}/libhwcore.fa",
-            build_dir.display()
-        );
-        println!(
-            "cargo:rustc-cdylib-link-arg={}/libqom.fa",
-            build_dir.display()
-        );
-        println!("cargo:rustc-cdylib-link-arg=-Wl,--no-whole-archive");
-        println!(
-            "cargo:rustc-cdylib-link-arg={}/libcapstone.a",
-            build_dir.display()
-        );
-        println!(
-            "cargo:rustc-cdylib-link-arg={}/libqemuutil.a",
-            build_dir.display()
-        );
-        println!(
-            "cargo:rustc-cdylib-link-arg={}/libhwcore.fa",
-            build_dir.display()
-        );
-        println!(
-            "cargo:rustc-cdylib-link-arg={}/libqom.fa",
-            build_dir.display()
-        );
-
-        println!("cargo:rustc-cdylib-link-arg=-lrt");
-        println!("cargo:rustc-cdylib-link-arg=-lutil");
-        println!("cargo:rustc-cdylib-link-arg=-lgthread-2.0");
-        println!("cargo:rustc-cdylib-link-arg=-lglib-2.0");
-        println!("cargo:rustc-cdylib-link-arg=-lstdc++");
-
-        println!("cargo:rustc-cdylib-link-arg=-Wl,--end-group");
     }
 
-    #[cfg(not(feature = "python"))]
+    Command::new("ld")
+        .current_dir(&out_dir_path)
+        .arg("-o")
+        .arg("libqemu-partially-linked.o")
+        .arg("-r")
+        .args(objects)
+        .arg("--start-group")
+        .arg("--whole-archive")
+        .arg(format!("{}/libhwcore.fa", build_dir.display()))
+        .arg(format!("{}/libqom.fa", build_dir.display()))
+        .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
+        .arg("--no-whole-archive")
+        .arg(format!("{}/libqemuutil.a", build_dir.display()))
+        .arg(format!("{}/libhwcore.fa", build_dir.display()))
+        .arg(format!("{}/libqom.fa", build_dir.display()))
+        .arg(format!(
+            "--dynamic-list={}/plugins/qemu-plugins.symbols",
+            qemu_path.display()
+        ))
+        .status()
+        .expect("Partial linked failure");
+
+    drop(
+        Command::new("ar")
+            .current_dir(&out_dir_path)
+            .arg("crus")
+            .arg("libqemu-partially-linked.a")
+            .arg("libqemu-partially-linked.o")
+            .status(),
+    );
+
+    println!("cargo:rustc-link-search=native={}", out_dir);
+    println!("cargo:rustc-link-lib=static=qemu-partially-linked");
+
+    println!("cargo:rustc-link-lib=rt");
+    println!("cargo:rustc-link-lib=gmodule-2.0");
+    println!("cargo:rustc-link-lib=glib-2.0");
+    println!("cargo:rustc-link-lib=stdc++");
+
+    /* #[cfg(not(feature = "python"))]
     {
         fs::copy(
             build_dir.join(&format!("libqemu-{}.so", cpu_target)),
@@ -321,79 +251,30 @@ pub fn build() {
         println!("cargo:rustc-link-lib=qemu-{}", cpu_target);
 
         println!("cargo:rustc-env=LD_LIBRARY_PATH={}", target_dir.display());
-    }
+    } */
 
-    drop(
-        Command::new("make")
-            .current_dir(&out_dir_path)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .arg("clean")
-            .status(),
-    );
-    drop(
-        Command::new("make")
-            .current_dir(&out_dir_path)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .status(),
-    );
+    assert!(Command::new("make")
+        .current_dir(&out_dir_path)
+        .env("CC", &cross_cc)
+        .env("OUT_DIR", &target_dir)
+        .arg("-C")
+        .arg(&qasan_dir)
+        .arg("clean")
+        .status()
+        .expect("make failed")
+        .success());
+    assert!(Command::new("make")
+        .current_dir(&out_dir_path)
+        .env("CC", &cross_cc)
+        .env("OUT_DIR", &target_dir)
+        .arg("-C")
+        .arg(&qasan_dir)
+        .status()
+        .expect("make failed")
+        .success());
 
     cc::Build::new()
         .warnings(false)
         .file(src_dir.join("asan-giovese.c"))
         .compile("asan_giovese");
 }
-
-/*
-    // Build a static library
-    let mut objects = vec![];
-    for dir in &[
-        build_dir.join("libcommon.fa.p"),
-        build_dir.join(&format!("libqemu-{}-linux-user.fa.p", cpu_target)),
-        build_dir.join("libqemuutil.a.p"),
-        build_dir.join("libqom.fa.p"),
-        build_dir.join("libhwcore.fa.p"),
-        build_dir.join("libcapstone.a.p"),
-    ] {
-        for path in read_dir(dir).unwrap() {
-            let path = path.unwrap().path();
-            if path.is_file() {
-                if let Some(name) = path.file_name() {
-                    if name.to_string_lossy().starts_with("stubs") {
-                        continue;
-                    }
-                    else if let Some(ext) = path.extension() {
-                        if ext == "o" {
-                            objects.push(path);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-
-    Command::new("ar")
-        .current_dir(&out_dir_path)
-        .arg("crus")
-        .arg("libqemu-bridge.a")
-        .args(&objects)
-        .status()
-        .expect("Ar failed");
-
-    println!("cargo:rustc-link-search=native={}", &out_dir);
-    println!("cargo:rustc-link-lib=static=qemu-bridge");
-
-    println!("cargo:rustc-link-lib=rt");
-    println!("cargo:rustc-link-lib=util");
-    println!("cargo:rustc-link-lib=gthread-2.0");
-    println!("cargo:rustc-link-lib=glib-2.0");
-    println!("cargo:rustc-link-lib=stdc++");
-
-}
-*/
