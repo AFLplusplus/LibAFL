@@ -42,10 +42,10 @@ do
     fi
     
     # skip test for nyx
-    if [[ $fuzzer == "nyx_"* ]];then
+    if [[ $fuzzer == *"nyx_"* ]];then
         continue
     fi
-    
+
     if [ -e ./Makefile.toml ]; then
         echo "[*] Testing $fuzzer"
         cargo make test || exit 1
