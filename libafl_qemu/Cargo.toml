@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
@@ -26,8 +26,8 @@ usermode = []
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.7.1" }
-libafl_targets = { path = "../libafl_targets", version = "0.7.1" }
+libafl = { path = "../libafl", version = "0.8.0" }
+libafl_targets = { path = "../libafl_targets", version = "0.8.0" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.11", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
