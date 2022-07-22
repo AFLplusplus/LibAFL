@@ -2,13 +2,14 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasBytesVec, Input},
     observers::ObserversTuple,
+    Error,
 };
 use libnyx::NyxReturnValue;
 use std::fmt::Debug;
 /// executor for nyx
 use std::marker::PhantomData;
 
-use crate::helper::{NyxHelper, NyxResult};
+use crate::helper::NyxHelper;
 
 /// executor for nyx standalone mode
 pub struct NyxExecutor<'a, I, S, OT> {
@@ -52,26 +53,23 @@ where
                 println!("FixMe: Nyx InvalidWriteToPayload handler is missing");
                 Err(libafl::Error::ShuttingDown)
             }
-            NyxReturnValue::Error => {
-                println!("Error: Nyx runtime error has occured...");
-                Err(libafl::Error::ShuttingDown)
-            }
+            NyxReturnValue::Error => Err(libafl::Error::illegal_state(
+                "Error: Nyx runtime error has occured...",
+            )),
             NyxReturnValue::IoError => {
                 // todo! *stop_soon_p = 0
-                println!("Error: QEMU-nyx died...");
-                Err(libafl::Error::ShuttingDown)
+                Err(libafl::Error::illegal_state("Error: QEMU-nyx died..."))
             }
             NyxReturnValue::Abort => {
                 self.helper.nyx_process.shutdown();
-                println!("Error: Nyx abort occured...");
-                Err(libafl::Error::ShuttingDown)
+                Err(libafl::Error::illegal_state("Error: Nyx abort occured..."))
             }
         }
     }
 }
 
 impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
-    pub fn new(helper: &'a mut NyxHelper, observers: OT) -> NyxResult<Self> {
+    pub fn new(helper: &'a mut NyxHelper, observers: OT) -> Result<Self, Error> {
         Ok(Self {
             helper,
             observers,

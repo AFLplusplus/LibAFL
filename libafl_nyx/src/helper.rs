@@ -4,9 +4,8 @@ use std::{
     path::Path,
 };
 
+use libafl::Error;
 use libnyx::{NyxProcess, NyxReturnValue};
-
-pub type NyxResult<T> = Result<T, String>;
 
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
@@ -37,13 +36,19 @@ impl NyxHelper {
         snap_mode: bool,
         parallel_mode: bool,
         parent_cpu_id: Option<u32>,
-    ) -> NyxResult<Self> {
-        let sharedir = target_dir.to_str().unwrap();
-        let workdir = target_dir.join("workdir");
-        let workdir = workdir.to_str().unwrap();
+    ) -> Result<Self, Error> {
+        let sharedir = target_dir
+            .to_str()
+            .expect("unable to convert target_dir to str");
+        let work_dir = target_dir.join("workdir");
+        let work_dir = work_dir.to_str().expect("unable to convert workdir to str");
         let nyx_type = if parallel_mode {
             let parent_cpu_id = match parent_cpu_id {
-                None => return Err("please set parent_cpu_id in nyx parallel mode".to_string()),
+                None => {
+                    return Err(Error::illegal_argument(
+                        "please set parent_cpu_id in nyx parallel mode",
+                    ))
+                }
                 Some(x) => x,
             };
             if cpu_id == parent_cpu_id {
@@ -57,13 +62,16 @@ impl NyxHelper {
             NyxProcessType::ALONE
         };
 
-        let mut nyx_process = match nyx_type {
-            NyxProcessType::ALONE => NyxProcess::new(sharedir, workdir, cpu_id, MAX_FILE, true)?,
+        let nyx_process = match nyx_type {
+            NyxProcessType::ALONE => NyxProcess::new(sharedir, work_dir, cpu_id, MAX_FILE, true),
             NyxProcessType::PARENT => {
-                NyxProcess::new_parent(sharedir, workdir, cpu_id, MAX_FILE, true)?
+                NyxProcess::new_parent(sharedir, work_dir, cpu_id, MAX_FILE, true)
             }
-            NyxProcessType::CHILD => NyxProcess::new_child(sharedir, workdir, cpu_id, cpu_id)?,
+            NyxProcessType::CHILD => NyxProcess::new_child(sharedir, work_dir, cpu_id, cpu_id),
         };
+
+        let mut nyx_process =
+            nyx_process.map_err(|msg: String| -> Error { Error::illegal_argument(msg) })?;
 
         let real_map_size = nyx_process.bitmap_buffer_size();
         let map_size = ((real_map_size + 63) >> 6) << 6;
@@ -81,16 +89,16 @@ impl NyxHelper {
             NyxReturnValue::Error => {
                 nyx_process.shutdown();
                 let msg = "Error: Nyx runtime error has occured...";
-                return Err(msg.to_string());
+                return Err(Error::illegal_state(msg));
             }
             NyxReturnValue::IoError => {
                 let msg = "Error: QEMU-nyx died...";
-                return Err(msg.to_string());
+                return Err(Error::illegal_state(msg));
             }
             NyxReturnValue::Abort => {
                 nyx_process.shutdown();
                 let msg = "Error: Nyx abort occured...";
-                return Err(msg.to_string());
+                return Err(Error::illegal_state(msg));
             }
             _ => {}
         }
