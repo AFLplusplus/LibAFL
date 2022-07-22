@@ -118,10 +118,8 @@ where
 pub fn gen_unique_cmp_ids<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     state: Option<&mut S>,
-#[cfg(cpu_target = "arm")]
-    pc: u32,
-#[cfg(not(cpu_target = "arm"))]
-    pc: u64,
+    #[cfg(cpu_target = "arm")] pc: u32,
+    #[cfg(not(cpu_target = "arm"))] pc: u64,
     _size: usize,
 ) -> Option<u64>
 where
@@ -153,10 +151,8 @@ where
 pub fn gen_hashed_cmp_ids<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
-#[cfg(cpu_target = "arm")]
-    pc: u32,
-#[cfg(not(cpu_target = "arm"))]
-    pc: u64,
+    #[cfg(cpu_target = "arm")] pc: u32,
+    #[cfg(not(cpu_target = "arm"))] pc: u64,
     _size: usize,
 ) -> Option<u64>
 where
