@@ -2,7 +2,7 @@
 
 use core::{
     convert::Into,
-    ffi::{c_void},
+    ffi::c_void,
     ptr::{addr_of, addr_of_mut, null},
 };
 #[cfg(feature = "usermode")]
@@ -456,7 +456,9 @@ impl CPU {
     }
 
     pub fn trigger_breakpoint(&self) {
-        unsafe { libafl_qemu_trigger_breakpoint(self.ptr); }
+        unsafe {
+            libafl_qemu_trigger_breakpoint(self.ptr);
+        }
     }
 
     #[cfg(feature = "usermode")]
@@ -581,7 +583,7 @@ impl Emulator {
                     argv.as_ptr() as *const *const u8,
                     envp.as_ptr() as *const *const u8,
                 );
-                libc::atexit(qemu_cleanup_atexit); 
+                libc::atexit(qemu_cleanup_atexit);
             }
             EMULATOR_IS_INITIALIZED = true;
         }
@@ -885,19 +887,17 @@ impl Emulator {
         }
     }
 
-    #[cfg(not(feature = "usermode"))]
+    /*#[cfg(not(feature = "usermode"))]
     pub fn save_snapshot(&self, name: &str) {
         let s = CString::new(name).expect("Invalid snapshot name");
         unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _) };
-        println!("asd {:?}", &s);
     }
 
     #[cfg(not(feature = "usermode"))]
     pub fn load_snapshot(&self, name: &str) {
         let s = CString::new(name).expect("Invalid snapshot name");
         unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _) };
-        println!("ttt {:?}", &s);
-    }
+    }*/
 
     #[cfg(feature = "usermode")]
     pub fn set_pre_syscall_hook(
