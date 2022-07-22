@@ -11,7 +11,7 @@ use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
-use std::{ffi::CString, slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 use strum_macros::EnumIter;
 
 #[cfg(not(any(cpu_target = "x86_64", cpu_target = "aarch64")))]
