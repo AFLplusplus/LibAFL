@@ -236,6 +236,8 @@ pub fn build() {
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
 
+    println!("cargo:rustc-link-lib=z");
+
     /* #[cfg(not(feature = "python"))]
     {
         fs::copy(

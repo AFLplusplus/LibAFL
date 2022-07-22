@@ -358,7 +358,7 @@ where
                     h.add_mapped(result as GuestAddr, a1 as usize, Some(prot));
                 }
             } else if i64::from(sys_num) == SYS_mremap {
-                let h = helpers
+                let h = hooks.helpers_mut()
                     .match_first_type_mut::<QemuSnapshotHelper>()
                     .unwrap();
                 h.add_mapped(result as GuestAddr, a2 as usize, None);

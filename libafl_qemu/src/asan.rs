@@ -446,6 +446,9 @@ where
 pub fn gen_readwrite_asan<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
+#[cfg(cpu_target = "arm")]
+    pc: u32,
+#[cfg(not(cpu_target = "arm"))]
     pc: u64,
     _size: usize,
 ) -> Option<u64>
@@ -454,13 +457,12 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    if h.must_instrument(pc) {
-        Some(pc)
+    if h.must_instrument(pc.into()) {
+        Some(pc.into())
     } else {
         None
     }
 }
-
 pub fn trace_read1_asan<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
