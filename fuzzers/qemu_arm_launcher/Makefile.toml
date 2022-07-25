@@ -2,6 +2,7 @@
 [env]
 FUZZER_NAME='libpng_harness'
 PROJECT_DIR = { script = ["pwd"] }
+CROSS_CC = "arm-linux-gnueabi-gcc"
 
 [tasks.unsupported]
 script_runner="@shell"
