@@ -28,7 +28,7 @@ tar -xvf zlib-1.2.12.tar.gz
 condition = { files_not_exist = [ "./zlib-1.2.12/zlib/lib/libz.a" ] }
 script_runner="@shell"
 script='''
-cd zlib-1.2.12 && CC=arm-linux-gnueabi-gcc AR=arm-linux-gnueabi-ar ./configure --prefix=./zlib
+cd zlib-1.2.12 && CC=$CROSS_CC ./configure --prefix=./zlib
 make install
 '''
 dependencies = [ "zlib_unix_wget" ]
@@ -51,7 +51,7 @@ tar -xvf libpng-1.6.37.tar.xz
 condition = { files_not_exist = [ "./libpng-1.6.37/.libs/libpng16.a" ] }
 script_runner="@shell"
 script='''
-cd libpng-1.6.37 && CC=arm-linux-gnueabi-gcc CFLAGS=-I../zlib-1.2.12/zlib/lib LDFLAGS=-L../zlib-1.2.12/zlib/lib ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes --host=arm
+cd libpng-1.6.37 && CC=$CROSS_CC CFLAGS=-I../zlib-1.2.12/zlib/lib LDFLAGS=-L../zlib-1.2.12/zlib/lib ./configure --enable-shared=no --with-pic=yes --enable-hardware-optimizations=yes --host=arm
 make
 '''
 dependencies = [ "zlib", "libpng_unix_wget" ]
