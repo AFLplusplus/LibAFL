@@ -615,6 +615,7 @@ impl Emulator {
 
     #[must_use]
     #[allow(clippy::cast_possible_wrap)]
+    #[allow(clippy::cast_sign_loss)]
     pub fn num_cpus(&self) -> usize {
         unsafe { libafl_qemu_num_cpus() as usize }
     }
