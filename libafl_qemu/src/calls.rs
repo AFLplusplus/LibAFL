@@ -128,7 +128,20 @@ where
             return None;
         }
 
-        let mut code = unsafe { std::slice::from_raw_parts(emu.g2h(pc), 512) };
+        #[allow(unused_mut)]
+        let mut code = {
+            #[cfg(feature = "usermode")]
+            unsafe {
+                std::slice::from_raw_parts(emu.g2h(pc), 512)
+            }
+            #[cfg(not(feature = "usermode"))]
+            &mut [0; 512]
+        };
+        #[cfg(not(feature = "usermode"))]
+        unsafe {
+            emu.read_mem(pc, code)
+        }; // TODO handle faults
+
         let mut iaddr = pc;
 
         'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr, 1) {
@@ -174,7 +187,14 @@ where
             }
 
             iaddr += insn.bytes().len() as u64;
-            code = unsafe { std::slice::from_raw_parts(emu.g2h(iaddr), 512) };
+            #[cfg(feature = "usermode")]
+            unsafe {
+                code = std::slice::from_raw_parts(emu.g2h(iaddr), 512);
+            }
+            #[cfg(not(feature = "usermode"))]
+            unsafe {
+                emu.read_mem(pc, code);
+            } // TODO handle faults
         }
     }
 
