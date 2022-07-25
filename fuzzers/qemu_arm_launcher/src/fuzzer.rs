@@ -96,7 +96,7 @@ pub fn fuzz() {
             emu.write_reg(Regs::R0, input_addr).unwrap();
             emu.write_reg(Regs::R1, len).unwrap();
             emu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
-            emu.write_reg(Regs::Sp, stack_ptr).unwrap();
+            emu.write_reg(Regs::Lr, ret_addr).unwrap();
 
             emu.run();
         }
