@@ -447,10 +447,12 @@ pub struct CPU {
 }
 
 impl CPU {
+    #[must_use]
     pub fn emulator(&self) -> Emulator {
         Emulator::new_empty()
     }
 
+    #[must_use]
     pub fn index(&self) -> usize {
         unsafe { libafl_qemu_cpu_index(self.ptr) as usize }
     }
@@ -609,10 +611,12 @@ impl Emulator {
         GuestMaps::new()
     }
 
+    #[must_use]
     pub fn num_cpus(&self) -> usize {
         unsafe { libafl_qemu_num_cpus() as usize }
     }
 
+    #[must_use]
     pub fn current_cpu(&self) -> Option<CPU> {
         let ptr = unsafe { libafl_qemu_current_cpu() };
         if ptr.is_null() {
@@ -622,6 +626,7 @@ impl Emulator {
         }
     }
 
+    #[must_use]
     pub fn cpu_from_index(&self, index: usize) -> CPU {
         unsafe {
             CPU {
@@ -650,6 +655,7 @@ impl Emulator {
         self.current_cpu().unwrap().read_mem(addr, buf);
     }
 
+    #[must_use]
     pub fn num_regs(&self) -> i32 {
         self.current_cpu().unwrap().num_regs()
     }
