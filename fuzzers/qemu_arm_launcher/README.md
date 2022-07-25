@@ -8,7 +8,7 @@ In contrast to the normal libfuzzer libpng example, this uses the `launcher` fea
 
 ## Prerequisites
 ```bash
-sudo apt install arm-linux-gnueabi-gcc g++-arm-linux-gnueabi
+sudo apt install gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
 ```
 
 ## Run
