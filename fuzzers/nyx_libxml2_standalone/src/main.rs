@@ -1,12 +1,12 @@
+use std::path::{Path, PathBuf};
+
+use libafl::bolts::rands::StdRand;
 use libafl::corpus::Corpus;
 use libafl::events::SimpleEventManager;
 use libafl::inputs::BytesInput;
 use libafl::monitors::tui::TuiMonitor;
 use libafl::{
-    bolts::{
-        rands::{RandomSeed, Xoshiro256StarRand},
-        tuples::tuple_list,
-    },
+    bolts::{rands::RandomSeed, tuples::tuple_list},
     corpus::{InMemoryCorpus, OnDiskCorpus, Testcase},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     mutators::{havoc_mutations, StdScheduledMutator},
@@ -18,12 +18,6 @@ use libafl::{
 };
 use libafl_nyx::executor::NyxExecutor;
 use libafl_nyx::helper::NyxHelper;
-#[allow(unused_imports)]
-use std::{
-    ffi::OsString,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
 
 fn main() {
     let share_dir = Path::new("/tmp/nyx_libxml2/");
@@ -36,12 +30,12 @@ fn main() {
     let observer = StdMapObserver::new("trace", trace_bits);
 
     let input = BytesInput::new(b"22".to_vec());
-    let rand = Xoshiro256StarRand::new();
-    let mut corpus = InMemoryCorpus::<BytesInput>::new();
+    let rand = StdRand::new();
+    let mut corpus = InMemoryCorpus::new();
     corpus
         .add(Testcase::new(input))
         .expect("error in adding corpus");
-    let solutions = OnDiskCorpus::<BytesInput>::new(PathBuf::from("./crashes")).unwrap();
+    let solutions = OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap();
 
     // libafl stuff
     let mut feedback = MaxMapFeedback::new(&observer);

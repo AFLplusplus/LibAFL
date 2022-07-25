@@ -1,14 +1,12 @@
-use libafl::bolts::core_affinity::Cores;
+use std::path::{Path, PathBuf};
+
 use libafl::bolts::launcher::Launcher;
+use libafl::bolts::rands::StdRand;
 use libafl::bolts::shmem::ShMemProvider;
 use libafl::events::EventConfig;
 use libafl::Error;
 use libafl::{
-    bolts::{
-        rands::{RandomSeed, Xoshiro256StarRand},
-        shmem::StdShMemProvider,
-        tuples::tuple_list,
-    },
+    bolts::{core_affinity::Cores, rands::RandomSeed, shmem::StdShMemProvider, tuples::tuple_list},
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
@@ -22,15 +20,6 @@ use libafl::{
 };
 use libafl_nyx::executor::NyxExecutor;
 use libafl_nyx::helper::NyxHelper;
-/// contains function for local test and shouldn't run in CI.
-/// To enable in local, please unset `test` feature in your IDE(e.g. 'Rust-analyzer>Cargo: Unset Test' in VSCODE)
-/// then you need to follow https://github.com/AFLplusplus/AFLplusplus/tree/stable/nyx_mode to set up libxml2 in /tmp/nyx_libxml2/
-#[allow(unused_imports)]
-use std::{
-    ffi::OsString,
-    path::{Path, PathBuf},
-    str::FromStr,
-};
 
 fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
@@ -64,8 +53,8 @@ fn main() {
         let observer = StdMapObserver::new("trace", trace_bits);
 
         let input = BytesInput::new(b"22".to_vec());
-        let rand = Xoshiro256StarRand::new();
-        let mut corpus = InMemoryCorpus::<BytesInput>::new();
+        let rand = StdRand::new();
+        let mut corpus = InMemoryCorpus::new();
         corpus
             .add(Testcase::new(input))
             .expect("error in adding corpus");
