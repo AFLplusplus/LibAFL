@@ -446,6 +446,7 @@ pub struct CPU {
     ptr: CPUStatePtr,
 }
 
+#[allow(clippy::unused_self)]
 impl CPU {
     #[must_use]
     pub fn emulator(&self) -> Emulator {
@@ -453,6 +454,7 @@ impl CPU {
     }
 
     #[must_use]
+    #[allow(clippy::cast_sign_loss)]
     pub fn index(&self) -> usize {
         unsafe { libafl_qemu_cpu_index(self.ptr) as usize }
     }
@@ -612,6 +614,7 @@ impl Emulator {
     }
 
     #[must_use]
+    #[allow(clippy::cast_possible_wrap)]
     pub fn num_cpus(&self) -> usize {
         unsafe { libafl_qemu_num_cpus() as usize }
     }
@@ -627,6 +630,7 @@ impl Emulator {
     }
 
     #[must_use]
+    #[allow(clippy::cast_possible_wrap)]
     pub fn cpu_from_index(&self, index: usize) -> CPU {
         unsafe {
             CPU {
