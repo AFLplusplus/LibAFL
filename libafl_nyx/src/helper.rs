@@ -18,7 +18,7 @@ pub struct NyxHelper {
 }
 
 const MAX_FILE: u32 = 1024 * 1024;
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum NyxProcessType {
     /// stand alone mode
     ALONE,
