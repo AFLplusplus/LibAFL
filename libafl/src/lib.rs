@@ -423,6 +423,26 @@ impl From<pyo3::PyErr> for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
+/// The purpose of this module is to alleviate imports of many components by adding a glob import.
+pub mod prelude {
+    pub use super::bolts::bolts_prelude::*;
+    pub use super::bolts::*;
+    pub use super::corpus::*;
+    pub use super::events::*;
+    pub use super::executors::*;
+    pub use super::feedbacks::*;
+    pub use super::fuzzer::*;
+    pub use super::generators::*;
+    pub use super::inputs::*;
+    pub use super::monitors::*;
+    pub use super::mutators::*;
+    pub use super::observers::*;
+    pub use super::schedulers::*;
+    pub use super::stages::*;
+    pub use super::state::*;
+    pub use super::*;
+}
+
 // TODO: no_std test
 #[cfg(feature = "std")]
 #[cfg(test)]
