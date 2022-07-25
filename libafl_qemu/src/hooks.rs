@@ -23,6 +23,7 @@ use crate::{
 enum Hook {
     Function(*const c_void),
     Closure(FatPtr),
+    #[cfg(feature = "usermode")]
     Once(FatPtr),
     Empty,
 }
@@ -425,7 +426,9 @@ define_cmp_exec_hook!(exec_cmp2_hook_wrapper, 2, u16);
 define_cmp_exec_hook!(exec_cmp4_hook_wrapper, 3, u32);
 define_cmp_exec_hook!(exec_cmp8_hook_wrapper, 4, u64);
 
+#[cfg(feature = "usermode")]
 static mut ON_THREAD_HOOKS: Vec<Hook> = vec![];
+#[cfg(feature = "usermode")]
 extern "C" fn on_thread_hooks_wrapper<I, QT, S>(tid: u32)
 where
     I: Input,
@@ -461,7 +464,9 @@ where
     }
 }
 
+#[cfg(feature = "usermode")]
 static mut SYSCALL_HOOKS: Vec<Hook> = vec![];
+#[cfg(feature = "usermode")]
 extern "C" fn syscall_hooks_wrapper<I, QT, S>(
     sys_num: i32,
     a0: u64,
@@ -561,7 +566,9 @@ where
     }
 }
 
+#[cfg(feature = "usermode")]
 static mut SYSCALL_POST_HOOKS: Vec<Hook> = vec![];
+#[cfg(feature = "usermode")]
 extern "C" fn syscall_after_hooks_wrapper<I, QT, S>(
     result: u64,
     sys_num: i32,
@@ -1419,6 +1426,7 @@ where
         }
     }
 
+    #[cfg(feature = "usermode")]
     pub fn thread_creation(&self, hook: fn(&mut Self, Option<&mut S>, tid: u32)) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Function(hook as *const libc::c_void));
@@ -1427,6 +1435,7 @@ where
             .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
     }
 
+    #[cfg(feature = "usermode")]
     pub fn thread_creation_closure(
         &self,
         hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u32) + 'a>,
@@ -1438,6 +1447,7 @@ where
             .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
     }
 
+    #[cfg(feature = "usermode")]
     pub fn thread_creation_once(&self, hook: Box<dyn FnOnce(&mut Self, Option<&mut S>, u32) + 'a>) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Once(transmute(hook)));
@@ -1446,6 +1456,7 @@ where
             .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
     }
 
+    #[cfg(feature = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn syscalls(
         &self,
@@ -1470,6 +1481,7 @@ where
             .set_pre_syscall_hook(syscall_hooks_wrapper::<I, QT, S>);
     }
 
+    #[cfg(feature = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn syscalls_closure(
         &self,
@@ -1496,6 +1508,7 @@ where
             .set_pre_syscall_hook(syscall_hooks_wrapper::<I, QT, S>);
     }
 
+    #[cfg(feature = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn after_syscalls(
         &self,
@@ -1521,6 +1534,7 @@ where
             .set_post_syscall_hook(syscall_after_hooks_wrapper::<I, QT, S>);
     }
 
+    #[cfg(feature = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn after_syscalls_closure(
         &self,

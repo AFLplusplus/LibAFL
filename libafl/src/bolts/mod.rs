@@ -151,3 +151,35 @@ pub fn format_duration_hms(duration: &time::Duration) -> String {
     let secs = duration.as_secs();
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
 }
+
+/// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
+pub mod bolts_prelude {
+    pub use super::anymap::*;
+    #[cfg(feature = "std")]
+    pub use super::build_id::*;
+    #[cfg(all(
+        any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"),
+        feature = "std"
+    ))]
+    pub use super::cli::*;
+    #[cfg(feature = "llmp_compression")]
+    pub use super::compress::*;
+    #[cfg(feature = "std")]
+    pub use super::core_affinity::*;
+    pub use super::cpu::*;
+    #[cfg(feature = "std")]
+    pub use super::fs::*;
+    #[cfg(feature = "std")]
+    pub use super::launcher::*;
+    pub use super::llmp::*;
+    #[cfg(all(feature = "std", unix))]
+    pub use super::minibsod::*;
+    pub use super::os::*;
+    pub use super::ownedref::*;
+    pub use super::rands::*;
+    pub use super::serdeany::*;
+    pub use super::shmem::*;
+    #[cfg(feature = "std")]
+    pub use super::staterestore::*;
+    pub use super::tuples::*;
+}
