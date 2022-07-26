@@ -446,8 +446,7 @@ where
 pub fn gen_readwrite_asan<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
-    #[cfg(cpu_target = "arm")] pc: u32,
-    #[cfg(not(cpu_target = "arm"))] pc: u64,
+    pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where

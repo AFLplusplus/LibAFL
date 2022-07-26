@@ -186,12 +186,7 @@ where
                 }
             }
 
-            #[cfg(cpu_target = "arm")]
-            let insn_len = insn.bytes().len() as u32;
-            #[cfg(not(cpu_target = "arm"))]
-            let insn_len = insn.bytes().len() as u64;
-
-            iaddr += insn_len;
+            iaddr += insn.bytes().len() as GuestAddr;
 
             #[cfg(feature = "usermode")]
             unsafe {
