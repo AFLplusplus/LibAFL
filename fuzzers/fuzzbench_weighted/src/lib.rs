@@ -318,9 +318,9 @@ fn fuzz(
     let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::new(Some(
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
         PowerSchedule::EXPLORE,
-    )));
+    ));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
