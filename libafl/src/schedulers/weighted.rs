@@ -93,7 +93,7 @@ pub struct WeightedScheduler<F, I, S> {
     phantom: PhantomData<(F, I, S)>,
 }
 
-impl<F, I, S> Default for WeightedScheduler<F, I, S> 
+impl<F, I, S> Default for WeightedScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
