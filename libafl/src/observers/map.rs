@@ -1226,6 +1226,9 @@ where
 }
 
 /// The Multi Map Observer merge different maps into one observer
+///
+/// # Safety
+/// If using this Observer inside a `HitcountsMapObserver`, sub-maps needs to be even-length.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
