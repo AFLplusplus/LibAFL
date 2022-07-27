@@ -54,7 +54,7 @@ pub trait AsIter<'it> {
     type IntoIter: Iterator<Item = &'it Self::Item>;
 
     /// Create an interator from &self
-    fn as_ref_iter(&'it self) -> Self::IntoIter;
+    fn as_iter(&'it self) -> Self::IntoIter;
 }
 
 /// Create an `Iterator` from a mutable reference
@@ -65,7 +65,7 @@ pub trait AsIterMut<'it> {
     type IntoIter: Iterator<Item = &'it mut Self::Item>;
 
     /// Create an interator from &mut self
-    fn as_mut_iter(&'it mut self) -> Self::IntoIter;
+    fn as_iter_mut(&'it mut self) -> Self::IntoIter;
 }
 
 /// Has a length field

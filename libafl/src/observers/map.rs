@@ -208,7 +208,7 @@ where
     type Item = T;
     type IntoIter = Iter<'it, T>;
 
-    fn as_ref_iter(&'it self) -> Self::IntoIter {
+    fn as_iter(&'it self) -> Self::IntoIter {
         let cnt = self.usable_count();
         self.as_slice()[..cnt].iter()
     }
@@ -228,7 +228,7 @@ where
     type Item = T;
     type IntoIter = IterMut<'it, T>;
 
-    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         let cnt = self.usable_count();
         self.as_mut_slice()[..cnt].iter_mut()
     }
@@ -503,7 +503,7 @@ where
     type Item = T;
     type IntoIter = Iter<'it, T>;
 
-    fn as_ref_iter(&'it self) -> Self::IntoIter {
+    fn as_iter(&'it self) -> Self::IntoIter {
         let cnt = self.usable_count();
         self.as_slice()[..cnt].iter()
     }
@@ -523,7 +523,7 @@ where
     type Item = T;
     type IntoIter = IterMut<'it, T>;
 
-    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         let cnt = self.usable_count();
         self.as_mut_slice()[..cnt].iter_mut()
     }
@@ -774,7 +774,7 @@ where
     type Item = T;
     type IntoIter = Iter<'it, T>;
 
-    fn as_ref_iter(&'it self) -> Self::IntoIter {
+    fn as_iter(&'it self) -> Self::IntoIter {
         let cnt = self.usable_count();
         self.as_slice()[..cnt].iter()
     }
@@ -794,7 +794,7 @@ where
     type Item = T;
     type IntoIter = IterMut<'it, T>;
 
-    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         let cnt = self.usable_count();
         self.as_mut_slice()[..cnt].iter_mut()
     }
@@ -1045,7 +1045,7 @@ where
         let len = self.len();
         if (len & 1) == 0 {
             // Aligned map. Let's go.
-            for item in self.as_mut_iter().step_by(2) {
+            for item in self.as_iter_mut().step_by(2) {
                 unsafe {
                     let u16_ptr = item as *mut _ as *mut u16;
                     *u16_ptr = *COUNT_CLASS_LOOKUP_16.get_unchecked((*u16_ptr) as usize);
@@ -1053,7 +1053,7 @@ where
             }
         } else {
             // we need special handling for the odd last element
-            for (i, item) in self.as_mut_iter().step_by(2).enumerate() {
+            for (i, item) in self.as_iter_mut().step_by(2).enumerate() {
                 if i * 2 == len - 1 {
                     // last element.
                     *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };
@@ -1182,8 +1182,8 @@ where
     type Item = u8;
     type IntoIter = <M as AsIter<'it>>::IntoIter;
 
-    fn as_ref_iter(&'it self) -> Self::IntoIter {
-        self.base.as_ref_iter()
+    fn as_iter(&'it self) -> Self::IntoIter {
+        self.base.as_iter()
     }
 }
 
@@ -1194,8 +1194,8 @@ where
     type Item = u8;
     type IntoIter = <M as AsIterMut<'it>>::IntoIter;
 
-    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
-        self.base.as_mut_iter()
+    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+        self.base.as_iter_mut()
     }
 }
 
@@ -1444,7 +1444,7 @@ where
     type Item = T;
     type IntoIter = Flatten<Iter<'it, OwnedSliceMut<'a, T>>>;
 
-    fn as_ref_iter(&'it self) -> Self::IntoIter {
+    fn as_iter(&'it self) -> Self::IntoIter {
         self.maps.iter().flatten()
     }
 }
@@ -1457,7 +1457,7 @@ where
     type Item = T;
     type IntoIter = Flatten<IterMut<'it, OwnedSliceMut<'a, T>>>;
 
-    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         self.maps.iter_mut().flatten()
     }
 }
@@ -1538,7 +1538,7 @@ where
     type Item = T;
     type IntoIter = Iter<'it, T>;
 
-    fn as_ref_iter(&'it self) -> Self::IntoIter {
+    fn as_iter(&'it self) -> Self::IntoIter {
         self.as_slice().iter()
     }
 }
@@ -1550,7 +1550,7 @@ where
     type Item = T;
     type IntoIter = IterMut<'it, T>;
 
-    fn as_mut_iter(&'it mut self) -> Self::IntoIter {
+    fn as_iter_mut(&'it mut self) -> Self::IntoIter {
         self.as_mut_slice().iter_mut()
     }
 }
@@ -1951,8 +1951,8 @@ pub mod pybind {
                 type Item = $datatype;
                 type IntoIter = Iter<'it, $datatype>;
 
-                fn as_ref_iter(&'it self) -> Self::IntoIter {
-                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute::<_, Self::IntoIter>(m.as_ref_iter()) } })
+                fn as_iter(&'it self) -> Self::IntoIter {
+                    mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute::<_, Self::IntoIter>(m.as_iter()) } })
                 }
             }
 
@@ -1960,8 +1960,8 @@ pub mod pybind {
                 type Item = $datatype;
                 type IntoIter = IterMut<'it, $datatype>;
 
-                fn as_mut_iter(&'it mut self) -> Self::IntoIter {
-                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute::<_, Self::IntoIter>(m.as_mut_iter()) } })
+                fn as_iter_mut(&'it mut self) -> Self::IntoIter {
+                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute::<_, Self::IntoIter>(m.as_iter_mut()) } })
                 }
             }
 

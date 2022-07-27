@@ -664,11 +664,7 @@ where
 
         let history_map = map_state.history_map.as_mut_slice();
 
-        for (i, (item, history)) in observer
-            .as_ref_iter()
-            .zip(history_map.iter_mut())
-            .enumerate()
-        {
+        for (i, (item, history)) in observer.as_iter().zip(history_map.iter_mut()).enumerate() {
             let reduced = R::reduce(*history, *item);
             if N::is_novel(*history, reduced) {
                 *history = reduced;
@@ -763,7 +759,7 @@ where
         let observer = observers.match_name::<O>(&self.name).unwrap();
         let mut hit_target: bool = false;
         //check if we've hit any targets.
-        for (i, &elem) in observer.as_ref_iter().enumerate() {
+        for (i, &elem) in observer.as_iter().enumerate() {
             if elem > 0 {
                 self.target_idx.push(i);
                 hit_target = true;
