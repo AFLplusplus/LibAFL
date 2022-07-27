@@ -47,7 +47,7 @@ pub trait AsMutSlice<T> {
 }
 
 /// Create an `Iterator` from a reference
-pub trait AsRefIterator<'it> {
+pub trait AsIter<'it> {
     /// The item type
     type Item: 'it;
     /// The iterator type
@@ -58,7 +58,7 @@ pub trait AsRefIterator<'it> {
 }
 
 /// Create an `Iterator` from a mutable reference
-pub trait AsMutIterator<'it> {
+pub trait AsIterMut<'it> {
     /// The item type
     type Item: 'it;
     /// The iterator type

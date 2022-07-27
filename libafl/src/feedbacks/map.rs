@@ -10,7 +10,7 @@ use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bolts::{tuples::Named, AsMutSlice, AsRefIterator, AsSlice, HasRefCnt},
+    bolts::{tuples::Named, AsIter, AsMutSlice, AsSlice, HasRefCnt},
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
@@ -323,7 +323,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     S: HasNamedMetadata,
 {
@@ -346,7 +346,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
@@ -417,7 +417,7 @@ where
 impl<I, O, S> Feedback<I, S> for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
-    for<'it> O: AsRefIterator<'it, Item = u8>,
+    for<'it> O: AsIter<'it, Item = u8>,
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
@@ -539,7 +539,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     S: HasNamedMetadata,
 {
     #[inline]
@@ -554,7 +554,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     S: HasNamedMetadata,
 {
     #[inline]
@@ -572,7 +572,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
@@ -716,7 +716,7 @@ pub struct ReachabilityFeedback<O> {
 impl<O> ReachabilityFeedback<O>
 where
     O: MapObserver<Entry = usize>,
-    for<'it> O: AsRefIterator<'it, Item = usize>,
+    for<'it> O: AsIter<'it, Item = usize>,
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
     #[must_use]
@@ -743,7 +743,7 @@ impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<Entry = usize>,
-    for<'it> O: AsRefIterator<'it, Item = usize>,
+    for<'it> O: AsIter<'it, Item = usize>,
     S: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
@@ -793,7 +793,7 @@ where
 impl<O> Named for ReachabilityFeedback<O>
 where
     O: MapObserver<Entry = usize>,
-    for<'it> O: AsRefIterator<'it, Item = usize>,
+    for<'it> O: AsIter<'it, Item = usize>,
 {
     #[inline]
     fn name(&self) -> &str {

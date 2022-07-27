@@ -20,7 +20,7 @@ use crate::{
     bolts::{
         ownedref::{OwnedRefMut, OwnedSliceMut},
         tuples::Named,
-        AsMutIterator, AsMutSlice, AsRefIterator, AsSlice, HasLen,
+        AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen,
     },
     executors::ExitKind,
     observers::Observer,
@@ -194,7 +194,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsRefIterator<'it> for StdMapObserver<'a, T>
+impl<'a, 'it, T> AsIter<'it> for StdMapObserver<'a, T>
 where
     T: Bounded
         + PartialEq
@@ -214,7 +214,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsMutIterator<'it> for StdMapObserver<'a, T>
+impl<'a, 'it, T> AsIterMut<'it> for StdMapObserver<'a, T>
 where
     T: Bounded
         + PartialEq
@@ -489,7 +489,7 @@ where
     }
 }
 
-impl<'a, 'it, T, const N: usize> AsRefIterator<'it> for ConstMapObserver<'a, T, N>
+impl<'a, 'it, T, const N: usize> AsIter<'it> for ConstMapObserver<'a, T, N>
 where
     T: Bounded
         + PartialEq
@@ -509,7 +509,7 @@ where
     }
 }
 
-impl<'a, 'it, T, const N: usize> AsMutIterator<'it> for ConstMapObserver<'a, T, N>
+impl<'a, 'it, T, const N: usize> AsIterMut<'it> for ConstMapObserver<'a, T, N>
 where
     T: Bounded
         + PartialEq
@@ -756,11 +756,11 @@ where
 {
     #[inline]
     fn len(&self) -> usize {
-        self.map.as_slice().len()
+        *self.size.as_ref()
     }
 }
 
-impl<'a, 'it, T> AsRefIterator<'it> for VariableMapObserver<'a, T>
+impl<'a, 'it, T> AsIter<'it> for VariableMapObserver<'a, T>
 where
     T: Bounded
         + PartialEq
@@ -780,7 +780,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsMutIterator<'it> for VariableMapObserver<'a, T>
+impl<'a, 'it, T> AsIterMut<'it> for VariableMapObserver<'a, T>
 where
     T: Bounded
         + PartialEq
@@ -1029,8 +1029,8 @@ fn init_count_class_16() {
 
 impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<I, S> + AsMutSlice<u8>,
-    for<'it> M: AsMutIterator<'it, Item = u8>,
+    M: MapObserver<Entry = u8> + Observer<I, S>,
+    for<'it> M: AsIterMut<'it, Item = u8>,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
@@ -1040,22 +1040,23 @@ where
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
-        let map = self.as_mut_slice();
-        let len = map.len();
-        if (len & 1) != 0 {
+        let len = self.len();
+        let len_is_odd = if (len & 1) != 0 { true } else { false };
+
+        for (i, item) in self.as_mut_iter().enumerate().step_by(2) {
+            if len_is_odd {
+                if i == len - 1 {
+                    // last element.
+                    *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };
+                }
+            }
+
             unsafe {
-                *map.get_unchecked_mut(len - 1) =
-                    *COUNT_CLASS_LOOKUP.get_unchecked(*map.get_unchecked(len - 1) as usize);
+                let u16_ptr = item as *mut _ as *mut u16;
+                *u16_ptr = *COUNT_CLASS_LOOKUP_16.get_unchecked((*u16_ptr) as usize)
             }
         }
 
-        let cnt = len / 2;
-        let map16 = unsafe { core::slice::from_raw_parts_mut(map.as_mut_ptr() as *mut u16, cnt) };
-        for (_i, item) in map16[0..cnt].iter_mut().enumerate() {
-            unsafe {
-                *item = *COUNT_CLASS_LOOKUP_16.get_unchecked(*item as usize);
-            }
-        }
         self.base.post_exec(state, input, exit_kind)
     }
 }
@@ -1083,7 +1084,7 @@ where
 impl<M> MapObserver for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8>,
-    for<'it> M: AsMutIterator<'it, Item = u8>,
+    for<'it> M: AsIterMut<'it, Item = u8>,
 {
     type Entry = u8;
 
@@ -1165,24 +1166,24 @@ where
     }
 }
 
-impl<'it, M> AsRefIterator<'it> for HitcountsMapObserver<M>
+impl<'it, M> AsIter<'it> for HitcountsMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned + AsRefIterator<'it, Item = u8>,
+    M: Named + Serialize + serde::de::DeserializeOwned + AsIter<'it, Item = u8>,
 {
     type Item = u8;
-    type IntoIter = <M as AsRefIterator<'it>>::IntoIter;
+    type IntoIter = <M as AsIter<'it>>::IntoIter;
 
     fn as_ref_iter(&'it self) -> Self::IntoIter {
         self.base.as_ref_iter()
     }
 }
 
-impl<'it, M> AsMutIterator<'it> for HitcountsMapObserver<M>
+impl<'it, M> AsIterMut<'it> for HitcountsMapObserver<M>
 where
-    M: Named + Serialize + serde::de::DeserializeOwned + AsMutIterator<'it, Item = u8>,
+    M: Named + Serialize + serde::de::DeserializeOwned + AsIterMut<'it, Item = u8>,
 {
     type Item = u8;
-    type IntoIter = <M as AsMutIterator<'it>>::IntoIter;
+    type IntoIter = <M as AsIterMut<'it>>::IntoIter;
 
     fn as_mut_iter(&'it mut self) -> Self::IntoIter {
         self.base.as_mut_iter()
@@ -1423,7 +1424,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsRefIterator<'it> for MultiMapObserver<'a, T>
+impl<'a, 'it, T> AsIter<'it> for MultiMapObserver<'a, T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     'a: 'it,
@@ -1436,7 +1437,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsMutIterator<'it> for MultiMapObserver<'a, T>
+impl<'a, 'it, T> AsIterMut<'it> for MultiMapObserver<'a, T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     'a: 'it,
@@ -1518,7 +1519,7 @@ where
     }
 }
 
-impl<'it, T> AsRefIterator<'it> for OwnedMapObserver<T>
+impl<'it, T> AsIter<'it> for OwnedMapObserver<T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
@@ -1530,7 +1531,7 @@ where
     }
 }
 
-impl<'it, T> AsMutIterator<'it> for OwnedMapObserver<T>
+impl<'it, T> AsIterMut<'it> for OwnedMapObserver<T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
@@ -1699,8 +1700,8 @@ where
 #[allow(missing_docs)]
 pub mod pybind {
     use super::{
-        AsMutIterator, AsMutSlice, AsRefIterator, AsSlice, Debug, Error, HasLen, Iter, IterMut,
-        MapObserver, Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
+        AsIter, AsIterMut, AsMutSlice, AsSlice, Debug, Error, HasLen, Iter, IterMut, MapObserver,
+        Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
     use crate::observers::pybind::PythonObserver;
     use concat_idents::concat_idents;
@@ -1934,7 +1935,7 @@ pub mod pybind {
                 }
             }
 
-            impl<'it> AsRefIterator<'it> for $struct_name_trait {
+            impl<'it> AsIter<'it> for $struct_name_trait {
                 type Item = $datatype;
                 type IntoIter = Iter<'it, $datatype>;
 
@@ -1943,7 +1944,7 @@ pub mod pybind {
                 }
             }
 
-            impl<'it> AsMutIterator<'it> for $struct_name_trait {
+            impl<'it> AsIterMut<'it> for $struct_name_trait {
                 type Item = $datatype;
                 type IntoIter = IterMut<'it, $datatype>;
 
