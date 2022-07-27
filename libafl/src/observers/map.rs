@@ -1041,19 +1041,17 @@ where
     #[allow(clippy::cast_ptr_alignment)]
     fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let len = self.len();
-        let len_is_odd = if (len & 1) != 0 { true } else { false };
+        let len_is_odd = (len & 1) != 0;
 
         for (i, item) in self.as_mut_iter().enumerate().step_by(2) {
-            if len_is_odd {
-                if i == len - 1 {
-                    // last element.
-                    *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };
-                }
+            if i == len - 1 && len_is_odd {
+                // last element.
+                *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };
             }
 
             unsafe {
                 let u16_ptr = item as *mut _ as *mut u16;
-                *u16_ptr = *COUNT_CLASS_LOOKUP_16.get_unchecked((*u16_ptr) as usize)
+                *u16_ptr = *COUNT_CLASS_LOOKUP_16.get_unchecked((*u16_ptr) as usize);
             }
         }
 
