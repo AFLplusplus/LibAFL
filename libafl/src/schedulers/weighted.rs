@@ -93,17 +93,37 @@ pub struct WeightedScheduler<F, I, S> {
     phantom: PhantomData<(F, I, S)>,
 }
 
+impl<F, I, S> Default for WeightedScheduler<F, I, S>
+where
+    F: TestcaseScore<I, S>,
+    I: Input,
+    S: HasCorpus<I> + HasMetadata + HasRand,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<F, I, S> WeightedScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
+    /// Create a new [`WeightedScheduler`] without any scheduling strategy
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            strat: None,
+            phantom: PhantomData,
+        }
+    }
+
     /// Create a new [`WeightedScheduler`]
     #[must_use]
-    pub fn new(strat: Option<PowerSchedule>) -> Self {
+    pub fn with_schedule(strat: PowerSchedule) -> Self {
         Self {
-            strat,
+            strat: Some(strat),
             phantom: PhantomData,
         }
     }
