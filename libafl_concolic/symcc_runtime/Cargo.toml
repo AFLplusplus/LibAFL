@@ -29,5 +29,5 @@ cmake = "0.1"
 bindgen = "0.59"
 regex = "1"
 lazy_static = "1.4"
-which = "4.1"
+which = "4.2"
 symcc_libafl = {path = "../symcc_libafl", version="0.8"}
