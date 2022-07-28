@@ -19,14 +19,14 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 no-cpp-runtime = []
 
 [dependencies]
-unchecked_unwrap = "3"
+unchecked_unwrap = "4"
 ctor = "0.1"
 libc = "0.2"
 libafl = {path = "../../libafl", version="0.8", default-features=false, features=["std"]}
 
 [build-dependencies]
 cmake = "0.1"
-bindgen = "0.59"
+bindgen = "0.60"
 regex = "1"
 lazy_static = "1.4"
 which = "4.2"

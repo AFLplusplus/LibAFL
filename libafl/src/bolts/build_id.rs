@@ -79,7 +79,7 @@ fn from_type_id<H: Hasher>(mut hasher: H) -> H {
     hasher
 }
 
-fn calculate() -> Uuid {
+fn calculate<'a>() -> Uuid {
     let hasher = xxhash_rust::xxh3::Xxh3::with_seed(0);
 
     let hasher = from_exe(hasher.clone()).unwrap_or(hasher);
@@ -90,10 +90,10 @@ fn calculate() -> Uuid {
     hasher.write_u8(0);
     <byteorder::NativeEndian as byteorder::ByteOrder>::write_u64(&mut bytes[8..], hasher.finish());
 
-    uuid::Builder::from_bytes(bytes)
+    *uuid::Builder::from_bytes(bytes)
         .set_variant(uuid::Variant::RFC4122)
         .set_version(uuid::Version::Random)
-        .build()
+        .as_uuid()
 }
 
 struct HashWriter<T: Hasher>(T);

@@ -22,11 +22,11 @@ cc = { version = "1.0", features = ["parallel"] }
 libafl = { path = "../libafl", version = "0.8.0", features = ["std", "libafl_derive", "frida_cli"] }
 libafl_targets = { path = "../libafl_targets", version = "0.8.0", features = ["std", "sancov_cmplog"] }
 
-nix = "0.23"
+nix = "0.24"
 libc = "0.2"
-hashbrown = "0.11"
+hashbrown = "0.12"
 libloading = "0.7"
-rangemap = "0.1"
+rangemap = "1.0"
 frida-gum-sys = { version = "0.3", features = [ "auto-download", "event-sink", "invocation-listener"] }
 frida-gum = { version = "0.6.4", features = [ "auto-download", "event-sink", "invocation-listener"] }
 regex = "1.5"
