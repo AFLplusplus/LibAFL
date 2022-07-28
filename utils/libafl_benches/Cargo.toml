@@ -15,7 +15,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 criterion = "0.3" # Benchmarking
 ahash = { version = "0.7", default-features=false, features=["compile-time-rng"] } # The hash function already used in hashbrown
 rustc-hash = { version = "1.1", default-features=false } # yet another hash
-xxhash-rust = { version = "0.8.4", features = ["xxh3"] } # xxh3 hashing for rust
+xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
 libafl = { path = "../../libafl", default-features=false } # libafl
 
 [[bench]]

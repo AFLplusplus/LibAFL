@@ -16,8 +16,8 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 
 [dependencies]
 serde_json = "1.0"
-regex = "1"
+regex = "1.6"
 postcard = "1.0"
 lazy_static = "1.4.0"
 libafl = { path = "../../../libafl" }
-clap = { version = "3.1", features = ["derive"] }
+clap = { version = "3.2", features = ["derive"] }
