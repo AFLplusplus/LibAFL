@@ -152,6 +152,7 @@ jobs:
         linux: llvm llvm-dev clang nasm ninja-build
         # update bash for macos to support `declare -A` command`
         macos: llvm libpng nasm coreutils z3 bash
+        all: gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
     - name: install cargo-make
       run: cargo install --force cargo-make
     - uses: actions/checkout@v2
