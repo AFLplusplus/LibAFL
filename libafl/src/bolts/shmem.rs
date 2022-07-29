@@ -1197,7 +1197,7 @@ pub mod win32_shmem {
         fn new_shmem(map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let uuid = Uuid::new_v4();
-                let mut map_str = format!("libafl_{}", uuid.to_simple());
+                let mut map_str = format!("libafl_{}", uuid.simple());
                 let map_str_bytes = map_str.as_mut_vec();
                 map_str_bytes[19] = 0; // Trucate to size 20
                 let handle = CreateFileMappingA(
