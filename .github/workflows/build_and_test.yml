@@ -149,10 +149,9 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - uses: lyricwulf/abc@v1
       with: 
-        linux: llvm llvm-dev clang nasm ninja-build
+        linux: llvm llvm-dev clang nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
         # update bash for macos to support `declare -A` command`
-        macos: llvm libpng nasm coreutils z3 bash
-        all: gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
+        macos: llvm libpng nasm coreutils z3 bash gcc-arm-embedded
     - name: install cargo-make
       run: cargo install --force cargo-make
     - uses: actions/checkout@v2
