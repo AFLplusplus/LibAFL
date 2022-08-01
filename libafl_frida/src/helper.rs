@@ -221,7 +221,7 @@ where
                 .build()
                 .expect("Failed to create Capstone object"),
             ranges: RangeMap::new(),
-            module_map: ModuleMap::new_from_names(&modules_to_instrument),
+            module_map: ModuleMap::new_from_names(gum, &modules_to_instrument),
             options,
             runtimes,
         };
