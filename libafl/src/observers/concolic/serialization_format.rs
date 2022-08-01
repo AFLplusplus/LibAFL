@@ -468,7 +468,7 @@ impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
         let mut len_buf = 0_u64.to_le_bytes();
         buffer.read_exact(&mut len_buf)?;
         let buffer_len = u64::from_le_bytes(len_buf);
-        assert!(usize::try_from(buffer_len).unwrap());
+        assert!(usize::try_from(buffer_len).is_ok());
         let buffer_len = buffer_len as usize;
         let (buffer, _) = buffer.split_at(buffer_len);
         Ok(Self::from_buffer(buffer))
