@@ -25,7 +25,8 @@ Welcome to `LibAFL`
     clippy::missing_panics_doc,
     clippy::missing_docs_in_private_items,
     clippy::module_name_repetitions,
-    clippy::unreadable_literal
+    clippy::unreadable_literal,
+    clippy::assertions_on_result_states,
 )]
 #![cfg_attr(debug_assertions, warn(
     missing_debug_implementations,
