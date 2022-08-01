@@ -8,13 +8,13 @@ CROSS_CC = "arm-linux-gnueabi-gcc"
 [tasks.unsupported]
 script_runner="@shell"
 script='''
-echo "Qemu fuzzer not supported on windows"
+echo "Qemu fuzzer not supported on windows/mac"
 '''
 
 #zlib
 [tasks.zlib]
 linux_alias = "zlib_unix"
-mac_alias = "zlib_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.zlib_unix_wget]
@@ -37,7 +37,7 @@ dependencies = [ "zlib_unix_wget" ]
 # libpng
 [tasks.libpng]
 linux_alias = "libpng_unix"
-mac_alias = "libpng_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.libpng_unix_wget]
@@ -70,7 +70,7 @@ args = ["build", "--release"]
 # Harness
 [tasks.harness]
 linux_alias = "harness_unix"
-mac_alias = "harness_unix"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.harness_unix]
@@ -104,7 +104,7 @@ dependencies = [ "harness", "fuzzer" ]
 # Harness with an artifical crash
 [tasks.harness_crashing]
 linux_alias = "harness_unix_crashing"
-mac_alias = "harness_unix_crashing"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.harness_unix_crashing]
@@ -128,7 +128,7 @@ dependencies = [ "libpng" ]
 # Run the fuzzer with an artificial crash
 [tasks.run_crashing]
 linux_alias = "run_unix_crashing"
-mac_alias = "run_unix_crashing"
+mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.run_unix_crashing]
