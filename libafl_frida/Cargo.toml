@@ -28,10 +28,10 @@ hashbrown = "0.12"
 libloading = "0.7"
 rangemap = "1.0"
 frida-gum-sys = { version = "0.3", features = [ "auto-download", "event-sink", "invocation-listener"] }
-frida-gum = { version = "0.6.5", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum = { version = "0.7.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
 regex = "1"
 dynasmrt = "1.2"
-capstone = "0.10"
+capstone = "0.11.0"
 color-backtrace ={ version = "0.5", features = [ "resolve-modules" ] }
 termcolor = "1.1.3"
 serde = "1.0"
