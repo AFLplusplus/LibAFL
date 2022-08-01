@@ -169,7 +169,7 @@ impl FridaRuntime for AsanRuntime {
         self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
-        self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
+        self.module_map = Some(ModuleMap::new_from_names(gum, modules_to_instrument));
         if !self.options.dont_instrument.is_empty() {
             for (module_name, offset) in self.options.dont_instrument.clone() {
                 let module_details = ModuleDetails::with_name(module_name).unwrap();
