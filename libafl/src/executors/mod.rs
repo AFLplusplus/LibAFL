@@ -178,10 +178,10 @@ mod test {
         let mut executor = NopExecutor {};
         assert!(executor
             .run_target(&mut (), &mut (), &mut (), &empty_input)
-            .is_err());
+            .unwrap_err());
         assert!(executor
             .run_target(&mut (), &mut (), &mut (), &nonempty_input)
-            .is_ok());
+            .unwrap_err());
     }
 }
 

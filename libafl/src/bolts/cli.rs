@@ -401,14 +401,14 @@ mod tests {
     #[test]
     #[cfg(feature = "frida_cli")]
     fn parse_instrumentation_location_fails_without_at_symbol() {
-        assert!(parse_instrumentation_location("mod_name0x12345").is_err());
+        assert!(parse_instrumentation_location("mod_name0x12345").unwrap_err());
     }
 
     /// pass module without address to `parse_instrumentation_location`, expect failure
     #[test]
     #[cfg(feature = "frida_cli")]
     fn parse_instrumentation_location_failes_without_address() {
-        assert!(parse_instrumentation_location("mod_name@").is_err());
+        assert!(parse_instrumentation_location("mod_name@").unwrap_err());
     }
 
     /// pass location without 0x to `parse_instrumentation_location`, expect value to be parsed

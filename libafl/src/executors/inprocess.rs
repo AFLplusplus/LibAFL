@@ -1659,7 +1659,7 @@ mod tests {
         let input = NopInput {};
         assert!(in_process_executor
             .run_target(&mut (), &mut (), &mut (), &input)
-            .is_ok());
+            .unwrap());
     }
 
     #[test]
@@ -1681,7 +1681,7 @@ mod tests {
         let input = NopInput {};
         assert!(in_process_fork_executor
             .run_target(&mut (), &mut (), &mut (), &input)
-            .is_ok());
+            .unwrap());
     }
 }
 
