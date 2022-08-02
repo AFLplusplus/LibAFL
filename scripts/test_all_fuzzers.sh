@@ -29,7 +29,7 @@ declare -A time_record || (echo "declare -A not avaliable, please update your ba
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
     # skip test for nyx(also skip fmt check, fmt check won't pass in macos)
-    if [[ $fuzzer == *"nyx_"* ]];then
+    if [[ $fuzzer == *"nyx_"* ]] && [[ $(uname -s) != "Linux" ]];then
         continue
     fi
 

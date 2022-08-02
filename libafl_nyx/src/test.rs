@@ -31,6 +31,7 @@ use std::{
     ffi::OsString,
     path::{Path, PathBuf},
     str::FromStr,
+    time::Duration
 };
 
 #[cfg(not(test))]
@@ -39,8 +40,8 @@ fn test_nyxhelper() {
     let share_dir = Path::new("/tmp/nyx_libxml2/");
     let cpu_id = 0;
     let snap_mode = true;
-    let nyx_type = crate::executor::NyxProcessType::ALONE;
-    let helper = NyxHelper::new(share_dir, cpu_id, snap_mode, nyx_type)
+    let parallel_mode = false;
+    let helper = NyxHelper::new(share_dir, cpu_id, snap_mode, parallel_mode, None)
         .expect("error when create Nyxhelper");
-    helper.set_timeout(10, 0);
+    helper.set_timeout(Duration::new(10,0));
 }
