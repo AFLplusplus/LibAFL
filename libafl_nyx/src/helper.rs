@@ -117,10 +117,7 @@ impl NyxHelper {
             .as_secs()
             .try_into()
             .expect("can't cast time's sec to u8");
-        let micro_sec: u32 = time
-            .subsec_micros()
-            .try_into()
-            .expect("can't cast time's usec to u32");
+        let micro_sec: u32 = time.subsec_micros();
         self.nyx_process.option_set_timeout(sec, micro_sec);
         self.nyx_process.option_apply();
     }

@@ -29,7 +29,10 @@ fn main() {
 
     let cores = Cores::from_cmdline("0-3").unwrap();
     let parent_cpu_id = 0;
-    assert!(cores.contains(parent_cpu_id),"parent_cpu_id is not in range of cores");
+    assert!(
+        cores.contains(parent_cpu_id),
+        "parent_cpu_id is not in range of cores"
+    );
 
     // region: fuzzer start function
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id: usize| {

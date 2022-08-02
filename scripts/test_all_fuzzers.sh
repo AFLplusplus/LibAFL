@@ -28,8 +28,19 @@ declare -A time_record || (echo "declare -A not avaliable, please update your ba
 # shellcheck disable=SC2116
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
-    # skip test for nyx(also skip fmt check, fmt check won't pass in macos)
-    if [[ $fuzzer == *"nyx_"* ]] && [[ $(uname -s) != "Linux" ]];then
+    # only check fmt on linux's nyx
+    if [[ $fuzzer == *"nyx_"* ]] && [[ $(uname -s) == "Linux" ]]; then
+        cd "$fuzzer" || exit 1
+        if [ "$1" != "--no-fmt" ]; then
+            
+            echo "[*] Checking fmt for $fuzzer"
+            cargo fmt --all -- --check || exit 1
+            echo "[*] Running clippy for $fuzzer"
+            cargo clippy || exit 1
+        else
+            echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
+        fi
+        cd -
         continue
     fi
 
