@@ -3,7 +3,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "8d8fc6b1bd69684a5ea57e2354153708cc2b3eed";
+const QEMU_REVISION: &str = "ebda58f3e94a82f769890814339295b467f16680";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -331,6 +331,8 @@ pub fn build() {
     println!("cargo:rustc-link-lib=gmodule-2.0");
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
+
+    println!("cargo:rustc-link-lib=z");
 
     /* #[cfg(not(feature = "python"))]
     {

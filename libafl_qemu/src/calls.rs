@@ -124,7 +124,7 @@ where
 {
     let emu = hooks.emulator();
     if let Some(h) = hooks.helpers().match_first_type::<QemuCallTracerHelper>() {
-        if !h.must_instrument(pc) {
+        if !h.must_instrument(pc.into()) {
             return None;
         }
 
@@ -144,7 +144,7 @@ where
 
         let mut iaddr = pc;
 
-        'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr, 1) {
+        'disasm: while let Ok(insns) = h.cs.disasm_count(code, iaddr.into(), 1) {
             if insns.is_empty() {
                 break;
             }
@@ -186,7 +186,8 @@ where
                 }
             }
 
-            iaddr += insn.bytes().len() as u64;
+            iaddr += insn.bytes().len() as GuestAddr;
+
             #[cfg(feature = "usermode")]
             unsafe {
                 code = std::slice::from_raw_parts(emu.g2h(iaddr), 512);

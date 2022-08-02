@@ -52,7 +52,7 @@ jobs:
     - name: set mold linker as default linker
       uses: rui314/setup-mold@v1
     - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang ninja-build clang-format-13 shellcheck
+      run: sudo apt-get install -y llvm llvm-dev clang ninja-build clang-format-13 shellcheck gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -149,7 +149,7 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - uses: lyricwulf/abc@v1
       with: 
-        linux: llvm llvm-dev clang nasm ninja-build
+        linux: llvm llvm-dev clang nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
         # update bash for macos to support `declare -A` command`
         macos: llvm libpng nasm coreutils z3 bash
     - name: install cargo-make
