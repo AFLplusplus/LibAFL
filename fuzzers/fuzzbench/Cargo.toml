@@ -17,7 +17,6 @@ debug = true
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 which = { version = "4.0.2" }
-num_cpus = "1.0"
 
 [dependencies]
 libafl = { path = "../../libafl/" }

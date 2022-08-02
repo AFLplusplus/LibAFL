@@ -598,7 +598,7 @@ mod tests {
     #[test]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
-        assert_eq!(set.len(), available_parallelism().unwrap() as usize);
+        assert_eq!(set.len(), usize::from(available_parallelism().unwrap()));
     }
 
     #[test]

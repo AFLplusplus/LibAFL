@@ -16,7 +16,6 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-num_cpus = "1.0"
 which = "4.1"
 xz = "0.1.0"
 flate2 = "1.0.22"
