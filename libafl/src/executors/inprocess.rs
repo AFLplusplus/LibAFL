@@ -1657,9 +1657,9 @@ mod tests {
             phantom: PhantomData,
         };
         let input = NopInput {};
-        assert!(in_process_executor
+        in_process_executor
             .run_target(&mut (), &mut (), &mut (), &input)
-            .is_ok());
+            .unwrap();
     }
 
     #[test]
@@ -1679,9 +1679,9 @@ mod tests {
             phantom: PhantomData,
         };
         let input = NopInput {};
-        assert!(in_process_fork_executor
+        in_process_fork_executor
             .run_target(&mut (), &mut (), &mut (), &input)
-            .is_ok());
+            .unwrap();
     }
 }
 

@@ -1197,7 +1197,7 @@ pub mod win32_shmem {
         fn new_shmem(map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let uuid = Uuid::new_v4();
-                let mut map_str = format!("libafl_{}", uuid.to_simple());
+                let mut map_str = format!("libafl_{}", uuid.simple());
                 let map_str_bytes = map_str.as_mut_vec();
                 map_str_bytes[19] = 0; // Trucate to size 20
                 let handle = CreateFileMappingA(
@@ -1397,7 +1397,7 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
                 let map_len = self.inner.as_slice().len();
-                assert!(i64::try_from(map_len).is_ok());
+                i64::try_from(map_len).unwrap();
                 let signed_pos = map_len as i64;
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
@@ -1405,14 +1405,14 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             }
             std::io::SeekFrom::Current(offset) => {
                 let current_pos = self.pos;
-                assert!(i64::try_from(current_pos).is_ok());
+                i64::try_from(current_pos).unwrap();
                 let signed_pos = current_pos as i64;
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
                 effective.try_into().unwrap()
             }
         };
-        assert!(usize::try_from(effective_new_pos).is_ok());
+        usize::try_from(effective_new_pos).unwrap();
         self.pos = effective_new_pos as usize;
         Ok(effective_new_pos)
     }

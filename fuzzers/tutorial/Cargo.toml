@@ -24,7 +24,7 @@ libafl = { path = "../../libafl/", features = ["default", "rand_trait"] }
 libafl_derive = { path = "../../libafl_derive/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer", "sancov_cmplog"] }
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
-lain = { version = "0.5", features = ["serde_support"]}
+lain = { version = "0.5", features = ["serde_support"], git = "https://github.com/Mrmaxmeier/lain.git", rev = "6c8a786" } # We're using a lain fork with updated rand crate
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
 

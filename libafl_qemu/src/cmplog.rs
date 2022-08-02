@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
+    GuestAddr,
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -118,7 +119,7 @@ where
 pub fn gen_unique_cmp_ids<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     state: Option<&mut S>,
-    pc: u64,
+    pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
@@ -127,7 +128,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
-        if !h.must_instrument(pc) {
+        if !h.must_instrument(pc.into()) {
             return None;
         }
     }
@@ -141,7 +142,7 @@ where
         .unwrap();
     let id = meta.current_id as usize;
 
-    Some(*meta.map.entry(pc).or_insert_with(|| {
+    Some(*meta.map.entry(pc.into()).or_insert_with(|| {
         meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
         id as u64
     }))
@@ -150,7 +151,7 @@ where
 pub fn gen_hashed_cmp_ids<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
-    pc: u64,
+    pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
@@ -159,11 +160,11 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {
-        if !h.must_instrument(pc) {
+        if !h.must_instrument(pc.into()) {
             return None;
         }
     }
-    Some(hash_me(pc) & (CMPLOG_MAP_W as u64 - 1))
+    Some(hash_me(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
 }
 
 pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8, _data: u64) {

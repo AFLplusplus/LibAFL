@@ -176,12 +176,12 @@ mod test {
         let empty_input = BytesInput::new(vec![]);
         let nonempty_input = BytesInput::new(vec![1u8]);
         let mut executor = NopExecutor {};
-        assert!(executor
+        executor
             .run_target(&mut (), &mut (), &mut (), &empty_input)
-            .is_err());
-        assert!(executor
+            .unwrap_err();
+        executor
             .run_target(&mut (), &mut (), &mut (), &nonempty_input)
-            .is_ok());
+            .unwrap();
     }
 }
 
