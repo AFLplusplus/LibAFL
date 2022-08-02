@@ -518,6 +518,7 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 #[cfg(target_vendor = "apple")]
 mod apple {
     use core::ptr::addr_of_mut;
+    use std::thread::available_parallelism;
 
     use crate::Error;
 
@@ -528,7 +529,6 @@ mod apple {
         thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
         THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
     };
-    use num_cpus;
 
     #[repr(C)]
     struct thread_affinity_policy_data_t {
@@ -547,7 +547,7 @@ mod apple {
 
     #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
-        Ok((0..(num_cpus::get()))
+        Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
             .map(|n| CoreId { id: n })
             .collect::<Vec<_>>())
@@ -591,18 +591,14 @@ mod apple {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::thread::available_parallelism;
 
-    // #[test]
-    // fn test_num_cpus() {
-    //     println!("Num CPUs: {}", num_cpus::get());
-    //     println!("Num Physical CPUs: {}", num_cpus::get_physical());
-    // }
+    use super::*;
 
     #[test]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
-        assert_eq!(set.len(), num_cpus::get());
+        assert_eq!(set.len(), available_parallelism().unwrap() as usize);
     }
 
     #[test]
