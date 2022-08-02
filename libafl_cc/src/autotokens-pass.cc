@@ -619,40 +619,45 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
   LLVMContext &Ctx = M.getContext();
 
-  size_t memlen = 0, count = 0, offset = 0;
+  if (dictionary.size()) {
+    size_t memlen = 0, count = 0, offset = 0;
 
-  // sort and unique the dictionary
-  std::sort(dictionary.begin(), dictionary.end());
-  auto last = std::unique(dictionary.begin(), dictionary.end());
-  dictionary.erase(last, dictionary.end());
+    // sort and unique the dictionary
+    std::sort(dictionary.begin(), dictionary.end());
+    auto last = std::unique(dictionary.begin(), dictionary.end());
+    dictionary.erase(last, dictionary.end());
 
-  for (auto token : dictionary) {
-    memlen += token.length();
-    count++;
-  }
-
-  auto ptrhld = std::unique_ptr<char[]>(new char[memlen + count]);
-
-  count = 0;
-
-  for (auto token : dictionary) {
-    if (offset + token.length() < 0xfffff0 && count < MAX_AUTO_EXTRAS) {
-      // This lenght is guranteed to be < MAX_AUTO_EXTRA
-      ptrhld.get()[offset++] = (uint8_t)token.length();
-      memcpy(ptrhld.get() + offset, token.c_str(), token.length());
-      offset += token.length();
+    for (auto token : dictionary) {
+      memlen += token.length();
       count++;
     }
-  }
 
-  // Type
-  ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
-  // The actual dict
-  GlobalVariable *dict = new GlobalVariable(
-      M, arrayTy, true, GlobalVariable::ExternalLinkage,
-      ConstantDataArray::get(Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))),
-      "libafl_dictionary_" + M.getName());
-  dict->setSection("libafl_token");
+    if (count) {
+      auto ptrhld = std::unique_ptr<char[]>(new char[memlen + count]);
+
+      count = 0;
+
+      for (auto token : dictionary) {
+        if (offset + token.length() < 0xfffff0 && count < MAX_AUTO_EXTRAS) {
+          // This lenght is guranteed to be < MAX_AUTO_EXTRA
+          ptrhld.get()[offset++] = (uint8_t)token.length();
+          memcpy(ptrhld.get() + offset, token.c_str(), token.length());
+          offset += token.length();
+          count++;
+        }
+      }
+
+      // Type
+      ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
+      // The actual dict
+      GlobalVariable *dict = new GlobalVariable(
+          M, arrayTy, true, GlobalVariable::ExternalLinkage,
+          ConstantDataArray::get(Ctx,
+                                 *(new ArrayRef<char>(ptrhld.get(), offset))),
+          "libafl_dictionary_" + M.getName());
+      dict->setSection("libafl_token");
+    }
+  }
 
 #if USE_NEW_PM
   auto PA = PreservedAnalyses::all();

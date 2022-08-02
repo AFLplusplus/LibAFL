@@ -50,9 +50,13 @@ pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
 pub mod cmplog;
 pub use cmplog::QemuCmpLogHelper;
+#[cfg(feature = "usermode")]
 pub mod snapshot;
+#[cfg(feature = "usermode")]
 pub use snapshot::QemuSnapshotHelper;
+#[cfg(feature = "usermode")]
 pub mod asan;
+#[cfg(feature = "usermode")]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
 pub mod calls;

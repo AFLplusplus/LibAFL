@@ -19,5 +19,5 @@ build = ["which", "cmake"] # common functionality to build symcc
 clone = ["which"] # common functionality to check out the symcc repo using git
 
 [dependencies]
-which = { version = "4.1", optional = true }
+which = { version = "4.2", optional = true }
 cmake = { version = "0.1", optional = true }

@@ -164,7 +164,7 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     if let Some(h) = hooks.helpers().match_first_type::<QemuEdgeCoverageHelper>() {
-        if !h.must_instrument(src) && !h.must_instrument(dest) {
+        if !h.must_instrument(src.into()) && !h.must_instrument(dest.into()) {
             return None;
         }
     }
@@ -224,7 +224,7 @@ where
         .helpers()
         .match_first_type::<QemuEdgeCoverageChildHelper>()
     {
-        if !h.must_instrument(src) && !h.must_instrument(dest) {
+        if !h.must_instrument(src.into()) && !h.must_instrument(dest.into()) {
             return None;
         }
     }
