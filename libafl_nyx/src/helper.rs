@@ -1,7 +1,8 @@
 /// [`NyxHelper`] is used to wrap `NyxProcess`
 use std::{
     fmt::{self, Debug},
-    path::Path, time::Duration,
+    path::Path,
+    time::Duration,
 };
 
 use libafl::Error;
@@ -111,9 +112,15 @@ impl NyxHelper {
     }
 
     /// set timeout
-    pub fn set_timeout(mut self, time:Duration) {
-        let sec:u8 = time.as_secs().try_into().expect("can't cast time's sec to u8");
-        let micro_sec:u32 = time.subsec_micros().try_into().expect("can't cast time's usec to u32");
+    pub fn set_timeout(mut self, time: Duration) {
+        let sec: u8 = time
+            .as_secs()
+            .try_into()
+            .expect("can't cast time's sec to u8");
+        let micro_sec: u32 = time
+            .subsec_micros()
+            .try_into()
+            .expect("can't cast time's usec to u32");
         self.nyx_process.option_set_timeout(sec, micro_sec);
         self.nyx_process.option_apply();
     }

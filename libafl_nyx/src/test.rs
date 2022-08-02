@@ -31,7 +31,7 @@ use std::{
     ffi::OsString,
     path::{Path, PathBuf},
     str::FromStr,
-    time::Duration
+    time::Duration,
 };
 
 #[cfg(not(test))]
@@ -43,5 +43,5 @@ fn test_nyxhelper() {
     let parallel_mode = false;
     let helper = NyxHelper::new(share_dir, cpu_id, snap_mode, parallel_mode, None)
         .expect("error when create Nyxhelper");
-    helper.set_timeout(Duration::new(10,0));
+    helper.set_timeout(Duration::new(10, 0));
 }

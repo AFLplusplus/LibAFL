@@ -1,3 +1,7 @@
+use std::fmt::Debug;
+/// executor for nyx
+use std::marker::PhantomData;
+
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasBytesVec, Input},
@@ -5,9 +9,6 @@ use libafl::{
     Error,
 };
 use libnyx::NyxReturnValue;
-use std::fmt::Debug;
-/// executor for nyx
-use std::marker::PhantomData;
 
 use crate::helper::NyxHelper;
 
@@ -49,10 +50,9 @@ where
             NyxReturnValue::Normal => Ok(ExitKind::Ok),
             NyxReturnValue::Crash | NyxReturnValue::Asan => Ok(ExitKind::Crash),
             NyxReturnValue::Timeout => Ok(ExitKind::Timeout),
-            NyxReturnValue::InvalidWriteToPayload => {
-                println!("FixMe: Nyx InvalidWriteToPayload handler is missing");
-                Err(libafl::Error::ShuttingDown)
-            }
+            NyxReturnValue::InvalidWriteToPayload => Err(libafl::Error::illegal_state(
+                "FixMe: Nyx InvalidWriteToPayload handler is missing",
+            )),
             NyxReturnValue::Error => Err(libafl::Error::illegal_state(
                 "Error: Nyx runtime error has occured...",
             )),
