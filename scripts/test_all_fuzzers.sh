@@ -40,7 +40,7 @@ do
         else
             echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
         fi
-        cd -
+        cd - || exit
         continue
     fi
 
