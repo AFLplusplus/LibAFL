@@ -314,6 +314,15 @@ where
         }
         Ok(())
     }
+
+    /// Reset the map with any value
+    pub fn reset_with_value(&mut self, value: T) -> Result<(), Error> {
+        let cnt = self.history_map.len();
+        for i in 0..cnt {
+            self.history_map[i] = value;
+        }
+        Ok(())
+    }
 }
 
 /// The most common AFL-like feedback type
@@ -352,6 +361,8 @@ where
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
+        // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
         state.add_named_metadata(MapFeedbackMetadata::<T>::default(), &self.name);
         Ok(())
     }
@@ -659,7 +670,7 @@ where
             .unwrap();
         let len = observer.len();
         if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, T::default());
+            map_state.history_map.resize(len, observer.initial());
         }
 
         let history_map = map_state.history_map.as_mut_slice();
