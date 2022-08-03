@@ -22,4 +22,3 @@ mimalloc = { version = "*", default-features = false }
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-num_cpus = "1.0"
