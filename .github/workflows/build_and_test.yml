@@ -21,10 +21,14 @@ jobs:
           profile: minimal
           toolchain: nightly
       - uses: Swatinem/rust-cache@v1
-      - name: install mdbook and linkcheck
+      - name: install mdbook
         uses: baptiste0928/cargo-install@v1.3.0
         with:
           crate: mdbook mdbook-linkcheck
+      - name: install linkcheck
+        uses: baptiste0928/cargo-install@v1.3.0
+        with:
+          crate: mdbook-linkcheck
       - uses: actions/checkout@v2
       - name: Build libafl debug
         run: cargo build -p libafl
