@@ -30,21 +30,22 @@ for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
     echo `uname -s`
     printenv
-    # only check fmt on linux's nyx
-    if [[ $fuzzer == *"nyx_"* ]] && [[ $(uname -s) == "Linux" ]]; then
-    	echo `uname -s`
-	printenv
-        cd "$fuzzer" || exit 1
-        if [ "$1" != "--no-fmt" ]; then
-            
-            echo "[*] Checking fmt for $fuzzer"
-            cargo fmt --all -- --check || exit 1
-            echo "[*] Running clippy for $fuzzer"
-            cargo clippy || exit 1
-        else
-            echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
-        fi
-        cd - || exit
+    # for nyx examples
+    if [[ $fuzzer == *"nyx_"* ]]; then
+    
+    	# only test on linux
+    	if [[ $(uname -s) == "Linux" ]]; then
+		cd "$fuzzer" || exit 1
+			if [ "$1" != "--no-fmt" ]; then
+			    echo "[*] Checking fmt for $fuzzer"
+			    cargo fmt --all -- --check || exit 1
+			    echo "[*] Running clippy for $fuzzer"
+			    cargo clippy || exit 1
+			else
+			    echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
+			fi
+		cd - || exit
+	fi
         continue
     fi
 
