@@ -28,9 +28,10 @@ declare -A time_record || (echo "declare -A not avaliable, please update your ba
 # shellcheck disable=SC2116
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
-    printenv
     # only check fmt on linux's nyx
     if [[ $fuzzer == *"nyx_"* ]] && [[ $(uname -s) == "Linux" ]]; then
+    	echo `uname -s`
+	printenv
         cd "$fuzzer" || exit 1
         if [ "$1" != "--no-fmt" ]; then
             
