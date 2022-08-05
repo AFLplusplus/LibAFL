@@ -358,16 +358,15 @@ impl CmpLogRuntime {
         match op2 {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
                 writer.put_ldr_reg_u64(Aarch64Register::X1, *value);
-                match special_case {
-                    Some(inst) => match inst {
+                if let Some(inst) = special_case {
+                    match inst {
                         SpecialCmpLogCase::Tbz => {
                             writer.put_bytes(self.ops_handle_tbz_masking());
                         }
                         SpecialCmpLogCase::Tbnz => {
                             writer.put_bytes(self.ops_handle_tbnz_masking());
                         }
-                    },
-                    None => (),
+                    }
                 }
             }
             CmplogOperandType::Regid(reg) => {

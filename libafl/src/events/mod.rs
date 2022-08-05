@@ -126,14 +126,14 @@ impl EventConfig {
             EventConfig::FromName { name_hash: a } => match other {
                 #[cfg(not(feature = "std"))]
                 EventConfig::AlwaysUnique => false,
-                EventConfig::FromName { name_hash: b } => (a == b),
+                EventConfig::FromName { name_hash: b } => a == b,
                 #[cfg(feature = "std")]
                 EventConfig::AlwaysUnique | EventConfig::BuildID { id: _ } => false,
             },
             #[cfg(feature = "std")]
             EventConfig::BuildID { id: a } => match other {
                 EventConfig::AlwaysUnique | EventConfig::FromName { name_hash: _ } => false,
-                EventConfig::BuildID { id: b } => (a == b),
+                EventConfig::BuildID { id: b } => a == b,
             },
         }
     }
