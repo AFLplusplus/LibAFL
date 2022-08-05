@@ -24,7 +24,7 @@ jobs:
       - name: install mdbook
         uses: baptiste0928/cargo-install@v1.3.0
         with:
-          crate: mdbook mdbook-linkcheck
+          crate: mdbook
       - name: install linkcheck
         uses: baptiste0928/cargo-install@v1.3.0
         with:
