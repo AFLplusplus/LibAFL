@@ -26,6 +26,8 @@ done
 declare -A time_record || (echo "declare -A not avaliable, please update your bash version to 4";exit 1)
 
 # shellcheck disable=SC2116
+
+fuzzers=$(echo "./fuzzers/nyx_libxml2_standalone") # todo: remove this test line
 for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
     echo `uname -s`
