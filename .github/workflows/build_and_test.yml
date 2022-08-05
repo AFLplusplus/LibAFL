@@ -21,10 +21,10 @@ jobs:
           profile: minimal
           toolchain: nightly
       - uses: Swatinem/rust-cache@v1
-      - name: install mdbook
-        run: cargo install mdbook
-      - name: install linkcheck
-        run: cargo install mdbook-linkcheck
+      - name: install mdbook and linkcheck
+        uses: baptiste0928/cargo-install@v1.3.0
+        with:
+          crate: mdbook mdbook-linkcheck
       - uses: actions/checkout@v2
       - name: Build libafl debug
         run: cargo build -p libafl
@@ -51,8 +51,10 @@ jobs:
     - uses: Swatinem/rust-cache@v1
     - name: set mold linker as default linker
       uses: rui314/setup-mold@v1
-    - name: Install deps
-      run: sudo apt-get install -y llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
+    - name: Install and cache deps
+      uses: awalsh128/cache-apt-pkgs-action@v1.1.0
+      with:
+        packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -157,7 +159,9 @@ jobs:
         # update bash for macos to support `declare -A` command`
         macos: llvm libpng nasm coreutils z3 bash
     - name: install cargo-make
-      run: cargo install --force cargo-make
+      uses: baptiste0928/cargo-install@v1.3.0
+      with:
+        crate: cargo-make
     - uses: actions/checkout@v2
     - name: Build and run example fuzzers
       if: runner.os == 'Linux'
