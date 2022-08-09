@@ -53,10 +53,8 @@ impl NyxHelper {
                 Some(x) => x,
             };
             if cpu_id == parent_cpu_id {
-                println!("parent!");
                 NyxProcessType::PARENT
             } else {
-                println!("child!");
                 NyxProcessType::CHILD
             }
         } else {

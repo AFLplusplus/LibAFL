@@ -78,7 +78,7 @@ impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
     }
 
     /// convert `trace_bits` ptr into real trace map
-    pub fn get_trace_bits(self) -> &'static mut [u8] {
+    pub fn trace_bits(self) -> &'static mut [u8] {
         unsafe { std::slice::from_raw_parts_mut(self.helper.trace_bits, self.helper.real_map_size) }
     }
 }
