@@ -38,9 +38,10 @@ impl NyxHelper {
         parallel_mode: bool,
         parent_cpu_id: Option<u32>,
     ) -> Result<Self, Error> {
-        let sharedir = target_dir
-            .to_str()
-            .expect("unable to convert target_dir to str");
+        let sharedir = match target_dir.to_str() {
+            Some(x) => x,
+            None => return Err(Error::illegal_argument("can't convert sharedir to str")),
+        };
         let work_dir = target_dir.join("workdir");
         let work_dir = work_dir.to_str().expect("unable to convert workdir to str");
         let nyx_type = if parallel_mode {
