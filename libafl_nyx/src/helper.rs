@@ -31,12 +31,33 @@ pub enum NyxProcessType {
 impl NyxHelper {
     /// create `NyxProcess` and do basic settings
     /// It will convert instance to parent or child using `parent_cpu_id` when set`parallel_mode`
+    /// will fail if initial connection takes more than 2 seconds
     pub fn new(
         target_dir: &Path,
         cpu_id: u32,
         snap_mode: bool,
         parallel_mode: bool,
         parent_cpu_id: Option<u32>,
+    ) -> Result<Self, Error> {
+        NyxHelper::new_with_initial_timeout(
+            target_dir,
+            cpu_id,
+            snap_mode,
+            parallel_mode,
+            parent_cpu_id,
+            2,
+        )
+    }
+    /// create `NyxProcess` and do basic settings
+    /// It will convert instance to parent or child using `parent_cpu_id` when set`parallel_mode`
+    /// will fail if initial connection takes more than `initial_timeout` seconds
+    pub fn new_with_initial_timeout(
+        target_dir: &Path,
+        cpu_id: u32,
+        snap_mode: bool,
+        parallel_mode: bool,
+        parent_cpu_id: Option<u32>,
+        initial_timeout: u8,
     ) -> Result<Self, Error> {
         let sharedir = match target_dir.to_str() {
             Some(x) => x,
@@ -80,7 +101,7 @@ impl NyxHelper {
         nyx_process.option_apply();
 
         // default timeout for initial dry-run
-        nyx_process.option_set_timeout(5, 0);
+        nyx_process.option_set_timeout(initial_timeout, 0);
         nyx_process.option_apply();
 
         // dry run to check if qemu is spawned
