@@ -1,23 +1,24 @@
 use std::path::{Path, PathBuf};
 
-use libafl::bolts::rands::StdRand;
-use libafl::corpus::Corpus;
-use libafl::events::SimpleEventManager;
-use libafl::inputs::BytesInput;
-use libafl::monitors::tui::TuiMonitor;
 use libafl::{
-    bolts::{rands::RandomSeed, tuples::tuple_list},
-    corpus::{InMemoryCorpus, OnDiskCorpus, Testcase},
+    bolts::{
+        rands::{RandomSeed, StdRand},
+        tuples::tuple_list,
+    },
+    corpus::{Corpus, OnDiskCorpus, Testcase},
+    events::SimpleEventManager,
     feedbacks::{CrashFeedback, MaxMapFeedback},
+    inputs::BytesInput,
+    monitors::tui::TuiMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
+    prelude::CachedOnDiskCorpus,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
     Fuzzer, StdFuzzer,
 };
-use libafl_nyx::executor::NyxExecutor;
-use libafl_nyx::helper::NyxHelper;
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper};
 
 fn main() {
     let share_dir = Path::new("/tmp/nyx_libxml2/");
@@ -31,7 +32,7 @@ fn main() {
 
     let input = BytesInput::new(b"22".to_vec());
     let rand = StdRand::new();
-    let mut corpus = InMemoryCorpus::new();
+    let mut corpus = CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap();
     corpus
         .add(Testcase::new(input))
         .expect("error in adding corpus");

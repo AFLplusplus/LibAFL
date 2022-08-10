@@ -1,6 +1,4 @@
-use std::fmt::Debug;
-/// executor for nyx
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
@@ -58,11 +56,11 @@ where
             )),
             NyxReturnValue::IoError => {
                 // todo! *stop_soon_p = 0
-                Err(libafl::Error::illegal_state("Error: QEMU-nyx died..."))
+                Err(libafl::Error::unknown("Error: QEMU-nyx died..."))
             }
             NyxReturnValue::Abort => {
                 self.helper.nyx_process.shutdown();
-                Err(libafl::Error::illegal_state("Error: Nyx abort occured..."))
+                Err(libafl::Error::shutting_down())
             }
         }
     }

@@ -1,25 +1,27 @@
 use std::path::{Path, PathBuf};
 
-use libafl::bolts::launcher::Launcher;
-use libafl::bolts::rands::StdRand;
-use libafl::bolts::shmem::ShMemProvider;
-use libafl::events::EventConfig;
-use libafl::Error;
 use libafl::{
-    bolts::{core_affinity::Cores, rands::RandomSeed, shmem::StdShMemProvider, tuples::tuple_list},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, Testcase},
+    bolts::{
+        core_affinity::Cores,
+        launcher::Launcher,
+        rands::{RandomSeed, StdRand},
+        shmem::{ShMemProvider, StdShMemProvider},
+        tuples::tuple_list,
+    },
+    corpus::{Corpus, OnDiskCorpus, Testcase},
+    events::EventConfig,
     feedbacks::{CrashFeedback, MaxMapFeedback},
     inputs::BytesInput,
     monitors::MultiMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
+    prelude::CachedOnDiskCorpus,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
-    Fuzzer, StdFuzzer,
+    Error, Fuzzer, StdFuzzer,
 };
-use libafl_nyx::executor::NyxExecutor;
-use libafl_nyx::helper::NyxHelper;
+use libafl_nyx::{executor::NyxExecutor, helper::NyxHelper};
 
 fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
@@ -27,12 +29,12 @@ fn main() {
 
     let monitor = MultiMonitor::new(|s| println!("{}", s));
 
-    let cores = Cores::from_cmdline("0-3").unwrap();
-    let parent_cpu_id = 0;
-    assert!(
-        cores.contains(parent_cpu_id),
-        "parent_cpu_id is not in range of cores"
-    );
+    let cores = Cores::all().expect("unable to get all core id");
+    let parent_cpu_id = cores
+        .ids
+        .first()
+        .expect("unable to get first core id")
+        .clone();
 
     // region: fuzzer start function
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id: usize| {
@@ -46,7 +48,7 @@ fn main() {
             cpu_id,
             true,
             parallel_mode,
-            Some(parent_cpu_id as u32),
+            Some(parent_cpu_id.id as u32),
         )
         .unwrap();
         let trace_bits =
@@ -55,7 +57,7 @@ fn main() {
 
         let input = BytesInput::new(b"22".to_vec());
         let rand = StdRand::new();
-        let mut corpus = InMemoryCorpus::new();
+        let mut corpus = CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap();
         corpus
             .add(Testcase::new(input))
             .expect("error in adding corpus");
