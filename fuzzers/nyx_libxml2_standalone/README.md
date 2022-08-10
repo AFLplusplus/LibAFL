@@ -12,5 +12,4 @@ the following command will:
 ```
 
 # run the fuzzer
-use `cargo run` to run the fuzzer
-
+use `cargo make run` to run the fuzzer. If you have setup all environment, you can use `cargo run` directly.
