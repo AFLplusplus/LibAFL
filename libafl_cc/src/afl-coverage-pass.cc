@@ -677,13 +677,13 @@ bool AFLCoverage::runOnModule(Module &M) {
                                              // is then fixed
                         #else
                                 if (NotZero) {
-
+                
                         #endif
                                   // register MapPtrIdx in a todo list
                                   todo.push_back(MapPtrIdx);
-
+                
                                 } else {
-
+                
                         */
         IRB.CreateAtomicRMW(llvm::AtomicRMWInst::BinOp::Add, MapPtrIdx, One,
 #if LLVM_VERSION_MAJOR >= 13
