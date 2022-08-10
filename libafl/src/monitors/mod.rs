@@ -239,7 +239,7 @@ pub trait Monitor {
 
 /// Monitor that print exactly nothing.
 /// Not good for debuging, very good for speed.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NopMonitor {
     start_time: Duration,
     client_stats: Vec<ClientStats>,
