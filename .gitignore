@@ -47,3 +47,5 @@ __pycache__
 
 *atomic_file_testfile*
 **/libxml2
+**/corpus_discovered
+**/libxml2-*.tar.gz

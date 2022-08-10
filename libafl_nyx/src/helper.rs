@@ -80,7 +80,7 @@ impl NyxHelper {
         nyx_process.option_apply();
 
         // default timeout for initial dry-run
-        nyx_process.option_set_timeout(2, 0);
+        nyx_process.option_set_timeout(5, 0);
         nyx_process.option_apply();
 
         // dry run to check if qemu is spawned
