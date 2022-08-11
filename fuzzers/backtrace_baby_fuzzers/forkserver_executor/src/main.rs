@@ -1,3 +1,9 @@
+use std::path::PathBuf;
+
+#[cfg(not(target_vendor = "apple"))]
+use libafl::bolts::shmem::StdShMemProvider;
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
 use libafl::{
     bolts::{
         current_nanos,
@@ -21,12 +27,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use std::path::PathBuf;
-
-#[cfg(not(target_vendor = "apple"))]
-use libafl::bolts::shmem::StdShMemProvider;
-#[cfg(target_vendor = "apple")]
-use libafl::bolts::shmem::UnixShMemProvider;
 
 #[allow(clippy::similar_names)]
 pub fn main() {

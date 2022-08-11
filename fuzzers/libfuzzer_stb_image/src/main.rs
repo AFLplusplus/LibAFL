@@ -16,15 +16,16 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    mutators::token_mutations::I2SRandReplace,
+    mutators::{
+        scheduled::{havoc_mutations, StdScheduledMutator},
+        token_mutations::I2SRandReplace,
+    },
     observers::{StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, StdState},
     Error,
 };
-
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,

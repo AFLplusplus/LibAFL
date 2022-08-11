@@ -1,3 +1,11 @@
+#[cfg(windows)]
+use std::ptr::write_volatile;
+use std::{
+    io::Write,
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+};
+
 use libafl::{
     bolts::{
         current_nanos,
@@ -21,13 +29,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
     Error,
-};
-#[cfg(windows)]
-use std::ptr::write_volatile;
-use std::{
-    io::Write,
-    path::PathBuf,
-    process::{Child, Command, Stdio},
 };
 
 #[allow(clippy::similar_names)]
