@@ -8,6 +8,7 @@ use std::{
 use libafl::Error;
 use libnyx::{NyxProcess, NyxReturnValue};
 
+const INIT_TIMEOUT: Duration = Duration::new(2, 0);
 pub struct NyxHelper {
     pub nyx_process: NyxProcess,
     /// real size of trace_bits
@@ -45,7 +46,7 @@ impl NyxHelper {
             snap_mode,
             parallel_mode,
             parent_cpu_id,
-            2,
+            INIT_TIMEOUT,
         )
     }
     /// create `NyxProcess` and do basic settings
@@ -57,7 +58,7 @@ impl NyxHelper {
         snap_mode: bool,
         parallel_mode: bool,
         parent_cpu_id: Option<u32>,
-        initial_timeout: u8,
+        initial_timeout: Duration,
     ) -> Result<Self, Error> {
         let sharedir = match target_dir.to_str() {
             Some(x) => x,
@@ -101,7 +102,12 @@ impl NyxHelper {
         nyx_process.option_apply();
 
         // default timeout for initial dry-run
-        nyx_process.option_set_timeout(initial_timeout, 0);
+        let sec: u8 = initial_timeout
+            .as_secs()
+            .try_into()
+            .expect("can't cast time's sec to u8");
+        let micro_sec: u32 = initial_timeout.subsec_micros();
+        nyx_process.option_set_timeout(sec, micro_sec);
         nyx_process.option_apply();
 
         // dry run to check if qemu is spawned
