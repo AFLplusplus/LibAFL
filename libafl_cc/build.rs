@@ -123,7 +123,7 @@ fn build_pass(
 
     println!("cargo:rerun-if-changed=src/{}", src_file);
     if cfg!(unix) {
-        assert!(Command::new(bindir_path.join("clang"))
+        assert!(Command::new(bindir_path.join("clang++"))
             .arg("-v")
             .args(cxxflags)
             .arg(src_dir.join(src_file))
@@ -240,7 +240,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     .expect("Could not write file");
 
     let mut llvm_config_ld = vec![];
-    if cfg!(apple) {
+    if cfg!(target_vendor = "apple") {
         llvm_config_ld.push("--libs");
     }
     if cfg!(windows) {
