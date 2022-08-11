@@ -1,8 +1,9 @@
 #[cfg(target_vendor = "apple")]
-use glob::glob;
-#[cfg(target_vendor = "apple")]
 use std::path::PathBuf;
 use std::{env, fs::File, io::Write, path::Path, process::Command, str};
+
+#[cfg(target_vendor = "apple")]
+use glob::glob;
 #[cfg(not(target_vendor = "apple"))]
 use which::which;
 

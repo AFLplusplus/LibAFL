@@ -1,14 +1,12 @@
 #[cfg(target_arch = "aarch64")]
-use frida_gum::instruction_writer::Aarch64Register;
-#[cfg(target_arch = "x86_64")]
-use frida_gum::instruction_writer::X86Register;
-
-#[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, arm64::Arm64OperandType, ArchOperand::Arm64Operand},
     Insn,
 };
-
+#[cfg(target_arch = "aarch64")]
+use frida_gum::instruction_writer::Aarch64Register;
+#[cfg(target_arch = "x86_64")]
+use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use num_traits::cast::FromPrimitive;
 
@@ -17,9 +15,7 @@ use num_traits::cast::FromPrimitive;
 #[inline]
 #[must_use]
 pub fn instruction_width(instr: &Insn, operands: &[arch::ArchOperand]) -> u32 {
-    use capstone::arch::arm64::Arm64Insn as I;
-    use capstone::arch::arm64::Arm64Reg as R;
-    use capstone::arch::arm64::Arm64Vas as V;
+    use capstone::arch::arm64::{Arm64Insn as I, Arm64Reg as R, Arm64Vas as V};
 
     let num_registers = match instr.id().0.into() {
         I::ARM64_INS_STP

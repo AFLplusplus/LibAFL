@@ -2,7 +2,6 @@
 //!
 use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
-use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
@@ -23,19 +22,22 @@ use libafl::{
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::{token_mutations::Tokens, I2SRandReplace},
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
+        I2SRandReplace,
+    },
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
 };
-
 pub use libafl_qemu::emu::Emulator;
 use libafl_qemu::{
     cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks,
 };
 use libafl_targets::CmpLogObserver;
+use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
@@ -431,12 +433,13 @@ where
 /// python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::qemu;
+    use std::path::PathBuf;
+
     use libafl::bolts::core_affinity::Cores;
     use libafl_qemu::emu::pybind::Emulator;
-    use pyo3::prelude::*;
-    use pyo3::types::PyBytes;
-    use std::path::PathBuf;
+    use pyo3::{prelude::*, types::PyBytes};
+
+    use crate::qemu;
 
     #[pyclass(unsendable)]
     struct QemuBytesCoverageSugar {

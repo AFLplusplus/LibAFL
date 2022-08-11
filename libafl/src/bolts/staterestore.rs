@@ -1,9 +1,7 @@
 //! Stores and restores state when a client needs to relaunch.
 //! Uses a [`ShMem`] up to a threshold, then write to disk.
-use ahash::AHasher;
 use alloc::string::{String, ToString};
 use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
-use serde::{de::DeserializeOwned, Serialize};
 use std::{
     env::temp_dir,
     fs::{self, File},
@@ -11,6 +9,9 @@ use std::{
     path::PathBuf,
     ptr::read_volatile,
 };
+
+use ahash::AHasher;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     bolts::{
@@ -246,6 +247,7 @@ mod tests {
         string::{String, ToString},
         vec::Vec,
     };
+
     use serial_test::serial;
 
     use crate::bolts::{

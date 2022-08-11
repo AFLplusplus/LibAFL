@@ -1,6 +1,5 @@
 //! The `MapObserver` provides access a map, usually injected into the target
 
-use ahash::AHasher;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -12,6 +11,8 @@ use core::{
     marker::PhantomData,
     slice::{from_raw_parts, Iter, IterMut},
 };
+
+use ahash::AHasher;
 use intervaltree::IntervalTree;
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
@@ -1895,14 +1896,15 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use concat_idents::concat_idents;
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
     use super::{
         AsIter, AsIterMut, AsMutSlice, AsSlice, Debug, Error, HasLen, Iter, IterMut, MapObserver,
         Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
     use crate::observers::pybind::PythonObserver;
-    use concat_idents::concat_idents;
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
 
     #[macro_export]
     macro_rules! mapob_unwrap_me {

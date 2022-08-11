@@ -20,14 +20,14 @@ pub mod concolic;
 
 #[cfg(unstable_feature)]
 pub mod owned;
-#[cfg(unstable_feature)]
-pub use owned::*;
-
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{fmt::Debug, time::Duration};
+
+#[cfg(unstable_feature)]
+pub use owned::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -294,24 +294,26 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{Debug, Observer, ObserversTuple, String, Vec};
-    use crate::bolts::tuples::{type_eq, MatchName, Named};
-    use crate::executors::pybind::PythonExitKind;
-    use crate::executors::ExitKind;
-    use crate::inputs::BytesInput;
-    use crate::inputs::HasBytesVec;
-    use crate::observers::map::pybind::{
-        PythonMapObserverI16, PythonMapObserverI32, PythonMapObserverI64, PythonMapObserverI8,
-        PythonMapObserverU16, PythonMapObserverU32, PythonMapObserverU64, PythonMapObserverU8,
-        PythonMapObserverWrapperI16, PythonMapObserverWrapperI32, PythonMapObserverWrapperI64,
-        PythonMapObserverWrapperI8, PythonMapObserverWrapperU16, PythonMapObserverWrapperU32,
-        PythonMapObserverWrapperU64, PythonMapObserverWrapperU8,
-    };
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
-    use crate::Error;
+    use std::cell::UnsafeCell;
+
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
-    use std::cell::UnsafeCell;
+
+    use super::{Debug, Observer, ObserversTuple, String, Vec};
+    use crate::{
+        bolts::tuples::{type_eq, MatchName, Named},
+        executors::{pybind::PythonExitKind, ExitKind},
+        inputs::{BytesInput, HasBytesVec},
+        observers::map::pybind::{
+            PythonMapObserverI16, PythonMapObserverI32, PythonMapObserverI64, PythonMapObserverI8,
+            PythonMapObserverU16, PythonMapObserverU32, PythonMapObserverU64, PythonMapObserverU8,
+            PythonMapObserverWrapperI16, PythonMapObserverWrapperI32, PythonMapObserverWrapperI64,
+            PythonMapObserverWrapperI8, PythonMapObserverWrapperU16, PythonMapObserverWrapperU32,
+            PythonMapObserverWrapperU64, PythonMapObserverWrapperU8,
+        },
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
 
     #[derive(Debug)]
     pub struct PyObjectObserver {

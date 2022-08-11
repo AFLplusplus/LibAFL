@@ -1,6 +1,12 @@
 //! Probabilistic sampling scheduler is a corpus scheduler that feeds the fuzzer
 //! with sampled item from the corpus.
 
+use alloc::string::String;
+use core::marker::PhantomData;
+
+use hashbrown::HashMap;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
@@ -9,10 +15,6 @@ use crate::{
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
-use alloc::string::String;
-use core::marker::PhantomData;
-use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
 #[derive(Debug, Clone)]
@@ -139,7 +141,7 @@ where
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
-    use core::borrow::BorrowMut;
+    use core::{borrow::BorrowMut, marker::PhantomData};
 
     use crate::{
         bolts::rands::StdRand,
@@ -149,7 +151,6 @@ mod tests {
         state::{HasCorpus, HasMetadata, StdState},
         Error,
     };
-    use core::marker::PhantomData;
 
     const FACTOR: f64 = 1337.0;
 

@@ -1,19 +1,12 @@
 //! A generic shared memory region to be used by any functions (queues or feedbacks
 //! too.)
 
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::pipes::Pipe;
-use crate::{
-    bolts::{AsMutSlice, AsSlice},
-    Error,
-};
 use alloc::{rc::Rc, string::ToString};
 use core::{
     cell::RefCell,
     fmt::{self, Debug, Display},
     mem::ManuallyDrop,
 };
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 #[cfg(all(unix, feature = "std"))]
@@ -21,17 +14,22 @@ use std::io::Read;
 #[cfg(feature = "std")]
 use std::io::Write;
 
+use serde::{Deserialize, Serialize};
 #[cfg(all(feature = "std", unix, not(target_os = "android")))]
 pub use unix_shmem::{MmapShMem, MmapShMemProvider};
-
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
-
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix))]
 pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
+use crate::{
+    bolts::{AsMutSlice, AsSlice},
+    Error,
+};
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -541,11 +539,12 @@ pub mod unix_shmem {
 
         use alloc::string::ToString;
         use core::{ptr, slice};
+        use std::{io::Write, process};
+
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
             perror, shm_open, shm_unlink, shmat, shmctl, shmget,
         };
-        use std::{io::Write, process};
 
         use crate::{
             bolts::{
@@ -922,11 +921,12 @@ pub mod unix_shmem {
     pub mod ashmem {
         use alloc::string::ToString;
         use core::{ptr, slice};
+        use std::ffi::CString;
+
         use libc::{
             c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
             PROT_WRITE,
         };
-        use std::ffi::CString;
 
         use crate::{
             bolts::{
@@ -1146,6 +1146,15 @@ pub mod unix_shmem {
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
+    use alloc::string::String;
+    use core::{
+        ffi::c_void,
+        fmt::{self, Debug, Formatter},
+        ptr, slice,
+    };
+
+    use uuid::Uuid;
+
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemId, ShMemProvider},
@@ -1154,22 +1163,16 @@ pub mod win32_shmem {
         Error,
     };
 
-    use alloc::string::String;
-    use core::{
-        ffi::c_void,
-        fmt::{self, Debug, Formatter},
-        ptr, slice,
-    };
-    use uuid::Uuid;
-
     const INVALID_HANDLE_VALUE: isize = -1;
 
     use windows::{
         core::PCSTR,
-        Win32::Foundation::{CloseHandle, BOOL, HANDLE},
-        Win32::System::Memory::{
-            CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
-            FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+        Win32::{
+            Foundation::{CloseHandle, BOOL, HANDLE},
+            System::Memory::{
+                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+                FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+            },
         },
     };
 

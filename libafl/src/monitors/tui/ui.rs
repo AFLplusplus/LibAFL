@@ -1,6 +1,9 @@
-use super::{current_time, format_duration_hms, Duration, String, TimedStats, TuiContext};
-
 use alloc::vec::Vec;
+use std::{
+    cmp::{max, min},
+    sync::{Arc, RwLock},
+};
+
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -13,10 +16,7 @@ use tui::{
     Frame,
 };
 
-use std::{
-    cmp::{max, min},
-    sync::{Arc, RwLock},
-};
+use super::{current_time, format_duration_hms, Duration, String, TimedStats, TuiContext};
 
 #[derive(Default)]
 pub struct TuiUI {

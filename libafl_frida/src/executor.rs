@@ -1,12 +1,12 @@
-use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
-
 use core::fmt::{self, Debug, Formatter};
+use std::{ffi::c_void, marker::PhantomData};
+
 use frida_gum::{
     stalker::{NoneEventSink, Stalker},
     Gum, MemoryRange, NativePointer,
 };
-use std::{ffi::c_void, marker::PhantomData};
-
+#[cfg(windows)]
+use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{HasTargetBytes, Input},
@@ -16,9 +16,7 @@ use libafl::{
 
 #[cfg(unix)]
 use crate::asan::errors::ASAN_ERRORS;
-
-#[cfg(windows)]
-use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
+use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
 pub struct FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>

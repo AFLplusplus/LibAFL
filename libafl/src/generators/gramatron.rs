@@ -1,6 +1,7 @@
 //! Gramatron generator
 use alloc::{string::String, vec::Vec};
 use core::marker::PhantomData;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{

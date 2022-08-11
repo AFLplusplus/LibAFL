@@ -4,6 +4,9 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::time::Duration;
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
@@ -12,8 +15,6 @@ use crate::{
     state::{HasCorpus, HasMetadata},
     Error,
 };
-use core::time::Duration;
-use serde::{Deserialize, Serialize};
 /// The n fuzz size
 pub const N_FUZZ_SIZE: usize = 1 << 21;
 

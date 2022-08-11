@@ -1,12 +1,13 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs,
     path::{Path, PathBuf},
 };
+
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bolts::{
@@ -655,6 +656,11 @@ where
 #[allow(missing_docs)]
 /// `State` Python bindings
 pub mod pybind {
+    use alloc::{boxed::Box, vec::Vec};
+    use std::path::PathBuf;
+
+    use pyo3::{prelude::*, types::PyDict};
+
     use crate::{
         bolts::{ownedref::OwnedPtrMut, rands::pybind::PythonRand},
         corpus::pybind::PythonCorpus,
@@ -669,9 +675,6 @@ pub mod pybind {
             HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,
         },
     };
-    use alloc::{boxed::Box, vec::Vec};
-    use pyo3::{prelude::*, types::PyDict};
-    use std::path::PathBuf;
 
     /// `StdState` with fixed generics
     pub type PythonStdState = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;

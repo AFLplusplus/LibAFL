@@ -1,17 +1,16 @@
-use clap::{self, StructOpt};
-use lazy_static::lazy_static;
-use regex::Regex;
-use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     fs,
     io::{BufReader, Write},
-    path::Path,
-    path::PathBuf,
+    path::{Path, PathBuf},
     rc::Rc,
 };
 
+use clap::{self, StructOpt};
+use lazy_static::lazy_static;
 use libafl::generators::gramatron::{Automaton, Trigger};
+use regex::Regex;
+use serde_json::Value;
 
 #[derive(Debug, StructOpt)]
 #[clap(

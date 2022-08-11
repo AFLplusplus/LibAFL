@@ -1,10 +1,11 @@
-use bio::data_structures::interval_tree::IntervalTree;
-use libafl::{inputs::Input, state::HasMetadata};
 use std::{
     cell::UnsafeCell,
     collections::{HashMap, HashSet},
     sync::Mutex,
 };
+
+use bio::data_structures::interval_tree::IntervalTree;
+use libafl::{inputs::Input, state::HasMetadata};
 use thread_local::ThreadLocal;
 
 use crate::{

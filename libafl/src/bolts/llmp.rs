@@ -57,6 +57,8 @@ Check out the `llmp_test` example in ./examples, or build it with `cargo run --e
 
 */
 
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 use alloc::{string::String, vec::Vec};
 #[cfg(not(target_pointer_width = "64"))]
 use core::sync::atomic::AtomicU32;
@@ -71,10 +73,8 @@ use core::{
     sync::atomic::{fence, AtomicU16, Ordering},
     time::Duration,
 };
-use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "std")]
-use alloc::string::ToString;
+#[cfg(all(unix, feature = "std"))]
+use std::os::unix::io::AsRawFd;
 #[cfg(feature = "std")]
 use std::{
     env,
@@ -86,6 +86,9 @@ use std::{
 
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
+#[cfg(all(unix, feature = "std"))]
+use nix::sys::socket::{self, sockopt::ReusePort};
+use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::{
@@ -95,10 +98,6 @@ use crate::{
     bolts::shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
     Error,
 };
-#[cfg(all(unix, feature = "std"))]
-use nix::sys::socket::{self, sockopt::ReusePort};
-#[cfg(all(unix, feature = "std"))]
-use std::os::unix::io::AsRawFd;
 
 /// The max number of pages a [`client`] may have mapped that were not yet read by the [`broker`]
 /// Usually, this value should not exceed `1`, else the broker cannot keep up with the amount of incoming messages.
@@ -2740,7 +2739,6 @@ mod tests {
         LlmpMsgHookResult::ForwardToClients,
         Tag,
     };
-
     use crate::bolts::shmem::{ShMemProvider, StdShMemProvider};
 
     #[test]

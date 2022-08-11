@@ -1,4 +1,10 @@
 //! The allocator hooks for address sanitizer.
+use std::ffi::c_void;
+
+use backtrace::Backtrace;
+use libc::{c_char, wchar_t};
+use nix::libc::memset;
+
 use crate::{
     alloc::Allocator,
     asan::{
@@ -6,10 +12,6 @@ use crate::{
         errors::{AsanError, AsanErrors},
     },
 };
-use backtrace::Backtrace;
-use libc::{c_char, wchar_t};
-use nix::libc::memset;
-use std::ffi::c_void;
 
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 impl AsanRuntime {

@@ -7,15 +7,14 @@ use core::{
     ptr::{addr_of_mut, write_volatile},
     sync::atomic::{compiler_fence, Ordering},
 };
-
-#[cfg(feature = "std")]
-use nix::errno::{errno, Errno};
 #[cfg(feature = "std")]
 use std::ffi::CString;
 
 /// armv7 `libc` does not feature a `uncontext_t` implementation
 #[cfg(target_arch = "arm")]
 pub use libc::c_ulong;
+#[cfg(feature = "std")]
+use nix::errno::{errno, Errno};
 
 /// ARMv7-specific representation of a saved context
 #[cfg(target_arch = "arm")]
@@ -234,21 +233,19 @@ pub struct ucontext_t {
     pub mcontext_data: mcontext64,
 }
 
-pub use libc::{c_void, siginfo_t};
-
+#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+use libc::ssize_t;
 #[cfg(not(any(
     all(target_os = "linux", target_arch = "arm"),
     all(target_vendor = "apple", target_arch = "aarch64")
 )))]
 pub use libc::ucontext_t;
-
-#[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-use libc::ssize_t;
 use libc::{
     c_int, malloc, sigaction, sigaddset, sigaltstack, sigemptyset, stack_t, SA_NODEFER, SA_ONSTACK,
     SA_SIGINFO, SIGABRT, SIGALRM, SIGBUS, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGKILL, SIGPIPE,
     SIGQUIT, SIGSEGV, SIGTERM, SIGTRAP, SIGUSR2,
 };
+pub use libc::{c_void, siginfo_t};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::Error;

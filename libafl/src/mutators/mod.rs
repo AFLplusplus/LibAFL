@@ -212,12 +212,15 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{MutationResult, Mutator};
-    use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::mutators::scheduled::pybind::PythonStdHavocMutator;
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
-    use crate::Error;
     use pyo3::prelude::*;
+
+    use super::{MutationResult, Mutator};
+    use crate::{
+        inputs::{BytesInput, HasBytesVec},
+        mutators::scheduled::pybind::PythonStdHavocMutator,
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
 
     #[derive(Clone, Debug)]
     pub struct PyObjectMutator {

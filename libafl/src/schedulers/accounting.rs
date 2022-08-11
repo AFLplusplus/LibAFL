@@ -1,5 +1,10 @@
 //! Coverage accounting corpus scheduler, more details at <https://www.ndss-symposium.org/wp-content/uploads/2020/02/24422-paper.pdf>
 
+use alloc::vec::Vec;
+
+use hashbrown::HashMap;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
     corpus::{Corpus, Testcase},
@@ -12,10 +17,6 @@ use crate::{
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
-
-use alloc::vec::Vec;
-use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
 
 /// A testcase metadata holding a list of indexes of a map
 #[derive(Debug, Serialize, Deserialize)]

@@ -9,15 +9,13 @@ pub mod tui;
 
 #[cfg(feature = "std")]
 pub mod disk;
-#[cfg(feature = "std")]
-pub use disk::OnDiskTOMLMonitor;
-
-use alloc::{fmt::Debug, string::String, vec::Vec};
-
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
-
+use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
+
+#[cfg(feature = "std")]
+pub use disk::OnDiskTOMLMonitor;
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -834,13 +832,13 @@ impl Default for ClientPerfMonitor {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::monitors::{Monitor, SimpleMonitor};
-    use pyo3::prelude::*;
-    use pyo3::types::PyUnicode;
-
-    use super::ClientStats;
     use alloc::{boxed::Box, string::String, vec::Vec};
     use core::time::Duration;
+
+    use pyo3::{prelude::*, types::PyUnicode};
+
+    use super::ClientStats;
+    use crate::monitors::{Monitor, SimpleMonitor};
 
     // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625
 

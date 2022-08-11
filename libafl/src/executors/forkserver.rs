@@ -1,5 +1,6 @@
 //! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
 
+use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -11,6 +12,15 @@ use std::{
     os::unix::{io::RawFd, process::CommandExt},
     path::Path,
     process::{Command, Stdio},
+};
+
+use nix::{
+    sys::{
+        select::{pselect, FdSet},
+        signal::{kill, SigSet, Signal},
+        time::{TimeSpec, TimeValLike},
+    },
+    unistd::Pid,
 };
 
 use crate::{
@@ -25,16 +35,6 @@ use crate::{
     mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     Error,
-};
-
-use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
-use nix::{
-    sys::{
-        select::{pselect, FdSet},
-        signal::{kill, SigSet, Signal},
-        time::{TimeSpec, TimeValLike},
-    },
-    unistd::Pid,
 };
 
 const FORKSRV_FD: i32 = 198;
@@ -1011,6 +1011,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsString;
+
+    use serial_test::serial;
+
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
@@ -1022,8 +1026,6 @@ mod tests {
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
-    use serial_test::serial;
-    use std::ffi::OsString;
     #[test]
     #[serial]
     fn test_forkserver() {

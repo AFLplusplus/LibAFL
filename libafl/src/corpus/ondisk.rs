@@ -2,18 +2,21 @@
 
 use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::{fs, fs::File, io::Write};
 use std::{
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
 
-#[cfg(feature = "std")]
-use std::{fs, fs::File, io::Write};
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::serdeany::SerdeAnyMap, corpus::Corpus, corpus::Testcase, inputs::Input,
-    state::HasMetadata, Error,
+    bolts::serdeany::SerdeAnyMap,
+    corpus::{Corpus, Testcase},
+    inputs::Input,
+    state::HasMetadata,
+    Error,
 };
 
 /// Options for the the format of the on-disk metadata
@@ -208,14 +211,16 @@ where
 #[cfg(feature = "python")]
 /// `OnDiskCorpus` Python bindings
 pub mod pybind {
+    use alloc::string::String;
+    use std::path::PathBuf;
+
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
     use crate::{
         corpus::{pybind::PythonCorpus, OnDiskCorpus},
         inputs::BytesInput,
     };
-    use alloc::string::String;
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
-    use std::path::PathBuf;
 
     #[pyclass(unsendable, name = "OnDiskCorpus")]
     #[derive(Serialize, Deserialize, Debug, Clone)]

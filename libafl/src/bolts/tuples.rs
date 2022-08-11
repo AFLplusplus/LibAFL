@@ -1,12 +1,11 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
-pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
-
 use core::{
     any::TypeId,
     ptr::{addr_of, addr_of_mut},
 };
 
+pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 use xxhash_rust::xxh3::xxh3_64;
 
 /// Returns if the type `T` is equal to `U`

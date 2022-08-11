@@ -1,8 +1,8 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
+use alloc::string::{String, ToString};
 use std::{fmt::Debug, marker::PhantomData};
 
-use alloc::string::{String, ToString};
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 

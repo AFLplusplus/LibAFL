@@ -20,10 +20,15 @@ pub use new_hash_feedback::NewHashFeedbackMetadata;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
+use alloc::string::{String, ToString};
+use core::{
+    fmt::{self, Debug, Formatter},
+    marker::PhantomData,
+    time::Duration,
+};
+
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
-
-use alloc::string::{String, ToString};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -35,12 +40,6 @@ use crate::{
     observers::{ListObserver, ObserversTuple, TimeObserver},
     state::HasClientPerfMonitor,
     Error,
-};
-
-use core::{
-    fmt::{self, Debug, Formatter},
-    marker::PhantomData,
-    time::Duration,
 };
 
 /// Feedbacks evaluate the observers.
@@ -1040,27 +1039,32 @@ impl From<bool> for ConstFeedback {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use std::cell::UnsafeCell;
+
+    use pyo3::prelude::*;
+
     use super::{
         ConstFeedback, CrashFeedback, Debug, EagerAndFeedback, EagerOrFeedback, FastAndFeedback,
         FastOrFeedback, Feedback, NotFeedback, String, ToString,
     };
-    use crate::corpus::testcase::pybind::{PythonTestcase, PythonTestcaseWrapper};
-    use crate::events::pybind::PythonEventManager;
-    use crate::executors::pybind::PythonExitKind;
-    use crate::feedbacks::map::pybind::{
-        PythonMaxMapFeedbackI16, PythonMaxMapFeedbackI32, PythonMaxMapFeedbackI64,
-        PythonMaxMapFeedbackI8, PythonMaxMapFeedbackU16, PythonMaxMapFeedbackU32,
-        PythonMaxMapFeedbackU64, PythonMaxMapFeedbackU8,
-    };
-    use crate::inputs::HasBytesVec;
-    use crate::observers::pybind::PythonObserversTuple;
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use crate::{
-        bolts::tuples::Named, corpus::Testcase, events::EventFirer, executors::ExitKind,
-        inputs::BytesInput, observers::ObserversTuple, Error,
+        bolts::tuples::Named,
+        corpus::{
+            testcase::pybind::{PythonTestcase, PythonTestcaseWrapper},
+            Testcase,
+        },
+        events::{pybind::PythonEventManager, EventFirer},
+        executors::{pybind::PythonExitKind, ExitKind},
+        feedbacks::map::pybind::{
+            PythonMaxMapFeedbackI16, PythonMaxMapFeedbackI32, PythonMaxMapFeedbackI64,
+            PythonMaxMapFeedbackI8, PythonMaxMapFeedbackU16, PythonMaxMapFeedbackU32,
+            PythonMaxMapFeedbackU64, PythonMaxMapFeedbackU8,
+        },
+        inputs::{BytesInput, HasBytesVec},
+        observers::{pybind::PythonObserversTuple, ObserversTuple},
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
     };
-    use pyo3::prelude::*;
-    use std::cell::UnsafeCell;
 
     #[derive(Debug)]
     pub struct PyObjectFeedback {

@@ -14,17 +14,17 @@ pub use generalized::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
-#[cfg(feature = "nautilus")]
-pub use nautilus::*;
-
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{clone::Clone, fmt::Debug};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
+
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::bolts::fs::write_file_atomic;

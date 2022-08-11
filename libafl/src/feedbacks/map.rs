@@ -4,8 +4,12 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::ops::{BitAnd, BitOr};
-use core::{fmt::Debug, marker::PhantomData};
+use core::{
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{BitAnd, BitOr},
+};
+
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -837,12 +841,13 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{Debug, HasObserverName, MaxMapFeedback};
-    use crate::feedbacks::pybind::PythonFeedback;
-    use crate::inputs::BytesInput;
-    use crate::state::pybind::PythonStdState;
     use concat_idents::concat_idents;
     use pyo3::prelude::*;
+
+    use super::{Debug, HasObserverName, MaxMapFeedback};
+    use crate::{
+        feedbacks::pybind::PythonFeedback, inputs::BytesInput, state::pybind::PythonStdState,
+    };
 
     macro_rules! define_python_map_feedback {
         ($struct_name:ident, $py_name:tt, $datatype:ty, $map_observer_type_name: ident, $my_std_state_type_name: ident) => {

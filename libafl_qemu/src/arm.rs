@@ -1,9 +1,7 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-pub use strum_macros::EnumIter;
-
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-
+pub use strum_macros::EnumIter;
 pub use syscall_numbers::arm::*;
 
 /// Registers for the ARM instruction set.

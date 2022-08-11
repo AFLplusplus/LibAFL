@@ -1,6 +1,7 @@
+use std::{env, fs, ptr};
+
 use libafl::{inputs::Input, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::{env, fs, ptr};
 
 use crate::{
     emu::{Emulator, SyscallHookResult},

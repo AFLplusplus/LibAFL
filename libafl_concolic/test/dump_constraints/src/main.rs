@@ -2,7 +2,6 @@
 //! It achieves this by running an instrumented target program with the necessary environment variables set.
 //! When the program has finished executing, it dumps the traced constraints to a file.
 
-use clap::{self, StructOpt};
 use std::{
     ffi::OsString,
     fs::File,
@@ -12,6 +11,7 @@ use std::{
     string::ToString,
 };
 
+use clap::{self, StructOpt};
 use libafl::{
     bolts::{
         shmem::{ShMem, ShMemProvider, StdShMemProvider},

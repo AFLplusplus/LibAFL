@@ -33,6 +33,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+
 use serde::{Deserialize, Serialize};
 
 use crate::Error;
@@ -206,11 +207,12 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 mod linux {
-    use super::CoreId;
     use alloc::{string::ToString, vec::Vec};
-    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
     use std::mem;
 
+    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
+
+    use super::CoreId;
     use crate::Error;
 
     #[allow(trivial_numeric_casts)]
@@ -331,10 +333,14 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(target_os = "windows")]
 mod windows {
-    use crate::bolts::core_affinity::{CoreId, Error};
     use alloc::vec::Vec;
-    use windows::Win32::System::SystemInformation::GROUP_AFFINITY;
-    use windows::Win32::System::Threading::{GetCurrentThread, SetThreadGroupAffinity};
+
+    use windows::Win32::System::{
+        SystemInformation::GROUP_AFFINITY,
+        Threading::{GetCurrentThread, SetThreadGroupAffinity},
+    };
+
+    use crate::bolts::core_affinity::{CoreId, Error};
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         let mut core_ids: Vec<CoreId> = Vec::new();
@@ -386,8 +392,7 @@ mod windows {
     #[allow(clippy::cast_ptr_alignment)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
-        use std::ptr;
-        use std::slice;
+        use std::{ptr, slice};
 
         #[allow(non_upper_case_globals)]
         const RelationProcessorCore: u32 = 0;
@@ -517,18 +522,18 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(target_vendor = "apple")]
 mod apple {
+    use alloc::vec::Vec;
     use core::ptr::addr_of_mut;
     use std::thread::available_parallelism;
 
-    use crate::Error;
-
-    use super::CoreId;
-    use alloc::vec::Vec;
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
         thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
         THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
     };
+
+    use super::CoreId;
+    use crate::Error;
 
     #[repr(C)]
     struct thread_affinity_policy_data_t {

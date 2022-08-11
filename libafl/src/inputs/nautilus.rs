@@ -6,17 +6,16 @@
 
 use alloc::{rc::Rc, string::String, vec::Vec};
 use core::{cell::RefCell, convert::From};
-use serde::{Deserialize, Serialize};
-
-use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input};
+use std::hash::{Hash, Hasher};
 
 use grammartec::{
     newtypes::NodeID,
     rule::RuleIDOrCustom,
     tree::{Tree, TreeLike},
 };
+use serde::{Deserialize, Serialize};
 
-use std::hash::{Hash, Hasher};
+use crate::{bolts::HasLen, generators::nautilus::NautilusContext, inputs::Input};
 
 /// An [`Input`] implementation for `Nautilus` grammar.
 #[derive(Serialize, Deserialize, Clone, Debug)]

@@ -10,6 +10,25 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
+#[cfg(all(feature = "std"))]
+use alloc::string::ToString;
+use core::fmt::{self, Debug, Formatter};
+#[cfg(feature = "std")]
+use core::marker::PhantomData;
+#[cfg(feature = "std")]
+use std::net::SocketAddr;
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use std::process::Stdio;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use std::{fs::File, os::unix::io::AsRawFd};
+
+#[cfg(feature = "std")]
+use serde::de::DeserializeOwned;
+#[cfg(feature = "std")]
+use typed_builder::TypedBuilder;
+
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -23,24 +42,6 @@ use crate::{
     observers::ObserversTuple,
     Error,
 };
-
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::core_affinity::CoreId;
-#[cfg(all(feature = "std"))]
-use alloc::string::ToString;
-use core::fmt::{self, Debug, Formatter};
-#[cfg(feature = "std")]
-use core::marker::PhantomData;
-#[cfg(feature = "std")]
-use serde::de::DeserializeOwned;
-#[cfg(feature = "std")]
-use std::net::SocketAddr;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use std::process::Stdio;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use std::{fs::File, os::unix::io::AsRawFd};
-#[cfg(feature = "std")]
-use typed_builder::TypedBuilder;
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
