@@ -102,10 +102,11 @@ impl NyxHelper {
         nyx_process.option_apply();
 
         // default timeout for initial dry-run
-        let sec: u8 = initial_timeout
+        let sec = initial_timeout
             .as_secs()
             .try_into()
-            .expect("can't cast time's sec to u8");
+            .map_err(|_| -> Error { Error::illegal_argument("can't cast time's sec to u8") })?;
+
         let micro_sec: u32 = initial_timeout.subsec_micros();
         nyx_process.option_set_timeout(sec, micro_sec);
         nyx_process.option_apply();
