@@ -18,9 +18,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#ifndef _WIN32
+  #include <unistd.h>
+  #include <sys/time.h>
+#else
+  #include <io.h>
+#endif
 #include <string.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -213,7 +217,9 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
   if (write(fd, line, strlen(line)) <= 0) {
     FATAL("Could not write to the dictionary file");
   }
+#ifndef _WIN32
   fsync(fd);
+#endif
 }
 
 #if USE_NEW_PM
@@ -242,7 +248,11 @@ bool AutoTokensPass::runOnModule(Module &M) {
   }
 
   if (use_file) {
+#ifndef _WIN32
     if ((fd = open(ptr, O_WRONLY | O_APPEND | O_CREAT | O_DSYNC, 0644)) < 0)
+#else
+    if ((fd = open(ptr, O_WRONLY | O_APPEND | O_CREAT, 0644)) < 0)
+#endif
       FATAL("Could not open/create %s.", ptr);
   }
 

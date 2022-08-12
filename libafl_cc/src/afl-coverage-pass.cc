@@ -31,8 +31,12 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/time.h>
+#ifndef _WIN32
+  #include <unistd.h>
+  #include <sys/time.h>
+#else
+  #include <io.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -781,8 +785,13 @@ bool AFLCoverage::runOnModule(Module &M) {
   }
   if (DumpCFG) {
     int fd;
+#ifndef _WIN32
     if ((fd = open(DumpCFGPath.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644)) <
         0)
+#else
+    if ((fd = _open(DumpCFGPath.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644)) <
+        0)
+#endif
       FATAL("Could not open/create CFG dump file.");
     std::string cfg = "";
     for (auto record = entry_bb.begin(); record != entry_bb.end(); record++) {
