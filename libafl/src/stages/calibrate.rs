@@ -1,7 +1,13 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
+use alloc::string::{String, ToString};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
+
+use num_traits::Bounded;
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    bolts::{current_time, tuples::Named, AsRefIterator},
+    bolts::{current_time, tuples::Named, AsIter},
     corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
@@ -17,10 +23,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata},
     Error,
 };
-use alloc::string::{String, ToString};
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
@@ -240,7 +242,7 @@ where
         O::Entry:
             PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
         R: Reducer<O::Entry>,
-        for<'it> O: AsRefIterator<'it, Item = O::Entry>,
+        for<'it> O: AsIter<'it, Item = O::Entry>,
         N: IsNovel<O::Entry>,
     {
         Self {

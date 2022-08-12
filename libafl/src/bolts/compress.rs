@@ -1,12 +1,15 @@
 //! Compression of events passed between a broker and clients.
 //! Currently we use the gzip compression algorithm for its fast decompression performance.
 
-use crate::Error;
 use alloc::vec::Vec;
 use core::fmt::Debug;
+
 use miniz_oxide::{
-    deflate::compress_to_vec, deflate::CompressionLevel, inflate::decompress_to_vec,
+    deflate::{compress_to_vec, CompressionLevel},
+    inflate::decompress_to_vec,
 };
+
+use crate::Error;
 
 /// Compression for your stream compression needs.
 #[derive(Debug)]

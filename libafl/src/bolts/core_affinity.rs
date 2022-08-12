@@ -33,6 +33,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+
 use serde::{Deserialize, Serialize};
 
 use crate::Error;
@@ -181,7 +182,7 @@ impl TryFrom<&str> for Cores {
 /// * `./fuzzer --cores 1,2-4,6`: clients run in cores 1,2,3,4,6
 /// * `./fuzzer --cores all`: one client runs on each available core
 #[cfg(feature = "std")]
-#[deprecated(since = "0.7.1", note = "Use Cores::from_cmdline instead")]
+#[deprecated(since = "0.8.0", note = "Use Cores::from_cmdline instead")]
 pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
     Ok(Cores::from_cmdline(args)?
         .ids
@@ -206,11 +207,12 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(any(target_os = "android", target_os = "linux"))]
 mod linux {
-    use super::CoreId;
     use alloc::{string::ToString, vec::Vec};
-    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
     use std::mem;
 
+    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
+
+    use super::CoreId;
     use crate::Error;
 
     #[allow(trivial_numeric_casts)]
@@ -331,10 +333,14 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(target_os = "windows")]
 mod windows {
-    use crate::bolts::core_affinity::{CoreId, Error};
     use alloc::vec::Vec;
-    use windows::Win32::System::SystemInformation::GROUP_AFFINITY;
-    use windows::Win32::System::Threading::{GetCurrentThread, SetThreadGroupAffinity};
+
+    use windows::Win32::System::{
+        SystemInformation::GROUP_AFFINITY,
+        Threading::{GetCurrentThread, SetThreadGroupAffinity},
+    };
+
+    use crate::bolts::core_affinity::{CoreId, Error};
 
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
         let mut core_ids: Vec<CoreId> = Vec::new();
@@ -386,8 +392,7 @@ mod windows {
     #[allow(clippy::cast_ptr_alignment)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
-        use std::ptr;
-        use std::slice;
+        use std::{ptr, slice};
 
         #[allow(non_upper_case_globals)]
         const RelationProcessorCore: u32 = 0;
@@ -517,18 +522,18 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(target_vendor = "apple")]
 mod apple {
-    use core::ptr::addr_of_mut;
-
-    use crate::Error;
-
-    use super::CoreId;
     use alloc::vec::Vec;
+    use core::ptr::addr_of_mut;
+    use std::thread::available_parallelism;
+
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
         thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
         THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
     };
-    use num_cpus;
+
+    use super::CoreId;
+    use crate::Error;
 
     #[repr(C)]
     struct thread_affinity_policy_data_t {
@@ -547,7 +552,7 @@ mod apple {
 
     #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
-        Ok((0..(num_cpus::get()))
+        Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
             .map(|n| CoreId { id: n })
             .collect::<Vec<_>>())
@@ -591,18 +596,14 @@ mod apple {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::thread::available_parallelism;
 
-    // #[test]
-    // fn test_num_cpus() {
-    //     println!("Num CPUs: {}", num_cpus::get());
-    //     println!("Num Physical CPUs: {}", num_cpus::get_physical());
-    // }
+    use super::*;
 
     #[test]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
-        assert_eq!(set.len(), num_cpus::get());
+        assert_eq!(set.len(), usize::from(available_parallelism().unwrap()));
     }
 
     #[test]

@@ -6,6 +6,7 @@ use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
 };
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -153,6 +154,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::{String, ToString};
+
     use crate::{
         bolts::{
             serdeany::SerdeAnyMap,
@@ -166,7 +169,6 @@ mod tests {
         observers::Observer,
         state::{HasClientPerfMonitor, HasMetadata},
     };
-    use alloc::string::{String, ToString};
 
     #[derive(Debug)]
     struct NopObserver {

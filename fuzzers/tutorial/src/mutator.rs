@@ -1,3 +1,4 @@
+use lain::traits::Mutatable;
 use libafl::{
     bolts::{
         rands::{Rand, StdRand},
@@ -9,8 +10,6 @@ use libafl::{
 };
 
 use crate::input::PacketData;
-
-use lain::traits::Mutatable;
 
 pub struct LainMutator {
     inner: lain::mutator::Mutator<StdRand>,

@@ -1,4 +1,5 @@
 use core::{fmt::Debug, ops::Range};
+
 use libafl::{bolts::tuples::MatchFirstType, inputs::Input};
 
 use crate::{emu::Emulator, hooks::QemuHooks};

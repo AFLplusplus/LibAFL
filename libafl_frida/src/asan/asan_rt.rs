@@ -6,17 +6,18 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use backtrace::Backtrace;
 use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
-use hashbrown::HashMap;
-use libafl::bolts::{cli::FuzzerOptions, AsSlice};
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-use rangemap::RangeMap;
+use std::{ffi::c_void, ptr::write_volatile};
 
+use backtrace::Backtrace;
+#[cfg(target_arch = "x86_64")]
+use capstone::{
+    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
+    Capstone, Insn, RegAccessType, RegId,
+};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{
@@ -26,24 +27,17 @@ use capstone::{
     },
     Capstone, Insn,
 };
-
-#[cfg(target_arch = "aarch64")]
-use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-
-#[cfg(target_arch = "x86_64")]
-use capstone::{
-    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, Insn, RegAccessType, RegId,
-};
-
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
-
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use frida_gum::interceptor::Interceptor;
+#[cfg(target_arch = "aarch64")]
+use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleMap,
+    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
+    Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
 };
+use hashbrown::HashMap;
+use libafl::bolts::{cli::FuzzerOptions, AsSlice};
 #[cfg(unix)]
 use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
@@ -51,17 +45,17 @@ use libc::{c_char, wchar_t};
 use libc::{getrlimit, rlimit};
 #[cfg(all(unix, not(target_vendor = "apple")))]
 use libc::{getrlimit64, rlimit64};
-use std::{ffi::c_void, ptr::write_volatile};
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+use rangemap::RangeMap;
 
+#[cfg(target_arch = "aarch64")]
+use crate::utils::instruction_width;
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::FridaRuntime,
     utils::writer_register,
 };
-
-#[cfg(target_arch = "aarch64")]
-use crate::utils::instruction_width;
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -169,7 +163,7 @@ impl FridaRuntime for AsanRuntime {
         self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
-        self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
+        self.module_map = Some(ModuleMap::new_from_names(gum, modules_to_instrument));
         if !self.options.dont_instrument.is_empty() {
             for (module_name, offset) in self.options.dont_instrument.clone() {
                 let module_details = ModuleDetails::with_name(module_name).unwrap();

@@ -1,5 +1,6 @@
 //! Expose an `Executor` based on a `Forkserver` in order to execute AFL/AFL++ binaries
 
+use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -11,6 +12,15 @@ use std::{
     os::unix::{io::RawFd, process::CommandExt},
     path::Path,
     process::{Command, Stdio},
+};
+
+use nix::{
+    sys::{
+        select::{pselect, FdSet},
+        signal::{kill, SigSet, Signal},
+        time::{TimeSpec, TimeValLike},
+    },
+    unistd::Pid,
 };
 
 use crate::{
@@ -27,16 +37,6 @@ use crate::{
     Error,
 };
 
-use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
-use nix::{
-    sys::{
-        select::{pselect, FdSet},
-        signal::{kill, SigSet, Signal},
-        time::{TimeSpec, TimeValLike},
-    },
-    unistd::Pid,
-};
-
 const FORKSRV_FD: i32 = 198;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
@@ -44,6 +44,7 @@ const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
+/// The length of header bytes which tells shmem size
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
 
@@ -870,7 +871,8 @@ where
                 let size = target_bytes.as_slice().len();
                 let size_in_bytes = size.to_ne_bytes();
                 // The first four bytes tells the size of the shmem.
-                map.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
+                map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+                    .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
                 map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                     .copy_from_slice(target_bytes.as_slice());
             }
@@ -1009,6 +1011,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::ffi::OsString;
+
+    use serial_test::serial;
+
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemProvider, StdShMemProvider},
@@ -1020,8 +1026,6 @@ mod tests {
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
-    use serial_test::serial;
-    use std::ffi::OsString;
     #[test]
     #[serial]
     fn test_forkserver() {

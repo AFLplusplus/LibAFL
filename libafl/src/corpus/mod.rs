@@ -13,10 +13,10 @@ pub use ondisk::OnDiskCorpus;
 
 #[cfg(feature = "std")]
 pub mod cached;
+use core::cell::RefCell;
+
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
-
-use core::cell::RefCell;
 
 use crate::{inputs::Input, Error};
 
@@ -56,6 +56,11 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use std::cell::RefCell;
+
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
     use crate::{
         corpus::{
             cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
@@ -65,9 +70,6 @@ pub mod pybind {
         inputs::BytesInput,
         Error,
     };
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
-    use std::cell::RefCell;
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     enum PythonCorpusWrapper {

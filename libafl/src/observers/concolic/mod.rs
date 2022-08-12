@@ -1,11 +1,11 @@
 //! # Concolic Tracing
+#[cfg(feature = "std")]
+use alloc::vec::Vec;
 use core::{
     fmt::{Debug, Display, Error, Formatter},
     num::NonZeroUsize,
 };
 
-#[cfg(feature = "std")]
-use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 

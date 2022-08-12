@@ -1,9 +1,9 @@
 //! Poor-rust-man's downcasts for stuff we send over the wire (or shared maps)
 
-use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
-
 use alloc::boxed::Box;
 use core::{any::Any, fmt::Debug};
+
+use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
 
 /// A (de)serializable Any trait
 pub trait SerdeAny: Any + erased_serde::Serialize + Debug {
@@ -69,19 +69,21 @@ macro_rules! create_serde_registry_for_trait {
         pub mod $mod_name {
 
             use alloc::boxed::Box;
-            use core::any::TypeId;
-            use core::fmt;
+            use core::{any::TypeId, fmt};
+
+            use hashbrown::{
+                hash_map::{Keys, Values, ValuesMut},
+                HashMap,
+            };
             use postcard;
             use serde::{Deserialize, Serialize};
-
-            use hashbrown::hash_map::{Keys, Values, ValuesMut};
-            use hashbrown::HashMap;
-
-            use $crate::bolts::{
-                anymap::{pack_type_id, unpack_type_id},
-                serdeany::{DeserializeCallback, DeserializeCallbackSeed},
+            use $crate::{
+                bolts::{
+                    anymap::{pack_type_id, unpack_type_id},
+                    serdeany::{DeserializeCallback, DeserializeCallbackSeed},
+                },
+                Error,
             };
-            use $crate::Error;
 
             /// Visitor object used internally for the [`SerdeAny`] registry.
             #[derive(Debug)]

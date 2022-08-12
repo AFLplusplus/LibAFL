@@ -1,6 +1,7 @@
+use std::{env, fs, ptr};
+
 use libafl::{inputs::Input, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use std::{env, fs, ptr};
 
 use crate::{
     emu::{Emulator, SyscallHookResult},
@@ -446,7 +447,7 @@ where
 pub fn gen_readwrite_asan<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,
-    pc: u64,
+    pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
@@ -454,13 +455,12 @@ where
     QT: QemuHelperTuple<I, S>,
 {
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
-    if h.must_instrument(pc) {
-        Some(pc)
+    if h.must_instrument(pc.into()) {
+        Some(pc.into())
     } else {
         None
     }
 }
-
 pub fn trace_read1_asan<I, QT, S>(
     hooks: &mut QemuHooks<'_, I, QT, S>,
     _state: Option<&mut S>,

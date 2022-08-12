@@ -109,11 +109,15 @@ pub mod state;
 
 pub mod fuzzer;
 use alloc::string::{FromUtf8Error, String};
-use core::{array::TryFromSliceError, fmt, num::ParseIntError, num::TryFromIntError};
-pub use fuzzer::*;
-
+use core::{
+    array::TryFromSliceError,
+    fmt,
+    num::{ParseIntError, TryFromIntError},
+};
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
+
+pub use fuzzer::*;
 
 #[cfg(feature = "errors_backtrace")]
 /// Error Backtrace type when `errors_backtrace` feature is enabled (== [`backtrace::Backtrace`])
@@ -423,10 +427,33 @@ impl From<pyo3::PyErr> for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
+/// The purpose of this module is to alleviate imports of many components by adding a glob import.
+pub mod prelude {
+    pub use super::{
+        bolts::{bolts_prelude::*, *},
+        corpus::*,
+        events::*,
+        executors::*,
+        feedbacks::*,
+        fuzzer::*,
+        generators::*,
+        inputs::*,
+        monitors::*,
+        mutators::*,
+        observers::*,
+        schedulers::*,
+        stages::*,
+        state::*,
+        *,
+    };
+}
+
 // TODO: no_std test
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "std")]
+    use crate::events::SimpleEventManager;
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, Testcase},
@@ -439,9 +466,6 @@ mod tests {
         state::{HasCorpus, StdState},
         Fuzzer, StdFuzzer,
     };
-
-    #[cfg(feature = "std")]
-    use crate::events::SimpleEventManager;
 
     #[test]
     #[allow(clippy::similar_names)]
@@ -515,11 +539,12 @@ pub extern "C" fn external_current_millis() -> u64 {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use pyo3::prelude::*;
+
     use super::{
         bolts, corpus, events, executors, feedbacks, fuzzer, generators, monitors, mutators,
         observers, stages, state,
     };
-    use pyo3::prelude::*;
 
     #[derive(Debug, Clone)]
     pub struct PythonMetadata {
@@ -607,6 +632,7 @@ pub mod pybind {
         ($struct_name:ident, $inner:tt) => {
             const _: () = {
                 use alloc::vec::Vec;
+
                 use pyo3::prelude::*;
                 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

@@ -47,25 +47,25 @@ pub trait AsMutSlice<T> {
 }
 
 /// Create an `Iterator` from a reference
-pub trait AsRefIterator<'it> {
+pub trait AsIter<'it> {
     /// The item type
     type Item: 'it;
     /// The iterator type
     type IntoIter: Iterator<Item = &'it Self::Item>;
 
     /// Create an interator from &self
-    fn as_ref_iter(&'it self) -> Self::IntoIter;
+    fn as_iter(&'it self) -> Self::IntoIter;
 }
 
 /// Create an `Iterator` from a mutable reference
-pub trait AsMutIterator<'it> {
+pub trait AsIterMut<'it> {
     /// The item type
     type Item: 'it;
     /// The iterator type
     type IntoIter: Iterator<Item = &'it mut Self::Item>;
 
     /// Create an interator from &mut self
-    fn as_mut_iter(&'it mut self) -> Self::IntoIter;
+    fn as_iter_mut(&'it mut self) -> Self::IntoIter;
 }
 
 /// Has a length field
@@ -150,4 +150,30 @@ pub fn current_milliseconds() -> u64 {
 pub fn format_duration_hms(duration: &time::Duration) -> String {
     let secs = duration.as_secs();
     format!("{}h-{}m-{}s", (secs / 60) / 60, (secs / 60) % 60, secs % 60)
+}
+
+/// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
+pub mod bolts_prelude {
+    #[cfg(feature = "std")]
+    pub use super::build_id::*;
+    #[cfg(all(
+        any(feature = "cli", feature = "frida_cli", feature = "qemu_cli"),
+        feature = "std"
+    ))]
+    pub use super::cli::*;
+    #[cfg(feature = "llmp_compression")]
+    pub use super::compress::*;
+    #[cfg(feature = "std")]
+    pub use super::core_affinity::*;
+    #[cfg(feature = "std")]
+    pub use super::fs::*;
+    #[cfg(feature = "std")]
+    pub use super::launcher::*;
+    #[cfg(all(feature = "std", unix))]
+    pub use super::minibsod::*;
+    #[cfg(feature = "std")]
+    pub use super::staterestore::*;
+    pub use super::{
+        anymap::*, cpu::*, llmp::*, os::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*,
+    };
 }

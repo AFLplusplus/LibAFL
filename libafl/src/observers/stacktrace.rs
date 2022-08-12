@@ -1,17 +1,6 @@
 //! the ``StacktraceObserver`` looks up the stacktrace on the execution thread and computes a hash for it for dedupe
 
-use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named},
-    executors::ExitKind,
-    inputs::Input,
-    observers::Observer,
-    Error,
-};
-
 use alloc::string::{String, ToString};
-use backtrace::Backtrace;
-use regex::Regex;
-use serde::{Deserialize, Serialize};
 use std::{
     fmt::Debug,
     fs::{self, File},
@@ -20,7 +9,18 @@ use std::{
     process::ChildStderr,
 };
 
+use backtrace::Backtrace;
+use regex::Regex;
+use serde::{Deserialize, Serialize};
+
 use super::ObserverWithHashField;
+use crate::{
+    bolts::{ownedref::OwnedRefMut, tuples::Named},
+    executors::ExitKind,
+    inputs::Input,
+    observers::Observer,
+    Error,
+};
 
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]
 /// ([`Debug`] is currently used for dev purposes, symbols hash will be used eventually)

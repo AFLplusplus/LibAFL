@@ -3,8 +3,9 @@
 //! You may use the [`crate::bolts::os::unix_signals::ucontext`]
 //! function to get a [`ucontext_t`].
 
-use libc::siginfo_t;
 use std::io::{BufWriter, Write};
+
+use libc::siginfo_t;
 
 use crate::bolts::os::unix_signals::{ucontext_t, Signal};
 

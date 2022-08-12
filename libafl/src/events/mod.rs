@@ -3,17 +3,16 @@
 pub mod simple;
 pub use simple::*;
 pub mod llmp;
-pub use llmp::*;
-
-use ahash::AHasher;
 use alloc::{
     boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
-use serde::{Deserialize, Serialize};
 
+use ahash::AHasher;
+pub use llmp::*;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
@@ -126,14 +125,14 @@ impl EventConfig {
             EventConfig::FromName { name_hash: a } => match other {
                 #[cfg(not(feature = "std"))]
                 EventConfig::AlwaysUnique => false,
-                EventConfig::FromName { name_hash: b } => (a == b),
+                EventConfig::FromName { name_hash: b } => a == b,
                 #[cfg(feature = "std")]
                 EventConfig::AlwaysUnique | EventConfig::BuildID { id: _ } => false,
             },
             #[cfg(feature = "std")]
             EventConfig::BuildID { id: a } => match other {
                 EventConfig::AlwaysUnique | EventConfig::FromName { name_hash: _ } => false,
-                EventConfig::BuildID { id: b } => (a == b),
+                EventConfig::BuildID { id: b } => a == b,
             },
         }
     }
@@ -582,6 +581,8 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use pyo3::prelude::*;
+
     use crate::{
         events::{
             simple::pybind::PythonSimpleEventManager, Event, EventFirer, EventManager,
@@ -593,7 +594,6 @@ pub mod pybind {
         state::pybind::PythonStdState,
         Error,
     };
-    use pyo3::prelude::*;
 
     #[derive(Debug, Clone)]
     pub enum PythonEventManagerWrapper {

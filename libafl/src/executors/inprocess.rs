@@ -3,6 +3,9 @@
 //!
 //! Needs the `fork` feature flag.
 
+use alloc::boxed::Box;
+#[cfg(all(unix, feature = "std"))]
+use alloc::vec::Vec;
 use core::{
     borrow::BorrowMut,
     ffi::c_void,
@@ -10,42 +13,32 @@ use core::{
     marker::PhantomData,
     ptr,
 };
-
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
-
-use alloc::boxed::Box;
-#[cfg(all(unix, feature = "std"))]
-use alloc::vec::Vec;
-
 #[cfg(all(feature = "std", unix))]
 use std::intrinsics::transmute;
 
 #[cfg(all(feature = "std", unix))]
 use libc::siginfo_t;
-
 #[cfg(all(feature = "std", unix))]
 use nix::{
     sys::wait::{waitpid, WaitStatus},
     unistd::{fork, ForkResult},
 };
+#[cfg(windows)]
+use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
 #[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
-
-#[cfg(windows)]
-use windows::Win32::System::Threading::SetThreadStackGuarantee;
-
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
-
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
@@ -512,12 +505,13 @@ mod unix_signal_handler {
     #[cfg(feature = "std")]
     use alloc::{boxed::Box, string::String};
     use core::mem::transmute;
-    use libc::siginfo_t;
     #[cfg(feature = "std")]
     use std::{
         io::{stdout, Write},
         panic,
     };
+
+    use libc::siginfo_t;
 
     use crate::{
         bolts::os::unix_signals::{ucontext_t, Handler, Signal},
@@ -860,15 +854,20 @@ mod unix_signal_handler {
 mod windows_exception_handler {
     #[cfg(feature = "std")]
     use alloc::boxed::Box;
-    use alloc::string::String;
-    use alloc::vec::Vec;
-    use core::ffi::c_void;
-    use core::{mem::transmute, ptr};
+    use alloc::{string::String, vec::Vec};
+    use core::{
+        ffi::c_void,
+        mem::transmute,
+        ptr,
+        sync::atomic::{compiler_fence, Ordering},
+    };
     #[cfg(feature = "std")]
     use std::{
         io::{stdout, Write},
         panic,
     };
+
+    use windows::Win32::System::Threading::ExitProcess;
 
     use crate::{
         bolts::os::windows_exceptions::{
@@ -886,9 +885,6 @@ mod windows_exception_handler {
         observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
-
-    use core::sync::atomic::{compiler_fence, Ordering};
-    use windows::Win32::System::Threading::ExitProcess;
 
     pub(crate) type HandlerFuncPtr =
         unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
@@ -1560,12 +1556,11 @@ where
 #[cfg(all(feature = "std", unix))]
 pub mod child_signal_handlers {
     use alloc::boxed::Box;
-    use libc::siginfo_t;
     use std::panic;
 
-    use super::InProcessForkExecutorGlobalData;
+    use libc::siginfo_t;
 
-    use super::FORK_EXECUTOR_GLOBAL_DATA;
+    use super::{InProcessForkExecutorGlobalData, FORK_EXECUTOR_GLOBAL_DATA};
     use crate::{
         bolts::os::unix_signals::{ucontext_t, Signal},
         executors::{ExitKind, HasObservers},
@@ -1633,6 +1628,7 @@ pub mod child_signal_handlers {
 #[cfg(test)]
 mod tests {
     use core::marker::PhantomData;
+
     use serial_test::serial;
 
     #[cfg(all(feature = "std", feature = "fork", unix))]
@@ -1657,9 +1653,9 @@ mod tests {
             phantom: PhantomData,
         };
         let input = NopInput {};
-        assert!(in_process_executor
+        in_process_executor
             .run_target(&mut (), &mut (), &mut (), &input)
-            .is_ok());
+            .unwrap();
     }
 
     #[test]
@@ -1679,9 +1675,9 @@ mod tests {
             phantom: PhantomData,
         };
         let input = NopInput {};
-        assert!(in_process_fork_executor
+        in_process_fork_executor
             .run_target(&mut (), &mut (), &mut (), &input)
-            .is_ok());
+            .unwrap();
     }
 }
 
@@ -1689,6 +1685,10 @@ mod tests {
 #[allow(missing_docs)]
 /// `InProcess` Python bindings
 pub mod pybind {
+    use alloc::boxed::Box;
+
+    use pyo3::{prelude::*, types::PyBytes};
+
     use crate::{
         events::pybind::PythonEventManager,
         executors::{inprocess::OwnedInProcessExecutor, pybind::PythonExecutor, ExitKind},
@@ -1697,8 +1697,6 @@ pub mod pybind {
         observers::pybind::PythonObserversTuple,
         state::pybind::{PythonStdState, PythonStdStateWrapper},
     };
-    use alloc::boxed::Box;
-    use pyo3::{prelude::*, types::PyBytes};
 
     #[pyclass(unsendable, name = "InProcessExecutor")]
     #[derive(Debug)]

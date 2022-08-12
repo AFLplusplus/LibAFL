@@ -4,6 +4,9 @@
 use alloc::rc::Rc;
 use core::cell::{Cell, RefCell};
 
+use super::{PushStage, PushStageHelper, PushStageSharedState};
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
@@ -18,11 +21,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
-
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
-
-use super::{PushStage, PushStageHelper, PushStageSharedState};
 
 /// The default maximum number of mutations to perform per input.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;

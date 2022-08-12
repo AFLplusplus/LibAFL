@@ -21,9 +21,9 @@ pub mod weighted;
 pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod powersched;
-pub use powersched::PowerQueueScheduler;
-
 use alloc::borrow::ToOwned;
+
+pub use powersched::PowerQueueScheduler;
 
 use crate::{
     bolts::rands::Rand,

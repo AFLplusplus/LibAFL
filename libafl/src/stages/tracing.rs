@@ -2,6 +2,8 @@
 
 use core::{fmt::Debug, marker::PhantomData};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers, ShadowExecutor},
@@ -13,9 +15,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions},
     Error,
 };
-
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]

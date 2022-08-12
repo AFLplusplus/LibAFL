@@ -1,4 +1,7 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
+use alloc::string::{String, ToString};
+use core::marker::PhantomData;
+
 use crate::{
     bolts::{HasLen, HasRefCnt},
     corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
@@ -11,9 +14,6 @@ use crate::{
     state::{HasCorpus, HasMetadata},
     Error,
 };
-use alloc::string::{String, ToString};
-
-use core::marker::PhantomData;
 
 /// Compute the favor factor of a [`Testcase`]. Lower is better.
 pub trait TestcaseScore<I, S>

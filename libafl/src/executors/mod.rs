@@ -31,8 +31,11 @@ pub use with_observers::WithObservers;
 
 #[cfg(all(feature = "std", unix))]
 pub mod command;
+use core::fmt::Debug;
+
 #[cfg(all(feature = "std", unix))]
 pub use command::CommandExecutor;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::AsSlice,
@@ -40,9 +43,6 @@ use crate::{
     observers::ObserversTuple,
     Error,
 };
-
-use core::fmt::Debug;
-use serde::{Deserialize, Serialize};
 
 /// How an execution finished.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -176,12 +176,12 @@ mod test {
         let empty_input = BytesInput::new(vec![]);
         let nonempty_input = BytesInput::new(vec![1u8]);
         let mut executor = NopExecutor {};
-        assert!(executor
+        executor
             .run_target(&mut (), &mut (), &mut (), &empty_input)
-            .is_err());
-        assert!(executor
+            .unwrap_err();
+        executor
             .run_target(&mut (), &mut (), &mut (), &nonempty_input)
-            .is_ok());
+            .unwrap();
     }
 }
 
@@ -189,16 +189,20 @@ mod test {
 #[allow(missing_docs)]
 /// `Executor` Python bindings
 pub mod pybind {
-    use crate::events::pybind::PythonEventManager;
-    use crate::executors::inprocess::pybind::PythonOwnedInProcessExecutor;
-    use crate::executors::{Executor, ExitKind, HasObservers};
-    use crate::fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper};
-    use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::observers::pybind::PythonObserversTuple;
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
-    use crate::Error;
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
+
+    use crate::{
+        events::pybind::PythonEventManager,
+        executors::{
+            inprocess::pybind::PythonOwnedInProcessExecutor, Executor, ExitKind, HasObservers,
+        },
+        fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
+        inputs::{BytesInput, HasBytesVec},
+        observers::pybind::PythonObserversTuple,
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
 
     #[pyclass(unsendable, name = "ExitKind")]
     #[derive(Clone, Debug, Serialize, Deserialize)]

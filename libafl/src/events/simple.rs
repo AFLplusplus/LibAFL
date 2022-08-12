@@ -1,14 +1,5 @@
 //! A very simple event manager, that just supports log outputs, but no multiprocessing
 
-use crate::{
-    events::{
-        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
-        EventRestarter, HasEventManagerId,
-    },
-    inputs::Input,
-    monitors::Monitor,
-    Error,
-};
 use alloc::{
     boxed::Box,
     string::{String, ToString},
@@ -17,9 +8,11 @@ use alloc::{
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{fmt::Debug, marker::PhantomData};
+
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
 
+use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
@@ -31,8 +24,15 @@ use crate::{
     executors::Executor,
     state::{HasCorpus, HasSolutions},
 };
-
-use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, ProgressReporter};
+use crate::{
+    events::{
+        BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
+        EventRestarter, HasEventManagerId,
+    },
+    inputs::Input,
+    monitors::Monitor,
+    Error,
+};
 
 /// The llmp connection from the actual fuzzer to the process supervising it
 const _ENV_FUZZER_SENDER: &str = "_AFL_ENV_FUZZER_SENDER";
@@ -494,11 +494,14 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::{
-        events::pybind::PythonEventManager, events::SimpleEventManager, inputs::BytesInput,
-        monitors::pybind::PythonMonitor, state::pybind::PythonStdState,
-    };
     use pyo3::prelude::*;
+
+    use crate::{
+        events::{pybind::PythonEventManager, SimpleEventManager},
+        inputs::BytesInput,
+        monitors::pybind::PythonMonitor,
+        state::pybind::PythonStdState,
+    };
 
     #[pyclass(unsendable, name = "SimpleEventManager")]
     #[derive(Debug)]

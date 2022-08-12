@@ -1,5 +1,6 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 use std::env;
+
+use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 
 pub fn main() {
     let mut args: Vec<String> = env::args().collect();

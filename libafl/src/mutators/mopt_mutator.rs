@@ -1,19 +1,23 @@
 //! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
 use alloc::{string::ToString, vec::Vec};
+use core::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{current_nanos, rands::Rand, rands::StdRand},
+    bolts::{
+        current_nanos,
+        rands::{Rand, StdRand},
+    },
     corpus::Corpus,
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
 };
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
-use serde::{Deserialize, Serialize};
 
 /// A Struct for managing MOpt-mutator parameters.
 /// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode.

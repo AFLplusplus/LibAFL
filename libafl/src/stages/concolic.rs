@@ -2,12 +2,12 @@
 //! and use the results for fuzzer input and mutations.
 //!
 
-use core::marker::PhantomData;
-
 use alloc::string::String;
 #[cfg(feature = "concolic_mutation")]
 use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
+use core::marker::PhantomData;
 
+use super::{Stage, TracingStage};
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
@@ -16,8 +16,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
-
-use super::{Stage, TracingStage};
 
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
@@ -85,6 +83,8 @@ where
     }
 }
 
+#[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
+use crate::monitors::PerfFeature;
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,
@@ -92,9 +92,6 @@ use crate::{
     observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
     start_timer, Evaluator,
 };
-
-#[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
-use crate::monitors::PerfFeature;
 
 #[cfg(feature = "concolic_mutation")]
 #[allow(clippy::too_many_lines)]

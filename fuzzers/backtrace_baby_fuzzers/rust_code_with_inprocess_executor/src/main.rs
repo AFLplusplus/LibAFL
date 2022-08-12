@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-
 #[cfg(windows)]
 use std::ptr::write_volatile;
 

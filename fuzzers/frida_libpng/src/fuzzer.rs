@@ -4,9 +4,9 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use frida_gum::Gum;
 use std::path::PathBuf;
 
+use frida_gum::Gum;
 use libafl::{
     bolts::{
         cli::{parse_args, FuzzerOptions},
@@ -27,8 +27,7 @@ use libafl::{
     monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-        token_mutations::I2SRandReplace,
-        token_mutations::Tokens,
+        token_mutations::{I2SRandReplace, Tokens},
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
@@ -36,19 +35,17 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-
-use libafl_frida::{
-    coverage_rt::CoverageRuntime, coverage_rt::MAP_SIZE, executor::FridaInProcessExecutor,
-    helper::FridaInstrumentationHelper,
-};
-
 #[cfg(unix)]
 use libafl_frida::asan::asan_rt::AsanRuntime;
-use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
-
 #[cfg(unix)]
 use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
-use libafl_frida::cmplog_rt::CmpLogRuntime;
+use libafl_frida::{
+    cmplog_rt::CmpLogRuntime,
+    coverage_rt::{CoverageRuntime, MAP_SIZE},
+    executor::FridaInProcessExecutor,
+    helper::FridaInstrumentationHelper,
+};
+use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {

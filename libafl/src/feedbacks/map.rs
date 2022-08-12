@@ -4,13 +4,17 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::ops::{BitAnd, BitOr};
-use core::{fmt::Debug, marker::PhantomData};
+use core::{
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{BitAnd, BitOr},
+};
+
 use num_traits::PrimInt;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bolts::{tuples::Named, AsMutSlice, AsRefIterator, AsSlice, HasRefCnt},
+    bolts::{tuples::Named, AsIter, AsMutSlice, AsSlice, HasRefCnt},
     corpus::Testcase,
     events::{Event, EventFirer},
     executors::ExitKind,
@@ -314,6 +318,15 @@ where
         }
         Ok(())
     }
+
+    /// Reset the map with any value
+    pub fn reset_with_value(&mut self, value: T) -> Result<(), Error> {
+        let cnt = self.history_map.len();
+        for i in 0..cnt {
+            self.history_map[i] = value;
+        }
+        Ok(())
+    }
 }
 
 /// The most common AFL-like feedback type
@@ -323,7 +336,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     S: HasNamedMetadata,
 {
@@ -346,12 +359,14 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
+        // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
         state.add_named_metadata(MapFeedbackMetadata::<T>::default(), &self.name);
         Ok(())
     }
@@ -417,7 +432,7 @@ where
 impl<I, O, S> Feedback<I, S> for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
-    for<'it> O: AsRefIterator<'it, Item = u8>,
+    for<'it> O: AsIter<'it, Item = u8>,
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
@@ -539,7 +554,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     S: HasNamedMetadata,
 {
     #[inline]
@@ -554,7 +569,7 @@ where
     R: Reducer<T>,
     N: IsNovel<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     S: HasNamedMetadata,
 {
     #[inline]
@@ -572,7 +587,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
-    for<'it> O: AsRefIterator<'it, Item = T>,
+    for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
@@ -659,16 +674,12 @@ where
             .unwrap();
         let len = observer.len();
         if map_state.history_map.len() < len {
-            map_state.history_map.resize(len, T::default());
+            map_state.history_map.resize(len, observer.initial());
         }
 
         let history_map = map_state.history_map.as_mut_slice();
 
-        for (i, (item, history)) in observer
-            .as_ref_iter()
-            .zip(history_map.iter_mut())
-            .enumerate()
-        {
+        for (i, (item, history)) in observer.as_iter().zip(history_map.iter_mut()).enumerate() {
             let reduced = R::reduce(*history, *item);
             if N::is_novel(*history, reduced) {
                 *history = reduced;
@@ -716,7 +727,7 @@ pub struct ReachabilityFeedback<O> {
 impl<O> ReachabilityFeedback<O>
 where
     O: MapObserver<Entry = usize>,
-    for<'it> O: AsRefIterator<'it, Item = usize>,
+    for<'it> O: AsIter<'it, Item = usize>,
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
     #[must_use]
@@ -743,7 +754,7 @@ impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<Entry = usize>,
-    for<'it> O: AsRefIterator<'it, Item = usize>,
+    for<'it> O: AsIter<'it, Item = usize>,
     S: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
@@ -763,7 +774,7 @@ where
         let observer = observers.match_name::<O>(&self.name).unwrap();
         let mut hit_target: bool = false;
         //check if we've hit any targets.
-        for (i, &elem) in observer.as_ref_iter().enumerate() {
+        for (i, &elem) in observer.as_iter().enumerate() {
             if elem > 0 {
                 self.target_idx.push(i);
                 hit_target = true;
@@ -793,7 +804,7 @@ where
 impl<O> Named for ReachabilityFeedback<O>
 where
     O: MapObserver<Entry = usize>,
-    for<'it> O: AsRefIterator<'it, Item = usize>,
+    for<'it> O: AsIter<'it, Item = usize>,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -830,12 +841,13 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{Debug, HasObserverName, MaxMapFeedback};
-    use crate::feedbacks::pybind::PythonFeedback;
-    use crate::inputs::BytesInput;
-    use crate::state::pybind::PythonStdState;
     use concat_idents::concat_idents;
     use pyo3::prelude::*;
+
+    use super::{Debug, HasObserverName, MaxMapFeedback};
+    use crate::{
+        feedbacks::pybind::PythonFeedback, inputs::BytesInput, state::pybind::PythonStdState,
+    };
 
     macro_rules! define_python_map_feedback {
         ($struct_name:ident, $py_name:tt, $datatype:ty, $map_observer_type_name: ident, $my_std_state_type_name: ident) => {

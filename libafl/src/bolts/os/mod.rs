@@ -1,11 +1,11 @@
 //! Operating System specific abstractions
 //!
 
-#[cfg(any(unix, all(windows, feature = "std")))]
-use crate::Error;
-
 #[cfg(feature = "std")]
 use std::{env, process::Command};
+
+#[cfg(any(unix, all(windows, feature = "std")))]
+use crate::Error;
 
 #[cfg(all(unix, feature = "std"))]
 pub mod unix_shmem_server;

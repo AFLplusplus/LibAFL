@@ -2,9 +2,9 @@
 //! The values will then be used in subsequent mutations.
 //!
 
+use alloc::string::{String, ToString};
 use core::fmt::{self, Debug, Formatter};
 
-use alloc::string::{String, ToString};
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,

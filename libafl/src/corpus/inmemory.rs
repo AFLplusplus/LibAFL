@@ -2,9 +2,14 @@
 
 use alloc::vec::Vec;
 use core::cell::RefCell;
+
 use serde::{Deserialize, Serialize};
 
-use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
+use crate::{
+    corpus::{Corpus, Testcase},
+    inputs::Input,
+    Error,
+};
 
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -91,12 +96,13 @@ where
 /// `InMemoryCorpus` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
     use crate::{
         corpus::{pybind::PythonCorpus, InMemoryCorpus},
         inputs::BytesInput,
     };
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
 
     #[pyclass(unsendable, name = "InMemoryCorpus")]
     #[derive(Serialize, Deserialize, Debug, Clone)]

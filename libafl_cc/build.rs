@@ -1,8 +1,8 @@
 #[cfg(target_vendor = "apple")]
-use glob::glob;
-#[cfg(target_vendor = "apple")]
 use std::path::PathBuf;
 use std::{env, fs::File, io::Write, path::Path, process::Command, str};
+#[cfg(target_vendor = "apple")]
+use glob::glob;
 use which::which;
 
 /// The max version of `LLVM` we're looking for

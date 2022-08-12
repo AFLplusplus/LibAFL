@@ -1,17 +1,13 @@
 //! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
-#[cfg(feature = "std")]
-use crate::mutators::str_decode;
 use alloc::vec::Vec;
 #[cfg(target_os = "linux")]
 use core::slice::from_raw_parts;
-use core::slice::Iter;
 use core::{
     mem::size_of,
     ops::{Add, AddAssign},
+    slice::Iter,
 };
-use hashbrown::HashSet;
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -19,6 +15,11 @@ use std::{
     path::Path,
 };
 
+use hashbrown::HashSet;
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+use crate::mutators::str_decode;
 use crate::{
     bolts::{rands::Rand, AsSlice},
     inputs::{HasBytesVec, Input},

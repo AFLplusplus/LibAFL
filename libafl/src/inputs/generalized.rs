@@ -1,16 +1,15 @@
 //! The `GeneralizedInput` is an input that ca be generalized to represent a rule, used by Grimoire
 
-use ahash::AHasher;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
-use core::hash::Hasher;
-use core::{cell::RefCell, convert::From};
+use core::{cell::RefCell, convert::From, hash::Hasher};
+#[cfg(feature = "std")]
+use std::{fs::File, io::Read, path::Path};
+
+use ahash::AHasher;
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::Error;
-#[cfg(feature = "std")]
-use std::{fs::File, io::Read, path::Path};
-
 use crate::{
     bolts::{ownedref::OwnedSlice, HasLen},
     inputs::{HasBytesVec, HasTargetBytes, Input},

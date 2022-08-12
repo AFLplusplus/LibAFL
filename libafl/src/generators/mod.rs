@@ -130,12 +130,16 @@ where
 #[allow(missing_docs)]
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::generators::{Generator, RandBytesGenerator, RandPrintablesGenerator};
-    use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
-    use crate::Error;
     use alloc::vec::Vec;
+
     use pyo3::prelude::*;
+
+    use crate::{
+        generators::{Generator, RandBytesGenerator, RandPrintablesGenerator},
+        inputs::{BytesInput, HasBytesVec},
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
 
     #[derive(Clone, Debug)]
     pub struct PyObjectGenerator {

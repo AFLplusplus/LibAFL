@@ -1,6 +1,11 @@
 //! The Minimizer schedulers are a family of corpus schedulers that feed the fuzzer
 // with testcases only from a subset of the total corpus.
 
+use core::marker::PhantomData;
+
+use hashbrown::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
+
 use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
     corpus::{Corpus, Testcase},
@@ -10,10 +15,6 @@ use crate::{
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
-
-use core::marker::PhantomData;
-use hashbrown::{HashMap, HashSet};
-use serde::{Deserialize, Serialize};
 
 /// Default probability to skip the non-favored values
 pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;

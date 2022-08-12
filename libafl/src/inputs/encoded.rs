@@ -2,15 +2,14 @@
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 //! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
-use ahash::AHasher;
-use core::hash::Hasher;
-
 #[cfg(feature = "std")]
 use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 #[cfg(feature = "std")]
 use core::str::from_utf8;
-use core::{cell::RefCell, convert::From};
+use core::{cell::RefCell, convert::From, hash::Hasher};
+
+use ahash::AHasher;
 use hashbrown::HashMap;
 #[cfg(feature = "std")]
 use regex::Regex;
@@ -259,11 +258,11 @@ impl EncodedInput {
 #[cfg(test)]
 mod tests {
     use alloc::borrow::ToOwned;
+    use core::str::from_utf8;
 
     use crate::inputs::encoded::{
         InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
     };
-    use core::str::from_utf8;
 
     #[test]
     fn test_input() {

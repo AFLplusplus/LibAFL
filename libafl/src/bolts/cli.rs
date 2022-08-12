@@ -69,15 +69,15 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use clap::{Command, CommandFactory, Parser};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "frida_cli")]
 use std::error;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
-use crate::Error;
+use clap::{Command, CommandFactory, Parser};
+use serde::{Deserialize, Serialize};
 
 use super::core_affinity::Cores;
+use crate::Error;
 
 /// helper function to go from a parsed cli string to a `Duration`
 fn parse_timeout(src: &str) -> Result<Duration, Error> {
@@ -371,9 +371,10 @@ pub fn parse_args() -> FuzzerOptions {
     any(feature = "cli", feature = "qemu_cli", feature = "frida_cli")
 ))]
 mod tests {
-    use super::*;
     #[cfg(feature = "frida_cli")]
     use alloc::string::String;
+
+    use super::*;
 
     /// pass a standard option and `--` followed by some options that `FuzzerOptions` doesn't know
     /// about; expect the standard option to work normally, and everything after `--` to be
@@ -401,14 +402,14 @@ mod tests {
     #[test]
     #[cfg(feature = "frida_cli")]
     fn parse_instrumentation_location_fails_without_at_symbol() {
-        assert!(parse_instrumentation_location("mod_name0x12345").is_err());
+        parse_instrumentation_location("mod_name0x12345").unwrap_err();
     }
 
     /// pass module without address to `parse_instrumentation_location`, expect failure
     #[test]
     #[cfg(feature = "frida_cli")]
     fn parse_instrumentation_location_failes_without_address() {
-        assert!(parse_instrumentation_location("mod_name@").is_err());
+        parse_instrumentation_location("mod_name@").unwrap_err();
     }
 
     /// pass location without 0x to `parse_instrumentation_location`, expect value to be parsed

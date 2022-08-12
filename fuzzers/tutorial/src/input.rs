@@ -1,12 +1,11 @@
+use std::hash::Hash;
+
+use lain::prelude::*;
 use libafl::{
     bolts::{ownedref::OwnedSlice, HasLen},
     inputs::{HasTargetBytes, Input},
 };
-
-use lain::prelude::*;
-
 use serde::{Deserialize, Serialize};
-use std::hash::Hash;
 
 #[derive(
     Serialize,

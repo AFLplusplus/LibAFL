@@ -5,22 +5,14 @@ Hence, the `unix_shmem_server` keeps track of existing maps, creates new maps fo
 and forwards them over unix domain sockets.
 */
 
-use crate::{
-    bolts::{
-        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-        AsMutSlice, AsSlice,
-    },
-    Error,
-};
-
 #[cfg(feature = "std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{mem::ManuallyDrop, ptr::addr_of};
-use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
+#[cfg(target_vendor = "apple")]
+use std::fs;
 use std::{
     borrow::BorrowMut,
     cell::RefCell,
@@ -31,13 +23,6 @@ use std::{
     sync::{Arc, Condvar, Mutex},
     thread::JoinHandle,
 };
-
-#[cfg(target_vendor = "apple")]
-use std::fs;
-
-#[cfg(all(feature = "std", unix))]
-use nix::poll::{poll, PollFd, PollFlags};
-
 #[cfg(all(feature = "std", unix))]
 use std::{
     os::unix::{
@@ -47,8 +32,20 @@ use std::{
     thread,
 };
 
+use hashbrown::HashMap;
+#[cfg(all(feature = "std", unix))]
+use nix::poll::{poll, PollFd, PollFlags};
+use serde::{Deserialize, Serialize};
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
+
+use crate::{
+    bolts::{
+        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+        AsMutSlice, AsSlice,
+    },
+    Error,
+};
 
 /// The default server name for our abstract shmem server
 #[cfg(all(unix, not(target_vendor = "apple")))]

@@ -1,13 +1,13 @@
 //! The random number generators of `LibAFL`
 use core::{debug_assert, fmt::Debug};
+
+#[cfg(feature = "rand_trait")]
+use rand_core::{self, impls::fill_bytes_via_next, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use crate::bolts::current_nanos;
-
-#[cfg(feature = "rand_trait")]
-use rand_core::{self, impls::fill_bytes_via_next, RngCore};
 
 const HASH_CONST: u64 = 0xa5b35705;
 
@@ -417,8 +417,9 @@ mod tests {
     #[test]
     #[cfg(feature = "rand_trait")]
     fn test_rgn_core_support() {
-        use crate::bolts::rands::StdRand;
         use rand_core::RngCore;
+
+        use crate::bolts::rands::StdRand;
         pub struct Mutator<R: RngCore> {
             rng: R,
         }
@@ -435,10 +436,11 @@ mod tests {
 #[allow(missing_docs)]
 /// `Rand` Python bindings
 pub mod pybind {
-    use super::Rand;
-    use crate::bolts::{current_nanos, rands::StdRand};
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
+
+    use super::Rand;
+    use crate::bolts::{current_nanos, rands::StdRand};
 
     #[pyclass(unsendable, name = "StdRand")]
     #[derive(Serialize, Deserialize, Debug, Clone)]

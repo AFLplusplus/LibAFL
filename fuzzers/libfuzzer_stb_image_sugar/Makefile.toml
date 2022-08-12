@@ -1,6 +1,6 @@
 # Variables
 [env]
-FUZZER_NAME='libfuzzer_stb_image'
+FUZZER_NAME='libfuzzer_stb_image_sugar'
 LIBAFL_CC = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/libafl_cc', mapping = {"windows" = '.\\target\\release\\libafl_cc.exe'} }
 LIBAFL_CXX = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/libafl_cxx', mapping = {"windows" = '.\\target\\release\\libafl_cxx.exe'} }
 FUZZER = { source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = './target/release/${FUZZER_NAME}', mapping = {"windows" = '.\\target\\release\\${FUZZER_NAME}.exe'} }

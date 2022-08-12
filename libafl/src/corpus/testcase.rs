@@ -3,6 +3,7 @@
 
 use alloc::string::String;
 use core::{convert::Into, default::Default, option::Option, time::Duration};
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -350,14 +351,16 @@ crate::impl_serdeany!(SchedulerTestcaseMetaData);
 #[allow(missing_docs)]
 /// `Testcase` Python bindings
 pub mod pybind {
+    use alloc::{boxed::Box, vec::Vec};
+
+    use pyo3::{prelude::*, types::PyDict};
+
     use super::{HasMetadata, Testcase};
     use crate::{
         bolts::ownedref::OwnedPtrMut,
         inputs::{BytesInput, HasBytesVec},
         pybind::PythonMetadata,
     };
-    use alloc::{boxed::Box, vec::Vec};
-    use pyo3::{prelude::*, types::PyDict};
 
     /// `PythonTestcase` with fixed generics
     pub type PythonTestcase = Testcase<BytesInput>;

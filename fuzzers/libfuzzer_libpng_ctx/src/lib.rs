@@ -6,10 +6,10 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use clap::{self, StructOpt};
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
+use clap::{self, StructOpt};
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -38,7 +38,6 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-
 use libafl_targets::{edges_map_from_ptr, libfuzzer_initialize, libfuzzer_test_one_input};
 
 fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {

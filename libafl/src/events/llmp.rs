@@ -1,5 +1,23 @@
 //! LLMP-backed event manager for scalable multi-processed fuzzing
 
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
+#[cfg(feature = "std")]
+use core::sync::atomic::{compiler_fence, Ordering};
+use core::{marker::PhantomData, time::Duration};
+#[cfg(feature = "std")]
+use std::net::{SocketAddr, ToSocketAddrs};
+
+use serde::de::DeserializeOwned;
+#[cfg(feature = "std")]
+use serde::Serialize;
+#[cfg(feature = "std")]
+use typed_builder::TypedBuilder;
+
+use super::{CustomBufEventResult, CustomBufHandlerFn};
 #[cfg(feature = "std")]
 use crate::bolts::core_affinity::CoreId;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
@@ -29,23 +47,6 @@ use crate::{
     observers::ObserversTuple,
     Error,
 };
-use alloc::{
-    boxed::Box,
-    string::{String, ToString},
-    vec::Vec,
-};
-#[cfg(feature = "std")]
-use core::sync::atomic::{compiler_fence, Ordering};
-use core::{marker::PhantomData, time::Duration};
-use serde::de::DeserializeOwned;
-#[cfg(feature = "std")]
-use serde::Serialize;
-#[cfg(feature = "std")]
-use std::net::{SocketAddr, ToSocketAddrs};
-#[cfg(feature = "std")]
-use typed_builder::TypedBuilder;
-
-use super::{CustomBufEventResult, CustomBufHandlerFn};
 
 /// Forward this to the client
 const _LLMP_TAG_EVENT_TO_CLIENT: Tag = 0x2C11E471;
@@ -990,6 +991,8 @@ where
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
+    use core::sync::atomic::{compiler_fence, Ordering};
+
     use serial_test::serial;
 
     use crate::{
@@ -1010,7 +1013,6 @@ mod tests {
         state::StdState,
         Fuzzer, StdFuzzer,
     };
-    use core::sync::atomic::{compiler_fence, Ordering};
 
     #[test]
     #[serial]

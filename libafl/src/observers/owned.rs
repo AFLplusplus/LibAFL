@@ -1,6 +1,7 @@
 //! A dynamic collection of owned observers, working only with unstable rust
 
 use core::{any::Any, fmt::Debug};
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{

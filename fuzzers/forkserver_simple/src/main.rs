@@ -1,5 +1,11 @@
-use clap::{Arg, Command};
 use core::time::Duration;
+use std::path::PathBuf;
+
+use clap::{Arg, Command};
+#[cfg(not(target_vendor = "apple"))]
+use libafl::bolts::shmem::StdShMemProvider;
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
 use libafl::{
     bolts::{
         current_nanos,
@@ -23,13 +29,6 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
 };
 use nix::sys::signal::Signal;
-use std::path::PathBuf;
-
-#[cfg(target_vendor = "apple")]
-use libafl::bolts::shmem::UnixShMemProvider;
-
-#[cfg(not(target_vendor = "apple"))]
-use libafl::bolts::shmem::StdShMemProvider;
 
 #[allow(clippy::similar_names)]
 pub fn main() {

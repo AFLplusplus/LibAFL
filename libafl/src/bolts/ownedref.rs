@@ -1,14 +1,16 @@
 //! Wrappers that abstracts references (or pointers) and owned data accesses.
 // The serialization is towards owned, allowing to serialize pointers without troubles.
 
-use crate::bolts::{AsMutSlice, AsSlice};
 use alloc::{
     boxed::Box,
     slice::{Iter, IterMut},
     vec::Vec,
 };
 use core::{clone::Clone, fmt::Debug, slice};
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+use crate::bolts::{AsMutSlice, AsSlice};
 
 /// Trait to convert into an Owned type
 pub trait IntoOwned {
