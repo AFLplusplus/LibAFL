@@ -19,10 +19,14 @@ uint32_t* __afl_acc_memop_ptr = __afl_acc_memop_ptr_local;
 extern EXT_VAR(__start_libafl_token, uint8_t);
 extern EXT_VAR(__stop_libafl_token, uint8_t);
 
+#elif __APPLE__
+extern uint8_t __start_libafl_token __asm("section$start$__DATA$__libafl_token");
+extern uint8_t __stop_libafl_token __asm("section$end$__DATA$__libafl_token");
+#endif
+
 // Expose the start of libafl_token section as C symbols
 uint8_t* __token_start = &__start_libafl_token;
 uint8_t* __token_stop = &__stop_libafl_token;
-#endif
 
 //#if defined(__ANDROID__) || defined(__HAIKU__)
 MAYBE_THREAD_LOCAL prev_loc_t __afl_prev_loc[NGRAM_SIZE_MAX];
