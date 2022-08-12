@@ -1,12 +1,10 @@
-use std::io::Read;
-use std::{
-    fs,
-    io::BufReader,
-    path::{Path, PathBuf},
-};
-
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{
+    fs,
+    io::{BufReader, Read},
+    path::{Path, PathBuf},
+};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},

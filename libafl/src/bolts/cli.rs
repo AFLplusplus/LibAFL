@@ -69,15 +69,15 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use clap::{Command, CommandFactory, Parser};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "frida_cli")]
 use std::error;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};
 
-use crate::Error;
+use clap::{Command, CommandFactory, Parser};
+use serde::{Deserialize, Serialize};
 
 use super::core_affinity::Cores;
+use crate::Error;
 
 /// helper function to go from a parsed cli string to a `Duration`
 fn parse_timeout(src: &str) -> Result<Duration, Error> {
@@ -371,9 +371,10 @@ pub fn parse_args() -> FuzzerOptions {
     any(feature = "cli", feature = "qemu_cli", feature = "frida_cli")
 ))]
 mod tests {
-    use super::*;
     #[cfg(feature = "frida_cli")]
     use alloc::string::String;
+
+    use super::*;
 
     /// pass a standard option and `--` followed by some options that `FuzzerOptions` doesn't know
     /// about; expect the standard option to work normally, and everything after `--` to be

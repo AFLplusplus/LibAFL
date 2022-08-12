@@ -34,23 +34,21 @@ pub use concolic::SimpleConcolicMutationalStage;
 
 #[cfg(feature = "std")]
 pub mod sync;
+use core::{convert::From, marker::PhantomData};
+
 #[cfg(feature = "std")]
 pub use sync::*;
 
+use self::push::PushStage;
 use crate::{
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{
-        HasExecutions, HasRand, {HasClientPerfMonitor, HasCorpus},
-    },
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
-use core::{convert::From, marker::PhantomData};
-
-use self::push::PushStage;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -261,6 +259,10 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use alloc::vec::Vec;
+
+    use pyo3::prelude::*;
+
     use crate::{
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
@@ -269,8 +271,6 @@ pub mod pybind {
         state::pybind::{PythonStdState, PythonStdStateWrapper},
         Error,
     };
-    use alloc::vec::Vec;
-    use pyo3::prelude::*;
 
     #[derive(Clone, Debug)]
     pub struct PyObjectStage {

@@ -4,6 +4,11 @@
 // Embedded needs alloc error handlers which only work on nightly right now...
 #![cfg_attr(not(any(windows, unix)), feature(default_alloc_error_handler))]
 
+#[cfg(not(any(windows, unix)))]
+use core::panic::PanicInfo;
+
+#[cfg(any(windows, unix))]
+use cstr_core::CString;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::InMemoryCorpus,
@@ -20,14 +25,8 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-
-#[cfg(any(windows, unix))]
-use cstr_core::CString;
 #[cfg(any(windows, unix))]
 use libc::{c_char, printf};
-
-#[cfg(not(any(windows, unix)))]
-use core::panic::PanicInfo;
 use static_alloc::Bump;
 
 #[global_allocator]

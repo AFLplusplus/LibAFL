@@ -1,7 +1,6 @@
 //! Based on <https://github.com/alecmocatta/build_id>
 //! (C) Alec Mocatta <alec@mocatta.net> under license MIT or Apache 2
 
-use once_cell::sync::Lazy;
 use std::{
     any::TypeId,
     env,
@@ -9,6 +8,8 @@ use std::{
     hash::{Hash, Hasher},
     io,
 };
+
+use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 static BUILD_ID: Lazy<Uuid> = Lazy::new(calculate);

@@ -1,17 +1,5 @@
-use libafl::{
-    bolts::{cli::FuzzerOptions, tuples::MatchFirstType},
-    inputs::{HasTargetBytes, Input},
-    Error,
-};
+use core::fmt::{self, Debug, Formatter};
 
-#[cfg(unix)]
-use libafl_targets::drcov::DrCovBasicBlock;
-
-#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-use crate::cmplog_rt::CmpLogRuntime;
-use crate::coverage_rt::CoverageRuntime;
-#[cfg(unix)]
-use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{self, BuildsCapstone},
@@ -22,16 +10,27 @@ use capstone::{
     arch::{self, BuildsCapstone},
     Capstone,
 };
-use core::fmt::{self, Debug, Formatter};
-#[cfg(unix)]
-use frida_gum::CpuContext;
-
 #[cfg(unix)]
 use frida_gum::instruction_writer::InstructionWriter;
+#[cfg(unix)]
+use frida_gum::CpuContext;
 use frida_gum::{stalker::Transformer, Gum, Module, ModuleDetails, ModuleMap, PageProtection};
+use libafl::{
+    bolts::{cli::FuzzerOptions, tuples::MatchFirstType},
+    inputs::{HasTargetBytes, Input},
+    Error,
+};
+#[cfg(unix)]
+use libafl_targets::drcov::DrCovBasicBlock;
 #[cfg(unix)]
 use nix::sys::mman::{mmap, MapFlags, ProtFlags};
 use rangemap::RangeMap;
+
+#[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+use crate::cmplog_rt::CmpLogRuntime;
+use crate::coverage_rt::CoverageRuntime;
+#[cfg(unix)]
+use crate::{asan::asan_rt::AsanRuntime, drcov_rt::DrCovRuntime};
 
 #[cfg(any(target_vendor = "apple"))]
 const ANONYMOUS_FLAG: MapFlags = MapFlags::MAP_ANON;

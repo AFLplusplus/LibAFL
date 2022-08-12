@@ -5,9 +5,12 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData};
+
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     bolts::AsSlice,
     corpus::Corpus,
@@ -21,9 +24,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
-
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 
 const MAX_GENERALIZED_LEN: usize = 8192;
 

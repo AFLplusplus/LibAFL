@@ -2,8 +2,9 @@
 
 use alloc::collections::vec_deque::VecDeque;
 use core::cell::RefCell;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{
@@ -137,11 +138,16 @@ where
 /// ``CachedOnDiskCorpus`` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::{corpus::pybind::PythonCorpus, corpus::CachedOnDiskCorpus, inputs::BytesInput};
     use alloc::string::String;
+    use std::path::PathBuf;
+
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
-    use std::path::PathBuf;
+
+    use crate::{
+        corpus::{pybind::PythonCorpus, CachedOnDiskCorpus},
+        inputs::BytesInput,
+    };
 
     #[pyclass(unsendable, name = "CachedOnDiskCorpus")]
     #[derive(Serialize, Deserialize, Debug, Clone)]

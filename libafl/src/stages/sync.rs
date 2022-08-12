@@ -2,12 +2,13 @@
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
 use core::marker::PhantomData;
-use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
     time::SystemTime,
 };
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
     fuzzer::Evaluator,

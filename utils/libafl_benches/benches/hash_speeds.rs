@@ -1,11 +1,11 @@
 //! Compare the speed of rust hash implementations
 
 use std::hash::Hasher;
-//use xxhash_rust::const_xxh3;
-use xxhash_rust::xxh3;
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use libafl::bolts::rands::{Rand, StdRand};
+//use xxhash_rust::const_xxh3;
+use xxhash_rust::xxh3;
 
 fn criterion_benchmark(c: &mut Criterion) {
     let mut rand = StdRand::with_seed(0);

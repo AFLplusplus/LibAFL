@@ -3,10 +3,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use clap::{Arg, Command};
 use core::{cell::RefCell, time::Duration};
-#[cfg(unix)]
-use nix::{self, unistd::dup};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -17,6 +14,7 @@ use std::{
     process,
 };
 
+use clap::{Arg, Command};
 use libafl::{
     bolts::{
         current_nanos, current_time,
@@ -49,13 +47,14 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
+#[cfg(target_os = "linux")]
+use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,
 };
-
-#[cfg(target_os = "linux")]
-use libafl_targets::autotokens;
+#[cfg(unix)]
+use nix::{self, unistd::dup};
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]

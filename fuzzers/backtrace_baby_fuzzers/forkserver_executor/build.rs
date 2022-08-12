@@ -1,6 +1,8 @@
-use std::env;
-use std::path::Path;
-use std::process::{exit, Command};
+use std::{
+    env,
+    path::Path,
+    process::{exit, Command},
+};
 
 const AFL_URL: &str = "https://github.com/AFLplusplus/AFLplusplus";
 

@@ -1,9 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use clap::{Arg, Command};
 use core::cell::RefCell;
-#[cfg(unix)]
-use nix::{self, unistd::dup};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -14,6 +11,7 @@ use std::{
     process,
 };
 
+use clap::{Arg, Command};
 use libafl::{
     bolts::{
         current_nanos, current_time,
@@ -55,6 +53,8 @@ use libafl_qemu::{
     hooks::QemuHooks,
     MmapPerms, QemuForkExecutor, Regs,
 };
+#[cfg(unix)]
+use nix::{self, unistd::dup};
 
 /// The fuzzer main
 pub fn main() {

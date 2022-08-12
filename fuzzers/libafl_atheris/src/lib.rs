@@ -3,7 +3,6 @@
 //! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
 //! for python instrumentation and fuzzing.
 
-use clap::{AppSettings, Arg, Command};
 use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
 use std::{
     env,
@@ -11,6 +10,7 @@ use std::{
     path::PathBuf,
 };
 
+use clap::{AppSettings, Arg, Command};
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -30,8 +30,10 @@ use libafl::{
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::{I2SRandReplace, Tokens},
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::{I2SRandReplace, Tokens},
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{StdMutationalStage, TracingStage},

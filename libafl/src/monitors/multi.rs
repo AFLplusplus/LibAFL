@@ -1,10 +1,9 @@
 //! Monitor to display both cumulative and per-client monitor
 
-use alloc::{string::String, vec::Vec};
-use core::{fmt::Write, time::Duration};
-
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
+use alloc::{string::String, vec::Vec};
+use core::{fmt::Write, time::Duration};
 
 use crate::{
     bolts::{current_time, format_duration_hms},

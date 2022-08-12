@@ -22,7 +22,6 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error, Fuzzer,
 };
-
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
 mod input;

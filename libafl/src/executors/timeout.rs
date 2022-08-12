@@ -1,30 +1,24 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
+#[cfg(target_os = "linux")]
+use core::ptr::{addr_of, addr_of_mut};
+#[cfg(all(windows, feature = "std"))]
+use core::{ffi::c_void, ptr::write_volatile};
 #[cfg(any(windows, unix))]
 use core::{
     fmt::{self, Debug, Formatter},
     time::Duration,
 };
-
-use crate::{
-    executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
-    observers::ObserversTuple,
-    Error,
-};
-
-#[cfg(all(windows, feature = "std"))]
-use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
-
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
-
-#[cfg(target_os = "linux")]
-use core::ptr::{addr_of, addr_of_mut};
+#[cfg(windows)]
+use core::{
+    ptr::addr_of_mut,
+    sync::atomic::{compiler_fence, Ordering},
+};
 
 #[cfg(all(unix, not(target_os = "linux")))]
 use libc::c_int;
-
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,
@@ -36,12 +30,12 @@ use windows::Win32::{
 };
 
 #[cfg(all(windows, feature = "std"))]
-use core::{ffi::c_void, ptr::write_volatile};
-
-#[cfg(windows)]
-use core::{
-    ptr::addr_of_mut,
-    sync::atomic::{compiler_fence, Ordering},
+use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
+use crate::{
+    executors::{Executor, ExitKind, HasObservers},
+    inputs::Input,
+    observers::ObserversTuple,
+    Error,
 };
 
 #[repr(C)]

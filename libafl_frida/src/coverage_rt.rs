@@ -1,17 +1,16 @@
 //! Functionality regarding binary-only coverage collection.
 use core::ptr::addr_of_mut;
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use rangemap::RangeMap;
 
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
+use libafl::bolts::xxh3_rrmxmx_mixer;
+use rangemap::RangeMap;
 
 use crate::helper::FridaRuntime;
-use libafl::bolts::xxh3_rrmxmx_mixer;
 
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;

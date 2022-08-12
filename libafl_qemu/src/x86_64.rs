@@ -1,11 +1,8 @@
+use capstone::arch::BuildsCapstone;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-pub use strum_macros::EnumIter;
-
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-
-use capstone::arch::BuildsCapstone;
-
+pub use strum_macros::EnumIter;
 pub use syscall_numbers::x86_64::*;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]

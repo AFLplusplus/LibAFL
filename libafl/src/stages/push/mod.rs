@@ -6,14 +6,14 @@
 
 /// Mutational stage is the normal fuzzing stage.
 pub mod mutational;
-pub use mutational::StdMutationalPushStage;
-
 use alloc::rc::Rc;
 use core::{
     cell::{Cell, RefCell},
     marker::PhantomData,
     time::Duration,
 };
+
+pub use mutational::StdMutationalPushStage;
 
 use crate::{
     bolts::current_time,

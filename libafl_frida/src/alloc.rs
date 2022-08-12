@@ -1,20 +1,3 @@
-use frida_gum::{PageProtection, RangeDetails};
-use hashbrown::HashMap;
-use libafl::bolts::cli::FuzzerOptions;
-use nix::{
-    libc::memset,
-    sys::mman::{mmap, MapFlags, ProtFlags},
-};
-
-use backtrace::Backtrace;
-#[cfg(any(
-    target_os = "linux",
-    target_vendor = "apple",
-    all(target_arch = "aarch64", target_os = "android")
-))]
-use libc::{sysconf, _SC_PAGESIZE};
-use rangemap::RangeSet;
-use serde::{Deserialize, Serialize};
 #[cfg(any(
     target_os = "linux",
     target_vendor = "apple",
@@ -22,6 +5,23 @@ use serde::{Deserialize, Serialize};
 ))]
 use std::io;
 use std::{collections::BTreeMap, ffi::c_void};
+
+use backtrace::Backtrace;
+use frida_gum::{PageProtection, RangeDetails};
+use hashbrown::HashMap;
+use libafl::bolts::cli::FuzzerOptions;
+#[cfg(any(
+    target_os = "linux",
+    target_vendor = "apple",
+    all(target_arch = "aarch64", target_os = "android")
+))]
+use libc::{sysconf, _SC_PAGESIZE};
+use nix::{
+    libc::memset,
+    sys::mman::{mmap, MapFlags, ProtFlags},
+};
+use rangemap::RangeSet;
+use serde::{Deserialize, Serialize};
 
 use crate::asan::errors::{AsanError, AsanErrors};
 

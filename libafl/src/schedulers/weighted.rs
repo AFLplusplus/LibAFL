@@ -5,6 +5,9 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::marker::PhantomData;
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
@@ -18,8 +21,6 @@ use crate::{
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
-use core::marker::PhantomData;
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 

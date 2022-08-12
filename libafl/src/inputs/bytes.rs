@@ -1,13 +1,13 @@
 //! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 
-use ahash::AHasher;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
-use core::hash::Hasher;
-use core::{cell::RefCell, convert::From};
-use serde::{Deserialize, Serialize};
+use core::{cell::RefCell, convert::From, hash::Hasher};
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
+
+use ahash::AHasher;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::{bolts::fs::write_file_atomic, Error};

@@ -1,14 +1,5 @@
 //! Exception handling for Windows
 
-pub use windows::Win32::System::Diagnostics::Debug::{
-    AddVectoredExceptionHandler, EXCEPTION_POINTERS,
-};
-
-pub use windows::Win32::Foundation::NTSTATUS;
-
-use crate::Error;
-use std::os::raw::{c_long, c_void};
-
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
@@ -17,8 +8,15 @@ use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+use std::os::raw::{c_long, c_void};
 
 use num_enum::TryFromPrimitive;
+pub use windows::Win32::{
+    Foundation::NTSTATUS,
+    System::Diagnostics::Debug::{AddVectoredExceptionHandler, EXCEPTION_POINTERS},
+};
+
+use crate::Error;
 
 //const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;

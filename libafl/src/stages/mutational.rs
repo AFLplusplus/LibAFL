@@ -3,6 +3,8 @@
 
 use core::marker::PhantomData;
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
@@ -15,9 +17,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasRand},
     Error,
 };
-
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
 
 // TODO multi mutators stage
 
@@ -166,6 +165,8 @@ where
 #[allow(missing_docs)]
 /// `StdMutationalStage` Python bindings
 pub mod pybind {
+    use pyo3::prelude::*;
+
     use crate::{
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
@@ -175,7 +176,6 @@ pub mod pybind {
         stages::{pybind::PythonStage, StdMutationalStage},
         state::pybind::PythonStdState,
     };
-    use pyo3::prelude::*;
 
     #[pyclass(unsendable, name = "StdMutationalStage")]
     #[derive(Debug)]

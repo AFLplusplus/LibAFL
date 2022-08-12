@@ -7,11 +7,12 @@ use core::{
 };
 #[cfg(feature = "usermode")]
 use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+
 #[cfg(feature = "usermode")]
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 use strum_macros::EnumIter;
 
 #[cfg(not(any(cpu_target = "x86_64", cpu_target = "aarch64")))]
@@ -948,10 +949,11 @@ impl Emulator {
 
 #[cfg(feature = "python")]
 pub mod pybind {
-    use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
-    use pyo3::exceptions::PyValueError;
-    use pyo3::{prelude::*, types::PyInt};
     use std::convert::TryFrom;
+
+    use pyo3::{exceptions::PyValueError, prelude::*, types::PyInt};
+
+    use super::{GuestAddr, GuestUsize, MmapPerms, SyscallHookResult};
 
     static mut PY_SYSCALL_HOOK: Option<PyObject> = None;
     static mut PY_GENERIC_HOOKS: Vec<(GuestAddr, PyObject)> = vec![];

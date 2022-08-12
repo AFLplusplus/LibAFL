@@ -2,13 +2,12 @@
 
 use alloc::{string::String, vec::Vec};
 use core::time::Duration;
+use std::{fs::File, io::Write, path::PathBuf};
 
 use crate::{
     bolts::{current_time, format_duration_hms},
     monitors::{ClientStats, Monitor, NopMonitor},
 };
-
-use std::{fs::File, io::Write, path::PathBuf};
 
 /// Wrap a monitor and log the current state of the monitor into a TOML file.
 #[derive(Debug, Clone)]

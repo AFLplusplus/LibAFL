@@ -49,10 +49,9 @@ use std::{
 };
 
 use bincode::{DefaultOptions, Options};
+pub use bincode::{ErrorKind, Result};
 
 use super::{SymExpr, SymExprRef};
-
-pub use bincode::{ErrorKind, Result};
 
 fn serialization_options() -> DefaultOptions {
     DefaultOptions::new()
@@ -381,9 +380,8 @@ impl<W: Write + Seek> MessageFileWriter<W> {
 
 #[cfg(test)]
 mod serialization_tests {
-    use std::io::Cursor;
-
     use alloc::vec::Vec;
+    use std::io::Cursor;
 
     use super::{MessageFileReader, MessageFileWriter, SymExpr};
 

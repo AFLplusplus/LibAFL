@@ -1,5 +1,11 @@
 //! A wide variety of mutations used during fuzzing.
 
+use alloc::{borrow::ToOwned, vec::Vec};
+use core::{
+    cmp::{max, min},
+    mem::size_of,
+};
+
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
@@ -7,12 +13,6 @@ use crate::{
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
-};
-
-use alloc::{borrow::ToOwned, vec::Vec};
-use core::{
-    cmp::{max, min},
-    mem::size_of,
 };
 
 /// Mem move in the own vec

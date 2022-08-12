@@ -1,7 +1,6 @@
 //! An `afl`-style forkserver fuzzer.
 //! Use this if your target has complex state that needs to be reset.
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
-use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
@@ -21,14 +20,17 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
+    },
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
+use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
@@ -293,10 +295,12 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 /// The python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::forkserver;
+    use std::path::PathBuf;
+
     use libafl::bolts::core_affinity::Cores;
     use pyo3::prelude::*;
-    use std::path::PathBuf;
+
+    use crate::forkserver;
 
     /// Python bindings for the `LibAFL` forkserver sugar
     #[pyclass(unsendable)]

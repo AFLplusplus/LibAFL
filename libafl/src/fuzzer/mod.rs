@@ -1,5 +1,10 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
+use alloc::string::ToString;
+use core::{marker::PhantomData, time::Duration};
+
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     bolts::current_time,
     corpus::{Corpus, Testcase},
@@ -15,12 +20,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     Error,
 };
-
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
-
-use alloc::string::ToString;
-use core::{marker::PhantomData, time::Duration};
 
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
@@ -672,18 +671,22 @@ where
 #[allow(missing_docs)]
 /// `Fuzzer` Python bindings
 pub mod pybind {
-    use crate::bolts::ownedref::OwnedPtrMut;
-    use crate::events::pybind::PythonEventManager;
-    use crate::executors::pybind::PythonExecutor;
-    use crate::feedbacks::pybind::PythonFeedback;
-    use crate::fuzzer::{Evaluator, Fuzzer, StdFuzzer};
-    use crate::inputs::BytesInput;
-    use crate::observers::pybind::PythonObserversTuple;
-    use crate::schedulers::QueueScheduler;
-    use crate::stages::pybind::PythonStagesTuple;
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
     use alloc::{boxed::Box, vec::Vec};
+
     use pyo3::prelude::*;
+
+    use crate::{
+        bolts::ownedref::OwnedPtrMut,
+        events::pybind::PythonEventManager,
+        executors::pybind::PythonExecutor,
+        feedbacks::pybind::PythonFeedback,
+        fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+        inputs::BytesInput,
+        observers::pybind::PythonObserversTuple,
+        schedulers::QueueScheduler,
+        stages::pybind::PythonStagesTuple,
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+    };
 
     /// `StdFuzzer` with fixed generics
     pub type PythonStdFuzzer = StdFuzzer<

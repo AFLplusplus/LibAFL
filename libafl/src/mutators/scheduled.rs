@@ -5,8 +5,10 @@ use core::{
     fmt::{self, Debug},
     marker::PhantomData,
 };
+
 use serde::{Deserialize, Serialize};
 
+pub use crate::mutators::{mutations::*, token_mutations::*};
 use crate::{
     bolts::{
         rands::Rand,
@@ -19,9 +21,6 @@ use crate::{
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
-
-pub use crate::mutators::mutations::*;
-pub use crate::mutators::token_mutations::*;
 
 /// The metadata placed in a [`crate::corpus::Testcase`] by a [`LoggerScheduledMutator`].
 #[derive(Debug, Serialize, Deserialize)]
@@ -505,11 +504,12 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{havoc_mutations, Debug, HavocMutationsType, StdScheduledMutator};
-    use crate::inputs::BytesInput;
-    use crate::mutators::pybind::PythonMutator;
-    use crate::state::pybind::PythonStdState;
     use pyo3::prelude::*;
+
+    use super::{havoc_mutations, Debug, HavocMutationsType, StdScheduledMutator};
+    use crate::{
+        inputs::BytesInput, mutators::pybind::PythonMutator, state::pybind::PythonStdState,
+    };
 
     #[pyclass(unsendable, name = "StdHavocMutator")]
     #[derive(Debug)]

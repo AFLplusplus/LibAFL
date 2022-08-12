@@ -1,8 +1,8 @@
 //! Utilities to parse and process ELFs
 
-use goblin::elf::{header::ET_DYN, Elf};
 use std::{convert::AsRef, fs::File, io::Read, path::Path, str};
 
+use goblin::elf::{header::ET_DYN, Elf};
 use libafl::Error;
 
 use crate::GuestAddr;

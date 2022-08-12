@@ -154,7 +154,6 @@ pub fn format_duration_hms(duration: &time::Duration) -> String {
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
 pub mod bolts_prelude {
-    pub use super::anymap::*;
     #[cfg(feature = "std")]
     pub use super::build_id::*;
     #[cfg(all(
@@ -166,20 +165,15 @@ pub mod bolts_prelude {
     pub use super::compress::*;
     #[cfg(feature = "std")]
     pub use super::core_affinity::*;
-    pub use super::cpu::*;
     #[cfg(feature = "std")]
     pub use super::fs::*;
     #[cfg(feature = "std")]
     pub use super::launcher::*;
-    pub use super::llmp::*;
     #[cfg(all(feature = "std", unix))]
     pub use super::minibsod::*;
-    pub use super::os::*;
-    pub use super::ownedref::*;
-    pub use super::rands::*;
-    pub use super::serdeany::*;
-    pub use super::shmem::*;
     #[cfg(feature = "std")]
     pub use super::staterestore::*;
-    pub use super::tuples::*;
+    pub use super::{
+        anymap::*, cpu::*, llmp::*, os::*, ownedref::*, rands::*, serdeany::*, shmem::*, tuples::*,
+    };
 }

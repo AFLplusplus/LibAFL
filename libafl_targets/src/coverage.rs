@@ -1,8 +1,9 @@
 //! Coverage maps as static mut array
 
-use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE};
 #[cfg(target_os = "linux")]
 use libafl::{mutators::Tokens, Error};
+
+use crate::{ACCOUNTING_MAP_SIZE, EDGES_MAP_SIZE};
 
 /// The map for edges.
 #[no_mangle]

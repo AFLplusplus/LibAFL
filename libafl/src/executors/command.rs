@@ -1,15 +1,16 @@
 //! The command executor executes a sub program for each run
+#[cfg(feature = "std")]
+use alloc::{borrow::ToOwned, string::String, vec::Vec};
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
 };
-
-#[cfg(feature = "std")]
-use alloc::{borrow::ToOwned, string::String, vec::Vec};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(feature = "std")]
 use std::process::Child;
+#[cfg(all(feature = "std", unix))]
+use std::time::Duration;
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
@@ -17,6 +18,9 @@ use std::{
     process::{Command, Stdio},
 };
 
+use super::HasObservers;
+#[cfg(all(feature = "std", unix))]
+use crate::executors::{Executor, ExitKind};
 use crate::{
     bolts::{
         fs::{InputFile, INPUTFILE_STD},
@@ -28,14 +32,6 @@ use crate::{
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
-
-#[cfg(all(feature = "std", unix))]
-use crate::executors::{Executor, ExitKind};
-
-#[cfg(all(feature = "std", unix))]
-use std::time::Duration;
-
-use super::HasObservers;
 
 /// How to deliver input to an external program
 /// `StdIn`: The traget reads from stdin
@@ -320,6 +316,7 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
+
         use wait_timeout::ChildExt;
 
         let mut child = self.configurer.spawn_child(input)?;

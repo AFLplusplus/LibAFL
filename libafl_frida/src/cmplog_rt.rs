@@ -3,15 +3,15 @@
 //! This allows the fuzzer to potentially solve the compares, if a compare value is directly
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
+use std::ffi::c_void;
+
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
 };
-use libafl_targets;
-use libafl_targets::CMPLOG_MAP_W;
+use libafl_targets::{self, CMPLOG_MAP_W};
 use rangemap::RangeMap;
-use std::ffi::c_void;
 
 use crate::helper::FridaRuntime;
 extern "C" {

@@ -1,6 +1,6 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
-#[cfg(target_arch = "x86_64")]
-use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
+use std::io::Write;
+
 use backtrace::Backtrace;
 use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
@@ -19,9 +19,10 @@ use libafl::{
     Error, SerdeAny,
 };
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
+#[cfg(target_arch = "x86_64")]
+use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
 use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

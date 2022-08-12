@@ -1,10 +1,11 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
 use alloc::string::String;
 use core::fmt::Debug;
+use std::fs::create_dir_all;
+
 use grammartec::{chunkstore::ChunkStore, context::Context};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::fs::create_dir_all;
 
 use crate::{
     bolts::tuples::Named,

@@ -9,10 +9,9 @@ use libafl::{
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error, SerdeAny,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::input::PacketData;
-
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, SerdeAny, Serialize, Deserialize)]
 pub struct PacketLenMetadata {

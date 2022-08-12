@@ -1,5 +1,13 @@
 //! Mutators for the `Nautilus` grammmar fuzzer
 
+use core::fmt::Debug;
+
+use grammartec::{
+    context::Context,
+    mutator::Mutator as BackingMutator,
+    tree::{Tree, TreeMutation},
+};
+
 use crate::{
     bolts::tuples::Named,
     feedbacks::NautilusChunksMetadata,
@@ -8,13 +16,6 @@ use crate::{
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMetadata},
     Error,
-};
-
-use core::fmt::Debug;
-use grammartec::mutator::Mutator as BackingMutator;
-use grammartec::{
-    context::Context,
-    tree::{Tree, TreeMutation},
 };
 
 /// The randomic mutator for `Nautilus` grammar.
