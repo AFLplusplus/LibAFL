@@ -655,11 +655,11 @@ bool AutoTokensPass::runOnModule(Module &M) {
           ConstantDataArray::get(Ctx,
                                  *(new ArrayRef<char>(ptrhld.get(), offset))),
           "libafl_dictionary_" + M.getName());
-      #if defined(__linux__)
-        dict->setSection("libafl_token");
-      #elif defined(__APPLE__)
-        dict->setSection("__DATA,__libafl_token");
-      #endif
+#if defined(__linux__)
+      dict->setSection("libafl_token");
+#elif defined(__APPLE__)
+      dict->setSection("__DATA,__libafl_token");
+#endif
     }
   }
 
