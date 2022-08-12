@@ -2,7 +2,7 @@
 cargo build --release
 export CC=`pwd`/target/release/libafl_cc
 export CXX=`pwd`/target/release/libafl_cxx
-curl -C https://gitlab.gnome.org/GNOME/libxml2/-/archive/v2.9.14/libxml2-v2.9.14.tar.gz --output libxml2-v2.9.14.tar.gz
+curl -C - https://gitlab.gnome.org/GNOME/libxml2/-/archive/v2.9.14/libxml2-v2.9.14.tar.gz --output libxml2-v2.9.14.tar.gz
 tar -xvf ./libxml2-v2.9.14.tar.gz  --transform s/libxml2-v2.9.14/libxml2/
 cd ./libxml2/ || exit
 ./autogen.sh --enable-shared=no
