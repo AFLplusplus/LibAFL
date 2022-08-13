@@ -79,6 +79,12 @@ cd docs && mdbook serve
 We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
 Be sure to read their documentation (and source), this is *the natural way to get started!*
 
+You can run each example fuzzer with
+```
+cargo make run
+```
+as long as the fuzzer directory has `Makefile.toml` file.
+
 The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
 
 ## Resources
