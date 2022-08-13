@@ -1,15 +1,14 @@
 //! Unix `pipe` wrapper for `LibAFL`
-use crate::Error;
-#[cfg(feature = "std")]
-use nix::unistd::{close, pipe, read, write};
 #[cfg(feature = "std")]
 use std::{
     io::{self, ErrorKind, Read, Write},
     os::unix::io::RawFd,
 };
 
-#[cfg(not(feature = "std"))]
-type RawFd = i32;
+#[cfg(feature = "std")]
+use nix::unistd::{close, pipe, read, write};
+
+use crate::Error;
 
 /// A unix pipe wrapper for `LibAFL`
 #[cfg(feature = "std")]

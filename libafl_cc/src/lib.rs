@@ -1,6 +1,7 @@
 //! Compiler Wrapper from `LibAFL`
 
 #![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![allow(
     clippy::unreadable_literal,
@@ -58,6 +59,8 @@
 
 use std::{convert::Into, path::Path, process::Command, string::String, vec::Vec};
 
+pub mod cfg;
+pub use cfg::{CfgEdge, ControlFlowGraph, EntryBasicBlockInfo, HasWeight};
 pub mod clang;
 pub use clang::{ClangWrapper, LLVMPasses};
 
@@ -90,7 +93,7 @@ pub const LIB_PREFIX: &str = "lib";
 /// Wrap a compiler hijacking its arguments
 pub trait CompilerWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments
-    fn from_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
+    fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
         S: AsRef<str>;
 

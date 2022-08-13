@@ -1,36 +1,39 @@
 use libafl::{
     bolts::tuples::Named,
-    corpus::{FavFactor, MinimizerCorpusScheduler, Testcase},
+    corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata},
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasMetadata},
+    schedulers::{MinimizerScheduler, TestcaseScore},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
     Error, SerdeAny,
 };
+use serde::{Deserialize, Serialize};
 
 use crate::input::PacketData;
-
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, SerdeAny, Serialize, Deserialize)]
 pub struct PacketLenMetadata {
     pub length: u64,
 }
 
-pub struct PacketLenFavFactor {}
+pub struct PacketLenTestcaseScore {}
 
-impl FavFactor<PacketData> for PacketLenFavFactor {
-    fn compute(entry: &mut Testcase<PacketData>) -> Result<u64, Error> {
+impl<S> TestcaseScore<PacketData, S> for PacketLenTestcaseScore
+where
+    S: HasCorpus<PacketData> + HasMetadata,
+{
+    fn compute(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
         Ok(entry
             .metadata()
             .get::<PacketLenMetadata>()
-            .map_or(1, |m| m.length))
+            .map_or(1, |m| m.length) as f64)
     }
 }
 
-pub type PacketLenMinimizerCorpusScheduler<C, CS, R, S> =
-    MinimizerCorpusScheduler<C, CS, PacketLenFavFactor, PacketData, MapIndexesMetadata, R, S>;
+pub type PacketLenMinimizerScheduler<CS, S> =
+    MinimizerScheduler<CS, PacketLenTestcaseScore, PacketData, MapIndexesMetadata, S>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {
@@ -41,6 +44,7 @@ impl<S> Feedback<PacketData, S> for PacketLenFeedback
 where
     S: HasClientPerfMonitor,
 {
+    #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -66,11 +70,6 @@ where
         testcase
             .metadata_mut()
             .insert(PacketLenMetadata { length: self.len });
-        Ok(())
-    }
-
-    #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &PacketData) -> Result<(), Error> {
         Ok(())
     }
 }

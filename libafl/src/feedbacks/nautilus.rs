@@ -1,9 +1,11 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
+use alloc::string::String;
 use core::fmt::Debug;
+use std::fs::create_dir_all;
+
 use grammartec::{chunkstore::ChunkStore, context::Context};
 use serde::{Deserialize, Serialize};
 use serde_json;
-use std::fs::create_dir_all;
 
 use crate::{
     bolts::tuples::Named,
@@ -78,6 +80,7 @@ impl<'a, S> Feedback<NautilusInput, S> for NautilusFeedback<'a>
 where
     S: HasMetadata + HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,

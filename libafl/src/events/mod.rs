@@ -3,13 +3,16 @@
 pub mod simple;
 pub use simple::*;
 pub mod llmp;
-pub use llmp::*;
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 
 use ahash::AHasher;
-use alloc::{string::String, vec::Vec};
-use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
+pub use llmp::*;
 use serde::{Deserialize, Serialize};
-
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
@@ -33,8 +36,6 @@ pub struct EventManagerId {
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "introspection")]
-use alloc::boxed::Box;
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -60,17 +61,26 @@ impl fmt::Display for LogSeverity {
     }
 }
 
+/// The result of a custom buf handler added using [`HasCustomBufHandlers::add_custom_buf_handler`]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CustomBufEventResult {
+    /// Exit early from event handling
+    Handled,
+    /// Call the next handler, if available
+    Next,
+}
+
 /// Indicate if an event worked or not
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum BrokerEventResult {
-    /// The broker haneled this. No need to pass it on.
+    /// The broker handled this. No need to pass it on.
     Handled,
     /// Pass this message along to the clients.
     Forward,
 }
 
 /// Distinguish a fuzzer by its config
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventConfig {
     /// Always assume unique setups for fuzzer configs
     AlwaysUnique,
@@ -103,7 +113,7 @@ impl EventConfig {
     #[must_use]
     pub fn from_build_id() -> Self {
         EventConfig::BuildID {
-            id: build_id::get(),
+            id: crate::bolts::build_id::get(),
         }
     }
 
@@ -115,14 +125,14 @@ impl EventConfig {
             EventConfig::FromName { name_hash: a } => match other {
                 #[cfg(not(feature = "std"))]
                 EventConfig::AlwaysUnique => false,
-                EventConfig::FromName { name_hash: b } => (a == b),
+                EventConfig::FromName { name_hash: b } => a == b,
                 #[cfg(feature = "std")]
                 EventConfig::AlwaysUnique | EventConfig::BuildID { id: _ } => false,
             },
             #[cfg(feature = "std")]
             EventConfig::BuildID { id: a } => match other {
                 EventConfig::AlwaysUnique | EventConfig::FromName { name_hash: _ } => false,
-                EventConfig::BuildID { id: b } => (a == b),
+                EventConfig::BuildID { id: b } => a == b,
             },
         }
     }
@@ -187,8 +197,6 @@ where
     UpdateExecStats {
         /// The time of generation of the [`Event`]
         time: Duration,
-        /// The stability of this fuzzer node, if known
-        stability: Option<f32>,
         /// The executions of this client
         executions: usize,
         /// [`PhantomData`]
@@ -210,8 +218,6 @@ where
         time: Duration,
         /// The executions of this client
         executions: usize,
-        /// The stability of this fuzzer node, if known
-        stability: Option<f32>,
         /// Current performance statistics
         introspection_monitor: Box<ClientPerfMonitor>,
 
@@ -231,6 +237,13 @@ where
         message: String,
         /// `PhantomData`
         phantom: PhantomData<I>,
+    },
+    /// Sends a custom buffer to other clients
+    CustomBuf {
+        /// The buffer
+        buf: Vec<u8>,
+        /// Tag of this buffer
+        tag: String,
     },
     /*/// A custom type
     Custom {
@@ -256,7 +269,6 @@ where
             } => "Testcase",
             Event::UpdateExecStats {
                 time: _,
-                stability: _,
                 executions: _,
                 phantom: _,
             }
@@ -269,16 +281,16 @@ where
             Event::UpdatePerfMonitor {
                 time: _,
                 executions: _,
-                stability: _,
                 introspection_monitor: _,
                 phantom: _,
             } => "PerfMonitor",
-            Event::Objective { objective_size: _ } => "Objective",
+            Event::Objective { .. } => "Objective",
             Event::Log {
                 severity_level: _,
                 message: _,
                 phantom: _,
             } => "Log",
+            Event::CustomBuf { .. } => "CustomBuf",
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
@@ -298,10 +310,10 @@ where
     /// In this case, if you `fire` faster than the broker can consume
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
-    /// This should not happen for a normal use-cases.
+    /// This should not happen for a normal use-case.
     fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
 
-    /// Send off an [`Event::Log`] event to the broker
+    /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
     fn log<S>(
         &mut self,
@@ -333,7 +345,7 @@ where
     }
 }
 
-/// [`EventFirer`] fire an event.
+/// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter<I>: EventFirer<I>
 where
     I: Input,
@@ -351,7 +363,6 @@ where
         S: HasExecutions + HasClientPerfMonitor,
     {
         let executions = *state.executions();
-        let stability = *state.stability();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
         if cur.checked_sub(last_report_time).unwrap_or_default() > monitor_timeout {
@@ -361,11 +372,22 @@ where
                 state,
                 Event::UpdateExecStats {
                     executions,
-                    stability,
                     time: cur,
                     phantom: PhantomData,
                 },
             )?;
+
+            if let Some(x) = state.stability() {
+                let stability = f64::from(*x);
+                self.fire(
+                    state,
+                    Event::UpdateUserStats {
+                        name: "stability".to_string(),
+                        value: UserStats::Float(stability),
+                        phantom: PhantomData,
+                    },
+                )?;
+            }
 
             // If performance monitor are requested, fire the `UpdatePerfMonitor` event
             #[cfg(feature = "introspection")]
@@ -381,7 +403,6 @@ where
                     Event::UpdatePerfMonitor {
                         executions,
                         time: cur,
-                        stability,
                         introspection_monitor: Box::new(state.introspection_monitor().clone()),
                         phantom: PhantomData,
                     },
@@ -425,10 +446,10 @@ pub trait EventProcessor<E, I, S, Z> {
 }
 /// The id of this [`EventManager`].
 /// For multi processed [`EventManager`]s,
-/// each connected client sholud have a unique ids.
+/// each connected client should have a unique ids.
 pub trait HasEventManagerId {
     /// The id of this manager. For Multiprocessed [`EventManager`]s,
-    /// each client sholud have a unique ids.
+    /// each client should have a unique ids.
     fn mgr_id(&self) -> EventManagerId;
 }
 
@@ -443,6 +464,16 @@ pub trait EventManager<E, I, S, Z>:
 where
     I: Input,
 {
+}
+
+/// The handler function for custom buffers exchanged via [`EventManager`]
+type CustomBufHandlerFn<S> =
+    dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
+
+/// Supports custom buf handlers to handle `CustomBuf` events.
+pub trait HasCustomBufHandlers<S> {
+    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
+    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>);
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
@@ -472,6 +503,14 @@ impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
 }
 
 impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
+
+impl<S> HasCustomBufHandlers<S> for NopEventManager {
+    fn add_custom_buf_handler(
+        &mut self,
+        _handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+    ) {
+    }
+}
 
 impl<I> ProgressReporter<I> for NopEventManager where I: Input {}
 
@@ -535,5 +574,103 @@ mod tests {
             }
             _ => panic!("mistmatch"),
         };
+    }
+}
+
+/// `EventManager` Python bindings
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+pub mod pybind {
+    use pyo3::prelude::*;
+
+    use crate::{
+        events::{
+            simple::pybind::PythonSimpleEventManager, Event, EventFirer, EventManager,
+            EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
+        },
+        executors::pybind::PythonExecutor,
+        fuzzer::pybind::PythonStdFuzzer,
+        inputs::BytesInput,
+        state::pybind::PythonStdState,
+        Error,
+    };
+
+    #[derive(Debug, Clone)]
+    pub enum PythonEventManagerWrapper {
+        Simple(Py<PythonSimpleEventManager>),
+    }
+
+    /// EventManager Trait binding
+    #[pyclass(unsendable, name = "EventManager")]
+    #[derive(Debug, Clone)]
+    pub struct PythonEventManager {
+        pub wrapper: PythonEventManagerWrapper,
+    }
+
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!($wrapper, $name, $body, PythonEventManagerWrapper, {
+                Simple
+            })
+        };
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonEventManagerWrapper, {
+                Simple
+            })
+        };
+    }
+
+    #[pymethods]
+    impl PythonEventManager {
+        #[staticmethod]
+        #[must_use]
+        pub fn new_simple(mgr: Py<PythonSimpleEventManager>) -> Self {
+            Self {
+                wrapper: PythonEventManagerWrapper::Simple(mgr),
+            }
+        }
+    }
+
+    impl EventFirer<BytesInput> for PythonEventManager {
+        fn fire<S>(&mut self, state: &mut S, event: Event<BytesInput>) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
+        }
+    }
+
+    impl<S> EventRestarter<S> for PythonEventManager {}
+
+    impl EventProcessor<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
+        for PythonEventManager
+    {
+        fn process(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            state: &mut PythonStdState,
+            executor: &mut PythonExecutor,
+        ) -> Result<usize, Error> {
+            unwrap_me_mut!(self.wrapper, e, { e.process(fuzzer, state, executor) })
+        }
+    }
+
+    impl ProgressReporter<BytesInput> for PythonEventManager {}
+
+    impl HasEventManagerId for PythonEventManager {
+        fn mgr_id(&self) -> EventManagerId {
+            unwrap_me!(self.wrapper, e, { e.mgr_id() })
+        }
+    }
+
+    impl EventManager<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
+        for PythonEventManager
+    {
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonEventManager>()?;
+        Ok(())
     }
 }

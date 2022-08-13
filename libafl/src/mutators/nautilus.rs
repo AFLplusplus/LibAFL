@@ -1,21 +1,21 @@
 //! Mutators for the `Nautilus` grammmar fuzzer
 
+use core::fmt::Debug;
+
+use grammartec::{
+    context::Context,
+    mutator::Mutator as BackingMutator,
+    tree::{Tree, TreeMutation},
+};
+
 use crate::{
     bolts::tuples::Named,
-    corpus::Corpus,
     feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMetadata},
     Error,
-};
-
-use core::{fmt::Debug, marker::PhantomData};
-use grammartec::mutator::Mutator as BackingMutator;
-use grammartec::{
-    context::Context,
-    tree::{Tree, TreeMutation},
 };
 
 /// The randomic mutator for `Nautilus` grammar.
@@ -30,7 +30,7 @@ impl Debug for NautilusRandomMutator<'_> {
     }
 }
 
-impl<'a, S> Mutator<NautilusInput, S> for NautilusRandomMutator<'a> {
+impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
     fn mutate(
         &mut self,
         _state: &mut S,
@@ -60,7 +60,7 @@ impl<'a, S> Mutator<NautilusInput, S> for NautilusRandomMutator<'a> {
     }
 }
 
-impl<'a> Named for NautilusRandomMutator<'a> {
+impl Named for NautilusRandomMutator<'_> {
     fn name(&self) -> &str {
         "NautilusRandomMutator"
     }
@@ -91,7 +91,7 @@ impl Debug for NautilusRecursionMutator<'_> {
     }
 }
 
-impl<'a, S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'a> {
+impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
     fn mutate(
         &mut self,
         _state: &mut S,
@@ -124,7 +124,7 @@ impl<'a, S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'a> {
     }
 }
 
-impl<'a> Named for NautilusRecursionMutator<'a> {
+impl Named for NautilusRecursionMutator<'_> {
     fn name(&self) -> &str {
         "NautilusRecursionMutator"
     }
@@ -143,22 +143,20 @@ impl<'a> NautilusRecursionMutator<'a> {
 }
 
 /// The splicing mutator for `Nautilus` that can splice inputs together
-pub struct NautilusSpliceMutator<'a, C> {
+pub struct NautilusSpliceMutator<'a> {
     ctx: &'a Context,
     mutator: BackingMutator,
-    phantom: PhantomData<C>,
 }
 
-impl Debug for NautilusSpliceMutator<'_, ()> {
+impl Debug for NautilusSpliceMutator<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "NautilusSpliceMutator {{}}")
     }
 }
 
-impl<'a, S, C> Mutator<NautilusInput, S> for NautilusSpliceMutator<'a, C>
+impl<S> Mutator<NautilusInput, S> for NautilusSpliceMutator<'_>
 where
-    C: Corpus<NautilusInput>,
-    S: HasCorpus<C, NautilusInput> + HasMetadata,
+    S: HasCorpus<NautilusInput> + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -194,13 +192,13 @@ where
     }
 }
 
-impl<'a, C> Named for NautilusSpliceMutator<'a, C> {
+impl Named for NautilusSpliceMutator<'_> {
     fn name(&self) -> &str {
         "NautilusSpliceMutator"
     }
 }
 
-impl<'a, C> NautilusSpliceMutator<'a, C> {
+impl<'a> NautilusSpliceMutator<'a> {
     /// Creates a new [`NautilusSpliceMutator`].
     #[must_use]
     pub fn new(context: &'a NautilusContext) -> Self {
@@ -208,7 +206,6 @@ impl<'a, C> NautilusSpliceMutator<'a, C> {
         Self {
             ctx: &context.ctx,
             mutator,
-            phantom: PhantomData,
         }
     }
 }

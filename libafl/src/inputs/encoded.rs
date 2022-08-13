@@ -1,13 +1,15 @@
 //! The `EncodedInput` is the "normal" input, a map of codes, that can be sent directly to the client
-//! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
+//! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
+//! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
-use ahash::AHasher;
-use core::hash::Hasher;
-
+#[cfg(feature = "std")]
+use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 #[cfg(feature = "std")]
 use core::str::from_utf8;
-use core::{cell::RefCell, convert::From};
+use core::{cell::RefCell, convert::From, hash::Hasher};
+
+use ahash::AHasher;
 use hashbrown::HashMap;
 #[cfg(feature = "std")]
 use regex::Regex;
@@ -27,12 +29,13 @@ where
 /// Trait to decode encoded input to bytes
 pub trait InputDecoder {
     /// Decode encoded input to bytes
+    #[allow(clippy::ptr_arg)] // we reuse the alloced `Vec`
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error>;
 }
 
-/// Tokenizer is a trait that can tokenize bytes into a ][`Vec`] of tokens
+/// Tokenizer is a trait that can tokenize bytes into a [`Vec`] of tokens
 pub trait Tokenizer {
-    /// Tokanize the given bytes
+    /// Tokenize the given bytes
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error>;
 }
 
@@ -72,7 +75,7 @@ impl InputDecoder for TokenInputEncoderDecoder {
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
         for id in input.codes() {
             let tok = self.id_table.get(&(id % self.next_id)).ok_or_else(|| {
-                Error::IllegalState(format!("Id {} not in the decoder table", id))
+                Error::illegal_state(format!("Id {} not in the decoder table", id))
             })?;
             bytes.extend_from_slice(tok.as_bytes());
             bytes.push(b' ');
@@ -99,13 +102,13 @@ impl Default for TokenInputEncoderDecoder {
     }
 }
 
-/// A native tokenizer struct
+/// A naive tokenizer struct
 #[cfg(feature = "std")]
 #[derive(Clone, Debug)]
 pub struct NaiveTokenizer {
     /// Ident regex
     ident_re: Regex,
-    /// Comement regex
+    /// Comment regex
     comment_re: Regex,
     /// String regex
     string_re: Regex,
@@ -143,7 +146,7 @@ impl Tokenizer for NaiveTokenizer {
     fn tokenize(&self, bytes: &[u8]) -> Result<Vec<String>, Error> {
         let mut tokens = vec![];
         let string =
-            from_utf8(bytes).map_err(|_| Error::IllegalArgument("Invalid UTF-8".to_owned()))?;
+            from_utf8(bytes).map_err(|_| Error::illegal_argument("Invalid UTF-8".to_owned()))?;
         let string = self.comment_re.replace_all(string, "").to_string();
         let mut str_prev = 0;
         for str_match in self.string_re.find_iter(&string) {
@@ -185,7 +188,7 @@ impl Tokenizer for NaiveTokenizer {
 }
 
 /// A codes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct EncodedInput {
     /// The input representation as list of codes
     codes: Vec<u32>,
@@ -254,10 +257,12 @@ impl EncodedInput {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+    use alloc::borrow::ToOwned;
+    use core::str::from_utf8;
+
     use crate::inputs::encoded::{
         InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
     };
-    use core::str::from_utf8;
 
     #[test]
     fn test_input() {

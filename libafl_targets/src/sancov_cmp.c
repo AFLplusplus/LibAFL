@@ -76,7 +76,7 @@ void __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases) {
 
   uintptr_t rt = RETADDR;
 
-  // if (!cases[1]) return;
+  // if (!cases[1]) {return;}
 
   for (uint64_t i = 0; i < cases[0]; i++) {
 

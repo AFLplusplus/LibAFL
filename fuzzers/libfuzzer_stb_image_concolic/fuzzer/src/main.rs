@@ -5,7 +5,11 @@ use mimalloc::MiMalloc;
 static GLOBAL: MiMalloc = MiMalloc;
 
 use clap::{self, StructOpt};
-use std::{env, path::PathBuf};
+use std::{
+    env,
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+};
 
 use libafl::{
     bolts::{
@@ -13,17 +17,15 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Named},
+        AsMutSlice, AsSlice,
     },
-    corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{
         command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, ShadowExecutor,
     },
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, Input},
     monitors::MultiMonitor,
@@ -38,6 +40,7 @@ use libafl::{
         },
         StdMapObserver, TimeObserver,
     },
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
         ConcolicTracingStage, ShadowTracingStage, SimpleConcolicMutationalStage,
         StdMutationalStage, TracingStage,
@@ -113,20 +116,18 @@ fn fuzz(
     let cmplog = unsafe { &mut CMPLOG_MAP };
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
+    
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        MaxMapFeedback::new_tracking(&edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -138,16 +139,18 @@ fn fuzz(
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
-            // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(feedback_state),
-        )
+        // States of the feedbacks.
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+        ).unwrap()
     });
 
     println!("We're a client, let's fuzz :)");
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -206,13 +209,13 @@ fn fuzz(
         // The shared memory for the concolic runtime to write its trace to
         let mut concolic_shmem = StdShMemProvider::new()
             .unwrap()
-            .new_map(DEFAULT_SIZE)
+            .new_shmem(DEFAULT_SIZE)
             .unwrap();
         concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer =
-            ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
+            ConcolicObserver::new("concolic".to_string(), concolic_shmem.as_mut_slice());
 
         let concolic_observer_name = concolic_observer.name().to_string();
 
@@ -241,22 +244,11 @@ fn fuzz(
     Ok(())
 }
 
-use std::process::{Child, Command, Stdio};
-
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MyCommandConfigurator;
 
-impl<EM, I, S, Z> CommandConfigurator<EM, I, S, Z> for MyCommandConfigurator
-where
-    I: HasTargetBytes + Input,
-{
-    fn spawn_child(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        input: &I,
-    ) -> Result<Child, Error> {
+impl CommandConfigurator for MyCommandConfigurator {
+    fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")

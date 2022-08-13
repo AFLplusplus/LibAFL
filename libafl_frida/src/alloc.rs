@@ -1,46 +1,57 @@
-use frida_gum::{PageProtection, RangeDetails};
-use hashbrown::HashMap;
-use nix::{
-    libc::memset,
-    sys::mman::{mmap, MapFlags, ProtFlags},
-};
-
-use backtrace::Backtrace;
 #[cfg(any(
     target_os = "linux",
-    all(target_arch = "aarch64", target_os = "android")
-))]
-use libc::{sysconf, _SC_PAGESIZE};
-use rangemap::RangeSet;
-use serde::{Deserialize, Serialize};
-#[cfg(any(
-    target_os = "linux",
+    target_vendor = "apple",
     all(target_arch = "aarch64", target_os = "android")
 ))]
 use std::io;
 use std::{collections::BTreeMap, ffi::c_void};
 
-use crate::{
-    asan::errors::{AsanError, AsanErrors},
-    FridaOptions,
+use backtrace::Backtrace;
+use frida_gum::{PageProtection, RangeDetails};
+use hashbrown::HashMap;
+use libafl::bolts::cli::FuzzerOptions;
+#[cfg(any(
+    target_os = "linux",
+    target_vendor = "apple",
+    all(target_arch = "aarch64", target_os = "android")
+))]
+use libc::{sysconf, _SC_PAGESIZE};
+use nix::{
+    libc::memset,
+    sys::mman::{mmap, MapFlags, ProtFlags},
 };
+use rangemap::RangeSet;
+use serde::{Deserialize, Serialize};
+
+use crate::asan::errors::{AsanError, AsanErrors};
 
 /// An allocator wrapper with binary-only address sanitization
 #[derive(Debug)]
-#[allow(missing_docs)]
 pub struct Allocator {
+    /// The fuzzer options
     #[allow(dead_code)]
-    options: FridaOptions,
+    options: FuzzerOptions,
+    /// The page size
     page_size: usize,
+    /// The shadow offsets
     shadow_offset: usize,
+    /// The shadow bit
     shadow_bit: usize,
+    /// If the shadow is pre-allocated
     pre_allocated_shadow: bool,
+    /// All tracked allocations
     allocations: HashMap<usize, AllocationMetadata>,
+    /// The shadow memory pages
     shadow_pages: RangeSet<usize>,
+    /// A list of allocations
     allocation_queue: BTreeMap<usize, Vec<AllocationMetadata>>,
+    /// The size of the largest allocation
     largest_allocation: usize,
+    /// The total size of all allocations combined
     total_allocation_size: usize,
+    /// The base address of the shadow memory
     base_mapping_addr: usize,
+    /// The current mapping address
     current_mapping_addr: usize,
 }
 
@@ -57,14 +68,20 @@ macro_rules! map_to_shadow {
 
 /// Metadata for an allocation
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[allow(missing_docs)]
 pub struct AllocationMetadata {
+    /// The address of the allocation
     pub address: usize,
+    /// The size of the allocation
     pub size: usize,
+    /// The actual allocated size, including metadata
     pub actual_size: usize,
+    /// A backtrace to the allocation location
     pub allocation_site_backtrace: Option<Backtrace>,
+    /// A backtrace to the location where this memory has been released
     pub release_site_backtrace: Option<Backtrace>,
+    /// If the allocation has been freed
     pub freed: bool,
+    /// If the allocation was done with a size of 0
     pub is_malloc_zero: bool,
 }
 
@@ -72,20 +89,23 @@ impl Allocator {
     /// Creates a new [`Allocator`] (not supported on this platform!)
     #[cfg(not(any(
         target_os = "linux",
+        target_vendor = "apple",
         all(target_arch = "aarch64", target_os = "android")
     )))]
     #[must_use]
-    pub fn new(_: FridaOptions) -> Self {
+    pub fn new(_: FuzzerOptions) -> Self {
         todo!("Shadow region not yet supported for this platform!");
     }
 
     /// Creates a new [`Allocator`]
     #[cfg(any(
         target_os = "linux",
+        target_vendor = "apple",
         all(target_arch = "aarch64", target_os = "android")
     ))]
     #[must_use]
-    pub fn new(options: FridaOptions) -> Self {
+    #[allow(clippy::too_many_lines)]
+    pub fn new(options: FuzzerOptions) -> Self {
         let ret = unsafe { sysconf(_SC_PAGESIZE) };
         assert!(
             ret >= 0,
@@ -98,55 +118,84 @@ impl Allocator {
         // probe to find a usable shadow bit:
         let mut shadow_bit = 0;
 
-        #[cfg(all(target_arch = "aarch64", target_os = "android"))]
-        for try_shadow_bit in &[44usize, 36usize] {
-            let addr: usize = 1 << try_shadow_bit;
-            if unsafe {
-                mmap(
-                    addr as *mut c_void,
-                    page_size,
-                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_PRIVATE
-                        | ANONYMOUS_FLAG
-                        | MapFlags::MAP_FIXED
-                        | MapFlags::MAP_NORESERVE,
-                    -1,
-                    0,
-                )
-            }
-            .is_ok()
-            {
-                shadow_bit = *try_shadow_bit;
+        let mut occupied_ranges: Vec<(usize, usize)> = vec![];
+        // max(userspace address) this is usually 0x8_0000_0000_0000 - 1 on x64 linux.
+        let mut userspace_max: usize = 0;
+
+        // Enumerate memory ranges that are already occupied.
+        for prot in [
+            PageProtection::Read,
+            PageProtection::Write,
+            PageProtection::Execute,
+        ] {
+            RangeDetails::enumerate_with_prot(prot, &mut |details| {
+                let start = details.memory_range().base_address().0 as usize;
+                let end = start + details.memory_range().size();
+                occupied_ranges.push((start, end));
+                // println!("{:x} {:x}", start, end);
+                let base: usize = 2;
+                // On x64, if end > 2**48, then that's in vsyscall or something.
+                #[cfg(target_arch = "x86_64")]
+                if end <= base.pow(48) && end > userspace_max {
+                    userspace_max = end;
+                }
+
+                // On x64, if end > 2**52, then range is not in userspace
+                #[cfg(target_arch = "aarch64")]
+                if end <= base.pow(52) && end > userspace_max {
+                    userspace_max = end;
+                }
+
+                true
+            });
+        }
+
+        let mut maxbit = 0;
+        for power in 1..64 {
+            let base: usize = 2;
+            if base.pow(power) > userspace_max {
+                maxbit = power;
                 break;
             }
         }
 
-        // x86_64's userspace's up to 0x7fff-ffff-ffff so 46 is not available. (0x4000-0000-0000 - 0xc000-0000-0000)
-        // we'd also want to avoid 0x5555-xxxx-xxxx because programs are mapped there. so 45 is not available either (0x2000-0000-0000 - 0x6000-0000-0000).
-        // This memory map is for amd64 linux.
-        #[cfg(target_os = "linux")]
         {
-            let try_shadow_bit: usize = 44;
-            let addr: usize = 1 << try_shadow_bit;
-            if unsafe {
-                mmap(
-                    addr as *mut c_void,
-                    page_size,
-                    ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
-                    MapFlags::MAP_PRIVATE
-                        | ANONYMOUS_FLAG
-                        | MapFlags::MAP_FIXED
-                        | MapFlags::MAP_NORESERVE,
-                    -1,
-                    0,
-                )
-            }
-            .is_ok()
-            {
-                shadow_bit = try_shadow_bit;
+            for try_shadow_bit in &[maxbit - 4, maxbit - 3, maxbit - 2] {
+                let addr: usize = 1 << try_shadow_bit;
+                let shadow_start = addr;
+                let shadow_end = addr + addr + addr;
+
+                // check if the proposed shadow bit overlaps with occupied ranges.
+                for (start, end) in &occupied_ranges {
+                    if (shadow_start <= *end) && (*start <= shadow_end) {
+                        // println!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
+                        println!("shadow_bit {:x} is not suitable", try_shadow_bit);
+                        break;
+                    }
+                }
+
+                if unsafe {
+                    mmap(
+                        addr as *mut c_void,
+                        page_size,
+                        ProtFlags::PROT_READ | ProtFlags::PROT_WRITE,
+                        MapFlags::MAP_PRIVATE
+                            | ANONYMOUS_FLAG
+                            | MapFlags::MAP_FIXED
+                            | MapFlags::MAP_NORESERVE,
+                        -1,
+                        0,
+                    )
+                }
+                .is_ok()
+                {
+                    shadow_bit = (*try_shadow_bit).try_into().unwrap();
+                    break;
+                }
             }
         }
 
+        println!("shadow_bit {:x} is suitable", shadow_bit);
         assert!(shadow_bit != 0);
         // attempt to pre-map the entire shadow-memory space
 
@@ -223,9 +272,9 @@ impl Allocator {
         } else {
             size
         };
-        if size > self.options.asan_max_allocation() {
+        if size > self.options.max_allocation {
             #[allow(clippy::manual_assert)]
-            if self.options.asan_max_allocation_panics() {
+            if self.options.max_allocation_panics {
                 panic!("ASAN: Allocation is too large: 0x{:x}", size);
             }
 
@@ -233,7 +282,7 @@ impl Allocator {
         }
         let rounded_up_size = self.round_up_to_page(size) + 2 * self.page_size;
 
-        if self.total_allocation_size + rounded_up_size > self.options.asan_max_total_allocation() {
+        if self.total_allocation_size + rounded_up_size > self.options.max_total_allocation {
             return std::ptr::null_mut();
         }
         self.total_allocation_size += rounded_up_size;
@@ -242,7 +291,7 @@ impl Allocator {
             //println!("reusing allocation at {:x}, (actual mapping starts at {:x}) size {:x}", metadata.address, metadata.address - self.page_size, size);
             metadata.is_malloc_zero = is_malloc_zero;
             metadata.size = size;
-            if self.options.enable_asan_allocation_backtraces {
+            if self.options.allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
             metadata
@@ -275,7 +324,7 @@ impl Allocator {
                 actual_size: rounded_up_size,
                 ..AllocationMetadata::default()
             };
-            if self.options.enable_asan_allocation_backtraces {
+            if self.options.allocation_backtraces {
                 metadata.allocation_site_backtrace = Some(Backtrace::new_unresolved());
             }
 
@@ -320,7 +369,7 @@ impl Allocator {
         let shadow_mapping_start = map_to_shadow!(self, ptr as usize);
 
         metadata.freed = true;
-        if self.options.enable_asan_allocation_backtraces {
+        if self.options.allocation_backtraces {
             metadata.release_site_backtrace = Some(Backtrace::new_unresolved());
         }
 

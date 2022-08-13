@@ -1,8 +1,7 @@
 //! Stores and restores state when a client needs to relaunch.
 //! Uses a [`ShMem`] up to a threshold, then write to disk.
-use ahash::AHasher;
+use alloc::string::{String, ToString};
 use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
-use serde::{de::DeserializeOwned, Serialize};
 use std::{
     env::temp_dir,
     fs::{self, File},
@@ -11,8 +10,14 @@ use std::{
     ptr::read_volatile,
 };
 
+use ahash::AHasher;
+use serde::{de::DeserializeOwned, Serialize};
+
 use crate::{
-    bolts::shmem::{ShMem, ShMemProvider},
+    bolts::{
+        shmem::{ShMem, ShMemProvider},
+        AsSlice,
+    },
     Error,
 };
 
@@ -42,7 +47,7 @@ impl StateShMemContent {
     pub fn buf_len_checked(&self, shmem_size: usize) -> Result<usize, Error> {
         let buf_len = unsafe { read_volatile(&self.buf_len) };
         if size_of::<StateShMemContent>() + buf_len > shmem_size {
-            Err(Error::IllegalState(format!("Stored buf_len is larger than the shared map! Shared data corrupted? Expected {} bytes max, but got {} (buf_len {})", shmem_size, size_of::<StateShMemContent>() + buf_len, buf_len)))
+            Err(Error::illegal_state(format!("Stored buf_len is larger than the shared map! Shared data corrupted? Expected {} bytes max, but got {} (buf_len {})", shmem_size, size_of::<StateShMemContent>() + buf_len, buf_len)))
         } else {
             Ok(buf_len)
         }
@@ -58,7 +63,7 @@ pub struct StateRestorer<SP>
 where
     SP: ShMemProvider,
 {
-    shmem: SP::Mem,
+    shmem: SP::ShMem,
     phantom: PhantomData<*const SP>,
 }
 
@@ -85,7 +90,7 @@ where
     }
 
     /// Create a new [`StateRestorer`].
-    pub fn new(shmem: SP::Mem) -> Self {
+    pub fn new(shmem: SP::ShMem) -> Self {
         let mut ret = Self {
             shmem,
             phantom: PhantomData,
@@ -100,7 +105,7 @@ where
         S: Serialize,
     {
         if self.has_content() {
-            return Err(Error::IllegalState(
+            return Err(Error::illegal_state(
                 "Trying to save state to a non-empty state map".to_string(),
             ));
         }
@@ -122,7 +127,7 @@ where
 
             let len = filename_buf.len();
             if len > self.shmem.len() {
-                return Err(Error::IllegalState(format!(
+                return Err(Error::illegal_state(format!(
                     "The state restorer map is too small to fit anything, even the filename! 
                         It needs to be at least {} bytes. 
                         The tmpfile was written to {:?}.",
@@ -178,7 +183,7 @@ where
     }
 
     fn content_mut(&mut self) -> &mut StateShMemContent {
-        let ptr = self.shmem.map().as_ptr();
+        let ptr = self.shmem.as_slice().as_ptr();
         #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
         unsafe {
             &mut *(ptr as *mut StateShMemContent)
@@ -188,7 +193,7 @@ where
     /// The content is either the name of the tmpfile, or the serialized bytes directly, if they fit on a single page.
     fn content(&self) -> &StateShMemContent {
         #[allow(clippy::cast_ptr_alignment)] // Beginning of the page will always be aligned
-        let ptr = self.shmem.map().as_ptr() as *const StateShMemContent;
+        let ptr = self.shmem.as_slice().as_ptr() as *const StateShMemContent;
         unsafe { &*(ptr) }
     }
 
@@ -223,7 +228,7 @@ where
             file_content = vec![];
             File::open(tmpfile)?.read_to_end(&mut file_content)?;
             if file_content.is_empty() {
-                return Err(Error::IllegalState(format!(
+                return Err(Error::illegal_state(format!(
                     "Colud not restore state from file {}",
                     &filename
                 )));
@@ -238,6 +243,11 @@ where
 #[cfg(test)]
 mod tests {
 
+    use alloc::{
+        string::{String, ToString},
+        vec::Vec,
+    };
+
     use serial_test::serial;
 
     use crate::bolts::{
@@ -251,7 +261,7 @@ mod tests {
         const TESTMAP_SIZE: usize = 1024;
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
-        let shmem = shmem_provider.new_map(TESTMAP_SIZE).unwrap();
+        let shmem = shmem_provider.new_shmem(TESTMAP_SIZE).unwrap();
         let mut state_restorer = StateRestorer::<StdShMemProvider>::new(shmem);
 
         let state = "hello world".to_string();

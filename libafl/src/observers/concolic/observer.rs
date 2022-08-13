@@ -1,3 +1,7 @@
+use alloc::string::String;
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
     bolts::tuples::Named,
     observers::{
@@ -5,7 +9,6 @@ use crate::{
         Observer,
     },
 };
-use serde::{Deserialize, Serialize};
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.
 #[derive(Serialize, Deserialize, Debug)]

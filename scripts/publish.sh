@@ -1,54 +1,54 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/.." || exit 1
 
 set -e
 
 cd libafl_derive
-cargo publish $@
-cd ..
+cargo publish "$@"
+cd .. || exit 1
 
 sleep 20
 
 cd libafl_cc
-cargo publish $@
-cd ..
+cargo publish "$@"
+cd .. || exit 1
 
 sleep 20
 
 cd libafl
-cargo publish $@
-cd ..
+cargo publish "$@"
+cd .. || exit 1
 
 sleep 20
 
 cd libafl_targets
-cargo publish $@
-cd ..
+cargo publish "$@"
+cd .. || exit 1
 
 sleep 20
 
 cd libafl_frida
-cargo publish $@
-cd ..
+cargo publish "$@"
+cd .. || exit 1
 
 sleep 20
 
 cd libafl_qemu
-cargo publish $@
-cd ..
+cargo publish "$@"
+cd .. || exit 1
 
 sleep 20
 
 cd libafl_sugar
-cargo publish $@
-cd ..
+cargo publish "$@"
+cd .. || exit 1
 
 sleep 20
 
 cd libafl_concolic/symcc_libafl
-cargo publish $@
-cd ../..
+cargo publish "$@"
+cd ../.. || exit 1
 
 sleep 20
 
@@ -60,5 +60,5 @@ if git submodule status | grep "^-">/dev/null ; then \
 fi
 
 cd libafl_concolic/symcc_runtime
-cargo publish $@
-cd ../..
+cargo publish "$@"
+cd ../.. || exit 1

@@ -1,5 +1,6 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 use std::env;
+
+use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -20,11 +21,10 @@ pub fn main() {
             .cpp(is_cpp)
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(true)
-            .from_args(&args)
+            .parse_args(&args)
             .expect("Failed to parse the command line")
             .add_pass(LLVMPasses::AFLCoverage)
-            .add_arg("-mllvm")
-            .add_arg("-ctx") // Context sensitive coverage
+            .add_passes_arg("-ctx") // Context sensitive coverage
             .link_staticlib(&dir, "libfuzzer_libpng")
             .run()
             .expect("Failed to run the wrapped compiler")

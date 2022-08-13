@@ -1,6 +1,6 @@
 #!/bin/bash
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR/.."
+cd "$SCRIPT_DIR/.." || exit 1
 
 # Clippy checks
 if [ "$1" != "--no-clean" ]; then
@@ -8,7 +8,8 @@ if [ "$1" != "--no-clean" ]; then
    echo "[+] Cleaning up previous builds..."
    cargo clean -p libafl
 fi
-RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --tests -- -Z macro-backtrace \
+RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --release --tests -- -Z macro-backtrace \
+   -D clippy::all \
    -D clippy::pedantic \
    -W clippy::similar_names \
    -A clippy::type_repetition_in_bounds \

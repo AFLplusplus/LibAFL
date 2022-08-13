@@ -9,8 +9,8 @@
   - [Build](./getting_started/build.md)
   - [Crates](./getting_started/crates.md)
 
-- [Baby Fuzzer](./baby_fuzzer.md)
-
+- [Baby Fuzzer](./baby_fuzzer/baby_fuzzer.md)
+  - [More Examples](./baby_fuzzer/more_examples.md)
 - [Core Concepts](./core_concepts/core_concepts.md)
   - [Observer](./core_concepts/observer.md)
   - [Executor](./core_concepts/executor.md)

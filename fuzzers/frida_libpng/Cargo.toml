@@ -1,9 +1,8 @@
 [package]
-name = "frida_libpng"
-version = "0.7.0"
+name = "frida_fuzzer"
+version = "0.8.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
-build = "build.rs"
 
 [features]
 default = ["std"]
@@ -17,7 +16,6 @@ debug = true
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-num_cpus = "1.0"
 which = "4.1"
 xz = "0.1.0"
 flate2 = "1.0.22"
@@ -28,17 +26,17 @@ reqwest = { version = "0.11.4", features = ["blocking"] }
 
 
 [dependencies]
-libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public" ] } #,  "llmp_small_maps", "llmp_debug"]}
-capstone = "0.10.0"
-frida-gum = { version = "0.6.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
+libafl = { path = "../../libafl/", features = [ "std", "llmp_compression", "llmp_bind_public", "frida_cli" ] } #,  "llmp_small_maps", "llmp_debug"]}
+capstone = "0.11.0"
+frida-gum = { version = "0.7.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
 libafl_frida = { path = "../../libafl_frida", features = ["cmplog"] }
 libafl_targets = { path = "../../libafl_targets", features = ["sancov_cmplog"] }
 lazy_static = "1.4.0"
 libc = "0.2"
 libloading = "0.7"
-num-traits = "0.2.14"
+num-traits = "0.2"
 rangemap = "0.1"
-clap = { version = "3.0", features = ["derive"] }
+clap = { version = "3.2", features = ["derive"] }
 serde = "1.0"
 mimalloc = { version = "*", default-features = false }
 

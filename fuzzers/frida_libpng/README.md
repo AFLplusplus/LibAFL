@@ -28,18 +28,16 @@ This means running --cores each client will start itself again to listen for cra
 By restarting the actual fuzzer, it can recover from these exit conditions.
 
 After building the libpng-harness, too, you can run `find . -name libpng-harness.so` to find the location of your harness, then run
-`./target/release/frida_libpng ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0`
+`./target/release/frida_libpng ./libpng-harness.so LLVMFuzzerTestOneInput ./libpng-harness.so --cores=0 --input=./corpus`
 
 ## Windows
-You can also fuzz libpng-1.6.37 on windows with frida mode! (still experimental, we have an issue on frida-gum.)
+You can also fuzz libpng-1.6.37 on windows with frida mode
 
 ### To build it with visual studio
 1. Install clang for windows (make sure you add LLVM to the system path!) 
 [https://github.com/llvm/llvm-project/releases/tag/llvmorg-12.0.1](https://github.com/llvm/llvm-project/releases/tag/llvmorg-12.0.1)
-2. Run build, this will download and extract libpng-1.6.37 directory.
-```
-cargo build --release
-```
+2. Download libpng-1.6.37[https://deac-fra.dl.sourceforge.net/project/libpng/libpng16/1.6.37/libpng-1.6.37.tar.xz] and zlib [https://zlib.net/zlib-1.2.11.tar.gz] into this directory, and rename `zlib-1.2.11` directory to `zlib`.
+
 3. Build libpng1.6.37 
    - Open libpng-1.6.37/projects/vstudio/vstudio.sln 
    - Open Build->Configuration Manager 
@@ -60,6 +58,6 @@ clang++ -L.\zlib.dll .\harness.o .\libpng16.lib -lzlib -shared -o .\libpng-harne
 ```
 5. Run the fuzzer
 ```
-./frida_libpng.exe ./libpng-harness.dll LLVMFuzzerTestOneInput ./libpng-harness.dll --cores=0
+./frida_libpng.exe ./libpng-harness.dll LLVMFuzzerTestOneInput ./libpng-harness.dll --cores=0 --input=./corpus
 ```
 

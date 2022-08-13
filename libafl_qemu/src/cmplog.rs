@@ -1,14 +1,15 @@
 use hashbrown::HashMap;
-use libafl::{executors::ExitKind, inputs::Input, observers::ObserversTuple, state::HasMetadata};
+use libafl::{inputs::Input, state::HasMetadata};
 pub use libafl_targets::{
-    cmplog::__libafl_targets_cmplog_instructions, CmpLogObserver, CMPLOG_MAP, CMPLOG_MAP_W,
+    cmplog::__libafl_targets_cmplog_instructions, CmpLogMap, CmpLogObserver, CMPLOG_MAP,
+    CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W,
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu::Emulator,
-    executor::QemuExecutor,
-    helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
+    hooks::QemuHooks,
+    GuestAddr,
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -36,14 +37,7 @@ pub struct QemuCmpLogHelper {
 
 impl QemuCmpLogHelper {
     #[must_use]
-    pub fn new() -> Self {
-        Self {
-            filter: QemuInstrumentationFilter::None,
-        }
-    }
-
-    #[must_use]
-    pub fn with_instrumentation_filter(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationFilter) -> Self {
         Self { filter }
     }
 
@@ -55,7 +49,7 @@ impl QemuCmpLogHelper {
 
 impl Default for QemuCmpLogHelper {
     fn default() -> Self {
-        Self::new()
+        Self::new(QemuInstrumentationFilter::None)
     }
 }
 
@@ -64,25 +58,68 @@ where
     I: Input,
     S: HasMetadata,
 {
-    fn init<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        executor.hook_cmp_generation(gen_unique_cmp_ids::<I, QT, S>);
-        executor.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
-        executor.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
-        executor.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
-        executor.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
+        hooks.cmps_raw(
+            Some(gen_unique_cmp_ids::<I, QT, S>),
+            Some(trace_cmp1_cmplog),
+            Some(trace_cmp2_cmplog),
+            Some(trace_cmp4_cmplog),
+            Some(trace_cmp8_cmplog),
+        );
+    }
+}
+
+#[derive(Debug)]
+pub struct QemuCmpLogChildHelper {
+    filter: QemuInstrumentationFilter,
+}
+
+impl QemuCmpLogChildHelper {
+    #[must_use]
+    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+        Self { filter }
+    }
+
+    #[must_use]
+    pub fn must_instrument(&self, addr: u64) -> bool {
+        self.filter.allowed(addr)
+    }
+}
+
+impl Default for QemuCmpLogChildHelper {
+    fn default() -> Self {
+        Self::new(QemuInstrumentationFilter::None)
+    }
+}
+
+impl<I, S> QemuHelper<I, S> for QemuCmpLogChildHelper
+where
+    I: Input,
+    S: HasMetadata,
+{
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    where
+        QT: QemuHelperTuple<I, S>,
+    {
+        hooks.cmps_raw(
+            Some(gen_hashed_cmp_ids::<I, QT, S>),
+            Some(trace_cmp1_cmplog),
+            Some(trace_cmp2_cmplog),
+            Some(trace_cmp4_cmplog),
+            Some(trace_cmp8_cmplog),
+        );
     }
 }
 
 pub fn gen_unique_cmp_ids<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
-    state: &mut S,
-    pc: u64,
+    hooks: &mut QemuHooks<'_, I, QT, S>,
+    state: Option<&mut S>,
+    pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
@@ -90,11 +127,12 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuCmpLogHelper>() {
-        if !h.must_instrument(pc) {
+    if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
+        if !h.must_instrument(pc.into()) {
             return None;
         }
     }
+    let state = state.expect("The gen_unique_cmp_ids hook works only for in-process fuzzing");
     if state.metadata().get::<QemuCmpsMapMetadata>().is_none() {
         state.add_metadata(QemuCmpsMapMetadata::new());
     }
@@ -104,31 +142,50 @@ where
         .unwrap();
     let id = meta.current_id as usize;
 
-    Some(*meta.map.entry(pc).or_insert_with(|| {
+    Some(*meta.map.entry(pc.into()).or_insert_with(|| {
         meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
         id as u64
     }))
 }
 
-pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8) {
+pub fn gen_hashed_cmp_ids<I, QT, S>(
+    hooks: &mut QemuHooks<'_, I, QT, S>,
+    _state: Option<&mut S>,
+    pc: GuestAddr,
+    _size: usize,
+) -> Option<u64>
+where
+    S: HasMetadata,
+    I: Input,
+    QT: QemuHelperTuple<I, S>,
+{
+    if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {
+        if !h.must_instrument(pc.into()) {
+            return None;
+        }
+    }
+    Some(hash_me(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
+}
+
+pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 1, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16) {
+pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 2, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32) {
+pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 4, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64) {
+pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1);
     }

@@ -4,6 +4,7 @@ It can report coverage and, on supported architecutres, even reports memory acce
 */
 
 #![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![allow(
     clippy::unreadable_literal,
@@ -80,11 +81,12 @@ pub mod drcov_rt;
 /// The frida executor
 pub mod executor;
 
-// for parsing asan and cmplog cores
-use libafl::bolts::os::{CoreId, Cores};
+/// Utilities
+#[cfg(unix)]
+pub mod utils;
 
-// for getting current core_id
-use core_affinity::get_core_ids;
+// for parsing asan and cmplog cores
+use libafl::bolts::core_affinity::{get_core_ids, CoreId, Cores};
 
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -208,7 +210,7 @@ impl FridaOptions {
                         1,
                         "Client should only be bound to a single core"
                     );
-                    let core_id: CoreId = core_ids[0].into();
+                    let core_id: CoreId = core_ids[0];
                     options.enable_asan = asan_cores.ids.contains(&core_id);
                 }
             }
@@ -220,7 +222,7 @@ impl FridaOptions {
                         1,
                         "Client should only be bound to a single core"
                     );
-                    let core_id = core_ids[0].into();
+                    let core_id = core_ids[0];
                     options.enable_cmplog = cmplog_cores.ids.contains(&core_id);
                 }
             }
@@ -319,7 +321,7 @@ impl Default for FridaOptions {
             enable_asan: false,
             enable_asan_leak_detection: false,
             enable_asan_continue_after_error: false,
-            enable_asan_allocation_backtraces: true,
+            enable_asan_allocation_backtraces: false,
             asan_max_allocation: 1 << 30,
             asan_max_total_allocation: 1 << 32,
             asan_max_allocation_panics: false,

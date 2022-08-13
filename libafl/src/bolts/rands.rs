@@ -1,13 +1,13 @@
 //! The random number generators of `LibAFL`
 use core::{debug_assert, fmt::Debug};
+
+#[cfg(feature = "rand_trait")]
+use rand_core::{self, impls::fill_bytes_via_next, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use crate::bolts::current_nanos;
-
-#[cfg(feature = "rand_trait")]
-use rand_core::{self, impls::fill_bytes_via_next, RngCore};
 
 const HASH_CONST: u64 = 0xa5b35705;
 
@@ -16,8 +16,8 @@ const HASH_CONST: u64 = 0xa5b35705;
 /// Not cryptographically secure (which is not what you want during fuzzing ;) )
 pub type StdRand = RomuDuoJrRand;
 
-/// Ways to get random around here
-/// Please note that these are not cryptographically secure
+/// Ways to get random around here.
+/// Please note that these are not cryptographically secure.
 /// Or, even if some might be by accident, at least they are not seeded in a cryptographically secure fashion.
 pub trait Rand: Debug + Serialize + DeserializeOwned {
     /// Sets the seed of this Rand
@@ -417,8 +417,9 @@ mod tests {
     #[test]
     #[cfg(feature = "rand_trait")]
     fn test_rgn_core_support() {
-        use crate::bolts::rands::StdRand;
         use rand_core::RngCore;
+
+        use crate::bolts::rands::StdRand;
         pub struct Mutator<R: RngCore> {
             rng: R,
         }
@@ -428,5 +429,91 @@ mod tests {
         };
 
         println!("random value: {}", mutator.rng.next_u32());
+    }
+}
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+/// `Rand` Python bindings
+pub mod pybind {
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use super::Rand;
+    use crate::bolts::{current_nanos, rands::StdRand};
+
+    #[pyclass(unsendable, name = "StdRand")]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for StdRand
+    pub struct PythonStdRand {
+        /// Rust wrapped StdRand object
+        pub inner: StdRand,
+    }
+
+    #[pymethods]
+    impl PythonStdRand {
+        #[staticmethod]
+        fn with_current_nanos() -> Self {
+            Self {
+                inner: StdRand::with_seed(current_nanos()),
+            }
+        }
+
+        #[staticmethod]
+        fn with_seed(seed: u64) -> Self {
+            Self {
+                inner: StdRand::with_seed(seed),
+            }
+        }
+
+        fn as_rand(slf: Py<Self>) -> PythonRand {
+            PythonRand::new_std(slf)
+        }
+    }
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    enum PythonRandWrapper {
+        Std(Py<PythonStdRand>),
+    }
+
+    /// Rand Trait binding
+    #[pyclass(unsendable, name = "Rand")]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct PythonRand {
+        wrapper: PythonRandWrapper,
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonRandWrapper, { Std })
+        };
+    }
+
+    #[pymethods]
+    impl PythonRand {
+        #[staticmethod]
+        fn new_std(py_std_rand: Py<PythonStdRand>) -> Self {
+            Self {
+                wrapper: PythonRandWrapper::Std(py_std_rand),
+            }
+        }
+    }
+
+    impl Rand for PythonRand {
+        fn set_seed(&mut self, seed: u64) {
+            unwrap_me_mut!(self.wrapper, r, { r.set_seed(seed) });
+        }
+
+        #[inline]
+        fn next(&mut self) -> u64 {
+            unwrap_me_mut!(self.wrapper, r, { r.next() })
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdRand>()?;
+        m.add_class::<PythonRand>()?;
+        Ok(())
     }
 }

@@ -1,5 +1,6 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper};
 use std::env;
+
+use libafl_cc::{ClangWrapper, CompilerWrapper};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -20,7 +21,7 @@ pub fn main() {
             .cpp(is_cpp)
             // silence the compiler wrapper output, needed for some configure scripts.
             .silence(true)
-            .from_args(&args)
+            .parse_args(&args)
             .expect("Failed to parse the command line")
             .link_staticlib(&dir, "tutorial")
             .add_arg("-fsanitize-coverage=trace-pc-guard")

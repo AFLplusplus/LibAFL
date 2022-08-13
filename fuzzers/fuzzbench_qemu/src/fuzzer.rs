@@ -1,9 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use clap::{App, Arg};
 use core::{cell::RefCell, time::Duration};
-#[cfg(unix)]
-use nix::{self, unistd::dup};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -14,6 +11,7 @@ use std::{
     process,
 };
 
+use clap::{Arg, Command};
 use libafl::{
     bolts::{
         current_nanos, current_time,
@@ -21,14 +19,13 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
-    corpus::{
-        Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, PowerQueueCorpusScheduler,
-    },
+    corpus::{Corpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
@@ -37,10 +34,12 @@ use libafl::{
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+    },
     stages::{
-        calibrate::CalibrationStage,
-        power::{PowerMutationalStage, PowerSchedule},
-        ShadowTracingStage, StdMutationalStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
+        StdMutationalStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -54,11 +53,14 @@ use libafl_qemu::{
     elf::EasyElf,
     emu::Emulator,
     filter_qemu_args,
+    hooks::QemuHooks,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
     QemuExecutor,
     Regs,
 };
+#[cfg(unix)]
+use nix::{self, unistd::dup};
 
 /// The fuzzer main
 pub fn main() {
@@ -66,7 +68,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match App::new("libafl_qemu_fuzzbench")
+    let res = match Command::new("libafl_qemu_fuzzbench")
         .version("0.4.0")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
@@ -111,7 +113,7 @@ pub fn main() {
                 env::current_exe()
                     .unwrap_or_else(|_| "fuzzer".into())
                     .to_string_lossy(),
-                err.info,
+                err,
             );
             return;
         }
@@ -186,9 +188,9 @@ fn fuzz(
     println!("Break at {:#x}", emu.read_reg::<_, u64>(Regs::Rip).unwrap());
 
     let stack_ptr: u64 = emu.read_reg(Regs::Rsp).unwrap();
-    let mut ret_addr = [0u64];
+    let mut ret_addr = [0; 8];
     unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
-    let ret_addr = ret_addr[0];
+    let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {:#x}", stack_ptr);
     println!("Return address = {:#x}", ret_addr);
@@ -251,20 +253,21 @@ fn fuzz(
     // Create an observation channel using cmplog map
     let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        map_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -277,23 +280,30 @@ fn fuzz(
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(feedback_state),
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
         )
+        .unwrap()
     });
-
-    let calibration = CalibrationStage::new(&mut state, &edges_observer);
 
     // Setup a randomic Input2State stage
     let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
 
     // Setup a MOPT mutator
-    let mutator = StdMOptMutator::new(&mut state, havoc_mutations().merge(tokens_mutations()), 5)?;
+    let mutator = StdMOptMutator::new(
+        &mut state,
+        havoc_mutations().merge(tokens_mutations()),
+        7,
+        5,
+    )?;
 
-    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
+    let scheduler =
+        IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -322,15 +332,19 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let executor = QemuExecutor::new(
-        &mut harness,
+    let mut hooks = QemuHooks::new(
         &emu,
         tuple_list!(
-            QemuEdgeCoverageHelper::new(),
-            QemuCmpLogHelper::new(),
+            QemuEdgeCoverageHelper::default(),
+            QemuCmpLogHelper::default(),
             //QemuAsanHelper::new(),
             //QemuSnapshotHelper::new()
         ),
+    );
+
+    let executor = QemuExecutor::new(
+        &mut hooks,
+        &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
@@ -345,7 +359,7 @@ fn fuzz(
     // Read tokens
     if let Some(tokenfile) = tokenfile {
         if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::from_tokens_file(tokenfile)?);
+            state.add_metadata(Tokens::from_file(tokenfile)?);
         }
     }
 

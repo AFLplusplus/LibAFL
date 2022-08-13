@@ -1,9 +1,8 @@
 use core::{fmt::Debug, ops::Range};
-use libafl::{
-    bolts::tuples::MatchFirstType, executors::ExitKind, inputs::Input, observers::ObserversTuple,
-};
 
-use crate::{emu::Emulator, executor::QemuExecutor};
+use libafl::{bolts::tuples::MatchFirstType, inputs::Input};
+
+use crate::{emu::Emulator, hooks::QemuHooks};
 
 /// A helper for `libafl_qemu`.
 // TODO remove 'static when specialization will be stable
@@ -11,10 +10,10 @@ pub trait QemuHelper<I, S>: 'static + Debug
 where
     I: Input,
 {
-    fn init<'a, H, OT, QT>(&self, _executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    const HOOKS_DO_SIDE_EFFECTS: bool = true;
+
+    fn init_hooks<QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
     }
@@ -28,10 +27,10 @@ pub trait QemuHelperTuple<I, S>: MatchFirstType + Debug
 where
     I: Input,
 {
-    fn init_all<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    const HOOKS_DO_SIDE_EFFECTS: bool;
+
+    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>;
 
     fn pre_exec_all(&mut self, _emulator: &Emulator, input: &I);
@@ -43,10 +42,10 @@ impl<I, S> QemuHelperTuple<I, S> for ()
 where
     I: Input,
 {
-    fn init_all<'a, H, OT, QT>(&self, _executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    const HOOKS_DO_SIDE_EFFECTS: bool = false;
+
+    fn init_hooks_all<QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
     }
@@ -62,14 +61,14 @@ where
     Tail: QemuHelperTuple<I, S>,
     I: Input,
 {
-    fn init_all<'a, H, OT, QT>(&self, executor: &QemuExecutor<'a, H, I, OT, QT, S>)
+    const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
+
+    fn init_hooks_all<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
-        H: FnMut(&I) -> ExitKind,
-        OT: ObserversTuple<I, S>,
         QT: QemuHelperTuple<I, S>,
     {
-        self.0.init(executor);
-        self.1.init_all(executor);
+        self.0.init_hooks(hooks);
+        self.1.init_hooks_all(hooks);
     }
 
     fn pre_exec_all(&mut self, emulator: &Emulator, input: &I) {
@@ -113,4 +112,12 @@ impl QemuInstrumentationFilter {
             QemuInstrumentationFilter::None => true,
         }
     }
+}
+
+#[must_use]
+pub fn hash_me(mut x: u64) -> u64 {
+    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
+    x = (x.overflowing_shr(16).0 ^ x).overflowing_mul(0x45d9f3b).0;
+    x = (x.overflowing_shr(16).0 ^ x) ^ x;
+    x
 }

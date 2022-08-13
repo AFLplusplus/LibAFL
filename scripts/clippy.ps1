@@ -1,4 +1,5 @@
 cargo clippy --all --all-features --tests -- `
+   -D clippy::all `
    -D clippy::pedantic `
    -W clippy::similar_names `
    -A clippy::type_repetition_in_bounds `

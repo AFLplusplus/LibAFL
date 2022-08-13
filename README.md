@@ -37,9 +37,20 @@ LibAFL offers integrations with popular instrumentation frameworks. At the momen
 
 ## Getting started
 
-1. Install the Rust development language. We highly recommend *not* to use e.g.
-your Linux distribution package as this is likely outdated. So rather install
+1. Install the Dependecies
+- The Rust development language.  
+We highly recommend *not* to use e.g. your Linux distribition package as this is likely outdated. So rather install
 Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/install).
+
+- LLVM tools  
+The LLVM tools are needed (newer than LLVM 11.0.0 but older than LLVM 15.0.0)
+
+- Cargo-make  
+We use cargo-make to build the fuzzers in `fuzzers/` directory. You can install it with
+
+```
+cargo install cargo-make
+```
 
 2. Clone the LibAFL repository with
 
@@ -47,7 +58,7 @@ Rust directly, instructions can be found [here](https://www.rust-lang.org/tools/
 git clone https://github.com/AFLplusplus/LibAFL
 ```
 
-Build the library using
+3. Build the library using
 
 ```
 cargo build --release
@@ -85,8 +96,6 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 + The Fuzzing101 [solutions](https://github.com/epi052/fuzzing-101-solutions) & series of [blog posts](https://epi052.gitlab.io/notes-to-self/blog/2021-11-01-fuzzing-101-with-libafl/) by [epi](https://github.com/epi052)
 
 ## Contributing
-
-Check the [TODO.md](./TODO.md) file for features that we plan to support.
 
 For bugs, feel free to open issues or contact us directly. Thank you for your support. <3
 

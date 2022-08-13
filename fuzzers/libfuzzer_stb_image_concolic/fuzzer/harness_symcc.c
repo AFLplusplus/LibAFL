@@ -14,26 +14,22 @@
 #include "stb_image.h"
 
 int main(int argc, char **argv) {
-  if (argc < 2) {
-    return -1;
-  }
+  if (argc < 2) { return -1; }
 
   char *file_path = argv[1];
 
   int x, y, channels;
 
-  if (!stbi_info(file_path, &x, &y, &channels))
-    return 0;
+  if (!stbi_info(file_path, &x, &y, &channels)) { return 0; }
 
   /* exit if the image is larger than ~80MB */
-  if (y && x > (80000000 / 4) / y)
-    return 0;
+  if (y && x > (80000000 / 4) / y) { return 0; }
 
   unsigned char *img = stbi_load(file_path, &x, &y, &channels, 4);
 
   free(img);
 
-  // if (x > 10000) free(img); // free crash
+  // if (x > 10000) {free(img);} // free crash
 
   return 0;
 }

@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
@@ -9,10 +9,11 @@ readme = "../README.md"
 license = "MIT OR Apache-2.0"
 keywords = ["fuzzing", "qemu", "instrumentation"]
 edition = "2021"
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
+default = ["usermode"]
 python = ["pyo3", "pyo3-build-config"]
-default = []
 
 # The following architecture features are mutually exclusive.
 x86_64 = [] # build qemu for x86_64 (default)
@@ -20,27 +21,33 @@ i386 = [] # build qemu for i386
 arm = [] # build qemu for arm
 aarch64 = [] # build qemu for aarch64
 
+usermode = []
+
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.7.0" }
-libafl_targets = { path = "../libafl_targets", version = "0.7.0" }
+libafl = { path = "../libafl", version = "0.8.0" }
+libafl_targets = { path = "../libafl_targets", version = "0.8.0" }
+
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
-hashbrown =  { version = "0.11", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
+hashbrown =  { version = "0.12", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
 num-traits = "0.2"
-num_enum = "0.5.4"
-goblin = "0.4.2"
+num_enum = "0.5.7"
+goblin = "0.5.3"
 libc = "0.2"
-strum = "0.21"
-strum_macros = "0.21"
-syscall-numbers = "2.0.0"
+strum = "0.24"
+strum_macros = "0.24"
+syscall-numbers = "3.0"
+bio = "0.41"
+thread_local = "1.1.4"
+capstone = "0.11.0"
 #pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
 pyo3 = { version = "0.15", optional = true }
 
 [build-dependencies]
 cc = { version = "1.0" }
-which = "4.1"
-pyo3-build-config = { version = "0.15", optional = true }
+which = "4.2"
+pyo3-build-config = { version = "0.16", optional = true }
 
 [lib]
 name = "libafl_qemu"

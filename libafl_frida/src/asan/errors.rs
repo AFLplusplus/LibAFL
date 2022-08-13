@@ -1,6 +1,6 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
-#[cfg(target_arch = "x86_64")]
-use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
+use std::io::Write;
+
 use backtrace::Backtrace;
 use capstone::{arch::BuildsCapstone, Capstone};
 use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
@@ -8,7 +8,7 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
 use libafl::{
-    bolts::{ownedref::OwnedPtr, tuples::Named},
+    bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
@@ -19,10 +19,11 @@ use libafl::{
     Error, SerdeAny,
 };
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use termcolor::{Color, ColorSpec, WriteColor};
 
-use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT, FridaOptions};
+#[cfg(target_arch = "x86_64")]
+use crate::asan::asan_rt::ASAN_SAVE_REGISTER_NAMES;
+use crate::{alloc::AllocationMetadata, asan::asan_rt::ASAN_SAVE_REGISTER_COUNT};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AsanReadWriteError {
@@ -94,14 +95,14 @@ impl AsanError {
 #[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Clone, Serialize, Deserialize, SerdeAny)]
 pub struct AsanErrors {
-    options: FridaOptions,
+    options: FuzzerOptions,
     errors: Vec<AsanError>,
 }
 
 impl AsanErrors {
     /// Creates a new `AsanErrors` struct
     #[must_use]
-    pub fn new(options: FridaOptions) -> Self {
+    pub fn new(options: FuzzerOptions) -> Self {
         Self {
             options,
             errors: Vec::new(),
@@ -444,7 +445,7 @@ impl AsanErrors {
                 writeln!(output, "{:━^100}", " REGISTERS ").unwrap();
 
                 #[cfg(target_arch = "aarch64")]
-                for reg in 0..=30 {
+                for (reg, val) in registers.iter().enumerate().take(30 + 1) {
                     if basereg.is_some() && reg == basereg.unwrap() as usize {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
@@ -454,7 +455,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, registers[reg]).unwrap();
+                    write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -509,7 +510,7 @@ impl AsanErrors {
 
                 cs.set_skipdata(true).expect("failed to set skipdata");
 
-                let start_pc = pc - 4 * 5;
+                let start_pc = pc;
                 for insn in cs
                     .disasm_count(
                         unsafe { std::slice::from_raw_parts(start_pc as *mut u8, 4 * 11) },
@@ -534,7 +535,7 @@ impl AsanErrors {
         };
 
         #[allow(clippy::manual_assert)]
-        if !self.options.asan_continue_after_error() {
+        if !self.options.continue_on_error {
             panic!("ASAN: Crashing target!");
         }
     }
@@ -615,6 +616,7 @@ where
     I: Input + HasTargetBytes,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,

@@ -3,7 +3,6 @@
 //! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
 //! for python instrumentation and fuzzing.
 
-use clap::{App, AppSettings, Arg};
 use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
 use std::{
     env,
@@ -11,30 +10,32 @@ use std::{
     path::PathBuf,
 };
 
+use clap::{AppSettings, Arg, Command};
 use libafl::{
     bolts::{
+        core_affinity::Cores,
         current_nanos,
         launcher::Launcher,
-        os::Cores,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
-    corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::EventConfig,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::{I2SRandReplace, Tokens},
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::{I2SRandReplace, Tokens},
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -125,7 +126,7 @@ pub fn LLVMFuzzerRunDriver(
 
     println!("Args: {:?}", std::env::args());
 
-    let matches = App::new("libafl_atheris")
+    let matches = Command::new("libafl_atheris")
         .version("0.1.0")
         .setting(AppSettings::AllowExternalSubcommands)
         .arg(Arg::new("script")) // The python script is the first arg
@@ -214,7 +215,7 @@ pub fn LLVMFuzzerRunDriver(
 
     // TODO: we need to handle Atheris calls to `exit` on errors somhow.
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut mgr, _core_id| {
+    let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Create an observation channel using the coverage map
         let edges_observer = unsafe {
             HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
@@ -231,20 +232,17 @@ pub fn LLVMFuzzerRunDriver(
         let cmplog = unsafe { &mut CMPLOG_MAP };
         let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
-        // The state of the edges feedback.
-        let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
-        let feedback = feedback_or!(
+        let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+            MaxMapFeedback::new_tracking(&edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::new_with_observer(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
-        let objective = feedback_or!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_or!(CrashFeedback::new(), TimeoutFeedback::new());
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
@@ -257,20 +255,23 @@ pub fn LLVMFuzzerRunDriver(
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(output_dir.clone()).unwrap(),
                 // States of the feedbacks.
-                // They are the data related to the feedbacks that you want to persist in the State.
-                tuple_list!(feedback_state),
+                // The feedbacks can report the data that should persist in the State.
+                &mut feedback,
+                // Same for objective feedbacks
+                &mut objective,
             )
+            .unwrap()
         });
 
         // Create a dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
             for tokens_file in &token_files {
-                state.add_metadata(Tokens::from_tokens_file(tokens_file)?);
+                state.add_metadata(Tokens::from_file(tokens_file)?);
             }
         }
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

@@ -3,6 +3,7 @@
 
 use alloc::string::String;
 use core::{convert::Into, default::Default, option::Option, time::Duration};
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -13,7 +14,7 @@ use crate::{
 };
 
 /// An entry in the Testcase Corpus
-#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct Testcase<I>
 where
@@ -31,6 +32,10 @@ where
     cached_len: Option<usize>,
     /// Number of executions done at discovery time
     executions: usize,
+    /// Number of fuzzing iterations of this particular input updated in perform_mutational
+    fuzz_level: usize,
+    /// If it has been fuzzed
+    fuzzed: bool,
 }
 
 impl<I> HasMetadata for Testcase<I>
@@ -99,7 +104,8 @@ where
 
     /// Set the input
     #[inline]
-    pub fn set_input(&mut self, input: I) {
+    pub fn set_input(&mut self, mut input: I) {
+        input.wrapped_as_testcase();
         self.input = Some(input);
     }
 
@@ -127,7 +133,7 @@ where
         &self.exec_time
     }
 
-    /// Get the execution time of the testcase (mut)
+    /// Get the execution time of the testcase (mutable)
     #[inline]
     pub fn exec_time_mut(&mut self) -> &mut Option<Duration> {
         &mut self.exec_time
@@ -145,10 +151,34 @@ where
         &self.executions
     }
 
-    /// Get the executions (mut)
+    /// Get the executions (mutable)
     #[inline]
     pub fn executions_mut(&mut self) -> &mut usize {
         &mut self.executions
+    }
+
+    /// Get the `fuzz_level`
+    #[inline]
+    pub fn fuzz_level(&self) -> usize {
+        self.fuzz_level
+    }
+
+    /// Set the `fuzz_level`
+    #[inline]
+    pub fn set_fuzz_leve(&mut self, fuzz_level: usize) {
+        self.fuzz_level = fuzz_level;
+    }
+
+    /// Get if it was fuzzed
+    #[inline]
+    pub fn fuzzed(&self) -> bool {
+        self.fuzzed
+    }
+
+    /// Set if it was fuzzed
+    #[inline]
+    pub fn set_fuzzed(&mut self, fuzzed: bool) {
+        self.fuzzed = fuzzed;
     }
 
     /// Create a new Testcase instace given an input
@@ -157,53 +187,53 @@ where
     where
         T: Into<I>,
     {
-        Testcase {
+        let mut slf = Testcase {
             input: Some(input.into()),
-            filename: None,
-            metadata: SerdeAnyMap::new(),
-            exec_time: None,
-            cached_len: None,
-            executions: 0,
-        }
+            ..Testcase::default()
+        };
+        slf.input.as_mut().unwrap().wrapped_as_testcase();
+        slf
     }
 
     /// Create a new Testcase instance given an [`Input`] and a `filename`
     #[inline]
-    pub fn with_filename(input: I, filename: String) -> Self {
+    pub fn with_filename(mut input: I, filename: String) -> Self {
+        input.wrapped_as_testcase();
         Testcase {
             input: Some(input),
             filename: Some(filename),
-            metadata: SerdeAnyMap::new(),
-            exec_time: None,
-            cached_len: None,
-            executions: 0,
+            ..Testcase::default()
         }
     }
 
     /// Create a new Testcase instance given an [`Input`] and the number of executions
     #[inline]
-    pub fn with_executions(input: I, executions: usize) -> Self {
+    pub fn with_executions(mut input: I, executions: usize) -> Self {
+        input.wrapped_as_testcase();
         Testcase {
             input: Some(input),
-            filename: None,
-            metadata: SerdeAnyMap::new(),
-            exec_time: None,
-            cached_len: None,
             executions,
+            ..Testcase::default()
         }
     }
+}
 
-    /// Create a new, empty, [`Testcase`].
-    #[must_use]
+impl<I> Default for Testcase<I>
+where
+    I: Input,
+{
+    /// Create a new default Testcase
     #[inline]
-    pub fn default() -> Self {
+    fn default() -> Self {
         Testcase {
             input: None,
             filename: None,
             metadata: SerdeAnyMap::new(),
             exec_time: None,
             cached_len: None,
+            fuzz_level: 0,
             executions: 0,
+            fuzzed: false,
         }
     }
 }
@@ -247,11 +277,9 @@ where
 
 /// The Metadata for each testcase used in power schedules.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PowerScheduleTestcaseMetaData {
+pub struct SchedulerTestcaseMetaData {
     /// Number of bits set in bitmap, updated in calibrate_case
     bitmap_size: u64,
-    /// Number of fuzzing iterations, updated in perform_mutational
-    fuzz_level: u64,
     /// Number of queue cycles behind
     handicap: u64,
     /// Path depth, initialized in on_add
@@ -260,13 +288,12 @@ pub struct PowerScheduleTestcaseMetaData {
     n_fuzz_entry: usize,
 }
 
-impl PowerScheduleTestcaseMetaData {
-    /// Create new [`struct@PowerScheduleTestcaseMetaData`]
+impl SchedulerTestcaseMetaData {
+    /// Create new [`struct@SchedulerTestcaseMetaData`]
     #[must_use]
     pub fn new(depth: u64) -> Self {
         Self {
             bitmap_size: 0,
-            fuzz_level: 0,
             handicap: 0,
             depth,
             n_fuzz_entry: 0,
@@ -282,17 +309,6 @@ impl PowerScheduleTestcaseMetaData {
     /// Set the bitmap size
     pub fn set_bitmap_size(&mut self, val: u64) {
         self.bitmap_size = val;
-    }
-
-    /// Get the fuzz level
-    #[must_use]
-    pub fn fuzz_level(&self) -> u64 {
-        self.fuzz_level
-    }
-
-    /// Set the fuzz level
-    pub fn set_fuzz_level(&mut self, val: u64) {
-        self.fuzz_level = val;
     }
 
     /// Get the handicap
@@ -329,4 +345,103 @@ impl PowerScheduleTestcaseMetaData {
     }
 }
 
-crate::impl_serdeany!(PowerScheduleTestcaseMetaData);
+crate::impl_serdeany!(SchedulerTestcaseMetaData);
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+/// `Testcase` Python bindings
+pub mod pybind {
+    use alloc::{boxed::Box, vec::Vec};
+
+    use pyo3::{prelude::*, types::PyDict};
+
+    use super::{HasMetadata, Testcase};
+    use crate::{
+        bolts::ownedref::OwnedPtrMut,
+        inputs::{BytesInput, HasBytesVec},
+        pybind::PythonMetadata,
+    };
+
+    /// `PythonTestcase` with fixed generics
+    pub type PythonTestcase = Testcase<BytesInput>;
+
+    #[pyclass(unsendable, name = "Testcase")]
+    #[derive(Debug)]
+    /// Python class for Testcase
+    pub struct PythonTestcaseWrapper {
+        /// Rust wrapped Testcase object
+        pub inner: OwnedPtrMut<PythonTestcase>,
+    }
+
+    impl PythonTestcaseWrapper {
+        pub fn wrap(r: &mut PythonTestcase) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
+
+        #[must_use]
+        pub fn unwrap(&self) -> &PythonTestcase {
+            self.inner.as_ref()
+        }
+
+        pub fn unwrap_mut(&mut self) -> &mut PythonTestcase {
+            self.inner.as_mut()
+        }
+    }
+
+    #[pymethods]
+    impl PythonTestcaseWrapper {
+        #[new]
+        fn new(input: Vec<u8>) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(PythonTestcase::new(BytesInput::new(input)))),
+            }
+        }
+
+        fn load_input(&mut self) -> &[u8] {
+            self.inner
+                .as_mut()
+                .load_input()
+                .expect("Failed to load input")
+                .bytes()
+        }
+
+        #[getter]
+        fn exec_time_ms(&self) -> Option<u128> {
+            self.inner.as_ref().exec_time().map(|t| t.as_millis())
+        }
+
+        #[getter]
+        fn executions(&self) -> usize {
+            *self.inner.as_ref().executions()
+        }
+
+        #[getter]
+        fn fuzz_level(&self) -> usize {
+            self.inner.as_ref().fuzz_level()
+        }
+
+        #[getter]
+        fn fuzzed(&self) -> bool {
+            self.inner.as_ref().fuzzed()
+        }
+
+        fn metadata(&mut self) -> PyObject {
+            let meta = self.inner.as_mut().metadata_mut();
+            if !meta.contains::<PythonMetadata>() {
+                Python::with_gil(|py| {
+                    let dict: Py<PyDict> = PyDict::new(py).into();
+                    meta.insert(PythonMetadata::new(dict.to_object(py)));
+                });
+            }
+            meta.get::<PythonMetadata>().unwrap().map.clone()
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonTestcaseWrapper>()?;
+        Ok(())
+    }
+}

@@ -6,14 +6,18 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
+use core::{
+    fmt::{self, Debug, Formatter},
+    ptr::addr_of_mut,
+};
+use std::{ffi::c_void, ptr::write_volatile};
+
 use backtrace::Backtrace;
-use core::fmt::{self, Debug, Formatter};
-use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
-use hashbrown::HashMap;
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-
-use crate::helper::FridaInstrumentationHelper;
-
+#[cfg(target_arch = "x86_64")]
+use capstone::{
+    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
+    Capstone, Insn, RegAccessType, RegId,
+};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{
@@ -23,24 +27,17 @@ use capstone::{
     },
     Capstone, Insn,
 };
-
-#[cfg(target_arch = "aarch64")]
-use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-
-#[cfg(target_arch = "x86_64")]
-use capstone::{
-    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, Insn, RegAccessType, RegId,
-};
-
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
-
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use frida_gum::interceptor::Interceptor;
+#[cfg(target_arch = "aarch64")]
+use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleMap,
+    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
+    Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
 };
+use hashbrown::HashMap;
+use libafl::bolts::{cli::FuzzerOptions, AsSlice};
 #[cfg(unix)]
 use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
@@ -48,19 +45,22 @@ use libc::{c_char, wchar_t};
 use libc::{getrlimit, rlimit};
 #[cfg(all(unix, not(target_vendor = "apple")))]
 use libc::{getrlimit64, rlimit64};
-use std::{ffi::c_void, ptr::write_volatile};
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+use rangemap::RangeMap;
 
+#[cfg(target_arch = "aarch64")]
+use crate::utils::instruction_width;
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
-    FridaOptions,
+    helper::FridaRuntime,
+    utils::writer_register,
 };
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
 }
 
-/// Get the current thread's TLS address
 extern "C" {
     fn tls_ptr() -> *const c_void;
 }
@@ -109,6 +109,7 @@ pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 /// even if the target would not have crashed under normal conditions.
 /// this helps finding mem errors early.
 pub struct AsanRuntime {
+    check_for_leaks_enabled: bool,
     current_report_impl: u64,
     allocator: Allocator,
     regs: [usize; ASAN_SAVE_REGISTER_COUNT],
@@ -126,7 +127,7 @@ pub struct AsanRuntime {
     blob_check_mem_48bytes: Option<Box<[u8]>>,
     blob_check_mem_64bytes: Option<Box<[u8]>>,
     stalked_addresses: HashMap<usize, usize>,
-    options: FridaOptions,
+    options: FuzzerOptions,
     module_map: Option<ModuleMap>,
     suppressed_addresses: Vec<usize>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
@@ -143,38 +144,16 @@ impl Debug for AsanRuntime {
     }
 }
 
-impl AsanRuntime {
-    /// Create a new `AsanRuntime`
-    #[must_use]
-    pub fn new(options: FridaOptions) -> AsanRuntime {
-        Self {
-            current_report_impl: 0,
-            allocator: Allocator::new(options.clone()),
-            regs: [0; ASAN_SAVE_REGISTER_COUNT],
-            blob_report: None,
-            blob_check_mem_byte: None,
-            blob_check_mem_halfword: None,
-            blob_check_mem_dword: None,
-            blob_check_mem_qword: None,
-            blob_check_mem_16bytes: None,
-            blob_check_mem_3bytes: None,
-            blob_check_mem_6bytes: None,
-            blob_check_mem_12bytes: None,
-            blob_check_mem_24bytes: None,
-            blob_check_mem_32bytes: None,
-            blob_check_mem_48bytes: None,
-            blob_check_mem_64bytes: None,
-            stalked_addresses: HashMap::new(),
-            options,
-            module_map: None,
-            suppressed_addresses: Vec::new(),
-            shadow_check_func: None,
-        }
-    }
+impl FridaRuntime for AsanRuntime {
     /// Initialize the runtime so that it is read for action. Take care not to move the runtime
     /// instance after this function has been called, as the generated blobs would become
     /// invalid!
-    pub fn init(&mut self, _gum: &Gum, modules_to_instrument: &[&str]) {
+    fn init(
+        &mut self,
+        gum: &Gum,
+        _ranges: &RangeMap<usize, (u16, String)>,
+        modules_to_instrument: &[&str],
+    ) {
         unsafe {
             ASAN_ERRORS = Some(AsanErrors::new(self.options.clone()));
         }
@@ -184,16 +163,16 @@ impl AsanRuntime {
         self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
-        self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
-        if let Some(suppressed_specifiers) = self.options.dont_instrument_locations() {
-            for (module_name, offset) in suppressed_specifiers {
+        self.module_map = Some(ModuleMap::new_from_names(gum, modules_to_instrument));
+        if !self.options.dont_instrument.is_empty() {
+            for (module_name, offset) in self.options.dont_instrument.clone() {
                 let module_details = ModuleDetails::with_name(module_name).unwrap();
                 let lib_start = module_details.range().base_address().0 as usize;
                 self.suppressed_addresses.push(lib_start + offset);
             }
         }
 
-        self.hook_functions(_gum);
+        self.hook_functions(gum);
         /*
         unsafe {
             let mem = self.allocator.alloc(0xac + 2, 8);
@@ -268,6 +247,64 @@ impl AsanRuntime {
             // assert!((self.shadow_check_func.unwrap())(((mem2 as usize) + 8875) as *const c_void, 4));
         }
         */
+        self.register_thread();
+    }
+    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+        &mut self,
+        input: &I,
+    ) -> Result<(), libafl::Error> {
+        let target_bytes = input.target_bytes();
+        let slice = target_bytes.as_slice();
+
+        self.unpoison(slice.as_ptr() as usize, slice.len());
+        Ok(())
+    }
+
+    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+        &mut self,
+        input: &I,
+    ) -> Result<(), libafl::Error> {
+        if self.check_for_leaks_enabled {
+            self.check_for_leaks();
+        }
+
+        let target_bytes = input.target_bytes();
+        let slice = target_bytes.as_slice();
+        self.poison(slice.as_ptr() as usize, slice.len());
+        self.reset_allocations();
+
+        Ok(())
+    }
+}
+
+impl AsanRuntime {
+    /// Create a new `AsanRuntime`
+    #[must_use]
+    pub fn new(options: FuzzerOptions) -> AsanRuntime {
+        Self {
+            check_for_leaks_enabled: options.detect_leaks,
+            current_report_impl: 0,
+            allocator: Allocator::new(options.clone()),
+            regs: [0; ASAN_SAVE_REGISTER_COUNT],
+            blob_report: None,
+            blob_check_mem_byte: None,
+            blob_check_mem_halfword: None,
+            blob_check_mem_dword: None,
+            blob_check_mem_qword: None,
+            blob_check_mem_16bytes: None,
+            blob_check_mem_3bytes: None,
+            blob_check_mem_6bytes: None,
+            blob_check_mem_12bytes: None,
+            blob_check_mem_24bytes: None,
+            blob_check_mem_32bytes: None,
+            blob_check_mem_48bytes: None,
+            blob_check_mem_64bytes: None,
+            stalked_addresses: HashMap::new(),
+            options,
+            module_map: None,
+            suppressed_addresses: Vec::new(),
+            shadow_check_func: None,
+        }
     }
 
     /// Reset all allocations so that they can be reused for new allocation requests.
@@ -282,7 +319,7 @@ impl AsanRuntime {
         &self.allocator
     }
 
-    /// Gets the allocator, mut
+    /// Gets the allocator (mutable)
     pub fn allocator_mut(&mut self) -> &mut Allocator {
         &mut self.allocator
     }
@@ -362,7 +399,7 @@ impl AsanRuntime {
             rlim_cur: 0,
             rlim_max: 0,
         };
-        assert!(unsafe { getrlimit(RLIMIT_STACK, &mut stack_rlimit as *mut rlimit) } == 0);
+        assert!(unsafe { getrlimit(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
 
         stack_rlimit.rlim_cur as usize
     }
@@ -375,7 +412,7 @@ impl AsanRuntime {
             rlim_cur: 0,
             rlim_max: 0,
         };
-        assert!(unsafe { getrlimit64(RLIMIT_STACK, &mut stack_rlimit as *mut rlimit64) } == 0);
+        assert!(unsafe { getrlimit64(RLIMIT_STACK, addr_of_mut!(stack_rlimit)) } == 0);
 
         stack_rlimit.rlim_cur as usize
     }
@@ -387,7 +424,7 @@ impl AsanRuntime {
     #[must_use]
     pub fn current_stack() -> (usize, usize) {
         let mut stack_var = 0xeadbeef;
-        let stack_address = &mut stack_var as *mut _ as *mut c_void as usize;
+        let stack_address = addr_of_mut!(stack_var) as usize;
         let range_details = RangeDetails::with_address(stack_address as u64).unwrap();
         // Write something to (hopefully) make sure the val isn't optimized out
         unsafe {
@@ -1853,17 +1890,17 @@ impl AsanRuntime {
             ; self_addr:
             ; .qword self as *mut _  as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+            ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
             ; .qword AsanRuntime::handle_trap as *mut c_void as i64
         );
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
-        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
-        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(1));
-        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(2));
-        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(3));
-        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(1));
+        self.blob_check_mem_halfword = Some(self.generate_shadow_check_blob(2));
+        self.blob_check_mem_dword = Some(self.generate_shadow_check_blob(3));
+        self.blob_check_mem_qword = Some(self.generate_shadow_check_blob(4));
+        self.blob_check_mem_16bytes = Some(self.generate_shadow_check_blob(5));
     }
 
     ///
@@ -1950,7 +1987,7 @@ impl AsanRuntime {
             ; self_addr:
             ; .qword self as *mut _  as *mut c_void as i64
             ; self_regs_addr:
-            ; .qword &mut self.regs as *mut _ as *mut c_void as i64
+            ; .qword addr_of_mut!(self.regs) as i64
             ; trap_func:
             ; .qword AsanRuntime::handle_trap as *mut c_void as i64
             ; register_frame_func:
@@ -2088,29 +2125,26 @@ impl AsanRuntime {
 
     /// Determine if the instruction is 'interesting' for the purposes of ASAN
     #[cfg(target_arch = "aarch64")]
+    #[must_use]
     #[inline]
     pub fn asan_is_interesting_instruction(
-        &self,
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
-    ) -> Result<
-        (
-            capstone::RegId,
-            capstone::RegId,
-            i32,
-            u32,
-            Arm64Shift,
-            Arm64Extender,
-        ),
-        (),
-    > {
+    ) -> Option<(
+        capstone::RegId,
+        capstone::RegId,
+        i32,
+        u32,
+        Arm64Shift,
+        Arm64Extender,
+    )> {
         // We have to ignore these instructions. Simulating them with their side effects is
         // complex, to say the least.
         match instr.mnemonic().unwrap() {
             "ldaxr" | "stlxr" | "ldxr" | "stxr" | "ldar" | "stlr" | "ldarb" | "ldarh" | "ldaxp"
             | "ldaxrb" | "ldaxrh" | "stlrb" | "stlrh" | "stlxp" | "stlxrb" | "stlxrh" | "ldxrb"
-            | "ldxrh" | "stxrb" | "stxrh" => return Err(()),
+            | "ldxrh" | "stxrb" | "stxrh" => return None,
             _ => (),
         }
 
@@ -2120,47 +2154,45 @@ impl AsanRuntime {
             .arch_detail()
             .operands();
         if operands.len() < 2 {
-            return Err(());
+            return None;
         }
 
         if let Arm64Operand(arm64operand) = operands.last().unwrap() {
             if let Arm64OperandType::Mem(opmem) = arm64operand.op_type {
-                return Ok((
+                return Some((
                     opmem.base(),
                     opmem.index(),
                     opmem.disp(),
-                    FridaInstrumentationHelper::instruction_width(instr, &operands),
+                    instruction_width(instr, &operands),
                     arm64operand.shift,
                     arm64operand.ext,
                 ));
             }
         }
 
-        Err(())
+        None
     }
 
     /// Checks if the current instruction is interesting for address sanitization.
     #[cfg(all(target_arch = "x86_64", unix))]
     #[inline]
-    #[allow(clippy::unused_self)]
+    #[must_use]
     #[allow(clippy::result_unit_err)]
     pub fn asan_is_interesting_instruction(
-        &self,
         capstone: &Capstone,
         _address: u64,
         instr: &Insn,
-    ) -> Result<(RegId, u8, RegId, RegId, i32, i64), ()> {
+    ) -> Option<(RegId, u8, RegId, RegId, i32, i64)> {
         let operands = capstone
             .insn_detail(instr)
             .unwrap()
             .arch_detail()
             .operands();
-
         // Ignore lea instruction
         // put nop into the white-list so that instructions like
         // like `nop dword [rax + rax]` does not get caught.
         match instr.mnemonic().unwrap() {
-            "lea" | "nop" => return Err(()),
+            "lea" | "nop" => return None,
 
             _ => (),
         }
@@ -2168,7 +2200,7 @@ impl AsanRuntime {
         // This is a TODO! In this case, both the src and the dst are mem operand
         // so we would need to return two operadns?
         if instr.mnemonic().unwrap().starts_with("rep") {
-            return Err(());
+            return None;
         }
 
         for operand in operands {
@@ -2188,7 +2220,7 @@ impl AsanRuntime {
                     );
                     */
                     if opmem.segment() == RegId(0) {
-                        return Ok((
+                        return Some((
                             opmem.segment(),
                             x86operand.size,
                             opmem.base(),
@@ -2201,7 +2233,7 @@ impl AsanRuntime {
             }
         }
 
-        Err(())
+        None
     }
 
     /// Emits a asan shadow byte check.
@@ -2227,14 +2259,14 @@ impl AsanRuntime {
         let basereg = if basereg.0 == 0 {
             None
         } else {
-            let reg = FridaInstrumentationHelper::writer_register(basereg);
+            let reg = writer_register(basereg);
             Some(reg)
         };
 
         let indexreg = if indexreg.0 == 0 {
             None
         } else {
-            let reg = FridaInstrumentationHelper::writer_register(indexreg);
+            let reg = writer_register(indexreg);
             Some(reg)
         };
 
@@ -2293,6 +2325,14 @@ impl AsanRuntime {
                 X86Register::Rip => {
                     writer.put_mov_reg_address(X86Register::Rdi, true_rip);
                 }
+                X86Register::Rsp => {
+                    // In this case rsp clobbered
+                    writer.put_lea_reg_reg_offset(
+                        X86Register::Rdi,
+                        X86Register::Rsp,
+                        redzone_size + 0x8 * 6,
+                    );
+                }
                 _ => {
                     writer.put_mov_reg_reg(X86Register::Rdi, basereg.unwrap());
                 }
@@ -2306,6 +2346,18 @@ impl AsanRuntime {
             Some(reg) => match reg {
                 X86Register::Rip => {
                     writer.put_mov_reg_address(X86Register::Rsi, true_rip);
+                }
+                X86Register::Rdi => {
+                    // In this case rdi is already clobbered, so we want it from the stack (we pushed rdi onto stack before!)
+                    writer.put_mov_reg_reg_offset_ptr(X86Register::Rsi, X86Register::Rsp, -0x28);
+                }
+                X86Register::Rsp => {
+                    // In this case rsp is also clobbered
+                    writer.put_lea_reg_reg_offset(
+                        X86Register::Rsi,
+                        X86Register::Rsp,
+                        redzone_size + 0x8 * 6,
+                    );
                 }
                 _ => {
                     writer.put_mov_reg_reg(X86Register::Rsi, indexreg.unwrap());
@@ -2363,6 +2415,7 @@ impl AsanRuntime {
     /// Emit a shadow memory check into the instruction stream
     #[cfg(target_arch = "aarch64")]
     #[inline]
+    #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
     pub fn emit_shadow_check(
         &mut self,
         _address: u64,
@@ -2374,14 +2427,19 @@ impl AsanRuntime {
         shift: Arm64Shift,
         extender: Arm64Extender,
     ) {
+        debug_assert!(
+            i32::try_from(frida_gum_sys::GUM_RED_ZONE_SIZE).is_ok(),
+            "GUM_RED_ZONE_SIZE is bigger than i32::max"
+        );
+        #[allow(clippy::cast_possible_wrap)]
         let redzone_size = frida_gum_sys::GUM_RED_ZONE_SIZE as i32;
         let writer = output.writer();
 
-        let basereg = FridaInstrumentationHelper::writer_register(basereg);
-        let indexreg = if indexreg.0 != 0 {
-            Some(FridaInstrumentationHelper::writer_register(indexreg))
-        } else {
+        let basereg = writer_register(basereg);
+        let indexreg = if indexreg.0 == 0 {
             None
+        } else {
+            Some(writer_register(indexreg))
         };
 
         if self.current_report_impl == 0
@@ -2409,7 +2467,7 @@ impl AsanRuntime {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            -(16 + redzone_size) as i64,
+            i64::from(-(16 + redzone_size)),
             IndexMode::PreAdjust,
         );
 
@@ -2462,7 +2520,7 @@ impl AsanRuntime {
                     Arm64Extender::ARM64_EXT_SXTH => 0b101,
                     Arm64Extender::ARM64_EXT_SXTW => 0b110,
                     Arm64Extender::ARM64_EXT_SXTX => 0b111,
-                    _ => -1,
+                    Arm64Extender::ARM64_EXT_INVALID => -1,
                 };
                 let (shift_encoding, shift_amount): (i32, u32) = match shift {
                     Arm64Shift::Lsl(amount) => (0b00, amount),
@@ -2473,11 +2531,13 @@ impl AsanRuntime {
 
                 if extender_encoding != -1 && shift_amount < 0b1000 {
                     // emit add extended register: https://developer.arm.com/documentation/ddi0602/latest/Base-Instructions/ADD--extended-register---Add--extended-register--
+                    #[allow(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b210000 | ((extender_encoding as u32) << 13) | (shift_amount << 10))
                             .to_le_bytes(),
                     );
                 } else if shift_encoding != -1 {
+                    #[allow(clippy::cast_sign_loss)]
                     writer.put_bytes(
                         &(0x8b010000 | ((shift_encoding as u32) << 22) | (shift_amount << 10))
                             .to_le_bytes(),
@@ -2498,56 +2558,62 @@ impl AsanRuntime {
         #[allow(clippy::comparison_chain)]
         if displacement < 0 {
             if displacement > -4096 {
+                #[allow(clippy::cast_sign_loss)]
+                let displacement = displacement.unsigned_abs();
                 // Subtract the displacement into x0
                 writer.put_sub_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    displacement.abs() as u64,
+                    u64::from(displacement),
                 );
             } else {
-                let displacement_hi = displacement.abs() / 4096;
-                let displacement_lo = displacement.abs() % 4096;
-                writer.put_bytes(&(0xd1400000u32 | ((displacement_hi as u32) << 10)).to_le_bytes());
+                #[allow(clippy::cast_sign_loss)]
+                let displacement = displacement.unsigned_abs();
+                let displacement_hi = displacement / 4096;
+                let displacement_lo = displacement % 4096;
+                writer.put_bytes(&(0xd1400000u32 | (displacement_hi << 10)).to_le_bytes());
                 writer.put_sub_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    displacement_lo as u64,
+                    u64::from(displacement_lo),
                 );
             }
         } else if displacement > 0 {
+            #[allow(clippy::cast_sign_loss)]
+            let displacement = displacement as u32;
             if displacement < 4096 {
                 // Add the displacement into x0
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    displacement as u64,
+                    u64::from(displacement),
                 );
             } else {
                 let displacement_hi = displacement / 4096;
                 let displacement_lo = displacement % 4096;
-                writer.put_bytes(&(0x91400000u32 | ((displacement_hi as u32) << 10)).to_le_bytes());
+                writer.put_bytes(&(0x91400000u32 | (displacement_hi << 10)).to_le_bytes());
                 writer.put_add_reg_reg_imm(
                     Aarch64Register::X0,
                     Aarch64Register::X0,
-                    displacement_lo as u64,
+                    u64::from(displacement_lo),
                 );
             }
         }
         // Insert the check_shadow_mem code blob
         #[cfg(unix)]
         match width {
-            1 => writer.put_bytes(&self.blob_check_mem_byte()),
-            2 => writer.put_bytes(&self.blob_check_mem_halfword()),
-            3 => writer.put_bytes(&self.blob_check_mem_3bytes()),
-            4 => writer.put_bytes(&self.blob_check_mem_dword()),
-            6 => writer.put_bytes(&self.blob_check_mem_6bytes()),
-            8 => writer.put_bytes(&self.blob_check_mem_qword()),
-            12 => writer.put_bytes(&self.blob_check_mem_12bytes()),
-            16 => writer.put_bytes(&self.blob_check_mem_16bytes()),
-            24 => writer.put_bytes(&self.blob_check_mem_24bytes()),
-            32 => writer.put_bytes(&self.blob_check_mem_32bytes()),
-            48 => writer.put_bytes(&self.blob_check_mem_48bytes()),
-            64 => writer.put_bytes(&self.blob_check_mem_64bytes()),
+            1 => writer.put_bytes(self.blob_check_mem_byte()),
+            2 => writer.put_bytes(self.blob_check_mem_halfword()),
+            3 => writer.put_bytes(self.blob_check_mem_3bytes()),
+            4 => writer.put_bytes(self.blob_check_mem_dword()),
+            6 => writer.put_bytes(self.blob_check_mem_6bytes()),
+            8 => writer.put_bytes(self.blob_check_mem_qword()),
+            12 => writer.put_bytes(self.blob_check_mem_12bytes()),
+            16 => writer.put_bytes(self.blob_check_mem_16bytes()),
+            24 => writer.put_bytes(self.blob_check_mem_24bytes()),
+            32 => writer.put_bytes(self.blob_check_mem_32bytes()),
+            48 => writer.put_bytes(self.blob_check_mem_48bytes()),
+            64 => writer.put_bytes(self.blob_check_mem_64bytes()),
             _ => false,
         };
 
@@ -2568,7 +2634,7 @@ impl AsanRuntime {
             Aarch64Register::X0,
             Aarch64Register::X1,
             Aarch64Register::Sp,
-            16 + redzone_size as i64,
+            16 + i64::from(redzone_size),
             IndexMode::PostAdjust,
         ));
     }

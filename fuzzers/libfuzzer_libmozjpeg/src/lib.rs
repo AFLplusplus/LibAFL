@@ -11,23 +11,26 @@ use libafl::{
         current_nanos,
         rands::StdRand,
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus, RandCorpusScheduler},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::{setup_restarting_mgr_std, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind},
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
+    },
     observers::StdMapObserver,
+    schedulers::RandScheduler,
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CMP_MAP, EDGES_MAP, MAX_EDGES_NUM,
 };
@@ -84,24 +87,15 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel using the allocations map
     let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map });
 
-    // The state of the edges feedback.
-    let edges_feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
-    // The state of the cmps feedback.
-    let cmps_feedback_state = MapFeedbackState::with_observer(&cmps_observer);
-
-    // The state of the allocs feedback.
-    let allocs_feedback_state = MapFeedbackState::with_observer(&allocs_observer);
-
     // Feedback to rate the interestingness of an input
-    let feedback = feedback_or!(
-        MaxMapFeedback::new(&edges_feedback_state, &edges_observer),
-        MaxMapFeedback::new(&cmps_feedback_state, &cmps_observer),
-        MaxMapFeedback::new(&allocs_feedback_state, &allocs_observer)
+    let mut feedback = feedback_or!(
+        MaxMapFeedback::new(&edges_observer),
+        MaxMapFeedback::new(&cmps_observer),
+        MaxMapFeedback::new(&allocs_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -114,20 +108,19 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(
-                edges_feedback_state,
-                cmps_feedback_state,
-                allocs_feedback_state
-            ),
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
         )
+        .unwrap()
     });
 
     println!("We're a client, let's fuzz :)");
 
     // Add the JPEG tokens if not existing
     if state.metadata().get::<Tokens>().is_none() {
-        state.add_metadata(Tokens::from_tokens_file("./jpeg.dict")?);
+        state.add_metadata(Tokens::from_file("./jpeg.dict")?);
     }
 
     // Setup a basic mutator with a mutational stage
@@ -135,7 +128,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     // A random policy to get testcasess from the corpus
-    let scheduler = RandCorpusScheduler::new();
+    let scheduler = RandScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

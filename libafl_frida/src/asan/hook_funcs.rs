@@ -1,4 +1,10 @@
 //! The allocator hooks for address sanitizer.
+use std::ffi::c_void;
+
+use backtrace::Backtrace;
+use libc::{c_char, wchar_t};
+use nix::libc::memset;
+
 use crate::{
     alloc::Allocator,
     asan::{
@@ -6,10 +12,6 @@ use crate::{
         errors::{AsanError, AsanErrors},
     },
 };
-use backtrace::Backtrace;
-use libc::{c_char, wchar_t};
-use nix::libc::memset;
-use std::ffi::c_void;
 
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
 impl AsanRuntime {
@@ -54,7 +56,19 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[inline]
     pub fn hook__Znwm(&mut self, size: usize) -> *mut c_void {
-        unsafe { self.allocator_mut().alloc(size, 8) }
+        let result = unsafe { self.allocator_mut().alloc(size, 8) };
+        if result.is_null() {
+            extern "C" {
+                fn _ZSt17__throw_bad_allocv();
+            }
+
+            unsafe {
+                _ZSt17__throw_bad_allocv();
+            }
+            0xabcdef as *mut c_void
+        } else {
+            result
+        }
     }
 
     #[allow(non_snake_case)]
@@ -70,7 +84,17 @@ impl AsanRuntime {
     #[allow(non_snake_case)]
     #[inline]
     pub fn hook__ZnwmSt11align_val_t(&mut self, size: usize, alignment: usize) -> *mut c_void {
-        unsafe { self.allocator_mut().alloc(size, alignment) }
+        let result = unsafe { self.allocator_mut().alloc(size, alignment) };
+        if result.is_null() {
+            extern "C" {
+                fn _ZSt17__throw_bad_allocv();
+            }
+
+            unsafe {
+                _ZSt17__throw_bad_allocv();
+            }
+        }
+        result
     }
 
     #[allow(non_snake_case)]

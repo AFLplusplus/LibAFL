@@ -1,10 +1,10 @@
+use std::hash::Hash;
+
+use lain::prelude::*;
 use libafl::{
     bolts::{ownedref::OwnedSlice, HasLen},
     inputs::{HasTargetBytes, Input},
 };
-
-use lain::prelude::*;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(
@@ -35,7 +35,7 @@ impl Fixup for PacketData {
 }
 
 #[derive(
-    Serialize, Deserialize, Debug, Copy, Clone, FuzzerObject, ToPrimitiveU32, BinarySerialize,
+    Serialize, Deserialize, Debug, Copy, Clone, FuzzerObject, ToPrimitiveU32, BinarySerialize, Hash,
 )]
 #[repr(u32)]
 pub enum PacketType {
@@ -68,5 +68,17 @@ impl HasTargetBytes for PacketData {
 impl HasLen for PacketData {
     fn len(&self) -> usize {
         self.serialized_size()
+    }
+}
+
+impl Hash for PacketData {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self.typ {
+            UnsafeEnum::Invalid(a) => a.hash(state),
+            UnsafeEnum::Valid(a) => a.hash(state),
+        }
+        self.offset.hash(state);
+        self.length.hash(state);
+        self.data.hash(state);
     }
 }

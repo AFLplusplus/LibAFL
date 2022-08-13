@@ -4,7 +4,7 @@ A well-known [`Stage`], for example, is the mutational stage, running multiple [
 Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 */
 
-/// Mutational stage is the normal fuzzing stage,
+/// Mutational stage is the normal fuzzing stage.
 pub mod mutational;
 pub use mutational::{MutationalStage, StdMutationalStage};
 
@@ -14,10 +14,16 @@ pub mod tracing;
 pub use tracing::{ShadowTracingStage, TracingStage};
 
 pub mod calibrate;
-pub use calibrate::{CalibrationStage, PowerScheduleMetadata};
+pub use calibrate::CalibrationStage;
 
 pub mod power;
-pub use power::PowerMutationalStage;
+pub use power::{PowerMutationalStage, StdPowerMutationalStage};
+
+pub mod generalization;
+pub use generalization::GeneralizationStage;
+
+pub mod owned;
+pub use owned::StagesOwnedList;
 
 #[cfg(feature = "std")]
 pub mod concolic;
@@ -28,24 +34,21 @@ pub use concolic::SimpleConcolicMutationalStage;
 
 #[cfg(feature = "std")]
 pub mod sync;
+use core::{convert::From, marker::PhantomData};
+
 #[cfg(feature = "std")]
 pub use sync::*;
 
+use self::push::PushStage;
 use crate::{
-    bolts::rands::Rand,
-    corpus::{Corpus, CorpusScheduler},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
-    state::{
-        HasExecutions, HasRand, {HasClientPerfMonitor, HasCorpus},
-    },
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasCorpusScheduler,
+    schedulers::Scheduler,
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
+    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
-use core::{convert::From, marker::PhantomData};
-
-use self::push::PushStage;
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
@@ -164,35 +167,31 @@ where
 /// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
 #[allow(clippy::type_complexity)]
 #[derive(Debug)]
-pub struct PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+pub struct PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    PS: PushStage<CS, EM, I, OT, S, Z>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     push_stage: PS,
-    phantom: PhantomData<(C, CS, EM, I, OT, R, S, Z)>,
+    phantom: PhantomData<(CS, EM, I, OT, S, Z)>,
 }
 
-impl<C, CS, EM, I, OT, PS, R, S, Z> PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+impl<CS, EM, I, OT, PS, S, Z> PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    PS: PushStage<CS, EM, I, OT, S, Z>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
-    /// Create a new [`PushStageAdapter`], warpping the given [`PushStage`]
+    /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
     #[must_use]
     pub fn new(push_stage: PS) -> Self {
@@ -203,22 +202,19 @@ where
     }
 }
 
-impl<C, CS, E, EM, I, OT, PS, R, S, Z> Stage<E, EM, S, Z>
-    for PushStageAdapter<C, CS, EM, I, OT, PS, R, S, Z>
+impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    PS: PushStage<C, CS, EM, I, OT, R, S, Z>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
+    PS: PushStage<CS, EM, I, OT, S, Z>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
     Z: ExecutesInput<I, OT, S, Z>
         + ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>
-        + HasCorpusScheduler<CS, I, S>,
+        + HasScheduler<CS, I, S>,
 {
     fn perform(
         &mut self,
@@ -256,5 +252,183 @@ where
 
         self.push_stage
             .deinit(fuzzer, state, event_mgr, executor.observers_mut())
+    }
+}
+
+/// `Stage` Python bindings
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+pub mod pybind {
+    use alloc::vec::Vec;
+
+    use pyo3::prelude::*;
+
+    use crate::{
+        events::pybind::PythonEventManager,
+        executors::pybind::PythonExecutor,
+        fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
+        stages::{mutational::pybind::PythonStdMutationalStage, Stage, StagesTuple},
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
+
+    #[derive(Clone, Debug)]
+    pub struct PyObjectStage {
+        inner: PyObject,
+    }
+
+    impl PyObjectStage {
+        #[must_use]
+        pub fn new(obj: PyObject) -> Self {
+            PyObjectStage { inner: obj }
+        }
+    }
+
+    impl Stage<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer> for PyObjectStage {
+        #[inline]
+        fn perform(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            executor: &mut PythonExecutor,
+            state: &mut PythonStdState,
+            manager: &mut PythonEventManager,
+            corpus_idx: usize,
+        ) -> Result<(), Error> {
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner.call_method1(
+                    py,
+                    "perform",
+                    (
+                        PythonStdFuzzerWrapper::wrap(fuzzer),
+                        executor.clone(),
+                        PythonStdStateWrapper::wrap(state),
+                        manager.clone(),
+                        corpus_idx,
+                    ),
+                )?;
+                Ok(())
+            })?;
+            Ok(())
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    pub enum PythonStageWrapper {
+        StdMutational(Py<PythonStdMutationalStage>),
+        Python(PyObjectStage),
+    }
+
+    /// Stage Trait binding
+    #[pyclass(unsendable, name = "Stage")]
+    #[derive(Clone, Debug)]
+    pub struct PythonStage {
+        wrapper: PythonStageWrapper,
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonStageWrapper,
+                { StdMutational },
+                {
+                    Python(py_wrapper) => {
+                        let $name = py_wrapper;
+                        $body
+                    }
+                }
+            )
+        };
+    }
+
+    #[pymethods]
+    impl PythonStage {
+        #[staticmethod]
+        #[must_use]
+        pub fn new_std_mutational(
+            py_std_havoc_mutations_stage: Py<PythonStdMutationalStage>,
+        ) -> Self {
+            Self {
+                wrapper: PythonStageWrapper::StdMutational(py_std_havoc_mutations_stage),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_py(obj: PyObject) -> Self {
+            Self {
+                wrapper: PythonStageWrapper::Python(PyObjectStage::new(obj)),
+            }
+        }
+
+        #[must_use]
+        pub fn unwrap_py(&self) -> Option<PyObject> {
+            match &self.wrapper {
+                PythonStageWrapper::Python(pyo) => Some(pyo.inner.clone()),
+                PythonStageWrapper::StdMutational(_) => None,
+            }
+        }
+    }
+
+    impl Stage<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer> for PythonStage {
+        #[inline]
+        #[allow(clippy::let_and_return)]
+        fn perform(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            executor: &mut PythonExecutor,
+            state: &mut PythonStdState,
+            manager: &mut PythonEventManager,
+            corpus_idx: usize,
+        ) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, s, {
+                s.perform(fuzzer, executor, state, manager, corpus_idx)
+            })
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[pyclass(unsendable, name = "StagesTuple")]
+    pub struct PythonStagesTuple {
+        list: Vec<PythonStage>,
+    }
+
+    #[pymethods]
+    impl PythonStagesTuple {
+        #[new]
+        fn new(list: Vec<PythonStage>) -> Self {
+            Self { list }
+        }
+
+        fn len(&self) -> usize {
+            self.list.len()
+        }
+
+        fn __getitem__(&self, idx: usize) -> PythonStage {
+            self.list[idx].clone()
+        }
+    }
+
+    impl StagesTuple<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer>
+        for PythonStagesTuple
+    {
+        fn perform_all(
+            &mut self,
+            fuzzer: &mut PythonStdFuzzer,
+            executor: &mut PythonExecutor,
+            state: &mut PythonStdState,
+            manager: &mut PythonEventManager,
+            corpus_idx: usize,
+        ) -> Result<(), Error> {
+            for s in &mut self.list {
+                s.perform(fuzzer, executor, state, manager, corpus_idx)?;
+            }
+            Ok(())
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStage>()?;
+        m.add_class::<PythonStagesTuple>()?;
+        Ok(())
     }
 }

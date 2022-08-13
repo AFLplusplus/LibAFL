@@ -1,8 +1,10 @@
-//! Concoliic feedback for comcolic fuzzing.
+//! Concolic feedback for concolic fuzzing.
 //! It is used to attach concolic tracing metadata to the testcase.
 //! This feedback should be used in combination with another feedback as this feedback always considers testcases
 //! to be not interesting.
 //! Requires a [`ConcolicObserver`] to observe the concolic trace.
+use alloc::{borrow::ToOwned, string::String};
+
 use crate::{
     bolts::tuples::Named,
     corpus::Testcase,
@@ -51,6 +53,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,

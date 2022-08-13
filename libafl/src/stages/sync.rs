@@ -2,16 +2,15 @@
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
 use core::marker::PhantomData;
-use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
     time::SystemTime,
 };
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    bolts::rands::Rand,
-    corpus::Corpus,
     fuzzer::Evaluator,
     inputs::Input,
     stages::Stage,
@@ -38,28 +37,24 @@ impl SyncFromDiskMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromDiskStage<C, CB, E, EM, I, R, S, Z>
+pub struct SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    C: Corpus<I>,
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     sync_dir: PathBuf,
     load_callback: CB,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, R, S, Z)>,
+    phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<C, CB, E, EM, I, R, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<C, CB, E, EM, I, R, S, Z>
+impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    C: Corpus<I>,
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -99,13 +94,11 @@ where
     }
 }
 
-impl<C, CB, E, EM, I, R, S, Z> SyncFromDiskStage<C, CB, E, EM, I, R, S, Z>
+impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
-    C: Corpus<I>,
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`]
@@ -148,7 +141,7 @@ where
                     }
                     max_time = Some(max_time.map_or(time, |t: SystemTime| t.max(time)));
                     let input = (self.load_callback)(fuzzer, state, &path)?;
-                    drop(fuzzer.evaluate_input(state, executor, manager, input)?);
+                    fuzzer.evaluate_input(state, executor, manager, input)?;
                 }
             } else if attr.is_dir() {
                 let dir_max_time =
@@ -163,13 +156,13 @@ where
     }
 }
 
-impl<C, E, EM, I, R, S, Z>
-    SyncFromDiskStage<C, fn(&mut Z, &mut S, &Path) -> Result<I, Error>, E, EM, I, R, S, Z>
+/// Function type when the callback in `SyncFromDiskStage` is not a lambda
+pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
+
+impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
-    C: Corpus<I>,
     I: Input,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs

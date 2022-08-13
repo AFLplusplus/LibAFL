@@ -12,3 +12,8 @@ Abort, on the other hand, raises an error LibAFL's inprocess executor will be ab
 ## Gramatron: gramatron grammars and preprocessing utils
 
 See https://github.com/HexHive/Gramatron
+
+## libafl_benches
+
+This folder contains benchmarks for various things in LibAFL, like hash speeds and RNGs.
+Run with `cargo bench`

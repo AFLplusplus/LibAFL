@@ -2,18 +2,21 @@
 
 use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::{fs, fs::File, io::Write};
 use std::{
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
 
-#[cfg(feature = "std")]
-use std::{fs, fs::File, io::Write};
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::serdeany::SerdeAnyMap, corpus::Corpus, corpus::Testcase, inputs::Input,
-    state::HasMetadata, Error,
+    bolts::serdeany::SerdeAnyMap,
+    corpus::{Corpus, Testcase},
+    inputs::Input,
+    state::HasMetadata,
+    Error,
 };
 
 /// Options for the the format of the on-disk metadata
@@ -133,7 +136,7 @@ where
     #[inline]
     fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
         if idx >= self.entries.len() {
-            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
+            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
         }
         self.entries[idx] = RefCell::new(testcase);
         Ok(())
@@ -161,7 +164,7 @@ where
         &self.current
     }
 
-    /// Current testcase scheduled (mut)
+    /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<usize> {
         &mut self.current
@@ -203,5 +206,46 @@ where
             dir_path,
             meta_format,
         })
+    }
+}
+#[cfg(feature = "python")]
+/// `OnDiskCorpus` Python bindings
+pub mod pybind {
+    use alloc::string::String;
+    use std::path::PathBuf;
+
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        corpus::{pybind::PythonCorpus, OnDiskCorpus},
+        inputs::BytesInput,
+    };
+
+    #[pyclass(unsendable, name = "OnDiskCorpus")]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for OnDiskCorpus
+    pub struct PythonOnDiskCorpus {
+        /// Rust wrapped OnDiskCorpus object
+        pub inner: OnDiskCorpus<BytesInput>,
+    }
+
+    #[pymethods]
+    impl PythonOnDiskCorpus {
+        #[new]
+        fn new(path: String) -> Self {
+            Self {
+                inner: OnDiskCorpus::new(PathBuf::from(path)).unwrap(),
+            }
+        }
+
+        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
+            PythonCorpus::new_on_disk(slf)
+        }
+    }
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonOnDiskCorpus>()?;
+        Ok(())
     }
 }

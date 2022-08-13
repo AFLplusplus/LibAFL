@@ -1,16 +1,12 @@
-//! A generic sharememory region to be used by any functions (queues or feedbacks
-// too.)
+//! A generic shared memory region to be used by any functions (queues or feedbacks
+//! too.)
 
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::pipes::Pipe;
-use crate::Error;
 use alloc::{rc::Rc, string::ToString};
 use core::{
     cell::RefCell,
     fmt::{self, Debug, Display},
     mem::ManuallyDrop,
 };
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 #[cfg(all(unix, feature = "std"))]
@@ -18,45 +14,39 @@ use std::io::Read;
 #[cfg(feature = "std")]
 use std::io::Write;
 
+use serde::{Deserialize, Serialize};
 #[cfg(all(feature = "std", unix, not(target_os = "android")))]
 pub use unix_shmem::{MmapShMem, MmapShMemProvider};
-
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
-
-#[cfg(all(feature = "std", unix))]
-pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
-
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
+
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::os::pipes::Pipe;
+#[cfg(all(feature = "std", unix))]
+pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
+use crate::{
+    bolts::{AsMutSlice, AsSlice},
+    Error,
+};
+
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
 pub type StdShMemProvider = Win32ShMemProvider;
-/// The standard sharedmem type
-#[cfg(all(windows, feature = "std"))]
-pub type StdShMem = Win32ShMem;
-
 /// The standard sharedmem provider
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemProvider =
     RcShMemProvider<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
-/// The standard sharedmem type
-#[cfg(all(target_os = "android", feature = "std"))]
-pub type StdShMem = RcShMem<ServedShMemProvider<unix_shmem::ashmem::AshmemShMemProvider>>;
 /// The standard sharedmem service
 #[cfg(all(target_os = "android", feature = "std"))]
 pub type StdShMemService = ShMemService<unix_shmem::ashmem::AshmemShMemProvider>;
-
 /// The standard sharedmem provider
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 pub type StdShMemProvider = RcShMemProvider<ServedShMemProvider<MmapShMemProvider>>;
-/// The standard sharedmem type
-#[cfg(all(feature = "std", target_vendor = "apple"))]
-pub type StdShMem = RcShMem<ServedShMemProvider<MmapShMemProvider>>;
 #[cfg(all(feature = "std", target_vendor = "apple"))]
 /// The standard sharedmem service
 pub type StdShMemService = ShMemService<MmapShMemProvider>;
-
 /// The default [`ShMemProvider`] for this os.
 #[cfg(all(
     feature = "std",
@@ -64,14 +54,6 @@ pub type StdShMemService = ShMemService<MmapShMemProvider>;
     not(any(target_os = "android", target_vendor = "apple"))
 ))]
 pub type StdShMemProvider = UnixShMemProvider;
-/// The default [`ShMemProvider`] for this os.
-#[cfg(all(
-    feature = "std",
-    unix,
-    not(any(target_os = "android", target_vendor = "apple"))
-))]
-pub type StdShMem = UnixShMem;
-
 /// The standard sharedmem service
 #[cfg(any(
     not(any(target_os = "android", target_vendor = "apple")),
@@ -108,10 +90,17 @@ pub struct ShMemId {
 }
 
 impl ShMemId {
-    /// Create a new id from a fixed-size string
+    /// Create a new id from a fixed-size string/bytes array
+    /// It should contain a valid cstring.
     #[must_use]
-    pub fn from_slice(slice: &[u8; 20]) -> Self {
-        Self { id: *slice }
+    pub fn from_array(array: &[u8; 20]) -> Self {
+        Self { id: *array }
+    }
+
+    /// Try to create a new id from a bytes string.
+    /// The slice must have a length of at least 20 bytes and contain a valid cstring.
+    pub fn try_from_slice(slice: &[u8]) -> Result<Self, Error> {
+        Ok(Self::from_array(&slice[0..20].try_into()?))
     }
 
     /// Create a new id from an int
@@ -132,7 +121,7 @@ impl ShMemId {
 
     /// Get the id as a fixed-length slice
     #[must_use]
-    pub fn as_slice(&self) -> &[u8; 20] {
+    pub fn as_array(&self) -> &[u8; 20] {
         &self.id
     }
 
@@ -146,6 +135,11 @@ impl ShMemId {
     #[must_use]
     pub fn as_str(&self) -> &str {
         alloc::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
+    }
+}
+impl AsSlice<u8> for ShMemId {
+    fn as_slice(&self) -> &[u8] {
+        &self.id
     }
 }
 
@@ -164,7 +158,7 @@ impl Display for ShMemId {
 /// A [`ShMem`] is an interface to shared maps.
 /// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
-pub trait ShMem: Sized + Debug + Clone {
+pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -176,6 +170,32 @@ pub trait ShMem: Sized + Debug + Clone {
         self.len() == 0
     }
 
+    /// Convert to an owned object reference
+    ///
+    /// # Safety
+    /// This function is not safe as the object may be not initialized.
+    /// The user is responsible to initialize the object with something like
+    /// `*shmem.as_object_mut::<T>() = T::new();`
+    unsafe fn as_object<T: Sized + 'static>(&self) -> &T {
+        assert!(self.len() >= core::mem::size_of::<T>());
+        (self.as_slice().as_ptr() as *const () as *const T)
+            .as_ref()
+            .unwrap()
+    }
+
+    /// Convert to an owned object mutable reference
+    ///
+    /// # Safety
+    /// This function is not safe as the object may be not initialized.
+    /// The user is responsible to initialize the object with something like
+    /// `*shmem.as_object_mut::<T>() = T::new();`
+    unsafe fn as_object_mut<T: Sized + 'static>(&mut self) -> &mut T {
+        assert!(self.len() >= core::mem::size_of::<T>());
+        (self.as_mut_slice().as_mut_ptr() as *mut () as *mut T)
+            .as_mut()
+            .unwrap()
+    }
+
     /// Get the description of the shared memory mapping
     fn description(&self) -> ShMemDescription {
         ShMemDescription {
@@ -183,12 +203,6 @@ pub trait ShMem: Sized + Debug + Clone {
             id: self.id(),
         }
     }
-
-    /// The actual shared map, in memory
-    fn map(&self) -> &[u8];
-
-    /// The actual shared map, mutable
-    fn map_mut(&mut self) -> &mut [u8];
 
     /// Write this map's config to env
     #[cfg(feature = "std")]
@@ -206,33 +220,49 @@ pub trait ShMem: Sized + Debug + Clone {
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].
 pub trait ShMemProvider: Clone + Default + Debug {
     /// The actual shared map handed out by this [`ShMemProvider`].
-    type Mem: ShMem;
+    type ShMem: ShMem;
 
     /// Create a new instance of the provider
     fn new() -> Result<Self, Error>;
 
     /// Create a new shared memory mapping
-    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error>;
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error>;
 
     /// Get a mapping given its id and size
-    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error>;
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error>;
+
+    /// Create a new shared memory mapping to hold an object of the given type
+    fn new_shmem_object<T: Sized + 'static>(&mut self) -> Result<Self::ShMem, Error> {
+        self.new_shmem(core::mem::size_of::<T>())
+    }
+
+    /// Get a mapping given its id to hold an object of the given type
+    fn shmem_object_from_id<T: Sized + 'static>(
+        &mut self,
+        id: ShMemId,
+    ) -> Result<Self::ShMem, Error> {
+        self.shmem_from_id_and_size(id, core::mem::size_of::<T>())
+    }
 
     /// Get a mapping given a description
-    fn from_description(&mut self, description: ShMemDescription) -> Result<Self::Mem, Error> {
-        self.from_id_and_size(description.id, description.size)
+    fn shmem_from_description(
+        &mut self,
+        description: ShMemDescription,
+    ) -> Result<Self::ShMem, Error> {
+        self.shmem_from_id_and_size(description.id, description.size)
     }
 
     /// Create a new sharedmap reference from an existing `id` and `len`
-    fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
-        self.from_id_and_size(mapping.id(), mapping.len())
+    fn clone_ref(&mut self, mapping: &Self::ShMem) -> Result<Self::ShMem, Error> {
+        self.shmem_from_id_and_size(mapping.id(), mapping.len())
     }
 
     /// Reads an existing map config from env vars, then maps it
     #[cfg(feature = "std")]
-    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::Mem, Error> {
+    fn existing_from_env(&mut self, env_name: &str) -> Result<Self::ShMem, Error> {
         let map_shm_str = env::var(env_name)?;
         let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
-        self.from_description(ShMemDescription::from_string_and_size(
+        self.shmem_from_description(ShMemDescription::from_string_and_size(
             &map_shm_str,
             map_size,
         ))
@@ -255,17 +285,17 @@ pub trait ShMemProvider: Clone + Default + Debug {
     }
 
     /// Release the resources associated with the given [`ShMem`]
-    fn release_map(&mut self, _map: &mut Self::Mem) {
+    fn release_shmem(&mut self, _shmem: &mut Self::ShMem) {
         // do nothing
     }
 }
 
-/// A Refernce Counted shared map,
+/// A Reference Counted shared map,
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
 pub struct RcShMem<T: ShMemProvider> {
-    internal: ManuallyDrop<T::Mem>,
+    internal: ManuallyDrop<T::ShMem>,
     provider: Rc<RefCell<T>>,
 }
 
@@ -280,23 +310,33 @@ where
     fn len(&self) -> usize {
         self.internal.len()
     }
+}
 
-    fn map(&self) -> &[u8] {
-        self.internal.map()
+impl<T> AsSlice<u8> for RcShMem<T>
+where
+    T: ShMemProvider + Debug,
+{
+    fn as_slice(&self) -> &[u8] {
+        self.internal.as_slice()
     }
+}
 
-    fn map_mut(&mut self) -> &mut [u8] {
-        self.internal.map_mut()
+impl<T> AsMutSlice<u8> for RcShMem<T>
+where
+    T: ShMemProvider + Debug,
+{
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        self.internal.as_mut_slice()
     }
 }
 
 impl<T: ShMemProvider> Drop for RcShMem<T> {
     fn drop(&mut self) {
-        self.provider.borrow_mut().release_map(&mut self.internal);
+        self.provider.borrow_mut().release_shmem(&mut self.internal);
     }
 }
 
-/// A Refernce Counted `ShMemProvider`,
+/// A Reference Counted `ShMemProvider`,
 /// that can use internal mutability.
 /// Useful if the `ShMemProvider` needs to keep local state.
 #[derive(Debug, Clone)]
@@ -325,7 +365,7 @@ impl<SP> ShMemProvider for RcShMemProvider<SP>
 where
     SP: ShMemProvider + Debug,
 {
-    type Mem = RcShMem<SP>;
+    type ShMem = RcShMem<SP>;
 
     fn new() -> Result<Self, Error> {
         Ok(Self {
@@ -335,26 +375,30 @@ where
         })
     }
 
-    fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
-        Ok(Self::Mem {
-            internal: ManuallyDrop::new(self.internal.borrow_mut().new_map(map_size)?),
+    fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
+            internal: ManuallyDrop::new(self.internal.borrow_mut().new_shmem(map_size)?),
             provider: self.internal.clone(),
         })
     }
 
-    fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-        Ok(Self::Mem {
-            internal: ManuallyDrop::new(self.internal.borrow_mut().from_id_and_size(id, size)?),
+    fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
+            internal: ManuallyDrop::new(
+                self.internal
+                    .borrow_mut()
+                    .shmem_from_id_and_size(id, size)?,
+            ),
             provider: self.internal.clone(),
         })
     }
 
-    fn release_map(&mut self, map: &mut Self::Mem) {
-        self.internal.borrow_mut().release_map(&mut map.internal);
+    fn release_shmem(&mut self, map: &mut Self::ShMem) {
+        self.internal.borrow_mut().release_shmem(&mut map.internal);
     }
 
-    fn clone_ref(&mut self, mapping: &Self::Mem) -> Result<Self::Mem, Error> {
-        Ok(Self::Mem {
+    fn clone_ref(&mut self, mapping: &Self::ShMem) -> Result<Self::ShMem, Error> {
+        Ok(Self::ShMem {
             internal: ManuallyDrop::new(self.internal.borrow_mut().clone_ref(&mapping.internal)?),
             provider: self.internal.clone(),
         })
@@ -404,7 +448,7 @@ where
                 pipe.write_all(&ok)?;
                 Ok(())
             }
-            None => Err(Error::IllegalState(
+            None => Err(Error::illegal_state(
                 "Unexpected `None` Pipe in RcShMemProvider! Missing post_fork()?".to_string(),
             )),
         }
@@ -420,13 +464,13 @@ where
                 if ret == ok {
                     Ok(())
                 } else {
-                    Err(Error::Unknown(format!(
+                    Err(Error::unknown(format!(
                         "Wrong result read from pipe! Expected 0, got {:?}",
                         ret
                     )))
                 }
             }
-            None => Err(Error::IllegalState(
+            None => Err(Error::illegal_state(
                 "Unexpected `None` Pipe in RcShMemProvider! Missing post_fork()?".to_string(),
             )),
         }
@@ -493,15 +537,20 @@ pub mod unix_shmem {
     #[cfg(all(unix, feature = "std", not(target_os = "android")))]
     mod default {
 
+        use alloc::string::ToString;
         use core::{ptr, slice};
+        use std::{io::Write, process};
+
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
             perror, shm_open, shm_unlink, shmat, shmctl, shmget,
         };
-        use std::{io::Write, process};
 
         use crate::{
-            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            bolts::{
+                shmem::{ShMem, ShMemId, ShMemProvider},
+                AsMutSlice, AsSlice,
+            },
             Error,
         };
         #[cfg(unix)]
@@ -577,7 +626,7 @@ pub mod unix_shmem {
                     );
                     if shm_fd == -1 {
                         perror(b"shm_open\0".as_ptr() as *const _);
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "Failed to shm_open map with id {:?}",
                             shmem_ctr
                         )));
@@ -587,7 +636,7 @@ pub mod unix_shmem {
                     if ftruncate(shm_fd, map_size.try_into()?) != 0 {
                         perror(b"ftruncate\0".as_ptr() as *const _);
                         shm_unlink(filename_path.as_ptr() as *const _);
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "setup_shm(): ftruncate() failed for map with id {:?}",
                             shmem_ctr
                         )));
@@ -606,7 +655,7 @@ pub mod unix_shmem {
                         perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "mmap() failed for map with id {:?}",
                             shmem_ctr
                         )));
@@ -622,7 +671,7 @@ pub mod unix_shmem {
                 }
             }
 
-            fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let shm_fd: i32 = id.to_string().parse().unwrap();
 
@@ -638,7 +687,7 @@ pub mod unix_shmem {
                     if map == libc::MAP_FAILED || map.is_null() {
                         perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "mmap() failed for map with fd {:?}",
                             shm_fd
                         )));
@@ -659,7 +708,7 @@ pub mod unix_shmem {
         #[cfg(unix)]
         #[derive(Clone, Debug)]
         pub struct MmapShMemProvider {
-            current_map_id: usize,
+            current_shmem_id: usize,
         }
 
         unsafe impl Send for MmapShMemProvider {}
@@ -674,18 +723,24 @@ pub mod unix_shmem {
         /// Implement [`ShMemProvider`] for [`MmapShMemProvider`].
         #[cfg(unix)]
         impl ShMemProvider for MmapShMemProvider {
-            type Mem = MmapShMem;
+            type ShMem = MmapShMem;
 
             fn new() -> Result<Self, Error> {
-                Ok(Self { current_map_id: 0 })
+                Ok(Self {
+                    current_shmem_id: 0,
+                })
             }
-            fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
-                self.current_map_id += 1;
-                MmapShMem::new(map_size, self.current_map_id)
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+                self.current_shmem_id += 1;
+                MmapShMem::new(map_size, self.current_shmem_id)
             }
 
-            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-                MmapShMem::from_id_and_size(id, size)
+            fn shmem_from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::ShMem, Error> {
+                MmapShMem::shmem_from_id_and_size(id, size)
             }
         }
 
@@ -697,12 +752,16 @@ pub mod unix_shmem {
             fn len(&self) -> usize {
                 self.map_size
             }
+        }
 
-            fn map(&self) -> &[u8] {
+        impl AsSlice<u8> for MmapShMem {
+            fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
+        }
 
-            fn map_mut(&mut self) -> &mut [u8] {
+        impl AsMutSlice<u8> for MmapShMem {
+            fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
@@ -750,14 +809,14 @@ pub mod unix_shmem {
                     );
 
                     if os_id < 0_i32 {
-                        return Err(Error::Unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
+                        return Err(Error::unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
                     }
 
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
 
                     if map as c_int == -1 || map.is_null() {
                         shmctl(os_id, libc::IPC_RMID, ptr::null_mut());
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to map the shared mapping".to_string(),
                         ));
                     }
@@ -771,13 +830,13 @@ pub mod unix_shmem {
             }
 
             /// Get a [`UnixShMem`] of the existing shared memory mapping identified by id
-            pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            pub fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let id_int: i32 = id.into();
                     let map = shmat(id_int, ptr::null(), 0) as *mut c_uchar;
 
                     if map.is_null() || map == ptr::null_mut::<c_uchar>().wrapping_sub(1) {
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to map the shared mapping".to_string(),
                         ));
                     }
@@ -796,12 +855,16 @@ pub mod unix_shmem {
             fn len(&self) -> usize {
                 self.map_size
             }
+        }
 
-            fn map(&self) -> &[u8] {
+        impl AsSlice<u8> for CommonUnixShMem {
+            fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
+        }
 
-            fn map_mut(&mut self) -> &mut [u8] {
+        impl AsMutSlice<u8> for CommonUnixShMem {
+            fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
@@ -834,17 +897,21 @@ pub mod unix_shmem {
         /// Implement [`ShMemProvider`] for [`UnixShMemProvider`].
         #[cfg(unix)]
         impl ShMemProvider for CommonUnixShMemProvider {
-            type Mem = CommonUnixShMem;
+            type ShMem = CommonUnixShMem;
 
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
-            fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 CommonUnixShMem::new(map_size)
             }
 
-            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-                CommonUnixShMem::from_id_and_size(id, size)
+            fn shmem_from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::ShMem, Error> {
+                CommonUnixShMem::shmem_from_id_and_size(id, size)
             }
         }
     }
@@ -852,15 +919,20 @@ pub mod unix_shmem {
     /// Module containing `ashmem` shared memory support, commonly used on Android.
     #[cfg(all(unix, feature = "std"))]
     pub mod ashmem {
+        use alloc::string::ToString;
         use core::{ptr, slice};
+        use std::ffi::CString;
+
         use libc::{
             c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
             PROT_WRITE,
         };
-        use std::ffi::CString;
 
         use crate::{
-            bolts::shmem::{ShMem, ShMemId, ShMemProvider},
+            bolts::{
+                shmem::{ShMem, ShMemId, ShMemProvider},
+                AsMutSlice, AsSlice,
+            },
             Error,
         };
 
@@ -908,7 +980,7 @@ pub mod unix_shmem {
 
                     let fd = open(device_path.as_ptr(), O_RDWR);
                     if fd == -1 {
-                        return Err(Error::Unknown(format!(
+                        return Err(Error::unknown(format!(
                             "Failed to open the ashmem device at {:?}",
                             device_path
                         )));
@@ -916,13 +988,13 @@ pub mod unix_shmem {
 
                     //if ioctl(fd, ASHMEM_SET_NAME, name) != 0 {
                     //close(fd);
-                    //return Err(Error::Unknown("Failed to set the ashmem mapping's name".to_string()));
+                    //return Err(Error::unknown("Failed to set the ashmem mapping's name".to_string()));
                     //};
 
                     #[allow(trivial_numeric_casts)]
                     if ioctl(fd, ASHMEM_SET_SIZE as _, map_size) != 0 {
                         close(fd);
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to set the ashmem mapping's size".to_string(),
                         ));
                     };
@@ -937,7 +1009,7 @@ pub mod unix_shmem {
                     );
                     if map == usize::MAX as *mut c_void {
                         close(fd);
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to map the ashmem mapping".to_string(),
                         ));
                     }
@@ -951,12 +1023,12 @@ pub mod unix_shmem {
             }
 
             /// Get a [`crate::bolts::shmem::unix_shmem::UnixShMem`] of the existing [`ShMem`] mapping identified by id.
-            pub fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+            pub fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
                 unsafe {
                     let fd: i32 = id.to_string().parse().unwrap();
                     #[allow(trivial_numeric_casts, clippy::cast_sign_loss)]
                     if ioctl(fd, ASHMEM_GET_SIZE as _) as u32 as usize != map_size {
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "The mapping's size differs from the requested size".to_string(),
                         ));
                     };
@@ -971,7 +1043,7 @@ pub mod unix_shmem {
                     );
                     if map == usize::MAX as *mut c_void {
                         close(fd);
-                        return Err(Error::Unknown(
+                        return Err(Error::unknown(
                             "Failed to map the ashmem mapping".to_string(),
                         ));
                     }
@@ -994,12 +1066,16 @@ pub mod unix_shmem {
             fn len(&self) -> usize {
                 self.map_size
             }
+        }
 
-            fn map(&self) -> &[u8] {
+        impl AsSlice<u8> for AshmemShMem {
+            fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
+        }
 
-            fn map_mut(&mut self) -> &mut [u8] {
+        impl AsMutSlice<u8> for AshmemShMem {
+            fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
         }
@@ -1044,19 +1120,23 @@ pub mod unix_shmem {
         /// Implement [`ShMemProvider`] for [`AshmemShMemProvider`], for the Android `ShMem`.
         #[cfg(unix)]
         impl ShMemProvider for AshmemShMemProvider {
-            type Mem = AshmemShMem;
+            type ShMem = AshmemShMem;
 
             fn new() -> Result<Self, Error> {
                 Ok(Self {})
             }
 
-            fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
+            fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
                 let mapping = AshmemShMem::new(map_size)?;
                 Ok(mapping)
             }
 
-            fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-                AshmemShMem::from_id_and_size(id, size)
+            fn shmem_from_id_and_size(
+                &mut self,
+                id: ShMemId,
+                size: usize,
+            ) -> Result<Self::ShMem, Error> {
+                AshmemShMem::shmem_from_id_and_size(id, size)
             }
         }
     }
@@ -1066,26 +1146,33 @@ pub mod unix_shmem {
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
-    use crate::{
-        bolts::shmem::{ShMem, ShMemId, ShMemProvider},
-        Error,
-    };
-
+    use alloc::string::String;
     use core::{
         ffi::c_void,
         fmt::{self, Debug, Formatter},
         ptr, slice,
     };
-    use std::convert::TryInto;
+
     use uuid::Uuid;
+
+    use crate::{
+        bolts::{
+            shmem::{ShMem, ShMemId, ShMemProvider},
+            AsMutSlice, AsSlice,
+        },
+        Error,
+    };
 
     const INVALID_HANDLE_VALUE: isize = -1;
 
     use windows::{
-        Win32::Foundation::{CloseHandle, BOOL, HANDLE, PSTR},
-        Win32::System::Memory::{
-            CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
-            FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+        core::PCSTR,
+        Win32::{
+            Foundation::{CloseHandle, BOOL, HANDLE},
+            System::Memory::{
+                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+                FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+            },
         },
     };
 
@@ -1110,10 +1197,10 @@ pub mod win32_shmem {
     }
 
     impl Win32ShMem {
-        fn new_map(map_size: usize) -> Result<Self, Error> {
+        fn new_shmem(map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let uuid = Uuid::new_v4();
-                let mut map_str = format!("libafl_{}", uuid.to_simple());
+                let mut map_str = format!("libafl_{}", uuid.simple());
                 let map_str_bytes = map_str.as_mut_vec();
                 map_str_bytes[19] = 0; // Trucate to size 20
                 let handle = CreateFileMappingA(
@@ -1122,24 +1209,19 @@ pub mod win32_shmem {
                     PAGE_READWRITE,
                     0,
                     map_size as u32,
-                    PSTR(map_str_bytes.as_mut_ptr()),
-                );
-                if handle == HANDLE(0) {
-                    return Err(Error::Unknown(format!(
-                        "Cannot create shared memory {}",
-                        String::from_utf8_lossy(map_str_bytes)
-                    )));
-                }
+                    PCSTR(map_str_bytes.as_mut_ptr()),
+                )?;
+
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
-                    return Err(Error::Unknown(format!(
+                    return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(map_str_bytes)
                     )));
                 }
 
                 Ok(Self {
-                    id: ShMemId::from_slice(&map_str_bytes[0..20].try_into().unwrap()),
+                    id: ShMemId::try_from_slice(map_str_bytes).unwrap(),
                     handle,
                     map,
                     map_size,
@@ -1147,24 +1229,19 @@ pub mod win32_shmem {
             }
         }
 
-        fn from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
+        fn shmem_from_id_and_size(id: ShMemId, map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let map_str_bytes = id.id;
                 // Unlike MapViewOfFile this one needs u32
                 let handle = OpenFileMappingA(
-                    FILE_MAP_ALL_ACCESS,
+                    FILE_MAP_ALL_ACCESS.0,
                     BOOL(0),
-                    PSTR(&map_str_bytes as *const u8 as *mut u8),
-                );
-                if handle == HANDLE(0) {
-                    return Err(Error::Unknown(format!(
-                        "Cannot open shared memory {}",
-                        String::from_utf8_lossy(&map_str_bytes)
-                    )));
-                }
+                    PCSTR(map_str_bytes.as_ptr() as *mut _),
+                )?;
+
                 let map = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, map_size) as *mut u8;
                 if map.is_null() {
-                    return Err(Error::Unknown(format!(
+                    return Err(Error::unknown(format!(
                         "Cannot map shared memory {}",
                         String::from_utf8_lossy(&map_str_bytes)
                     )));
@@ -1187,12 +1264,15 @@ pub mod win32_shmem {
         fn len(&self) -> usize {
             self.map_size
         }
+    }
 
-        fn map(&self) -> &[u8] {
+    impl AsSlice<u8> for Win32ShMem {
+        fn as_slice(&self) -> &[u8] {
             unsafe { slice::from_raw_parts(self.map, self.map_size) }
         }
-
-        fn map_mut(&mut self) -> &mut [u8] {
+    }
+    impl AsMutSlice<u8> for Win32ShMem {
+        fn as_mut_slice(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
         }
     }
@@ -1219,17 +1299,21 @@ pub mod win32_shmem {
 
     /// Implement [`ShMemProvider`] for [`Win32ShMemProvider`]
     impl ShMemProvider for Win32ShMemProvider {
-        type Mem = Win32ShMem;
+        type ShMem = Win32ShMem;
 
         fn new() -> Result<Self, Error> {
             Ok(Self {})
         }
-        fn new_map(&mut self, map_size: usize) -> Result<Self::Mem, Error> {
-            Win32ShMem::new_map(map_size)
+        fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
+            Win32ShMem::new_shmem(map_size)
         }
 
-        fn from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::Mem, Error> {
-            Win32ShMem::from_id_and_size(id, size)
+        fn shmem_from_id_and_size(
+            &mut self,
+            id: ShMemId,
+            size: usize,
+        ) -> Result<Self::ShMem, Error> {
+            Win32ShMem::shmem_from_id_and_size(id, size)
         }
     }
 }
@@ -1268,7 +1352,7 @@ impl<T: ShMem> ShMemCursor<T> {
 
     /// Slice from the current location on this map to the end, mutable
     fn empty_slice_mut(&mut self) -> &mut [u8] {
-        &mut (self.inner.map_mut()[self.pos..])
+        &mut (self.inner.as_mut_slice()[self.pos..])
     }
 }
 
@@ -1315,8 +1399,8 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
         let effective_new_pos = match pos {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
-                let map_len = self.inner.map().len();
-                assert!(i64::try_from(map_len).is_ok());
+                let map_len = self.inner.as_slice().len();
+                i64::try_from(map_len).unwrap();
                 let signed_pos = map_len as i64;
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
@@ -1324,14 +1408,14 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             }
             std::io::SeekFrom::Current(offset) => {
                 let current_pos = self.pos;
-                assert!(i64::try_from(current_pos).is_ok());
+                i64::try_from(current_pos).unwrap();
                 let signed_pos = current_pos as i64;
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
                 effective.try_into().unwrap()
             }
         };
-        assert!(usize::try_from(effective_new_pos).is_ok());
+        usize::try_from(effective_new_pos).unwrap();
         self.pos = effective_new_pos as usize;
         Ok(effective_new_pos)
     }
@@ -1342,14 +1426,17 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
 mod tests {
     use serial_test::serial;
 
-    use crate::bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider};
+    use crate::bolts::{
+        shmem::{ShMemProvider, StdShMemProvider},
+        AsMutSlice, AsSlice,
+    };
 
     #[test]
     #[serial]
     fn test_shmem_service() {
         let mut provider = StdShMemProvider::new().unwrap();
-        let mut map = provider.new_map(1024).unwrap();
-        map.map_mut()[0] = 1;
-        assert!(map.map()[0] == 1);
+        let mut map = provider.new_shmem(1024).unwrap();
+        map.as_mut_slice()[0] = 1;
+        assert!(map.as_slice()[0] == 1);
     }
 }

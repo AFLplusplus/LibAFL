@@ -1,20 +1,19 @@
-use std::io::Read;
-use std::{fs, path::PathBuf};
-
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{fs, io::Read, path::PathBuf};
 
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{InMemoryCorpus, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Evaluator, Fuzzer, StdFuzzer},
     inputs::{EncodedInput, InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder},
     monitors::SimpleMonitor,
     mutators::{encoded_mutations::encoded_mutations, scheduled::StdScheduledMutator},
     observers::StdMapObserver,
+    schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
@@ -68,14 +67,11 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&observer);
-
     // Feedback to rate the interestingness of an input
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -87,9 +83,12 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    )
+    .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
     let monitor = SimpleMonitor::new(|s| println!("{}", s));
@@ -99,7 +98,7 @@ pub fn main() {
     let mut mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
-    let scheduler = QueueCorpusScheduler::new();
+    let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -115,7 +114,7 @@ pub fn main() {
     .expect("Failed to create the Executor");
 
     // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::with_max_iterations(encoded_mutations(), 2);
+    let mutator = StdScheduledMutator::with_max_stack_pow(encoded_mutations(), 2);
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     println!("Decoder {:?} ...", &encoder_decoder);

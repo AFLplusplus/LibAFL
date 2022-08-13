@@ -1,9 +1,7 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use strum_macros::EnumIter;
-
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-
+pub use strum_macros::EnumIter;
 pub use syscall_numbers::arm::*;
 
 /// Registers for the ARM instruction set.
@@ -46,4 +44,9 @@ impl IntoPy<PyObject> for Regs {
         let n: i32 = self.into();
         n.into_py(py)
     }
+}
+
+/// Return an ARM ArchCapstoneBuilder
+pub fn capstone() -> capstone::arch::arm::ArchCapstoneBuilder {
+    capstone::Capstone::new().arm()
 }

@@ -1,15 +1,14 @@
 //! The gramatron grammar fuzzer
-use ahash::AHasher;
-use core::hash::Hasher;
-
 use alloc::{rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From};
+use core::{cell::RefCell, convert::From, hash::Hasher};
+
+use ahash::AHasher;
 use serde::{Deserialize, Serialize};
 
 use crate::{bolts::HasLen, inputs::Input, Error};
 
 /// A terminal for gramatron grammar fuzzing
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Terminal {
     /// The state
     pub state: usize,
@@ -32,7 +31,7 @@ impl Terminal {
 }
 
 /// An input for gramatron grammar fuzzing
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct GramatronInput {
     /// The input representation as list of terminals
     terms: Vec<Terminal>,
@@ -91,14 +90,14 @@ impl GramatronInput {
         }
     }
 
-    /// crop the value to the given length
+    /// Crop the value to the given length
     pub fn crop(&self, from: usize, to: usize) -> Result<Self, Error> {
         if from < to && to <= self.terms.len() {
             let mut terms = vec![];
             terms.clone_from_slice(&self.terms[from..to]);
             Ok(Self { terms })
         } else {
-            Err(Error::IllegalArgument("Invalid from or to argument".into()))
+            Err(Error::illegal_argument("Invalid from or to argument"))
         }
     }
 }

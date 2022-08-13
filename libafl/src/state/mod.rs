@@ -1,21 +1,22 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs,
     path::{Path, PathBuf},
 };
 
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
 use crate::{
     bolts::{
         rands::Rand,
-        serdeany::{SerdeAny, SerdeAnyMap},
+        serdeany::{NamedSerdeAnyMap, SerdeAny, SerdeAnyMap},
     },
     corpus::Corpus,
     events::{Event, EventFirer, LogSeverity},
-    feedbacks::FeedbackStatesTuple,
+    feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
     inputs::Input,
@@ -26,21 +27,19 @@ use crate::{
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
-/// The [`State`] of the fuzzer
-/// Contains all important information about the current run
+/// The [`State`] of the fuzzer.
+/// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any timme.
 pub trait State: Serialize + DeserializeOwned {}
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus<C, I>
-where
-    C: Corpus<I>,
-    I: Input,
-{
+pub trait HasCorpus<I: Input> {
+    /// The associated type implementing [`Corpus`].
+    type Corpus: Corpus<I>;
     /// The testcase corpus
-    fn corpus(&self) -> &C;
-    /// The testcase corpus (mut)
-    fn corpus_mut(&mut self) -> &mut C;
+    fn corpus(&self) -> &Self::Corpus;
+    /// The testcase corpus (mutable)
+    fn corpus_mut(&mut self) -> &mut Self::Corpus;
 }
 
 /// Interact with the maximum size
@@ -52,26 +51,23 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions<C, I>
-where
-    C: Corpus<I>,
-    I: Input,
-{
+pub trait HasSolutions<I: Input> {
+    /// The associated type implementing [`Corpus`] for solutions
+    type Solutions: Corpus<I>;
     /// The solutions corpus
-    fn solutions(&self) -> &C;
-    /// The solutions corpus (mut)
-    fn solutions_mut(&mut self) -> &mut C;
+    fn solutions(&self) -> &Self::Solutions;
+    /// The solutions corpus (mutable)
+    fn solutions_mut(&mut self) -> &mut Self::Solutions;
 }
 
 /// Trait for elements offering a rand
-pub trait HasRand<R>
-where
-    R: Rand,
-{
+pub trait HasRand {
+    /// The associated type implementing [`Rand`]
+    type Rand: Rand;
     /// The rand instance
-    fn rand(&self) -> &R;
-    /// The rand instance (mut)
-    fn rand_mut(&mut self) -> &mut R;
+    fn rand(&self) -> &Self::Rand;
+    /// The rand instance (mutable)
+    fn rand_mut(&mut self) -> &mut Self::Rand;
 }
 
 /// Trait for offering a [`ClientPerfMonitor`]
@@ -85,7 +81,7 @@ pub trait HasClientPerfMonitor {
     /// This node's stability
     fn stability(&self) -> &Option<f32>;
 
-    /// This node's stability (mut)
+    /// This node's stability (mutable)
     fn stability_mut(&mut self) -> &mut Option<f32>;
 }
 
@@ -93,7 +89,7 @@ pub trait HasClientPerfMonitor {
 pub trait HasMetadata {
     /// A map, storing all metadata
     fn metadata(&self) -> &SerdeAnyMap;
-    /// A map, storing all metadata (mut)
+    /// A map, storing all metadata (mutable)
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap;
 
     /// Add a metadata to the metadata map
@@ -115,16 +111,30 @@ pub trait HasMetadata {
     }
 }
 
-/// Trait for elements offering a feedback
-pub trait HasFeedbackStates<FT>
-where
-    FT: FeedbackStatesTuple,
-{
-    /// The feedback states
-    fn feedback_states(&self) -> &FT;
+/// Trait for elements offering named metadata
+pub trait HasNamedMetadata {
+    /// A map, storing all metadata
+    fn named_metadata(&self) -> &NamedSerdeAnyMap;
+    /// A map, storing all metadata (mutable)
+    fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap;
 
-    /// The feedback states (mut)
-    fn feedback_states_mut(&mut self) -> &mut FT;
+    /// Add a metadata to the metadata map
+    #[inline]
+    fn add_named_metadata<M>(&mut self, meta: M, name: &str)
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata_mut().insert(meta, name);
+    }
+
+    /// Check for a metadata
+    #[inline]
+    fn has_named_metadata<M>(&self, name: &str) -> bool
+    where
+        M: SerdeAny,
+    {
+        self.named_metadata().contains::<M>(name)
+    }
 }
 
 /// Trait for the execution counter
@@ -132,7 +142,7 @@ pub trait HasExecutions {
     /// The executions counter
     fn executions(&self) -> &usize;
 
-    /// The executions counter (mut)
+    /// The executions counter (mutable)
     fn executions_mut(&mut self) -> &mut usize;
 }
 
@@ -141,19 +151,18 @@ pub trait HasStartTime {
     /// The starting time
     fn start_time(&self) -> &Duration;
 
-    /// The starting time (mut)
+    /// The starting time (mutable)
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "FT: serde::de::DeserializeOwned")]
-pub struct StdState<C, FT, I, R, SC>
+#[serde(bound = "C: serde::Serialize + for<'a> serde::Deserialize<'a>")]
+pub struct StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// RNG instance
@@ -164,12 +173,12 @@ where
     start_time: Duration,
     /// The corpus
     corpus: C,
-    /// States of the feedback used to evaluate an input
-    feedback_states: FT,
     // Solutions corpus
     solutions: SC,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
+    /// Metadata stored with names
+    named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
     /// The stability of the current fuzzing process
@@ -182,45 +191,46 @@ where
     phantom: PhantomData<I>,
 }
 
-impl<C, FT, I, R, SC> State for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> State for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
 }
 
-impl<C, FT, I, R, SC> HasRand<R> for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasRand for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
+    type Rand = R;
+
     /// The rand instance
     #[inline]
-    fn rand(&self) -> &R {
+    fn rand(&self) -> &Self::Rand {
         &self.rand
     }
 
-    /// The rand instance (mut)
+    /// The rand instance (mutable)
     #[inline]
-    fn rand_mut(&mut self) -> &mut R {
+    fn rand_mut(&mut self) -> &mut Self::Rand {
         &mut self.rand
     }
 }
 
-impl<C, FT, I, R, SC> HasCorpus<C, I> for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasCorpus<I> for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
+    type Corpus = C;
+
     /// Returns the corpus
     #[inline]
     fn corpus(&self) -> &C {
@@ -234,33 +244,33 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasSolutions<SC, I> for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasSolutions<I> for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
+    type Solutions = SC;
+
     /// Returns the solutions corpus
     #[inline]
     fn solutions(&self) -> &SC {
         &self.solutions
     }
 
-    /// Returns the solutions corpus (mut)
+    /// Returns the solutions corpus (mutable)
     #[inline]
     fn solutions_mut(&mut self) -> &mut SC {
         &mut self.solutions
     }
 }
 
-impl<C, FT, I, R, SC> HasMetadata for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// Get all the metadata into an [`hashbrown::HashMap`]
@@ -276,33 +286,31 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasFeedbackStates<FT> for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    /// The feedback states
+    /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
-    fn feedback_states(&self) -> &FT {
-        &self.feedback_states
+    fn named_metadata(&self) -> &NamedSerdeAnyMap {
+        &self.named_metadata
     }
 
-    /// The feedback states (mut)
+    /// Get all the metadata into an [`hashbrown::HashMap`] (mutable)
     #[inline]
-    fn feedback_states_mut(&mut self) -> &mut FT {
-        &mut self.feedback_states
+    fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap {
+        &mut self.named_metadata
     }
 }
 
-impl<C, FT, I, R, SC> HasExecutions for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// The executions counter
@@ -311,19 +319,18 @@ where
         &self.executions
     }
 
-    /// The executions counter (mut)
+    /// The executions counter (mutable)
     #[inline]
     fn executions_mut(&mut self) -> &mut usize {
         &mut self.executions
     }
 }
 
-impl<C, FT, I, R, SC> HasMaxSize for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn max_size(&self) -> usize {
@@ -335,12 +342,11 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> HasStartTime for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     /// The starting time
@@ -349,7 +355,7 @@ where
         &self.start_time
     }
 
-    /// The starting time (mut)
+    /// The starting time (mutable)
     #[inline]
     fn start_time_mut(&mut self) -> &mut Duration {
         &mut self.start_time
@@ -357,15 +363,14 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<C, FT, I, R, SC> StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
-    /// loads inputs from a directory
+    /// Loads inputs from a directory.
     /// If `forced` is `true`, the value will be loaded,
     /// even if it's not considered to be `interesting`.
     pub fn load_from_directory<E, EM, Z>(
@@ -445,7 +450,7 @@ where
         Ok(())
     }
 
-    /// Loads all intial inputs, even if they are not consiered `intesting`.
+    /// Loads all intial inputs, even if they are not considered `interesting`.
     /// This is rarely the right method, use `load_initial_inputs`,
     /// and potentially fix your `Feedback`, instead.
     pub fn load_initial_inputs_forced<E, EM, Z>(
@@ -478,12 +483,11 @@ where
     }
 }
 
-impl<C, FT, I, R, SC> StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn generate_initial_internal<G, E, EM, Z>(
@@ -559,31 +563,43 @@ where
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.
-    pub fn new(rand: R, corpus: C, solutions: SC, feedback_states: FT) -> Self {
-        Self {
+    pub fn new<F, O>(
+        rand: R,
+        corpus: C,
+        solutions: SC,
+        feedback: &mut F,
+        objective: &mut O,
+    ) -> Result<Self, Error>
+    where
+        F: Feedback<I, Self>,
+        O: Feedback<I, Self>,
+    {
+        let mut state = Self {
             rand,
             executions: 0,
             stability: None,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
+            named_metadata: NamedSerdeAnyMap::default(),
             corpus,
-            feedback_states,
             solutions,
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
             phantom: PhantomData,
-        }
+        };
+        feedback.init_state(&mut state)?;
+        objective.init_state(&mut state)?;
+        Ok(state)
     }
 }
 
 #[cfg(feature = "introspection")]
-impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
@@ -600,7 +616,7 @@ where
         &self.stability
     }
 
-    /// This node's stability (mut)
+    /// This node's stability (mutable)
     #[inline]
     fn stability_mut(&mut self) -> &mut Option<f32> {
         &mut self.stability
@@ -608,12 +624,11 @@ where
 }
 
 #[cfg(not(feature = "introspection"))]
-impl<C, FT, I, R, SC> HasClientPerfMonitor for StdState<C, FT, I, R, SC>
+impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC>
 where
     C: Corpus<I>,
     I: Input,
     R: Rand,
-    FT: FeedbackStatesTuple,
     SC: Corpus<I>,
 {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
@@ -630,9 +645,152 @@ where
         &self.stability
     }
 
-    /// This node's stability (mut)
+    /// This node's stability (mutable)
     #[inline]
     fn stability_mut(&mut self) -> &mut Option<f32> {
         &mut self.stability
+    }
+}
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+/// `State` Python bindings
+pub mod pybind {
+    use alloc::{boxed::Box, vec::Vec};
+    use std::path::PathBuf;
+
+    use pyo3::{prelude::*, types::PyDict};
+
+    use crate::{
+        bolts::{ownedref::OwnedPtrMut, rands::pybind::PythonRand},
+        corpus::pybind::PythonCorpus,
+        events::pybind::PythonEventManager,
+        executors::pybind::PythonExecutor,
+        feedbacks::pybind::PythonFeedback,
+        fuzzer::pybind::PythonStdFuzzerWrapper,
+        generators::pybind::PythonGenerator,
+        inputs::BytesInput,
+        pybind::PythonMetadata,
+        state::{
+            HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,
+        },
+    };
+
+    /// `StdState` with fixed generics
+    pub type PythonStdState = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
+
+    #[pyclass(unsendable, name = "StdState")]
+    #[derive(Debug)]
+    /// Python class for StdState
+    pub struct PythonStdStateWrapper {
+        /// Rust wrapped StdState object
+        pub inner: OwnedPtrMut<PythonStdState>,
+    }
+
+    impl PythonStdStateWrapper {
+        pub fn wrap(r: &mut PythonStdState) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
+
+        #[must_use]
+        pub fn unwrap(&self) -> &PythonStdState {
+            self.inner.as_ref()
+        }
+
+        pub fn unwrap_mut(&mut self) -> &mut PythonStdState {
+            self.inner.as_mut()
+        }
+    }
+
+    #[pymethods]
+    impl PythonStdStateWrapper {
+        #[new]
+        fn new(
+            py_rand: PythonRand,
+            corpus: PythonCorpus,
+            solutions: PythonCorpus,
+            feedback: &mut PythonFeedback,
+            objective: &mut PythonFeedback,
+        ) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(
+                    StdState::new(py_rand, corpus, solutions, feedback, objective)
+                        .expect("Failed to create a new StdState"),
+                )),
+            }
+        }
+
+        fn metadata(&mut self) -> PyObject {
+            let meta = self.inner.as_mut().metadata_mut();
+            if !meta.contains::<PythonMetadata>() {
+                Python::with_gil(|py| {
+                    let dict: Py<PyDict> = PyDict::new(py).into();
+                    meta.insert(PythonMetadata::new(dict.to_object(py)));
+                });
+            }
+            meta.get::<PythonMetadata>().unwrap().map.clone()
+        }
+
+        fn rand(&self) -> PythonRand {
+            self.inner.as_ref().rand().clone()
+        }
+
+        fn corpus(&self) -> PythonCorpus {
+            self.inner.as_ref().corpus().clone()
+        }
+
+        fn solutions(&self) -> PythonCorpus {
+            self.inner.as_ref().solutions().clone()
+        }
+
+        fn executions(&self) -> usize {
+            *self.inner.as_ref().executions()
+        }
+
+        fn max_size(&self) -> usize {
+            self.inner.as_ref().max_size()
+        }
+
+        fn generate_initial_inputs(
+            &mut self,
+            py_fuzzer: &mut PythonStdFuzzerWrapper,
+            py_executor: &mut PythonExecutor,
+            py_generator: &mut PythonGenerator,
+            py_mgr: &mut PythonEventManager,
+            num: usize,
+        ) {
+            self.inner
+                .as_mut()
+                .generate_initial_inputs(
+                    py_fuzzer.unwrap_mut(),
+                    py_executor,
+                    py_generator,
+                    py_mgr,
+                    num,
+                )
+                .expect("Failed to generate the initial corpus");
+        }
+
+        #[allow(clippy::needless_pass_by_value)]
+        fn load_initial_inputs(
+            &mut self,
+            py_fuzzer: &mut PythonStdFuzzerWrapper,
+            py_executor: &mut PythonExecutor,
+            py_mgr: &mut PythonEventManager,
+            in_dirs: Vec<PathBuf>,
+        ) {
+            self.inner
+                .as_mut()
+                .load_initial_inputs(py_fuzzer.unwrap_mut(), py_executor, py_mgr, &in_dirs)
+                .expect("Failed to load the initial corpus");
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdStateWrapper>()?;
+        Ok(())
     }
 }

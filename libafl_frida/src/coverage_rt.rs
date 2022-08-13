@@ -1,13 +1,16 @@
 //! Functionality regarding binary-only coverage collection.
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use std::ffi::c_void;
+use core::ptr::addr_of_mut;
 
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
 #[cfg(target_arch = "aarch64")]
 use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-
 use frida_gum::{instruction_writer::InstructionWriter, stalker::StalkerOutput};
+use libafl::bolts::xxh3_rrmxmx_mixer;
+use rangemap::RangeMap;
+
+use crate::helper::FridaRuntime;
 
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
@@ -27,21 +30,42 @@ impl Default for CoverageRuntime {
     }
 }
 
+impl FridaRuntime for CoverageRuntime {
+    /// Initialize the coverage runtime
+    fn init(
+        &mut self,
+        _gum: &frida_gum::Gum,
+        _ranges: &RangeMap<usize, (u16, String)>,
+        _modules_to_instrument: &[&str],
+    ) {
+        self.generate_maybe_log_blob();
+    }
+
+    fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+        &mut self,
+        _input: &I,
+    ) -> Result<(), libafl::Error> {
+        Ok(())
+    }
+
+    fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
+        &mut self,
+        _input: &I,
+    ) -> Result<(), libafl::Error> {
+        Ok(())
+    }
+}
+
 impl CoverageRuntime {
     /// Create a new coverage runtime
     #[must_use]
     pub fn new() -> Self {
         Self {
-            map: [0u8; MAP_SIZE],
+            map: [0_u8; MAP_SIZE],
             previous_pc: 0,
             current_log_impl: 0,
             blob_maybe_log: None,
         }
-    }
-
-    /// Initialize the coverage runtime
-    pub fn init(&mut self) {
-        self.generate_maybe_log_blob();
     }
 
     /// Retrieve the coverage map pointer
@@ -69,7 +93,7 @@ impl CoverageRuntime {
             ;   ldr x2, >previous_loc
             ;   ldr x4, [x2]
             ;   eor x4, x4, x0
-            ;   mov x3, ((MAP_SIZE - 1) as u32) as u64
+            ;   mov x3, u64::from((MAP_SIZE - 1) as u32)
             ;   and x4, x4, x3
             ;   ldr x3, [x1, x4]
             ;   add x3, x3, #1
@@ -80,12 +104,12 @@ impl CoverageRuntime {
             ;   ldp x1, x2, [sp], #0x10
             ;   ret
             ;map_addr:
-            ;.qword &mut self.map as *mut _ as *mut c_void as i64
+            ;.qword addr_of_mut!(self.map) as i64
             ;previous_loc:
             ;.qword 0
         );
         let ops_vec = ops.finalize().unwrap();
-        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice())
+        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
     /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
@@ -116,7 +140,7 @@ impl CoverageRuntime {
             ;   popfq
             ;   ret
             ;map_addr:
-            ;.qword &mut self.map as *mut _ as *mut c_void as i64
+            ;.qword addr_of_mut!(self.map) as i64
             ;previous_loc:
             ;.qword 0
         );
@@ -127,14 +151,7 @@ impl CoverageRuntime {
     /// Emits coverage mapping into the current basic block.
     #[inline]
     pub fn emit_coverage_mapping(&mut self, address: u64, output: &StalkerOutput) {
-        let tmp = (address >> 32) + ((address & 0xffffffff) << 32);
-        let bitflip = 0x1cad21f72c81017c ^ 0xdb979082e96dd4de;
-        let mut h64 = tmp ^ bitflip;
-        h64 = h64.rotate_left(49) & h64.rotate_left(24);
-        h64 *= 0x9FB21C651E98DF25;
-        h64 ^= (h64 >> 35) + 8;
-        h64 *= 0x9FB21C651E98DF25;
-        h64 ^= h64 >> 28;
+        let h64 = xxh3_rrmxmx_mixer(address);
 
         let writer = output.writer();
         #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
@@ -152,7 +169,7 @@ impl CoverageRuntime {
 
             self.current_log_impl = writer.pc();
             writer.put_bytes(self.blob_maybe_log());
-            let prev_loc_pointer = &mut self.previous_pc as *mut _ as u64; // Get the pointer to self.previous_pc
+            let prev_loc_pointer = addr_of_mut!(self.previous_pc) as u64; // Get the pointer to self.previous_pc
 
             writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
 

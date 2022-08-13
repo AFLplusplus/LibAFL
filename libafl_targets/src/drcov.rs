@@ -2,13 +2,16 @@
 //! writing basic-block trace files to be read by coverage analysis tools, such as [Lighthouse](https://github.com/gaasedelen/lighthouse),
 //! [bncov](https://github.com/ForAllSecure/bncov), [dragondance](https://github.com/0ffffffffh/dragondance), etc.
 
-use libafl::Error;
-use rangemap::RangeMap;
+use alloc::{string::String, vec::Vec};
+use core::ptr::addr_of;
 use std::{
     fs::File,
     io::{BufWriter, Write},
     path::Path,
 };
+
+use libafl::Error;
+use rangemap::RangeMap;
 
 /// A basic block struct
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,7 +100,7 @@ impl<'a> DrCovWriter<'a> {
             };
             writer
                 .write_all(unsafe {
-                    std::slice::from_raw_parts(&basic_block as *const _ as *const u8, 8)
+                    std::slice::from_raw_parts(addr_of!(basic_block) as *const u8, 8)
                 })
                 .unwrap();
         }

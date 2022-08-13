@@ -49,10 +49,9 @@ use std::{
 };
 
 use bincode::{DefaultOptions, Options};
+pub use bincode::{ErrorKind, Result};
 
 use super::{SymExpr, SymExprRef};
-
-pub use bincode::{ErrorKind, Result};
 
 fn serialization_options() -> DefaultOptions {
     DefaultOptions::new()
@@ -381,6 +380,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
 
 #[cfg(test)]
 mod serialization_tests {
+    use alloc::vec::Vec;
     use std::io::Cursor;
 
     use super::{MessageFileReader, MessageFileWriter, SymExpr};
@@ -446,7 +446,7 @@ pub const DEFAULT_ENV_NAME: &str = "SHARED_MEMORY_MESSAGES";
 /// The default shared memory size used by the concolic tracing.
 ///
 /// This amounts to 1GiB of memory, which is considered to be enough for any reasonable trace. It is also assumed
-/// that the memory will not be phsyically mapped until accessed, alleviating reource concerns.
+/// that the memory will not be physically mapped until accessed, alleviating resource concerns.
 pub const DEFAULT_SIZE: usize = 1024 * 1024 * 1024;
 
 impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
@@ -466,7 +466,7 @@ impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
         let mut len_buf = 0_u64.to_le_bytes();
         buffer.read_exact(&mut len_buf)?;
         let buffer_len = u64::from_le_bytes(len_buf);
-        assert!(usize::try_from(buffer_len).is_ok());
+        usize::try_from(buffer_len).unwrap();
         let buffer_len = buffer_len as usize;
         let (buffer, _) = buffer.split_at(buffer_len);
         Ok(Self::from_buffer(buffer))
@@ -488,7 +488,7 @@ impl<T: ShMem> MessageFileWriter<ShMemCursor<T>> {
     }
 }
 
-impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
+impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::ShMem>> {
     /// Creates a new `MessageFileWriter` by reading a [`ShMem`] from the given environment variable.
     pub fn from_stdshmem_env_with_name(env_name: impl AsRef<str>) -> io::Result<Self> {
         Self::from_shmem(
@@ -507,4 +507,4 @@ impl MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>> {
 
 /// A writer that will write messages to a shared memory buffer.
 pub type StdShMemMessageFileWriter =
-    MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::Mem>>;
+    MessageFileWriter<ShMemCursor<<StdShMemProvider as ShMemProvider>::ShMem>>;

@@ -2,10 +2,12 @@
 //! The values will then be used in subsequent mutations.
 //!
 
+use alloc::string::{String, ToString};
 use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
+    executors::ExitKind,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
@@ -32,7 +34,12 @@ pub const CMPLOG_KIND_RTN: u8 = 1;
 extern "C" {
     /// Logs an instruction for feedback during fuzzing
     pub fn __libafl_targets_cmplog_instructions(k: usize, shape: u8, arg1: u64, arg2: u64);
+
+    /// Pointer to the `CmpLog` map
+    pub static mut libafl_cmplog_map_ptr: *mut CmpLogMap;
 }
+
+pub use libafl_cmplog_map_ptr as CMPLOG_MAP_PTR;
 
 /// The header for `CmpLog` hits.
 #[repr(C)]
@@ -104,35 +111,36 @@ impl CmpMap for CmpLogMap {
         }
     }
 
-    fn values_of(&self, idx: usize, execution: usize) -> CmpValues {
+    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
         if self.headers[idx].kind == CMPLOG_KIND_INS {
             unsafe {
                 match self.headers[idx].shape {
-                    1 => CmpValues::U8((
+                    1 => Some(CmpValues::U8((
                         self.vals.operands[idx][execution].0 as u8,
                         self.vals.operands[idx][execution].1 as u8,
-                    )),
-                    2 => CmpValues::U16((
+                    ))),
+                    2 => Some(CmpValues::U16((
                         self.vals.operands[idx][execution].0 as u16,
                         self.vals.operands[idx][execution].1 as u16,
-                    )),
-                    4 => CmpValues::U32((
+                    ))),
+                    4 => Some(CmpValues::U32((
                         self.vals.operands[idx][execution].0 as u32,
                         self.vals.operands[idx][execution].1 as u32,
-                    )),
-                    8 => CmpValues::U64((
+                    ))),
+                    8 => Some(CmpValues::U64((
                         self.vals.operands[idx][execution].0,
                         self.vals.operands[idx][execution].1,
-                    )),
-                    other => panic!("Invalid CmpLog shape {}", other),
+                    ))),
+                    // other => panic!("Invalid CmpLog shape {}", other),
+                    _ => None,
                 }
             }
         } else {
             unsafe {
-                CmpValues::Bytes((
+                Some(CmpValues::Bytes((
                     self.vals.routines[idx][execution].0.to_vec(),
                     self.vals.routines[idx][execution].1.to_vec(),
-                ))
+                )))
             }
         }
     }
@@ -187,11 +195,11 @@ where
         }
     }
 
-    fn map(&self) -> &CmpLogMap {
+    fn cmp_map(&self) -> &CmpLogMap {
         self.map.as_ref()
     }
 
-    fn map_mut(&mut self) -> &mut CmpLogMap {
+    fn cmp_map_mut(&mut self) -> &mut CmpLogMap {
         self.map.as_mut()
     }
 }
@@ -209,7 +217,7 @@ where
         Ok(())
     }
 
-    fn post_exec(&mut self, state: &mut S, _input: &I) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = 0;
         }

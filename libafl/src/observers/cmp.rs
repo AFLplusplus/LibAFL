@@ -5,10 +5,11 @@ use alloc::{
     vec::Vec,
 };
 use core::fmt::Debug;
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    bolts::{ownedref::OwnedRefMut, tuples::Named, AsSlice},
+    bolts::{ownedref::OwnedRefMut, tuples::Named, AsMutSlice, AsSlice},
     observers::Observer,
     state::HasMetadata,
     Error,
@@ -69,6 +70,13 @@ impl AsSlice<CmpValues> for CmpValuesMetadata {
         self.list.as_slice()
     }
 }
+impl AsMutSlice<CmpValues> for CmpValuesMetadata {
+    /// Convert to a slice
+    #[must_use]
+    fn as_mut_slice(&mut self) -> &mut [CmpValues] {
+        self.list.as_mut_slice()
+    }
+}
 
 impl CmpValuesMetadata {
     /// Creates a new [`struct@CmpValuesMetadata`]
@@ -96,7 +104,7 @@ pub trait CmpMap: Debug {
     fn usable_executions_for(&self, idx: usize) -> usize;
 
     /// Get the logged values for a cmp
-    fn values_of(&self, idx: usize, execution: usize) -> CmpValues;
+    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues>;
 
     /// Reset the state
     fn reset(&mut self) -> Result<(), Error>;
@@ -111,10 +119,10 @@ where
     fn usable_count(&self) -> usize;
 
     /// Get the `CmpMap`
-    fn map(&self) -> &CM;
+    fn cmp_map(&self) -> &CM;
 
-    /// Get the `CmpMap` (mut)
-    fn map_mut(&mut self) -> &mut CM;
+    /// Get the `CmpMap` (mutable)
+    fn cmp_map_mut(&mut self) -> &mut CM;
 
     /// Add [`struct@CmpValuesMetadata`] to the State including the logged values.
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
@@ -132,7 +140,7 @@ where
         meta.list.clear();
         let count = self.usable_count();
         for i in 0..count {
-            let execs = self.map().usable_executions_for(i);
+            let execs = self.cmp_map().usable_executions_for(i);
             if execs > 0 {
                 // Recongize loops and discard if needed
                 if execs > 4 {
@@ -143,24 +151,25 @@ where
 
                     let mut last: Option<CmpValues> = None;
                     for j in 0..execs {
-                        let val = self.map().values_of(i, j);
-                        if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
-                            if let Some(v) = val.to_u64_tuple() {
-                                if l.0.wrapping_add(1) == v.0 {
-                                    increasing_v0 += 1;
-                                }
-                                if l.1.wrapping_add(1) == v.1 {
-                                    increasing_v1 += 1;
-                                }
-                                if l.0.wrapping_sub(1) == v.0 {
-                                    decreasing_v0 += 1;
-                                }
-                                if l.1.wrapping_sub(1) == v.1 {
-                                    decreasing_v1 += 1;
+                        if let Some(val) = self.cmp_map().values_of(i, j) {
+                            if let Some(l) = last.and_then(|x| x.to_u64_tuple()) {
+                                if let Some(v) = val.to_u64_tuple() {
+                                    if l.0.wrapping_add(1) == v.0 {
+                                        increasing_v0 += 1;
+                                    }
+                                    if l.1.wrapping_add(1) == v.1 {
+                                        increasing_v1 += 1;
+                                    }
+                                    if l.0.wrapping_sub(1) == v.0 {
+                                        decreasing_v0 += 1;
+                                    }
+                                    if l.1.wrapping_sub(1) == v.1 {
+                                        decreasing_v1 += 1;
+                                    }
                                 }
                             }
+                            last = Some(val);
                         }
-                        last = Some(val);
                     }
                     // We check for execs-2 because the logged execs may wrap and have something like
                     // 8 9 10 3 4 5 6 7
@@ -173,7 +182,9 @@ where
                     }
                 }
                 for j in 0..execs {
-                    meta.list.push(self.map().values_of(i, j));
+                    if let Some(val) = self.cmp_map().values_of(i, j) {
+                        meta.list.push(val);
+                    }
                 }
             }
         }
@@ -185,9 +196,9 @@ where
 #[serde(bound = "CM: serde::de::DeserializeOwned")]
 pub struct StdCmpObserver<'a, CM>
 where
-    CM: CmpMap + Serialize + DeserializeOwned,
+    CM: CmpMap + Serialize,
 {
-    map: OwnedRefMut<'a, CM>,
+    cmp_map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: String,
 }
@@ -199,17 +210,17 @@ where
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
         match &self.size {
-            None => self.map.as_ref().len(),
+            None => self.cmp_map.as_ref().len(),
             Some(o) => *o.as_ref(),
         }
     }
 
-    fn map(&self) -> &CM {
-        self.map.as_ref()
+    fn cmp_map(&self) -> &CM {
+        self.cmp_map.as_ref()
     }
 
-    fn map_mut(&mut self) -> &mut CM {
-        self.map.as_mut()
+    fn cmp_map_mut(&mut self) -> &mut CM {
+        self.cmp_map.as_mut()
     }
 }
 
@@ -218,7 +229,7 @@ where
     CM: CmpMap + Serialize + DeserializeOwned,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
-        self.map.as_mut().reset()?;
+        self.cmp_map.as_mut().reset()?;
         Ok(())
     }
 }
@@ -242,7 +253,7 @@ where
         Self {
             name: name.to_string(),
             size: None,
-            map: OwnedRefMut::Ref(map),
+            cmp_map: OwnedRefMut::Ref(map),
         }
     }
 
@@ -252,7 +263,7 @@ where
         Self {
             name: name.to_string(),
             size: Some(OwnedRefMut::Ref(size)),
-            map: OwnedRefMut::Ref(map),
+            cmp_map: OwnedRefMut::Ref(map),
         }
     }
 }

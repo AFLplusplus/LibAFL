@@ -10,35 +10,38 @@
 //! On `Unix` systems, the [`Launcher`] will use `fork` if the `fork` feature is used for `LibAFL`.
 //! Else, it will start subsequent nodes with the same commandline, and will set special `env` variables accordingly.
 
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use crate::bolts::os::startable_self;
-#[cfg(all(unix, feature = "std", feature = "fork"))]
-use crate::bolts::os::{dup2, fork, ForkResult};
-#[cfg(feature = "std")]
-use crate::{
-    bolts::{os::Cores, shmem::ShMemProvider},
-    events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
-    inputs::Input,
-    monitors::Monitor,
-    observers::ObserversTuple,
-    Error,
-};
-
+#[cfg(all(feature = "std"))]
+use alloc::string::ToString;
 use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "std")]
 use core::marker::PhantomData;
-#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
-use core_affinity::CoreId;
-#[cfg(feature = "std")]
-use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use std::net::SocketAddr;
 #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
 use std::process::Stdio;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use std::{fs::File, os::unix::io::AsRawFd};
+
+#[cfg(feature = "std")]
+use serde::de::DeserializeOwned;
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
+
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::bolts::core_affinity::CoreId;
+#[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
+use crate::bolts::os::startable_self;
+#[cfg(all(unix, feature = "std", feature = "fork"))]
+use crate::bolts::os::{dup2, fork, ForkResult};
+#[cfg(feature = "std")]
+use crate::{
+    bolts::{core_affinity::Cores, shmem::ShMemProvider},
+    events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
+    inputs::Input,
+    monitors::Monitor,
+    observers::ObserversTuple,
+    Error,
+};
 
 /// The (internal) `env` that indicates we're running as client.
 const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
@@ -86,7 +89,7 @@ where
     phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
 }
 
-impl<'a, CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
+impl<CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
@@ -121,13 +124,15 @@ where
     #[cfg(all(unix, feature = "std", feature = "fork"))]
     #[allow(clippy::similar_names)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        use crate::bolts::core_affinity::get_core_ids;
+
         if self.run_client.is_none() {
-            return Err(Error::IllegalArgument(
+            return Err(Error::illegal_argument(
                 "No client callback provided".to_string(),
             ));
         }
 
-        let core_ids = core_affinity::get_core_ids().unwrap();
+        let core_ids = get_core_ids().unwrap();
         let num_cores = core_ids.len();
         let mut handles = vec![];
 
@@ -137,6 +142,9 @@ where
         let stdout_file = self
             .stdout_file
             .map(|filename| File::create(filename).unwrap());
+
+        #[cfg(feature = "std")]
+        let debug_output = std::env::var("LIBAFL_DEBUG_OUTPUT").is_ok();
 
         // Spawn clients
         let mut index = 0_u64;
@@ -159,10 +167,13 @@ where
                         std::thread::sleep(std::time::Duration::from_millis(index * 100));
 
                         #[cfg(feature = "std")]
-                        if let Some(file) = stdout_file {
-                            dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
-                            dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                        if !debug_output {
+                            if let Some(file) = stdout_file {
+                                dup2(file.as_raw_fd(), libc::STDOUT_FILENO)?;
+                                dup2(file.as_raw_fd(), libc::STDERR_FILENO)?;
+                            }
                         }
+
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
                         let (state, mgr) = RestartingMgr::<I, MT, OT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
@@ -223,6 +234,8 @@ where
     #[cfg(all(feature = "std", any(windows, not(feature = "fork"))))]
     #[allow(unused_mut, clippy::match_wild_err_arm)]
     pub fn launch(&mut self) -> Result<(), Error> {
+        use crate::bolts::core_affinity;
+
         let is_client = std::env::var(_AFL_LAUNCHER_CLIENT);
 
         let mut handles = match is_client {

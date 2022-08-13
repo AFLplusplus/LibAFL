@@ -1,8 +1,9 @@
-# Baby fuzzer
-
-This is a minimalistic example about how to create a libafl based fuzzer.
-
-It runs on a single core until a crash occurs and then exits.
-
-The tested program is a simple Rust function without any instrumentation.
-For real fuzzing, you will want to add some sort to add coverage or other feedback.
+## baby nautilus fuzzer
+(Nautilus)[https://www.ndss-symposium.org/ndss-paper/nautilus-fishing-for-deep-bugs-with-grammars/] is a coverage-guided and grammar-based fuzzer. It needs to read the mruby's context-free grammar stored in `grammar.json`. And then use the corresponding feedback, generator, and mutator to fuzz.
+`libafl::mutators::nautilus` contains:
+```
+NautilusInput,NautilusContext
+NautilusChunksMetadata,NautilusFeedback
+NautilusGenerator
+NautilusRandomMutator,NautilusRecursionMutator,NautilusSpliceMutator
+```

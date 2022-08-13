@@ -1,24 +1,28 @@
 //! The `MOpt` mutator scheduler, see <https://github.com/puppet-meteor/MOpt-AFL> and <https://www.usenix.org/conference/usenixsecurity19/presentation/lyu>
 use alloc::{string::ToString, vec::Vec};
+use core::{
+    fmt::{self, Debug},
+    marker::PhantomData,
+};
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{rands::Rand, rands::StdRand},
+    bolts::{
+        current_nanos,
+        rands::{Rand, StdRand},
+    },
     corpus::Corpus,
     inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,
 };
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
-use serde::{Deserialize, Serialize};
 
-/// A Struct for managing MOpt-mutator parameters
-/// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode
-/// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator
-/// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator
+/// A Struct for managing MOpt-mutator parameters.
+/// There are 2 modes for `MOpt` scheduler, the core fuzzing mode and the pilot fuzzing mode.
+/// In short, in the pilot fuzzing mode, the fuzzer employs several `swarms` to compute the probability to choose the mutation operator.
+/// On the other hand, in the core fuzzing mode, the fuzzer chooses the best `swarms`, which was determined during the pilot fuzzing mode, to compute the probability to choose the operation operator.
 /// With the current implementation we are always in the pacemaker fuzzing mode.
 #[derive(Serialize, Deserialize, Clone)]
 pub struct MOpt {
@@ -140,7 +144,7 @@ impl MOpt {
     /// Creates a new [`struct@MOpt`] instance.
     pub fn new(operator_num: usize, swarm_num: usize) -> Result<Self, Error> {
         let mut mopt = Self {
-            rand: StdRand::with_seed(0),
+            rand: StdRand::with_seed(current_nanos()),
             total_finds: 0,
             finds_until_last_swarm: 0,
             w_init: 0.9,
@@ -233,7 +237,9 @@ impl MOpt {
             if self.probability_now[swarm][self.operator_num - 1] < 0.99
                 || self.probability_now[swarm][self.operator_num - 1] > 1.01
             {
-                return Err(Error::MOpt("Error in pso_update".to_string()));
+                return Err(Error::illegal_state(
+                    "MOpt: Error in pso_update".to_string(),
+                ));
             }
         }
         Ok(())
@@ -301,7 +307,9 @@ impl MOpt {
             if self.probability_now[swarm][self.operator_num - 1] < 0.99
                 || self.probability_now[swarm][self.operator_num - 1] > 1.01
             {
-                return Err(Error::MOpt("Error in pso_update".to_string()));
+                return Err(Error::illegal_state(
+                    "MOpt: Error in pso_update".to_string(),
+                ));
             }
         }
         self.swarm_now = 0;
@@ -340,7 +348,9 @@ impl MOpt {
             || (res + 1 < operator_num
                 && select_prob > self.probability_now[self.swarm_now][res + 1])
         {
-            return Err(Error::MOpt("Error in select_algorithm".to_string()));
+            return Err(Error::illegal_state(
+                "MOpt: Error in select_algorithm".to_string(),
+            ));
         }
         Ok(res)
     }
@@ -360,29 +370,24 @@ pub enum MOptMode {
 
 /// This is the main struct of `MOpt`, an `AFL` mutator.
 /// See the original `MOpt` implementation in <https://github.com/puppet-meteor/MOpt-AFL>
-pub struct StdMOptMutator<C, I, MT, R, S, SC>
+pub struct StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     mode: MOptMode,
     finds_before: usize,
     mutations: MT,
-    phantom: PhantomData<(C, I, R, S, SC)>,
+    max_stack_pow: u64,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<C, I, MT, R, S, SC> Debug for StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> Debug for StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -394,14 +399,11 @@ where
     }
 }
 
-impl<C, I, MT, R, S, SC> Mutator<I, S> for StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> Mutator<I, S> for StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     #[inline]
     fn mutate(
@@ -468,6 +470,7 @@ where
                     }
                 }
 
+                #[allow(clippy::cast_lossless)]
                 if mopt.pilot_time > mopt.period_pilot {
                     let new_finds = mopt.total_finds - mopt.finds_until_last_swarm;
                     let f = (new_finds as f64) / ((mopt.pilot_time as f64) / (PERIOD_PILOT_COEF));
@@ -532,22 +535,27 @@ where
     }
 }
 
-impl<C, I, MT, R, S, SC> StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     /// Create a new [`StdMOptMutator`].
-    pub fn new(state: &mut S, mutations: MT, swarm_num: usize) -> Result<Self, Error> {
-        state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
+    pub fn new(
+        state: &mut S,
+        mutations: MT,
+        max_stack_pow: u64,
+        swarm_num: usize,
+    ) -> Result<Self, Error> {
+        if !state.has_metadata::<MOpt>() {
+            state.add_metadata::<MOpt>(MOpt::new(mutations.len(), swarm_num)?);
+        }
         Ok(Self {
             mode: MOptMode::Pilotfuzzing,
             finds_before: 0,
             mutations,
+            max_stack_pow,
             phantom: PhantomData,
         })
     }
@@ -619,14 +627,11 @@ where
     }
 }
 
-impl<C, I, MT, R, S, SC> ComposedByMutations<I, MT, S> for StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     /// Get the mutations
     #[inline]
@@ -634,25 +639,22 @@ where
         &self.mutations
     }
 
-    // Get the mutations (mut)
+    // Get the mutations (mutable)
     #[inline]
     fn mutations_mut(&mut self) -> &mut MT {
         &mut self.mutations
     }
 }
 
-impl<C, I, MT, R, S, SC> ScheduledMutator<I, MT, S> for StdMOptMutator<C, I, MT, R, S, SC>
+impl<I, MT, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, S>
 where
-    C: Corpus<I>,
     I: Input,
     MT: MutatorsTuple<I, S>,
-    R: Rand,
-    S: HasRand<R> + HasMetadata + HasCorpus<C, I> + HasSolutions<SC, I>,
-    SC: Corpus<I>,
+    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {
-        1 << (1 + state.rand_mut().below(6))
+        1 << (1 + state.rand_mut().below(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply

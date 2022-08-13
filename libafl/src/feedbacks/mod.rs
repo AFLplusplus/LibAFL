@@ -4,34 +4,42 @@
 pub mod map;
 pub use map::*;
 
+pub mod differential;
+pub use differential::DiffFeedback;
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
 pub use concolic::ConcolicFeedback;
 
+#[cfg(feature = "std")]
+pub mod new_hash_feedback;
+#[cfg(feature = "std")]
+pub use new_hash_feedback::NewHashFeedback;
+#[cfg(feature = "std")]
+pub use new_hash_feedback::NewHashFeedbackMetadata;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
-#[cfg(feature = "nautilus")]
-pub use nautilus::*;
-
 use alloc::string::{String, ToString};
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    bolts::tuples::{MatchName, Named},
-    corpus::Testcase,
-    events::EventFirer,
-    executors::ExitKind,
-    inputs::Input,
-    observers::{ObserversTuple, TimeObserver},
-    state::HasClientPerfMonitor,
-    Error,
-};
-
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
     time::Duration,
+};
+
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+use serde::{Deserialize, Serialize};
+
+use crate::{
+    bolts::tuples::Named,
+    corpus::Testcase,
+    events::EventFirer,
+    executors::ExitKind,
+    inputs::Input,
+    observers::{ListObserver, ObserversTuple, TimeObserver},
+    state::HasClientPerfMonitor,
+    Error,
 };
 
 /// Feedbacks evaluate the observers.
@@ -42,7 +50,14 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// Initializes the feedback state.
+    /// This method is called after that the `State` is created.
+    fn init_state(&mut self, _state: &mut S) -> Result<(), Error> {
+        Ok(())
+    }
+
     /// `is_interesting ` return if an input is worth the addition to the corpus
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -59,6 +74,7 @@ where
     /// It also keeps track of introspection stats.
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
@@ -105,39 +121,13 @@ where
     }
 }
 
-/// [`FeedbackState`] is the data associated with a [`Feedback`] that must persist as part
-/// of the fuzzer State
-pub trait FeedbackState: Named + Serialize + serde::de::DeserializeOwned + Debug {
-    /// Reset the internal state
-    fn reset(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
+/// Has an associated observer name (mostly used to retrieve the observer with `MatchName` from an `ObserverTuple`)
+pub trait HasObserverName {
+    /// The name associated with the observer
+    fn observer_name(&self) -> &str;
 }
 
-/// A haskell-style tuple of feedback states
-pub trait FeedbackStatesTuple: MatchName + Serialize + serde::de::DeserializeOwned + Debug {
-    /// Resets all the feedback states of the tuple
-    fn reset_all(&mut self) -> Result<(), Error>;
-}
-
-impl FeedbackStatesTuple for () {
-    fn reset_all(&mut self) -> Result<(), Error> {
-        Ok(())
-    }
-}
-
-impl<Head, Tail> FeedbackStatesTuple for (Head, Tail)
-where
-    Head: FeedbackState,
-    Tail: FeedbackStatesTuple,
-{
-    fn reset_all(&mut self) -> Result<(), Error> {
-        self.0.reset()?;
-        self.1.reset_all()
-    }
-}
-
-/// A cobined feedback consisting of ultiple [`Feedback`]s
+/// A combined feedback consisting of multiple [`Feedback`]s
 #[derive(Debug)]
 pub struct CombinedFeedback<A, B, FL, I, S>
 where
@@ -196,6 +186,13 @@ where
     I: Input,
     S: HasClientPerfMonitor + Debug,
 {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        self.first.init_state(state)?;
+        self.second.init_state(state)?;
+        Ok(())
+    }
+
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -220,6 +217,7 @@ where
     }
 
     #[cfg(feature = "introspection")]
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
         state: &mut S,
@@ -264,7 +262,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
-    /// The name of this cobination
+    /// The name of this combination
     fn name() -> &'static str;
 
     /// If the feedback pair is interesting
@@ -531,19 +529,19 @@ where
 }
 
 /// Combine two feedbacks with an eager AND operation,
-/// will call all feedbacks functions even if not necessery to conclude the result
+/// will call all feedbacks functions even if not necessary to conclude the result
 pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerAnd, I, S>;
 
 /// Combine two feedbacks with an fast AND operation,
-/// might skip calling feedbacks functions if not necessery to conclude the result
+/// might skip calling feedbacks functions if not necessary to conclude the result
 pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastAnd, I, S>;
 
 /// Combine two feedbacks with an eager OR operation,
-/// will call all feedbacks functions even if not necessery to conclude the result
+/// will call all feedbacks functions even if not necessary to conclude the result
 pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerOr, I, S>;
 
 /// Combine two feedbacks with an fast OR operation,
-/// might skip calling feedbacks functions if not necessery to conclude the result
+/// might skip calling feedbacks functions if not necessary to conclude the result.
 /// This means any feedback that is not first might be skipped, use caution when using with
 /// `TimeFeedback`
 pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastOr, I, S>;
@@ -583,6 +581,11 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+        self.first.init_state(state)
+    }
+
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
@@ -698,6 +701,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -730,6 +734,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -780,6 +785,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -822,7 +828,7 @@ impl Default for TimeoutFeedback {
 }
 
 /// Nop feedback that annotates execution time in the new testcase, if any
-/// for this Feedback, the testcase is never interesting (use with an OR)
+/// for this Feedback, the testcase is never interesting (use with an OR).
 /// It decides, if the given [`TimeObserver`] value of a run is interesting.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeFeedback {
@@ -835,6 +841,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
@@ -893,5 +900,720 @@ impl TimeFeedback {
             exec_time: None,
             name: observer.name().to_string(),
         }
+    }
+}
+
+/// Consider interesting a testcase if the list in `ListObserver` is not empty.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ListFeedback<T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    name: String,
+    phantom: PhantomData<T>,
+}
+
+impl<I, S, T> Feedback<I, S> for ListFeedback<T>
+where
+    I: Input,
+    S: HasClientPerfMonitor,
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        // TODO Replace with match_name_type when stable
+        let observer = observers
+            .match_name::<ListObserver<T>>(self.name())
+            .unwrap();
+        // TODO register the list content in a testcase metadata
+        Ok(!observer.list().is_empty())
+    }
+}
+
+impl<T> Named for ListFeedback<T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    #[inline]
+    fn name(&self) -> &str {
+        self.name.as_str()
+    }
+}
+
+impl<T> ListFeedback<T>
+where
+    T: Debug + Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`ListFeedback`], deciding if the value of a [`ListObserver`] with the given `name` of a run is interesting.
+    #[must_use]
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: name.to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creates a new [`TimeFeedback`], deciding if the given [`ListObserver`] value of a run is interesting.
+    #[must_use]
+    pub fn new_with_observer(observer: &ListObserver<T>) -> Self {
+        Self {
+            name: observer.name().to_string(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+/// The [`ConstFeedback`] reports the same value, always.
+/// It can be used to enable or disable feedback results through composition.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConstFeedback {
+    /// Always returns `true`
+    True,
+    /// Alsways returns `false`
+    False,
+}
+
+impl<I, S> Feedback<I, S> for ConstFeedback
+where
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    #[inline]
+    #[allow(clippy::wrong_self_convention)]
+    fn is_interesting<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        _observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
+    where
+        EM: EventFirer<I>,
+        OT: ObserversTuple<I, S>,
+    {
+        Ok(match self {
+            ConstFeedback::True => true,
+            ConstFeedback::False => false,
+        })
+    }
+}
+
+impl Named for ConstFeedback {
+    #[inline]
+    fn name(&self) -> &str {
+        "ConstFeedback"
+    }
+}
+
+impl ConstFeedback {
+    /// Creates a new [`ConstFeedback`] from the given boolean
+    #[must_use]
+    pub fn new(val: bool) -> Self {
+        Self::from(val)
+    }
+}
+
+impl From<bool> for ConstFeedback {
+    fn from(val: bool) -> Self {
+        if val {
+            Self::True
+        } else {
+            Self::False
+        }
+    }
+}
+
+/// `Feedback` Python bindings
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+pub mod pybind {
+    use std::cell::UnsafeCell;
+
+    use pyo3::prelude::*;
+
+    use super::{
+        ConstFeedback, CrashFeedback, Debug, EagerAndFeedback, EagerOrFeedback, FastAndFeedback,
+        FastOrFeedback, Feedback, NotFeedback, String, ToString,
+    };
+    use crate::{
+        bolts::tuples::Named,
+        corpus::{
+            testcase::pybind::{PythonTestcase, PythonTestcaseWrapper},
+            Testcase,
+        },
+        events::{pybind::PythonEventManager, EventFirer},
+        executors::{pybind::PythonExitKind, ExitKind},
+        feedbacks::map::pybind::{
+            PythonMaxMapFeedbackI16, PythonMaxMapFeedbackI32, PythonMaxMapFeedbackI64,
+            PythonMaxMapFeedbackI8, PythonMaxMapFeedbackU16, PythonMaxMapFeedbackU32,
+            PythonMaxMapFeedbackU64, PythonMaxMapFeedbackU8,
+        },
+        inputs::{BytesInput, HasBytesVec},
+        observers::{pybind::PythonObserversTuple, ObserversTuple},
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
+
+    #[derive(Debug)]
+    pub struct PyObjectFeedback {
+        inner: PyObject,
+        name: UnsafeCell<String>,
+    }
+
+    impl Clone for PyObjectFeedback {
+        fn clone(&self) -> PyObjectFeedback {
+            PyObjectFeedback {
+                inner: self.inner.clone(),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+    }
+
+    impl PyObjectFeedback {
+        #[must_use]
+        pub fn new(obj: PyObject) -> Self {
+            PyObjectFeedback {
+                inner: obj,
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+    }
+
+    // crate::impl_serde_pyobjectwrapper!(PyObjectObserver, inner);
+
+    impl Named for PyObjectFeedback {
+        fn name(&self) -> &str {
+            let s = Python::with_gil(|py| -> PyResult<String> {
+                let s: String = self.inner.call_method0(py, "name")?.extract(py)?;
+                Ok(s)
+            })
+            .unwrap();
+            unsafe {
+                *self.name.get() = s;
+                &*self.name.get()
+            }
+        }
+    }
+
+    impl Feedback<BytesInput, PythonStdState> for PyObjectFeedback {
+        fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner
+                    .call_method1(py, "init_state", (PythonStdStateWrapper::wrap(state),))?;
+                Ok(())
+            })?;
+            Ok(())
+        }
+
+        fn is_interesting<EM, OT>(
+            &mut self,
+            state: &mut PythonStdState,
+            manager: &mut EM,
+            input: &BytesInput,
+            observers: &OT,
+            exit_kind: &ExitKind,
+        ) -> Result<bool, Error>
+        where
+            EM: EventFirer<BytesInput>,
+            OT: ObserversTuple<BytesInput, PythonStdState>,
+        {
+            // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
+            let dont_look_at_this: &PythonObserversTuple =
+                unsafe { &*(observers as *const OT as *const PythonObserversTuple) };
+            let dont_look_at_this2: &PythonEventManager =
+                unsafe { &*(manager as *mut EM as *const PythonEventManager) };
+            Ok(Python::with_gil(|py| -> PyResult<bool> {
+                let r: bool = self
+                    .inner
+                    .call_method1(
+                        py,
+                        "is_interesting",
+                        (
+                            PythonStdStateWrapper::wrap(state),
+                            dont_look_at_this2.clone(),
+                            input.bytes(),
+                            dont_look_at_this.clone(),
+                            PythonExitKind::from(*exit_kind),
+                        ),
+                    )?
+                    .extract(py)?;
+                Ok(r)
+            })?)
+        }
+
+        fn append_metadata(
+            &mut self,
+            state: &mut PythonStdState,
+            testcase: &mut PythonTestcase,
+        ) -> Result<(), Error> {
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner.call_method1(
+                    py,
+                    "append_metadata",
+                    (
+                        PythonStdStateWrapper::wrap(state),
+                        PythonTestcaseWrapper::wrap(testcase),
+                    ),
+                )?;
+                Ok(())
+            })?;
+            Ok(())
+        }
+
+        fn discard_metadata(
+            &mut self,
+            state: &mut PythonStdState,
+            input: &BytesInput,
+        ) -> Result<(), Error> {
+            Python::with_gil(|py| -> PyResult<()> {
+                self.inner.call_method1(
+                    py,
+                    "discard_metadata",
+                    (PythonStdStateWrapper::wrap(state), input.bytes()),
+                )?;
+                Ok(())
+            })?;
+            Ok(())
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[pyclass(unsendable, name = "CrashFeedback")]
+    pub struct PythonCrashFeedback {
+        pub inner: CrashFeedback,
+    }
+
+    #[pymethods]
+    impl PythonCrashFeedback {
+        #[new]
+        fn new() -> Self {
+            Self {
+                inner: CrashFeedback::new(),
+            }
+        }
+
+        #[must_use]
+        pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+            PythonFeedback::new_crash(slf)
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    #[pyclass(unsendable, name = "ConstFeedback")]
+    pub struct PythonConstFeedback {
+        pub inner: ConstFeedback,
+    }
+
+    #[pymethods]
+    impl PythonConstFeedback {
+        #[new]
+        fn new(v: bool) -> Self {
+            Self {
+                inner: ConstFeedback::new(v),
+            }
+        }
+
+        #[must_use]
+        pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+            PythonFeedback::new_const(slf)
+        }
+    }
+
+    #[derive(Debug)]
+    #[pyclass(unsendable, name = "NotFeedback")]
+    pub struct PythonNotFeedback {
+        pub inner: NotFeedback<PythonFeedback, BytesInput, PythonStdState>,
+    }
+
+    #[pymethods]
+    impl PythonNotFeedback {
+        #[new]
+        fn new(feedback: PythonFeedback) -> Self {
+            Self {
+                inner: NotFeedback::new(feedback),
+            }
+        }
+
+        #[must_use]
+        pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+            PythonFeedback::new_not(slf)
+        }
+    }
+
+    macro_rules! define_combined {
+        ($feed:ident, $pyname:ident, $pystring:tt, $method:ident) => {
+            #[derive(Debug)]
+            #[pyclass(unsendable, name = $pystring)]
+            pub struct $pyname {
+                pub inner: $feed<PythonFeedback, PythonFeedback, BytesInput, PythonStdState>,
+            }
+
+            #[pymethods]
+            impl $pyname {
+                #[new]
+                fn new(a: PythonFeedback, b: PythonFeedback) -> Self {
+                    Self {
+                        inner: $feed::new(a, b),
+                    }
+                }
+
+                #[must_use]
+                pub fn as_feedback(slf: Py<Self>) -> PythonFeedback {
+                    PythonFeedback::$method(slf)
+                }
+            }
+        };
+    }
+
+    define_combined!(
+        EagerAndFeedback,
+        PythonEagerAndFeedback,
+        "EagerAndFeedback",
+        new_and
+    );
+    define_combined!(
+        FastAndFeedback,
+        PythonFastAndFeedback,
+        "FastAndFeedback",
+        new_fast_and
+    );
+    define_combined!(
+        EagerOrFeedback,
+        PythonEagerOrFeedback,
+        "EagerOrFeedback",
+        new_or
+    );
+    define_combined!(
+        FastOrFeedback,
+        PythonFastOrFeedback,
+        "FastOrFeedback",
+        new_fast_or
+    );
+
+    #[derive(Clone, Debug)]
+    pub enum PythonFeedbackWrapper {
+        MaxMapI8(Py<PythonMaxMapFeedbackI8>),
+        MaxMapI16(Py<PythonMaxMapFeedbackI16>),
+        MaxMapI32(Py<PythonMaxMapFeedbackI32>),
+        MaxMapI64(Py<PythonMaxMapFeedbackI64>),
+        MaxMapU8(Py<PythonMaxMapFeedbackU8>),
+        MaxMapU16(Py<PythonMaxMapFeedbackU16>),
+        MaxMapU32(Py<PythonMaxMapFeedbackU32>),
+        MaxMapU64(Py<PythonMaxMapFeedbackU64>),
+        Crash(Py<PythonCrashFeedback>),
+        Const(Py<PythonConstFeedback>),
+        Not(Py<PythonNotFeedback>),
+        And(Py<PythonEagerAndFeedback>),
+        FastAnd(Py<PythonFastAndFeedback>),
+        Or(Py<PythonEagerOrFeedback>),
+        FastOr(Py<PythonFastOrFeedback>),
+        Python(PyObjectFeedback),
+    }
+
+    #[pyclass(unsendable, name = "Feedback")]
+    #[derive(Debug)]
+    /// Observer Trait binding
+    pub struct PythonFeedback {
+        pub wrapper: PythonFeedbackWrapper,
+        name: UnsafeCell<String>,
+    }
+
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!($wrapper, $name, $body, PythonFeedbackWrapper,
+                {
+                    MaxMapI8,
+                    MaxMapI16,
+                    MaxMapI32,
+                    MaxMapI64,
+                    MaxMapU8,
+                    MaxMapU16,
+                    MaxMapU32,
+                    MaxMapU64,
+                    Crash,
+                    Const,
+                    Not,
+                    And,
+                    FastAnd,
+                    Or,
+                    FastOr
+                },
+                {
+                     Python(py_wrapper) => {
+                         let $name = py_wrapper;
+                         $body
+                     }
+                }
+            )
+        };
+    }
+
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!($wrapper, $name, $body, PythonFeedbackWrapper,
+                {
+                    MaxMapI8,
+                    MaxMapI16,
+                    MaxMapI32,
+                    MaxMapI64,
+                    MaxMapU8,
+                    MaxMapU16,
+                    MaxMapU32,
+                    MaxMapU64,
+                    Crash,
+                    Const,
+                    Not,
+                    And,
+                    FastAnd,
+                    Or,
+                    FastOr
+                },
+                {
+                     Python(py_wrapper) => {
+                         let $name = py_wrapper;
+                         $body
+                     }
+                }
+            )
+        };
+    }
+
+    impl Clone for PythonFeedback {
+        fn clone(&self) -> PythonFeedback {
+            PythonFeedback {
+                wrapper: self.wrapper.clone(),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+    }
+
+    #[pymethods]
+    impl PythonFeedback {
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_i8(map_feedback: Py<PythonMaxMapFeedbackI8>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapI8(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_i16(map_feedback: Py<PythonMaxMapFeedbackI16>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapI16(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_i32(map_feedback: Py<PythonMaxMapFeedbackI32>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapI32(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_i64(map_feedback: Py<PythonMaxMapFeedbackI64>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapI64(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_u8(map_feedback: Py<PythonMaxMapFeedbackU8>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapU8(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_u16(map_feedback: Py<PythonMaxMapFeedbackU16>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapU16(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_u32(map_feedback: Py<PythonMaxMapFeedbackU32>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapU32(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_max_map_u64(map_feedback: Py<PythonMaxMapFeedbackU64>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::MaxMapU64(map_feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_crash(feedback: Py<PythonCrashFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Crash(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_const(feedback: Py<PythonConstFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Const(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_not(feedback: Py<PythonNotFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Not(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_and(feedback: Py<PythonEagerAndFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::And(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_fast_and(feedback: Py<PythonFastAndFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::FastAnd(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_or(feedback: Py<PythonEagerOrFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Or(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_fast_or(feedback: Py<PythonFastOrFeedback>) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::FastOr(feedback),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_py(obj: PyObject) -> Self {
+            Self {
+                wrapper: PythonFeedbackWrapper::Python(PyObjectFeedback::new(obj)),
+                name: UnsafeCell::new(String::new()),
+            }
+        }
+
+        pub fn unwrap_py(&self) -> Option<PyObject> {
+            match &self.wrapper {
+                PythonFeedbackWrapper::Python(pyo) => Some(pyo.inner.clone()),
+                _ => None,
+            }
+        }
+    }
+
+    impl Named for PythonFeedback {
+        fn name(&self) -> &str {
+            let s = unwrap_me!(self.wrapper, f, { f.name().to_string() });
+            unsafe {
+                *self.name.get() = s;
+                &*self.name.get()
+            }
+        }
+    }
+
+    impl Feedback<BytesInput, PythonStdState> for PythonFeedback {
+        fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, f, {
+                Feedback::<BytesInput, PythonStdState>::init_state(f, state)
+            })
+        }
+
+        fn is_interesting<EM, OT>(
+            &mut self,
+            state: &mut PythonStdState,
+            manager: &mut EM,
+            input: &BytesInput,
+            observers: &OT,
+            exit_kind: &ExitKind,
+        ) -> Result<bool, Error>
+        where
+            EM: EventFirer<BytesInput>,
+            OT: ObserversTuple<BytesInput, PythonStdState>,
+        {
+            unwrap_me_mut!(self.wrapper, f, {
+                f.is_interesting(state, manager, input, observers, exit_kind)
+            })
+        }
+
+        fn append_metadata(
+            &mut self,
+            state: &mut PythonStdState,
+            testcase: &mut Testcase<BytesInput>,
+        ) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, f, { f.append_metadata(state, testcase) })
+        }
+
+        fn discard_metadata(
+            &mut self,
+            state: &mut PythonStdState,
+            input: &BytesInput,
+        ) -> Result<(), Error> {
+            unwrap_me_mut!(self.wrapper, f, { f.discard_metadata(state, input) })
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonCrashFeedback>()?;
+        m.add_class::<PythonConstFeedback>()?;
+        m.add_class::<PythonNotFeedback>()?;
+        m.add_class::<PythonEagerAndFeedback>()?;
+        m.add_class::<PythonFastAndFeedback>()?;
+        m.add_class::<PythonEagerOrFeedback>()?;
+        m.add_class::<PythonFastOrFeedback>()?;
+        m.add_class::<PythonFeedback>()?;
+        Ok(())
     }
 }

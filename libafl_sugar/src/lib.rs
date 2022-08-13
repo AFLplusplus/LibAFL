@@ -1,6 +1,7 @@
 //! Sugar API to simplify the life of the naive user of `LibAFL`
 
 #![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
 #![deny(clippy::pedantic)]
 #![allow(
     clippy::unreadable_literal,
@@ -87,6 +88,10 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     #[cfg(target_os = "linux")]
     {
         qemu::pybind::register(py, m)?;
+    }
+    #[cfg(unix)]
+    {
+        forkserver::pybind::register(py, m)?;
     }
     Ok(())
 }

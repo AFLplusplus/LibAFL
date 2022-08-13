@@ -1,10 +1,9 @@
-//! Monitor to disply both cumulative and per-client monitor
-
-use alloc::{string::String, vec::Vec};
-use core::time::Duration;
+//! Monitor to display both cumulative and per-client monitor
 
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
+use alloc::{string::String, vec::Vec};
+use core::{fmt::Write, time::Duration};
 
 use crate::{
     bolts::{current_time, format_duration_hms},
@@ -71,7 +70,7 @@ where
             pad, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {
-            fmt += &format!(", {}: {}", key, val);
+            write!(fmt, ", {}: {}", key, val).unwrap();
         }
         (self.print_fn)(fmt);
 

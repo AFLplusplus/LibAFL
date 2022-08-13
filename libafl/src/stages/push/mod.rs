@@ -4,10 +4,8 @@
 //! The push stage relies on internal muttability of the supplied `Observers`.
 //!
 
-/// Mutational stage is the normal fuzzing stage,
+/// Mutational stage is the normal fuzzing stage.
 pub mod mutational;
-pub use mutational::StdMutationalPushStage;
-
 use alloc::rc::Rc;
 use core::{
     cell::{Cell, RefCell},
@@ -15,15 +13,17 @@ use core::{
     time::Duration,
 };
 
+pub use mutational::StdMutationalPushStage;
+
 use crate::{
-    bolts::{current_time, rands::Rand},
-    corpus::{Corpus, CorpusScheduler},
+    bolts::current_time,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::Input,
     observers::ObserversTuple,
+    schedulers::Scheduler,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
-    Error, EvaluatorObservers, ExecutionProcessor, HasCorpusScheduler,
+    Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
 /// Send a monitor update all 15 (or more) seconds
@@ -32,16 +32,14 @@ const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 // The shared state for all [`PushStage`]s
 /// Should be stored inside a `[Rc<RefCell<_>>`]
 #[derive(Clone, Debug)]
-pub struct PushStageSharedState<C, CS, EM, I, OT, R, S, Z>
+pub struct PushStageSharedState<CS, EM, I, OT, S, Z>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// The [`crate::state::State`]
     pub state: S,
@@ -51,19 +49,17 @@ where
     pub event_mgr: EM,
     /// The [`crate::observers::ObserversTuple`]
     pub observers: OT,
-    phantom: PhantomData<(C, CS, I, OT, R, S, Z)>,
+    phantom: PhantomData<(CS, I, OT, S, Z)>,
 }
 
-impl<C, CS, EM, I, OT, R, S, Z> PushStageSharedState<C, CS, EM, I, OT, R, S, Z>
+impl<CS, EM, I, OT, S, Z> PushStageSharedState<CS, EM, I, OT, S, Z>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
@@ -80,16 +76,14 @@ where
 
 /// Helper class for the [`PushStage`] trait, taking care of borrowing the shared state
 #[derive(Clone, Debug)]
-pub struct PushStageHelper<C, CS, EM, I, OT, R, S, Z>
+pub struct PushStageHelper<CS, EM, I, OT, S, Z>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
@@ -98,8 +92,8 @@ where
     pub last_monitor_time: Duration,
     /// The shared state, keeping track of the corpus and the fuzzer
     #[allow(clippy::type_complexity)]
-    pub shared_state: Rc<RefCell<Option<PushStageSharedState<C, CS, EM, I, OT, R, S, Z>>>>,
-    /// If the last iteraation failed
+    pub shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, I, OT, S, Z>>>>,
+    /// If the last iteration failed
     pub errored: bool,
 
     /// The corpus index we're currently working on
@@ -109,26 +103,24 @@ where
     pub current_input: Option<I>, // Todo: Get rid of copy
 
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, CS, (), EM, I, R, OT, S, Z)>,
+    phantom: PhantomData<(CS, (), EM, I, OT, S, Z)>,
     exit_kind: Rc<Cell<Option<ExitKind>>>,
 }
 
-impl<C, CS, EM, I, OT, R, S, Z> PushStageHelper<C, CS, EM, I, OT, R, S, Z>
+impl<CS, EM, I, OT, S, Z> PushStageHelper<CS, EM, I, OT, S, Z>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R>,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageHelper`]
     #[must_use]
     #[allow(clippy::type_complexity)]
     pub fn new(
-        shared_state: Rc<RefCell<Option<PushStageSharedState<C, CS, EM, I, OT, R, S, Z>>>>,
+        shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, I, OT, S, Z>>>>,
         exit_kind_ref: Rc<Cell<Option<ExitKind>>>,
     ) -> Self {
         Self {
@@ -145,17 +137,14 @@ where
 
     /// Sets the shared state for this helper (and all other helpers owning the same [`RefCell`])
     #[inline]
-    pub fn set_shared_state(
-        &mut self,
-        shared_state: PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
-    ) {
-        (&mut *self.shared_state.borrow_mut()).replace(shared_state);
+    pub fn set_shared_state(&mut self, shared_state: PushStageSharedState<CS, EM, I, OT, S, Z>) {
+        (*self.shared_state.borrow_mut()).replace(shared_state);
     }
 
     /// Takes the shared state from this helper, replacing it with `None`
     #[inline]
     #[allow(clippy::type_complexity)]
-    pub fn take_shared_state(&mut self) -> Option<PushStageSharedState<C, CS, EM, I, OT, R, S, Z>> {
+    pub fn take_shared_state(&mut self) -> Option<PushStageSharedState<CS, EM, I, OT, S, Z>> {
         let shared_state_ref = &mut (*self.shared_state).borrow_mut();
         shared_state_ref.take()
     }
@@ -176,7 +165,7 @@ where
     /// Resets this state after a full stage iter.
     fn end_of_iter(
         &mut self,
-        shared_state: PushStageSharedState<C, CS, EM, I, OT, R, S, Z>,
+        shared_state: PushStageSharedState<CS, EM, I, OT, S, Z>,
         errored: bool,
     ) {
         self.set_shared_state(shared_state);
@@ -191,23 +180,21 @@ where
 /// A push stage is a generator that returns a single testcase for each call.
 /// It's an iterator so we can chain it.
 /// After it has finished once, we will call it agan for the next fuzzer round.
-pub trait PushStage<C, CS, EM, I, OT, R, S, Z>: Iterator
+pub trait PushStage<CS, EM, I, OT, S, Z>: Iterator
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    R: Rand,
-    S: HasClientPerfMonitor + HasCorpus<C, I> + HasRand<R> + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasCorpusScheduler<CS, I, S>,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Gets the [`PushStageHelper`]
-    fn push_stage_helper(&self) -> &PushStageHelper<C, CS, EM, I, OT, R, S, Z>;
-    /// Gets the [`PushStageHelper`], mut
-    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<C, CS, EM, I, OT, R, S, Z>;
+    fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, I, OT, S, Z>;
+    /// Gets the [`PushStageHelper`] (mutable)
+    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, I, OT, S, Z>;
 
-    /// Set the current corpus index this stagve works on
+    /// Set the current corpus index this stage works on
     fn set_current_corpus_idx(&mut self, corpus_idx: usize) {
         self.push_stage_helper_mut().current_corpus_idx = Some(corpus_idx);
     }

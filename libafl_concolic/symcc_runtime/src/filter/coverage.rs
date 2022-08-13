@@ -70,6 +70,7 @@ impl<THasher: Hasher, THashBuilder: BuildHasher> CallStackCoverage<THasher, THas
         self.pending = true;
     }
 
+    #[allow(clippy::wrong_self_convention)]
     pub fn is_interesting(&self) -> bool {
         self.is_interesting
     }
@@ -194,7 +195,9 @@ where
         let val = unsafe {
             // SAFETY: the index is modulo by the length, therefore it is always in bounds
             let len = self.hitcounts_map.len();
-            self.hitcounts_map.map_mut().get_unchecked_mut(hash % len)
+            self.hitcounts_map
+                .as_mut_slice()
+                .get_unchecked_mut(hash % len)
         };
         *val = val.saturating_add(1);
     }

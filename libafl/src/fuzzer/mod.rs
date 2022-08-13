@@ -1,39 +1,39 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
+use alloc::string::ToString;
+use core::{marker::PhantomData, time::Duration};
+
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, CorpusScheduler, Testcase},
+    corpus::{Corpus, Testcase},
     events::{Event, EventConfig, EventFirer, EventManager, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
+    schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     Error,
 };
 
-#[cfg(feature = "introspection")]
-use crate::monitors::PerfFeature;
-
-use alloc::string::ToString;
-use core::{marker::PhantomData, time::Duration};
-
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
-pub trait HasCorpusScheduler<CS, I, S>
+pub trait HasScheduler<CS, I, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     I: Input,
 {
     /// The scheduler
     fn scheduler(&self) -> &CS;
 
-    /// The scheduler (mut)
+    /// The scheduler (mutable)
     fn scheduler_mut(&mut self) -> &mut CS;
 }
 
@@ -47,7 +47,7 @@ where
     /// The feedback
     fn feedback(&self) -> &F;
 
-    /// The feedback (mut)
+    /// The feedback (mutable)
     fn feedback_mut(&mut self) -> &mut F;
 }
 
@@ -61,7 +61,7 @@ where
     /// The objective feedback
     fn objective(&self) -> &OF;
 
-    /// The objective feedback (mut)
+    /// The objective feedback (mutable)
     fn objective_mut(&mut self) -> &mut OF;
 }
 
@@ -85,7 +85,7 @@ where
         EM: EventFirer<I>;
 }
 
-/// Evaluate an input modyfing the state of the fuzzer
+/// Evaluate an input modifying the state of the fuzzer
 pub trait EvaluatorObservers<I, OT, S>: Sized
 where
     I: Input,
@@ -106,7 +106,7 @@ where
         EM: EventManager<E, I, S, Self>;
 }
 
-/// Evaluate an input modyfing the state of the fuzzer
+/// Evaluate an input modifying the state of the fuzzer
 pub trait Evaluator<E, EM, I, S> {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new testcase in the corpus
@@ -152,8 +152,8 @@ where
     EM: ProgressReporter<I>,
     S: HasExecutions + HasClientPerfMonitor,
 {
-    /// Fuzz for a single iteration
-    /// Returns the index of the last fuzzed corpus item
+    /// Fuzz for a single iteration.
+    /// Returns the index of the last fuzzed corpus item.
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
@@ -182,8 +182,8 @@ where
         }
     }
 
-    /// Fuzz for n iterations
-    /// Returns the index of the last fuzzed corpus item
+    /// Fuzz for n iterations.
+    /// Returns the index of the last fuzzed corpus item.
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
@@ -197,7 +197,7 @@ where
         iters: u64,
     ) -> Result<usize, Error> {
         if iters == 0 {
-            return Err(Error::IllegalArgument(
+            return Err(Error::illegal_argument(
                 "Cannot fuzz for 0 iterations!".to_string(),
             ));
         }
@@ -221,11 +221,11 @@ where
 }
 
 /// The corpus this input should be added to
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExecuteInputResult {
     /// No special input
     None,
-    /// This input should be stored ini the corpus
+    /// This input should be stored in the corpus
     Corpus,
     /// This input leads to a solution
     Solution,
@@ -233,9 +233,9 @@ pub enum ExecuteInputResult {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+pub struct StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -244,13 +244,12 @@ where
     scheduler: CS,
     feedback: F,
     objective: OF,
-    phantom: PhantomData<(C, I, OT, S, SC)>,
+    phantom: PhantomData<(I, OT, S)>,
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> HasCorpusScheduler<CS, I, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> HasScheduler<CS, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -265,9 +264,9 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> HasFeedback<F, I, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> HasFeedback<F, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -282,9 +281,9 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> HasObjective<I, OF, S> for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> HasObjective<I, OF, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -299,17 +298,14 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> ExecutionProcessor<I, OT, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> ExecutionProcessor<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    C: Corpus<I>,
-    SC: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -416,17 +412,14 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> EvaluatorObservers<I, OT, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> EvaluatorObservers<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
-    SC: Corpus<I>,
+    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -448,19 +441,16 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, I, OF, OT, S, SC> Evaluator<E, EM, I, S>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, E, EM, F, I, OF, OT, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    C: Corpus<I>,
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<C, I> + HasSolutions<SC, I> + HasClientPerfMonitor + HasExecutions,
-    SC: Corpus<I>,
+    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -517,10 +507,9 @@ where
     }
 }
 
-impl<C, CS, E, EM, F, I, OF, OT, S, ST, SC> Fuzzer<E, EM, I, S, ST>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
@@ -568,9 +557,9 @@ where
     }
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
@@ -602,14 +591,16 @@ where
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
+        *state.executions_mut() += 1;
+
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
-        *state.executions_mut() += 1;
-
         start_timer!(state);
-        executor.observers_mut().post_exec_all(state, input)?;
+        executor
+            .observers_mut()
+            .post_exec_all(state, input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(exit_kind)
@@ -635,10 +626,9 @@ where
         OT: ObserversTuple<I, S>;
 }
 
-impl<C, CS, F, I, OF, OT, S, SC> ExecutesInput<I, OT, S, Self>
-    for StdFuzzer<C, CS, F, I, OF, OT, S, SC>
+impl<CS, F, I, OF, OT, S> ExecutesInput<I, OT, S, Self> for StdFuzzer<CS, F, I, OF, OT, S>
 where
-    CS: CorpusScheduler<I, S>,
+    CS: Scheduler<I, S>,
     F: Feedback<I, S>,
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -661,16 +651,126 @@ where
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);
 
+        *state.executions_mut() += 1;
+
         start_timer!(state);
         let exit_kind = executor.run_target(self, state, event_mgr, input)?;
         mark_feature_time!(state, PerfFeature::TargetExecution);
 
-        *state.executions_mut() += 1;
-
         start_timer!(state);
-        executor.observers_mut().post_exec_all(state, input)?;
+        executor
+            .observers_mut()
+            .post_exec_all(state, input, &exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(exit_kind)
+    }
+}
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+/// `Fuzzer` Python bindings
+pub mod pybind {
+    use alloc::{boxed::Box, vec::Vec};
+
+    use pyo3::prelude::*;
+
+    use crate::{
+        bolts::ownedref::OwnedPtrMut,
+        events::pybind::PythonEventManager,
+        executors::pybind::PythonExecutor,
+        feedbacks::pybind::PythonFeedback,
+        fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+        inputs::BytesInput,
+        observers::pybind::PythonObserversTuple,
+        schedulers::QueueScheduler,
+        stages::pybind::PythonStagesTuple,
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+    };
+
+    /// `StdFuzzer` with fixed generics
+    pub type PythonStdFuzzer = StdFuzzer<
+        QueueScheduler,
+        PythonFeedback,
+        BytesInput,
+        PythonFeedback,
+        PythonObserversTuple,
+        PythonStdState,
+    >;
+
+    /// Python class for StdFuzzer
+    #[pyclass(unsendable, name = "StdFuzzer")]
+    #[derive(Debug)]
+    pub struct PythonStdFuzzerWrapper {
+        /// Rust wrapped StdFuzzer object
+        pub inner: OwnedPtrMut<PythonStdFuzzer>,
+    }
+
+    impl PythonStdFuzzerWrapper {
+        pub fn wrap(r: &mut PythonStdFuzzer) -> Self {
+            Self {
+                inner: OwnedPtrMut::Ptr(r),
+            }
+        }
+
+        #[must_use]
+        pub fn unwrap(&self) -> &PythonStdFuzzer {
+            self.inner.as_ref()
+        }
+
+        pub fn unwrap_mut(&mut self) -> &mut PythonStdFuzzer {
+            self.inner.as_mut()
+        }
+    }
+
+    #[pymethods]
+    impl PythonStdFuzzerWrapper {
+        #[new]
+        fn new(py_feedback: PythonFeedback, py_objective: PythonFeedback) -> Self {
+            Self {
+                inner: OwnedPtrMut::Owned(Box::new(StdFuzzer::new(
+                    QueueScheduler::new(),
+                    py_feedback,
+                    py_objective,
+                ))),
+            }
+        }
+
+        fn add_input(
+            &mut self,
+            py_state: &mut PythonStdStateWrapper,
+            py_executor: &mut PythonExecutor,
+            py_mgr: &mut PythonEventManager,
+            input: Vec<u8>,
+        ) -> usize {
+            self.inner
+                .as_mut()
+                .add_input(
+                    py_state.unwrap_mut(),
+                    py_executor,
+                    py_mgr,
+                    BytesInput::new(input),
+                )
+                .expect("Failed to add input")
+        }
+
+        fn fuzz_loop(
+            &mut self,
+            py_executor: &mut PythonExecutor,
+            py_state: &mut PythonStdStateWrapper,
+            py_mgr: &mut PythonEventManager,
+            stages_tuple: &mut PythonStagesTuple,
+        ) {
+            self.inner
+                .as_mut()
+                .fuzz_loop(stages_tuple, py_executor, py_state.unwrap_mut(), py_mgr)
+                .expect("Failed to generate the initial corpus");
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdFuzzerWrapper>()?;
+        Ok(())
     }
 }
