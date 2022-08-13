@@ -1,2 +1,2 @@
-pub mod tinyinst;
 pub mod executor;
+pub mod tinyinst;

@@ -1,12 +1,14 @@
-use crate::tinyinst::litecov::{self, Coverage, DebuggerStatus, LiteCov};
-use cxx::UniquePtr;
 use core::pin::Pin;
+use std::{ffi::CString, os::raw::c_char};
+
+use cxx::UniquePtr;
 use libafl::{
     executors::{Executor, ExitKind},
     inputs::Input,
     Error,
 };
-use std::{ffi::CString, os::raw::c_char};
+
+use crate::tinyinst::litecov::{self, Coverage, DebuggerStatus, LiteCov};
 
 pub struct TinyInstExecutor {
     instrumentation_ptr: UniquePtr<LiteCov>,
@@ -17,9 +19,19 @@ pub struct TinyInstExecutor {
     timeout: u32,
 }
 
+impl std::fmt::Debug for TinyInstExecutor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TinyInstExecutor")
+            .field("argc", &self.argc)
+            .field("argv", &self.argv)
+            .field("timeout", &self.timeout)
+            .finish_non_exhaustive()
+    }
+}
+
 impl<EM, I, S, Z> Executor<EM, I, S, Z> for TinyInstExecutor
 where
-I: Input,
+    I: Input,
 {
     #[inline]
     fn run_target(
@@ -32,19 +44,21 @@ I: Input,
         let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
 
         unsafe {
-            status = self.instrumentation_ptr.pin_mut().Run(self.argc as i32, self.argv.as_mut_ptr(), self.timeout);
+            status = self.instrumentation_ptr.pin_mut().Run(
+                self.argc as i32,
+                self.argv.as_mut_ptr(),
+                self.timeout,
+            );
         }
 
         match status {
             DebuggerStatus::DEBUGGER_CRASHED | DebuggerStatus::DEBUGGER_HANGED => {
                 Ok(ExitKind::Crash)
-            },
-            DebuggerStatus::DEBUGGER_NONE => {
-                Err(Error::Unknown("The harness was not run.".to_string()))
-            },
-            _ => {
-                Ok(ExitKind::Ok)
             }
+            DebuggerStatus::DEBUGGER_NONE => {
+                Err(Error::unknown("The harness was not run.".to_string()))
+            }
+            _ => Ok(ExitKind::Ok),
         }
     }
 }
@@ -52,10 +66,11 @@ I: Input,
 impl TinyInstExecutor {
     pub unsafe fn new(args: Vec<String>, timeout: u32) -> Self {
         let mut instrumentation_ptr = LiteCov::new();
-        let instrumentation = instrumentation_ptr.pin_mut(); 
+        let instrumentation = instrumentation_ptr.pin_mut();
 
         let argc = args.len() + 1;
-        let vec_cstr : Vec<CString> = args.iter()
+        let vec_cstr: Vec<CString> = args
+            .iter()
             .map(|arg| CString::new(arg.as_str()).unwrap())
             .collect();
         let mut argv: Vec<*mut c_char> = Vec::with_capacity(argc + 1);
@@ -72,7 +87,7 @@ impl TinyInstExecutor {
             instrumentation_ptr,
             coverage_ptr,
             newcoverage_ptr,
-            argc,            
+            argc,
             argv,
             timeout,
         }

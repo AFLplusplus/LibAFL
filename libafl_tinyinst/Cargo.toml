@@ -14,7 +14,7 @@ edition = "2021"
 # use x64 native tools cmd prompt
 [dependencies]
 cxx = "1.0"
-libafl = { path = "../libafl", version = "0.7.0", features = ["std", "libafl_derive"] }
+libafl = { path = "../libafl", version = "0.8.0", features = ["std", "libafl_derive"] }
 
 [build-dependencies]
-cmake = { git = "https://github.com/tokatoka/cmake-rs" } # use crates.io's one when the latest one gets published.
+cmake = "0.1"

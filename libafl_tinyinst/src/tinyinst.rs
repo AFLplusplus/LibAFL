@@ -20,10 +20,10 @@ pub mod litecov {
         DEBUGGER_TARGET_END,
         DEBUGGER_CRASHED,
         DEBUGGER_HANGED,
-        DEBUGGER_ATTACHED
+        DEBUGGER_ATTACHED,
     }
 
-    unsafe extern "C++"{
+    unsafe extern "C++" {
         include!("litecov.h");
         include!("coverage.h");
         // for constructors.
@@ -43,7 +43,11 @@ pub mod litecov {
         pub fn litecov_new() -> UniquePtr<LiteCov>;
 
         pub unsafe fn Init(self: Pin<&mut LiteCov>, argc: i32, argv: *mut *mut c_char);
-        pub fn GetCoverage(self: Pin<&mut LiteCov>, coverage: Pin<&mut Coverage>, clear_coverage: bool);
+        pub fn GetCoverage(
+            self: Pin<&mut LiteCov>,
+            coverage: Pin<&mut Coverage>,
+            clear_coverage: bool,
+        );
         pub fn IgnoreCoverage(self: Pin<&mut LiteCov>, coverage: Pin<&mut Coverage>);
         pub fn ClearCoverage(self: Pin<&mut LiteCov>);
         pub fn HasNewCoverage(self: Pin<&mut LiteCov>) -> bool;
@@ -55,7 +59,12 @@ pub mod litecov {
         type DebuggerStatus;
         // class Debugger
         // pub unsafe fn Run(self: Pin<&mut LiteCov>, cmd: *mut c_char, timeout: u32) -> DebuggerStatus;
-        pub unsafe fn Run(self: Pin<&mut LiteCov>, argc: i32, argv: *mut *mut c_char, timeout: u32) -> DebuggerStatus;
+        pub unsafe fn Run(
+            self: Pin<&mut LiteCov>,
+            argc: i32,
+            argv: *mut *mut c_char,
+            timeout: u32,
+        ) -> DebuggerStatus;
         pub fn Kill(self: Pin<&mut LiteCov>) -> DebuggerStatus;
         pub fn Continue(self: Pin<&mut LiteCov>, timeout: u32) -> DebuggerStatus;
         pub fn Attach(self: Pin<&mut LiteCov>, pid: u32, timeout: u32) -> DebuggerStatus;

@@ -1,11 +1,12 @@
+use std::{
+    env,
+    path::Path,
+    process::{exit, Command},
+};
+
 use cmake::Config;
-use std::env;
-use std::path::Path;
-use std::process::{exit, Command};
 
-
-fn main(){
-    
+fn main() {
     // First we generate .cc and .h files from ffi.rs
     if !cfg!(windows) {
         println!("cargo:warning=No MacOS support yet.");
@@ -33,19 +34,21 @@ fn main(){
 
     // shim
     std::fs::copy("./src/shim.cpp", "./tinyinst/shim.cpp").unwrap();
-    
+
     std::fs::copy("./src/shim.h", "./tinyinst/shim.h").unwrap();
 
     let dst = Config::new("TinyInst")
-        .generator("Visual Studio 17 2022") // make this configurable from env variable 
+        .generator("Visual Studio 17 2022") // make this configurable from env variable
         .build_target("tinyinst")
         .profile("Release") // without this, it goes into RelWithDbInfo folder??
         .build();
 
-
-    println!("cargo:warning={}",dst.display());
+    println!("cargo:warning={}", dst.display());
     println!("cargo:rustc-link-search={}\\build\\Release", dst.display()); // debug build?
-    println!("cargo:rustc-link-search={}\\build\\third_party\\obj\\wkit\\lib", dst.display()); //xed
+    println!(
+        "cargo:rustc-link-search={}\\build\\third_party\\obj\\wkit\\lib",
+        dst.display()
+    ); //xed
 
     println!("cargo:rustc-link-lib=static=tinyinst");
     println!("cargo:rustc-link-lib=static=xed");
@@ -54,5 +57,4 @@ fn main(){
     println!("cargo:rerun-if-changed=src/");
     println!("cargo:rerun-if-changed=src/tinyinst.rs");
     println!("cargo:rerun-if-changed=build.rs");
-
 }
