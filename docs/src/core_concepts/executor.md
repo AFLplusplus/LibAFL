@@ -17,7 +17,7 @@ A common pattern when creating an Executor is wrapping an existing one, for inst
 
 ## InProcessExecutor
 Let's begin with the base case; `InProcessExecutor`.
-This executor executes the harness program (function) in the fuzzer process.
+This executor executes the harness program (function) inside the fuzzer process.
 
 When you want to execute the harness as fast as possible, you will most probably want to use this `InprocessExecutor`.
 
