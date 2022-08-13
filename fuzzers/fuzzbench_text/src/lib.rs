@@ -53,7 +53,7 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
@@ -427,7 +427,7 @@ fn fuzz_binary(
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         {
             toks += autotokens()?;
         }
@@ -654,7 +654,7 @@ fn fuzz_text(
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         {
             toks += autotokens()?;
         }
