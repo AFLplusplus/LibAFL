@@ -4,6 +4,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[rustversion::nightly]
+use core::simd::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -493,7 +495,7 @@ where
             let history = VectorType::from_slice(&history_map[i..]);
             let items = VectorType::from_slice(&map[i..]);
 
-            if items.max(history) != history {
+            if items.simd_max(history) != history {
                 interesting = true;
                 unsafe {
                     for j in i..(i + VectorType::LANES) {
