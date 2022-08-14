@@ -60,5 +60,5 @@ impl IntoPy<PyObject> for Regs {
 
 /// Return an ARM64 ArchCapstoneBuilder
 pub fn capstone() -> capstone::arch::arm64::ArchCapstoneBuilder {
-    capstone::Capstone::new().arm()
+    capstone::Capstone::new().arm64()
 }
