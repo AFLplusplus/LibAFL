@@ -4,6 +4,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[rustversion::nightly]
+use core::simd::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -25,9 +27,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
     Error,
 };
-
-#[rustversion::nightly]
-use core::simd::SimdOrd;
 
 /// The prefix of the metadata names
 pub const MAPFEEDBACK_PREFIX: &str = "mapfeedback_metadata_";
