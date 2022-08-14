@@ -157,7 +157,7 @@ where
     /// (Note: An iteration represents a complete run of every stage.
     /// Therefore it does not mean that the harness is executed for once,
     /// because each stage could run the harness for multiple times)
-    /// 
+    ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
     /// This way, the state will be available in the next, respawned, iteration.
