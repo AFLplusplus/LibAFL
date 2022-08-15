@@ -11,13 +11,13 @@ In our model, it can also hold a set of Observers connected with each execution.
 
 In Rust, we bind this concept to the [`Executor`](https://docs.rs/libafl/0/libafl/executors/trait.Executor.html) trait. A structure implementing this trait must implement [`HasObservers`](https://docs.rs/libafl/0/libafl/executors/trait.HasObservers.html) too if wants to hold a set of Observers.
 
-By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/0/libafl/executors/inprocess/struct.InProcessExecutor.html) is which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/0/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
+By default, we implement some commonly used Executors such as [`InProcessExecutor`](https://docs.rs/libafl/0/libafl/executors/inprocess/struct.InProcessExecutor.html) in which the target is a harness function providing in-process crash detection. Another Executor is the [`ForkserverExecutor`](https://docs.rs/libafl/0/libafl/executors/forkserver/struct.ForkserverExecutor.html) that implements an AFL-like mechanism to spawn child processes to fuzz.
 
 A common pattern when creating an Executor is wrapping an existing one, for instance [`TimeoutExecutor`](https://docs.rs/libafl/0.6.1/libafl/executors/timeout/struct.TimeoutExecutor.html) wraps an executor and install a timeout callback before calling the original run function of the wrapped executor.
 
 ## InProcessExecutor
 Let's begin with the base case; `InProcessExecutor`.
-This executor uses [_SanitizerCoverage_](https://clang.llvm.org/docs/SanitizerCoverage.html) as its backend, as you can find the related code in `libafl_targets/src/sancov_pcguards`. Here we allocate a map called `EDGES_MAP` and then our compiler wrapper compiles the harness to write the coverage into this map.
+This executor executes the harness program (function) inside the fuzzer process.
 
 When you want to execute the harness as fast as possible, you will most probably want to use this `InprocessExecutor`.
 

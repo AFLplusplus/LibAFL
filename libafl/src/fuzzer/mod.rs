@@ -154,6 +154,9 @@ where
 {
     /// Fuzz for a single iteration.
     /// Returns the index of the last fuzzed corpus item.
+    /// (Note: An iteration represents a complete run of every stage.
+    /// Therefore it does not mean that the harness is executed for once,
+    /// because each stage could run the harness for multiple times)
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
@@ -184,6 +187,9 @@ where
 
     /// Fuzz for n iterations.
     /// Returns the index of the last fuzzed corpus item.
+    /// (Note: An iteration represents a complete run of every stage.
+    /// therefore the number n is not always equal to the number of the actual harness executions,
+    /// because each stage could run the harness for multiple times)
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
