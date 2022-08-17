@@ -92,7 +92,7 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, I, OT, RT, S> HasObservers<I, OT, S>
+impl<'a, 'b, 'c, H, I, OT, RT, S> HasObservers<I, S>
     for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
 where
     H: FnMut(&I) -> ExitKind,

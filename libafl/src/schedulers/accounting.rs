@@ -95,7 +95,7 @@ impl TopAccountingMetadata {
 #[derive(Debug)]
 pub struct CoverageAccountingScheduler<'a, CS, I, S>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler,
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -104,9 +104,9 @@ where
     inner: MinimizerScheduler<CS, LenTimeMulTestcaseScore<I, S>, I, MapIndexesMetadata, S>,
 }
 
-impl<'a, CS, I, S> Scheduler<I, S> for CoverageAccountingScheduler<'a, CS, I, S>
+impl<'a, CS, I, S> Scheduler for CoverageAccountingScheduler<'a, CS, I, S>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler,
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {
@@ -156,7 +156,7 @@ where
 
 impl<'a, CS, I, S> CoverageAccountingScheduler<'a, CS, I, S>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler,
     I: Input + HasLen,
     S: HasCorpus<I> + HasMetadata + HasRand,
 {

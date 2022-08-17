@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<F, I, S> Scheduler<I, S> for ProbabilitySamplingScheduler<F, I, S>
+impl<F, I, S> Scheduler for ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
@@ -172,7 +172,7 @@ mod tests {
         }
     }
 
-    pub type UniformProbabilitySamplingScheduler<I, S> =
+    pub type UniformProbabilitySamplingScheduler =
         ProbabilitySamplingScheduler<UniformDistribution<I>, I, S>;
 
     #[test]

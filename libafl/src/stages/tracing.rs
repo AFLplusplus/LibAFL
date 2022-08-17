@@ -21,7 +21,7 @@ use crate::{
 pub struct TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
@@ -33,7 +33,7 @@ where
 impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
@@ -82,7 +82,7 @@ where
 impl<EM, I, OT, S, TE, Z> TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
@@ -111,7 +111,7 @@ impl<E, EM, I, OT, S, SOT, Z> Stage<ShadowExecutor<E, I, S, SOT>, EM, S, Z>
     for ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
 where
     I: Input,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<I> + Debug,
@@ -163,7 +163,7 @@ where
 impl<E, EM, I, OT, S, SOT, Z> ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
 where
     I: Input,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,

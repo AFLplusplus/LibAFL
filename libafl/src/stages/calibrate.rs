@@ -44,7 +44,7 @@ const CAL_STAGE_MAX: usize = 16;
 
 impl<E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
     EM: EventFirer<I>,
     I: Input,
     O: MapObserver,

@@ -22,7 +22,7 @@ use crate::{
 pub struct ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
@@ -33,7 +33,7 @@ where
 impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {
@@ -70,7 +70,7 @@ where
 impl<EM, I, OT, S, TE, Z> ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
 {

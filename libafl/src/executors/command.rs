@@ -377,7 +377,7 @@ where
     }
 }
 
-impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
+impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, S>
     for CommandExecutor<EM, I, OT, S, T, Z>
 {
     fn observers(&self) -> &OT {

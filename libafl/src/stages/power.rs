@@ -21,7 +21,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
@@ -39,7 +39,7 @@ where
 impl<E, F, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
     for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
@@ -132,7 +132,7 @@ where
 impl<E, F, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z>
     for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
@@ -158,7 +158,7 @@ where
 
 impl<E, F, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,

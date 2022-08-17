@@ -100,15 +100,14 @@ impl From<ExitKind> for DiffExitKind {
 crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers<I, OT, S>: Debug
-where
-    OT: ObserversTuple<I, S>,
-{
+pub trait HasObservers<I, S>: Debug {
+    type Observers: ObserversTuple<I, S>;
+
     /// Get the linked observers
-    fn observers(&self) -> &OT;
+    fn observers(&self) -> &Self::Observers;
 
     /// Get the linked observers (mutable)
-    fn observers_mut(&mut self) -> &mut OT;
+    fn observers_mut(&mut self) -> &mut Self::Observers;
 }
 
 /// An executor takes the given inputs, and runs the harness/target.

@@ -86,39 +86,43 @@ pub trait Observer<I, S>: Named + Debug {
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple<I, S>: MatchName + Debug {
+pub trait ObserversTuple: MatchName + Debug {
+
+    type Input;
+    type State;
+
     /// This is called right before the next execution.
-    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+    fn pre_exec_all(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error>;
 
     /// This is called right after the last execution
     fn post_exec_all(
         &mut self,
-        state: &mut S,
-        input: &I,
+        state: &mut Self::State,
+        input: &Self::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 
     /// This is called right before the next execution in the child process, if any.
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+    fn pre_exec_child_all(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error>;
 
     /// This is called right after the last execution in the child process, if any.
     fn post_exec_child_all(
         &mut self,
-        state: &mut S,
-        input: &I,
+        state: &mut Self::State,
+        input: &Self::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 }
 
-impl<I, S> ObserversTuple<I, S> for () {
-    fn pre_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl ObserversTuple for () {
+    fn pre_exec_all(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec_all(
         &mut self,
-        _state: &mut S,
-        _input: &I,
+        _state: &mut Self::State,
+        _input: &Self::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())

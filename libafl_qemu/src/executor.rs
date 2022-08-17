@@ -112,7 +112,7 @@ where
     }
 }
 
-impl<'a, H, I, OT, QT, S> HasObservers<I, OT, S> for QemuExecutor<'a, H, I, OT, QT, S>
+impl<'a, H, I, OT, QT, S> HasObservers<I, S> for QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
@@ -241,7 +241,7 @@ where
     }
 }
 
-impl<'a, H, I, OT, QT, S, SP> HasObservers<I, OT, S> for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
+impl<'a, H, I, OT, QT, S, SP> HasObservers<I, S> for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,

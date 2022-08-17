@@ -152,13 +152,9 @@ pub struct PowerQueueScheduler {
     strat: PowerSchedule,
 }
 
-impl<I, S> Scheduler<I, S> for PowerQueueScheduler
-where
-    S: HasCorpus<I> + HasMetadata,
-    I: Input,
-{
+impl Scheduler for PowerQueueScheduler {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(self.strat)));
         }
@@ -189,7 +185,7 @@ where
         Ok(())
     }
 
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {

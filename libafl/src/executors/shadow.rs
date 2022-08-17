@@ -74,21 +74,20 @@ where
     }
 }
 
-impl<E, I, OT, S, SOT> HasObservers<I, OT, S> for ShadowExecutor<E, I, S, SOT>
+impl<E, I, S, SOT> HasObservers<I, S> for ShadowExecutor<E, I, S, SOT>
 where
     I: Debug,
     S: Debug,
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    E: HasObservers<I, S>,
     SOT: ObserversTuple<I, S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.executor.observers_mut()
     }
 }

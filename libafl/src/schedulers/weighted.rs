@@ -219,7 +219,7 @@ where
     }
 }
 
-impl<F, I, S> Scheduler<I, S> for WeightedScheduler<F, I, S>
+impl<F, I, S> Scheduler for WeightedScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     S: HasCorpus<I> + HasMetadata + HasRand,
@@ -327,4 +327,4 @@ where
 }
 
 /// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler<I, S> = WeightedScheduler<CorpusWeightTestcaseScore<I, S>, I, S>;
+pub type StdWeightedScheduler = WeightedScheduler<CorpusWeightTestcaseScore<I, S>, I, S>;

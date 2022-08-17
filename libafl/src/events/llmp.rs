@@ -384,8 +384,8 @@ where
     ) -> Result<(), Error>
     where
         OT: ObserversTuple<I, S> + DeserializeOwned,
-        E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
-        Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
+        E: Executor<Self, I, S, Z> + HasObservers<I, S>,
+        Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S>,
     {
         match event {
             Event::NewTestcase {
@@ -490,10 +490,10 @@ where
 impl<E, I, OT, S, SP, Z> EventProcessor<E, I, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
     SP: ShMemProvider,
-    E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<Self, I, S, Z> + HasObservers<I, S>,
     I: Input,
     OT: ObserversTuple<I, S> + DeserializeOwned,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
+    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S>, //CE: CustomEvent<I>,
 {
     fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
         // TODO: Get around local event copy by moving handle_in_client
@@ -529,11 +529,11 @@ where
 
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S, SP>
 where
-    E: Executor<Self, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<Self, I, S, Z> + HasObservers<I, S>,
     I: Input,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>, //CE: CustomEvent<I>,
+    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S>, //CE: CustomEvent<I>,
 {
 }
 
@@ -645,9 +645,9 @@ where
 #[cfg(feature = "std")]
 impl<E, I, OT, S, SP, Z> EventProcessor<E, I, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
-    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, S>,
     I: Input,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
+    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S>,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
@@ -660,10 +660,10 @@ where
 #[cfg(feature = "std")]
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
-    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z> + HasObservers<I, S>,
     I: Input,
     S: Serialize,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S>,
+    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S>,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,

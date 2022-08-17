@@ -45,11 +45,10 @@ use crate::{
 /// Feedbacks evaluate the observers.
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
-pub trait Feedback<I, S>: Named + Debug
-where
-    I: Input,
-    S: HasClientPerfMonitor,
-{
+pub trait Feedback: Named + Debug {
+    type Input: Input;
+    type State: HasClientPerfMonitor;
+
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
     fn init_state(&mut self, _state: &mut S) -> Result<(), Error> {
@@ -60,9 +59,9 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>

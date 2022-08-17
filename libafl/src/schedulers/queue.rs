@@ -8,13 +8,9 @@ use crate::{corpus::Corpus, inputs::Input, schedulers::Scheduler, state::HasCorp
 #[derive(Debug, Clone)]
 pub struct QueueScheduler;
 
-impl<I, S> Scheduler<I, S> for QueueScheduler
-where
-    S: HasCorpus<I>,
-    I: Input,
-{
+impl Scheduler for QueueScheduler {
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {

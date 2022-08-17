@@ -937,7 +937,7 @@ where
     }
 }
 
-impl<I, OT, S, SP> HasObservers<I, OT, S> for ForkserverExecutor<I, OT, S, SP>
+impl<I, OT, S, SP> HasObservers<I, S> for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
@@ -993,18 +993,17 @@ where
     }
 }
 
-impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutForkserverExecutor<E>
+impl<E, I, S> HasObservers<I, S> for TimeoutForkserverExecutor<E>
 where
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    E: HasObservers<I, S>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.executor.observers_mut()
     }
 }

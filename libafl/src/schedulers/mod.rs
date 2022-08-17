@@ -35,21 +35,21 @@ use crate::{
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait Scheduler<I, S>
-where
-    I: Input,
-{
+pub trait Scheduler {
+    type Input: Input;
+    type State;
+
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, _state: &mut S, _idx: usize) -> Result<(), Error> {
+    fn on_add(&self, _state: &mut Self::State, _idx: usize) -> Result<(), Error> {
         Ok(())
     }
 
     /// Replaces the testcase at the given idx
     fn on_replace(
         &self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _idx: usize,
-        _testcase: &Testcase<I>,
+        _testcase: &Testcase<Self::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -57,28 +57,24 @@ where
     /// Removes an entry from the corpus, returning it if it was present.
     fn on_remove(
         &self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _idx: usize,
-        _testcase: &Option<Testcase<I>>,
+        _testcase: &Option<Testcase<Self::Input>>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut S) -> Result<usize, Error>;
+    fn next(&self, state: &mut Self::State) -> Result<usize, Error>;
 }
 
 /// Feed the fuzzer simpply with a random testcase on request
 #[derive(Debug, Clone)]
 pub struct RandScheduler;
 
-impl<I, S> Scheduler<I, S> for RandScheduler
-where
-    S: HasCorpus<I> + HasRand,
-    I: Input,
-{
+impl Scheduler for RandScheduler {
     /// Gets the next entry at random
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {

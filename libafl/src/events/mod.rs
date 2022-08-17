@@ -299,10 +299,9 @@ where
 }
 
 /// [`EventFirer`] fire an event.
-pub trait EventFirer<I>
-where
-    I: Input,
-{
+pub trait EventFirer {
+    type Input: Input;
+
     /// Send off an [`Event`] to the broker
     ///
     /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
@@ -311,7 +310,7 @@ where
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-case.
-    fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+    fn fire<S>(&mut self, state: &mut S, event: Event<Self::Input>) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
@@ -332,9 +331,9 @@ where
     }
 
     /// Serialize all observers for this type and manager
-    fn serialize_observers<OT, S>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<I, S> + Serialize,
+        OT: ObserversTuple + Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }

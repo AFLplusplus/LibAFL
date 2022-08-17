@@ -114,7 +114,7 @@ where
     }
 }
 
-impl<H, HB, I, OT, S> HasObservers<I, OT, S> for GenericInProcessExecutor<H, HB, I, OT, S>
+impl<H, HB, I, OT, S> HasObservers<I, S> for GenericInProcessExecutor<H, HB, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -309,7 +309,7 @@ impl InProcessHandlers {
     pub fn new<E, EM, I, OF, OT, S, Z, H>() -> Result<Self, Error>
     where
         I: Input,
-        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<I, S>,
         OT: ObserversTuple<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OF: Feedback<I, S>,
@@ -581,7 +581,7 @@ mod unix_signal_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
     where
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -656,7 +656,7 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -736,7 +736,7 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -921,7 +921,7 @@ mod windows_exception_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
     where
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -1013,7 +1013,7 @@ mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -1109,7 +1109,7 @@ mod windows_exception_handler {
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<I, S>,
         EM: EventFirer<I> + EventRestarter<S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<I, S>,
@@ -1280,7 +1280,7 @@ impl InChildProcessHandlers {
     pub fn new<E, I, OT, S>() -> Result<Self, Error>
     where
         I: Input,
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, S>,
         OT: ObserversTuple<I, S>,
     {
         unsafe {
@@ -1534,7 +1534,7 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, H, I, OT, S, SP> HasObservers<I, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
@@ -1571,7 +1571,7 @@ pub mod child_signal_handlers {
     /// invokes the `post_exec_child` hook on all observer in case the child process panics
     pub fn setup_child_panic_hook<E, I, OT, S>()
     where
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, S>,
         OT: ObserversTuple<I, S>,
         I: Input,
     {
@@ -1607,7 +1607,7 @@ pub mod child_signal_handlers {
         _context: &mut ucontext_t,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<I, S>,
         OT: ObserversTuple<I, S>,
         I: Input,
     {

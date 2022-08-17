@@ -33,7 +33,7 @@ where
     }
 }
 
-impl<I, E: Debug, OT: Debug, S> HasObservers<I, OT, S> for WithObservers<E, OT>
+impl<I, E: Debug, OT: Debug, S> HasObservers<I, S> for WithObservers<E, OT>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
