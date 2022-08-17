@@ -182,7 +182,7 @@ impl TryFrom<&str> for Cores {
 /// * `./fuzzer --cores 1,2-4,6`: clients run in cores 1,2,3,4,6
 /// * `./fuzzer --cores all`: one client runs on each available core
 #[cfg(feature = "std")]
-#[deprecated(since = "0.8.0", note = "Use Cores::from_cmdline instead")]
+#[deprecated(since = "0.8.1", note = "Use Cores::from_cmdline instead")]
 pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
     Ok(Cores::from_cmdline(args)?
         .ids
