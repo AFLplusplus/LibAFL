@@ -64,7 +64,10 @@ impl TuiUI {
     pub fn on_right(&mut self) {
         if self.clients != 0 {
             // clients_idx never 0
-            self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
+            if self.clients - 1 != 0 {
+                // except for when it is ;)
+                self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
+            }
         }
     }
 
@@ -74,7 +77,10 @@ impl TuiUI {
             if self.clients_idx == 1 {
                 self.clients_idx = self.clients - 1;
             } else {
-                self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
+                if self.clients - 1 != 0 {
+                    // dont wanna be dividing by 0
+                    self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
+                }
             }
         }
     }
