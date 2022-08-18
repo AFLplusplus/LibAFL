@@ -51,7 +51,7 @@ pub trait Feedback: Named + Debug {
 
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
-    fn init_state(&mut self, _state: &mut S) -> Result<(), Error> {
+    fn init_state(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         Ok(())
     }
 
@@ -66,8 +66,8 @@ pub trait Feedback: Named + Debug {
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>;
+        EM: EventFirer,
+        OT: ObserversTuple;
 
     /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
     /// It also keeps track of introspection stats.
@@ -78,13 +78,13 @@ pub trait Feedback: Named + Debug {
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // Start a timer for this feedback
         let start_time = crate::bolts::cpu::read_time_counter();
@@ -107,15 +107,15 @@ pub trait Feedback: Named + Debug {
     #[inline]
     fn append_metadata(
         &mut self,
-        _state: &mut S,
-        _testcase: &mut Testcase<I>,
+        _state: &mut Self::State,
+        _testcase: &mut Testcase<Self::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -128,13 +128,11 @@ pub trait HasObserverName {
 
 /// A combined feedback consisting of multiple [`Feedback`]s
 #[derive(Debug)]
-pub struct CombinedFeedback<A, B, FL, I, S>
+pub struct CombinedFeedback<A, B, FL>
 where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
+    A: Feedback,
+    B: Feedback,
     FL: FeedbackLogic<A, B, I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
 {
     /// First [`Feedback`]
     pub first: A,
@@ -254,13 +252,15 @@ where
 }
 
 /// Logical combination of two feedbacks
-pub trait FeedbackLogic<A, B, I, S>: 'static + Debug
+pub trait FeedbackLogic<A, B>: 'static + Debug
 where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
+    A: Feedback,
+    B: Feedback,
 {
+
+    type Input: Input;
+    type State: HasClientPerfMonitor;
+
     /// The name of this combination
     fn name() -> &'static str;
 
@@ -268,15 +268,15 @@ where
     fn is_pair_interesting<EM, OT>(
         first: &mut A,
         second: &mut B,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>;
+        EM: EventFirer,
+        OT: ObserversTuple;
 
     /// If this pair is interesting (with introspection features enabled)
     #[cfg(feature = "introspection")]
@@ -284,15 +284,15 @@ where
     fn is_pair_interesting_introspection<EM, OT>(
         first: &mut A,
         second: &mut B,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>;
+        EM: EventFirer,
+        OT: ObserversTuple;
 }
 
 /// Eager `OR` combination of two feedbacks

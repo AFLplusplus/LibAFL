@@ -47,17 +47,14 @@ pub trait HasFeedback {
 }
 
 /// Holds an objective feedback
-pub trait HasObjective<I, OF, S>
-where
-    OF: Feedback<I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
-{
+pub trait HasObjective {
+    type Objectives: Feedback,
+
     /// The objective feedback
-    fn objective(&self) -> &OF;
+    fn objective(&self) -> &Self::Objectives;
 
     /// The objective feedback (mutable)
-    fn objective_mut(&mut self) -> &mut OF;
+    fn objective_mut(&mut self) -> &mut Self::Objectives;
 }
 
 /// Evaluate if an input is interesting using the feedback
@@ -549,12 +546,7 @@ where
 
 impl<CS, F, OF> StdFuzzer<CS, F, OF>
 where
-    Self: HasScheduler,
-    CS: Scheduler,
-    F: Feedback<I, S>,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasExecutions + HasClientPerfMonitor,
+    Self: HasScheduler + HasFeedback + HasObjective,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
@@ -568,7 +560,7 @@ where
     /// Runs the input and triggers observers and feedback
     pub fn execute_input<E, EM>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         event_mgr: &mut EM,
         input: &Self::Input,

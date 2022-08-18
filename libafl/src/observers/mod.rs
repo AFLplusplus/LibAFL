@@ -87,7 +87,6 @@ pub trait Observer<I, S>: Named + Debug {
 
 /// A haskell-style tuple of observers
 pub trait ObserversTuple: MatchName + Debug {
-
     type Input;
     type State;
 
@@ -103,7 +102,11 @@ pub trait ObserversTuple: MatchName + Debug {
     ) -> Result<(), Error>;
 
     /// This is called right before the next execution in the child process, if any.
-    fn pre_exec_child_all(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error>;
+    fn pre_exec_child_all(
+        &mut self,
+        state: &mut Self::State,
+        input: &Self::Input,
+    ) -> Result<(), Error>;
 
     /// This is called right after the last execution in the child process, if any.
     fn post_exec_child_all(
@@ -115,7 +118,11 @@ pub trait ObserversTuple: MatchName + Debug {
 }
 
 impl ObserversTuple for () {
-    fn pre_exec_all(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec_all(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
