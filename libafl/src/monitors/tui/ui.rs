@@ -76,11 +76,9 @@ impl TuiUI {
             // clients_idx never 0
             if self.clients_idx == 1 {
                 self.clients_idx = self.clients - 1;
-            } else {
-                if self.clients - 1 != 0 {
-                    // dont wanna be dividing by 0
-                    self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
-                }
+            } else if self.clients - 1 != 0 {
+                // don't wanna be dividing by 0
+                self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
             }
         }
     }
