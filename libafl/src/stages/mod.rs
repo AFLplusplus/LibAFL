@@ -8,6 +8,9 @@ Other stages may enrich [`crate::corpus::Testcase`]s with metadata.
 pub mod mutational;
 pub use mutational::{MutationalStage, StdMutationalStage};
 
+pub mod tmin;
+pub use tmin::{StdTMinMutationalStage, TMinMutationalStage};
+
 pub mod push;
 
 pub mod tracing;
