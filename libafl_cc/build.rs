@@ -204,19 +204,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
     cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={}", acc_map_size));
 
-    let llvm_version = match find_llvm_config()
-        .unwrap()
-        .split('-')
-        .collect::<Vec<&str>>()
-        .get(2)
-    {
-        Some(ver) => ver.parse::<usize>().ok(),
-        None => None,
-    };
-    // The approach below causes issues with arguments to optimization passes.
-    // An example is fuzzers/libfuzzer_libpng_accounting which passes -granularity=FUNC.
-    // In CI/CD, the new pass manager is not used. For now, maintain the same behavior.
-    //let llvm_version = find_llvm_version();
+    let llvm_version = find_llvm_version();
 
     if let Some(ver) = llvm_version {
         if ver >= 14 {
