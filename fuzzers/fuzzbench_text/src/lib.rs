@@ -70,7 +70,7 @@ pub fn libafl_main() {
     //RegistryBuilder::register::<Tokens>();
 
     let res = match Command::new("libafl_fuzzbench")
-        .version("0.8.0")
+        .version("0.8.1")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
