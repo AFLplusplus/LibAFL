@@ -129,7 +129,7 @@ where
 
 impl<F, I, S> Default for ProbabilitySamplingScheduler<F, I, S>
 where
-    F: TestcaseScore<I, S>,
+    F: TestcaseScore,
     I: Input,
     S: HasCorpus + HasMetadata + HasRand,
 {

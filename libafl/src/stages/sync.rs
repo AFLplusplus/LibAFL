@@ -61,7 +61,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut <Self as Stage>::State,
         manager: &mut EM,
         _corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -116,7 +116,7 @@ where
         last: &Option<SystemTime>,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut <Self as Stage>::State,
         manager: &mut EM,
     ) -> Result<Option<SystemTime>, Error> {
         let mut max_time = None;

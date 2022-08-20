@@ -5,6 +5,7 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
+    events::EventManager,
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     inputs::Input,
@@ -19,44 +20,26 @@ use crate::{
 };
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
-where
-    E: Executor + HasObservers,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: Mutator,
-    O: MapObserver,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasCorpus + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
-{
+pub struct PowerMutationalStage<F, O> {
     map_observer_name: String,
-    mutator: M,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, F, EM, I, O, OT, S, Z)>,
+    mutator: <Self as MutationalStage>::Mutator,
+    phantom: PhantomData<(F, O)>,
 }
 
-impl<E, F, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
-    for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
+impl<F, O> MutationalStage for PowerMutationalStage<F, O>
 where
-    E: Executor + HasObservers,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: Mutator,
+    F: TestcaseScore,
     O: MapObserver,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
     #[inline]
-    fn mutator(&self) -> &M {
+    fn mutator(&self) -> &Self::Mutator {
         &self.mutator
     }
 
     /// The list of mutators, added to this stage (as mutable ref)
     #[inline]
-    fn mutator_mut(&mut self) -> &mut M {
+    fn mutator_mut(&mut self) -> &mut Self::Mutator {
         &mut self.mutator
     }
 
@@ -73,10 +56,10 @@ where
     #[allow(clippy::cast_possible_wrap)]
     fn perform_mutational(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut <Self as Stage>::Fuzzer,
+        executor: &mut <Self as Stage>::Executor,
         state: &mut Self::State,
-        manager: &mut EM,
+        manager: &mut <Self as Stage>::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let num = self.iterations(state, corpus_idx)?;
@@ -129,25 +112,15 @@ where
     }
 }
 
-impl<E, F, EM, I, M, O, OT, S, Z> Stage for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
-where
-    E: Executor + HasObservers,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: Mutator,
-    O: MapObserver,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, I, S>,
-{
+impl<F, O> Stage for PowerMutationalStage<F, O> {
     #[inline]
     #[allow(clippy::let_and_return)]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut EM,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
@@ -155,19 +128,13 @@ where
     }
 }
 
-impl<E, F, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
+impl<F, O> PowerMutationalStage<F, O>
 where
-    E: Executor + HasObservers,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: Mutator,
+    F: TestcaseScore,
     O: MapObserver,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasCorpus + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]
-    pub fn new(mutator: M, map_observer_name: &O) -> Self {
+    pub fn new(mutator: <Self as MutationalStage>::Mutator, map_observer_name: &O) -> Self {
         Self {
             map_observer_name: map_observer_name.name().to_string(),
             mutator,
@@ -177,5 +144,4 @@ where
 }
 
 /// The standard powerscheduling stage
-pub type StdPowerMutationalStage<E, EM, I, M, O, OT, S, Z> =
-    PowerMutationalStage<E, CorpusPowerTestcaseScore<I, S>, EM, I, M, O, OT, S, Z>;
+pub type StdPowerMutationalStage<O> = PowerMutationalStage<CorpusPowerTestcaseScore, O>;

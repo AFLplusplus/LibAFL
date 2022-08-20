@@ -155,7 +155,7 @@ where
     where
         EM: EventFirer + EventRestarter,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         Z: HasObservers,
     {
         let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z, H>()?;

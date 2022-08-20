@@ -26,17 +26,14 @@ use crate::{
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<I, O, OT, S>
+pub struct CalibrationStage<O>
 where
-    I: Input,
     O: MapObserver,
-    OT: ObserversTuple,
-    S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
-    phantom: PhantomData<(I, O, OT, S)>,
+    phantom: PhantomData<O>,
 }
 
 const CAL_STAGE_START: usize = 4;
@@ -228,16 +225,22 @@ where
     }
 }
 
-impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
+impl<O> CalibrationStage<O>
 where
-    I: Input,
     O: MapObserver,
-    OT: ObserversTuple,
-    S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new<N, R>(map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>) -> Self
+    pub fn new<N, R>(
+        map_feedback: &MapFeedback<
+            <Self as Stage>::Input,
+            N,
+            O,
+            R,
+            <Self as Stage>::State,
+            O::Entry,
+        >,
+    ) -> Self
     where
         O::Entry:
             PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,

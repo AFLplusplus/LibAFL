@@ -805,7 +805,7 @@ where
     #[builder(default = ManagerKind::Any)]
     kind: ManagerKind,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(I, OT, S)>,
+    phantom: PhantomData<(I, OT, S)>,
 }
 
 #[cfg(feature = "std")]

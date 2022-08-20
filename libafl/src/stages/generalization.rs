@@ -21,7 +21,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
+    state::{HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
 
@@ -60,32 +60,19 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct GeneralizationStage<EM, O, OT, S, Z>
-where
-    O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
-{
+pub struct GeneralizationStage {
     map_observer_name: String,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, O, OT, S, Z)>,
 }
 
-impl<E, EM, O, OT, S, Z> Stage for GeneralizationStage<EM, O, OT, S, Z>
-where
-    O: MapObserver,
-    E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, S>,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
-{
+impl Stage for GeneralizationStage {
     #[inline]
     #[allow(clippy::too_many_lines)]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut EM,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         if state
@@ -347,18 +334,12 @@ where
     }
 }
 
-impl<EM, O, OT, S, Z> GeneralizationStage<EM, O, OT, S, Z>
-where
-    O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
-{
+impl GeneralizationStage {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
-    pub fn new(map_observer: &O) -> Self {
+    pub fn new<O: MapObserver>(map_observer: &O) -> Self {
         Self {
             map_observer_name: map_observer.name().to_string(),
-            phantom: PhantomData,
         }
     }
 
@@ -367,21 +348,26 @@ where
     pub fn from_name(map_observer_name: &str) -> Self {
         Self {
             map_observer_name: map_observer_name.to_string(),
-            phantom: PhantomData,
         }
     }
 
-    fn verify_input<E>(
+    fn verify_input<E, O>(
         &self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut Self::State,
-        manager: &mut EM,
+        fuzzer: &mut <Self as Stage>::Fuzzer,
+        executor: &mut <Self as Stage>::Executor,
+        state: &mut <Self as Stage>::State,
+        manager: &mut <Self as Stage>::EventManager,
         novelties: &[usize],
         input: &GeneralizedInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, S>,
+        E: Executor<
+                EventManager = <Self as Stage>::EventManager,
+                Input = GeneralizedInput,
+                State = <Self as Stage>::State,
+                Fuzzer = <Self as Stage>::Fuzzer,
+            > + HasObservers<Input = GeneralizedInput>,
+        O: MapObserver,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -416,17 +402,22 @@ where
     #[allow(clippy::too_many_arguments)]
     fn find_gaps<E>(
         &self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut Self::State,
-        manager: &mut EM,
+        fuzzer: &mut <Self as Stage>::Fuzzer,
+        executor: &mut <Self as Stage>::Executor,
+        state: &mut <Self as Stage>::State,
+        manager: &mut <Self as Stage>::EventManager,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
         find_next_index: fn(&[Option<u8>], usize, u8) -> usize,
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, S>,
+        E: Executor<
+                EventManager = <Self as Stage>::EventManager,
+                Input = GeneralizedInput,
+                State = <Self as Stage>::State,
+                Fuzzer = <Self as Stage>::Fuzzer,
+            > + HasObservers<Input = GeneralizedInput>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -460,7 +451,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut Self::State,
+        state: &mut <Self as Stage>::State,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -468,7 +459,8 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<Input = GeneralizedInput>,
+        E: Executor<EventManager = EM, Input = GeneralizedInput, State = Self, Fuzzer = Z>
+            + HasObservers<Input = GeneralizedInput>,
     {
         let mut index = 0;
         while index < payload.len() {

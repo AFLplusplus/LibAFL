@@ -86,7 +86,7 @@ where
     #[builder(default = true)]
     spawn_broker: bool,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
+    phantom: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
 }
 
 impl<CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
