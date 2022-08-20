@@ -594,6 +594,109 @@ mod apple {
     }
 }
 
+// FreeBSD Section
+
+#[cfg(target_os = "freebsd")]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    freebsd::get_core_ids()
+}
+
+#[cfg(target_os = "freebsd")]
+#[inline]
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    freebsd::set_for_current(core_id)
+}
+
+#[cfg(target_os = "freebsd")]
+mod freebsd {
+    use alloc::vec::Vec;
+    use std::{mem, thread::available_parallelism};
+
+    use libc::{cpuset_setaffinity, cpuset_t, CPU_SET};
+
+    use super::CoreId;
+    use crate::Error;
+
+    const CPU_LEVEL_WHICH: libc::c_int = 3;
+    const CPU_WHICH_PID: libc::c_int = 2;
+
+    #[allow(trivial_numeric_casts)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+        // Turn `core_id` into a `libc::cpuset_t` with only
+        let mut set = new_cpuset();
+
+        unsafe { CPU_SET(core_id.id, &mut set) };
+
+        // Set the current thread's core affinity.
+        let result = unsafe {
+            cpuset_setaffinity(
+                CPU_LEVEL_WHICH,
+                CPU_WHICH_PID,
+                -1, // Defaults to current thread
+                mem::size_of::<cpuset_t>(),
+                &set,
+            )
+        };
+
+        if result < 0 {
+            Err(Error::unknown("Failed to set_for_current"))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn new_cpuset() -> cpuset_t {
+        unsafe { mem::zeroed::<cpuset_t>() }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_freebsd_get_affinity_mask() {
+            get_affinity_mask().unwrap();
+        }
+
+        #[test]
+        fn test_freebsd_set_for_current() {
+            let ids = get_core_ids().unwrap();
+
+            assert!(!ids.is_empty());
+
+            ids[0].set_affinity().unwrap();
+
+            // Ensure that the system pinned the current thread
+            // to the specified core.
+            let mut core_mask = new_cpuset();
+            unsafe { CPU_SET(ids[0].id, &mut core_mask) };
+
+            let new_mask = get_affinity_mask().unwrap();
+
+            let mut is_equal = true;
+
+            for i in 0..CPU_SETSIZE as usize {
+                let is_set1 = unsafe { CPU_ISSET(i, &core_mask) };
+                let is_set2 = unsafe { CPU_ISSET(i, &new_mask) };
+
+                if is_set1 != is_set2 {
+                    is_equal = false;
+                }
+            }
+
+            assert!(is_equal);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::thread::available_parallelism;
