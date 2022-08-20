@@ -35,11 +35,11 @@ const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 pub struct PushStageSharedState<CS, EM, I, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    EM: EventFirer + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     /// The [`crate::state::State`]
     pub state: S,
@@ -55,11 +55,11 @@ where
 impl<CS, EM, I, OT, S, Z> PushStageSharedState<CS, EM, I, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    EM: EventFirer + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
@@ -79,11 +79,11 @@ where
 pub struct PushStageHelper<CS, EM, I, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    EM: EventFirer + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
@@ -110,11 +110,11 @@ where
 impl<CS, EM, I, OT, S, Z> PushStageHelper<CS, EM, I, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    EM: EventFirer + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     /// Create a new [`PushStageHelper`]
     #[must_use]
@@ -180,19 +180,37 @@ where
 /// A push stage is a generator that returns a single testcase for each call.
 /// It's an iterator so we can chain it.
 /// After it has finished once, we will call it agan for the next fuzzer round.
-pub trait PushStage<CS, EM, I, OT, S, Z>: Iterator
-where
-    CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
-{
+pub trait PushStage: Iterator {
+    type Scheduler: Scheduler;
+    type EventManager: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter;
+    type Input: Input;
+    type ObserversTuple: ObserversTuple;
+    type Stage: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions;
+    type Fuzzer: ExecutionProcessor + EvaluatorObservers + HasScheduler;
+    type State;
+
     /// Gets the [`PushStageHelper`]
-    fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, I, OT, S, Z>;
+    fn push_stage_helper(
+        &self,
+    ) -> &PushStageHelper<
+        Self::Scheduler,
+        Self::EventManager,
+        Self::Input,
+        Self::ObserversTuple,
+        Self::Stage,
+        Self::Fuzzer,
+    >;
     /// Gets the [`PushStageHelper`] (mutable)
-    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, I, OT, S, Z>;
+    fn push_stage_helper_mut(
+        &mut self,
+    ) -> &mut PushStageHelper<
+        Self::Scheduler,
+        Self::EventManager,
+        Self::Input,
+        Self::ObserversTuple,
+        Self::Stage,
+        Self::Fuzzer,
+    >;
 
     /// Set the current corpus index this stage works on
     fn set_current_corpus_idx(&mut self, corpus_idx: usize) {
@@ -205,10 +223,10 @@ where
     #[inline]
     fn init(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
+        _fuzzer: &mut Self::Fuzzer,
+        _state: &mut Self::State,
+        _event_mgr: &mut Self::EventManager,
+        _observers: &mut Self::ObserversTuple,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -218,21 +236,21 @@ where
     /// After this stage has finished, or if the stage does not process any inputs, this should return `None`.
     fn pre_exec(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
-    ) -> Option<Result<I, Error>>;
+        _fuzzer: &mut Self::Fuzzer,
+        _state: &mut Self::State,
+        _event_mgr: &mut Self::EventManager,
+        _observers: &mut Self::ObserversTuple,
+    ) -> Option<Result<Self::Input, Error>>;
 
     /// Called after the execution of a testcase finished.
     #[inline]
     fn post_exec(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
-        _input: I,
+        _fuzzer: &mut Self::Fuzzer,
+        _state: &mut Self::State,
+        _event_mgr: &mut Self::EventManager,
+        _observers: &mut Self::ObserversTuple,
+        _input: Self::Input,
         _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -242,16 +260,16 @@ where
     #[inline]
     fn deinit(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
+        _fuzzer: &mut Self::Fuzzer,
+        _state: &mut Self::State,
+        _event_mgr: &mut Self::EventManager,
+        _observers: &mut Self::ObserversTuple,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     /// This is the default implementation for `next` for this stage
-    fn next_std(&mut self) -> Option<Result<I, Error>> {
+    fn next_std(&mut self) -> Option<Result<Self::Input, Error>> {
         let mut shared_state = {
             let shared_state_ref = &mut (*self.push_stage_helper_mut().shared_state).borrow_mut();
             shared_state_ref.take().unwrap()

@@ -41,38 +41,46 @@ pub use sync::*;
 
 use self::push::PushStage;
 use crate::{
-    events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
-    executors::{Executor, HasObservers},
+    executors::HasObservers,
     inputs::Input,
-    observers::ObserversTuple,
-    schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
-    Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
+    state::{HasClientPerfMonitor, HasCorpus},
+    Error, Evaluator, ExecutesInput,
 };
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<E, EM, S, Z> {
+pub trait Stage {
+    type Input: Input;
+    type State: HasClientPerfMonitor + HasCorpus<Input = Self::Input>;
+    type Fuzzer: Evaluator<Input = Self::Input, State = Self::State, Executor = Self::Executor>;
+    type Executor;
+    type EventManager;
+
     /// Run the stage
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
+        state: &mut Self::State,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
 pub trait StagesTuple<E, EM, S, Z> {
+    type Executor;
+    type EventManager;
+    type State;
+    type Fuzzer;
+
     /// Performs all `Stages` in this tuple
     fn perform_all(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
+        state: &mut Self::State,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
@@ -92,14 +100,14 @@ impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for () {
 
 impl<Head, Tail, E, EM, S, Z> StagesTuple<E, EM, S, Z> for (Head, Tail)
 where
-    Head: Stage<E, EM, S, Z>,
+    Head: Stage,
     Tail: StagesTuple<E, EM, S, Z>,
 {
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -123,7 +131,7 @@ where
     phantom: PhantomData<(E, EM, S, Z)>,
 }
 
-impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for ClosureStage<CB, E, EM, S, Z>
+impl<CB, E, EM, S, Z> Stage for ClosureStage<CB, E, EM, S, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
 {
@@ -131,7 +139,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -167,61 +175,32 @@ where
 /// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
 #[allow(clippy::type_complexity)]
 #[derive(Debug)]
-pub struct PushStageAdapter<CS, EM, I, OT, PS, S, Z>
+pub struct PushStageAdapter<PS>
 where
-    CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    PS: PushStage,
 {
     push_stage: PS,
-    phantom: PhantomData<(CS, EM, I, OT, S, Z)>,
 }
 
-impl<CS, EM, I, OT, PS, S, Z> PushStageAdapter<CS, EM, I, OT, PS, S, Z>
+impl<PS> PushStageAdapter<PS>
 where
-    CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    PS: PushStage,
 {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
     #[must_use]
     pub fn new(push_stage: PS) -> Self {
-        Self {
-            push_stage,
-            phantom: PhantomData,
-        }
+        Self { push_stage }
     }
 }
 
-impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, S, Z>
-where
-    CS: Scheduler,
-    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutesInput<I, S, Z>
-        + ExecutionProcessor<I, S>
-        + EvaluatorObservers<I, S>
-        + HasScheduler<CS, I, S>,
-{
+impl<PS> Stage for PushStageAdapter<PS> {
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
-        state: &mut S,
-        event_mgr: &mut EM,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
+        state: &mut Self::State,
+        event_mgr: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;

@@ -373,8 +373,8 @@ pub enum MOptMode {
 pub struct StdMOptMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    MT: MutatorsTuple,
+    S: HasRand + HasMetadata + HasCorpus + HasSolutions<I>,
 {
     mode: MOptMode,
     finds_before: usize,
@@ -386,8 +386,8 @@ where
 impl<I, MT, S> Debug for StdMOptMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    MT: MutatorsTuple,
+    S: HasRand + HasMetadata + HasCorpus + HasSolutions<I>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -399,17 +399,17 @@ where
     }
 }
 
-impl<I, MT, S> Mutator<I, S> for StdMOptMutator<I, MT, S>
+impl<I, MT, S> Mutator for StdMOptMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    MT: MutatorsTuple,
+    S: HasRand + HasMetadata + HasCorpus + HasSolutions<I>,
 {
     #[inline]
     fn mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         self.finds_before = state.corpus().count() + state.solutions().count();
@@ -419,7 +419,7 @@ where
     #[allow(clippy::cast_precision_loss)]
     fn post_exec(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         _stage_idx: i32,
         _corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
@@ -538,12 +538,12 @@ where
 impl<I, MT, S> StdMOptMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    MT: MutatorsTuple,
+    S: HasRand + HasMetadata + HasCorpus + HasSolutions<I>,
 {
     /// Create a new [`StdMOptMutator`].
     pub fn new(
-        state: &mut S,
+        state: &mut Self::State,
         mutations: MT,
         max_stack_pow: u64,
         swarm_num: usize,
@@ -561,8 +561,8 @@ where
     }
     fn core_mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
@@ -591,8 +591,8 @@ where
 
     fn pilot_mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
@@ -630,8 +630,8 @@ where
 impl<I, MT, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    MT: MutatorsTuple,
+    S: HasRand + HasMetadata + HasCorpus + HasSolutions<I>,
 {
     /// Get the mutations
     #[inline]
@@ -649,16 +649,16 @@ where
 impl<I, MT, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    MT: MutatorsTuple,
+    S: HasRand + HasMetadata + HasCorpus + HasSolutions<I>,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, _: &I) -> u64 {
+    fn iterations(&self, state: &mut Self::State, _: &I) -> u64 {
         1 << (1 + state.rand_mut().below(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, _: &I) -> usize {
+    fn schedule(&self, state: &mut Self::State, _: &I) -> usize {
         state
             .metadata_mut()
             .get_mut::<MOpt>()
@@ -669,8 +669,8 @@ where
 
     fn scheduled_mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mode = self.mode;

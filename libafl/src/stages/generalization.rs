@@ -71,7 +71,7 @@ where
     phantom: PhantomData<(EM, O, OT, S, Z)>,
 }
 
-impl<E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for GeneralizationStage<EM, O, OT, S, Z>
+impl<E, EM, O, OT, S, Z> Stage for GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
     E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, S>,
@@ -84,7 +84,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -375,7 +375,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         novelties: &[usize],
         input: &GeneralizedInput,
@@ -418,7 +418,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -460,7 +460,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -468,7 +468,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, S>,
+        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<Input = GeneralizedInput>,
     {
         let mut index = 0;
         while index < payload.len() {

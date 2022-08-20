@@ -43,14 +43,14 @@ impl FridaRuntime for CoverageRuntime {
 
     fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
         &mut self,
-        _input: &I,
+        _input: &Self::Input,
     ) -> Result<(), libafl::Error> {
         Ok(())
     }
 
     fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
         &mut self,
-        _input: &I,
+        _input: &Self::Input,
     ) -> Result<(), libafl::Error> {
         Ok(())
     }

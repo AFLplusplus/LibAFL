@@ -48,7 +48,7 @@ impl Named for ConcolicFeedback {
     }
 }
 
-impl<I, S> Feedback<I, S> for ConcolicFeedback
+impl<I, S> Feedback for ConcolicFeedback
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -56,15 +56,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         self.metadata = observers
             .match_name::<ConcolicObserver>(&self.name)
@@ -74,7 +74,7 @@ where
 
     fn append_metadata(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _testcase: &mut Testcase<I>,
     ) -> Result<(), Error> {
         if let Some(metadata) = self.metadata.take() {
@@ -83,7 +83,7 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 }

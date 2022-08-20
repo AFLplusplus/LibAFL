@@ -22,7 +22,7 @@ pub struct ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     phantom: PhantomData<(F, I, S)>,
 }
@@ -59,7 +59,7 @@ impl<F, I, S> ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Creates a new [`struct@ProbabilitySamplingScheduler`]
     #[must_use]
@@ -72,7 +72,7 @@ where
     /// Calculate the score and store in `ProbabilityMetadata`
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
-    pub fn store_probability(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    pub fn store_probability(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         let factor = F::compute(&mut *state.corpus().get(idx)?.borrow_mut(), state)?;
         if factor == 0.0 {
             return Err(Error::illegal_state(
@@ -94,9 +94,9 @@ impl<F, I, S> Scheduler for ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
         }
@@ -131,7 +131,7 @@ impl<F, I, S> Default for ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     fn default() -> Self {
         Self::new()
@@ -165,7 +165,7 @@ mod tests {
     impl<I, S> TestcaseScore<I, S> for UniformDistribution<I>
     where
         I: Input,
-        S: HasMetadata + HasCorpus<I>,
+        S: HasMetadata + HasCorpus,
     {
         fn compute(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
             Ok(FACTOR)

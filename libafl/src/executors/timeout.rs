@@ -262,18 +262,18 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasInProcessHandlers,
+    E: Executor + HasInProcessHandlers,
     I: Input,
 {
     #[allow(clippy::cast_sign_loss)]
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -332,17 +332,17 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
+    E: Executor,
     I: Input,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
@@ -363,17 +363,17 @@ where
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
+    E: Executor,
     I: Input,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
@@ -392,9 +392,9 @@ where
     }
 }
 
-impl<E, I, S> HasObservers<I, S> for TimeoutExecutor<E>
+impl<E, I, S> HasObservers for TimeoutExecutor<E>
 where
-    E: HasObservers<I, S>,
+    E: HasObservers,
 {
     #[inline]
     fn observers(&self) -> &Self::Observers {

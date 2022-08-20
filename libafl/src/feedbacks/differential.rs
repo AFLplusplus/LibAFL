@@ -116,7 +116,7 @@ where
     }
 }
 
-impl<F, I, O1, O2, S> Feedback<I, S> for DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> Feedback for DiffFeedback<F, O1, O2>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
@@ -127,15 +127,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S> + MatchName,
+        EM: EventFirer,
+        OT: ObserversTuple + MatchName,
     {
         fn err(name: &str) -> Error {
             Error::illegal_argument(format!("DiffFeedback: observer {} not found", name))
@@ -196,10 +196,10 @@ mod tests {
     }
 
     struct NopEventFirer;
-    impl<I: Input> EventFirer<I> for NopEventFirer {
+    impl<I: Input> EventFirer for NopEventFirer {
         fn fire<S>(
             &mut self,
-            _state: &mut S,
+            _state: &mut Self::State,
             _event: crate::events::Event<I>,
         ) -> Result<(), crate::Error> {
             Ok(())

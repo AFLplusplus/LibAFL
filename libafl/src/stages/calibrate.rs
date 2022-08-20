@@ -30,8 +30,8 @@ pub struct CalibrationStage<I, O, OT, S>
 where
     I: Input,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
+    OT: ObserversTuple,
+    S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
     map_observer_name: String,
     map_name: String,
@@ -42,15 +42,15 @@ where
 const CAL_STAGE_START: usize = 4;
 const CAL_STAGE_MAX: usize = 16;
 
-impl<E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S>
+impl<E, EM, I, O, OT, S, Z> Stage for CalibrationStage<I, O, OT, S>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
-    EM: EventFirer<I>,
+    E: Executor + HasObservers,
+    EM: EventFirer,
     I: Input,
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
+    OT: ObserversTuple,
+    S: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -59,7 +59,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -232,8 +232,8 @@ impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
 where
     I: Input,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
+    OT: ObserversTuple,
+    S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]

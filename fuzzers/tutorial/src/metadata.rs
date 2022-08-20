@@ -47,7 +47,7 @@ where
     #[inline]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
         input: &PacketData,
         _observers: &OT,
@@ -64,7 +64,7 @@ where
     #[inline]
     fn append_metadata(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         testcase: &mut Testcase<PacketData>,
     ) -> Result<(), Error> {
         testcase

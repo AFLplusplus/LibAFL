@@ -228,7 +228,7 @@ impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
         Ok(())
     }

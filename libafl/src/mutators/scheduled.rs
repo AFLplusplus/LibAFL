@@ -56,7 +56,7 @@ impl LogMutationMetadata {
 pub trait ComposedByMutations<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple,
 {
     /// Get the mutations
     fn mutations(&self) -> &MT;
@@ -66,23 +66,23 @@ where
 }
 
 /// A [`Mutator`] scheduling multiple [`Mutator`]s for an input.
-pub trait ScheduledMutator<I, MT, S>: ComposedByMutations<I, MT, S> + Mutator<I, S>
+pub trait ScheduledMutator<I, MT, S>: ComposedByMutations<I, MT, S> + Mutator
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, input: &I) -> u64;
+    fn iterations(&self, state: &mut Self::State, input: &I) -> u64;
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, input: &I) -> usize;
+    fn schedule(&self, state: &mut Self::State, input: &I) -> usize;
 
     /// New default implementation for mutate.
     /// Implementations must forward mutate() to this method
     fn scheduled_mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
@@ -104,7 +104,7 @@ where
 pub struct StdScheduledMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple,
     S: HasRand,
 {
     mutations: MT,
@@ -115,7 +115,7 @@ where
 impl<I, MT, S> Debug for StdScheduledMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple,
     S: HasRand,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -128,17 +128,17 @@ where
     }
 }
 
-impl<I, MT, S> Mutator<I, S> for StdScheduledMutator<I, MT, S>
+impl<I, MT, S> Mutator for StdScheduledMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple,
     S: HasRand,
 {
     #[inline]
     fn mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input, stage_idx)
@@ -148,7 +148,7 @@ where
 impl<I, MT, S> ComposedByMutations<I, MT, S> for StdScheduledMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple,
     S: HasRand,
 {
     /// Get the mutations
@@ -167,16 +167,16 @@ where
 impl<I, MT, S> ScheduledMutator<I, MT, S> for StdScheduledMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple,
     S: HasRand,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, _: &I) -> u64 {
+    fn iterations(&self, state: &mut Self::State, _: &I) -> u64 {
         1 << (1 + state.rand_mut().below(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, _: &I) -> usize {
+    fn schedule(&self, state: &mut Self::State, _: &I) -> usize {
         debug_assert!(!self.mutations().is_empty());
         state.rand_mut().below(self.mutations().len() as u64) as usize
     }
@@ -185,7 +185,7 @@ where
 impl<I, MT, S> StdScheduledMutator<I, MT, S>
 where
     I: Input,
-    MT: MutatorsTuple<I, S>,
+    MT: MutatorsTuple,
     S: HasRand,
 {
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
@@ -282,8 +282,8 @@ pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
 pub struct LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    MT: MutatorsTuple + NamedTuple,
+    S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
     scheduled: SM,
@@ -294,8 +294,8 @@ where
 impl<I, MT, S, SM> Debug for LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    MT: MutatorsTuple + NamedTuple,
+    S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -308,17 +308,17 @@ where
     }
 }
 
-impl<I, MT, S, SM> Mutator<I, S> for LoggerScheduledMutator<I, MT, S, SM>
+impl<I, MT, S, SM> Mutator for LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    MT: MutatorsTuple + NamedTuple,
+    S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
     fn mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input, stage_idx)
@@ -326,7 +326,7 @@ where
 
     fn post_exec(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         _stage_idx: i32,
         corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
@@ -349,8 +349,8 @@ where
 impl<I, MT, S, SM> ComposedByMutations<I, MT, S> for LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    MT: MutatorsTuple + NamedTuple,
+    S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
     #[inline]
@@ -367,17 +367,17 @@ where
 impl<I, MT, S, SM> ScheduledMutator<I, MT, S> for LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    MT: MutatorsTuple + NamedTuple,
+    S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, _: &I) -> u64 {
+    fn iterations(&self, state: &mut Self::State, _: &I) -> u64 {
         1 << (1 + state.rand_mut().below(6))
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, _: &I) -> usize {
+    fn schedule(&self, state: &mut Self::State, _: &I) -> usize {
         debug_assert!(!self.scheduled.mutations().is_empty());
         state
             .rand_mut()
@@ -386,8 +386,8 @@ where
 
     fn scheduled_mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;
@@ -410,8 +410,8 @@ where
 impl<I, MT, S, SM> LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
-    MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    MT: MutatorsTuple + NamedTuple,
+    S: HasRand + HasCorpus,
     SM: ScheduledMutator<I, MT, S>,
 {
     /// Create a new [`StdScheduledMutator`] instance without mutations and corpus

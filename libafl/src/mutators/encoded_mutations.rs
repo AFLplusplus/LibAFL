@@ -25,7 +25,7 @@ pub struct EncodedRandMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -60,7 +60,7 @@ pub struct EncodedIncMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -95,7 +95,7 @@ pub struct EncodedDecMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -130,7 +130,7 @@ pub struct EncodedAddMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -169,7 +169,7 @@ pub struct EncodedDeleteMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -212,7 +212,7 @@ where
 {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -270,7 +270,7 @@ pub struct EncodedCopyMutator;
 impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -313,7 +313,7 @@ where
 {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -387,7 +387,7 @@ where
 {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut EncodedInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {

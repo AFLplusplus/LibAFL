@@ -83,7 +83,7 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
         _input: &NautilusInput,
         _observers: &OT,
@@ -98,7 +98,7 @@ where
 
     fn append_metadata(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         testcase: &mut Testcase<NautilusInput>,
     ) -> Result<(), Error> {
         let input = testcase.load_input()?.clone();
@@ -110,7 +110,11 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &NautilusInput) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &NautilusInput,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

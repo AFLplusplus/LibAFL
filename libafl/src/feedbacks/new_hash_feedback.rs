@@ -74,7 +74,7 @@ pub struct NewHashFeedback<O> {
     o_type: PhantomData<O>,
 }
 
-impl<I, S, O> Feedback<I, S> for NewHashFeedback<O>
+impl<I, S, O> Feedback for NewHashFeedback<O>
 where
     I: Input,
     S: HasClientPerfMonitor + HasNamedMetadata,
@@ -88,15 +88,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         let observer = observers
             .match_name::<O>(&self.observer_name)

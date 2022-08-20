@@ -76,7 +76,7 @@ pub trait Feedback: Named + Debug {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         input: &Self::Input,
         observers: &OT,
@@ -115,7 +115,11 @@ pub trait Feedback: Named + Debug {
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -128,40 +132,29 @@ pub trait HasObserverName {
 
 /// A combined feedback consisting of multiple [`Feedback`]s
 #[derive(Debug)]
-pub struct CombinedFeedback<A, B, FL>
-where
-    A: Feedback,
-    B: Feedback,
-    FL: FeedbackLogic<A, B, I, S>,
-{
+pub struct CombinedFeedback<A, B> {
     /// First [`Feedback`]
     pub first: A,
     /// Second [`Feedback`]
     pub second: B,
     name: String,
-    phantom: PhantomData<(I, S, FL)>,
 }
 
-impl<A, B, FL, I, S> Named for CombinedFeedback<A, B, FL, I, S>
+impl<A, B> Named for CombinedFeedback<A, B>
 where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    FL: FeedbackLogic<A, B, I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
+    A: Feedback,
+    B: Feedback,
 {
     fn name(&self) -> &str {
         self.name.as_ref()
     }
 }
 
-impl<A, B, FL, I, S> CombinedFeedback<A, B, FL, I, S>
+impl<A, B, FL> CombinedFeedback<A, B>
 where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    FL: FeedbackLogic<A, B, I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
+    A: Feedback,
+    B: Feedback,
+    FL: FeedbackLogic<FeedbackA = A, FeedbackB = B>,
 {
     /// Create a new combined feedback
     pub fn new(first: A, second: B) -> Self {
@@ -170,20 +163,17 @@ where
             first,
             second,
             name,
-            phantom: PhantomData,
         }
     }
 }
 
-impl<A, B, FL, I, S> Feedback<I, S> for CombinedFeedback<A, B, FL, I, S>
+impl<A, B, FL> Feedback for CombinedFeedback<A, B>
 where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    FL: FeedbackLogic<A, B, I, S>,
-    I: Input,
-    S: HasClientPerfMonitor + Debug,
+    A: Feedback,
+    B: Feedback,
+    FL: FeedbackLogic<FeedbackA = A, FeedbackB = B>,
 {
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+    fn init_state(&mut self, state: &mut Self::State) -> Result<(), Error> {
         self.first.init_state(state)?;
         self.second.init_state(state)?;
         Ok(())
@@ -192,17 +182,17 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
-        FL::is_pair_interesting(
+        Self::FeedbackLogic::is_pair_interesting(
             &mut self.first,
             &mut self.second,
             state,
@@ -217,15 +207,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         FL::is_pair_interesting_introspection(
             &mut self.first,
@@ -239,24 +229,26 @@ where
     }
 
     #[inline]
-    fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        state: &mut Self::State,
+        testcase: &mut Testcase<Self::Input>,
+    ) -> Result<(), Error> {
         self.first.append_metadata(state, testcase)?;
         self.second.append_metadata(state, testcase)
     }
 
     #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, state: &mut Self::State, input: &A::Input) -> Result<(), Error> {
         self.first.discard_metadata(state, input)?;
         self.second.discard_metadata(state, input)
     }
 }
 
 /// Logical combination of two feedbacks
-pub trait FeedbackLogic<A, B>: 'static + Debug
-where
-    A: Feedback,
-    B: Feedback,
-{
+pub trait FeedbackLogic: 'static + Debug {
+    type FeedbackA: Feedback<Input = Self::Input, State = Self::State>;
+    type FeedbackB: Feedback<Input = Self::Input, State = Self::State>;
 
     type Input: Input;
     type State: HasClientPerfMonitor;
@@ -266,8 +258,8 @@ where
 
     /// If the feedback pair is interesting
     fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
         state: &mut Self::State,
         manager: &mut EM,
         input: &Self::Input,
@@ -282,8 +274,8 @@ where
     #[cfg(feature = "introspection")]
     #[allow(clippy::too_many_arguments)]
     fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
         state: &mut Self::State,
         manager: &mut EM,
         input: &Self::Input,
@@ -311,29 +303,23 @@ pub struct LogicEagerAnd {}
 #[derive(Debug, Clone)]
 pub struct LogicFastAnd {}
 
-impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicEagerOr
-where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
-{
+impl FeedbackLogic for LogicEagerOr {
     fn name() -> &'static str {
         "Eager OR"
     }
 
     fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -342,17 +328,17 @@ where
 
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -362,29 +348,23 @@ where
     }
 }
 
-impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicFastOr
-where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
-{
+impl FeedbackLogic for LogicFastOr {
     fn name() -> &'static str {
         "Fast OR"
     }
 
     fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         if a {
@@ -396,17 +376,17 @@ where
 
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -419,29 +399,23 @@ where
     }
 }
 
-impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicEagerAnd
-where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
-{
+impl FeedbackLogic for LogicEagerAnd {
     fn name() -> &'static str {
         "Eager AND"
     }
 
     fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -450,17 +424,17 @@ where
 
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -470,29 +444,23 @@ where
     }
 }
 
-impl<A, B, I, S> FeedbackLogic<A, B, I, S> for LogicFastAnd
-where
-    A: Feedback<I, S>,
-    B: Feedback<I, S>,
-    I: Input,
-    S: HasClientPerfMonitor,
-{
+impl FeedbackLogic for LogicFastAnd {
     fn name() -> &'static str {
         "Fast AND"
     }
 
     fn is_pair_interesting<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         if !a {
@@ -504,17 +472,17 @@ where
 
     #[cfg(feature = "introspection")]
     fn is_pair_interesting_introspection<EM, OT>(
-        first: &mut A,
-        second: &mut B,
-        state: &mut S,
+        first: &mut Self::FeedbackA,
+        second: &mut Self::FeedbackB,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -549,7 +517,7 @@ pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastOr, I, S>;
 #[derive(Clone)]
 pub struct NotFeedback<A, I, S>
 where
-    A: Feedback<I, S>,
+    A: Feedback,
     I: Input,
     S: HasClientPerfMonitor,
 {
@@ -562,7 +530,7 @@ where
 
 impl<A, I, S> Debug for NotFeedback<A, I, S>
 where
-    A: Feedback<I, S>,
+    A: Feedback,
     I: Input,
     S: HasClientPerfMonitor,
 {
@@ -574,9 +542,9 @@ where
     }
 }
 
-impl<A, I, S> Feedback<I, S> for NotFeedback<A, I, S>
+impl<A, I, S> Feedback for NotFeedback<A, I, S>
 where
-    A: Feedback<I, S>,
+    A: Feedback,
     I: Input,
     S: HasClientPerfMonitor,
 {
@@ -587,15 +555,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         Ok(!self
             .first
@@ -603,19 +571,23 @@ where
     }
 
     #[inline]
-    fn append_metadata(&mut self, state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        state: &mut Self::State,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         self.first.append_metadata(state, testcase)
     }
 
     #[inline]
-    fn discard_metadata(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, state: &mut Self::State, input: &I) -> Result<(), Error> {
         self.first.discard_metadata(state, input)
     }
 }
 
 impl<A, I, S> Named for NotFeedback<A, I, S>
 where
-    A: Feedback<I, S>,
+    A: Feedback,
     I: Input,
     S: HasClientPerfMonitor,
 {
@@ -627,7 +599,7 @@ where
 
 impl<A, I, S> NotFeedback<A, I, S>
 where
-    A: Feedback<I, S>,
+    A: Feedback,
     I: Input,
     S: HasClientPerfMonitor,
 {
@@ -695,7 +667,7 @@ macro_rules! feedback_not {
 }
 
 /// Hack to use () as empty Feedback
-impl<I, S> Feedback<I, S> for ()
+impl<I, S> Feedback for ()
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -703,15 +675,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         Ok(false)
     }
@@ -728,7 +700,7 @@ impl Named for () {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {}
 
-impl<I, S> Feedback<I, S> for CrashFeedback
+impl<I, S> Feedback for CrashFeedback
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -736,15 +708,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         if let ExitKind::Crash = exit_kind {
             Ok(true)
@@ -779,7 +751,7 @@ impl Default for CrashFeedback {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeoutFeedback {}
 
-impl<I, S> Feedback<I, S> for TimeoutFeedback
+impl<I, S> Feedback for TimeoutFeedback
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -787,15 +759,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         if let ExitKind::Timeout = exit_kind {
             Ok(true)
@@ -835,7 +807,7 @@ pub struct TimeFeedback {
     name: String,
 }
 
-impl<I, S> Feedback<I, S> for TimeFeedback
+impl<I, S> Feedback for TimeFeedback
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -843,15 +815,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
@@ -861,7 +833,11 @@ where
 
     /// Append to the testcase the generated metadata in case of a new corpus item
     #[inline]
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         *testcase.exec_time_mut() = self.exec_time;
         self.exec_time = None;
         Ok(())
@@ -869,7 +845,7 @@ where
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.exec_time = None;
         Ok(())
     }
@@ -912,7 +888,7 @@ where
     phantom: PhantomData<T>,
 }
 
-impl<I, S, T> Feedback<I, S> for ListFeedback<T>
+impl<I, S, T> Feedback for ListFeedback<T>
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -921,15 +897,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers
@@ -983,7 +959,7 @@ pub enum ConstFeedback {
     False,
 }
 
-impl<I, S> Feedback<I, S> for ConstFeedback
+impl<I, S> Feedback for ConstFeedback
 where
     I: Input,
     S: HasClientPerfMonitor,
@@ -992,15 +968,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         Ok(match self {
             ConstFeedback::True => true,

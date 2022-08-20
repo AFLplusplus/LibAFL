@@ -356,7 +356,7 @@ where
     phantom: PhantomData<(I, N, S, R, O, T)>,
 }
 
-impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
+impl<I, N, O, R, S, T> Feedback for MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
@@ -376,15 +376,15 @@ where
     #[rustversion::nightly]
     default fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -392,20 +392,24 @@ where
     #[rustversion::not(nightly)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             let meta = MapIndexesMetadata::new(core::mem::take(v));
             testcase.add_metadata(meta);
@@ -418,7 +422,7 @@ where
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
         }
@@ -431,7 +435,7 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<I, O, S> Feedback<I, S> for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
+impl<I, O, S> Feedback for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
     for<'it> O: AsIter<'it, Item = u8>,
@@ -442,15 +446,15 @@ where
     #[allow(clippy::needless_range_loop)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
@@ -656,15 +660,15 @@ where
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_interesting_default<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -752,7 +756,7 @@ where
     }
 }
 
-impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
+impl<I, O, S> Feedback for ReachabilityFeedback<O>
 where
     I: Input,
     O: MapObserver<Entry = usize>,
@@ -762,15 +766,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();
@@ -789,7 +793,11 @@ where
         }
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
             testcase.add_metadata(meta);
@@ -797,7 +805,7 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())
     }

@@ -48,65 +48,69 @@ pub trait HasFeedback {
 
 /// Holds an objective feedback
 pub trait HasObjective {
-    type Objectives: Feedback,
+    type Objective: Feedback;
 
     /// The objective feedback
-    fn objective(&self) -> &Self::Objectives;
+    fn objective(&self) -> &Self::Objective;
 
     /// The objective feedback (mutable)
-    fn objective_mut(&mut self) -> &mut Self::Objectives;
+    fn objective_mut(&mut self) -> &mut Self::Objective;
 }
 
 /// Evaluate if an input is interesting using the feedback
-pub trait ExecutionProcessor<I, S>
+pub trait ExecutionProcessor
 where
-    I: Input,
-    Self: HasObservers<I, S>,
+    Self: HasObservers,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
         &mut self,
-        state: &mut S,
+        state: &mut <<Self as HasObservers>::Observers as ObserversTuple>::State,
         manager: &mut EM,
-        input: I,
+        input: <<Self as HasObservers>::Observers as ObserversTuple>::Input,
         observers: &Self::Observers,
         exit_kind: &ExitKind,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        EM: EventFirer<I>;
+        EM: EventFirer;
 }
 
 /// Evaluate an input modifying the state of the fuzzer
-pub trait EvaluatorObservers<I, S>: Sized
-where
-    I: Input,
-{
+pub trait EvaluatorObservers: Sized {
+    type Input: Input;
+    type State;
+
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new testcase in the corpus
     fn evaluate_input_with_observers<E, EM>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: Self::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, S>,
-        EM: EventManager<E, I, S, Self>;
+        E: Executor + HasObservers,
+        EM: EventManager<Fuzzer = Self>;
 }
 
 /// Evaluate an input modifying the state of the fuzzer
-pub trait Evaluator<E, EM, I, S> {
+pub trait Evaluator {
+    type Executor;
+    type EventManager;
+    type Input: Input;
+    type State;
+
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new testcase in the corpus
     fn evaluate_input(
         &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
+        state: &mut Self::State,
+        executor: &mut Self::Executor,
+        manager: &mut Self::EventManager,
+        input: Self::Input,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
         self.evaluate_input_events(state, executor, manager, input, true)
     }
@@ -116,10 +120,10 @@ pub trait Evaluator<E, EM, I, S> {
     /// This version has a boolean to decide if send events to the manager.
     fn evaluate_input_events(
         &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
+        state: &mut Self::State,
+        executor: &mut Self::Executor,
+        manager: &mut Self::EventManager,
+        input: Self::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>;
 
@@ -129,20 +133,21 @@ pub trait Evaluator<E, EM, I, S> {
     /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
     fn add_input(
         &mut self,
-        state: &mut S,
-        executor: &mut E,
-        manager: &mut EM,
-        input: I,
+        state: &mut Self::State,
+        executor: &mut Self::Executor,
+        manager: &mut Self::EventManager,
+        input: Self::Input,
     ) -> Result<usize, Error>;
 }
 
 /// The main fuzzer trait.
-pub trait Fuzzer<E, EM, I, S, ST>
-where
-    I: Input,
-    EM: ProgressReporter<I>,
-    S: HasExecutions + HasClientPerfMonitor,
-{
+pub trait Fuzzer {
+    type Executor;
+    type Input: Input;
+    type State: HasExecutions + HasClientPerfMonitor;
+    type EventManager: ProgressReporter;
+    type Stages;
+
     /// Fuzz for a single iteration.
     /// Returns the index of the last fuzzed corpus item.
     /// (Note: An iteration represents a complete run of every stage.
@@ -154,19 +159,19 @@ where
     /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_one(
         &mut self,
-        stages: &mut ST,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
+        stages: &mut Self::Stages,
+        executor: &mut Self::Executor,
+        state: &mut Self::State,
+        manager: &mut Self::EventManager,
     ) -> Result<usize, Error>;
 
     /// Fuzz forever (or until stopped)
     fn fuzz_loop(
         &mut self,
-        stages: &mut ST,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
+        stages: &mut Self::Stages,
+        executor: &mut Self::Executor,
+        state: &mut Self::State,
+        manager: &mut Self::EventManager,
     ) -> Result<usize, Error> {
         let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
@@ -187,10 +192,10 @@ where
     /// This way, the state will be available in the next, respawned, iteration.
     fn fuzz_loop_for(
         &mut self,
-        stages: &mut ST,
-        executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
+        stages: &mut Self::Stages,
+        executor: &mut Self::Executor,
+        state: &mut Self::State,
+        manager: &mut Self::EventManager,
         iters: u64,
     ) -> Result<usize, Error> {
         if iters == 0 {
@@ -230,84 +235,55 @@ pub enum ExecuteInputResult {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<CS, F, OF> {
-    scheduler: CS,
-    feedback: F,
-    objective: OF,
+pub struct StdFuzzer {
+    scheduler: <Self as HasScheduler>::Scheduler,
+    feedback: <Self as HasFeedback>::Feedback,
+    objective: <Self as HasObjective>::Objective,
 }
 
-impl<CS, F, I, OF, S> HasScheduler<CS, I, S> for StdFuzzer<CS, F, OF>
-where
-    CS: Scheduler,
-    F: Feedback<I, S>,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasClientPerfMonitor,
-{
-    fn scheduler(&self) -> &CS {
+impl HasScheduler for StdFuzzer {
+    fn scheduler(&self) -> &Self::Scheduler {
         &self.scheduler
     }
 
-    fn scheduler_mut(&mut self) -> &mut CS {
+    fn scheduler_mut(&mut self) -> &mut Self::Scheduler {
         &mut self.scheduler
     }
 }
 
-impl<CS, F, I, OF, S> HasFeedback<F, I, S> for StdFuzzer<CS, F, OF>
-where
-    CS: Scheduler,
-    F: Feedback<I, S>,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasClientPerfMonitor,
-{
-    fn feedback(&self) -> &F {
+impl<CS, F, I, OF, S> HasFeedback for StdFuzzer {
+    fn feedback(&self) -> &Self::Feedback {
         &self.feedback
     }
 
-    fn feedback_mut(&mut self) -> &mut F {
+    fn feedback_mut(&mut self) -> &mut Self::Feedback {
         &mut self.feedback
     }
 }
 
-impl<CS, F, I, OF, S> HasObjective<I, OF, S> for StdFuzzer<CS, F, OF>
-where
-    CS: Scheduler,
-    F: Feedback<I, S>,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasClientPerfMonitor,
-{
-    fn objective(&self) -> &OF {
-        &self.objective
+impl<CS, F, I, OF, S> HasObservers for StdFuzzer {
+    fn observers(&self) -> &Self::Observers {
+        &self.observers
     }
 
-    fn objective_mut(&mut self) -> &mut OF {
-        &mut self.objective
+    fn observers_mut(&mut self) -> &mut Self::Observers {
+        &mut self.observers
     }
 }
 
-impl<CS, F, I, OF, S> ExecutionProcessor<I, S> for StdFuzzer<CS, F, OF>
-where
-    CS: Scheduler,
-    F: Feedback<I, S>,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
-    Self: HasObservers<I, S>,
-{
+impl ExecutionProcessor for StdFuzzer {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
         &mut self,
-        state: &mut S,
+        state: &mut <Self as Fuzzer>::State,
         manager: &mut EM,
-        input: I,
+        input: Self::Input,
         observers: &Self::Observers,
         exit_kind: &ExitKind,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        EM: EventFirer<I>,
+        EM: EventFirer,
     {
         let mut res = ExecuteInputResult::None;
 
@@ -401,27 +377,27 @@ where
     }
 }
 
-impl<CS, F, I, OF, S> EvaluatorObservers<I, S> for StdFuzzer<CS, F, OF>
+impl<CS, F, I, OF, S> EvaluatorObservers for StdFuzzer
 where
     CS: Scheduler,
-    F: Feedback<I, S>,
+    F: Feedback,
     I: Input,
-    OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    OF: Feedback,
+    S: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
     fn evaluate_input_with_observers<E, EM>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
         input: I,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, S>,
-        EM: EventManager<E, I, S, Self>,
+        E: Executor + HasObservers,
+        EM: EventManager<Fuzzer = Self>,
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
@@ -429,21 +405,21 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, OF, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, I, OF, S> Evaluator for StdFuzzer
 where
     CS: Scheduler,
-    E: Executor<EM, I, S, Self> + HasObservers<I, S>,
-    EM: EventManager<E, I, S, Self>,
-    F: Feedback<I, S>,
+    E: Executor + HasObservers,
+    EM: EventManager<Fuzzer = Self>,
+    F: Feedback,
     I: Input,
-    OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    OF: Feedback,
+    S: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
     fn evaluate_input_events(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
         input: I,
@@ -455,7 +431,7 @@ where
     /// Adds an input, even if it's not conisered `interesting` by any of the executors
     fn add_input(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
         input: I,
@@ -494,21 +470,21 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, OF, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, OF>
+impl<CS, E, EM, F, I, OF, S, ST> Fuzzer for StdFuzzer
 where
     CS: Scheduler,
-    EM: EventManager<E, I, S, Self>,
-    F: Feedback<I, S>,
+    EM: EventManager,
+    F: Feedback,
     I: Input,
     S: HasClientPerfMonitor + HasExecutions,
-    OF: Feedback<I, S>,
+    OF: Feedback,
     ST: StagesTuple<E, EM, S, Self>,
 {
     fn fuzz_one(
         &mut self,
         stages: &mut ST,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<usize, Error> {
         // Init timer for scheduler
@@ -544,7 +520,7 @@ where
     }
 }
 
-impl<CS, F, OF> StdFuzzer<CS, F, OF>
+impl<CS, F, OF> StdFuzzer
 where
     Self: HasScheduler + HasFeedback + HasObjective,
 {
@@ -560,13 +536,13 @@ where
     /// Runs the input and triggers observers and feedback
     pub fn execute_input<E, EM>(
         &mut self,
-        state: &mut Self::State,
+        state: &mut <Self as Fuzzer>::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &Self::Input,
+        input: &<Self as Fuzzer>::Input,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, S>,
+        E: Executor + HasObservers,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -589,40 +565,34 @@ where
 }
 
 /// Structs with this trait will execute an [`Input`]
-pub trait ExecutesInput<I, S, Z>
-where
-    I: Input,
-{
+pub trait ExecutesInput {
+    type Input: Input;
+    type Fuzzer;
+    type State;
+
     /// Runs the input and triggers observers and feedback
     fn execute_input<E, EM>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Z> + HasObservers<I, S>;
+        E: Executor + HasObservers;
 }
 
-impl<CS, F, I, OF, S> ExecutesInput<I, S, Self> for StdFuzzer<CS, F, OF>
-where
-    CS: Scheduler,
-    F: Feedback<I, S>,
-    I: Input,
-    OF: Feedback<I, S>,
-    S: HasExecutions + HasClientPerfMonitor,
-{
+impl ExecutesInput for StdFuzzer {
     /// Runs the input and triggers observers and feedback
     fn execute_input<E, EM>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, S>,
+        E: Executor + HasObservers,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;

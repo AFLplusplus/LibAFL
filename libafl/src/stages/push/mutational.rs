@@ -37,12 +37,12 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 pub struct StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    EM: EventFirer + EventRestarter + HasEventManagerId,
     I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    M: Mutator,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     current_corpus_idx: Option<usize>,
     testcases_to_do: usize,
@@ -58,16 +58,16 @@ where
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    EM: EventFirer + EventRestarter + HasEventManagerId,
     I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    M: Mutator,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
-    fn iterations(&self, state: &mut S, _corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut Self::State, _corpus_idx: usize) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
     }
 
@@ -81,18 +81,18 @@ impl<CS, EM, I, M, OT, S, Z> PushStage<CS, EM, I, OT, S, Z>
     for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter,
     I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    M: Mutator,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     /// Creates a new default mutational stage
     fn init(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Result<(), Error> {
@@ -112,7 +112,7 @@ where
     fn deinit(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Result<(), Error> {
@@ -123,7 +123,7 @@ where
     fn pre_exec(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Option<Result<I, Error>> {
@@ -159,7 +159,7 @@ where
     fn post_exec(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         event_mgr: &mut EM,
         observers: &mut OT,
         last_input: I,
@@ -192,12 +192,12 @@ where
 impl<CS, EM, I, M, OT, S, Z> Iterator for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter,
     I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    M: Mutator,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     type Item = Result<I, Error>;
 
@@ -209,12 +209,12 @@ where
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    EM: EventFirer + EventRestarter + HasEventManagerId,
     I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
-    Z: ExecutionProcessor<I, S> + EvaluatorObservers<I, S> + HasScheduler<CS, I, S>,
+    M: Mutator,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
     /// Creates a new default mutational stage
     #[must_use]

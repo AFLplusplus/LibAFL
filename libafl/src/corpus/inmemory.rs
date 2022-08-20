@@ -34,7 +34,7 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, testcase: Testcase) -> Result<usize, Error> {
         self.entries.push(RefCell::new(testcase));
         Ok(self.entries.len() - 1)
     }

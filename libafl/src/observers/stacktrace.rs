@@ -101,7 +101,12 @@ impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a>
 where
     I: Input + Debug,
 {
-    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
             if exit_kind == &ExitKind::Crash {
                 self.update_hash(collect_backtrace());
@@ -114,8 +119,8 @@ where
 
     fn post_exec_child(
         &mut self,
-        _state: &mut S,
-        _input: &I,
+        _state: &mut Self::State,
+        _input: &Self::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::Child {
@@ -244,14 +249,14 @@ impl<I, S> Observer<I, S> for ASANBacktraceObserver
 where
     I: Debug,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec(
         &mut self,
-        _state: &mut S,
-        _input: &I,
+        _state: &mut Self::State,
+        _input: &Self::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())

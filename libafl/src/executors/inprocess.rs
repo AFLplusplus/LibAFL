@@ -64,7 +64,7 @@ where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
@@ -80,7 +80,7 @@ where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessExecutor")
@@ -90,19 +90,19 @@ where
     }
 }
 
-impl<EM, H, HB, I, OT, S, Z> Executor<EM, I, S, Z> for GenericInProcessExecutor<H, HB, I, OT, S>
+impl<EM, H, HB, I, OT, S, Z> Executor for GenericInProcessExecutor<H, HB, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
@@ -114,12 +114,12 @@ where
     }
 }
 
-impl<H, HB, I, OT, S> HasObservers<I, S> for GenericInProcessExecutor<H, HB, I, OT, S>
+impl<H, HB, I, OT, S> HasObservers for GenericInProcessExecutor<H, HB, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -137,7 +137,7 @@ where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -149,14 +149,14 @@ where
         harness_fn: HB,
         observers: OT,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I> + EventRestarter<S>,
-        OF: Feedback<I, S>,
+        EM: EventFirer + EventRestarter,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
     {
         let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z, H>()?;
         #[cfg(windows)]
@@ -219,7 +219,7 @@ impl<'a, H, I, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, I, OT, S
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
 {
     /// the timeout handler
     #[inline]
@@ -244,9 +244,9 @@ impl InProcessHandlers {
         &self,
         _executor: &E,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _mgr: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
     ) {
         #[cfg(unix)]
         unsafe {
@@ -309,12 +309,12 @@ impl InProcessHandlers {
     pub fn new<E, EM, I, OF, OT, S, Z, H>() -> Result<Self, Error>
     where
         I: Input,
-        E: Executor<EM, I, S, Z> + HasObservers<I, S>,
-        OT: ObserversTuple<I, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OF: Feedback<I, S>,
+        E: Executor + HasObservers,
+        OT: ObserversTuple,
+        EM: EventFirer + EventRestarter,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
         H: FnMut(&I) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
@@ -581,13 +581,13 @@ mod unix_signal_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
     where
-        E: HasObservers<I, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: HasObservers,
+        EM: EventFirer + EventRestarter,
+        OT: ObserversTuple,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
         I: Input,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -656,13 +656,13 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers<I, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: HasObservers,
+        EM: EventFirer + EventRestarter,
+        OT: ObserversTuple,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
         I: Input,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
     {
         if !data.is_valid() {
             #[cfg(feature = "std")]
@@ -736,13 +736,13 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasObservers<I, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: Executor + HasObservers,
+        EM: EventFirer + EventRestarter,
+        OT: ObserversTuple,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
         I: Input,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
@@ -921,13 +921,13 @@ mod windows_exception_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
     where
-        E: HasObservers<I, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: HasObservers,
+        EM: EventFirer + EventRestarter,
+        OT: ObserversTuple,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
         I: Input,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -1013,13 +1013,13 @@ mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers<I, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: HasObservers,
+        EM: EventFirer + EventRestarter,
+        OT: ObserversTuple,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
         I: Input,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -1109,13 +1109,13 @@ mod windows_exception_handler {
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasObservers<I, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: Executor + HasObservers,
+        EM: EventFirer + EventRestarter,
+        OT: ObserversTuple,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
         I: Input,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
     {
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
@@ -1259,7 +1259,7 @@ pub struct InChildProcessHandlers {
 #[cfg(all(feature = "std", unix))]
 impl InChildProcessHandlers {
     /// Call before running a target.
-    pub fn pre_run_target<E, I, S>(&self, executor: &E, state: &mut S, input: &I) {
+    pub fn pre_run_target<E, I, S>(&self, executor: &E, state: &mut Self::State, input: &I) {
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
@@ -1280,8 +1280,8 @@ impl InChildProcessHandlers {
     pub fn new<E, I, OT, S>() -> Result<Self, Error>
     where
         I: Input,
-        E: HasObservers<I, S>,
-        OT: ObserversTuple<I, S>,
+        E: HasObservers,
+        OT: ObserversTuple,
     {
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
@@ -1394,7 +1394,7 @@ pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
     SP: ShMemProvider,
 {
     harness_fn: &'a mut H,
@@ -1409,7 +1409,7 @@ impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1421,12 +1421,11 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
-    for InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, EM, H, I, OT, S, SP, Z> Executor for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
     SP: ShMemProvider,
 {
     #[allow(unreachable_code)]
@@ -1434,9 +1433,9 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         _mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -1492,7 +1491,7 @@ impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
     SP: ShMemProvider,
 {
     /// Creates a new [`InProcessForkExecutor`]
@@ -1500,15 +1499,15 @@ where
         harness_fn: &'a mut H,
         observers: OT,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _event_mgr: &mut EM,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I> + EventRestarter<S>,
-        OF: Feedback<I, S>,
+        EM: EventFirer + EventRestarter,
+        OF: Feedback,
         S: HasSolutions<I> + HasClientPerfMonitor,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObservers,
     {
         let handlers = InChildProcessHandlers::new::<Self, I, OT, S>()?;
         Ok(Self {
@@ -1534,11 +1533,11 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, I, OT, S, SP> HasObservers<I, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, H, I, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
     SP: ShMemProvider,
 {
     #[inline]
@@ -1571,8 +1570,8 @@ pub mod child_signal_handlers {
     /// invokes the `post_exec_child` hook on all observer in case the child process panics
     pub fn setup_child_panic_hook<E, I, OT, S>()
     where
-        E: HasObservers<I, S>,
-        OT: ObserversTuple<I, S>,
+        E: HasObservers,
+        OT: ObserversTuple,
         I: Input,
     {
         let old_hook = panic::take_hook();
@@ -1607,8 +1606,8 @@ pub mod child_signal_handlers {
         _context: &mut ucontext_t,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
-        E: HasObservers<I, S>,
-        OT: ObserversTuple<I, S>,
+        E: HasObservers,
+        OT: ObserversTuple,
         I: Input,
     {
         if data.is_valid() {

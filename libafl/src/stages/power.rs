@@ -21,13 +21,13 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
+    E: Executor + HasObservers,
     F: TestcaseScore<I, S>,
     I: Input,
-    M: Mutator<I, S>,
+    M: Mutator,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     map_observer_name: String,
@@ -39,13 +39,13 @@ where
 impl<E, F, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
     for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
+    E: Executor + HasObservers,
     F: TestcaseScore<I, S>,
     I: Input,
-    M: Mutator<I, S>,
+    M: Mutator,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata + HasRand,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -62,7 +62,7 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_sign_loss)]
-    fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut Self::State, corpus_idx: usize) -> Result<usize, Error> {
         // Update handicap
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let score = F::compute(&mut *testcase, state)? as usize;
@@ -75,7 +75,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -129,16 +129,15 @@ where
     }
 }
 
-impl<E, F, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z>
-    for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
+impl<E, F, EM, I, M, O, OT, S, Z> Stage for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
+    E: Executor + HasObservers,
     F: TestcaseScore<I, S>,
     I: Input,
-    M: Mutator<I, S>,
+    M: Mutator,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata + HasRand,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -147,7 +146,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -158,13 +157,13 @@ where
 
 impl<E, F, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, S>,
+    E: Executor + HasObservers,
     F: TestcaseScore<I, S>,
     I: Input,
-    M: Mutator<I, S>,
+    M: Mutator,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    OT: ObserversTuple,
+    S: HasClientPerfMonitor + HasCorpus + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]

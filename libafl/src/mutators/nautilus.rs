@@ -33,7 +33,7 @@ impl Debug for NautilusRandomMutator<'_> {
 impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
     fn mutate(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         input: &mut NautilusInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -94,7 +94,7 @@ impl Debug for NautilusRecursionMutator<'_> {
 impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
     fn mutate(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         input: &mut NautilusInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -160,7 +160,7 @@ where
 {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut NautilusInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {

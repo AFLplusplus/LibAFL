@@ -89,27 +89,23 @@ crate::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<F, I, S> {
+pub struct WeightedScheduler<F> {
     strat: Option<PowerSchedule>,
-    phantom: PhantomData<(F, I, S)>,
+    phantom: PhantomData<(F)>,
 }
 
-impl<F, I, S> Default for WeightedScheduler<F, I, S>
+impl<F> Default for WeightedScheduler<F>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    F: TestcaseScore,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F, I, S> WeightedScheduler<F, I, S>
+impl<F> WeightedScheduler<F>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    F: TestcaseScore,
 {
     /// Create a new [`WeightedScheduler`] without any scheduling strategy
     #[must_use]
@@ -222,11 +218,11 @@ where
 impl<F, I, S> Scheduler for WeightedScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
     I: Input,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata(SchedulerMetadata::new(self.strat));
         }
@@ -327,4 +323,4 @@ where
 }
 
 /// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler = WeightedScheduler<CorpusWeightTestcaseScore<I, S>, I, S>;
+pub type StdWeightedScheduler = WeightedScheduler<CorpusWeightTestcaseScore>;

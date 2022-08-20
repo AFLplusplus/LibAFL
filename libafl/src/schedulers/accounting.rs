@@ -97,7 +97,7 @@ pub struct CoverageAccountingScheduler<'a, CS, I, S>
 where
     CS: Scheduler,
     I: Input + HasLen,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
@@ -108,20 +108,25 @@ impl<'a, CS, I, S> Scheduler for CoverageAccountingScheduler<'a, CS, I, S>
 where
     CS: Scheduler,
     I: Input + HasLen,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)
     }
 
-    fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &self,
+        state: &mut Self::State,
+        idx: usize,
+        testcase: &Testcase<I>,
+    ) -> Result<(), Error> {
         self.inner.on_replace(state, idx, testcase)
     }
 
     fn on_remove(
         &self,
-        state: &mut S,
+        state: &mut Self::State,
         idx: usize,
         testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
@@ -158,12 +163,16 @@ impl<'a, CS, I, S> CoverageAccountingScheduler<'a, CS, I, S>
 where
     CS: Scheduler,
     I: Input + HasLen,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_accounting_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    pub fn update_accounting_score(
+        &self,
+        state: &mut Self::State,
+        idx: usize,
+    ) -> Result<(), Error> {
         let mut indexes = vec![];
         let mut new_favoreds = vec![];
         {
@@ -263,7 +272,7 @@ where
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
-    pub fn new(state: &mut S, base: CS, accounting_map: &'a [u32]) -> Self {
+    pub fn new(state: &mut Self::State, base: CS, accounting_map: &'a [u32]) -> Self {
         match state.metadata().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
@@ -284,7 +293,7 @@ where
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
     pub fn with_skip_prob(
-        state: &mut S,
+        state: &mut Self::State,
         base: CS,
         skip_non_favored_prob: u64,
         accounting_map: &'a [u32],

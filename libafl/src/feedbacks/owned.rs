@@ -24,7 +24,7 @@ impl FeedbackStatesTuple for FeedbackStatesOwnedList {
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {

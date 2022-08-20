@@ -210,7 +210,7 @@ where
         + Debug,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -505,7 +505,7 @@ where
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -776,7 +776,7 @@ where
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -1043,13 +1043,18 @@ where
     M: MapObserver<Entry = u8> + Observer<I, S> + AsMutSlice<u8>,
 {
     #[inline]
-    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut Self::State, input: &I) -> Result<(), Error> {
         self.base.pre_exec(state, input)
     }
 
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
-    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        state: &mut Self::State,
+        input: &Self::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         let map = self.as_mut_slice();
         let len = map.len();
         if (len & 1) != 0 {
@@ -1243,13 +1248,18 @@ where
     for<'it> M: AsIterMut<'it, Item = u8>,
 {
     #[inline]
-    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut Self::State, input: &I) -> Result<(), Error> {
         self.base.pre_exec(state, input)
     }
 
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
-    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        state: &mut Self::State,
+        input: &Self::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         for item in self.as_iter_mut() {
             *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };
         }
@@ -1435,7 +1445,7 @@ where
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -1691,7 +1701,7 @@ where
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -2243,7 +2253,7 @@ pub mod pybind {
                 Self: MapObserver,
             {
                 #[inline]
-                fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+                fn pre_exec(&mut self, state: &mut Self::State, input: &I) -> Result<(), Error> {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.pre_exec(state, input) })
                 }
             }

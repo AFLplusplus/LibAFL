@@ -39,6 +39,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::AsSlice,
+    events::EventManager,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
@@ -100,8 +101,9 @@ impl From<ExitKind> for DiffExitKind {
 crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers<I, S>: Debug {
-    type Observers: ObserversTuple<I, S>;
+pub trait HasObservers: Debug {
+    type Input: Input;
+    type Observers: ObserversTuple<Input = Self::Input>;
 
     /// Get the linked observers
     fn observers(&self) -> &Self::Observers;
@@ -111,17 +113,19 @@ pub trait HasObservers<I, S>: Debug {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, I, S, Z>: Debug
-where
-    I: Input,
-{
+pub trait Executor: Debug {
+    type Input: Input;
+    type State;
+    type Fuzzer;
+    type EventManager: EventManager;
+
     /// Instruct the target about the input and run
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
-        input: &I,
+        fuzzer: &mut Self::Fuzzer,
+        state: &mut Self::State,
+        mgr: &mut Self::EventManager,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error>;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
@@ -131,7 +135,7 @@ where
     fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
     where
         Self: Sized,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple,
     {
         WithObservers::new(self, observers)
     }
@@ -146,16 +150,16 @@ where
 #[derive(Debug)]
 struct NopExecutor {}
 
-impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor
+impl<EM, I, S, Z> Executor for NopExecutor
 where
     I: Input + HasTargetBytes,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::empty("Input Empty"))

@@ -66,7 +66,7 @@ where
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata,
+    S: HasCorpus + HasMetadata,
 {
     base: CS,
     skip_non_favored_prob: u64,
@@ -79,23 +79,28 @@ where
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         self.update_score(state, idx)?;
         self.base.on_add(state, idx)
     }
 
     /// Replaces the testcase at the given idx
-    fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &self,
+        state: &mut Self::State,
+        idx: usize,
+        testcase: &Testcase<I>,
+    ) -> Result<(), Error> {
         self.base.on_replace(state, idx, testcase)
     }
 
     /// Removes an entry from the corpus, returning M if M was present.
     fn on_remove(
         &self,
-        state: &mut S,
+        state: &mut Self::State,
         idx: usize,
         testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
@@ -127,12 +132,12 @@ where
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    pub fn update_score(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata().get::<TopRatedsMetadata>().is_none() {
             state.add_metadata(TopRatedsMetadata::new());

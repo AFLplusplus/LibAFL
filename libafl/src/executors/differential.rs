@@ -29,8 +29,8 @@ where
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
     pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
     where
-        A: Executor<EM, I, S, Z>,
-        B: Executor<EM, I, S, Z>,
+        A: Executor,
+        B: Executor,
         I: Input,
     {
         Self { primary, secondary }
@@ -47,18 +47,18 @@ where
     }
 }
 
-impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for DiffExecutor<A, B>
+impl<A, B, EM, I, S, Z> Executor for DiffExecutor<A, B>
 where
-    A: Executor<EM, I, S, Z>,
-    B: Executor<EM, I, S, Z>,
+    A: Executor,
+    B: Executor,
     I: Input,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
         self.primary.post_run_reset();
@@ -76,9 +76,9 @@ where
     }
 }
 
-impl<A, B, I, S> HasObservers<I, S> for DiffExecutor<A, B>
+impl<A, B, I, S> HasObservers for DiffExecutor<A, B>
 where
-    A: HasObservers<I, S>,
+    A: HasObservers,
     B: Debug,
 {
     #[inline]

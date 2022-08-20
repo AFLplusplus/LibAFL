@@ -52,7 +52,7 @@ pub trait Observer<I, S>: Named + Debug {
 
     /// Called right before execution starts.
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
@@ -60,8 +60,8 @@ pub trait Observer<I, S>: Named + Debug {
     #[inline]
     fn post_exec(
         &mut self,
-        _state: &mut S,
-        _input: &I,
+        _state: &mut Self::State,
+        _input: &Self::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -69,7 +69,7 @@ pub trait Observer<I, S>: Named + Debug {
 
     /// Called right before execution starts in the child process, if any.
     #[inline]
-    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec_child(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
@@ -77,8 +77,8 @@ pub trait Observer<I, S>: Named + Debug {
     #[inline]
     fn post_exec_child(
         &mut self,
-        _state: &mut S,
-        _input: &I,
+        _state: &mut Self::State,
+        _input: &Self::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -135,49 +135,53 @@ impl ObserversTuple for () {
         Ok(())
     }
 
-    fn pre_exec_child_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec_child_all(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec_child_all(
         &mut self,
-        _state: &mut S,
-        _input: &I,
+        _state: &mut Self::State,
+        _input: &Self::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<Head, Tail, I, S> ObserversTuple<I, S> for (Head, Tail)
+impl<Head, Tail, I, S> ObserversTuple for (Head, Tail)
 where
     Head: Observer<I, S>,
-    Tail: ObserversTuple<I, S>,
+    Tail: ObserversTuple,
 {
-    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec_all(&mut self, state: &mut Self::State, input: &I) -> Result<(), Error> {
         self.0.pre_exec(state, input)?;
         self.1.pre_exec_all(state, input)
     }
 
     fn post_exec_all(
         &mut self,
-        state: &mut S,
-        input: &I,
+        state: &mut Self::State,
+        input: &Self::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec(state, input, exit_kind)?;
         self.1.post_exec_all(state, input, exit_kind)
     }
 
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec_child_all(&mut self, state: &mut Self::State, input: &I) -> Result<(), Error> {
         self.0.pre_exec_child(state, input)?;
         self.1.pre_exec_child_all(state, input)
     }
 
     fn post_exec_child_all(
         &mut self,
-        state: &mut S,
-        input: &I,
+        state: &mut Self::State,
+        input: &Self::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec_child(state, input, exit_kind)?;
@@ -221,7 +225,7 @@ impl TimeObserver {
 }
 
 impl<I, S> Observer<I, S> for TimeObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
@@ -229,8 +233,8 @@ impl<I, S> Observer<I, S> for TimeObserver {
 
     fn post_exec(
         &mut self,
-        _state: &mut S,
-        _input: &I,
+        _state: &mut Self::State,
+        _input: &Self::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
@@ -286,7 +290,7 @@ impl<'a, I, S, T> Observer<I, S> for ListObserver<'a, T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.list.as_mut().clear();
         Ok(())
     }

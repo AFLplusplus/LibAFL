@@ -251,7 +251,7 @@ impl FridaRuntime for AsanRuntime {
     }
     fn pre_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
         &mut self,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<(), libafl::Error> {
         let target_bytes = input.target_bytes();
         let slice = target_bytes.as_slice();
@@ -262,7 +262,7 @@ impl FridaRuntime for AsanRuntime {
 
     fn post_exec<I: libafl::inputs::Input + libafl::inputs::HasTargetBytes>(
         &mut self,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<(), libafl::Error> {
         if self.check_for_leaks_enabled {
             self.check_for_leaks();

@@ -552,7 +552,7 @@ pub struct AsanErrorsObserver {
 }
 
 impl<I, S> Observer<I, S> for AsanErrorsObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
@@ -611,7 +611,7 @@ pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,
 }
 
-impl<I, S> Feedback<I, S> for AsanErrorsFeedback
+impl<I, S> Feedback for AsanErrorsFeedback
 where
     I: Input + HasTargetBytes,
     S: HasClientPerfMonitor,
@@ -619,15 +619,15 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple,
     {
         let observer = observers
             .match_name::<AsanErrorsObserver>("AsanErrors")
@@ -645,7 +645,11 @@ where
         }
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        testcase: &mut Testcase<I>,
+    ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }
@@ -653,7 +657,7 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         self.errors = None;
         Ok(())
     }

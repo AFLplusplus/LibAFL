@@ -9,14 +9,14 @@ use crate::{
 };
 
 /// Combine `Stage` and `AsAny`
-pub trait AnyStage<E, EM, S, Z>: Stage<E, EM, S, Z> + AsAny {}
+pub trait AnyStage: Stage + AsAny {}
 
 /// An owned list of `Observer` trait objects
 #[derive(Default)]
 #[allow(missing_debug_implementations)]
 pub struct StagesOwnedList<E, EM, S, Z> {
     /// The named trait objects map
-    pub list: Vec<Box<dyn AnyStage<E, EM, S, Z>>>,
+    pub list: Vec<Box<dyn AnyStage>>,
 }
 
 impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for StagesOwnedList<E, EM, S, Z> {
@@ -24,7 +24,7 @@ impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for StagesOwnedList<E, EM, S, Z> {
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -38,7 +38,7 @@ impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for StagesOwnedList<E, EM, S, Z> {
 impl<E, EM, S, Z> StagesOwnedList<E, EM, S, Z> {
     /// Create a new instance
     #[must_use]
-    pub fn new(list: Vec<Box<dyn AnyStage<E, EM, S, Z>>>) -> Self {
+    pub fn new(list: Vec<Box<dyn AnyStage>>) -> Self {
         Self { list }
     }
 }

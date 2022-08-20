@@ -41,28 +41,27 @@ pub struct SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z: Evaluator,
 {
     sync_dir: PathBuf,
     load_callback: CB,
-    #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, S, Z>
+impl<CB, E, EM, I, S, Z> Stage for SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z: Evaluator,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         _corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -98,8 +97,8 @@ impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z: Evaluator,
 {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
@@ -117,7 +116,7 @@ where
         last: &Option<SystemTime>,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
     ) -> Result<Option<SystemTime>, Error> {
         let mut max_time = None;
@@ -162,8 +161,8 @@ pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, 
 impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Z: Evaluator,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]

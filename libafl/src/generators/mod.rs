@@ -22,32 +22,27 @@ pub use nautilus::*;
 const DUMMY_BYTES_MAX: usize = 64;
 
 /// Generators can generate ranges of bytes.
-pub trait Generator<I, S>
-where
-    I: Input,
-{
+pub trait Generator {
+    type Input: Input;
+    type State;
+
     /// Generate a new input
-    fn generate(&mut self, state: &mut S) -> Result<I, Error>;
+    fn generate(&mut self, state: &mut Self::State) -> Result<Self::Input, Error>;
 
     /// Generate a new dummy input
-    fn generate_dummy(&self, state: &mut S) -> I;
+    fn generate_dummy(&self, state: &mut Self::State) -> Self::Input;
 }
 
 #[derive(Clone, Debug)]
 /// Generates random bytes
-pub struct RandBytesGenerator<S>
-where
-    S: HasRand,
-{
+pub struct RandBytesGenerator {
     max_size: usize,
-    phantom: PhantomData<S>,
 }
 
-impl<S> Generator<BytesInput, S> for RandBytesGenerator<S>
-where
-    S: HasRand,
-{
-    fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
+impl Generator for RandBytesGenerator {
+    type Input = BytesInput;
+
+    fn generate(&mut self, state: &mut Self::State) -> Result<BytesInput, Error> {
         let mut size = state.rand_mut().below(self.max_size as u64);
         if size == 0 {
             size = 1;
@@ -59,41 +54,30 @@ where
     }
 
     /// Generates up to `DUMMY_BYTES_MAX` non-random dummy bytes (0)
-    fn generate_dummy(&self, _state: &mut S) -> BytesInput {
+    fn generate_dummy(&self, _state: &mut Self::State) -> BytesInput {
         let size = min(self.max_size, DUMMY_BYTES_MAX);
         BytesInput::new(vec![0; size])
     }
 }
 
-impl<S> RandBytesGenerator<S>
-where
-    S: HasRand,
-{
+impl RandBytesGenerator {
     /// Returns a new [`RandBytesGenerator`], generating up to `max_size` random bytes.
     #[must_use]
     pub fn new(max_size: usize) -> Self {
-        Self {
-            max_size,
-            phantom: PhantomData,
-        }
+        Self { max_size }
     }
 }
 
 #[derive(Clone, Debug)]
 /// Generates random printable characters
-pub struct RandPrintablesGenerator<S>
-where
-    S: HasRand,
-{
+pub struct RandPrintablesGenerator {
     max_size: usize,
-    phantom: PhantomData<S>,
 }
 
-impl<S> Generator<BytesInput, S> for RandPrintablesGenerator<S>
-where
-    S: HasRand,
-{
-    fn generate(&mut self, state: &mut S) -> Result<BytesInput, Error> {
+impl Generator for RandPrintablesGenerator {
+    type Input = BytesInput;
+
+    fn generate(&mut self, state: &mut Self::State) -> Result<BytesInput, Error> {
         let mut size = state.rand_mut().below(self.max_size as u64);
         if size == 0 {
             size = 1;
@@ -106,23 +90,17 @@ where
     }
 
     /// Generates up to `DUMMY_BYTES_MAX` non-random dummy bytes (0)
-    fn generate_dummy(&self, _state: &mut S) -> BytesInput {
+    fn generate_dummy(&self, _state: &mut Self::State) -> BytesInput {
         let size = min(self.max_size, DUMMY_BYTES_MAX);
         BytesInput::new(vec![0_u8; size])
     }
 }
 
-impl<S> RandPrintablesGenerator<S>
-where
-    S: HasRand,
-{
+impl RandPrintablesGenerator {
     /// Creates a new [`RandPrintablesGenerator`], generating up to `max_size` random printable characters.
     #[must_use]
     pub fn new(max_size: usize) -> Self {
-        Self {
-            max_size,
-            phantom: PhantomData,
-        }
+        Self { max_size }
     }
 }
 

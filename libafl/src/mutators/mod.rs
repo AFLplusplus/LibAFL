@@ -42,22 +42,24 @@ pub enum MutationResult {
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<I, S>
-where
-    I: Input,
-{
+pub trait Mutator {
+    /// Type of the Input
+    type Input: Input;
+    /// Type of the State
+    type State;
+
     /// Mutate a given input
     fn mutate(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
     /// Post-process given the outcome of the execution
     fn post_exec(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _stage_idx: i32,
         _corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
@@ -66,22 +68,22 @@ where
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
-pub trait MutatorsTuple<I, S>: HasConstLen
-where
-    I: Input,
-{
+pub trait MutatorsTuple: HasConstLen {
+    type Input: Input;
+    type State;
+
     /// Runs the `mutate` function on all `Mutators` in this `Tuple`.
     fn mutate_all(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
     /// Runs the `post_exec` function on all `Mutators` in this `Tuple`.
     fn post_exec_all(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         stage_idx: i32,
         corpus_idx: Option<usize>,
     ) -> Result<(), Error>;
@@ -90,8 +92,8 @@ where
     fn get_and_mutate(
         &mut self,
         index: usize,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -99,20 +101,17 @@ where
     fn get_and_post_exec(
         &mut self,
         index: usize,
-        state: &mut S,
+        state: &mut Self::State,
         stage_idx: i32,
         corpus_idx: Option<usize>,
     ) -> Result<(), Error>;
 }
 
-impl<I, S> MutatorsTuple<I, S> for ()
-where
-    I: Input,
-{
+impl MutatorsTuple for () {
     fn mutate_all(
         &mut self,
-        _state: &mut S,
-        _input: &mut I,
+        _state: &mut Self::State,
+        _input: &mut Self::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         Ok(MutationResult::Skipped)
@@ -120,7 +119,7 @@ where
 
     fn post_exec_all(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _stage_idx: i32,
         _corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
@@ -130,8 +129,8 @@ where
     fn get_and_mutate(
         &mut self,
         _index: usize,
-        _state: &mut S,
-        _input: &mut I,
+        _state: &mut Self::State,
+        _input: &mut Self::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         Ok(MutationResult::Skipped)
@@ -140,7 +139,7 @@ where
     fn get_and_post_exec(
         &mut self,
         _index: usize,
-        _state: &mut S,
+        _state: &mut Self::State,
         _stage_idx: i32,
         _corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
@@ -148,16 +147,15 @@ where
     }
 }
 
-impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
+impl<Head, Tail> MutatorsTuple for (Head, Tail)
 where
-    Head: Mutator<I, S> + Named,
-    Tail: MutatorsTuple<I, S>,
-    I: Input,
+    Head: Mutator + Named,
+    Tail: MutatorsTuple,
 {
     fn mutate_all(
         &mut self,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let r = self.0.mutate(state, input, stage_idx)?;
@@ -170,7 +168,7 @@ where
 
     fn post_exec_all(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         stage_idx: i32,
         corpus_idx: Option<usize>,
     ) -> Result<(), Error> {
@@ -181,8 +179,8 @@ where
     fn get_and_mutate(
         &mut self,
         index: usize,
-        state: &mut S,
-        input: &mut I,
+        state: &mut Self::State,
+        input: &mut Self::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if index == 0 {
@@ -195,7 +193,7 @@ where
     fn get_and_post_exec(
         &mut self,
         index: usize,
-        state: &mut S,
+        state: &mut Self::State,
         stage_idx: i32,
         corpus_idx: Option<usize>,
     ) -> Result<(), Error> {

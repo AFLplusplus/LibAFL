@@ -31,7 +31,7 @@ where
 {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut GramatronInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -99,7 +99,7 @@ where
 {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut GramatronInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
@@ -171,7 +171,7 @@ where
 {
     fn mutate(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         input: &mut GramatronInput,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {

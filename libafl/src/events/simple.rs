@@ -69,7 +69,7 @@ where
     }
 }
 
-impl<I, MT, S> EventFirer<I> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventFirer for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
@@ -83,14 +83,14 @@ where
     }
 }
 
-impl<I, MT, S> EventRestarter<S> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventRestarter for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
 }
 
-impl<E, I, MT, S, Z> EventProcessor<E, I, S, Z> for SimpleEventManager<I, MT, S>
+impl<E, I, MT, S, Z> EventProcessor for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
@@ -98,7 +98,7 @@ where
     fn process(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         _executor: &mut E,
     ) -> Result<usize, Error> {
         let count = self.events.len();
@@ -131,7 +131,7 @@ where
     }
 }
 
-impl<I, MT, S> ProgressReporter<I> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> ProgressReporter for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
@@ -247,7 +247,7 @@ where
 
     // Handle arriving events in the client
     #[allow(clippy::needless_pass_by_value, clippy::unused_self)]
-    fn handle_in_client(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error> {
+    fn handle_in_client(&mut self, state: &mut Self::State, event: Event<I>) -> Result<(), Error> {
         if let Event::CustomBuf { tag, buf } = &event {
             for handler in &mut self.custom_buf_handlers {
                 handler(state, tag, buf)?;
@@ -281,7 +281,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> EventFirer<I> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SP> EventFirer for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
     SP: ShMemProvider,
@@ -293,7 +293,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> EventRestarter<S> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SP> EventRestarter for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
     S: Serialize,
@@ -309,14 +309,19 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, MT, Z> EventProcessor<E, I, S, Z> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<E, I, S, SP, MT, Z> EventProcessor for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
+    fn process(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        executor: &mut E,
+    ) -> Result<usize, Error> {
         self.simple_event_mgr.process(fuzzer, state, executor)
     }
 }
@@ -348,7 +353,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> ProgressReporter<I> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SP> ProgressReporter for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
     SP: ShMemProvider,
@@ -390,7 +395,7 @@ where
     #[allow(clippy::similar_names)]
     pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
-        S: DeserializeOwned + Serialize + HasCorpus<I> + HasSolutions<I>,
+        S: DeserializeOwned + Serialize + HasCorpus + HasSolutions<I>,
         MT: Debug,
     {
         // We start ourself as child process to actually fuzz

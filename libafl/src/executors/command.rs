@@ -301,7 +301,7 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, I, OT, S, T, Z> Executor for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input + HasTargetBytes,
     T: CommandConfigurator,
@@ -311,9 +311,9 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
@@ -377,7 +377,7 @@ where
     }
 }
 
-impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, S>
+impl<EM, I, OT: ObserversTuple, S, T: Debug, Z> HasObservers
     for CommandExecutor<EM, I, OT, S, T, Z>
 {
     fn observers(&self) -> &OT {
@@ -602,7 +602,7 @@ impl CommandExecutorBuilder {
 /// impl CommandConfigurator for MyExecutor {
 ///     fn spawn_child<I: HasTargetBytes>(
 ///        &mut self,
-///        input: &I,
+///        input: &Self::Input,
 ///     ) -> Result<Child, Error> {
 ///         let mut command = Command::new("../if");
 ///         command
@@ -617,7 +617,7 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, I, S, Z> {
+/// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```

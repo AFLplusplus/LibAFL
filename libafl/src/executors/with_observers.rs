@@ -16,27 +16,27 @@ pub struct WithObservers<E: Debug, OT: Debug> {
     observers: OT,
 }
 
-impl<E, EM, I, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, OT>
+impl<E, EM, I, OT, S, Z> Executor for WithObservers<E, OT>
 where
     I: Input,
-    E: Executor<EM, I, S, Z>,
+    E: Executor,
     OT: Debug,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
 }
 
-impl<I, E: Debug, OT: Debug, S> HasObservers<I, S> for WithObservers<E, OT>
+impl<I, E: Debug, OT: Debug, S> HasObservers for WithObservers<E, OT>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple,
 {
     fn observers(&self) -> &OT {
         &self.observers
