@@ -181,7 +181,7 @@ pub mod pybind {
             &mut self,
             idx: usize,
             testcase: Testcase<BytesInput>,
-        ) -> Result<Option<Testcase<I>>, Error> {
+        ) -> Result<Testcase<BytesInput>, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.replace(idx, testcase) })
         }
 
