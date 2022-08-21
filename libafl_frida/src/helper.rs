@@ -48,10 +48,10 @@ pub trait FridaRuntime: 'static + Debug {
     );
 
     /// Method called before execution
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &Self::Input) -> Result<(), Error>;
 
     /// Method called after execution
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &Self::Input) -> Result<(), Error>;
 }
 
 /// The tuple for Frida Runtime
@@ -65,10 +65,14 @@ pub trait FridaRuntimeTuple: MatchFirstType + Debug {
     );
 
     /// Method called before execution
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &Self::Input)
+        -> Result<(), Error>;
 
     /// Method called after execution
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error>;
+    fn post_exec_all<I: Input + HasTargetBytes>(
+        &mut self,
+        input: &Self::Input,
+    ) -> Result<(), Error>;
 }
 
 impl FridaRuntimeTuple for () {
@@ -79,10 +83,16 @@ impl FridaRuntimeTuple for () {
         _modules_to_instrument: &[&str],
     ) {
     }
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn pre_exec_all<I: Input + HasTargetBytes>(
+        &mut self,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn post_exec_all<I: Input + HasTargetBytes>(
+        &mut self,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -102,12 +112,18 @@ where
         self.1.init_all(gum, ranges, modules_to_instrument);
     }
 
-    fn pre_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+    fn pre_exec_all<I: Input + HasTargetBytes>(
+        &mut self,
+        input: &Self::Input,
+    ) -> Result<(), Error> {
         self.0.pre_exec(input)?;
         self.1.pre_exec_all(input)
     }
 
-    fn post_exec_all<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+    fn post_exec_all<I: Input + HasTargetBytes>(
+        &mut self,
+        input: &Self::Input,
+    ) -> Result<(), Error> {
         self.0.post_exec(input)?;
         self.1.post_exec_all(input)
     }
@@ -400,12 +416,18 @@ where
     }
 
     /// Method called before execution
-    pub fn pre_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+    pub fn pre_exec<I: Input + HasTargetBytes>(
+        &mut self,
+        input: &Self::Input,
+    ) -> Result<(), Error> {
         self.runtimes.pre_exec_all(input)
     }
 
     /// Method called after execution
-    pub fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+    pub fn post_exec<I: Input + HasTargetBytes>(
+        &mut self,
+        input: &Self::Input,
+    ) -> Result<(), Error> {
         self.runtimes.post_exec_all(input)
     }
 

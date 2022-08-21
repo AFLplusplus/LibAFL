@@ -38,17 +38,16 @@ impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
     }
 }
 
-impl<A, B, EM, I, S, Z> Executor for CombinedExecutor<A, B>
+impl<A, B> Executor for CombinedExecutor<A, B>
 where
     A: Executor,
     B: Executor,
-    I: Input,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        mgr: &mut EM,
+        mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let ret = self.primary.run_target(fuzzer, state, mgr, input);
@@ -58,7 +57,7 @@ where
     }
 }
 
-impl<A, B, I, S> HasObservers for CombinedExecutor<A, B>
+impl<A, B> HasObservers for CombinedExecutor<A, B>
 where
     A: HasObservers,
     B: Debug,

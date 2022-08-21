@@ -63,14 +63,14 @@ pub struct CmpValuesMetadata {
 
 crate::impl_serdeany!(CmpValuesMetadata);
 
-impl AsSlice<CmpValues> for CmpValuesMetadata {
+impl AsSlice for CmpValuesMetadata {
     /// Convert to a slice
     #[must_use]
     fn as_slice(&self) -> &[CmpValues] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<CmpValues> for CmpValuesMetadata {
+impl AsMutSlice for CmpValuesMetadata {
     /// Convert to a slice
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [CmpValues] {
@@ -111,7 +111,7 @@ pub trait CmpMap: Debug {
 }
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<CM, I, S>: Observer<I, S>
+pub trait CmpObserver<CM, I, S>: Observer
 where
     CM: CmpMap,
 {
@@ -224,11 +224,11 @@ where
     }
 }
 
-impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
+impl<'a, CM> Observer for StdCmpObserver<'a, CM>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
 {
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
         Ok(())
     }

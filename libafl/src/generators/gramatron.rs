@@ -1,6 +1,5 @@
 //! Gramatron generator
 use alloc::{string::String, vec::Vec};
-use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
 
@@ -34,44 +33,42 @@ pub struct Automaton {
 
 #[derive(Clone, Debug)]
 /// Generates random inputs from a grammar automaton
-pub struct GramatronGenerator<'a, S>
-where
-    S: HasRand,
-{
+pub struct GramatronGenerator<'a> {
     automaton: &'a Automaton,
-    phantom: PhantomData<S>,
 }
 
-impl<'a, S> Generator<GramatronInput, S> for GramatronGenerator<'a, S>
+impl<'a> Generator for GramatronGenerator<'a>
 where
-    S: HasRand,
+    Self: Generator<Input = GramatronInput>,
+    Self::State: HasRand,
 {
-    fn generate(&mut self, state: &mut S) -> Result<GramatronInput, Error> {
+    fn generate(&mut self, state: &mut Self::State) -> Result<GramatronInput, Error> {
         let mut input = GramatronInput::new(vec![]);
         self.append_generated_terminals(&mut input, state);
         Ok(input)
     }
 
-    fn generate_dummy(&self, _state: &mut S) -> GramatronInput {
+    fn generate_dummy(&self, _state: &mut Self::State) -> GramatronInput {
         GramatronInput::new(vec![])
     }
 }
 
-impl<'a, S> GramatronGenerator<'a, S>
+impl<'a> GramatronGenerator<'a>
 where
-    S: HasRand,
+    <Self as Generator>::State: HasRand,
 {
     /// Returns a new [`GramatronGenerator`]
     #[must_use]
     pub fn new(automaton: &'a Automaton) -> Self {
-        Self {
-            automaton,
-            phantom: PhantomData,
-        }
+        Self { automaton }
     }
 
     /// Append the generated terminals
-    pub fn append_generated_terminals(&self, input: &mut GramatronInput, state: &mut S) -> usize {
+    pub fn append_generated_terminals(
+        &self,
+        input: &mut GramatronInput,
+        state: &mut <Self as Generator>::State,
+    ) -> usize {
         let mut counter = 0;
         let final_state = self.automaton.final_state;
         let mut current_state =

@@ -132,15 +132,16 @@ pub trait HasObserverName {
 
 /// A combined feedback consisting of multiple [`Feedback`]s
 #[derive(Debug)]
-pub struct CombinedFeedback<A, B> {
+pub struct CombinedFeedback<A, B, FL> {
     /// First [`Feedback`]
     pub first: A,
     /// Second [`Feedback`]
     pub second: B,
     name: String,
+    phantom: PhantomData<FL>,
 }
 
-impl<A, B> Named for CombinedFeedback<A, B>
+impl<A, B, FL> Named for CombinedFeedback<A, B, FL>
 where
     A: Feedback,
     B: Feedback,
@@ -150,7 +151,7 @@ where
     }
 }
 
-impl<A, B, FL> CombinedFeedback<A, B>
+impl<A, B, FL> CombinedFeedback<A, B, FL>
 where
     A: Feedback,
     B: Feedback,
@@ -163,11 +164,12 @@ where
             first,
             second,
             name,
+            phantom: PhantomData,
         }
     }
 }
 
-impl<A, B, FL> Feedback for CombinedFeedback<A, B>
+impl<A, B, FL> Feedback for CombinedFeedback<A, B, FL>
 where
     A: Feedback,
     B: Feedback,
@@ -497,21 +499,21 @@ impl FeedbackLogic for LogicFastAnd {
 
 /// Combine two feedbacks with an eager AND operation,
 /// will call all feedbacks functions even if not necessary to conclude the result
-pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerAnd, I, S>;
+pub type EagerAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerAnd>;
 
 /// Combine two feedbacks with an fast AND operation,
 /// might skip calling feedbacks functions if not necessary to conclude the result
-pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastAnd, I, S>;
+pub type FastAndFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastAnd>;
 
 /// Combine two feedbacks with an eager OR operation,
 /// will call all feedbacks functions even if not necessary to conclude the result
-pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerOr, I, S>;
+pub type EagerOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicEagerOr>;
 
 /// Combine two feedbacks with an fast OR operation,
 /// might skip calling feedbacks functions if not necessary to conclude the result.
 /// This means any feedback that is not first might be skipped, use caution when using with
 /// `TimeFeedback`
-pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastOr, I, S>;
+pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastOr>;
 
 /// Compose feedbacks with an `NOT` operation
 #[derive(Clone)]
@@ -580,7 +582,11 @@ where
     }
 
     #[inline]
-    fn discard_metadata(&mut self, state: &mut Self::State, input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        state: &mut Self::State,
+        input: &Self::Input,
+    ) -> Result<(), Error> {
         self.first.discard_metadata(state, input)
     }
 }
@@ -667,10 +673,9 @@ macro_rules! feedback_not {
 }
 
 /// Hack to use () as empty Feedback
-impl<I, S> Feedback for ()
+impl Feedback for ()
 where
-    I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -700,10 +705,9 @@ impl Named for () {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CrashFeedback {}
 
-impl<I, S> Feedback for CrashFeedback
+impl Feedback for CrashFeedback
 where
-    I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -751,10 +755,9 @@ impl Default for CrashFeedback {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeoutFeedback {}
 
-impl<I, S> Feedback for TimeoutFeedback
+impl Feedback for TimeoutFeedback
 where
-    I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -807,10 +810,9 @@ pub struct TimeFeedback {
     name: String,
 }
 
-impl<I, S> Feedback for TimeFeedback
+impl Feedback for TimeFeedback
 where
-    I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -845,7 +847,11 @@ where
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     #[inline]
-    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         self.exec_time = None;
         Ok(())
     }
@@ -888,10 +894,8 @@ where
     phantom: PhantomData<T>,
 }
 
-impl<I, S, T> Feedback for ListFeedback<T>
+impl<T> Feedback for ListFeedback<T>
 where
-    I: Input,
-    S: HasClientPerfMonitor,
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     #[allow(clippy::wrong_self_convention)]
@@ -959,10 +963,9 @@ pub enum ConstFeedback {
     False,
 }
 
-impl<I, S> Feedback for ConstFeedback
+impl Feedback for ConstFeedback
 where
-    I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[inline]
     #[allow(clippy::wrong_self_convention)]

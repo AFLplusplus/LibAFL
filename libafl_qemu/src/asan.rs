@@ -439,7 +439,7 @@ where
         hooks.syscalls(qasan_fake_syscall::<I, QT, S>);
     }
 
-    fn post_exec(&mut self, _emulator: &Emulator, _input: &I) {
+    fn post_exec(&mut self, _emulator: &Emulator, _input: &Self::Input) {
         self.reset();
     }
 }

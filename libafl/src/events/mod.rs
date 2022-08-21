@@ -478,48 +478,53 @@ type CustomBufHandlerFn<S> =
     dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
 
 /// Supports custom buf handlers to handle `CustomBuf` events.
-pub trait HasCustomBufHandlers<S> {
+pub trait HasCustomBufHandlers {
+    type State;
+
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>);
+    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<Self::State>>);
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
 pub struct NopEventManager {}
 
-impl<I> EventFirer for NopEventManager
-where
-    I: Input,
-{
-    fn fire<S>(&mut self, _state: &mut Self::State, _event: Event<I>) -> Result<(), Error> {
+impl EventFirer for NopEventManager {
+    fn fire<S>(
+        &mut self,
+        _state: &mut Self::State,
+        _event: Event<Self::Input>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<S> EventRestarter for NopEventManager {}
+impl EventRestarter for NopEventManager {}
 
 impl EventProcessor for NopEventManager {
     fn process(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
-        _executor: &mut E,
+        _executor: &mut Self::Executor,
     ) -> Result<usize, Error> {
         Ok(0)
     }
 }
 
-impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
+impl EventManager for NopEventManager {}
 
-impl<S> HasCustomBufHandlers<S> for NopEventManager {
+impl HasCustomBufHandlers for NopEventManager {
     fn add_custom_buf_handler(
         &mut self,
-        _handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        _handler: Box<
+            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+        >,
     ) {
     }
 }
 
-impl<I> ProgressReporter for NopEventManager where I: Input {}
+impl ProgressReporter for NopEventManager {}
 
 impl HasEventManagerId for NopEventManager {
     fn mgr_id(&self) -> EventManagerId {

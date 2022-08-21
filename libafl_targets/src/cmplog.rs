@@ -204,12 +204,12 @@ where
     }
 }
 
-impl<'a, I, S> Observer<I, S> for CmpLogObserver<'a>
+impl<'a, I, S> Observer for CmpLogObserver<'a>
 where
     S: HasMetadata,
     Self: CmpObserver<CmpLogMap, I, S>,
 {
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
         self.map.as_mut().reset()?;
         unsafe {
             CMPLOG_ENABLED = 1;

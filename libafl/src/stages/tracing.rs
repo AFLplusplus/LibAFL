@@ -7,7 +7,6 @@ use crate::monitors::PerfFeature;
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers, ShadowExecutor},
-    inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
     stages::Stage,
@@ -18,32 +17,25 @@ use crate::{
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct TracingStage<EM, I, OT, S, TE, Z>
+pub struct TracingStage<TE>
 where
-    I: Input,
     TE: Executor + HasObservers,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     tracer_executor: TE,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, I, OT, S, TE, Z)>,
 }
 
-impl<E, EM, I, OT, S, TE, Z> Stage for TracingStage<EM, I, OT, S, TE, Z>
+impl<TE> Stage for TracingStage<TE>
 where
-    I: Input,
     TE: Executor + HasObservers,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        _executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        _executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut EM,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         start_timer!(state);
@@ -79,19 +71,14 @@ where
     }
 }
 
-impl<EM, I, OT, S, TE, Z> TracingStage<EM, I, OT, S, TE, Z>
+impl<TE> TracingStage<TE>
 where
-    I: Input,
     TE: Executor + HasObservers,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    <Self as Stage>::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
-        Self {
-            tracer_executor,
-            phantom: PhantomData,
-        }
+        Self { tracer_executor }
     }
 
     /// Gets the underlying tracer executor
@@ -102,27 +89,26 @@ where
 
 /// A stage that runs the shadow executor using also the shadow observers
 #[derive(Clone, Debug)]
-pub struct ShadowTracingStage<E, EM, I, OT, S, SOT, Z> {
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, I, OT, S, SOT, Z)>,
+pub struct ShadowTracingStage<OT, SOT> {
+    phantom: PhantomData<(OT, SOT)>,
 }
 
-impl<E, EM, I, OT, S, SOT, Z> Stage<ShadowExecutor<E, I, S, SOT>, EM, S, Z>
-    for ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
+impl<OT, SOT> Stage for ShadowTracingStage<OT, SOT>
 where
-    I: Input,
-    E: Executor + HasObservers,
+    Self: Stage<Executor = ShadowExecutor<Self::Executor, SOT>>,
+    Self::Executor: Executor<Input = Self::Input, State = Self::State>,
+    Self::Executor: Executor + HasObservers,
     OT: ObserversTuple,
     SOT: ObserversTuple,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus + Debug,
+    Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus + Debug,
 {
     #[inline]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut ShadowExecutor<E, I, S, SOT>,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut ShadowExecutor<Self::Executor, SOT>,
         state: &mut Self::State,
-        manager: &mut EM,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         start_timer!(state);
@@ -160,16 +146,14 @@ where
     }
 }
 
-impl<E, EM, I, OT, S, SOT, Z> ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
+impl<OT, SOT> ShadowTracingStage<OT, SOT>
 where
-    I: Input,
-    E: Executor + HasObservers,
     OT: ObserversTuple,
     SOT: ObserversTuple,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    <Self as Stage>::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default stage
-    pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {
+    pub fn new(_executor: &mut ShadowExecutor<<Self as Stage>::Executor, SOT>) -> Self {
         Self {
             phantom: PhantomData,
         }

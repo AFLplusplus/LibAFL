@@ -213,7 +213,7 @@ where
         hooks.after_syscalls(trace_mmap_snapshot::<I, QT, S>);
     }
 
-    fn pre_exec(&mut self, emulator: &Emulator, _input: &I) {
+    fn pre_exec(&mut self, emulator: &Emulator, _input: &Self::Input) {
         if self.empty {
             self.snapshot(emulator);
         } else {

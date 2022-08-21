@@ -19,31 +19,27 @@ use crate::{
 
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
-pub struct ConcolicTracingStage<EM, I, OT, S, TE, Z>
+pub struct ConcolicTracingStage<TE>
 where
-    I: Input,
     TE: Executor + HasObservers,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    <Self as Stage>::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
-    inner: TracingStage<EM, I, OT, S, TE, Z>,
+    inner: TracingStage<TE>,
     observer_name: String,
 }
 
-impl<E, EM, I, OT, S, TE, Z> Stage for ConcolicTracingStage<EM, I, OT, S, TE, Z>
+impl<TE> Stage for ConcolicTracingStage<TE>
 where
-    I: Input,
     TE: Executor + HasObservers,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut EM,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         self.inner
@@ -67,15 +63,13 @@ where
     }
 }
 
-impl<EM, I, OT, S, TE, Z> ConcolicTracingStage<EM, I, OT, S, TE, Z>
+impl<TE> ConcolicTracingStage<TE>
 where
-    I: Input,
     TE: Executor + HasObservers,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    <Self as Stage>::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
-    pub fn new(inner: TracingStage<EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
+    pub fn new(inner: TracingStage<TE>, observer_name: String) -> Self {
         Self {
             inner,
             observer_name,
@@ -358,8 +352,8 @@ where
     #[inline]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,

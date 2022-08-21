@@ -34,7 +34,6 @@ pub use concolic::SimpleConcolicMutationalStage;
 
 #[cfg(feature = "std")]
 pub mod sync;
-use core::{convert::From, marker::PhantomData};
 
 #[cfg(feature = "std")]
 pub use sync::*;
@@ -68,7 +67,7 @@ pub trait Stage {
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
-pub trait StagesTuple<E, EM, S, Z> {
+pub trait StagesTuple {
     type Executor;
     type EventManager;
     type State;
@@ -85,30 +84,35 @@ pub trait StagesTuple<E, EM, S, Z> {
     ) -> Result<(), Error>;
 }
 
-impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for () {
+impl StagesTuple for () {
     fn perform_all(
         &mut self,
-        _: &mut Z,
-        _: &mut E,
-        _: &mut S,
-        _: &mut EM,
+        _: &mut Self::Fuzzer,
+        _: &mut Self::Executor,
+        _: &mut Self::State,
+        _: &mut Self::EventManager,
         _: usize,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<Head, Tail, E, EM, S, Z> StagesTuple<E, EM, S, Z> for (Head, Tail)
+impl<Head, Tail> StagesTuple for (Head, Tail)
 where
     Head: Stage,
-    Tail: StagesTuple<E, EM, S, Z>,
+    Tail: StagesTuple<
+        Executor = Self::Executor,
+        EventManager = Self::EventManager,
+        State = Self::State,
+        Fuzzer = Self::Fuzzer,
+    >,
 {
     fn perform_all(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut EM,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         // Perform the current stage
@@ -123,24 +127,26 @@ where
 
 /// A [`Stage`] that will call a closure
 #[derive(Debug)]
-pub struct ClosureStage<CB, E, EM, S, Z>
-where
-    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
-{
+pub struct ClosureStage<CB> {
     closure: CB,
-    phantom: PhantomData<(E, EM, S, Z)>,
 }
 
-impl<CB, E, EM, S, Z> Stage for ClosureStage<CB, E, EM, S, Z>
+impl<CB> Stage for ClosureStage<CB>
 where
-    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+    CB: FnMut(
+        &mut Self::Fuzzer,
+        &mut Self::Executor,
+        &mut Self::State,
+        &mut Self::EventManager,
+        usize,
+    ) -> Result<(), Error>,
 {
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut Self::State,
-        manager: &mut EM,
+        manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         (self.closure)(fuzzer, executor, state, manager, corpus_idx)
@@ -148,23 +154,32 @@ where
 }
 
 /// A stage that takes a closure
-impl<CB, E, EM, S, Z> ClosureStage<CB, E, EM, S, Z>
+impl<CB> ClosureStage<CB>
 where
-    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+    CB: FnMut(
+        &mut <Self as Stage>::Fuzzer,
+        &mut <Self as Stage>::Executor,
+        &mut <Self as Stage>::State,
+        &mut <Self as Stage>::EventManager,
+        usize,
+    ) -> Result<(), Error>,
 {
     /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {
-        Self {
-            closure,
-            phantom: PhantomData,
-        }
+        Self { closure }
     }
 }
 
-impl<CB, E, EM, S, Z> From<CB> for ClosureStage<CB, E, EM, S, Z>
+impl<CB> From<CB> for ClosureStage<CB>
 where
-    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+    CB: FnMut(
+        &mut <Self as Stage>::Fuzzer,
+        &mut <Self as Stage>::Executor,
+        &mut <Self as Stage>::State,
+        &mut <Self as Stage>::EventManager,
+        usize,
+    ) -> Result<(), Error>,
 {
     #[must_use]
     fn from(closure: CB) -> Self {

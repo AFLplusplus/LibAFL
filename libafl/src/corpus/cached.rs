@@ -18,20 +18,13 @@ use crate::{
 /// A corpus that keep in memory a maximun number of testcases. The eviction policy is FIFO.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct CachedOnDiskCorpus<I>
-where
-    I: Input,
-{
-    inner: OnDiskCorpus<I>,
+pub struct CachedOnDiskCorpus {
+    inner: OnDiskCorpus,
     cached_indexes: RefCell<VecDeque<usize>>,
     cache_max_len: usize,
 }
 
-impl<I> Corpus<I> for CachedOnDiskCorpus<I>
-where
-    I: Input,
-{
+impl Corpus for CachedOnDiskCorpus {
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
@@ -40,20 +33,20 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<usize, Error> {
         self.inner.add(testcase)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: usize, testcase: Testcase<Self::Input>) -> Result<(), Error> {
         // TODO finish
         self.inner.replace(idx, testcase)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<Self::Input>>, Error> {
         let testcase = self.inner.remove(idx)?;
         if testcase.is_some() {
             self.cached_indexes.borrow_mut().retain(|e| *e != idx);
@@ -63,7 +56,7 @@ where
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         let testcase = { self.inner.get(idx)? };
         if testcase.borrow().input().is_none() {
             let _ = testcase.borrow_mut().load_input()?;
@@ -98,10 +91,7 @@ where
     }
 }
 
-impl<I> CachedOnDiskCorpus<I>
-where
-    I: Input,
-{
+impl CachedOnDiskCorpus {
     /// Creates the [`CachedOnDiskCorpus`].
     pub fn new(dir_path: PathBuf, cache_max_len: usize) -> Result<Self, Error> {
         if cache_max_len == 0 {

@@ -22,8 +22,8 @@ pub struct FeedbackStatesOwnedList {
 impl FeedbackStatesTuple for FeedbackStatesOwnedList {
     fn perform_all(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,

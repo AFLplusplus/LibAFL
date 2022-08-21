@@ -13,16 +13,13 @@ use crate::{
 
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct InMemoryCorpus<I>
-where
-    I: Input,
-{
-    entries: Vec<RefCell<Testcase<I>>>,
+#[serde(bound = "<Self as Corpus>::Input: serde::de::DeserializeOwned")]
+pub struct InMemoryCorpus {
+    entries: Vec<RefCell<Testcase<<Self as Corpus>::Input>>>,
     current: Option<usize>,
 }
 
-impl<I> Corpus<I> for InMemoryCorpus<I>
+impl<I> Corpus for InMemoryCorpus
 where
     I: Input,
 {
@@ -34,7 +31,7 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase) -> Result<usize, Error> {
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<usize, Error> {
         self.entries.push(RefCell::new(testcase));
         Ok(self.entries.len() - 1)
     }
@@ -78,7 +75,7 @@ where
     }
 }
 
-impl<I> InMemoryCorpus<I>
+impl<I> InMemoryCorpus
 where
     I: Input,
 {

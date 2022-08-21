@@ -266,7 +266,7 @@ where
     }
 }
 
-impl AsSlice<Vec<u8>> for Tokens {
+impl AsSlice for Tokens {
     fn as_slice(&self) -> &[Vec<u8>] {
         self.tokens()
     }
@@ -295,10 +295,10 @@ impl<'it> IntoIterator for &'it Tokens {
 #[derive(Debug, Default)]
 pub struct TokenInsert;
 
-impl<I, S> Mutator for TokenInsert
+impl Mutator for TokenInsert
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    Self::Input: Input + HasBytesVec,
+    Self::State: HasMetadata + HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -361,10 +361,10 @@ impl TokenInsert {
 #[derive(Debug, Default)]
 pub struct TokenReplace;
 
-impl<I, S> Mutator for TokenReplace
+impl Mutator for TokenReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    Self::Input: Input + HasBytesVec,
+    Self::State: HasMetadata + HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -423,10 +423,10 @@ impl TokenReplace {
 #[derive(Debug, Default)]
 pub struct I2SRandReplace;
 
-impl<I, S> Mutator for I2SRandReplace
+impl Mutator for I2SRandReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    Self::Input: Input + HasBytesVec,
+    Self::State: HasMetadata + HasRand + HasMaxSize,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(

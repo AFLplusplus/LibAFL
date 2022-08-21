@@ -18,9 +18,9 @@ where
     {
     }
 
-    fn pre_exec(&mut self, _emulator: &Emulator, _input: &I) {}
+    fn pre_exec(&mut self, _emulator: &Emulator, _input: &Self::Input) {}
 
-    fn post_exec(&mut self, _emulator: &Emulator, _input: &I) {}
+    fn post_exec(&mut self, _emulator: &Emulator, _input: &Self::Input) {}
 }
 
 pub trait QemuHelperTuple<I, S>: MatchFirstType + Debug
@@ -33,9 +33,9 @@ where
     where
         QT: QemuHelperTuple<I, S>;
 
-    fn pre_exec_all(&mut self, _emulator: &Emulator, input: &I);
+    fn pre_exec_all(&mut self, _emulator: &Emulator, input: &Self::Input);
 
-    fn post_exec_all(&mut self, _emulator: &Emulator, input: &I);
+    fn post_exec_all(&mut self, _emulator: &Emulator, input: &Self::Input);
 }
 
 impl<I, S> QemuHelperTuple<I, S> for ()
@@ -50,9 +50,9 @@ where
     {
     }
 
-    fn pre_exec_all(&mut self, _emulator: &Emulator, _input: &I) {}
+    fn pre_exec_all(&mut self, _emulator: &Emulator, _input: &Self::Input) {}
 
-    fn post_exec_all(&mut self, _emulator: &Emulator, _input: &I) {}
+    fn post_exec_all(&mut self, _emulator: &Emulator, _input: &Self::Input) {}
 }
 
 impl<Head, Tail, I, S> QemuHelperTuple<I, S> for (Head, Tail)
@@ -71,12 +71,12 @@ where
         self.1.init_hooks_all(hooks);
     }
 
-    fn pre_exec_all(&mut self, emulator: &Emulator, input: &I) {
+    fn pre_exec_all(&mut self, emulator: &Emulator, input: &Self::Input) {
         self.0.pre_exec(emulator, input);
         self.1.pre_exec_all(emulator, input);
     }
 
-    fn post_exec_all(&mut self, emulator: &Emulator, input: &I) {
+    fn post_exec_all(&mut self, emulator: &Emulator, input: &Self::Input) {
         self.0.post_exec(emulator, input);
         self.1.post_exec_all(emulator, input);
     }

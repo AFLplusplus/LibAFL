@@ -17,6 +17,7 @@ use crate::{
     mutators::Mutator,
     observers::ObserversTuple,
     schedulers::Scheduler,
+    stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
@@ -67,7 +68,11 @@ where
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
-    fn iterations(&self, state: &mut Self::State, _corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(
+        &self,
+        state: &mut <Self as Stage>::State,
+        _corpus_idx: usize,
+    ) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
     }
 
@@ -77,8 +82,7 @@ where
     }
 }
 
-impl<CS, EM, I, M, OT, S, Z> PushStage<CS, EM, I, OT, S, Z>
-    for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
+impl<CS, EM, I, M, OT, S, Z> PushStage for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
     CS: Scheduler,
     EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter,
@@ -91,9 +95,9 @@ where
     /// Creates a new default mutational stage
     fn init(
         &mut self,
-        fuzzer: &mut Z,
+        fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        _event_mgr: &mut EM,
+        _event_mgr: &mut Self::EventManager,
         _observers: &mut OT,
     ) -> Result<(), Error> {
         // Find a testcase to work on, unless someone already set it
@@ -111,9 +115,9 @@ where
     #[inline]
     fn deinit(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
-        _event_mgr: &mut EM,
+        _event_mgr: &mut Self::EventManager,
         _observers: &mut OT,
     ) -> Result<(), Error> {
         self.current_corpus_idx = None;
@@ -122,9 +126,9 @@ where
 
     fn pre_exec(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        _event_mgr: &mut EM,
+        _event_mgr: &mut Self::EventManager,
         _observers: &mut OT,
     ) -> Option<Result<I, Error>> {
         if self.testcases_done >= self.testcases_to_do {
@@ -158,9 +162,9 @@ where
 
     fn post_exec(
         &mut self,
-        fuzzer: &mut Z,
+        fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        event_mgr: &mut EM,
+        event_mgr: &mut Self::EventManager,
         observers: &mut OT,
         last_input: I,
         exit_kind: ExitKind,

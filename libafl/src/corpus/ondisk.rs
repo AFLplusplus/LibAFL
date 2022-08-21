@@ -43,21 +43,14 @@ pub struct OnDiskMetadata<'a> {
 /// A corpus able to store testcases to disk, and load them from disk, when they are being used.
 #[cfg(feature = "std")]
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "I: serde::de::DeserializeOwned")]
-pub struct OnDiskCorpus<I>
-where
-    I: Input,
-{
-    entries: Vec<RefCell<Testcase<I>>>,
+pub struct OnDiskCorpus {
+    entries: Vec<RefCell<Testcase<<Self as Corpus>::Input>>>,
     current: Option<usize>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
 }
 
-impl<I> Corpus<I> for OnDiskCorpus<I>
-where
-    I: Input,
-{
+impl Corpus for OnDiskCorpus {
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
@@ -66,7 +59,7 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, mut testcase: Testcase<Self::Input>) -> Result<usize, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase
@@ -134,7 +127,7 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: usize, testcase: Testcase<Self::Input>) -> Result<(), Error> {
         if idx >= self.entries.len() {
             return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
         }
@@ -144,7 +137,7 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<Self::Input>>, Error> {
         if idx >= self.entries.len() {
             Ok(None)
         } else {
@@ -154,7 +147,7 @@ where
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
         Ok(&self.entries[idx])
     }
 
@@ -171,17 +164,14 @@ where
     }
 }
 
-impl<I> OnDiskCorpus<I>
-where
-    I: Input,
-{
+impl OnDiskCorpus {
     /// Creates the [`OnDiskCorpus`].
     /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
     pub fn new<P>(dir_path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
-        fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
+        fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus, Error> {
             fs::create_dir_all(&dir_path)?;
             Ok(OnDiskCorpus {
                 entries: vec![],

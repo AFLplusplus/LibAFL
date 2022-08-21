@@ -59,8 +59,8 @@ where
     #[inline]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut <Self as Stage>::State,
         manager: &mut EM,
         _corpus_idx: usize,

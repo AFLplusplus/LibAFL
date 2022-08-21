@@ -248,7 +248,7 @@ fn fuzz(
 pub struct MyCommandConfigurator;
 
 impl CommandConfigurator for MyCommandConfigurator {
-    fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
+    fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &Self::Input) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")

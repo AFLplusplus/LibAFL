@@ -116,13 +116,12 @@ where
     }
 }
 
-impl<F, I, O1, O2, S> Feedback for DiffFeedback<F, O1, O2>
+impl<F, O1, O2> Feedback for DiffFeedback<F, O1, O2>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
-    I: Input,
-    S: HasMetadata + HasClientPerfMonitor,
-    O1: Observer<I, S> + PartialEq<O2>,
-    O2: Observer<I, S>,
+    Self::State: HasMetadata + HasClientPerfMonitor,
+    O1: Observer + PartialEq<O2>,
+    O2: Observer,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -183,7 +182,7 @@ mod tests {
             }
         }
     }
-    impl<I, S> Observer<I, S> for NopObserver {}
+    impl<I, S> Observer for NopObserver {}
     impl PartialEq for NopObserver {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value

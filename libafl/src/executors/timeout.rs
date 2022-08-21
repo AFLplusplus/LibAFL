@@ -33,7 +33,6 @@ use windows::Win32::{
 use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
     Error,
 };
 
@@ -262,17 +261,16 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
+impl<E> Executor for TimeoutExecutor<E>
 where
     E: Executor + HasInProcessHandlers,
-    I: Input,
 {
     #[allow(clippy::cast_sign_loss)]
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        mgr: &mut EM,
+        mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
@@ -332,16 +330,15 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
+impl<E> Executor for TimeoutExecutor<E>
 where
     E: Executor,
-    I: Input,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        mgr: &mut EM,
+        mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
@@ -363,16 +360,15 @@ where
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
+impl<E> Executor for TimeoutExecutor<E>
 where
     E: Executor,
-    I: Input,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        mgr: &mut EM,
+        mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
@@ -392,7 +388,7 @@ where
     }
 }
 
-impl<E, I, S> HasObservers for TimeoutExecutor<E>
+impl<E> HasObservers for TimeoutExecutor<E>
 where
     E: HasObservers,
 {

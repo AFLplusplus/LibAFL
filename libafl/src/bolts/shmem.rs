@@ -137,7 +137,7 @@ impl ShMemId {
         alloc::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
     }
 }
-impl AsSlice<u8> for ShMemId {
+impl AsSlice for ShMemId {
     fn as_slice(&self) -> &[u8] {
         &self.id
     }
@@ -158,7 +158,7 @@ impl Display for ShMemId {
 /// A [`ShMem`] is an interface to shared maps.
 /// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
-pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
+pub trait ShMem: Sized + Debug + Clone + AsSlice + AsMutSlice {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -312,7 +312,7 @@ where
     }
 }
 
-impl<T> AsSlice<u8> for RcShMem<T>
+impl<T> AsSlice for RcShMem<T>
 where
     T: ShMemProvider + Debug,
 {
@@ -321,7 +321,7 @@ where
     }
 }
 
-impl<T> AsMutSlice<u8> for RcShMem<T>
+impl<T> AsMutSlice for RcShMem<T>
 where
     T: ShMemProvider + Debug,
 {
@@ -754,13 +754,13 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsSlice<u8> for MmapShMem {
+        impl AsSlice for MmapShMem {
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
         }
 
-        impl AsMutSlice<u8> for MmapShMem {
+        impl AsMutSlice for MmapShMem {
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -857,13 +857,13 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsSlice<u8> for CommonUnixShMem {
+        impl AsSlice for CommonUnixShMem {
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
         }
 
-        impl AsMutSlice<u8> for CommonUnixShMem {
+        impl AsMutSlice for CommonUnixShMem {
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -1068,13 +1068,13 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsSlice<u8> for AshmemShMem {
+        impl AsSlice for AshmemShMem {
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
         }
 
-        impl AsMutSlice<u8> for AshmemShMem {
+        impl AsMutSlice for AshmemShMem {
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -1266,12 +1266,12 @@ pub mod win32_shmem {
         }
     }
 
-    impl AsSlice<u8> for Win32ShMem {
+    impl AsSlice for Win32ShMem {
         fn as_slice(&self) -> &[u8] {
             unsafe { slice::from_raw_parts(self.map, self.map_size) }
         }
     }
-    impl AsMutSlice<u8> for Win32ShMem {
+    impl AsMutSlice for Win32ShMem {
         fn as_mut_slice(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
         }

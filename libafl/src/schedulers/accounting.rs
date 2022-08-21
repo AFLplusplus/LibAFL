@@ -10,6 +10,7 @@ use crate::{
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::Input,
+    observers::MapObserver,
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
@@ -29,13 +30,19 @@ pub struct AccountingIndexesMetadata {
 
 crate::impl_serdeany!(AccountingIndexesMetadata);
 
-impl AsSlice<usize> for AccountingIndexesMetadata {
+impl AsSlice for AccountingIndexesMetadata
+where
+    Self: MapObserver<Item = usize>,
+{
     /// Convert to a slice
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<usize> for AccountingIndexesMetadata {
+impl AsMutSlice for AccountingIndexesMetadata
+where
+    Self: MapObserver<Item = usize>,
+{
     /// Convert to a slice
     fn as_mut_slice(&mut self) -> &mut [usize] {
         self.list.as_mut_slice()
@@ -101,7 +108,7 @@ where
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
-    inner: MinimizerScheduler<CS, LenTimeMulTestcaseScore<I, S>, I, MapIndexesMetadata, S>,
+    inner: MinimizerScheduler<CS, LenTimeMulTestcaseScore, MapIndexesMetadata>,
 }
 
 impl<'a, CS, I, S> Scheduler for CoverageAccountingScheduler<'a, CS, I, S>
@@ -170,7 +177,7 @@ where
     #[allow(clippy::cast_possible_wrap)]
     pub fn update_accounting_score(
         &self,
-        state: &mut Self::State,
+        state: &mut <Self as Scheduler>::State,
         idx: usize,
     ) -> Result<(), Error> {
         let mut indexes = vec![];
@@ -272,7 +279,11 @@ where
 
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
-    pub fn new(state: &mut Self::State, base: CS, accounting_map: &'a [u32]) -> Self {
+    pub fn new(
+        state: &mut <Self as Scheduler>::State,
+        base: CS,
+        accounting_map: &'a [u32],
+    ) -> Self {
         match state.metadata().get::<TopAccountingMetadata>() {
             Some(meta) => {
                 if meta.max_accounting.len() != accounting_map.len() {
@@ -293,7 +304,7 @@ where
     /// Creates a new [`CoverageAccountingScheduler`] that wraps a `base` [`Scheduler`]
     /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
     pub fn with_skip_prob(
-        state: &mut Self::State,
+        state: &mut <Self as Scheduler>::State,
         base: CS,
         skip_non_favored_prob: u64,
         accounting_map: &'a [u32],

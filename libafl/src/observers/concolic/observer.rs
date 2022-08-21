@@ -18,7 +18,7 @@ pub struct ConcolicObserver<'map> {
     name: String,
 }
 
-impl<'map, I, S> Observer<I, S> for ConcolicObserver<'map> {}
+impl<'map> Observer for ConcolicObserver<'map> {}
 
 impl<'map> ConcolicObserver<'map> {
     /// Create the concolic observer metadata for this run

@@ -51,7 +51,7 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[allow(clippy::type_complexity, missing_debug_implementations)]
 pub struct Launcher<'a, CF, I, MT, OT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<OT, SP>, usize) -> Result<(), Error>,
     I: Input + 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
@@ -91,7 +91,7 @@ where
 
 impl<CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<OT, SP>, usize) -> Result<(), Error>,
     I: Input,
     OT: ObserversTuple + DeserializeOwned,
     MT: Monitor + Clone,
@@ -113,7 +113,7 @@ where
 #[cfg(feature = "std")]
 impl<'a, CF, I, MT, OT, S, SP> Launcher<'a, CF, I, MT, OT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<OT, SP>, usize) -> Result<(), Error>,
     I: Input,
     OT: ObserversTuple + DeserializeOwned,
     MT: Monitor + Clone,

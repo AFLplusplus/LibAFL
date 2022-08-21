@@ -551,8 +551,8 @@ pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl<I, S> Observer<I, S> for AsanErrorsObserver {
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+impl<I, S> Observer for AsanErrorsObserver {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
@@ -657,7 +657,11 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         self.errors = None;
         Ok(())
     }

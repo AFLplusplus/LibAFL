@@ -96,7 +96,7 @@ where
     }
 }
 
-impl<SH> AsSlice<u8> for ServedShMem<SH>
+impl<SH> AsSlice for ServedShMem<SH>
 where
     SH: ShMem,
 {
@@ -104,7 +104,7 @@ where
         self.inner.as_slice()
     }
 }
-impl<SH> AsMutSlice<u8> for ServedShMem<SH>
+impl<SH> AsMutSlice for ServedShMem<SH>
 where
     SH: ShMem,
 {

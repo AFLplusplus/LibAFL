@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
-    inputs::Input,
     schedulers::{Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
@@ -18,13 +17,8 @@ use crate::{
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
 #[derive(Debug, Clone)]
-pub struct ProbabilitySamplingScheduler<F, I, S>
-where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus + HasMetadata + HasRand,
-{
-    phantom: PhantomData<(F, I, S)>,
+pub struct ProbabilitySamplingScheduler<F> {
+    phantom: PhantomData<F>,
 }
 
 /// A state metadata holding a map of probability of corpus elements.
@@ -55,11 +49,9 @@ impl Default for ProbabilityMetadata {
     }
 }
 
-impl<F, I, S> ProbabilitySamplingScheduler<F, I, S>
+impl<F> ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus + HasMetadata + HasRand,
+    F: TestcaseScore,
 {
     /// Creates a new [`struct@ProbabilitySamplingScheduler`]
     #[must_use]
@@ -72,7 +64,11 @@ where
     /// Calculate the score and store in `ProbabilityMetadata`
     #[allow(clippy::cast_precision_loss)]
     #[allow(clippy::unused_self)]
-    pub fn store_probability(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
+    pub fn store_probability(
+        &self,
+        state: &mut <Self as Scheduler>::State,
+        idx: usize,
+    ) -> Result<(), Error> {
         let factor = F::compute(&mut *state.corpus().get(idx)?.borrow_mut(), state)?;
         if factor == 0.0 {
             return Err(Error::illegal_state(
@@ -90,11 +86,10 @@ where
     }
 }
 
-impl<F, I, S> Scheduler for ProbabilitySamplingScheduler<F, I, S>
+impl<F> Scheduler for ProbabilitySamplingScheduler<F>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus + HasMetadata + HasRand,
+    F: TestcaseScore,
+    Self::State: HasCorpus + HasMetadata + HasRand,
 {
     fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
@@ -105,7 +100,7 @@ where
 
     /// Gets the next entry
     #[allow(clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
@@ -127,12 +122,7 @@ where
     }
 }
 
-impl<F, I, S> Default for ProbabilitySamplingScheduler<F, I, S>
-where
-    F: TestcaseScore,
-    I: Input,
-    S: HasCorpus + HasMetadata + HasRand,
-{
+impl<F> Default for ProbabilitySamplingScheduler<F> {
     fn default() -> Self {
         Self::new()
     }
@@ -141,12 +131,12 @@ where
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
-    use core::{borrow::BorrowMut, marker::PhantomData};
+    use core::borrow::BorrowMut;
 
     use crate::{
         bolts::rands::StdRand,
         corpus::{Corpus, InMemoryCorpus, Testcase},
-        inputs::{bytes::BytesInput, Input},
+        inputs::bytes::BytesInput,
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::{HasCorpus, HasMetadata, StdState},
         Error,
@@ -155,25 +145,19 @@ mod tests {
     const FACTOR: f64 = 1337.0;
 
     #[derive(Debug, Clone)]
-    pub struct UniformDistribution<I>
-    where
-        I: Input,
-    {
-        phantom: PhantomData<I>,
-    }
+    pub struct UniformDistribution {}
 
-    impl<I, S> TestcaseScore<I, S> for UniformDistribution<I>
+    impl TestcaseScore for UniformDistribution
     where
-        I: Input,
-        S: HasMetadata + HasCorpus,
+        Self::State: HasMetadata + HasCorpus,
     {
-        fn compute(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
+        fn compute(_: &mut Testcase<Self::Input>, _state: &Self::State) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }
 
     pub type UniformProbabilitySamplingScheduler =
-        ProbabilitySamplingScheduler<UniformDistribution<I>, I, S>;
+        ProbabilitySamplingScheduler<UniformDistribution>;
 
     #[test]
     fn test_prob_sampling() {

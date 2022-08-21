@@ -150,15 +150,15 @@ pub trait Executor: Debug {
 #[derive(Debug)]
 struct NopExecutor {}
 
-impl<EM, I, S, Z> Executor for NopExecutor
+impl Executor for NopExecutor
 where
-    I: Input + HasTargetBytes,
+    Self::Input: Input + HasTargetBytes,
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
-        _mgr: &mut EM,
+        _mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {

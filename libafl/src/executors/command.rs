@@ -310,9 +310,9 @@ where
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
-        _mgr: &mut EM,
+        _mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;

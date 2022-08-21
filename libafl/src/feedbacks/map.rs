@@ -215,13 +215,13 @@ pub struct MapIndexesMetadata {
 
 crate::impl_serdeany!(MapIndexesMetadata);
 
-impl AsSlice<usize> for MapIndexesMetadata {
+impl AsSlice for MapIndexesMetadata {
     /// Convert to a slice
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<usize> for MapIndexesMetadata {
+impl AsMutSlice for MapIndexesMetadata {
     /// Convert to a slice
     fn as_mut_slice(&mut self) -> &mut [usize] {
         self.list.as_mut_slice()
@@ -255,14 +255,14 @@ pub struct MapNoveltiesMetadata {
 
 crate::impl_serdeany!(MapNoveltiesMetadata);
 
-impl AsSlice<usize> for MapNoveltiesMetadata {
+impl AsSlice for MapNoveltiesMetadata {
     /// Convert to a slice
     #[must_use]
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<usize> for MapNoveltiesMetadata {
+impl AsMutSlice for MapNoveltiesMetadata {
     /// Convert to a slice
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [usize] {
@@ -337,7 +337,7 @@ pub struct MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<Entry = T>,
+    O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     S: HasNamedMetadata,
@@ -360,7 +360,7 @@ impl<I, N, O, R, S, T> Feedback for MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<Entry = T>,
+    O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
@@ -422,7 +422,11 @@ where
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
         }
@@ -437,7 +441,7 @@ where
 #[rustversion::nightly]
 impl<I, O, S> Feedback for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<u8>,
+    O: MapObserver<Item = u8> + AsSlice,
     for<'it> O: AsIter<'it, Item = u8>,
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug,
@@ -559,7 +563,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
-    O: MapObserver<Entry = T>,
+    O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
     S: HasNamedMetadata,
 {
@@ -574,7 +578,7 @@ where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     N: IsNovel<T>,
-    O: MapObserver<Entry = T>,
+    O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
     S: HasNamedMetadata,
 {
@@ -592,7 +596,7 @@ impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
-    O: MapObserver<Entry = T>,
+    O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
@@ -660,9 +664,9 @@ where
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn is_interesting_default<EM, OT>(
         &mut self,
-        state: &mut Self::State,
+        state: &mut <Self as Feedback>::State,
         manager: &mut EM,
-        _input: &Self::Input,
+        _input: &<Self as Feedback>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -732,7 +736,7 @@ pub struct ReachabilityFeedback<O> {
 
 impl<O> ReachabilityFeedback<O>
 where
-    O: MapObserver<Entry = usize>,
+    O: MapObserver<Item = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {
     /// Creates a new [`ReachabilityFeedback`] for a [`MapObserver`].
@@ -756,12 +760,11 @@ where
     }
 }
 
-impl<I, O, S> Feedback for ReachabilityFeedback<O>
+impl<O> Feedback for ReachabilityFeedback<O>
 where
-    I: Input,
-    O: MapObserver<Entry = usize>,
+    O: MapObserver<Item = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -805,7 +808,11 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())
     }
@@ -813,7 +820,7 @@ where
 
 impl<O> Named for ReachabilityFeedback<O>
 where
-    O: MapObserver<Entry = usize>,
+    O: MapObserver<Item = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {
     #[inline]

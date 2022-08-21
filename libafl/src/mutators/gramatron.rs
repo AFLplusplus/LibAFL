@@ -18,16 +18,14 @@ use crate::{
 
 /// A random mutator for grammar fuzzing
 #[derive(Debug)]
-pub struct GramatronRandomMutator<'a, S>
-where
-    S: HasRand + HasMetadata,
-{
-    generator: &'a GramatronGenerator<'a, S>,
+pub struct GramatronRandomMutator<'a> {
+    generator: &'a GramatronGenerator<'a>,
 }
 
-impl<'a, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, S>
+impl<'a> Mutator for GramatronRandomMutator<'a>
 where
-    S: HasRand + HasMetadata,
+    Self::State: HasRand + HasMetadata,
+    Self: Mutator<Input = GramatronInput>,
 {
     fn mutate(
         &mut self,
@@ -47,22 +45,19 @@ where
     }
 }
 
-impl<'a, S> Named for GramatronRandomMutator<'a, S>
-where
-    S: HasRand + HasMetadata,
-{
+impl<'a> Named for GramatronRandomMutator<'a> {
     fn name(&self) -> &str {
         "GramatronRandomMutator"
     }
 }
 
-impl<'a, S> GramatronRandomMutator<'a, S>
+impl<'a> GramatronRandomMutator<'a>
 where
-    S: HasRand + HasMetadata,
+    <Self as Mutator>::State: HasRand + HasMetadata,
 {
     /// Creates a new [`GramatronRandomMutator`].
     #[must_use]
-    pub fn new(generator: &'a GramatronGenerator<'a, S>) -> Self {
+    pub fn new(generator: &'a GramatronGenerator<'a>) -> Self {
         Self { generator }
     }
 }
@@ -93,9 +88,9 @@ impl GramatronIdxMapMetadata {
 #[derive(Default, Debug)]
 pub struct GramatronSpliceMutator;
 
-impl<S> Mutator<GramatronInput, S> for GramatronSpliceMutator
+impl Mutator for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<GramatronInput> + HasMetadata,
+    Self::State: HasRand + HasCorpus<Input = GramatronInput> + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -165,9 +160,10 @@ pub struct GramatronRecursionMutator {
     temp: Vec<Terminal>,
 }
 
-impl<S> Mutator<GramatronInput, S> for GramatronRecursionMutator
+impl Mutator for GramatronRecursionMutator
 where
-    S: HasRand + HasMetadata,
+    Self::State: HasRand + HasMetadata,
+    Self: Mutator<Input = GramatronInput>,
 {
     fn mutate(
         &mut self,

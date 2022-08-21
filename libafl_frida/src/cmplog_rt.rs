@@ -93,11 +93,11 @@ impl FridaRuntime for CmpLogRuntime {
         self.generate_instrumentation_blobs();
     }
 
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &Self::Input) -> Result<(), Error> {
         Ok(())
     }
 
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, _input: &Self::Input) -> Result<(), Error> {
         Ok(())
     }
 }

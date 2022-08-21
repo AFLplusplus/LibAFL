@@ -4,7 +4,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{fmt::Debug, marker::PhantomData};
+use core::fmt::Debug;
 
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,7 @@ use crate::{
     inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
+    prelude::Scheduler,
     stages::Stage,
     start_timer,
     state::{HasCorpus, HasExecutions, HasMetadata},
@@ -449,18 +450,22 @@ impl GeneralizationStage {
     #[allow(clippy::too_many_arguments)]
     fn find_gaps_in_closures<E>(
         &self,
-        fuzzer: &mut Z,
+        fuzzer: &mut <Self as Stage>::Fuzzer,
         executor: &mut E,
         state: &mut <Self as Stage>::State,
-        manager: &mut EM,
+        manager: &mut <Self as Stage>::EventManager,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
         opening_char: u8,
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EventManager = EM, Input = GeneralizedInput, State = Self, Fuzzer = Z>
-            + HasObservers<Input = GeneralizedInput>,
+        E: Executor<
+                EventManager = <Self as Stage>::EventManager,
+                Input = GeneralizedInput,
+                State = Self,
+                Fuzzer = <Self as Stage>::Fuzzer,
+            > + HasObservers<Input = GeneralizedInput>,
     {
         let mut index = 0;
         while index < payload.len() {

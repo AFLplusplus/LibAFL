@@ -43,7 +43,6 @@ use crate::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasSolutions},
@@ -51,36 +50,32 @@ use crate::{
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
-pub type InProcessExecutor<'a, H, I, OT, S> = GenericInProcessExecutor<H, &'a mut H, I, OT, S>;
+pub type InProcessExecutor<'a, H> = GenericInProcessExecutor<H, &'a mut H>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<I, OT, S> =
-    GenericInProcessExecutor<dyn FnMut(&I) -> ExitKind, Box<dyn FnMut(&I) -> ExitKind>, I, OT, S>;
+pub type OwnedInProcessExecutor<I: Input> =
+    GenericInProcessExecutor<dyn FnMut(&I) -> ExitKind, Box<dyn FnMut(&I) -> ExitKind>>;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
-pub struct GenericInProcessExecutor<H, HB, I, OT, S>
+pub struct GenericInProcessExecutor<H, HB>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&<Self as Executor>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    I: Input,
-    OT: ObserversTuple,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
     /// The observers, observing each run
-    observers: OT,
+    observers: <Self as HasObservers>::Observers,
     // Crash and timeout hah
     handlers: InProcessHandlers,
-    phantom: PhantomData<(I, S, *const H)>,
+    phantom: PhantomData<*const H>,
 }
 
-impl<H, HB, I, OT, S> Debug for GenericInProcessExecutor<H, HB, I, OT, S>
+impl<H, HB> Debug for GenericInProcessExecutor<H, HB>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&<Self as Executor>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    I: Input,
-    OT: ObserversTuple,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessExecutor")
@@ -90,18 +85,16 @@ where
     }
 }
 
-impl<EM, H, HB, I, OT, S, Z> Executor for GenericInProcessExecutor<H, HB, I, OT, S>
+impl<H, HB> Executor for GenericInProcessExecutor<H, HB>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&Self::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    I: Input,
-    OT: ObserversTuple,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        mgr: &mut EM,
+        mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.handlers
@@ -114,30 +107,26 @@ where
     }
 }
 
-impl<H, HB, I, OT, S> HasObservers for GenericInProcessExecutor<H, HB, I, OT, S>
+impl<H, HB> HasObservers for GenericInProcessExecutor<H, HB>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&Self::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    I: Input,
-    OT: ObserversTuple,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         &self.observers
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         &mut self.observers
     }
 }
 
-impl<H, HB, I, OT, S> GenericInProcessExecutor<H, HB, I, OT, S>
+impl<H, HB> GenericInProcessExecutor<H, HB>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&<Self as Executor>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    I: Input,
-    OT: ObserversTuple,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -147,18 +136,27 @@ where
     /// This may return an error on unix, if signal handler setup fails
     pub fn new<EM, OF, Z>(
         harness_fn: HB,
-        observers: OT,
+        observers: <Self as HasObservers>::Observers,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
-        _event_mgr: &mut EM,
+        _state: &mut <Self as Executor>::State,
+        _event_mgr: &mut <Self as Executor>::EventManager,
     ) -> Result<Self, Error>
     where
         EM: EventFirer + EventRestarter,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        <Self as Executor>::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObservers,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z, H>()?;
+        let handlers = InProcessHandlers::new::<
+            Self,
+            EM,
+            Self::Input,
+            OF,
+            Self::ObserversTuple,
+            Self::State,
+            Z,
+            H,
+        >()?;
         #[cfg(windows)]
         unsafe {
             /*
@@ -217,7 +215,7 @@ pub trait HasInProcessHandlers {
 #[cfg(windows)]
 impl<'a, H, I, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&Self::Input) -> ExitKind,
     I: Input,
     OT: ObserversTuple,
 {
@@ -244,9 +242,9 @@ impl InProcessHandlers {
         &self,
         _executor: &E,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        _state: &mut S,
         _mgr: &mut EM,
-        _input: &Self::Input,
+        _input: &I,
     ) {
         #[cfg(unix)]
         unsafe {
@@ -313,7 +311,7 @@ impl InProcessHandlers {
         OT: ObserversTuple,
         EM: EventFirer + EventRestarter,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         Z: HasObservers,
         H: FnMut(&I) -> ExitKind + ?Sized,
     {
@@ -585,7 +583,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -660,7 +658,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -740,7 +738,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -925,7 +923,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -1017,7 +1015,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -1113,7 +1111,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -1259,7 +1257,7 @@ pub struct InChildProcessHandlers {
 #[cfg(all(feature = "std", unix))]
 impl InChildProcessHandlers {
     /// Call before running a target.
-    pub fn pre_run_target<E, I, S>(&self, executor: &E, state: &mut Self::State, input: &I) {
+    pub fn pre_run_target<E, I, S>(&self, executor: &E, state: &S, input: &I) {
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
             write_volatile(
@@ -1390,26 +1388,20 @@ impl Handler for InProcessForkExecutorGlobalData {
 
 /// [`InProcessForkExecutor`] is an executor that forks the current process before each execution.
 #[cfg(all(feature = "std", unix))]
-pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
+pub struct InProcessForkExecutor<'a, H, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
-    I: Input,
-    OT: ObserversTuple,
-    SP: ShMemProvider,
+    H: FnMut(&<Self as Executor>::Input) -> ExitKind + ?Sized,
 {
     harness_fn: &'a mut H,
     shmem_provider: SP,
-    observers: OT,
+    observers: <Self as HasObservers>::Observers,
     handlers: InChildProcessHandlers,
-    phantom: PhantomData<(I, S)>,
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, H, SP> Debug for InProcessForkExecutor<'a, H, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
-    I: Input,
-    OT: ObserversTuple,
+    H: FnMut(&<Self as Executor>::Input) -> ExitKind + ?Sized,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1421,20 +1413,18 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, EM, H, I, OT, S, SP, Z> Executor for InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, H, SP> Executor for InProcessForkExecutor<'a, H, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
-    I: Input,
-    OT: ObserversTuple,
+    H: FnMut(&Self::Input) -> ExitKind + ?Sized,
     SP: ShMemProvider,
 {
     #[allow(unreachable_code)]
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        _mgr: &mut EM,
+        _mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
@@ -1487,29 +1477,28 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, H, SP> InProcessForkExecutor<'a, H, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
-    I: Input,
-    OT: ObserversTuple,
+    H: FnMut(&<Self as Executor>::Input) -> ExitKind + ?Sized,
     SP: ShMemProvider,
 {
     /// Creates a new [`InProcessForkExecutor`]
     pub fn new<EM, OF, Z>(
         harness_fn: &'a mut H,
-        observers: OT,
+        observers: <Self as HasObservers>::Observers,
         _fuzzer: &mut Z,
-        _state: &mut Self::State,
+        _state: &mut <Self as Executor>::State,
         _event_mgr: &mut EM,
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
         EM: EventFirer + EventRestarter,
         OF: Feedback,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        <Self as Executor>::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObservers,
     {
-        let handlers = InChildProcessHandlers::new::<Self, I, OT, S>()?;
+        let handlers =
+            InChildProcessHandlers::new::<Self, Self::Input, Self::Observers, Self::State>()?;
         Ok(Self {
             harness_fn,
             shmem_provider,
@@ -1533,20 +1522,18 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, I, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, H, SP> HasObservers for InProcessForkExecutor<'a, H, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
-    I: Input,
-    OT: ObserversTuple,
+    H: FnMut(&Self::Input) -> ExitKind + ?Sized,
     SP: ShMemProvider,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         &self.observers
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         &mut self.observers
     }
 }

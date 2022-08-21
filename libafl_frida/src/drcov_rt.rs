@@ -36,13 +36,13 @@ impl FridaRuntime for DrCovRuntime {
     }
 
     /// Called before execution, does nothing
-    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &I) -> Result<(), Error> {
+    fn pre_exec<I: Input + HasTargetBytes>(&mut self, _input: &Self::Input) -> Result<(), Error> {
         Ok(())
     }
 
     /// Called after execution, writes the trace to a unique `DrCov` file for this trace
     /// into `./coverage/<trace_hash>.drcov`
-    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<(), Error> {
+    fn post_exec<I: Input + HasTargetBytes>(&mut self, input: &Self::Input) -> Result<(), Error> {
         let mut hasher = AHasher::new_with_keys(0, 0);
         hasher.write(input.target_bytes().as_slice());
 

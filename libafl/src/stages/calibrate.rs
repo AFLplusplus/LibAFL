@@ -26,38 +26,28 @@ use crate::{
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<O>
-where
-    O: MapObserver,
-{
+pub struct CalibrationStage<O> {
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
-    phantom: PhantomData<O>,
 }
 
 const CAL_STAGE_START: usize = 4;
 const CAL_STAGE_MAX: usize = 16;
 
-impl<E, EM, I, O, OT, S, Z> Stage for CalibrationStage<I, O, OT, S>
+impl<O> Stage for CalibrationStage<O>
 where
-    E: Executor + HasObservers,
-    EM: EventFirer,
-    I: Input,
     O: MapObserver,
-    for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple,
-    S: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    for<'de> <O as MapObserver>::Item: Serialize + Deserialize<'de> + 'static,
 {
     #[inline]
     #[allow(clippy::let_and_return, clippy::too_many_lines)]
     fn perform(
         &mut self,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut Self::Fuzzer,
+        executor: &mut Self::Executor,
         state: &mut Self::State,
-        mgr: &mut EM,
+        mgr: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry
@@ -150,7 +140,7 @@ where
 
             let history_map = &mut state
                 .named_metadata_mut()
-                .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
+                .get_mut::<MapFeedbackMetadata<O::Item>>(&self.map_name)
                 .unwrap()
                 .history_map;
 
@@ -238,21 +228,20 @@ where
             O,
             R,
             <Self as Stage>::State,
-            O::Entry,
+            <O as MapObserver>::Item,
         >,
     ) -> Self
     where
-        O::Entry:
-            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
-        R: Reducer<O::Entry>,
-        for<'it> O: AsIter<'it, Item = O::Entry>,
-        N: IsNovel<O::Entry>,
+        //O::Item:
+        //    PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+        R: Reducer<<O as MapObserver>::Item>,
+        for<'it> O: AsIter<'it, Item = <O as MapObserver>::Item>,
+        N: IsNovel<<O as MapObserver>::Item>,
     {
         Self {
             map_observer_name: map_feedback.observer_name().to_string(),
             map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
-            phantom: PhantomData,
         }
     }
 }

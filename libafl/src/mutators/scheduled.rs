@@ -1,10 +1,7 @@
 //! The `ScheduledMutator` schedules multiple mutations internally.
 
 use alloc::{string::String, vec::Vec};
-use core::{
-    fmt::{self, Debug},
-    marker::PhantomData,
-};
+use core::fmt::{self, Debug};
 
 use serde::{Deserialize, Serialize};
 
@@ -31,13 +28,13 @@ pub struct LogMutationMetadata {
 
 crate::impl_serdeany!(LogMutationMetadata);
 
-impl AsSlice<String> for LogMutationMetadata {
+impl AsSlice for LogMutationMetadata {
     #[must_use]
     fn as_slice(&self) -> &[String] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<String> for LogMutationMetadata {
+impl AsMutSlice for LogMutationMetadata {
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [String] {
         self.list.as_mut_slice()
@@ -53,29 +50,23 @@ impl LogMutationMetadata {
 }
 
 /// A [`Mutator`] that composes multiple mutations into one.
-pub trait ComposedByMutations<I, MT, S>
-where
-    I: Input,
-    MT: MutatorsTuple,
-{
+pub trait ComposedByMutations {
+    type MutatorsTuple: MutatorsTuple;
+
     /// Get the mutations
-    fn mutations(&self) -> &MT;
+    fn mutations(&self) -> &Self::MutatorsTuple;
 
     /// Get the mutations (mutable)
-    fn mutations_mut(&mut self) -> &mut MT;
+    fn mutations_mut(&mut self) -> &mut Self::MutatorsTuple;
 }
 
 /// A [`Mutator`] scheduling multiple [`Mutator`]s for an input.
-pub trait ScheduledMutator<I, MT, S>: ComposedByMutations<I, MT, S> + Mutator
-where
-    I: Input,
-    MT: MutatorsTuple,
-{
+pub trait ScheduledMutator: ComposedByMutations + Mutator {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut Self::State, input: &I) -> u64;
+    fn iterations(&self, state: &mut Self::State, input: &Self::Input) -> u64;
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut Self::State, input: &I) -> usize;
+    fn schedule(&self, state: &mut Self::State, input: &Self::Input) -> usize;
 
     /// New default implementation for mutate.
     /// Implementations must forward mutate() to this method
@@ -101,38 +92,25 @@ where
 }
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
-pub struct StdScheduledMutator<I, MT, S>
-where
-    I: Input,
-    MT: MutatorsTuple,
-    S: HasRand,
-{
-    mutations: MT,
+pub struct StdScheduledMutator {
+    mutations: <Self as ComposedByMutations>::MutatorsTuple,
     max_stack_pow: u64,
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<I, MT, S> Debug for StdScheduledMutator<I, MT, S>
-where
-    I: Input,
-    MT: MutatorsTuple,
-    S: HasRand,
-{
+impl Debug for StdScheduledMutator {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "StdScheduledMutator with {} mutations for Input type {}",
             self.mutations.len(),
-            core::any::type_name::<I>()
+            core::any::type_name::<Self::Input>()
         )
     }
 }
 
-impl<I, MT, S> Mutator for StdScheduledMutator<I, MT, S>
+impl Mutator for StdScheduledMutator
 where
-    I: Input,
-    MT: MutatorsTuple,
-    S: HasRand,
+    Self::State: HasRand,
 {
     #[inline]
     fn mutate(
@@ -145,64 +123,59 @@ where
     }
 }
 
-impl<I, MT, S> ComposedByMutations<I, MT, S> for StdScheduledMutator<I, MT, S>
+impl ComposedByMutations for StdScheduledMutator
 where
-    I: Input,
-    MT: MutatorsTuple,
-    S: HasRand,
+    <Self as Mutator>::State: HasRand,
 {
     /// Get the mutations
     #[inline]
-    fn mutations(&self) -> &MT {
+    fn mutations(&self) -> &Self::MutatorsTuple {
         &self.mutations
     }
 
     // Get the mutations (mutable)
     #[inline]
-    fn mutations_mut(&mut self) -> &mut MT {
+    fn mutations_mut(&mut self) -> &mut Self::MutatorsTuple {
         &mut self.mutations
     }
 }
 
-impl<I, MT, S> ScheduledMutator<I, MT, S> for StdScheduledMutator<I, MT, S>
+impl ScheduledMutator for StdScheduledMutator
 where
-    I: Input,
-    MT: MutatorsTuple,
-    S: HasRand,
+    Self::State: HasRand,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut Self::State, _: &I) -> u64 {
+    fn iterations(&self, state: &mut Self::State, _: &Self::Input) -> u64 {
         1 << (1 + state.rand_mut().below(self.max_stack_pow))
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut Self::State, _: &I) -> usize {
+    fn schedule(&self, state: &mut Self::State, _: &Self::Input) -> usize {
         debug_assert!(!self.mutations().is_empty());
         state.rand_mut().below(self.mutations().len() as u64) as usize
     }
 }
 
-impl<I, MT, S> StdScheduledMutator<I, MT, S>
+impl StdScheduledMutator
 where
-    I: Input,
-    MT: MutatorsTuple,
-    S: HasRand,
+    <Self as Mutator>::State: HasRand,
 {
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
-    pub fn new(mutations: MT) -> Self {
+    pub fn new(mutations: <Self as ComposedByMutations>::MutatorsTuple) -> Self {
         StdScheduledMutator {
             mutations,
             max_stack_pow: 7,
-            phantom: PhantomData,
         }
     }
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
-    pub fn with_max_stack_pow(mutations: MT, max_stack_pow: u64) -> Self {
+    pub fn with_max_stack_pow(
+        mutations: <Self as ComposedByMutations>::MutatorsTuple,
+        max_stack_pow: u64,
+    ) -> Self {
         StdScheduledMutator {
             mutations,
             max_stack_pow,
-            phantom: PhantomData,
         }
     }
 }
@@ -279,41 +252,29 @@ pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
 }
 
 /// A logging [`Mutator`] that wraps around a [`StdScheduledMutator`].
-pub struct LoggerScheduledMutator<I, MT, S, SM>
-where
-    I: Input,
-    MT: MutatorsTuple + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
-{
+pub struct LoggerScheduledMutator<SM> {
     scheduled: SM,
     mutation_log: Vec<usize>,
-    phantom: PhantomData<(I, MT, S)>,
 }
 
-impl<I, MT, S, SM> Debug for LoggerScheduledMutator<I, MT, S, SM>
+impl<SM> Debug for LoggerScheduledMutator<SM>
 where
-    I: Input,
-    MT: MutatorsTuple + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    SM: ScheduledMutator,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "LoggerScheduledMutator with {} mutations for Input type {}",
             self.scheduled.mutations().len(),
-            core::any::type_name::<I>()
+            core::any::type_name::<<Self as Mutator>::Input>()
         )
     }
 }
 
-impl<I, MT, S, SM> Mutator for LoggerScheduledMutator<I, MT, S, SM>
+impl<SM> Mutator for LoggerScheduledMutator<SM>
 where
-    I: Input,
-    MT: MutatorsTuple + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    Self::State: HasRand + HasCorpus,
+    SM: ScheduledMutator,
 {
     fn mutate(
         &mut self,
@@ -346,38 +307,33 @@ where
     }
 }
 
-impl<I, MT, S, SM> ComposedByMutations<I, MT, S> for LoggerScheduledMutator<I, MT, S, SM>
+impl<SM> ComposedByMutations for LoggerScheduledMutator<SM>
 where
-    I: Input,
-    MT: MutatorsTuple + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    Self::MutatorsTuple: NamedTuple,
+    SM: ScheduledMutator,
 {
     #[inline]
-    fn mutations(&self) -> &MT {
+    fn mutations(&self) -> &Self::MutatorsTuple {
         self.scheduled.mutations()
     }
 
     #[inline]
-    fn mutations_mut(&mut self) -> &mut MT {
+    fn mutations_mut(&mut self) -> &mut Self::MutatorsTuple {
         self.scheduled.mutations_mut()
     }
 }
 
-impl<I, MT, S, SM> ScheduledMutator<I, MT, S> for LoggerScheduledMutator<I, MT, S, SM>
+impl<SM> ScheduledMutator for LoggerScheduledMutator<SM>
 where
-    I: Input,
-    MT: MutatorsTuple + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    SM: ScheduledMutator,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut Self::State, _: &I) -> u64 {
+    fn iterations(&self, state: &mut Self::State, _: &Self::Input) -> u64 {
         1 << (1 + state.rand_mut().below(6))
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut Self::State, _: &I) -> usize {
+    fn schedule(&self, state: &mut Self::State, _: &Self::Input) -> usize {
         debug_assert!(!self.scheduled.mutations().is_empty());
         state
             .rand_mut()
@@ -407,19 +363,15 @@ where
     }
 }
 
-impl<I, MT, S, SM> LoggerScheduledMutator<I, MT, S, SM>
+impl<SM> LoggerScheduledMutator<SM>
 where
-    I: Input,
-    MT: MutatorsTuple + NamedTuple,
-    S: HasRand + HasCorpus,
-    SM: ScheduledMutator<I, MT, S>,
+    SM: ScheduledMutator,
 {
     /// Create a new [`StdScheduledMutator`] instance without mutations and corpus
     pub fn new(scheduled: SM) -> Self {
         Self {
             scheduled,
             mutation_log: vec![],
-            phantom: PhantomData,
         }
     }
 }

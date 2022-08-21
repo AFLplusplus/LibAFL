@@ -1,28 +1,22 @@
 //! A `ShadowExecutor` wraps an executor to have shadow observer that will not be considered by the feedbacks and the manager
 
-use core::{
-    fmt::{self, Debug, Formatter},
-    marker::PhantomData,
-};
+use core::fmt::{self, Debug, Formatter};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
     observers::ObserversTuple,
     Error,
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
-pub struct ShadowExecutor<E: Debug, I: Debug, S, SOT: Debug> {
+pub struct ShadowExecutor<E: Debug, SOT: Debug> {
     /// The wrapped executor
     executor: E,
     /// The shadow observers
     shadow_observers: SOT,
-    /// phantom data
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<E: Debug, I: Debug, S, SOT: Debug> Debug for ShadowExecutor<E, I, S, SOT> {
+impl<E: Debug, SOT: Debug> Debug for ShadowExecutor<E, SOT> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ShadowExecutor")
             .field("executor", &self.executor)
@@ -31,7 +25,7 @@ impl<E: Debug, I: Debug, S, SOT: Debug> Debug for ShadowExecutor<E, I, S, SOT> {
     }
 }
 
-impl<E: Debug, I: Debug, S, SOT: Debug> ShadowExecutor<E, I, S, SOT>
+impl<E: Debug, SOT: Debug> ShadowExecutor<E, SOT>
 where
     SOT: ObserversTuple,
 {
@@ -40,7 +34,6 @@ where
         Self {
             executor,
             shadow_observers,
-            phantom: PhantomData,
         }
     }
 
@@ -57,27 +50,24 @@ where
     }
 }
 
-impl<E, EM, I, S, SOT, Z> Executor for ShadowExecutor<E, I, S, SOT>
+impl<E, SOT> Executor for ShadowExecutor<E, SOT>
 where
     E: Executor,
-    I: Input,
     SOT: ObserversTuple,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        fuzzer: &mut Self::Fuzzer,
         state: &mut Self::State,
-        mgr: &mut EM,
+        mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
 }
 
-impl<E, I, S, SOT> HasObservers for ShadowExecutor<E, I, S, SOT>
+impl<E, SOT> HasObservers for ShadowExecutor<E, SOT>
 where
-    I: Debug,
-    S: Debug,
     E: HasObservers,
     SOT: ObserversTuple,
 {

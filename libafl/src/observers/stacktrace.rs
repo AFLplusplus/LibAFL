@@ -97,10 +97,7 @@ impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
     }
 }
 
-impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a>
-where
-    I: Input + Debug,
-{
+impl<'a> Observer for BacktraceObserver<'a> {
     fn post_exec(
         &mut self,
         _state: &mut Self::State,
@@ -245,11 +242,11 @@ impl Default for ASANBacktraceObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for ASANBacktraceObserver
+impl Observer for ASANBacktraceObserver
 where
-    I: Debug,
+    Self::Input: Debug,
 {
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
         Ok(())
     }
 

@@ -377,17 +377,17 @@ impl<E: Debug> TimeoutForkserverExecutor<E> {
     }
 }
 
-impl<E: Debug, EM, I, S, Z> Executor for TimeoutForkserverExecutor<E>
+impl<E: Debug> Executor for TimeoutForkserverExecutor<E>
 where
-    I: Input + HasTargetBytes,
+    Self::Input: Input + HasTargetBytes,
     E: Executor + HasForkserver,
 {
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
-        _mgr: &mut EM,
+        _mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
@@ -473,25 +473,22 @@ where
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-pub struct ForkserverExecutor<I, OT, S, SP>
+pub struct ForkserverExecutor<SP>
 where
-    OT: Debug,
     SP: ShMemProvider,
 {
     target: OsString,
     args: Vec<OsString>,
     input_file: InputFile,
     forkserver: Forkserver,
-    observers: OT,
+    observers: <Self as HasObservers>::Observers,
     map: Option<SP::ShMem>,
-    phantom: PhantomData<(I, S)>,
     /// Cache that indicates if we have a `ASan` observer registered.
     has_asan_observer: Option<bool>,
 }
 
-impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
+impl<SP> Debug for ForkserverExecutor<SP>
 where
-    OT: Debug,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -506,7 +503,10 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), (), StdShMemProvider> {
+impl ForkserverExecutor<StdShMemProvider>
+where
+    Self: Executor<Input = (), State = ()> + HasObservers<Observers = ()>,
+{
     /// Builder for `ForkserverExecutor`
     #[must_use]
     pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
@@ -514,10 +514,9 @@ impl ForkserverExecutor<(), (), (), StdShMemProvider> {
     }
 }
 
-impl<I, OT, S, SP> ForkserverExecutor<I, OT, S, SP>
+impl<SP> ForkserverExecutor<SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    <Self as Executor>::Input: Input + HasTargetBytes,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -557,10 +556,7 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Builds `ForkserverExecutor`.
     #[allow(clippy::pedantic)]
-    pub fn build<I, OT, S>(
-        &mut self,
-        observers: OT,
-    ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
+    pub fn build<I, OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<SP>, Error>
     where
         I: Input + HasTargetBytes,
         OT: ObserversTuple,
@@ -848,18 +844,17 @@ impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 }
 
-impl<EM, I, OT, S, SP, Z> Executor for ForkserverExecutor<I, OT, S, SP>
+impl<SP> Executor for ForkserverExecutor<SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    Self::Input: Input + HasTargetBytes,
     SP: ShMemProvider,
 {
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
+        _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
-        _mgr: &mut EM,
+        _mgr: &mut Self::EventManager,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
@@ -937,27 +932,24 @@ where
     }
 }
 
-impl<I, OT, S, SP> HasObservers for ForkserverExecutor<I, OT, S, SP>
+impl<SP> HasObservers for ForkserverExecutor<SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
+    Self::Input: Input + HasTargetBytes,
     SP: ShMemProvider,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         &self.observers
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         &mut self.observers
     }
 }
 
-impl<I, OT, S, SP> HasForkserver for ForkserverExecutor<I, OT, S, SP>
+impl<SP> HasForkserver for ForkserverExecutor<SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple,
     SP: ShMemProvider,
 {
     type SP = SP;
@@ -993,7 +985,7 @@ where
     }
 }
 
-impl<E, I, S> HasObservers for TimeoutForkserverExecutor<E>
+impl<E> HasObservers for TimeoutForkserverExecutor<E>
 where
     E: HasObservers,
 {

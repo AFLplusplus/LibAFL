@@ -57,7 +57,7 @@ where
         hooks.blocks(Some(gen_blocks_calls::<I, QT, S>), None);
     }
 
-    fn pre_exec(&mut self, _emulator: &Emulator, _input: &I) {
+    fn pre_exec(&mut self, _emulator: &Emulator, _input: &Self::Input) {
         self.reset();
     }
 }

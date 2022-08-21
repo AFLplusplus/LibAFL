@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, SchedulerTestcaseMetaData},
-    inputs::Input,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
@@ -91,7 +90,7 @@ crate::impl_serdeany!(WeightedScheduleMetadata);
 #[derive(Clone, Debug)]
 pub struct WeightedScheduler<F> {
     strat: Option<PowerSchedule>,
-    phantom: PhantomData<(F)>,
+    phantom: PhantomData<F>,
 }
 
 impl<F> Default for WeightedScheduler<F>
@@ -132,7 +131,7 @@ where
         clippy::cast_precision_loss,
         clippy::cast_lossless
     )]
-    pub fn create_alias_table(&self, state: &mut S) -> Result<(), Error> {
+    pub fn create_alias_table(&self, state: &mut <Self as Scheduler>::State) -> Result<(), Error> {
         let n = state.corpus().count();
 
         let mut alias_table: Vec<usize> = vec![0; n];
@@ -215,11 +214,9 @@ where
     }
 }
 
-impl<F, I, S> Scheduler for WeightedScheduler<F, I, S>
+impl<F> Scheduler for WeightedScheduler<F>
 where
-    F: TestcaseScore<I, S>,
-    S: HasCorpus + HasMetadata + HasRand,
-    I: Input,
+    F: TestcaseScore,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
@@ -261,7 +258,7 @@ where
     }
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut <Self as Scheduler>::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
