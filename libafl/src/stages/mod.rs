@@ -9,7 +9,10 @@ pub mod mutational;
 pub use mutational::{MutationalStage, StdMutationalStage};
 
 pub mod tmin;
-pub use tmin::{StdTMinMutationalStage, TMinMutationalStage};
+pub use tmin::{
+    minimizers::{MapEqualityFactory, MapEqualityFeedback},
+    StdTMinMutationalStage, TMinMutationalStage,
+};
 
 pub mod push;
 

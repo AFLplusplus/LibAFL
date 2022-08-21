@@ -41,12 +41,11 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         if idx >= self.entries.len() {
             return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
         }
-        self.entries[idx] = RefCell::new(testcase);
-        Ok(())
+        Ok(self.entries[idx].replace(testcase))
     }
 
     /// Removes an entry from the corpus, returning it if it was present.

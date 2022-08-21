@@ -296,6 +296,57 @@ where
         OT: ObserversTuple<I, S>;
 }
 
+/// Factory for feedbacks which should be sensitive to an existing context, e.g. observer(s) from a
+/// specific execution
+pub trait FeedbackFactory<F, I, S, T>
+where
+    F: Feedback<I, S>,
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    fn create_feedback(&self, ctx: &T) -> F;
+}
+
+impl<FE, FU, I, S, T> FeedbackFactory<FE, I, S, T> for FU
+where
+    FU: Fn(&T) -> FE,
+    FE: Feedback<I, S>,
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    fn create_feedback(&self, ctx: &T) -> FE {
+        self(ctx)
+    }
+}
+
+#[derive(Default, Debug, Copy, Clone)]
+pub struct DefaultFeedbackFactory<F>
+where
+    F: Default,
+{
+    phantom: PhantomData<F>,
+}
+
+impl<F> DefaultFeedbackFactory<F>
+where
+    F: Default,
+{
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<F, I, S, T> FeedbackFactory<F, I, S, T> for DefaultFeedbackFactory<F>
+where
+    F: Feedback<I, S> + Default,
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    fn create_feedback(&self, _ctx: &T) -> F {
+        F::default()
+    }
+}
+
 /// Eager `OR` combination of two feedbacks
 #[derive(Debug, Clone)]
 pub struct LogicEagerOr {}
@@ -776,6 +827,8 @@ impl Default for CrashFeedback {
     }
 }
 
+pub type CrashFeedbackFactory = DefaultFeedbackFactory<CrashFeedback>;
+
 /// A [`TimeoutFeedback`] reduces the timeout value of a run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeoutFeedback {}
@@ -826,6 +879,8 @@ impl Default for TimeoutFeedback {
         Self::new()
     }
 }
+
+pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 
 /// Nop feedback that annotates execution time in the new testcase, if any
 /// for this Feedback, the testcase is never interesting (use with an OR).

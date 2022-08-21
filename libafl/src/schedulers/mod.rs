@@ -39,22 +39,17 @@ pub trait Scheduler<I, S>
 where
     I: Input,
 {
-    /// Add an entry to the corpus and return its index
+    /// Added an entry to the corpus at the given index
     fn on_add(&self, _state: &mut S, _idx: usize) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Replaces the testcase at the given idx
-    fn on_replace(
-        &self,
-        _state: &mut S,
-        _idx: usize,
-        _testcase: &Testcase<I>,
-    ) -> Result<(), Error> {
+    /// Replaced the given testcase at the given idx
+    fn on_replace(&self, _state: &mut S, _idx: usize, _prev: &Testcase<I>) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removed the given entry from the corpus at the given index
     fn on_remove(
         &self,
         _state: &mut S,
