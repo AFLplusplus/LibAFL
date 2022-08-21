@@ -2,7 +2,7 @@ use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
 
-use libafl::prelude::{tmin::minimizers::MapEqualityFactory, *};
+use libafl::prelude::*;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];
@@ -48,6 +48,7 @@ pub fn main() -> Result<(), Error> {
 
     let mut mgr = SimpleEventManager::new(mon);
 
+    let corpus_dir = PathBuf::from("./corpus");
     let solution_dir = PathBuf::from("./solutions");
 
     // create a State from scratch
@@ -55,7 +56,7 @@ pub fn main() -> Result<(), Error> {
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
-        InMemoryCorpus::new(),
+        OnDiskCorpus::new(&corpus_dir).unwrap(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(&solution_dir).unwrap(),

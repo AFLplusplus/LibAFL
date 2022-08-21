@@ -304,6 +304,7 @@ where
     I: Input,
     S: HasClientPerfMonitor,
 {
+    /// Create the feedback from the provided context
     fn create_feedback(&self, ctx: &T) -> F;
 }
 
@@ -319,6 +320,7 @@ where
     }
 }
 
+/// A feedback factory which merely invokes `::default()` for the feedback type provided
 #[derive(Default, Debug, Copy, Clone)]
 pub struct DefaultFeedbackFactory<F>
 where
@@ -331,6 +333,8 @@ impl<F> DefaultFeedbackFactory<F>
 where
     F: Default,
 {
+    /// Create the feedback factory
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -827,6 +831,7 @@ impl Default for CrashFeedback {
     }
 }
 
+/// A feedback factory for crash feedbacks
 pub type CrashFeedbackFactory = DefaultFeedbackFactory<CrashFeedback>;
 
 /// A [`TimeoutFeedback`] reduces the timeout value of a run.
@@ -880,6 +885,7 @@ impl Default for TimeoutFeedback {
     }
 }
 
+/// A feedback factory for timeout feedbacks
 pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 
 /// Nop feedback that annotates execution time in the new testcase, if any

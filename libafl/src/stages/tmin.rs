@@ -1,24 +1,27 @@
 //! The [`TMinMutationalStage`] is a stage which will attempt to minimise recent solutions.
 //! For new solutions, it will perform a range of random mutations, and then run them in the executor.
 
-use core::{hash::Hash, marker::PhantomData};
-use std::hash::Hasher;
+use alloc::string::{String, ToString};
+use core::{
+    fmt::Debug,
+    hash::{Hash, Hasher},
+    marker::PhantomData,
+};
 
 use ahash::AHasher;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
-pub use crate::stages::mutational::DEFAULT_MUTATIONAL_MAX_ITERATIONS;
 use crate::{
-    bolts::HasLen,
+    bolts::{tuples::Named, HasLen},
     corpus::{Corpus, Testcase},
     events::EventFirer,
-    executors::{Executor, HasObservers},
-    feedbacks::{Feedback, FeedbackFactory},
+    executors::{Executor, ExitKind, HasObservers},
+    feedbacks::{Feedback, FeedbackFactory, HasObserverName},
     inputs::Input,
     mark_feature_time,
     mutators::Mutator,
-    observers::ObserversTuple,
+    observers::{MapObserver, ObserversTuple},
     schedulers::Scheduler,
     stages::Stage,
     start_timer,
@@ -278,118 +281,108 @@ where
     }
 }
 
-pub mod minimizers {
-    use alloc::string::{String, ToString};
-    use core::{fmt::Debug, marker::PhantomData};
+/// A feedback which checks if the hash of the currently observed map is equal to the original hash
+/// provided
+#[derive(Clone, Debug)]
+pub struct MapEqualityFeedback<M> {
+    name: String,
+    obs_name: String,
+    orig_hash: u64,
+    phantom: PhantomData<M>,
+}
 
-    use crate::{
-        bolts::tuples::Named,
-        events::EventFirer,
-        executors::ExitKind,
-        feedbacks::{Feedback, HasObserverName},
-        inputs::Input,
-        observers::{MapObserver, ObserversTuple},
-        prelude::FeedbackFactory,
-        state::HasClientPerfMonitor,
-        Error,
-    };
-
-    #[derive(Clone, Debug)]
-    pub struct MapEqualityFeedback<M> {
-        name: String,
-        obs_name: String,
-        orig_hash: u64,
-        phantom: PhantomData<M>,
-    }
-
-    impl<M> MapEqualityFeedback<M> {
-        pub fn new(name: &str, obs_name: &str, orig_hash: u64) -> Self {
-            MapEqualityFeedback {
-                name: name.to_string(),
-                obs_name: obs_name.to_string(),
-                orig_hash,
-                phantom: Default::default(),
-            }
+impl<M> MapEqualityFeedback<M> {
+    /// Create a new map equality feedback -- can be used with feedback logic
+    #[must_use]
+    pub fn new(name: &str, obs_name: &str, orig_hash: u64) -> Self {
+        MapEqualityFeedback {
+            name: name.to_string(),
+            obs_name: obs_name.to_string(),
+            orig_hash,
+            phantom: PhantomData,
         }
     }
+}
 
-    impl<M> Named for MapEqualityFeedback<M> {
-        fn name(&self) -> &str {
-            &self.name
-        }
+impl<M> Named for MapEqualityFeedback<M> {
+    fn name(&self) -> &str {
+        &self.name
     }
+}
 
-    impl<M> HasObserverName for MapEqualityFeedback<M> {
-        fn observer_name(&self) -> &str {
-            &self.obs_name
-        }
+impl<M> HasObserverName for MapEqualityFeedback<M> {
+    fn observer_name(&self) -> &str {
+        &self.obs_name
     }
+}
 
-    impl<I, M, S> Feedback<I, S> for MapEqualityFeedback<M>
+impl<I, M, S> Feedback<I, S> for MapEqualityFeedback<M>
+where
+    I: Input,
+    M: MapObserver,
+    S: HasClientPerfMonitor,
+{
+    fn is_interesting<EM, OT>(
+        &mut self,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &I,
+        observers: &OT,
+        _exit_kind: &ExitKind,
+    ) -> Result<bool, Error>
     where
-        I: Input,
-        M: MapObserver,
-        S: HasClientPerfMonitor,
-    {
-        fn is_interesting<EM, OT>(
-            &mut self,
-            _state: &mut S,
-            _manager: &mut EM,
-            _input: &I,
-            observers: &OT,
-            _exit_kind: &ExitKind,
-        ) -> Result<bool, Error>
-        where
-            EM: EventFirer<I>,
-            OT: ObserversTuple<I, S>,
-        {
-            let obs = observers
-                .match_name::<M>(self.observer_name())
-                .expect("Should have been provided valid observer name.");
-            Ok(obs.hash() == self.orig_hash)
-        }
-    }
-
-    pub struct MapEqualityFactory<M> {
-        obs_name: String,
-        phantom: PhantomData<M>,
-    }
-
-    impl<M> MapEqualityFactory<M>
-    where
-        M: MapObserver,
-    {
-        pub fn new_from_observer(obs: &M) -> Self {
-            Self {
-                obs_name: obs.name().to_string(),
-                phantom: PhantomData,
-            }
-        }
-    }
-
-    impl<M> HasObserverName for MapEqualityFactory<M> {
-        fn observer_name(&self) -> &str {
-            &self.obs_name
-        }
-    }
-
-    impl<I, M, OT, S> FeedbackFactory<MapEqualityFeedback<M>, I, S, OT> for MapEqualityFactory<M>
-    where
-        I: Input,
-        M: MapObserver,
+        EM: EventFirer<I>,
         OT: ObserversTuple<I, S>,
-        S: HasClientPerfMonitor,
     {
-        fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M> {
-            let obs = observers
-                .match_name::<M>(self.observer_name())
-                .expect("Should have been provided valid observer name.");
-            MapEqualityFeedback {
-                name: "MapEq".to_string(),
-                obs_name: self.obs_name.clone(),
-                orig_hash: obs.hash(),
-                phantom: Default::default(),
-            }
+        let obs = observers
+            .match_name::<M>(self.observer_name())
+            .expect("Should have been provided valid observer name.");
+        Ok(obs.hash() == self.orig_hash)
+    }
+}
+
+/// A feedback factory for ensuring that the maps for minimised inputs are the same
+#[derive(Debug, Clone)]
+pub struct MapEqualityFactory<M> {
+    obs_name: String,
+    phantom: PhantomData<M>,
+}
+
+impl<M> MapEqualityFactory<M>
+where
+    M: MapObserver,
+{
+    /// Creates a new map equality feedback for the given observer
+    pub fn new_from_observer(obs: &M) -> Self {
+        Self {
+            obs_name: obs.name().to_string(),
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<M> HasObserverName for MapEqualityFactory<M> {
+    fn observer_name(&self) -> &str {
+        &self.obs_name
+    }
+}
+
+impl<I, M, OT, S> FeedbackFactory<MapEqualityFeedback<M>, I, S, OT> for MapEqualityFactory<M>
+where
+    I: Input,
+    M: MapObserver,
+    OT: ObserversTuple<I, S>,
+    S: HasClientPerfMonitor,
+{
+    fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M> {
+        let obs = observers
+            .match_name::<M>(self.observer_name())
+            .expect("Should have been provided valid observer name.");
+        MapEqualityFeedback {
+            name: "MapEq".to_string(),
+            obs_name: self.obs_name.clone(),
+            orig_hash: obs.hash(),
+            phantom: PhantomData,
         }
     }
 }
