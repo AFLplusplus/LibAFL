@@ -1,5 +1,4 @@
-//! The [`TMinMutationalStage`] is a stage which will attempt to minimise recent solutions.
-//! For new solutions, it will perform a range of random mutations, and then run them in the executor.
+//! The [`TMinMutationalStage`] is a stage which will attempt to minimise corpus entries.
 
 use alloc::string::{String, ToString};
 use core::{
@@ -29,10 +28,9 @@ use crate::{
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 
-/// Mutational stage which minimises recent solutions.
+/// Mutational stage which minimises corpus entries.
 ///
-/// This analysis is BYOM: Bring Your Own Mutators. You must provide at least one mutator that
-/// actually reduces size, or implementations will infinitely loop.
+/// You must provide at least one mutator that actually reduces size.
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, I, M, OT, S, Z>:
     Stage<E, EM, S, Z> + FeedbackFactory<F2, I, S, OT>
 where
@@ -124,7 +122,7 @@ where
                 )?;
 
                 if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
-                    // we found a new solution! use the smaller base
+                    // we found a reduced corpus entry! use the smaller base
                     base = input;
 
                     // do more runs! maybe we can minify further
@@ -165,7 +163,7 @@ where
     }
 }
 
-/// The default solution minimising mutational stage
+/// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
 pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, S, T, Z>
 where
@@ -270,7 +268,7 @@ where
     I: Input + HasLen,
     M: Mutator<I, S>,
 {
-    /// Creates a new minimising mutational stage that will minimise existing solutions
+    /// Creates a new minimising mutational stage that will minimise provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
         Self {
             mutator,
