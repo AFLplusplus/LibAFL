@@ -24,6 +24,7 @@ aarch64 = [] # build qemu for aarch64
 be = []
 
 usermode = []
+systemmode = []
 
 clippy = [] # special feature for clippy, don't use in normal projects§
 
