@@ -15,7 +15,7 @@ use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
 
 #[cfg(feature = "std")]
-pub use disk::OnDiskTOMLMonitor;
+pub use disk::{OnDiskTOMLMonitor, OnDiskJSONMonitor};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 

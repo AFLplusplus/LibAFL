@@ -3,7 +3,6 @@
 use alloc::{string::String, vec::Vec};
 use core::time::Duration;
 use std::{fs::File, io::Write, path::PathBuf};
-#[cfg(serde_json)]
 use std::fs::OpenOptions;
 
 use crate::{
@@ -136,17 +135,17 @@ impl OnDiskTOMLMonitor<NopMonitor> {
     }
 }
 
-#[cfg(serde_json)]
 #[derive(Debug, Clone)]
+/// Wraps a base monitor and continuously appends the current statistics to a JSON file
 pub struct OnDiskJSONMonitor<M> where M: Monitor {
     base: M,
     filename: PathBuf,
     last_update: Duration,
 }
 
-#[cfg(serde_json)]
 impl<M> OnDiskJSONMonitor<M> where M: Monitor {
-    pub fn new(filename: P, base: M) -> Self<M> where P: Into<PathBuf> {
+    /// Create a new [`OnDiskJSONMonitor`]
+    pub fn new<P>(filename: P, base: M) -> Self where P: Into<PathBuf> {
         Self {
             base,
             filename: filename.into(),
@@ -155,7 +154,6 @@ impl<M> OnDiskJSONMonitor<M> where M: Monitor {
     }
 }
 
-#[cfg(serde_json)]
 impl<M> Monitor for OnDiskJSONMonitor<M> where M: Monitor {
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
         self.base.client_stats_mut()
@@ -172,7 +170,7 @@ impl<M> Monitor for OnDiskJSONMonitor<M> where M: Monitor {
     fn display(&mut self, event_msg: String, sender_id: u32) {
         if (current_time() - self.last_update).as_secs() >= 60 {
             let file = OpenOptions::new().append(true).open(&self.filename).expect("Failed to open JSON file");
-            writeln!(&file, serde_json::to_string(&self.client_stats()).expect("Failed to serialize client stats")).expect("Failed to write JSON to file");
+            writeln!(&file, "{}", serde_json::to_string(&self.client_stats()).expect("Failed to serialize client stats")).expect("Failed to write JSON to file");
             self.last_update = current_time();
         }
         self.base.display(event_msg, sender_id);
