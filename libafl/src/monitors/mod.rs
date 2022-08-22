@@ -56,7 +56,7 @@ impl fmt::Display for UserStats {
 }
 
 /// A simple struct to keep track of client monitor
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ClientStats {
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
