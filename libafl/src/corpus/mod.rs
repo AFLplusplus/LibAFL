@@ -13,6 +13,10 @@ pub use ondisk::OnDiskCorpus;
 
 #[cfg(feature = "std")]
 pub mod cached;
+
+#[cfg(feature = "cmin")]
+pub mod minimisation;
+
 use core::cell::RefCell;
 
 #[cfg(feature = "std")]
