@@ -128,7 +128,7 @@ where
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
     fn add_cmpvalues_meta(&mut self, state: &mut S)
     where
-        S: HasMetadata,
+        Self::State: HasMetadata,
     {
         #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
         let meta = if let Some(meta) = state.metadata_mut().get_mut::<CmpValuesMetadata>() {

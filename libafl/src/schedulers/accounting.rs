@@ -104,7 +104,7 @@ pub struct CoverageAccountingScheduler<'a, CS, I, S>
 where
     CS: Scheduler,
     I: Input + HasLen,
-    S: HasCorpus + HasMetadata + HasRand,
+    Self::State: HasCorpus + HasMetadata + HasRand,
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
@@ -115,7 +115,7 @@ impl<'a, CS, I, S> Scheduler for CoverageAccountingScheduler<'a, CS, I, S>
 where
     CS: Scheduler,
     I: Input + HasLen,
-    S: HasCorpus + HasMetadata + HasRand,
+    Self::State: HasCorpus + HasMetadata + HasRand,
 {
     fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
@@ -170,7 +170,7 @@ impl<'a, CS, I, S> CoverageAccountingScheduler<'a, CS, I, S>
 where
     CS: Scheduler,
     I: Input + HasLen,
-    S: HasCorpus + HasMetadata + HasRand,
+    Self::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]

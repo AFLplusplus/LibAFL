@@ -34,7 +34,7 @@ use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::
 use crate::{
     bolts::{
         llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
-        shmem::ShMemProvider,
+        shmem::ShMemProvider, bolts_prelude::HasShMemProvider,
     },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
@@ -521,7 +521,7 @@ where
             } else {
                 msg
             };
-            let event: Event<I> = postcard::from_bytes(event_bytes)?;
+            let event: Event<Self::Input> = postcard::from_bytes(event_bytes)?;
             self.handle_in_client(fuzzer, executor, state, client_id, event)?;
             count += 1;
         }
@@ -545,7 +545,7 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<dyn FnMut(&mut <Self as EventManager>::Input, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
     ) {
         self.custom_buf_handlers.push(handler);
     }
@@ -553,7 +553,6 @@ where
 
 impl<OT, SP> ProgressReporter for LlmpEventManager<OT, SP>
 where
-    I: Input,
     OT: ObserversTuple + DeserializeOwned,
     SP: ShMemProvider,
 {
@@ -736,7 +735,6 @@ pub fn setup_restarting_mgr_std<I, MT, OT, S>(
     configuration: EventConfig,
 ) -> Result<(Option<S>, LlmpRestartingEventManager<OT, StdShMemProvider>), Error>
 where
-    I: Input,
     MT: Monitor + Clone,
     OT: ObserversTuple + DeserializeOwned,
     S: DeserializeOwned,
@@ -756,11 +754,10 @@ where
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
 #[derive(TypedBuilder, Debug)]
-pub struct RestartingMgr<I, MT, OT, S, SP>
+pub struct RestartingMgr<MT, OT, SP>
 where
-    I: Input,
     OT: ObserversTuple + DeserializeOwned,
-    S: DeserializeOwned,
+    <Self as EventManager>::State: DeserializeOwned,
     SP: ShMemProvider + 'static,
     MT: Monitor,
     //CE: CustomEvent<I>,
@@ -782,27 +779,25 @@ where
     /// The type of manager to build
     #[builder(default = ManagerKind::Any)]
     kind: ManagerKind,
-    #[builder(setter(skip), default = PhantomData)]
-    phantom: PhantomData<(I, OT, S)>,
 }
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<I, MT, OT, S, SP> RestartingMgr<I, MT, OT, S, SP>
+impl<MT, OT, SP> RestartingMgr<MT, OT, SP>
 where
-    I: Input,
+    <Self as EventManager>::Input: Input,
     OT: ObserversTuple + DeserializeOwned,
-    S: DeserializeOwned,
+    <Self as EventManager>::State: DeserializeOwned,
     SP: ShMemProvider,
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager
-    pub fn launch(&mut self) -> Result<(Option<S>, LlmpRestartingEventManager<OT, SP>), Error> {
+    pub fn launch(&mut self) -> Result<(Option<<Self as EventManager>::State>, LlmpRestartingEventManager<OT, SP>), Error> {
         // We start ourself as child process to actually fuzz
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
-            let broker_things = |mut broker: LlmpEventBroker<I, MT, SP>, remote_broker_addr| {
+            let broker_things = |mut broker: LlmpEventBroker<<Self as EventManager>::Input, MT, SP>, remote_broker_addr| {
                 if let Some(remote_broker_addr) = remote_broker_addr {
                     println!("B2b: Connecting to {:?}", &remote_broker_addr);
                     broker.connect_b2b(remote_broker_addr)?;
@@ -818,7 +813,7 @@ where
                         LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
-                            let event_broker = LlmpEventBroker::<I, MT, SP>::new(
+                            let event_broker = LlmpEventBroker::<<Self as EventManager>::Input, MT, SP>::new(
                                 broker,
                                 self.monitor.take().unwrap(),
                             )?;
@@ -839,7 +834,7 @@ where
                     }
                 }
                 ManagerKind::Broker => {
-                    let event_broker = LlmpEventBroker::<I, MT, SP>::new_on_port(
+                    let event_broker = LlmpEventBroker::<<Self as EventManager>::Input, MT, SP>::new_on_port(
                         self.shmem_provider.clone(),
                         self.monitor.take().unwrap(),
                         self.broker_port,

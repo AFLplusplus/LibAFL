@@ -311,7 +311,7 @@ impl InProcessHandlers {
         OT: ObserversTuple,
         EM: EventFirer + EventRestarter,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObservers,
         H: FnMut(&I) -> ExitKind + ?Sized,
     {
@@ -583,7 +583,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -658,7 +658,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -738,7 +738,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -923,7 +923,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -1015,7 +1015,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -1111,7 +1111,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {

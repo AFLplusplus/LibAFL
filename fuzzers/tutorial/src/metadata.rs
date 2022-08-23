@@ -22,7 +22,7 @@ pub struct PacketLenTestcaseScore {}
 
 impl<S> TestcaseScore<PacketData, S> for PacketLenTestcaseScore
 where
-    S: HasCorpus<PacketData> + HasMetadata,
+    Self::State: HasCorpus<PacketData> + HasMetadata,
 {
     fn compute(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
         Ok(entry
@@ -42,7 +42,7 @@ pub struct PacketLenFeedback {
 
 impl<S> Feedback<PacketData, S> for PacketLenFeedback
 where
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[inline]
     fn is_interesting<EM, OT>(

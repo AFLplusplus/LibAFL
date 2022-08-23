@@ -24,7 +24,7 @@ fn extend_with_random_generalized<S>(
     gap_indices: &mut Vec<usize>,
 ) -> Result<(), Error>
 where
-    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
+    Self::State: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
 {
     let rand_idx = state.rand_mut().next() as usize;
 

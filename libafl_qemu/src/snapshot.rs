@@ -195,7 +195,7 @@ impl Default for QemuSnapshotHelper {
 impl<I, S> QemuHelper<I, S> for QemuSnapshotHelper
 where
     I: Input,
-    S: HasMetadata,
+    Self::State: HasMetadata,
 {
     fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where

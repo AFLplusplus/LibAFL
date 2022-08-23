@@ -9,7 +9,6 @@ pub mod mutational;
 use alloc::rc::Rc;
 use core::{
     cell::{Cell, RefCell},
-    marker::PhantomData,
     time::Duration,
 };
 
@@ -29,10 +28,34 @@ use crate::{
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
+
+// The shared state for all [`PushStage`]s
+/// Should be stored inside a `[Rc<RefCell<_>>`]
+pub trait PushStageSharedState {
+    type Scheduler: Scheduler;
+    type EventManager: EventFirer + EventRestarter + HasEventManagerId;
+    type Input: Input;
+    type Observers: ObserversTuple;
+    type State: HasClientPerfMonitor + HasCorpus + HasRand;
+    type Fuzzer: ExecutionProcessor + EvaluatorObservers + HasScheduler;
+}
+
 // The shared state for all [`PushStage`]s
 /// Should be stored inside a `[Rc<RefCell<_>>`]
 #[derive(Clone, Debug)]
-pub struct PushStageSharedState<CS, EM, I, OT, S, Z>
+pub struct StdPushStageSharedState
+{
+    /// The [`crate::state::State`]
+    pub state: <Self as PushStageSharedState>::State,
+    /// The [`crate::fuzzer::Fuzzer`] instance
+    pub fuzzer: <Self as PushStageSharedState>::Fuzzer,
+    /// The [`crate::events::EventManager`]
+    pub event_mgr: <Self as PushStageSharedState>::EventManager,
+    /// The [`crate::observers::ObserversTuple`]
+    pub observers: <Self as PushStageSharedState>::Observers,
+}
+
+impl<CS, EM, I, OT, S, Z> PushStageSharedState for StdPushStageSharedState
 where
     CS: Scheduler,
     EM: EventFirer + EventRestarter + HasEventManagerId,
@@ -41,49 +64,43 @@ where
     S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
-    /// The [`crate::state::State`]
-    pub state: S,
-    /// The [`crate::fuzzer::Fuzzer`] instance
-    pub fuzzer: Z,
-    /// The [`crate::events::EventManager`]
-    pub event_mgr: EM,
-    /// The [`crate::observers::ObserversTuple`]
-    pub observers: OT,
-    phantom: PhantomData<(CS, I, OT, S, Z)>,
+    type Scheduler = CS;
+    type EventManager = EM;
+    type Input = I;
+    type Observers = OT;
+    type State = S;
+    type Fuzzer = Z;
 }
 
-impl<CS, EM, I, OT, S, Z> PushStageSharedState<CS, EM, I, OT, S, Z>
-where
-    CS: Scheduler,
-    EM: EventFirer + EventRestarter + HasEventManagerId,
-    I: Input,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasCorpus + HasRand,
-    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
+impl StdPushStageSharedState
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
-    pub fn new(fuzzer: Z, state: S, observers: OT, event_mgr: EM) -> Self {
+    pub fn new(fuzzer: <Self as PushStageSharedState>::Fuzzer, state: <Self as PushStageSharedState>::State, observers: <Self as PushStageSharedState>::Observers, event_mgr: <Self as PushStageSharedState>::EventManager) -> Self {
         Self {
             state,
             fuzzer,
             event_mgr,
             observers,
-            phantom: PhantomData,
         }
     }
 }
 
+/// The PushStageState
+trait PushStageHelper {
+    type Scheduler: Scheduler;
+    type EventManager: EventFirer + EventRestarter + HasEventManagerId;
+    type Input: Input;
+    type Observers: ObserversTuple;
+    type State: HasClientPerfMonitor + HasCorpus + HasRand;
+    type Fuzzer: ExecutionProcessor + EvaluatorObservers + HasScheduler;
+    type PushStageSharedState: PushStageSharedState<Scheduler = Self::Scheduler, EventManager = Self::EventManager, Input = Self::Input, Observers = Self::Observers, State = Self::State, Fuzzer = Self::Fuzzer>;
+
+}
+
 /// Helper class for the [`PushStage`] trait, taking care of borrowing the shared state
 #[derive(Clone, Debug)]
-pub struct PushStageHelper<CS, EM, I, OT, S, Z>
-where
-    CS: Scheduler,
-    EM: EventFirer + EventRestarter + HasEventManagerId,
-    I: Input,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasCorpus + HasRand,
-    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
+pub struct StdPushStageHelper
 {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
@@ -92,7 +109,7 @@ where
     pub last_monitor_time: Duration,
     /// The shared state, keeping track of the corpus and the fuzzer
     #[allow(clippy::type_complexity)]
-    pub shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, I, OT, S, Z>>>>,
+    pub shared_state: Rc<RefCell<Option<<Self as PushStageHelper>::PushStageSharedState>>>,
     /// If the last iteration failed
     pub errored: bool,
 
@@ -100,14 +117,12 @@ where
     pub current_corpus_idx: Option<usize>,
 
     /// The input we just ran
-    pub current_input: Option<I>, // Todo: Get rid of copy
+    pub current_input: Option<<Self as PushStageSharedState>::Input>, // Todo: Get rid of copy
 
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(CS, (), EM, I, OT, S, Z)>,
     exit_kind: Rc<Cell<Option<ExitKind>>>,
 }
 
-impl<CS, EM, I, OT, S, Z> PushStageHelper<CS, EM, I, OT, S, Z>
+impl<CS, EM, I, OT, S, Z> PushStageHelper for StdPushStageHelper
 where
     CS: Scheduler,
     EM: EventFirer + EventRestarter + HasEventManagerId,
@@ -116,17 +131,37 @@ where
     S: HasClientPerfMonitor + HasCorpus + HasRand,
     Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
+    /// The `Scheduler`
+    type Scheduler = S;
+
+    /// The `EventManager`
+    type EventManager = EM;
+
+    /// The `Input`
+    type Input = I;
+
+    /// The [`ObserversTuple`]
+    type Observers = OT;
+
+    /// The `State`
+    type State = S;
+
+    /// The `Fuzzer`
+    type Fuzzer = Z;
+}
+
+impl StdPushStageHelper
+{
     /// Create a new [`PushStageHelper`]
     #[must_use]
     #[allow(clippy::type_complexity)]
     pub fn new(
-        shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, I, OT, S, Z>>>>,
+        shared_state: Rc<RefCell<Option<<Self as PushStageHelper>::PushStageSharedState>>>,
         exit_kind_ref: Rc<Cell<Option<ExitKind>>>,
     ) -> Self {
         Self {
             shared_state,
             initialized: false,
-            phantom: PhantomData,
             last_monitor_time: current_time(),
             exit_kind: exit_kind_ref,
             errored: false,
@@ -137,14 +172,14 @@ where
 
     /// Sets the shared state for this helper (and all other helpers owning the same [`RefCell`])
     #[inline]
-    pub fn set_shared_state(&mut self, shared_state: PushStageSharedState<CS, EM, I, OT, S, Z>) {
+    pub fn set_shared_state(&mut self, shared_state: <Self as PushStageHelper>::PushStageSharedState) {
         (*self.shared_state.borrow_mut()).replace(shared_state);
     }
 
     /// Takes the shared state from this helper, replacing it with `None`
     #[inline]
     #[allow(clippy::type_complexity)]
-    pub fn take_shared_state(&mut self) -> Option<PushStageSharedState<CS, EM, I, OT, S, Z>> {
+    pub fn take_shared_state(&mut self) -> Option<<Self as PushStageHelper>::PushStageSharedState> {
         let shared_state_ref = &mut (*self.shared_state).borrow_mut();
         shared_state_ref.take()
     }
@@ -165,7 +200,7 @@ where
     /// Resets this state after a full stage iter.
     fn end_of_iter(
         &mut self,
-        shared_state: PushStageSharedState<CS, EM, I, OT, S, Z>,
+        shared_state: <Self as PushStageHelper>::PushStageSharedState,
         errored: bool,
     ) {
         self.set_shared_state(shared_state);
@@ -184,33 +219,21 @@ pub trait PushStage: Iterator {
     type Scheduler: Scheduler;
     type EventManager: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter;
     type Input: Input;
-    type ObserversTuple: ObserversTuple;
+    type Observers: ObserversTuple;
     type Stage: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions;
     type Fuzzer: ExecutionProcessor + EvaluatorObservers + HasScheduler;
     type State;
+    type PushStageHelper: PushStageHelper<Scheduler = Self::Scheduler, EventManager = Self::EventManager, Input = Self::Input, Observers = Self::Observers, Fuzzer= Self::Fuzzer, State = Self::State>;
 
     /// Gets the [`PushStageHelper`]
     fn push_stage_helper(
         &self,
-    ) -> &PushStageHelper<
-        Self::Scheduler,
-        Self::EventManager,
-        Self::Input,
-        Self::ObserversTuple,
-        Self::Stage,
-        Self::Fuzzer,
-    >;
+    ) -> &Self::PushStageHelper;
+
     /// Gets the [`PushStageHelper`] (mutable)
     fn push_stage_helper_mut(
         &mut self,
-    ) -> &mut PushStageHelper<
-        Self::Scheduler,
-        Self::EventManager,
-        Self::Input,
-        Self::ObserversTuple,
-        Self::Stage,
-        Self::Fuzzer,
-    >;
+    ) -> &mut Self::PushStageHelper;
 
     /// Set the current corpus index this stage works on
     fn set_current_corpus_idx(&mut self, corpus_idx: usize) {
@@ -224,9 +247,9 @@ pub trait PushStage: Iterator {
     fn init(
         &mut self,
         _fuzzer: &mut Self::Fuzzer,
-        _state: &mut Self::State,
+        _state: &mut Self::Stage,
         _event_mgr: &mut Self::EventManager,
-        _observers: &mut Self::ObserversTuple,
+        _observers: &mut Self::Observers,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -239,7 +262,7 @@ pub trait PushStage: Iterator {
         _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
         _event_mgr: &mut Self::EventManager,
-        _observers: &mut Self::ObserversTuple,
+        _observers: &mut Self::Observers,
     ) -> Option<Result<Self::Input, Error>>;
 
     /// Called after the execution of a testcase finished.
@@ -249,7 +272,7 @@ pub trait PushStage: Iterator {
         _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
         _event_mgr: &mut Self::EventManager,
-        _observers: &mut Self::ObserversTuple,
+        _observers: &mut Self::Observers,
         _input: Self::Input,
         _exit_kind: ExitKind,
     ) -> Result<(), Error> {
@@ -263,7 +286,7 @@ pub trait PushStage: Iterator {
         _fuzzer: &mut Self::Fuzzer,
         _state: &mut Self::State,
         _event_mgr: &mut Self::EventManager,
-        _observers: &mut Self::ObserversTuple,
+        _observers: &mut Self::Observers,
     ) -> Result<(), Error> {
         Ok(())
     }

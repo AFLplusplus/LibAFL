@@ -29,7 +29,6 @@ use crate::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
     },
-    inputs::Input,
     monitors::Monitor,
     Error,
 };
@@ -336,7 +335,7 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<dyn FnMut(&mut <Self as EventManager>::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
     ) {
         self.simple_event_mgr.add_custom_buf_handler(handler);
     }
@@ -380,9 +379,9 @@ where
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     #[allow(clippy::similar_names)]
-    pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
+    pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<<Self as EventManager>::State>, Self), Error>
     where
-        S: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
+        <Self as EventManager>::State: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
         MT: Debug,
     {
         // We start ourself as child process to actually fuzz
@@ -445,7 +444,7 @@ where
         };
 
         // If we're restarting, deserialize the old state.
-        let (state, mgr) = match staterestorer.restore::<S>()? {
+        let (state, mgr) = match staterestorer.restore::<<Self as EventManager>::State>()? {
             None => {
                 println!("First run. Let's set it all up");
                 // Mgr to send and receive msgs from/to all other fuzzer instances

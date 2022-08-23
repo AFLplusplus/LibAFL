@@ -60,7 +60,7 @@ where
     where
         EM: EventFirer + EventRestarter,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObservers,
     {
         Ok(Self {
@@ -178,7 +178,7 @@ where
     where
         EM: EventFirer + EventRestarter,
         OF: Feedback,
-        S: HasSolutions + HasClientPerfMonitor,
+        Self::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObservers,
     {
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");

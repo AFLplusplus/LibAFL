@@ -215,6 +215,19 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice + AsMutSlice {
     }
 }
 
+/// Trait for components that own an [`ShMemProvider`]
+pub trait HasShMemProvider {
+    /// The [`ShMemProvider`] used by this component
+    type ShMemProvider: ShMemProvider;
+
+    /// Borrows the [`ShMemProvider`]
+    fn shmem_provider() -> &Self::ShMemProvider;
+
+    /// Borrows the [`ShMemProvider`] (mut)
+    fn shmem_provider_mut() -> &mut Self::ShMemProvider;
+
+}
+
 /// A [`ShMemProvider`] provides access to shared maps.
 /// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMem`].

@@ -357,7 +357,7 @@ pub trait ProgressReporter: EventFirer {
         monitor_timeout: Duration,
     ) -> Result<Duration, Error>
     where
-        S: HasExecutions + HasClientPerfMonitor,
+        Self::State: HasExecutions + HasClientPerfMonitor,
     {
         let executions = *state.executions();
         let cur = current_time();

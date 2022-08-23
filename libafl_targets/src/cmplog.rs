@@ -185,7 +185,7 @@ pub struct CmpLogObserver<'a> {
 
 impl<'a, I, S> CmpObserver<CmpLogMap, I, S> for CmpLogObserver<'a>
 where
-    S: HasMetadata,
+    Self::State: HasMetadata,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -206,7 +206,7 @@ where
 
 impl<'a, I, S> Observer for CmpLogObserver<'a>
 where
-    S: HasMetadata,
+    Self::State: HasMetadata,
     Self: CmpObserver<CmpLogMap, I, S>,
 {
     fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {

@@ -337,7 +337,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 pub struct SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     _phantom: PhantomData<(EM, I, S, Z)>,
 }
@@ -346,7 +346,7 @@ where
 impl<E, EM, I, S, Z> Stage for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input + HasBytesVec,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -389,7 +389,7 @@ where
 impl<EM, I, S, Z> Default for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     fn default() -> Self {
         Self {

@@ -614,7 +614,7 @@ pub struct AsanErrorsFeedback {
 impl<I, S> Feedback for AsanErrorsFeedback
 where
     I: Input + HasTargetBytes,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(

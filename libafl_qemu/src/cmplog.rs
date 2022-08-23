@@ -56,7 +56,7 @@ impl Default for QemuCmpLogHelper {
 impl<I, S> QemuHelper<I, S> for QemuCmpLogHelper
 where
     I: Input,
-    S: HasMetadata,
+    Self::State: HasMetadata,
 {
     fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
@@ -98,7 +98,7 @@ impl Default for QemuCmpLogChildHelper {
 impl<I, S> QemuHelper<I, S> for QemuCmpLogChildHelper
 where
     I: Input,
-    S: HasMetadata,
+    Self::State: HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
@@ -123,7 +123,7 @@ pub fn gen_unique_cmp_ids<I, QT, S>(
     _size: usize,
 ) -> Option<u64>
 where
-    S: HasMetadata,
+    Self::State: HasMetadata,
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
@@ -155,7 +155,7 @@ pub fn gen_hashed_cmp_ids<I, QT, S>(
     _size: usize,
 ) -> Option<u64>
 where
-    S: HasMetadata,
+    Self::State: HasMetadata,
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {

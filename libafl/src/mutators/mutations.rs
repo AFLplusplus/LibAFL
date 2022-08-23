@@ -103,7 +103,7 @@ pub struct BitFlipMutator;
 impl Mutator for BitFlipMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -143,7 +143,7 @@ pub struct ByteFlipMutator;
 impl Mutator for ByteFlipMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -181,7 +181,7 @@ pub struct ByteIncMutator;
 impl Mutator for ByteIncMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -220,7 +220,7 @@ pub struct ByteDecMutator;
 impl Mutator for ByteDecMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -259,7 +259,7 @@ pub struct ByteNegMutator;
 impl Mutator for ByteNegMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -298,7 +298,7 @@ pub struct ByteRandMutator;
 impl Mutator for ByteRandMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -342,7 +342,7 @@ macro_rules! add_mutator_impl {
         impl Mutator for $name
         where
             Self::Input: Input + HasBytesVec,
-            S: HasRand,
+            Self::State: HasRand,
         {
             fn mutate(
                 &mut self,
@@ -408,7 +408,7 @@ macro_rules! interesting_mutator_impl {
         impl Mutator for $name
         where
             Self::Input: Input + HasBytesVec,
-            S: HasRand,
+            Self::State: HasRand,
         {
             #[allow(clippy::cast_sign_loss)]
             fn mutate(
@@ -461,7 +461,7 @@ pub struct BytesDeleteMutator;
 impl Mutator for BytesDeleteMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -503,7 +503,7 @@ pub struct BytesExpandMutator;
 impl Mutator for BytesExpandMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand + HasMaxSize,
+    Self::State: HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -552,7 +552,7 @@ pub struct BytesInsertMutator;
 impl Mutator for BytesInsertMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand + HasMaxSize,
+    Self::State: HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -607,7 +607,7 @@ pub struct BytesRandInsertMutator;
 impl Mutator for BytesRandInsertMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand + HasMaxSize,
+    Self::State: HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -659,7 +659,7 @@ pub struct BytesSetMutator;
 impl Mutator for BytesSetMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -703,7 +703,7 @@ pub struct BytesRandSetMutator;
 impl Mutator for BytesRandSetMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -747,7 +747,7 @@ pub struct BytesCopyMutator;
 impl Mutator for BytesCopyMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -793,7 +793,7 @@ pub struct BytesInsertCopyMutator {
 impl Mutator for BytesInsertCopyMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand + HasMaxSize,
+    Self::State: HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -855,7 +855,7 @@ pub struct BytesSwapMutator;
 impl Mutator for BytesSwapMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand,
+    Self::State: HasRand,
 {
     fn mutate(
         &mut self,
@@ -901,7 +901,7 @@ pub struct CrossoverInsertMutator;
 impl Mutator for CrossoverInsertMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand + HasCorpus + HasMaxSize,
+    Self::State: HasRand + HasCorpus + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -976,7 +976,7 @@ pub struct CrossoverReplaceMutator;
 impl Mutator for CrossoverReplaceMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand + HasCorpus,
+    Self::State: HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
@@ -1059,7 +1059,7 @@ pub struct SpliceMutator;
 impl Mutator for SpliceMutator
 where
     Self::Input: Input + HasBytesVec,
-    S: HasRand + HasCorpus,
+    Self::State: HasRand + HasCorpus,
 {
     #[allow(clippy::cast_sign_loss)]
     fn mutate(
@@ -1181,7 +1181,7 @@ mod tests {
     fn test_mutations<I, S>() -> impl MutatorsTuple
     where
         Self::Input: Input + HasBytesVec,
-        S: HasRand + HasCorpus + HasMetadata + HasMaxSize,
+        Self::State: HasRand + HasCorpus + HasMetadata + HasMaxSize,
     {
         tuple_list!(
             BitFlipMutator::new(),

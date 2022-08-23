@@ -340,7 +340,7 @@ where
     O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    S: HasNamedMetadata,
+    Self::State: HasNamedMetadata,
 {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
@@ -364,7 +364,7 @@ where
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+    Self::State: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
@@ -444,7 +444,7 @@ where
     O: MapObserver<Item = u8> + AsSlice,
     for<'it> O: AsIter<'it, Item = u8>,
     I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+    Self::State: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -565,7 +565,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
-    S: HasNamedMetadata,
+    Self::State: HasNamedMetadata,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -580,7 +580,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
-    S: HasNamedMetadata,
+    Self::State: HasNamedMetadata,
 {
     #[inline]
     fn observer_name(&self) -> &str {
@@ -600,7 +600,7 @@ where
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+    Self::State: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     /// Create new `MapFeedback`
     #[must_use]

@@ -102,7 +102,7 @@ where
     /// Saves a state to the connected [`ShMem`], or a tmpfile, if its serialized size get too large.
     pub fn save<S>(&mut self, state: &S) -> Result<(), Error>
     where
-        S: Serialize,
+        Self::State: Serialize,
     {
         if self.has_content() {
             return Err(Error::illegal_state(
@@ -206,7 +206,7 @@ where
     /// Can only be read once.
     pub fn restore<S>(&self) -> Result<Option<S>, Error>
     where
-        S: DeserializeOwned,
+        Self::State: DeserializeOwned,
     {
         if !self.has_content() {
             return Ok(None);

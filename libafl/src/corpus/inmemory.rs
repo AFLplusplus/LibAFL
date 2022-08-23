@@ -19,9 +19,7 @@ pub struct InMemoryCorpus {
     current: Option<usize>,
 }
 
-impl<I> Corpus for InMemoryCorpus
-where
-    I: Input,
+impl Corpus for InMemoryCorpus
 {
     /// Returns the number of elements
     #[inline]
@@ -75,9 +73,7 @@ where
     }
 }
 
-impl<I> InMemoryCorpus
-where
-    I: Input,
+impl InMemoryCorpus
 {
     /// Creates a new [`InMemoryCorpus`], keeping all [`Testcase`]`s` in memory.
     /// This is the simplest and fastest option, however test progress will be lost on exit or on OOM.

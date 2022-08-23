@@ -1,7 +1,6 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
-use core::marker::PhantomData;
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -37,32 +36,25 @@ impl SyncFromDiskMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromDiskStage<CB, E, EM, I, S, Z>
-where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
-    I: Input,
-    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
-    Z: Evaluator,
+pub struct SyncFromDiskStage<CB>
 {
     sync_dir: PathBuf,
     load_callback: CB,
-    phantom: PhantomData<(E, EM, I, S, Z)>,
 }
 
-impl<CB, E, EM, I, S, Z> Stage for SyncFromDiskStage<CB, E, EM, I, S, Z>
+impl<CB> Stage for SyncFromDiskStage<CB>
 where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
-    I: Input,
-    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
-    Z: Evaluator,
+    CB: FnMut(&mut <Self as Stage>::Fuzzer, &mut <Self as Stage>::State, &Path) -> Result<Self::Input, Error>,
+    Self::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    Self::Fuzzer: Evaluator,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Self::Fuzzer,
         executor: &mut Self::Executor,
-        state: &mut <Self as Stage>::State,
-        manager: &mut EM,
+        state: &mut Self::State,
+        manager: &mut Self::EventManager,
         _corpus_idx: usize,
     ) -> Result<(), Error> {
         let last = state
@@ -93,12 +85,11 @@ where
     }
 }
 
-impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z>
+impl<CB> SyncFromDiskStage<CB>
 where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
-    I: Input,
-    S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
-    Z: Evaluator,
+    CB: FnMut(&mut <Self as Stage>::Fuzzer, &mut <Self as Stage>::State, &Path) -> Result<<Self as Stage>::Input, Error>,
+    <Self as Stage>::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
+    <Self as Stage>::Fuzzer: Evaluator,
 {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
@@ -106,7 +97,6 @@ where
         Self {
             sync_dir,
             load_callback,
-            phantom: PhantomData,
         }
     }
 
@@ -114,10 +104,10 @@ where
         &mut self,
         in_dir: &Path,
         last: &Option<SystemTime>,
-        fuzzer: &mut Z,
-        executor: &mut E,
+        fuzzer: &mut <Self as Stage>::Fuzzer,
+        executor: &mut <Self as Stage>::Executor,
         state: &mut <Self as Stage>::State,
-        manager: &mut EM,
+        manager: &mut <Self as Stage>::EventManager,
     ) -> Result<Option<SystemTime>, Error> {
         let mut max_time = None;
         for entry in fs::read_dir(in_dir)? {
@@ -158,9 +148,9 @@ where
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
 pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, Error>;
 
-impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
+impl<I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>>
 where
-    I: Input,
+    Self: Stage<Input = I, State = S, Fuzzer = Z>,
     S: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     Z: Evaluator,
 {
@@ -173,7 +163,6 @@ where
         Self {
             sync_dir,
             load_callback: load_callback::<_, _, I>,
-            phantom: PhantomData,
         }
     }
 }

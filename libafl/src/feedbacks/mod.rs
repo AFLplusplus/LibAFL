@@ -521,7 +521,7 @@ pub struct NotFeedback<A, I, S>
 where
     A: Feedback,
     I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     /// The feedback to invert
     pub first: A,
@@ -534,7 +534,7 @@ impl<A, I, S> Debug for NotFeedback<A, I, S>
 where
     A: Feedback,
     I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("NotFeedback")
@@ -548,7 +548,7 @@ impl<A, I, S> Feedback for NotFeedback<A, I, S>
 where
     A: Feedback,
     I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         self.first.init_state(state)
@@ -595,7 +595,7 @@ impl<A, I, S> Named for NotFeedback<A, I, S>
 where
     A: Feedback,
     I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -607,7 +607,7 @@ impl<A, I, S> NotFeedback<A, I, S>
 where
     A: Feedback,
     I: Input,
-    S: HasClientPerfMonitor,
+    Self::State: HasClientPerfMonitor,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {

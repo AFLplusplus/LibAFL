@@ -410,7 +410,7 @@ impl Default for QemuAsanHelper {
 impl<I, S> QemuHelper<I, S> for QemuAsanHelper
 where
     I: Input,
-    S: HasMetadata,
+    Self::State: HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 

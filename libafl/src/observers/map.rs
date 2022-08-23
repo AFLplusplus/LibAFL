@@ -355,7 +355,7 @@ where
     #[must_use]
     pub fn new<S>(name: S, map: &'a mut [<Self as MapObserver>::Item]) -> Self
     where
-        S: Into<String>,
+        Self::State: Into<String>,
     {
         Self {
             map: OwnedSliceMut::from(map),
@@ -368,7 +368,7 @@ where
     #[must_use]
     pub fn new_owned<S>(name: S, map: Vec<<Self as MapObserver>::Item>) -> Self
     where
-        S: Into<String>,
+        Self::State: Into<String>,
     {
         Self {
             map: OwnedSliceMut::from(map),
@@ -387,7 +387,7 @@ where
         map: OwnedSliceMut<'a, <Self as MapObserver>::Item>,
     ) -> Self
     where
-        S: Into<String>,
+        Self::State: Into<String>,
         <Self as MapObserver>::Item: Default,
     {
         Self {
@@ -407,7 +407,7 @@ where
         len: usize,
     ) -> Self
     where
-        S: Into<String>,
+        Self::State: Into<String>,
     {
         StdMapObserver {
             map: OwnedSliceMut::from_raw_parts_mut(map_ptr, len),
