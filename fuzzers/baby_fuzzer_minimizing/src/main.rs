@@ -94,21 +94,21 @@ pub fn main() -> Result<(), Error> {
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
-    let minimiser = StdScheduledMutator::new(havoc_mutations());
+    let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(
         StdMutationalStage::new(mutator),
-        StdTMinMutationalStage::new(minimiser, factory, 128)
+        StdTMinMutationalStage::new(minimizer, factory, 128)
     );
 
     while state.solutions().is_empty() {
         fuzzer.fuzz_one(&mut stages, &mut executor, &mut state, &mut mgr)?;
     }
 
-    let minimised_dir = PathBuf::from("./minimised");
+    let minimized_dir = PathBuf::from("./minimized");
 
     let mut state = StdState::new(
         StdRand::with_seed(current_nanos()),
-        OnDiskCorpus::new(&minimised_dir).unwrap(),
+        OnDiskCorpus::new(&minimized_dir).unwrap(),
         InMemoryCorpus::new(),
         &mut (),
         &mut (),
@@ -120,9 +120,9 @@ pub fn main() -> Result<(), Error> {
 
     let mut mgr = SimpleEventManager::new(mon);
 
-    let minimiser = StdScheduledMutator::new(havoc_mutations());
+    let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdTMinMutationalStage::new(
-        minimiser,
+        minimizer,
         CrashFeedbackFactory::default(),
         1 << 10
     ));

@@ -1,4 +1,4 @@
-//! The [`TMinMutationalStage`] is a stage which will attempt to minimise corpus entries.
+//! The [`TMinMutationalStage`] is a stage which will attempt to minimize corpus entries.
 
 use alloc::string::{String, ToString};
 use core::{
@@ -28,7 +28,7 @@ use crate::{
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 
-/// Mutational stage which minimises corpus entries.
+/// Mutational stage which minimizes corpus entries.
 ///
 /// You must provide at least one mutator that actually reduces size.
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, I, M, OT, S, Z>:
@@ -268,7 +268,7 @@ where
     I: Input + HasLen,
     M: Mutator<I, S>,
 {
-    /// Creates a new minimising mutational stage that will minimise provided corpus entries
+    /// Creates a new minimising mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
         Self {
             mutator,
@@ -339,7 +339,7 @@ where
     }
 }
 
-/// A feedback factory for ensuring that the maps for minimised inputs are the same
+/// A feedback factory for ensuring that the maps for minimized inputs are the same
 #[derive(Debug, Clone)]
 pub struct MapEqualityFactory<M> {
     obs_name: String,
