@@ -140,7 +140,7 @@ impl OnDiskTOMLMonitor<NopMonitor> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 /// Wraps a base monitor and continuously appends the current statistics to a JSON lines file.
 pub struct OnDiskJSONMonitor<F, M>
 where
@@ -148,7 +148,7 @@ where
     M: Monitor,
 {
     base: M,
-    file: File,
+    path: PathBuf,
     /// A function that has the current runtime as argument and decides, whether a record should be logged
     log_record: F,
 }
@@ -164,15 +164,10 @@ where
         P: Into<PathBuf>,
     {
         let path = filename.into();
-        let file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&path)
-            .expect("Failed to open logging file");
 
         Self {
             base,
-            file,
+            path,
             log_record,
         }
     }
@@ -198,6 +193,12 @@ where
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let runtime = current_time() - self.base.start_time();
         if (self.log_record)(&runtime) {
+            let file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&self.path)
+                .expect("Failed to open logging file");
+
             let line = json!({
                 "run_time": runtime,
                 "clients": self.base.client_stats().len(),
@@ -207,7 +208,7 @@ where
                 "exec_sec": self.base.execs_per_sec(),
                 "clients": &self.client_stats()[1..]
             });
-            writeln!(&self.file, "{}", line).expect("Unable to write JSON to file");
+            writeln!(&file, "{}", line).expect("Unable to write JSON to file");
         }
         self.base.display(event_msg, sender_id);
     }
