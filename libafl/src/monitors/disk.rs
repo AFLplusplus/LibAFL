@@ -144,7 +144,7 @@ impl OnDiskTOMLMonitor<NopMonitor> {
 /// Wraps a base monitor and continuously appends the current statistics to a JSON lines file.
 pub struct OnDiskJSONMonitor<F, M>
 where
-    F: Fn(&Duration) -> bool,
+    F: FnMut(&Duration) -> bool,
     M: Monitor,
 {
     base: M,
@@ -155,7 +155,7 @@ where
 
 impl<F, M> OnDiskJSONMonitor<F, M>
 where
-    F: Fn(&Duration) -> bool,
+    F: FnMut(&Duration) -> bool,
     M: Monitor,
 {
     /// Create a new [`OnDiskJSONMonitor`]
@@ -175,7 +175,7 @@ where
 
 impl<F, M> Monitor for OnDiskJSONMonitor<F, M>
 where
-    F: Fn(&Duration) -> bool,
+    F: FnMut(&Duration) -> bool,
     M: Monitor,
 {
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
