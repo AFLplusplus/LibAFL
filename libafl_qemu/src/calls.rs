@@ -130,14 +130,14 @@ where
 
         #[allow(unused_mut)]
         let mut code = {
-            #[cfg(feature = "usermode")]
+            #[cfg(emulation_mode = "usermode")]
             unsafe {
                 std::slice::from_raw_parts(emu.g2h(pc), 512)
             }
-            #[cfg(not(feature = "usermode"))]
+            #[cfg(emulation_mode = "systemmode")]
             &mut [0; 512]
         };
-        #[cfg(not(feature = "usermode"))]
+        #[cfg(emulation_mode = "systemmode")]
         unsafe {
             emu.read_mem(pc, code)
         }; // TODO handle faults
@@ -188,11 +188,11 @@ where
 
             iaddr += insn.bytes().len() as GuestAddr;
 
-            #[cfg(feature = "usermode")]
+            #[cfg(emulation_mode = "usermode")]
             unsafe {
                 code = std::slice::from_raw_parts(emu.g2h(iaddr), 512);
             }
-            #[cfg(not(feature = "usermode"))]
+            #[cfg(emulation_mode = "systemmode")]
             unsafe {
                 emu.read_mem(pc, code);
             } // TODO handle faults
