@@ -16,4 +16,4 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode", "arm"] }
+libafl_qemu = { path = "../../libafl_qemu/", features = ["arm", "usermode"] }
