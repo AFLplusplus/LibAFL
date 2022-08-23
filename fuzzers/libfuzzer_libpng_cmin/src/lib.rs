@@ -202,7 +202,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Each fuzz_one will internally do many executions of the target.
     // If your target is very instable, setting a low count here may help.
     // However, you will lose a lot of performance that way.
-    let iters = 100;
+    let iters = 10_000;
     fuzzer.fuzz_loop_for(
         &mut stages,
         &mut executor,

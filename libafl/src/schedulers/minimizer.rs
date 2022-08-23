@@ -99,7 +99,20 @@ where
         idx: usize,
         testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
-        self.base.on_remove(state, idx, testcase)
+        self.base.on_remove(state, idx, testcase)?;
+        if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {
+            if meta.map.values().any(|other_idx| *other_idx == idx) {
+                let _ = state.metadata_mut().remove::<TopRatedsMetadata>(); // cannot be guaranteed
+            } else {
+                meta.map
+                    .values_mut()
+                    .filter(|other_idx| **other_idx > idx)
+                    .for_each(|other_idx| {
+                        *other_idx -= 1;
+                    });
+            }
+        }
+        Ok(())
     }
 
     /// Gets the next entry
