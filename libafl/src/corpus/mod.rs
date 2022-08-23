@@ -13,13 +13,14 @@ pub use ondisk::OnDiskCorpus;
 
 #[cfg(feature = "std")]
 pub mod cached;
+#[cfg(feature = "std")]
+pub use cached::CachedOnDiskCorpus;
 
 #[cfg(feature = "cmin")]
 pub mod minimizer;
 use core::cell::RefCell;
 
-#[cfg(feature = "std")]
-pub use cached::CachedOnDiskCorpus;
+#[cfg(feature = "cmin")]
 pub use minimizer::*;
 
 use crate::{inputs::Input, Error};
