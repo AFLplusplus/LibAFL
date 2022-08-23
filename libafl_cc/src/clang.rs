@@ -294,6 +294,14 @@ impl CompilerWrapper for ClangWrapper {
         }
         for pass in &self.passes {
             if self.use_new_pm {
+                // https://github.com/llvm/llvm-project/issues/56137
+                // Need this -Xclang -load -Xclang -<pass>.so thing even with the new PM
+                // to pass the arguments to LLVM Passes
+                args.push("-Xclang".into());
+                args.push("-load".into());
+                args.push("-Xclang".into());
+                args.push(pass.path().into_os_string().into_string().unwrap());
+                args.push("-Xclang".into());
                 args.push(format!(
                     "-fpass-plugin={}",
                     pass.path().into_os_string().into_string().unwrap()
