@@ -1,6 +1,7 @@
 //! The Minimizer schedulers are a family of corpus schedulers that feed the fuzzer
-// with testcases only from a subset of the total corpus.
+//! with testcases only from a subset of the total corpus.
 
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use hashbrown::{HashMap, HashSet};
@@ -100,17 +101,64 @@ where
         testcase: &Option<Testcase<I>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, idx, testcase)?;
-        if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {
-            if meta.map.values().any(|other_idx| *other_idx == idx) {
-                let _ = state.metadata_mut().remove::<TopRatedsMetadata>(); // cannot be guaranteed
-            } else {
-                meta.map
-                    .values_mut()
-                    .filter(|other_idx| **other_idx > idx)
-                    .for_each(|other_idx| {
-                        *other_idx -= 1;
-                    });
+        let mut entries = if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {
+            let entries = meta
+                .map
+                .drain_filter(|_, other_idx| *other_idx == idx)
+                .map(|(entry, _)| entry)
+                .collect::<Vec<_>>();
+            meta.map
+                .values_mut()
+                .filter(|other_idx| **other_idx > idx)
+                .for_each(|other_idx| {
+                    *other_idx -= 1;
+                });
+            entries
+        } else {
+            return Ok(());
+        };
+        entries.sort_unstable(); // this should already be sorted, but just in case
+        let mut map = HashMap::new();
+        for i in 0..state.corpus().count() {
+            let mut old = state.corpus().get(i)?.borrow_mut();
+            let factor = F::compute(&mut *old, state)?;
+            if let Some(old_map) = old.metadata_mut().get_mut::<M>() {
+                let mut e_iter = entries.iter();
+                let mut map_iter = old_map.as_slice().iter(); // ASSERTION: guaranteed to be in order?
+
+                // manual set intersection
+                let mut entry = e_iter.next();
+                let mut map_entry = map_iter.next();
+                loop {
+                    if let Some(e) = entry {
+                        if let Some(me) = map_entry {
+                            if e == me {
+                                // if we found a better factor, prefer it
+                                map.entry(*e)
+                                    .and_modify(|(f, idx)| {
+                                        if *f > factor {
+                                            *f = factor;
+                                            *idx = i;
+                                        }
+                                    })
+                                    .or_insert((factor, i));
+                            } else if e < me {
+                                entry = e_iter.next();
+                            } else {
+                                map_entry = map_iter.next();
+                            }
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
             }
+        }
+        if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {
+            meta.map
+                .extend(map.into_iter().map(|(entry, (_, idx))| (entry, idx)));
         }
         Ok(())
     }

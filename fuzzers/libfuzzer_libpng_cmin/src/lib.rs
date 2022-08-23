@@ -212,6 +212,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     )?;
 
     let orig_size = state.corpus().count();
+    let msg = "Started distillation...".to_string();
+    restarting_mgr.log(&mut state, LogSeverity::Info, msg)?;
     minimiser.minimise(&mut fuzzer, &mut executor, &mut restarting_mgr, &mut state)?;
     let msg = format!("Distilled out {} cases", orig_size - state.corpus().count());
     restarting_mgr.log(&mut state, LogSeverity::Info, msg)?;
