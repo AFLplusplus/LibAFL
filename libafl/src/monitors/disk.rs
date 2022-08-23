@@ -140,41 +140,47 @@ impl OnDiskTOMLMonitor<NopMonitor> {
     }
 }
 
-#[derive(Debug, Clone)]
-/// Wraps a base monitor and continuously appends the current statistics to a JSON file
-pub struct OnDiskJSONMonitor<M>
+#[derive(Debug)]
+/// Wraps a base monitor and continuously appends the current statistics to a JSON lines file.
+pub struct OnDiskJSONMonitor<F, M>
 where
+    F: Fn(&Duration) -> bool,
     M: Monitor,
 {
     base: M,
-    filename: PathBuf,
-    last_update: Duration,
+    file: File,
+    /// A function that has the current runtime as argument and decides, whether a record should be logged
+    log_record: F,
 }
 
-impl<M> OnDiskJSONMonitor<M>
+impl<F, M> OnDiskJSONMonitor<F, M>
 where
+    F: Fn(&Duration) -> bool,
     M: Monitor,
 {
     /// Create a new [`OnDiskJSONMonitor`]
-    pub fn new<P>(filename: P, base: M) -> Self
+    pub fn new<P>(filename: P, base: M, log_record: F) -> Self
     where
         P: Into<PathBuf>,
     {
-        let file = filename.into();
-        if !file.exists() {
-            File::create(&file).expect("Failed to create logging file");
-        }
+        let path = filename.into();
+        let file = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open(&path)
+            .expect("Failed to open logging file");
 
         Self {
             base,
-            filename: file,
-            last_update: current_time(),
+            file,
+            log_record,
         }
     }
 }
 
-impl<M> Monitor for OnDiskJSONMonitor<M>
+impl<F, M> Monitor for OnDiskJSONMonitor<F, M>
 where
+    F: Fn(&Duration) -> bool,
     M: Monitor,
 {
     fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
@@ -190,14 +196,10 @@ where
     }
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
-        let cur_time = current_time();
-        if (cur_time - self.last_update).as_secs() >= 60 {
-            let file = OpenOptions::new()
-                .append(true)
-                .open(&self.filename)
-                .expect("Failed to open JSON file");
+        let runtime = current_time() - self.base.start_time();
+        if (self.log_record)(&runtime) {
             let line = json!({
-                "run_time": cur_time - self.base.start_time(),
+                "run_time": runtime,
                 "clients": self.base.client_stats().len(),
                 "corpus": self.base.corpus_size(),
                 "objectives": self.base.objective_size(),
@@ -205,8 +207,7 @@ where
                 "exec_sec": self.base.execs_per_sec(),
                 "clients": &self.client_stats()[1..]
             });
-            writeln!(&file, "{}", line).expect("Unable to write JSON to file");
-            self.last_update = cur_time;
+            writeln!(&self.file, "{}", line).expect("Unable to write JSON to file");
         }
         self.base.display(event_msg, sender_id);
     }
