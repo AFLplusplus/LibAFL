@@ -5,30 +5,29 @@ use alloc::{
     vec::Vec,
 };
 use core::{hash::Hash, marker::PhantomData};
-use std::time::{Duration, Instant};
 
 use hashbrown::{HashMap, HashSet};
+use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
-    bolts::{AsIter, HasLen},
+    bolts::AsIter,
     corpus::Corpus,
     events::EventManager,
     executors::{Executor, HasObservers},
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
-    schedulers::Scheduler,
-    state::HasCorpus,
+    schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
+    state::{HasCorpus, HasMetadata},
     Error, Evaluator, HasScheduler,
 };
 
-pub trait CorpusMinimiser<I, O>
+pub trait CorpusMinimizer<I, S>
 where
     I: Input,
+    S: HasCorpus<I>,
 {
-    fn new(obs: &O) -> Self;
-
-    fn minimise<CS, EX, EM, OT, S, Z>(
+    fn minimize<CS, EX, EM, OT, Z>(
         &self,
         fuzzer: &mut Z,
         executor: &mut EX,
@@ -40,37 +39,50 @@ where
         EX: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         EM: EventManager<EX, I, S, Z>,
         OT: ObserversTuple<I, S>,
-        S: HasCorpus<I>,
         Z: Evaluator<EX, EM, I, S> + HasScheduler<CS, I, S>;
 }
 
 #[derive(Debug)]
-pub struct MapCorpusMinimiser<I, O, W>
-where
-    I: Input,
-    W: InputWeigher<I>,
-{
-    obs_name: String,
-    phantom: PhantomData<(I, O, W)>,
-}
-
-pub type StdCorpusMinimiser<I, O> = MapCorpusMinimiser<I, O, TimeLenInputWeigher<I>>;
-
-impl<E, I, O, W> CorpusMinimiser<I, O> for MapCorpusMinimiser<I, O, W>
+pub struct MapCorpusMinimizer<E, I, O, S, TS>
 where
     E: Copy + Hash + Eq,
     I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
-    W: InputWeigher<I>,
+    S: HasMetadata + HasCorpus<I>,
+    TS: TestcaseScore<I, S>,
 {
-    fn new(obs: &O) -> Self {
+    obs_name: String,
+    phantom: PhantomData<(E, I, O, S, TS)>,
+}
+
+pub type StdCorpusMinimizer<E, I, O, S> =
+    MapCorpusMinimizer<E, I, O, S, LenTimeMulTestcaseScore<I, S>>;
+
+impl<E, I, O, S, TS> MapCorpusMinimizer<E, I, O, S, TS>
+where
+    E: Copy + Hash + Eq,
+    I: Input,
+    for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
+    S: HasMetadata + HasCorpus<I>,
+    TS: TestcaseScore<I, S>,
+{
+    pub fn new(obs: &O) -> Self {
         Self {
             obs_name: obs.name().to_string(),
             phantom: PhantomData,
         }
     }
+}
 
-    fn minimise<CS, EX, EM, OT, S, Z>(
+impl<E, I, O, S, TS> CorpusMinimizer<I, S> for MapCorpusMinimizer<E, I, O, S, TS>
+where
+    E: Copy + Hash + Eq,
+    I: Input,
+    for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
+    S: HasMetadata + HasCorpus<I>,
+    TS: TestcaseScore<I, S>,
+{
+    fn minimize<CS, EX, EM, OT, Z>(
         &self,
         fuzzer: &mut Z,
         executor: &mut EX,
@@ -82,7 +94,6 @@ where
         EX: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         EM: EventManager<EX, I, S, Z>,
         OT: ObserversTuple<I, S>,
-        S: HasCorpus<I>,
         Z: Evaluator<EX, EM, I, S> + HasScheduler<CS, I, S>,
     {
         let cfg = Config::default();
@@ -93,18 +104,20 @@ where
         let mut cov_map = HashMap::new();
 
         for idx in 0..state.corpus().count() {
-            let input = state
-                .corpus()
-                .get(idx)?
-                .borrow()
-                .input()
-                .as_ref()
-                .expect("Input should be present")
-                .clone();
+            let (weight, input) = {
+                let mut testcase = state.corpus().get(idx)?.borrow_mut();
+                let weight = TS::compute(&mut *testcase, state)?
+                    .to_u64()
+                    .expect("Weight must be computable.");
+                let input = testcase
+                    .input()
+                    .as_ref()
+                    .expect("Input must be available.")
+                    .clone();
+                (weight, input)
+            };
             executor.observers_mut().pre_exec_all(state, &input)?;
-            let start = Instant::now();
             let kind = executor.run_target(fuzzer, state, manager, &input)?;
-            let exec_time = Instant::now() - start;
             executor
                 .observers_mut()
                 .post_exec_all(state, &input, &kind)?;
@@ -123,7 +136,8 @@ where
                     .or_insert_with(|| HashSet::new())
                     .insert(seed_expr.clone());
             }
-            seed_exprs.insert(seed_expr, (idx, W::weigh_input(&input, exec_time)?));
+
+            seed_exprs.insert(seed_expr, (idx, weight));
         }
 
         for (_, cov) in cov_map {
@@ -154,41 +168,9 @@ where
             }
             Ok(())
         } else {
-            Err(Error::unknown("Corpus minimisation failed; unsat."))
+            Err(Error::unknown("Corpus minimization failed; unsat."))
         };
 
         res
-    }
-}
-
-pub trait InputWeigher<I> {
-    fn weigh_input(input: &I, execution_time: Duration) -> Result<u64, Error>;
-}
-
-#[derive(Debug)]
-pub struct TimeInputWeigher<I> {
-    phantom: PhantomData<I>,
-}
-
-impl<I> InputWeigher<I> for TimeInputWeigher<I> {
-    fn weigh_input(_: &I, execution_time: Duration) -> Result<u64, Error> {
-        Ok(execution_time.as_millis().try_into()?)
-    }
-}
-
-#[derive(Debug)]
-pub struct TimeLenInputWeigher<I>
-where
-    I: HasLen,
-{
-    phantom: PhantomData<I>,
-}
-
-impl<I> InputWeigher<I> for TimeLenInputWeigher<I>
-where
-    I: HasLen,
-{
-    fn weigh_input(input: &I, execution_time: Duration) -> Result<u64, Error> {
-        Ok(TimeInputWeigher::weigh_input(input, execution_time)? * u64::try_from(input.len())?)
     }
 }

@@ -15,12 +15,12 @@ pub use ondisk::OnDiskCorpus;
 pub mod cached;
 
 #[cfg(feature = "cmin")]
-pub mod minimisation;
-
+pub mod minimizer;
 use core::cell::RefCell;
 
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
+pub use minimizer::*;
 
 use crate::{inputs::Input, Error};
 

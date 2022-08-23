@@ -17,7 +17,7 @@ use libafl::{
         AsSlice,
     },
     corpus::{
-        minimisation::{CorpusMinimiser, StdCorpusMinimiser},
+        minimizer::{CorpusMinimizer, StdCorpusMinimizer},
         Corpus, InMemoryCorpus, OnDiskCorpus,
     },
     events::{setup_restarting_mgr_std, EventConfig, EventFirer, EventRestarter, LogSeverity},
@@ -85,7 +85,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
     let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
 
-    let minimiser = StdCorpusMinimiser::new(&edges_observer);
+    let minimizer = StdCorpusMinimizer::new(&edges_observer);
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -214,7 +214,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let orig_size = state.corpus().count();
     let msg = "Started distillation...".to_string();
     restarting_mgr.log(&mut state, LogSeverity::Info, msg)?;
-    minimiser.minimise(&mut fuzzer, &mut executor, &mut restarting_mgr, &mut state)?;
+    minimizer.minimize(&mut fuzzer, &mut executor, &mut restarting_mgr, &mut state)?;
     let msg = format!("Distilled out {} cases", orig_size - state.corpus().count());
     restarting_mgr.log(&mut state, LogSeverity::Info, msg)?;
 

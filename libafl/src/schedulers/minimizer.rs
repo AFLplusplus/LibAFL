@@ -2,7 +2,7 @@
 //! with testcases only from a subset of the total corpus.
 
 use alloc::vec::Vec;
-use core::marker::PhantomData;
+use core::{cmp::Ordering, marker::PhantomData};
 
 use hashbrown::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
@@ -129,10 +129,13 @@ where
                 // manual set intersection
                 let mut entry = e_iter.next();
                 let mut map_entry = map_iter.next();
-                loop {
-                    if let Some(e) = entry {
-                        if let Some(me) = map_entry {
-                            if e == me {
+                while let Some(e) = entry {
+                    if let Some(me) = map_entry {
+                        match e.cmp(me) {
+                            Ordering::Less => {
+                                entry = e_iter.next();
+                            }
+                            Ordering::Equal => {
                                 // if we found a better factor, prefer it
                                 map.entry(*e)
                                     .and_modify(|(f, idx)| {
@@ -142,13 +145,10 @@ where
                                         }
                                     })
                                     .or_insert((factor, i));
-                            } else if e < me {
-                                entry = e_iter.next();
-                            } else {
+                            }
+                            Ordering::Greater => {
                                 map_entry = map_iter.next();
                             }
-                        } else {
-                            break;
                         }
                     } else {
                         break;
