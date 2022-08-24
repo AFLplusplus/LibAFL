@@ -13,6 +13,9 @@ script='''
 echo "Cargo-make not integrated yet on this platform"
 '''
 
+[tasks.build]
+dependencies = [ "libxml2" ]
+
 [tasks.libxml2]
 linux_alias = "libxml2_unix"
 mac_alias = "unsupported"
