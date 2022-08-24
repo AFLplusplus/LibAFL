@@ -33,7 +33,7 @@ do
     
     	# only test on linux
     	if [[ $(uname -s) == "Linux" ]]; then
-		cd "$fuzzer" || exit 1
+		    cd "$fuzzer" || exit 1
 			if [ "$1" != "--no-fmt" ]; then
 			    echo "[*] Checking fmt for $fuzzer"
 			    cargo fmt --all -- --check || exit 1
@@ -45,10 +45,6 @@ do
             cargo make build
 		    cd - || exit
 	    fi
-        continue
-    
-    # todo: remove this else branch
-    else
         continue
     fi
 
