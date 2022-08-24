@@ -166,8 +166,8 @@ where
         for (seed, (_, weight)) in &seed_exprs {
             // opt will attempt to minimise the number of violated assertions.
             //
-            // To tell opt to maximize the number of not seeds, we tell opt to minimize the number
-            // of not seeds.
+            // To tell opt to minimize the number of seeds, we tell opt to maximize the number of
+            // not seeds.
             //
             // Additionally, each seed has a weight associated with them; the higher, the more z3
             // doesn't want to violate the assertion. Thus, inputs which have higher weights will be
