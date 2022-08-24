@@ -728,7 +728,7 @@ impl Emulator {
     pub fn load_addr(&self) -> GuestAddr {
         unsafe { libafl_load_addr() as GuestAddr }
     }
-    #[cfg(feature = "systemmode")]
+    #[cfg(emulation_mode = "systemmode")]
     #[must_use]
     pub fn load_addr(&self) -> GuestAddr {
         // Only work if the binary is linked to the correct address and not pie

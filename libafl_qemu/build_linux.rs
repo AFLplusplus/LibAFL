@@ -29,10 +29,10 @@ macro_rules! assert_unique_feature {
 pub fn build() {
     // Make sure that exactly one qemu mode is set
     assert_unique_feature!("usermode", "systemmode");
-    let emulation_mode = if cfg!(feature = "systemmode") {
-        "systemmode".to_string()
-    }else if cfg!(feature = "usermode") {
+    let emulation_mode = if cfg!(feature = "usermode") {
         "usermode".to_string()
+    }else if cfg!(feature = "systemmmode") {
+        "systemmmode".to_string()
     }else{
         env::var("EMULATION_MODE").unwrap_or_else(|_| {
             println!(
