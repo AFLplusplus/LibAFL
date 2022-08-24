@@ -31,8 +31,8 @@ pub fn build() {
     assert_unique_feature!("usermode", "systemmode");
     let emulation_mode = if cfg!(feature = "usermode") {
         "usermode".to_string()
-    }else if cfg!(feature = "systemmmode") {
-        "systemmmode".to_string()
+    }else if cfg!(feature = "systemmode") {
+        "systemmode".to_string()
     }else{
         env::var("EMULATION_MODE").unwrap_or_else(|_| {
             println!(
