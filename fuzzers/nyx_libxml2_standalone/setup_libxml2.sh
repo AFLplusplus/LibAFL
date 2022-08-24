@@ -1,8 +1,11 @@
 #!/bin/sh
-cargo build --release
-PWD=$(pwd)
-export CC="$PWD/target/release/libafl_cc"
-export CXX="$PWD/target/release/libafl_cxx"
+# cargo build --release
+# PWD=$(pwd)
+# export CC="$PWD/target/release/libafl_cc"
+# export CXX="$PWD/target/release/libafl_cxx"
+
+export CC=afl-clang-fast
+export CXX=afl-clang-fast++
 curl -C - https://gitlab.gnome.org/GNOME/libxml2/-/archive/v2.9.14/libxml2-v2.9.14.tar.gz --output libxml2-v2.9.14.tar.gz
 tar -xvf ./libxml2-v2.9.14.tar.gz  --transform s/libxml2-v2.9.14/libxml2/ || exit
 cd ./libxml2/ || exit

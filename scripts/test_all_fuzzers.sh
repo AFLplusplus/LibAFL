@@ -43,7 +43,12 @@ do
 			    echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
 			fi
 		cd - || exit
-	fi
+        cargo make
+	    fi
+        continue
+    
+    # todo: remove this else branch
+    else
         continue
     fi
 
