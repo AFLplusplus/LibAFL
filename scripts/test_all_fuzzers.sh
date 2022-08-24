@@ -42,8 +42,8 @@ do
 			else
 			    echo "[+] Skipping fmt and clippy for $fuzzer (--no-fmt specified)"
 			fi
-		cd - || exit
-        cargo make
+            cargo make
+		    cd - || exit
 	    fi
         continue
     
