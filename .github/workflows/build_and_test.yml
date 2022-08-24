@@ -156,7 +156,7 @@ jobs:
         # update bash for macos to support `declare -A` command`
         macos: llvm libpng nasm coreutils z3 bash
     - name: pip install
-      run: pip install msgack jinja2
+      run: python3 -m pip install msgpack jinja2
     - name: install cargo-make
       uses: baptiste0928/cargo-install@v1.3.0
       with:
