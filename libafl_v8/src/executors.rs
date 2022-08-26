@@ -3,98 +3,132 @@ use core::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
 };
-use std::iter;
+use std::{
+    borrow::{Borrow, BorrowMut},
+    cell::RefCell,
+    iter,
+    rc::Rc,
+    sync::Arc,
+};
 
+use deno_core::{v8, JsRuntime, ModuleId, ModuleSpecifier};
+use deno_runtime::worker::MainWorker;
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{BytesInput, HasBytesVec, Input},
     observers::ObserversTuple,
+    state::State,
     Error,
 };
-pub use v8;
+use tokio::{runtime, runtime::Runtime};
 use v8::{
-    ArrayBuffer, ContextScope, Function, HandleScope, Local, Script, TryCatch, Uint8Array, Value,
+    ArrayBuffer, Context, ContextScope, Function, HandleScope, Local, Script, TryCatch, Uint8Array,
+    Value,
 };
 
-pub struct V8Executor<'s1, 's2, EM, I, OT, S, Z>
+use crate::{v8::Global, Mutex};
+
+pub struct V8Executor<'rt, EM, I, OT, S, Z>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
+    S: State,
 {
-    scope: ContextScope<'s1, HandleScope<'s2>>,
-    source: String,
+    id: ModuleId,
     observers: OT,
+    rt: &'rt Runtime,
+    worker: Arc<Mutex<MainWorker>>,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl<'s1, 's2, EM, I, OT, S, Z> V8Executor<'s1, 's2, EM, I, OT, S, Z>
+impl<'rt, EM, I, OT, S, Z> V8Executor<'rt, EM, I, OT, S, Z>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
+    S: State,
 {
-    /// Create a new V8 executor. You MUST invoke `initialize_v8` before using this method.
+    /// Create a new V8 executor.
     pub fn new(
-        mut scope: ContextScope<'s1, HandleScope<'s2>>,
-        source: &str,
+        rt: &'rt Runtime,
+        worker: Arc<Mutex<MainWorker>>,
+        main_module: ModuleSpecifier,
         observers: OT,
-        fuzzer: &mut Z,
-        state: &mut S,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _mgr: &mut EM,
     ) -> Result<Self, Error> {
-        v8::V8::assert_initialized();
-        // run the script to initialise the program
-        {
-            let code = v8::String::new(&mut scope, source).unwrap();
+        let copy = worker.clone();
+        let id = match rt.block_on(async {
+            let mut locked = copy.lock().await;
+            let mod_id = locked.preload_main_module(&main_module).await?;
+            let handle = locked.js_runtime.mod_evaluate(mod_id);
+            locked.run_event_loop(false).await?;
+            handle.await??;
 
-            let mut scope = TryCatch::new(&mut scope);
+            Ok::<ModuleId, deno_core::anyhow::Error>(mod_id)
+        }) {
+            Err(e) => return Err(Error::unknown(e.to_string())),
+            Ok(id) => id,
+        };
 
-            let script = Script::compile(&mut scope, code, None).unwrap();
-            script.run(&mut scope);
-
-            if let Some(err) = js_err_to_libafl(&mut scope) {
-                return Err(err);
-            }
-        }
-
-        get_harness_func(&mut scope)?; // check that the fuzz harness exists
         Ok(Self {
-            scope,
-            source: source.to_string(),
+            id,
             observers,
+            rt,
+            worker,
             phantom: Default::default(),
+        })
+    }
+
+    fn invoke_harness_func(&self, input: &I) -> Result<ExitKind, Error> {
+        let id = self.id;
+        let copy = self.worker.clone();
+        self.rt.block_on(async {
+            let mut locked = copy.lock().await;
+
+            let res = {
+                let module_namespace = locked.js_runtime.get_module_namespace(id).unwrap();
+                let mut scope = locked.js_runtime.handle_scope();
+                let module_namespace = Local::<v8::Object>::new(&mut scope, module_namespace);
+
+                let default_export_name = v8::String::new(&mut scope, "default").unwrap();
+                let harness = module_namespace
+                    .get(&mut scope, default_export_name.into())
+                    .unwrap();
+
+                match Local::<Function>::try_from(harness) {
+                    Ok(func) => {
+                        let recv = v8::undefined(&mut scope);
+                        let try_catch = &mut TryCatch::new(&mut scope);
+                        let input = input.to_js_value(try_catch)?;
+                        let res = func.call(try_catch, recv.into(), &[input]);
+                        if res.is_none() {
+                            println!("{}", js_err_to_libafl(try_catch).unwrap().to_string());
+                            Ok(ExitKind::Crash)
+                        } else {
+                            Ok(ExitKind::Ok)
+                        }
+                    }
+                    Err(e) => Err(Error::illegal_state(format!(
+                        "The default export of the fuzz harness module is not a function: {}",
+                        e.to_string(),
+                    ))),
+                }
+            };
+
+            if let Err(e) = locked.run_event_loop(false).await {
+                return Err(Error::illegal_state(e.to_string()));
+            }
+            res
         })
     }
 }
 
-fn get_harness_func<'s1, 's2>(
-    scope: &mut ContextScope<'s1, HandleScope<'s2>>,
-) -> Result<Local<'s1, Function>, Error> {
-    let global = scope.get_current_context().global(scope);
-    let harness_name = Local::from(v8::String::new(scope, "LLVMFuzzerTestOneInput").unwrap());
-    let func = global.get(scope, harness_name);
-    let func = if let Some(func) = func {
-        func
-    } else {
-        return Err(Error::illegal_state(
-            "LLVMFuzzerTestOneInput not defined in JS harness",
-        ));
-    };
-
-    match Local::<Function>::try_from(func) {
-        Ok(func) => {
-            // good to go!
-            Ok(func)
-        }
-        _ => Err(Error::illegal_state(
-            "LLVMFuzzerTestOneInput is defined in JS harness, but wasn't a function",
-        )),
-    }
-}
-
-impl<'s1, 's2, EM, I, OT, S, Z> Executor<EM, I, S, Z> for V8Executor<'s1, 's2, EM, I, OT, S, Z>
+impl<'rt, EM, I, OT, S, Z> Executor<EM, I, S, Z> for V8Executor<'rt, EM, I, OT, S, Z>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
+    S: State,
 {
     fn run_target(
         &mut self,
@@ -103,27 +137,15 @@ where
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let harness = get_harness_func(&mut self.scope)?;
-
-        let scope = &mut HandleScope::new(&mut self.scope);
-        let recv = v8::undefined(scope);
-        let try_catch = &mut TryCatch::new(scope);
-
-        let input = input.to_js_value(try_catch)?;
-        let res = if harness.call(try_catch, recv.into(), &[input]).is_none() {
-            Ok(ExitKind::Crash)
-        } else {
-            Ok(ExitKind::Ok)
-        };
-
-        res
+        self.invoke_harness_func(input)
     }
 }
 
-impl<'s1, 's2, EM, I, OT, S, Z> HasObservers<I, OT, S> for V8Executor<'s1, 's2, EM, I, OT, S, Z>
+impl<'rt, EM, I, OT, S, Z> HasObservers<I, OT, S> for V8Executor<'rt, EM, I, OT, S, Z>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
+    S: State,
 {
     fn observers(&self) -> &OT {
         &self.observers
@@ -134,14 +156,14 @@ where
     }
 }
 
-impl<'s1, 's2, EM, I, OT, S, Z> Debug for V8Executor<'s1, 's2, EM, I, OT, S, Z>
+impl<'rt, EM, I, OT, S, Z> Debug for V8Executor<'rt, EM, I, OT, S, Z>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
+    S: State,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("V8Executor")
-            .field("source", &self.source)
             .field("observers", &self.observers)
             .finish_non_exhaustive()
     }
@@ -215,7 +237,6 @@ pub trait IntoJSValue {
 
 impl IntoJSValue for BytesInput {
     fn to_js_value<'s>(&self, scope: &mut HandleScope<'s>) -> Result<Local<'s, Value>, Error> {
-        println!("{}: {:?}", self.bytes().len(), self);
         let store = ArrayBuffer::new_backing_store_from_vec(Vec::from(self.bytes())).make_shared();
         let buffer = ArrayBuffer::with_backing_store(scope, &store);
         let array = Uint8Array::new(scope, buffer, 0, self.bytes().len()).unwrap();

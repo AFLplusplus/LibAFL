@@ -71,7 +71,16 @@ missing_docs,
 #![allow(clippy::borrow_deref_ref)]
 
 pub mod executors;
-pub mod handlers;
+pub mod observers;
 
+pub use deno_core::{self, v8};
+pub use deno_runtime;
 pub use executors::*;
-pub use handlers::*;
+pub use observers::*;
+pub use tokio::{runtime, sync::Mutex};
+
+pub(crate) fn forbid_deserialization<T>() -> T {
+    unimplemented!(
+        "Deserialization is forbidden for this type; cannot cross a serialization boundary"
+    )
+}

@@ -6,5 +6,6 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1"
 libafl = { path = "../../libafl" }
 libafl_v8 = { path = "../../libafl_v8" }
