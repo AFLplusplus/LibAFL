@@ -697,6 +697,72 @@ mod freebsd {
     }
 }
 
+// NetBSD Section
+
+#[cfg(target_os = "netbsd")]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    netbsd::get_core_ids()
+}
+
+#[cfg(target_os = "netbsd")]
+#[inline]
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    netbsd::set_for_current(core_id)
+}
+
+#[cfg(target_os = "netbsd")]
+mod netbsd {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use libc::{_cpuset, pthread_self, pthread_setaffinity_np};
+
+    use super::CoreId;
+    use crate::Error;
+
+    extern "C" {
+        fn _cpuset_create() -> *mut _cpuset;
+        fn _cpuset_destroy(c: *mut _cpuset);
+        fn _cpuset_set(i: usize, c: *mut _cpuset) -> i32;
+        fn _cpuset_size(c: *const _cpuset) -> usize;
+    }
+
+    #[allow(trivial_numeric_casts)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+        let set = new_cpuset();
+
+        unsafe { _cpuset_set(core_id.id, set) };
+        // Set the current thread's core affinity.
+        let result = unsafe {
+            pthread_setaffinity_np(
+                pthread_self(), // Defaults to current thread
+                _cpuset_size(set),
+                set,
+            )
+        };
+
+        unsafe { _cpuset_destroy(set) };
+
+        if result < 0 {
+            Err(Error::unknown("Failed to set_for_current"))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn new_cpuset() -> *mut _cpuset {
+        unsafe { _cpuset_create() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::thread::available_parallelism;
