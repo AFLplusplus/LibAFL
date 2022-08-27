@@ -221,10 +221,10 @@ pub trait HasShMemProvider {
     type ShMemProvider: ShMemProvider;
 
     /// Borrows the [`ShMemProvider`]
-    fn shmem_provider() -> &Self::ShMemProvider;
+    fn shmem_provider<'a>() -> &'a Self::ShMemProvider;
 
     /// Borrows the [`ShMemProvider`] (mut)
-    fn shmem_provider_mut() -> &mut Self::ShMemProvider;
+    fn shmem_provider_mut<'a>() -> &'a mut Self::ShMemProvider;
 
 }
 

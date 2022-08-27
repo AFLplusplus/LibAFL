@@ -340,7 +340,7 @@ where
     O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    Self::State: HasNamedMetadata,
+    <Self as Feedback>::State: HasNamedMetadata,
 {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
@@ -565,7 +565,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
-    Self::State: HasNamedMetadata,
+    <Self as Feedback>::State: HasNamedMetadata,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -580,7 +580,7 @@ where
     N: IsNovel<T>,
     O: MapObserver<Item = T>,
     for<'it> O: AsIter<'it, Item = T>,
-    Self::State: HasNamedMetadata,
+    <Self as Feedback>::State: HasNamedMetadata,
 {
     #[inline]
     fn observer_name(&self) -> &str {
@@ -600,7 +600,7 @@ where
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
-    Self::State: HasNamedMetadata + HasClientPerfMonitor + Debug,
+    <Self as Feedback>::State: HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -799,7 +799,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        testcase: &mut Testcase<I>,
+        testcase: &mut Testcase<Self::Input>,
     ) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));

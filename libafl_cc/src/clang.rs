@@ -87,7 +87,7 @@ impl CompilerWrapper for ClangWrapper {
     #[allow(clippy::too_many_lines)]
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         let mut new_args: Vec<String> = vec![];
         if args.is_empty() {
@@ -230,7 +230,7 @@ impl CompilerWrapper for ClangWrapper {
 
     fn add_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         self.base_args.push(arg.as_ref().to_string());
         self
@@ -238,7 +238,7 @@ impl CompilerWrapper for ClangWrapper {
 
     fn add_cc_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         self.cc_args.push(arg.as_ref().to_string());
         self
@@ -246,7 +246,7 @@ impl CompilerWrapper for ClangWrapper {
 
     fn add_link_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         self.link_args.push(arg.as_ref().to_string());
         self
@@ -254,7 +254,7 @@ impl CompilerWrapper for ClangWrapper {
 
     fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         let lib_file = dir
             .join(format!("{}{}.{}", LIB_PREFIX, name.as_ref(), LIB_EXT))
@@ -429,7 +429,7 @@ impl ClangWrapper {
     /// Add LLVM pass arguments
     pub fn add_passes_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         self.passes_args.push(arg.as_ref().to_string());
         self

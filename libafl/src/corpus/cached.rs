@@ -11,7 +11,6 @@ use crate::{
         ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
         Corpus, Testcase,
     },
-    inputs::Input,
     Error,
 };
 

@@ -4,7 +4,6 @@ use alloc::{boxed::Box, vec::Vec};
 
 use crate::{
     bolts::anymap::AsAny,
-    events::Event,
     prelude::State,
     stages::{Stage, StagesTuple},
     Error,

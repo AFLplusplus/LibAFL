@@ -101,6 +101,16 @@ fn find_macos_sdk_libs() -> String {
     )
 }
 
+fn find_llvm_version() -> Option<i32> {
+    let output = exec_llvm_config(&["--version"]);
+    if let Some(major) = output.split('.').collect::<Vec<&str>>().first() {
+        if let Ok(res) = major.parse::<i32>() {
+            return Some(res);
+        }
+    }
+    None
+}
+
 fn build_pass(
     bindir_path: &Path,
     out_dir: &Path,

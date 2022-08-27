@@ -5,17 +5,15 @@ use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
-    events::EventManager,
-    executors::{Executor, HasObservers},
+    executors::HasObservers,
     fuzzer::Evaluator,
-    inputs::Input,
     mutators::Mutator,
-    observers::{MapObserver, ObserversTuple},
+    observers::MapObserver,
     schedulers::{
         powersched::SchedulerMetadata, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
     },
     stages::{MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata},
     Error,
 };
 /// The mutational stage using power schedules

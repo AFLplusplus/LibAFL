@@ -183,7 +183,7 @@ impl Error {
     #[must_use]
     pub fn serialize<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::Serialize(arg.into(), ErrorBacktrace::new())
     }
@@ -203,7 +203,7 @@ impl Error {
     #[must_use]
     pub fn empty_optional<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::EmptyOptional(arg.into(), ErrorBacktrace::new())
     }
@@ -211,7 +211,7 @@ impl Error {
     #[must_use]
     pub fn key_not_found<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::KeyNotFound(arg.into(), ErrorBacktrace::new())
     }
@@ -219,7 +219,7 @@ impl Error {
     #[must_use]
     pub fn empty<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::Empty(arg.into(), ErrorBacktrace::new())
     }
@@ -227,7 +227,7 @@ impl Error {
     #[must_use]
     pub fn iterator_end<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::IteratorEnd(arg.into(), ErrorBacktrace::new())
     }
@@ -235,7 +235,7 @@ impl Error {
     #[must_use]
     pub fn not_implemented<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::NotImplemented(arg.into(), ErrorBacktrace::new())
     }
@@ -243,7 +243,7 @@ impl Error {
     #[must_use]
     pub fn illegal_state<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::IllegalState(arg.into(), ErrorBacktrace::new())
     }
@@ -251,7 +251,7 @@ impl Error {
     #[must_use]
     pub fn illegal_argument<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::IllegalArgument(arg.into(), ErrorBacktrace::new())
     }
@@ -264,7 +264,7 @@ impl Error {
     #[must_use]
     pub fn unsupported<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::Unsupported(arg.into(), ErrorBacktrace::new())
     }
@@ -272,7 +272,7 @@ impl Error {
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Error::Unknown(arg.into(), ErrorBacktrace::new())
     }

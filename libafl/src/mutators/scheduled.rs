@@ -13,7 +13,6 @@ use crate::{
         AsMutSlice, AsSlice,
     },
     corpus::Corpus,
-    inputs::Input,
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,

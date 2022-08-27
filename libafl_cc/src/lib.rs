@@ -95,27 +95,27 @@ pub trait CompilerWrapper {
     /// Set the wrapper arguments parsing a command line set of arguments
     fn parse_args<S>(&mut self, args: &[S]) -> Result<&'_ mut Self, Error>
     where
-        Self::State: AsRef<str>;
+        S: AsRef<str>;
 
     /// Add a compiler argument
     fn add_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>;
+        S: AsRef<str>;
 
     /// Add a compiler argument only when compiling
     fn add_cc_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>;
+        S: AsRef<str>;
 
     /// Add a compiler argument only when linking
     fn add_link_arg<S>(&mut self, arg: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>;
+        S: AsRef<str>;
 
     /// Add compiler arguments
     fn add_args<S>(&mut self, args: &[S]) -> &'_ mut Self
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         for arg in args {
             self.add_arg(arg);
@@ -126,7 +126,7 @@ pub trait CompilerWrapper {
     /// Add compiler arguments only when compiling
     fn add_cc_args<S>(&mut self, args: &[S]) -> &'_ mut Self
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         for arg in args {
             self.add_cc_arg(arg);
@@ -137,7 +137,7 @@ pub trait CompilerWrapper {
     /// Add compiler arguments only when linking
     fn add_link_args<S>(&mut self, args: &[S]) -> &'_ mut Self
     where
-        Self::State: AsRef<str>,
+        S: AsRef<str>,
     {
         for arg in args {
             self.add_link_arg(arg);
@@ -148,7 +148,7 @@ pub trait CompilerWrapper {
     /// Link static C lib
     fn link_staticlib<S>(&mut self, dir: &Path, name: S) -> &'_ mut Self
     where
-        Self::State: AsRef<str>;
+        S: AsRef<str>;
 
     /// Command to run the compiler
     fn command(&mut self) -> Result<Vec<String>, Error>;

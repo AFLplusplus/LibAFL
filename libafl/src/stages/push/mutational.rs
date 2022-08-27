@@ -20,6 +20,8 @@ use crate::{
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
+use super::StdPushStageHelper;
+
 /// The default maximum number of mutations to perform per input.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 /// A Mutational push stage is the stage in a fuzzing run that mutates inputs.
@@ -213,7 +215,7 @@ where
     ) -> Self {
         Self {
             mutator,
-            psh: PushStageHelperType::new(shared_state, exit_kind),
+            psh: StdPushStageHelper::new(shared_state, exit_kind),
             current_corpus_idx: None, // todo
             testcases_to_do: 0,
             testcases_done: 0,

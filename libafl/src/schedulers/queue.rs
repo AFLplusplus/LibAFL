@@ -2,7 +2,7 @@
 
 use alloc::borrow::ToOwned;
 
-use crate::{corpus::Corpus, inputs::Input, schedulers::Scheduler, state::HasCorpus, Error};
+use crate::{corpus::Corpus, schedulers::Scheduler, state::HasCorpus, Error};
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]

@@ -25,7 +25,7 @@ where
     /// Serialize the type
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        Self::State: Serializer,
+        S: Serializer,
     {
         erased_serde::serialize(self.0, serializer)
     }
@@ -577,7 +577,7 @@ macro_rules! create_serde_registry_for_trait {
         impl Serialize for dyn $trait_name {
             fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
             where
-                Self::State: Serializer,
+                S: Serializer,
             {
                 use serde::ser::SerializeSeq;
 

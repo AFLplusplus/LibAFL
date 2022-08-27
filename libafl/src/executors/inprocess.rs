@@ -311,7 +311,7 @@ impl InProcessHandlers {
         OT: ObserversTuple,
         EM: EventFirer + EventRestarter,
         OF: Feedback,
-        Self::State: HasSolutions + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         Z: HasObservers,
         H: FnMut(&I) -> ExitKind + ?Sized,
     {
@@ -583,7 +583,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        Self::State: HasSolutions + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -658,7 +658,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        Self::State: HasSolutions + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -738,7 +738,7 @@ mod unix_signal_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        Self::State: HasSolutions + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {

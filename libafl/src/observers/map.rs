@@ -11,7 +11,6 @@ use core::{
     marker::PhantomData,
     slice::{from_raw_parts, Iter, IterMut},
 };
-use tui::widgets::canvas::Map;
 
 use ahash::AHasher;
 use intervaltree::IntervalTree;
@@ -355,7 +354,7 @@ where
     #[must_use]
     pub fn new<S>(name: S, map: &'a mut [<Self as MapObserver>::Item]) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Self {
             map: OwnedSliceMut::from(map),
@@ -368,7 +367,7 @@ where
     #[must_use]
     pub fn new_owned<S>(name: S, map: Vec<<Self as MapObserver>::Item>) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         Self {
             map: OwnedSliceMut::from(map),
@@ -387,7 +386,7 @@ where
         map: OwnedSliceMut<'a, <Self as MapObserver>::Item>,
     ) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
         <Self as MapObserver>::Item: Default,
     {
         Self {
@@ -407,7 +406,7 @@ where
         len: usize,
     ) -> Self
     where
-        Self::State: Into<String>,
+        S: Into<String>,
     {
         StdMapObserver {
             map: OwnedSliceMut::from_raw_parts_mut(map_ptr, len),

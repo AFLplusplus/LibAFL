@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
-    inputs::Input,
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata},
     Error,

@@ -14,7 +14,6 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::Input,
     observers::{Observer, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata},
     Error,

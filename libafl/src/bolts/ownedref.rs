@@ -41,7 +41,7 @@ where
 {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
-        Self::State: Serializer,
+        S: Serializer,
     {
         match self {
             OwnedRef::Ref(r) => r.serialize(se),
@@ -109,7 +109,7 @@ pub enum OwnedRefMut<'a, T: 'a + ?Sized> {
 impl<'a, T: 'a + ?Sized + Serialize> Serialize for OwnedRefMut<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
-        Self::State: Serializer,
+        S: Serializer,
     {
         match self {
             OwnedRefMut::Ref(r) => r.serialize(se),
@@ -185,7 +185,7 @@ enum OwnedSliceInner<'a, T: 'a + Sized> {
 impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceInner<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
-        Self::State: Serializer,
+        S: Serializer,
     {
         match self {
             OwnedSliceInner::RefRaw(rr, len) => unsafe {
@@ -346,7 +346,7 @@ pub enum OwnedSliceMutInner<'a, T: 'a + Sized> {
 impl<'a, T: 'a + Sized + Serialize> Serialize for OwnedSliceMutInner<'a, T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
-        Self::State: Serializer,
+        S: Serializer,
     {
         match self {
             OwnedSliceMutInner::RefRaw(rr, len) => {
@@ -523,7 +523,7 @@ pub enum OwnedPtr<T: Sized> {
 impl<T: Sized + Serialize> Serialize for OwnedPtr<T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
-        Self::State: Serializer,
+        S: Serializer,
     {
         self.as_ref().serialize(se)
     }
@@ -584,7 +584,7 @@ pub enum OwnedPtrMut<T: Sized> {
 impl<T: Sized + Serialize> Serialize for OwnedPtrMut<T> {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
-        Self::State: Serializer,
+        S: Serializer,
     {
         self.as_ref().serialize(se)
     }

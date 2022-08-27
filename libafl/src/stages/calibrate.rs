@@ -1,7 +1,7 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
 use alloc::string::{String, ToString};
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use core::{fmt::Debug, time::Duration};
 
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
@@ -15,8 +15,6 @@ use crate::{
         map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
         HasObserverName,
     },
-    fuzzer::Evaluator,
-    inputs::Input,
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,

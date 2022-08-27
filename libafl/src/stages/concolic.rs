@@ -12,7 +12,7 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     inputs::Input,
-    observers::{concolic::ConcolicObserver, ObserversTuple},
+    observers::concolic::ConcolicObserver,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
@@ -337,7 +337,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 pub struct SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     _phantom: PhantomData<(EM, I, S, Z)>,
 }
@@ -389,7 +389,7 @@ where
 impl<EM, I, S, Z> Default for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    Self::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     fn default() -> Self {
         Self {

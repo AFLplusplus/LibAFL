@@ -19,7 +19,6 @@ use crate::{
     inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
-    prelude::Scheduler,
     stages::Stage,
     start_timer,
     state::{HasCorpus, HasExecutions, HasMetadata},

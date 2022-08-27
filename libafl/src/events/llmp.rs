@@ -560,7 +560,6 @@ where
 
 impl<OT, SP> HasEventManagerId for LlmpEventManager<OT, SP>
 where
-    I: Input,
     OT: ObserversTuple + DeserializeOwned,
     SP: ShMemProvider,
 {

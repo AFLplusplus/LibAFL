@@ -517,24 +517,20 @@ pub type FastOrFeedback<A, B, I, S> = CombinedFeedback<A, B, LogicFastOr>;
 
 /// Compose feedbacks with an `NOT` operation
 #[derive(Clone)]
-pub struct NotFeedback<A, I, S>
+pub struct NotFeedback<A>
 where
     A: Feedback,
-    I: Input,
-    Self::State: HasClientPerfMonitor,
 {
     /// The feedback to invert
     pub first: A,
     /// The name
     name: String,
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<A, I, S> Debug for NotFeedback<A, I, S>
+impl<A> Debug for NotFeedback<A>
 where
-    A: Feedback,
-    I: Input,
-    Self::State: HasClientPerfMonitor,
+    A: Feedback<Input = <Self as Feedback>::Input, State = <Self as Feedback>::State>,
+    <Self as Feedback>::State: HasClientPerfMonitor,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("NotFeedback")
@@ -544,13 +540,12 @@ where
     }
 }
 
-impl<A, I, S> Feedback for NotFeedback<A, I, S>
+impl<A> Feedback for NotFeedback<A>
 where
-    A: Feedback,
-    I: Input,
-    Self::State: HasClientPerfMonitor,
+    A: Feedback<Input = <Self as Feedback>::Input, State = <Self as Feedback>::State>,
+    <Self as Feedback>::State: HasClientPerfMonitor,
 {
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+    fn init_state(&mut self, state: &mut Self::State) -> Result<(), Error> {
         self.first.init_state(state)
     }
 
@@ -576,7 +571,7 @@ where
     fn append_metadata(
         &mut self,
         state: &mut Self::State,
-        testcase: &mut Testcase<I>,
+        testcase: &mut Testcase<Self::Input>,
     ) -> Result<(), Error> {
         self.first.append_metadata(state, testcase)
     }
@@ -591,11 +586,10 @@ where
     }
 }
 
-impl<A, I, S> Named for NotFeedback<A, I, S>
+impl<A> Named for NotFeedback<A>
 where
-    A: Feedback,
-    I: Input,
-    Self::State: HasClientPerfMonitor,
+    A: Feedback<Input = <Self as Feedback>::Input, State = <Self as Feedback>::State>,
+    <Self as Feedback>::State: HasClientPerfMonitor,
 {
     #[inline]
     fn name(&self) -> &str {
@@ -603,11 +597,10 @@ where
     }
 }
 
-impl<A, I, S> NotFeedback<A, I, S>
+impl<A> NotFeedback<A>
 where
-    A: Feedback,
-    I: Input,
-    Self::State: HasClientPerfMonitor,
+    A: Feedback<Input = <Self as Feedback>::Input, State = <Self as Feedback>::State>,
+    <Self as Feedback>::State: HasClientPerfMonitor,
 {
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
@@ -615,7 +608,6 @@ where
         Self {
             first,
             name,
-            phantom: PhantomData,
         }
     }
 }
@@ -838,7 +830,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        testcase: &mut Testcase<I>,
+        testcase: &mut Testcase<Self::Input>,
     ) -> Result<(), Error> {
         *testcase.exec_time_mut() = self.exec_time;
         self.exec_time = None;
