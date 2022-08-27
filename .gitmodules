@@ -1,3 +1,9 @@
 [submodule "libafl_concolic/symcc_runtime/symcc"]
 	path = libafl_concolic/symcc_runtime/symcc
 	url = https://github.com/AFLplusplus/symcc.git
+[submodule "libafl_nyx/QEMU-Nyx"]
+	path = libafl_nyx/QEMU-Nyx
+	url = https://github.com/nyx-fuzz/QEMU-Nyx.git
+[submodule "libafl_nyx/packer"]
+	path = libafl_nyx/packer
+	url = https://github.com/syheliel/packer.git
