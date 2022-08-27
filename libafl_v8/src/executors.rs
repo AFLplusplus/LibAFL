@@ -103,7 +103,6 @@ where
                         let input = input.to_js_value(try_catch)?;
                         let res = func.call(try_catch, recv.into(), &[input]);
                         if res.is_none() {
-                            println!("{}", js_err_to_libafl(try_catch).unwrap().to_string());
                             Ok(ExitKind::Crash)
                         } else {
                             Ok(ExitKind::Ok)

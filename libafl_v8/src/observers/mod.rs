@@ -253,10 +253,6 @@ impl<'rt, I, S> Observer<I, S> for JSMapObserver<'rt> {
                 Err(e) => return Err(Error::unknown(e.to_string())),
             }
         })?;
-        if *exit_kind == ExitKind::Crash {
-            println!("{:?}", coverage);
-            println!("{:?}", self.last_coverage.len());
-        }
         self.mapper
             .process_coverage(coverage, &mut self.last_coverage);
         Ok(())
