@@ -264,7 +264,10 @@ impl CompilerWrapper for ClangWrapper {
 
         if cfg!(unix) {
             if cfg!(target_vendor = "apple") {
-                self.add_link_arg(lib_file)
+                // Same as --whole-archive on linux
+                // Without this option, the linker picks the first symbols it finds and does not care if it's a weak or a strong symbol
+                // See: <https://stackoverflow.com/questions/13089166/how-to-make-gcc-link-strong-symbol-in-static-library-to-overwrite-weak-symbol>
+                self.add_link_arg("-Wl,-force_load").add_link_arg(lib_file)
             } else {
                 self.add_link_arg("-Wl,--whole-archive")
                     .add_link_arg(lib_file)
