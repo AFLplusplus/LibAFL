@@ -763,6 +763,35 @@ mod netbsd {
     }
 }
 
+#[cfg(target_os = "openbsd")]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    openbsd::get_core_ids()
+}
+
+#[cfg(target_os = "openbsd")]
+#[inline]
+fn set_for_current_helper(_: CoreId) -> Result<(), Error> {
+    Ok(()) // There is no notion of cpu affinity on this platform
+}
+
+#[cfg(target_os = "openbsd")]
+mod openbsd {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use super::CoreId;
+    use crate::Error;
+
+    #[allow(trivial_numeric_casts)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::thread::available_parallelism;
