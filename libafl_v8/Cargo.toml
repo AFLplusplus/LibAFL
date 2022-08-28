@@ -8,9 +8,11 @@ edition = "2021"
 
 [dependencies]
 ahash = { version = "0.7", features = ["compile-time-rng"] }
-# fetch deno directly because of git submodules
-deno_core = { git = "https://github.com/denoland/deno.git", tag = "v1.25.0" }
-deno_runtime = { git = "https://github.com/denoland/deno.git", tag = "v1.25.0" }
+deno_ast = { version = "0.17.0", features = ["transpiling"] }
+# fetch deno directly because of git deps; cannot use local submodule due to workspacing
+deno_core = { git = "https://github.com/denoland/deno.git", tag = "v1.24.3" }
+deno_runtime = { git = "https://github.com/denoland/deno.git", tag = "v1.24.3" }
+import_map = "0.12.1"
 libafl = { path = "../libafl", version = "0.8.1" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

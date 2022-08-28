@@ -49,3 +49,6 @@ __pycache__
 **/libxml2
 **/corpus_discovered
 **/libxml2-*.tar.gz
+
+# JS dependency files
+node_modules/

@@ -1,3 +1,5 @@
+//! Observers for JavaScript targets
+
 mod json_types;
 
 use core::{
@@ -5,20 +7,14 @@ use core::{
     slice::Iter,
 };
 use std::{
-    borrow::BorrowMut,
-    cell::RefCell,
     collections::{hash_map::Entry, HashMap},
     hash::{Hash, Hasher},
-    rc::Rc,
-    sync::{Arc, Mutex as StdMutex},
+    sync::Arc,
 };
 
-use ahash::{AHashMap, AHasher};
-use deno_core::{
-    futures::TryFutureExt, serde_json::Value, JsRuntime, JsRuntimeInspector, LocalInspectorSession,
-};
+use ahash::AHasher;
+use deno_core::LocalInspectorSession;
 use deno_runtime::worker::MainWorker;
-use json_types::CoverageRange;
 pub use json_types::{StartPreciseCoverageParameters, TakePreciseCoverageReturnObject};
 use libafl::{
     bolts::{AsIter, AsMutSlice, HasLen},
@@ -27,11 +23,8 @@ use libafl::{
     prelude::Named,
     Error,
 };
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
-use tokio::{
-    runtime::Runtime,
-    sync::{oneshot::channel, Mutex},
-};
+use serde::{Deserialize, Serialize};
+use tokio::{runtime::Runtime, sync::Mutex};
 
 use super::forbid_deserialization;
 
@@ -123,6 +116,7 @@ impl JSCoverageMapper {
     }
 }
 
+/// Observer which inspects JavaScript coverage at either a block or function level
 #[derive(Serialize, Deserialize)]
 pub struct JSMapObserver<'rt> {
     initial: u8,
@@ -140,6 +134,9 @@ pub struct JSMapObserver<'rt> {
 }
 
 impl<'rt> JSMapObserver<'rt> {
+    /// Create the observer with the provided name to use the provided asynchronous runtime and JS
+    /// worker to push inspector data. If you don't know what kind of coverage you want, use this
+    /// constructor.
     pub fn new(
         name: &str,
         rt: &'rt Runtime,
@@ -157,6 +154,8 @@ impl<'rt> JSMapObserver<'rt> {
         )
     }
 
+    /// Create the observer with the provided name to use the provided asynchronous runtime, JS
+    /// worker to push inspector data, and the parameters with which coverage is collected.
     pub fn new_with_parameters(
         name: &str,
         rt: &'rt Runtime,
@@ -237,7 +236,12 @@ impl<'rt, I, S> Observer<I, S> for JSMapObserver<'rt> {
         Ok(())
     }
 
-    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &I,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         let session = self.inspector.clone();
         let copy = self.worker.clone();
         let coverage = self.rt.block_on(async {

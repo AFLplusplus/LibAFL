@@ -1,33 +1,30 @@
+//! Executors for JavaScript targets
+//!
+//! Currently, the only provided executor is `V8Executor`, but additional executors for other
+//! environments may be added later for different JavaScript contexts.
+
 use core::{
     fmt,
     fmt::{Debug, Formatter},
     marker::PhantomData,
 };
-use std::{
-    borrow::{Borrow, BorrowMut},
-    cell::RefCell,
-    iter,
-    rc::Rc,
-    sync::Arc,
-};
+use std::{iter, sync::Arc};
 
-use deno_core::{v8, JsRuntime, ModuleId, ModuleSpecifier};
+use deno_core::{v8, ModuleId, ModuleSpecifier};
 use deno_runtime::worker::MainWorker;
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{BytesInput, HasBytesVec, Input},
+    inputs::Input,
     observers::ObserversTuple,
     state::State,
     Error,
 };
-use tokio::{runtime, runtime::Runtime};
-use v8::{
-    ArrayBuffer, Context, ContextScope, Function, HandleScope, Local, Script, TryCatch, Uint8Array,
-    Value,
-};
+use tokio::runtime::Runtime;
+use v8::{Function, HandleScope, Local, TryCatch};
 
-use crate::{v8::Global, Mutex};
+use crate::{values::IntoJSValue, Mutex};
 
+/// Executor which executes JavaScript using Deno and V8.
 pub struct V8Executor<'rt, EM, I, OT, S, Z>
 where
     I: Input + IntoJSValue,
@@ -168,6 +165,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 fn js_err_to_libafl(scope: &mut TryCatch<HandleScope>) -> Option<Error> {
     if !scope.has_caught() {
         None
@@ -227,18 +225,5 @@ fn js_err_to_libafl(scope: &mut TryCatch<HandleScope>) -> Option<Error> {
             "Encountered uncaught JS exception while executing: {}:{}: {}\n{}\n{}",
             filename, line_number, exception_string, source_line, err_underline
         )))
-    }
-}
-
-pub trait IntoJSValue {
-    fn to_js_value<'s>(&self, scope: &mut HandleScope<'s>) -> Result<Local<'s, Value>, Error>;
-}
-
-impl IntoJSValue for BytesInput {
-    fn to_js_value<'s>(&self, scope: &mut HandleScope<'s>) -> Result<Local<'s, Value>, Error> {
-        let store = ArrayBuffer::new_backing_store_from_vec(Vec::from(self.bytes())).make_shared();
-        let buffer = ArrayBuffer::with_backing_store(scope, &store);
-        let array = Uint8Array::new(scope, buffer, 0, self.bytes().len()).unwrap();
-        Ok(array.into())
     }
 }

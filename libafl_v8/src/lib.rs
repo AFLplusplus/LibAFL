@@ -1,3 +1,5 @@
+//! libafl executors, observers, and other necessary components for fuzzing JavaScript targets.
+
 // lints directly from main libafl
 #![allow(incomplete_features)]
 // For `type_eq`
@@ -71,13 +73,17 @@ missing_docs,
 #![allow(clippy::borrow_deref_ref)]
 
 pub mod executors;
+pub mod loader;
 pub mod observers;
+pub mod values;
 
 pub use deno_core::{self, v8};
 pub use deno_runtime;
 pub use executors::*;
+pub use loader::*;
 pub use observers::*;
 pub use tokio::{runtime, sync::Mutex};
+pub use values::*;
 
 pub(crate) fn forbid_deserialization<T>() -> T {
     unimplemented!(
