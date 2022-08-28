@@ -1,6 +1,6 @@
 //! Structs which are used to interact with the Inspector API
 //!
-//! Source is unmodified from original. Refer to: https://chromedevtools.github.io/devtools-protocol/
+//! Snipped region is unmodified from original. Refer to: https://chromedevtools.github.io/devtools-protocol/
 //!
 //! Taken from: https://github.com/denoland/deno/blob/e96933bc163fd81a276cbc169b17f76724a5ac33/cli/tools/coverage/json_types.rs
 
@@ -10,6 +10,8 @@
 // Copyright 2018-2022 the Deno authors. All rights reserved. MIT license.
 
 use serde::{Deserialize, Serialize};
+
+// ---- SNIP ----
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -65,4 +67,33 @@ pub struct TakePreciseCoverageReturnObject {
 #[serde(rename_all = "camelCase")]
 pub struct ProcessCoverage {
     pub result: Vec<ScriptCoverage>,
+}
+
+// ---- SNIP ----
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TakeTypeProfileReturnObject {
+    pub result: Vec<ScriptTypeProfile>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptTypeProfile {
+    pub script_id: String,
+    pub url: String,
+    pub entries: Vec<TypeProfileEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypeProfileEntry {
+    pub offset: usize,
+    pub types: Vec<TypeObject>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TypeObject {
+    pub name: String,
 }

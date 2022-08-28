@@ -77,16 +77,84 @@ pub mod loader;
 pub mod observers;
 pub mod values;
 
+use std::iter;
+
 pub use deno_core::{self, v8};
 pub use deno_runtime;
 pub use executors::*;
+use libafl::Error;
 pub use loader::*;
 pub use observers::*;
 pub use tokio::{runtime, sync::Mutex};
 pub use values::*;
 
+use crate::v8::{HandleScope, Local, TryCatch};
+
 pub(crate) fn forbid_deserialization<T>() -> T {
     unimplemented!(
         "Deserialization is forbidden for this type; cannot cross a serialization boundary"
     )
+}
+
+/// Convert a JS error from a try/catch scope into a libafl error
+pub fn js_err_to_libafl(scope: &mut TryCatch<HandleScope>) -> Option<Error> {
+    if !scope.has_caught() {
+        None
+    } else {
+        let exception = scope.exception().unwrap();
+        let exception_string = exception
+            .to_string(scope)
+            .unwrap()
+            .to_rust_string_lossy(scope);
+        let message = if let Some(message) = scope.message() {
+            message
+        } else {
+            return Some(Error::illegal_state(format!(
+                "Provided script threw an error while executing: {}",
+                exception_string
+            )));
+        };
+
+        let filename = message.get_script_resource_name(scope).map_or_else(
+            || "(unknown)".into(),
+            |s| s.to_string(scope).unwrap().to_rust_string_lossy(scope),
+        );
+        let line_number = message.get_line_number(scope).unwrap_or_default();
+
+        let source_line = message
+            .get_source_line(scope)
+            .map(|s| s.to_string(scope).unwrap().to_rust_string_lossy(scope))
+            .unwrap();
+
+        let start_column = message.get_start_column();
+        let end_column = message.get_end_column();
+
+        let err_underline = iter::repeat(' ')
+            .take(start_column)
+            .chain(iter::repeat('^').take(end_column - start_column))
+            .collect::<String>();
+
+        if let Some(stack_trace) = scope.stack_trace() {
+            let stack_trace = unsafe { Local::<v8::String>::cast(stack_trace) };
+            let stack_trace = stack_trace
+                .to_string(scope)
+                .map(|s| s.to_rust_string_lossy(scope));
+
+            if let Some(stack_trace) = stack_trace {
+                return Some(Error::illegal_state(format!(
+                    "Encountered uncaught JS exception while executing: {}:{}: {}\n{}\n{}\n{}",
+                    filename,
+                    line_number,
+                    exception_string,
+                    source_line,
+                    err_underline,
+                    stack_trace
+                )));
+            }
+        }
+        Some(Error::illegal_state(format!(
+            "Encountered uncaught JS exception while executing: {}:{}: {}\n{}\n{}",
+            filename, line_number, exception_string, source_line, err_underline
+        )))
+    }
 }

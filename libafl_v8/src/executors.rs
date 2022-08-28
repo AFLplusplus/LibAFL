@@ -8,7 +8,7 @@ use core::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
 };
-use std::{iter, sync::Arc};
+use std::sync::Arc;
 
 use deno_core::{v8, ModuleId, ModuleSpecifier};
 use deno_runtime::worker::MainWorker;
@@ -20,7 +20,7 @@ use libafl::{
     Error,
 };
 use tokio::runtime::Runtime;
-use v8::{Function, HandleScope, Local, TryCatch};
+use v8::{Function, Local, TryCatch};
 
 use crate::{values::IntoJSValue, Mutex};
 
@@ -118,6 +118,11 @@ where
             res
         })
     }
+
+    /// Fetches the ID of the main module for hooking
+    pub fn main_module_id(&self) -> ModuleId {
+        self.id
+    }
 }
 
 impl<'rt, EM, I, OT, S, Z> Executor<EM, I, S, Z> for V8Executor<'rt, EM, I, OT, S, Z>
@@ -162,68 +167,5 @@ where
         f.debug_struct("V8Executor")
             .field("observers", &self.observers)
             .finish_non_exhaustive()
-    }
-}
-
-#[allow(dead_code)]
-fn js_err_to_libafl(scope: &mut TryCatch<HandleScope>) -> Option<Error> {
-    if !scope.has_caught() {
-        None
-    } else {
-        let exception = scope.exception().unwrap();
-        let exception_string = exception
-            .to_string(scope)
-            .unwrap()
-            .to_rust_string_lossy(scope);
-        let message = if let Some(message) = scope.message() {
-            message
-        } else {
-            return Some(Error::illegal_state(format!(
-                "Provided script threw an error while executing: {}",
-                exception_string
-            )));
-        };
-
-        let filename = message.get_script_resource_name(scope).map_or_else(
-            || "(unknown)".into(),
-            |s| s.to_string(scope).unwrap().to_rust_string_lossy(scope),
-        );
-        let line_number = message.get_line_number(scope).unwrap_or_default();
-
-        let source_line = message
-            .get_source_line(scope)
-            .map(|s| s.to_string(scope).unwrap().to_rust_string_lossy(scope))
-            .unwrap();
-
-        let start_column = message.get_start_column();
-        let end_column = message.get_end_column();
-
-        let err_underline = iter::repeat(' ')
-            .take(start_column)
-            .chain(iter::repeat('^').take(end_column - start_column))
-            .collect::<String>();
-
-        if let Some(stack_trace) = scope.stack_trace() {
-            let stack_trace = unsafe { Local::<v8::String>::cast(stack_trace) };
-            let stack_trace = stack_trace
-                .to_string(scope)
-                .map(|s| s.to_rust_string_lossy(scope));
-
-            if let Some(stack_trace) = stack_trace {
-                return Some(Error::illegal_state(format!(
-                    "Encountered uncaught JS exception while executing: {}:{}: {}\n{}\n{}\n{}",
-                    filename,
-                    line_number,
-                    exception_string,
-                    source_line,
-                    err_underline,
-                    stack_trace
-                )));
-            }
-        }
-        Some(Error::illegal_state(format!(
-            "Encountered uncaught JS exception while executing: {}:{}: {}\n{}\n{}",
-            filename, line_number, exception_string, source_line, err_underline
-        )))
     }
 }
