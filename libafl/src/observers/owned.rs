@@ -31,7 +31,7 @@ unsafe fn downcast_mut_unsafe<T>(any: &mut dyn Any) -> &mut T {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Combine `Observer` and `AsAny`
-pub trait AnyObserver<I: 'static + Debug, Self::State: 'static + Debug>: Observer + AsAny {}
+pub trait AnyObserver<I: 'static + Debug, S: 'static + Debug>: Observer + AsAny {}
 
 crate::create_anymap_for_trait!(
     observers_anymap,
@@ -44,12 +44,12 @@ pub use observers_anymap::{AnyMap as ObserversAnyMap, NamedAnyMap as NamedObserv
 /// An owned list of `Observer` trait objects
 /// This is not really serializable, using this struct needs [`crate::events::EventConfig::AlwaysUnique`] as configuration
 #[derive(Debug, Default)]
-pub struct ObserversOwnedMap<I: 'static + Debug, Self::State: 'static + Debug> {
+pub struct ObserversOwnedMap<I: 'static + Debug, S: 'static + Debug> {
     /// The named trait objects map
     pub map: NamedObserversAnyMap<I, S>,
 }
 
-impl<I: 'static + Debug, Self::State: 'static + Debug> Serialize for ObserversOwnedMap<I, S> {
+impl<I: 'static + Debug, S: 'static + Debug> Serialize for ObserversOwnedMap<I, S> {
     fn serialize<T>(&self, _serializer: T) -> Result<T::Ok, T::Error>
     where
         T: Serializer,
@@ -58,7 +58,7 @@ impl<I: 'static + Debug, Self::State: 'static + Debug> Serialize for ObserversOw
     }
 }
 
-impl<'de, I: 'static + Debug, Self::State: 'static + Debug> Deserialize<'de> for ObserversOwnedMap<I, S> {
+impl<'de, I: 'static + Debug, S: 'static + Debug> Deserialize<'de> for ObserversOwnedMap<I, S> {
     fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -67,7 +67,7 @@ impl<'de, I: 'static + Debug, Self::State: 'static + Debug> Deserialize<'de> for
     }
 }
 
-impl<I: 'static + Debug, Self::State: 'static + Debug> ObserversTuple for ObserversOwnedMap<I, S> {
+impl<I: 'static + Debug, S: 'static + Debug> ObserversTuple for ObserversOwnedMap<I, S> {
     fn pre_exec_all(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error> {
         self.map
             .for_each_mut(&mut |_, ob| ob.pre_exec(state, input))
@@ -103,7 +103,7 @@ impl<I: 'static + Debug, Self::State: 'static + Debug> ObserversTuple for Observ
     }
 }
 
-impl<I: 'static + Debug, Self::State: 'static + Debug> MatchName for ObserversOwnedMap<I, S> {
+impl<I: 'static + Debug, S: 'static + Debug> MatchName for ObserversOwnedMap<I, S> {
     fn match_name<T>(&self, name: &str) -> Option<&T> {
         unsafe {
             let t = pack_type_id(type_id::<T>());

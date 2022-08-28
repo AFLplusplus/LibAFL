@@ -33,8 +33,9 @@ use crate::bolts::{
 use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
 use crate::{
     bolts::{
+        bolts_prelude::HasShMemProvider,
         llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
-        shmem::ShMemProvider, bolts_prelude::HasShMemProvider,
+        shmem::ShMemProvider,
     },
     events::{
         BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
@@ -545,7 +546,13 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut <Self as EventManager>::Input, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<
+            dyn FnMut(
+                &mut <Self as EventManager>::Input,
+                &String,
+                &[u8],
+            ) -> Result<CustomBufEventResult, Error>,
+        >,
     ) {
         self.custom_buf_handlers.push(handler);
     }
@@ -791,19 +798,29 @@ where
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager
-    pub fn launch(&mut self) -> Result<(Option<<Self as EventManager>::State>, LlmpRestartingEventManager<OT, SP>), Error> {
+    pub fn launch(
+        &mut self,
+    ) -> Result<
+        (
+            Option<<Self as EventManager>::State>,
+            LlmpRestartingEventManager<OT, SP>,
+        ),
+        Error,
+    > {
         // We start ourself as child process to actually fuzz
         let (staterestorer, new_shmem_provider, core_id) = if std::env::var(_ENV_FUZZER_SENDER)
             .is_err()
         {
-            let broker_things = |mut broker: LlmpEventBroker<<Self as EventManager>::Input, MT, SP>, remote_broker_addr| {
-                if let Some(remote_broker_addr) = remote_broker_addr {
-                    println!("B2b: Connecting to {:?}", &remote_broker_addr);
-                    broker.connect_b2b(remote_broker_addr)?;
-                };
+            let broker_things =
+                |mut broker: LlmpEventBroker<<Self as EventManager>::Input, MT, SP>,
+                 remote_broker_addr| {
+                    if let Some(remote_broker_addr) = remote_broker_addr {
+                        println!("B2b: Connecting to {:?}", &remote_broker_addr);
+                        broker.connect_b2b(remote_broker_addr)?;
+                    };
 
-                broker.broker_loop()
-            };
+                    broker.broker_loop()
+                };
 
             // We get here if we are on Unix, or we are a broker on Windows (or without forks).
             let (mgr, core_id) = match self.kind {
@@ -812,10 +829,11 @@ where
                         LlmpConnection::on_port(self.shmem_provider.clone(), self.broker_port)?;
                     match connection {
                         LlmpConnection::IsBroker { broker } => {
-                            let event_broker = LlmpEventBroker::<<Self as EventManager>::Input, MT, SP>::new(
-                                broker,
-                                self.monitor.take().unwrap(),
-                            )?;
+                            let event_broker =
+                                LlmpEventBroker::<<Self as EventManager>::Input, MT, SP>::new(
+                                    broker,
+                                    self.monitor.take().unwrap(),
+                                )?;
 
                             // Yep, broker. Just loop here.
                             println!(
@@ -833,11 +851,12 @@ where
                     }
                 }
                 ManagerKind::Broker => {
-                    let event_broker = LlmpEventBroker::<<Self as EventManager>::Input, MT, SP>::new_on_port(
-                        self.shmem_provider.clone(),
-                        self.monitor.take().unwrap(),
-                        self.broker_port,
-                    )?;
+                    let event_broker =
+                        LlmpEventBroker::<<Self as EventManager>::Input, MT, SP>::new_on_port(
+                            self.shmem_provider.clone(),
+                            self.monitor.take().unwrap(),
+                            self.broker_port,
+                        )?;
 
                     broker_things(event_broker, self.remote_broker_addr)?;
 

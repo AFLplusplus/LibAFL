@@ -225,7 +225,6 @@ pub trait HasShMemProvider {
 
     /// Borrows the [`ShMemProvider`] (mut)
     fn shmem_provider_mut<'a>() -> &'a mut Self::ShMemProvider;
-
 }
 
 /// A [`ShMemProvider`] provides access to shared maps.

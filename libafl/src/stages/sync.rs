@@ -36,15 +36,18 @@ impl SyncFromDiskMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromDiskStage<CB>
-{
+pub struct SyncFromDiskStage<CB> {
     sync_dir: PathBuf,
     load_callback: CB,
 }
 
 impl<CB> Stage for SyncFromDiskStage<CB>
 where
-    CB: FnMut(&mut <Self as Stage>::Fuzzer, &mut <Self as Stage>::State, &Path) -> Result<Self::Input, Error>,
+    CB: FnMut(
+        &mut <Self as Stage>::Fuzzer,
+        &mut <Self as Stage>::State,
+        &Path,
+    ) -> Result<Self::Input, Error>,
     Self::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     Self::Fuzzer: Evaluator,
 {
@@ -87,7 +90,11 @@ where
 
 impl<CB> SyncFromDiskStage<CB>
 where
-    CB: FnMut(&mut <Self as Stage>::Fuzzer, &mut <Self as Stage>::State, &Path) -> Result<<Self as Stage>::Input, Error>,
+    CB: FnMut(
+        &mut <Self as Stage>::Fuzzer,
+        &mut <Self as Stage>::State,
+        &Path,
+    ) -> Result<<Self as Stage>::Input, Error>,
     <Self as Stage>::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
     <Self as Stage>::Fuzzer: Evaluator,
 {

@@ -28,7 +28,6 @@ use crate::{
 /// Send a monitor update all 15 (or more) seconds
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
-
 // The shared state for all [`PushStage`]s
 /// Should be stored inside a `[Rc<RefCell<_>>`]
 pub trait PushStageSharedState {
@@ -43,8 +42,7 @@ pub trait PushStageSharedState {
 // The shared state for all [`PushStage`]s
 /// Should be stored inside a `[Rc<RefCell<_>>`]
 #[derive(Clone, Debug)]
-pub struct StdPushStageSharedState
-{
+pub struct StdPushStageSharedState {
     /// The [`crate::state::State`]
     pub state: <Self as PushStageSharedState>::State,
     /// The [`crate::fuzzer::Fuzzer`] instance
@@ -55,28 +53,24 @@ pub struct StdPushStageSharedState
     pub observers: <Self as PushStageSharedState>::Observers,
 }
 
-impl<CS, EM, I, OT, S, Z> PushStageSharedState for StdPushStageSharedState
-where
-    CS: Scheduler,
-    EM: EventFirer + EventRestarter + HasEventManagerId,
-    I: Input,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasCorpus + HasRand,
-    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
-{
-    type Scheduler = CS;
-    type EventManager = EM;
-    type Input = I;
-    type Observers = OT;
-    type State = S;
-    type Fuzzer = Z;
+impl PushStageSharedState for StdPushStageSharedState {
+    /*type Scheduler = Self::Scheduler;
+    type EventManager = Self::EventManager;
+    type Input = Self::Input;
+    type Observers = Self::Observers;
+    type State = Self::State;
+    type Fuzzer = Self::Fuzzer;*/
 }
 
-impl StdPushStageSharedState
-{
+impl StdPushStageSharedState {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
-    pub fn new(fuzzer: <Self as PushStageSharedState>::Fuzzer, state: <Self as PushStageSharedState>::State, observers: <Self as PushStageSharedState>::Observers, event_mgr: <Self as PushStageSharedState>::EventManager) -> Self {
+    pub fn new(
+        fuzzer: <Self as PushStageSharedState>::Fuzzer,
+        state: <Self as PushStageSharedState>::State,
+        observers: <Self as PushStageSharedState>::Observers,
+        event_mgr: <Self as PushStageSharedState>::EventManager,
+    ) -> Self {
         Self {
             state,
             fuzzer,
@@ -94,14 +88,19 @@ trait PushStageHelper {
     type Observers: ObserversTuple;
     type State: HasClientPerfMonitor + HasCorpus + HasRand;
     type Fuzzer: ExecutionProcessor + EvaluatorObservers + HasScheduler;
-    type PushStageSharedState: PushStageSharedState<Scheduler = Self::Scheduler, EventManager = Self::EventManager, Input = Self::Input, Observers = Self::Observers, State = Self::State, Fuzzer = Self::Fuzzer>;
-
+    type PushStageSharedState: PushStageSharedState<
+        Scheduler = Self::Scheduler,
+        EventManager = Self::EventManager,
+        Input = Self::Input,
+        Observers = Self::Observers,
+        State = Self::State,
+        Fuzzer = Self::Fuzzer,
+    >;
 }
 
 /// Helper class for the [`PushStage`] trait, taking care of borrowing the shared state
 #[derive(Clone, Debug)]
-pub struct StdPushStageHelper
-{
+pub struct StdPushStageHelper {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
     pub initialized: bool,
@@ -122,36 +121,34 @@ pub struct StdPushStageHelper
     exit_kind: Rc<Cell<Option<ExitKind>>>,
 }
 
-impl<CS, EM, I, OT, S, Z> PushStageHelper for StdPushStageHelper
+impl PushStageHelper for StdPushStageHelper
 where
-    CS: Scheduler,
-    EM: EventFirer + EventRestarter + HasEventManagerId,
-    I: Input,
-    OT: ObserversTuple,
-    S: HasClientPerfMonitor + HasCorpus + HasRand,
-    Z: ExecutionProcessor + EvaluatorObservers + HasScheduler,
+    Self::EventManager: EventFirer + EventRestarter + HasEventManagerId,
+    Self::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Self::Fuzzer: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {
+    /*
     /// The `Scheduler`
-    type Scheduler = S;
+    type Scheduler = Self::Scheduler;
 
     /// The `EventManager`
-    type EventManager = EM;
+    type EventManager = Self::EventManager;
 
     /// The `Input`
-    type Input = I;
+    type Input = Self::Input;
 
     /// The [`ObserversTuple`]
-    type Observers = OT;
+    type Observers = Self::Observers;
 
     /// The `State`
-    type State = S;
+    type State = Self::State;
 
     /// The `Fuzzer`
-    type Fuzzer = Z;
+    type Fuzzer = Self::Fuzzer;
+    */
 }
 
-impl StdPushStageHelper
-{
+impl StdPushStageHelper {
     /// Create a new [`PushStageHelper`]
     #[must_use]
     #[allow(clippy::type_complexity)]
@@ -172,7 +169,10 @@ impl StdPushStageHelper
 
     /// Sets the shared state for this helper (and all other helpers owning the same [`RefCell`])
     #[inline]
-    pub fn set_shared_state(&mut self, shared_state: <Self as PushStageHelper>::PushStageSharedState) {
+    pub fn set_shared_state(
+        &mut self,
+        shared_state: <Self as PushStageHelper>::PushStageSharedState,
+    ) {
         (*self.shared_state.borrow_mut()).replace(shared_state);
     }
 
@@ -223,17 +223,20 @@ pub trait PushStage: Iterator {
     type Stage: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions;
     type Fuzzer: ExecutionProcessor + EvaluatorObservers + HasScheduler;
     type State;
-    type PushStageHelper: PushStageHelper<Scheduler = Self::Scheduler, EventManager = Self::EventManager, Input = Self::Input, Observers = Self::Observers, Fuzzer= Self::Fuzzer, State = Self::State>;
+    type PushStageHelper: PushStageHelper<
+        Scheduler = Self::Scheduler,
+        EventManager = Self::EventManager,
+        Input = Self::Input,
+        Observers = Self::Observers,
+        Fuzzer = Self::Fuzzer,
+        State = Self::State,
+    >;
 
     /// Gets the [`PushStageHelper`]
-    fn push_stage_helper(
-        &self,
-    ) -> &Self::PushStageHelper;
+    fn push_stage_helper(&self) -> &Self::PushStageHelper;
 
     /// Gets the [`PushStageHelper`] (mutable)
-    fn push_stage_helper_mut(
-        &mut self,
-    ) -> &mut Self::PushStageHelper;
+    fn push_stage_helper_mut(&mut self) -> &mut Self::PushStageHelper;
 
     /// Set the current corpus index this stage works on
     fn set_current_corpus_idx(&mut self, corpus_idx: usize) {

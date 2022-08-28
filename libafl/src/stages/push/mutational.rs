@@ -14,7 +14,7 @@ use crate::{
     mark_feature_time,
     mutators::Mutator,
     schedulers::Scheduler,
-    stages::{Stage, PushStage},
+    stages::{PushStage, Stage},
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
@@ -184,7 +184,8 @@ where
 
 impl<M> Iterator for StdMutationalPushStage<M>
 where
-    <Self as PushStage>::EventManager: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter,
+    <Self as PushStage>::EventManager:
+        EventFirer + EventRestarter + HasEventManagerId + ProgressReporter,
     <Self as PushStage>::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
     <Self as PushStage>::Fuzzer: ExecutionProcessor + EvaluatorObservers + HasScheduler,
 {

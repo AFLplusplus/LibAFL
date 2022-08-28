@@ -18,8 +18,7 @@ pub struct InMemoryCorpus {
     current: Option<usize>,
 }
 
-impl Corpus for InMemoryCorpus
-{
+impl Corpus for InMemoryCorpus {
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
@@ -72,8 +71,7 @@ impl Corpus for InMemoryCorpus
     }
 }
 
-impl InMemoryCorpus
-{
+impl InMemoryCorpus {
     /// Creates a new [`InMemoryCorpus`], keeping all [`Testcase`]`s` in memory.
     /// This is the simplest and fastest option, however test progress will be lost on exit or on OOM.
     #[must_use]

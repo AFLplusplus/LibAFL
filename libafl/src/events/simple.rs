@@ -335,7 +335,13 @@ where
 {
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut <Self as EventManager>::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<
+            dyn FnMut(
+                &mut <Self as EventManager>::State,
+                &String,
+                &[u8],
+            ) -> Result<CustomBufEventResult, Error>,
+        >,
     ) {
         self.simple_event_mgr.add_custom_buf_handler(handler);
     }
@@ -379,7 +385,10 @@ where
     /// This [`EventManager`] is simple and single threaded,
     /// but can still used shared maps to recover from crashes and timeouts.
     #[allow(clippy::similar_names)]
-    pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<<Self as EventManager>::State>, Self), Error>
+    pub fn launch(
+        mut monitor: MT,
+        shmem_provider: &mut SP,
+    ) -> Result<(Option<<Self as EventManager>::State>, Self), Error>
     where
         <Self as EventManager>::State: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
         MT: Debug,

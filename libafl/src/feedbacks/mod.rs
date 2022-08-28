@@ -605,10 +605,7 @@ where
     /// Creates a new [`NotFeedback`].
     pub fn new(first: A) -> Self {
         let name = format!("Not({})", first.name());
-        Self {
-            first,
-            name,
-        }
+        Self { first, name }
     }
 }
 
