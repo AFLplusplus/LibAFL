@@ -429,7 +429,7 @@ fn fuzz_binary(
         }
         #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         {
-            toks += autotokens()?;
+            toks += autotokens();
         }
 
         if !toks.is_empty() {
@@ -656,7 +656,7 @@ fn fuzz_text(
         }
         #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         {
-            toks += autotokens()?;
+            toks += autotokens();
         }
 
         if !toks.is_empty() {

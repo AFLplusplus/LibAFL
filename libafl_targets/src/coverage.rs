@@ -37,17 +37,15 @@ pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
 /// Return Tokens from the compile-time token section
-/// Will return `Error::IllegalState` if no token section was found
-/// In this case, the compilation probably did not include an `AutoTokens`-pass
 ///
 /// # Safety
 ///
 /// This fn is safe to call, as long as the compilation did not break, previously
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
-pub fn autotokens() -> Result<Tokens, Error> {
+pub fn autotokens() -> Tokens {
     unsafe {
         if __token_start.is_null() || __token_stop.is_null() {
-            Ok(Tokens::default())
+            Tokens::default()
         } else {
             // we can safely unwrap
             Tokens::from_ptrs(__token_start, __token_stop)
