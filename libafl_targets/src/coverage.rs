@@ -37,8 +37,6 @@ pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
 /// Return Tokens from the compile-time token section
-/// Will return `Error::IllegalState` if no token section was found
-/// In this case, the compilation probably did not include an `AutoTokens`-pass
 ///
 /// # Safety
 ///
