@@ -369,7 +369,7 @@ fn fuzz(
         }
         #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         {
-            toks += autotokens();
+            toks += autotokens()?;
         }
 
         if !toks.is_empty() {
