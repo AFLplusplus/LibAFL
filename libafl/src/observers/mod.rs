@@ -42,10 +42,7 @@ use crate::{
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer: Named + Debug {
-    type Input;
-    type State;
-
+pub trait Observer<I, S>: Named + Debug {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
     #[inline]
@@ -55,7 +52,7 @@ pub trait Observer: Named + Debug {
 
     /// Called right before execution starts.
     #[inline]
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
@@ -63,8 +60,8 @@ pub trait Observer: Named + Debug {
     #[inline]
     fn post_exec(
         &mut self,
-        _state: &mut Self::State,
-        _input: &Self::Input,
+        _state: &mut S,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -72,11 +69,7 @@ pub trait Observer: Named + Debug {
 
     /// Called right before execution starts in the child process, if any.
     #[inline]
-    fn pre_exec_child(
-        &mut self,
-        _state: &mut Self::State,
-        _input: &Self::Input,
-    ) -> Result<(), Error> {
+    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
@@ -84,8 +77,8 @@ pub trait Observer: Named + Debug {
     #[inline]
     fn post_exec_child(
         &mut self,
-        _state: &mut Self::State,
-        _input: &Self::Input,
+        _state: &mut S,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -162,7 +155,7 @@ impl ObserversTuple for () {
 
 impl<Head, Tail> ObserversTuple for (Head, Tail)
 where
-    Head: Observer,
+    Head: Observer<Self::Input, Self::State>,
     Tail: ObserversTuple,
 {
     fn pre_exec_all(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error> {
@@ -235,8 +228,8 @@ impl TimeObserver {
     }
 }
 
-impl Observer for TimeObserver {
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+impl<I, S> Observer<I, S> for TimeObserver {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
@@ -244,8 +237,8 @@ impl Observer for TimeObserver {
 
     fn post_exec(
         &mut self,
-        _state: &mut Self::State,
-        _input: &Self::Input,
+        _state: &mut S,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
@@ -297,11 +290,11 @@ where
     }
 }
 
-impl<'a, T> Observer for ListObserver<'a, T>
+impl<'a, I, S, T> Observer<I, S> for ListObserver<'a, T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.list.as_mut().clear();
         Ok(())
     }

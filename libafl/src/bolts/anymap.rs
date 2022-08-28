@@ -68,11 +68,9 @@ macro_rules! create_anymap_for_trait {
             use alloc::boxed::Box;
             use core::any::TypeId;
 
-            use hashbrown::hash_map::{Keys, Values, ValuesMut};
-            use hashbrown::HashMap;
+            use hashbrown::{hash_map::{Keys, Values, ValuesMut}, HashMap};
 
-            use $crate::bolts::anymap::{pack_type_id, unpack_type_id};
-            use $crate::Error;
+            use $crate::{Error, bolts::anymap::{pack_type_id, unpack_type_id}};
 
             use super::*;
             #[allow(unused_import_braces)]

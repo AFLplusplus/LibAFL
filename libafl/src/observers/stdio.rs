@@ -25,7 +25,7 @@ impl StdOutObserver {
     }
 }
 
-impl Observer for StdOutObserver {}
+impl<I, S> Observer<I, S> for StdOutObserver {}
 
 impl Named for StdOutObserver {
     fn name(&self) -> &str {
@@ -52,7 +52,7 @@ impl StdErrObserver {
     }
 }
 
-impl Observer for StdErrObserver {}
+impl<I, S> Observer<I, S> for StdErrObserver {}
 
 impl Named for StdErrObserver {
     fn name(&self) -> &str {

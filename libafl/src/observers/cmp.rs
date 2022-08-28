@@ -111,7 +111,7 @@ pub trait CmpMap: Debug {
 }
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<CM, I, S>: Observer
+pub trait CmpObserver<CM, I, S>: Observer<I, S>
 where
     CM: CmpMap,
 {
@@ -128,7 +128,7 @@ where
     /// This routine does a basic loop filtering because loop index cmps are not interesting.
     fn add_cmpvalues_meta(&mut self, state: &mut S)
     where
-        Self::State: HasMetadata,
+        S: HasMetadata,
     {
         #[allow(clippy::option_if_let_else)] // we can't mutate state in a closure
         let meta = if let Some(meta) = state.metadata_mut().get_mut::<CmpValuesMetadata>() {
@@ -224,11 +224,11 @@ where
     }
 }
 
-impl<'a, CM> Observer for StdCmpObserver<'a, CM>
+impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
 {
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
         Ok(())
     }

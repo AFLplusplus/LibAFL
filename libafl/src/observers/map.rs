@@ -195,9 +195,9 @@ pub struct StdMapObserver<'a> {
     name: String,
 }
 
-impl<'a> Observer for StdMapObserver<'a> {
+impl<'a, I, S> Observer<I, S> for StdMapObserver<'a> {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -427,12 +427,12 @@ pub struct ConstMapObserver<'a, const N: usize> {
     name: String,
 }
 
-impl<'a, const N: usize> Observer for ConstMapObserver<'a, N>
+impl<'a, I, const N: usize, S> Observer<I, S> for ConstMapObserver<'a, N>
 where
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -634,9 +634,9 @@ pub struct VariableMapObserver<'a> {
     name: String,
 }
 
-impl<'a> Observer for VariableMapObserver<'a> {
+impl<'a, I, S> Observer<I, S> for VariableMapObserver<'a> {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -831,23 +831,18 @@ where
     base: M,
 }
 
-impl<M> Observer for HitcountsMapObserver<M>
+impl<I, M, S> Observer<I, S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Item = u8> + Observer + AsMutSlice<Item = u8>,
+    M: MapObserver<Item = u8> + Observer<I, S> + AsMutSlice<Item = u8>,
 {
     #[inline]
-    fn pre_exec(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.base.pre_exec(state, input)
     }
 
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
-    fn post_exec(
-        &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         let map = self.as_mut_slice();
         let len = map.len();
         if (len & 1) != 0 {
@@ -1035,24 +1030,19 @@ where
     base: M,
 }
 
-impl<M> Observer for HitcountsIterableMapObserver<M>
+impl<I, M, S> Observer<I, S> for HitcountsIterableMapObserver<M>
 where
-    M: MapObserver<Item = u8> + Observer,
+    M: MapObserver<Item = u8> + Observer<I, S>,
     for<'it> M: AsIterMut<'it, Item = u8>,
 {
     #[inline]
-    fn pre_exec(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.base.pre_exec(state, input)
     }
 
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
-    fn post_exec(
-        &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
-        exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
+    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         for item in self.as_iter_mut() {
             *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };
         }
@@ -1230,12 +1220,12 @@ pub struct MultiMapObserver<'a> {
     iter_idx: usize,
 }
 
-impl<'a> Observer for MultiMapObserver<'a>
+impl<'a, I, S> Observer<I, S> for MultiMapObserver<'a>
 where
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -1453,14 +1443,14 @@ pub struct OwnedMapObserver {
     name: String,
 }
 
-impl Observer for OwnedMapObserver
+impl<I, S> Observer<I, S> for OwnedMapObserver
 where
     <Self as MapObserver>::Item:
         Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut Self::State, _input: &Self::Input) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -1990,7 +1980,7 @@ pub mod pybind {
                 Self: MapObserver,
             {
                 #[inline]
-                fn pre_exec(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error> {
+                fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.pre_exec(state, input) })
                 }
             }

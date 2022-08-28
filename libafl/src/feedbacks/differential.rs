@@ -119,8 +119,8 @@ impl<F, O1, O2> Feedback for DiffFeedback<F, O1, O2>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     Self::State: HasMetadata + HasClientPerfMonitor,
-    O1: Observer + PartialEq<O2>,
-    O2: Observer,
+    O1: Observer<Self::Input, Self::State> + PartialEq<O2>,
+    O2: Observer<Self::Input, Self::State>,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -181,7 +181,7 @@ mod tests {
             }
         }
     }
-    impl<I, S> Observer for NopObserver {}
+    impl<I, S> Observer<I, S> for NopObserver {}
     impl PartialEq for NopObserver {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value

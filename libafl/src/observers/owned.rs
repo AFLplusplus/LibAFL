@@ -31,12 +31,12 @@ unsafe fn downcast_mut_unsafe<T>(any: &mut dyn Any) -> &mut T {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// Combine `Observer` and `AsAny`
-pub trait AnyObserver<I: 'static + Debug, S: 'static + Debug>: Observer + AsAny {}
+pub trait AnyObserver<I: 'static + Debug, S: 'static + Debug>: Observer<I, S> + AsAny {}
 
 crate::create_anymap_for_trait!(
     observers_anymap,
     super,
-    AnyObserver<I: 'static + Debug, Self::State: 'static + Debug>,
+    AnyObserver<I: 'static + Debug, S: 'static + Debug>,
     derive(Debug)
 );
 pub use observers_anymap::{AnyMap as ObserversAnyMap, NamedAnyMap as NamedObserversAnyMap};
@@ -67,35 +67,36 @@ impl<'de, I: 'static + Debug, S: 'static + Debug> Deserialize<'de> for Observers
     }
 }
 
-impl<I: 'static + Debug, S: 'static + Debug> ObserversTuple for ObserversOwnedMap<I, S> {
-    fn pre_exec_all(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error> {
+impl<I, S> ObserversTuple for ObserversOwnedMap<I, S>
+where
+    I: 'static + Debug,
+    S: 'static + Debug,
+    Self: ObserversTuple<Input = I, State = S>,
+{
+    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.map
             .for_each_mut(&mut |_, ob| ob.pre_exec(state, input))
     }
 
     fn post_exec_all(
         &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
+        state: &mut S,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.map
             .for_each_mut(&mut |_, ob| ob.post_exec(state, input, exit_kind))
     }
 
-    fn pre_exec_child_all(
-        &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
-    ) -> Result<(), Error> {
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.map
             .for_each_mut(&mut |_, ob| ob.pre_exec_child(state, input))
     }
 
     fn post_exec_child_all(
         &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
+        state: &mut S,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.map
