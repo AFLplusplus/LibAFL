@@ -213,11 +213,9 @@ pub trait HasInProcessHandlers {
 }
 
 #[cfg(windows)]
-impl<'a, H, I, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, I, OT, S>
+impl<'a, H> HasInProcessHandlers for InProcessExecutor<'a, H>
 where
     H: FnMut(&Self::Input) -> ExitKind,
-    I: Input,
-    OT: ObserversTuple,
 {
     /// the timeout handler
     #[inline]
@@ -923,7 +921,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        Self::State: HasSolutions + HasClientPerfMonitor,
+        S::State: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -1015,7 +1013,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        Self::State: HasSolutions + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
@@ -1111,7 +1109,7 @@ mod windows_exception_handler {
         EM: EventFirer + EventRestarter,
         OT: ObserversTuple,
         OF: Feedback,
-        Self::State: HasSolutions + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         I: Input,
         Z: HasObservers,
     {
