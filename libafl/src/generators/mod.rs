@@ -70,12 +70,11 @@ where
     G: Generator<BytesInput, S>,
 {
     fn generate(&mut self, state: &mut S) -> Result<GeneralizedInput, Error> {
-        let bytes_input = self.bytes_generator.generate(state)?;
-        Ok(GeneralizedInput::new(bytes_input.bytes))
+        Ok(self.bytes_generator.generate(state)?.into())
     }
 
     fn generate_dummy(&self, state: &mut S) -> GeneralizedInput {
-        GeneralizedInput::new(self.bytes_generator.generate_dummy(state).bytes)
+        self.bytes_generator.generate_dummy(state).into()
     }
 }
 
