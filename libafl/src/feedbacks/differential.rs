@@ -162,7 +162,7 @@ mod tests {
         events::EventFirer,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
-        inputs::{BytesInput, Input},
+        inputs::BytesInput,
         monitors::ClientPerfMonitor,
         observers::Observer,
         state::{HasClientPerfMonitor, HasMetadata},
@@ -194,11 +194,11 @@ mod tests {
     }
 
     struct NopEventFirer;
-    impl<I: Input> EventFirer for NopEventFirer {
+    impl EventFirer for NopEventFirer {
         fn fire<S>(
             &mut self,
             _state: &mut Self::State,
-            _event: crate::events::Event<I>,
+            _event: crate::events::Event<Self::Input>,
         ) -> Result<(), crate::Error> {
             Ok(())
         }

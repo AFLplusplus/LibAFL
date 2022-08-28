@@ -1178,10 +1178,10 @@ mod tests {
         state::{HasMetadata, StdState},
     };
 
-    fn test_mutations<I, S>() -> impl MutatorsTuple
+    fn test_mutations<I, S>() -> impl MutatorsTuple<Input = I, State = S>
     where
-        Self::Input: Input + HasBytesVec,
-        Self::State: HasRand + HasCorpus + HasMetadata + HasMaxSize,
+        I: Input + HasBytesVec,
+        S: HasRand + HasCorpus + HasMetadata + HasMaxSize,
     {
         tuple_list!(
             BitFlipMutator::new(),
