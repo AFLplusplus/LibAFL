@@ -143,7 +143,7 @@ pub mod pybind {
     /// Python class for CachedOnDiskCorpus
     pub struct PythonCachedOnDiskCorpus {
         /// Rust wrapped CachedOnDiskCorpus object
-        pub inner: CachedOnDiskCorpus<BytesInput>,
+        pub inner: CachedOnDiskCorpus<Input = BytesInput>,
     }
 
     #[pymethods]

@@ -596,7 +596,12 @@ pub mod pybind {
     };
 
     /// `StdState` with fixed generics
-    pub type PythonStdState = StdState<PythonCorpus, BytesInput, PythonRand, PythonCorpus>;
+    pub type PythonStdState = StdState<
+        Corpus = PythonCorpus,
+        Input = BytesInput,
+        Rand = PythonRand,
+        Solutions = PythonCorpus,
+    >;
 
     #[pyclass(unsendable, name = "StdState")]
     #[derive(Debug)]

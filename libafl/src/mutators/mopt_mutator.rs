@@ -369,7 +369,7 @@ pub enum MOptMode {
 pub struct StdMOptMutator {
     mode: MOptMode,
     finds_before: usize,
-    mutations: <Self as ComposedByMutations>::MutatorsTuple,
+    mutations: <Self as ComposedByMutations>::Mutations,
     max_stack_pow: u64,
 }
 
@@ -525,7 +525,7 @@ where
     /// Create a new [`StdMOptMutator`].
     pub fn new(
         state: &mut <Self as Mutator>::State,
-        mutations: <Self as ComposedByMutations>::MutatorsTuple,
+        mutations: <Self as ComposedByMutations>::Mutations,
         max_stack_pow: u64,
         swarm_num: usize,
     ) -> Result<Self, Error> {
@@ -613,13 +613,13 @@ where
 {
     /// Get the mutations
     #[inline]
-    fn mutations(&self) -> &Self::MutatorsTuple {
+    fn mutations(&self) -> &Self::Mutations {
         &self.mutations
     }
 
     // Get the mutations (mutable)
     #[inline]
-    fn mutations_mut(&mut self) -> &mut Self::MutatorsTuple {
+    fn mutations_mut(&mut self) -> &mut Self::Mutations {
         &mut self.mutations
     }
 }

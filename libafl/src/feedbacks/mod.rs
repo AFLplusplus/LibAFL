@@ -1201,7 +1201,7 @@ pub mod pybind {
     #[derive(Debug)]
     #[pyclass(unsendable, name = "NotFeedback")]
     pub struct PythonNotFeedback {
-        pub inner: NotFeedback<PythonFeedback, BytesInput, PythonStdState>,
+        pub inner: NotFeedback<PythonFeedback, Input = BytesInput, State = PythonStdState>,
     }
 
     #[pymethods]

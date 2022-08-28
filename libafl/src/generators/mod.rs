@@ -158,7 +158,7 @@ pub mod pybind {
     /// Python class for RandBytesGenerator
     pub struct PythonRandBytesGenerator {
         /// Rust wrapped RandBytesGenerator object
-        pub inner: RandBytesGenerator<PythonStdState>,
+        pub inner: RandBytesGenerator<State = PythonStdState>,
     }
 
     #[pymethods]

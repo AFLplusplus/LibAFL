@@ -99,7 +99,7 @@ pub mod pybind {
     /// Python class for InMemoryCorpus
     pub struct PythonInMemoryCorpus {
         /// Rust wrapped InMemoryCorpus object
-        pub inner: InMemoryCorpus<BytesInput>,
+        pub inner: InMemoryCorpus<Input = BytesInput>,
     }
 
     #[pymethods]

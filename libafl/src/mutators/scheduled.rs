@@ -50,13 +50,13 @@ impl LogMutationMetadata {
 
 /// A [`Mutator`] that composes multiple mutations into one.
 pub trait ComposedByMutations {
-    type MutatorsTuple: MutatorsTuple;
+    type Mutations: MutatorsTuple;
 
     /// Get the mutations
-    fn mutations(&self) -> &Self::MutatorsTuple;
+    fn mutations(&self) -> &Self::Mutations;
 
     /// Get the mutations (mutable)
-    fn mutations_mut(&mut self) -> &mut Self::MutatorsTuple;
+    fn mutations_mut(&mut self) -> &mut Self::Mutations;
 }
 
 /// A [`Mutator`] scheduling multiple [`Mutator`]s for an input.
@@ -92,7 +92,7 @@ pub trait ScheduledMutator: ComposedByMutations + Mutator {
 
 /// A [`Mutator`] that schedules one of the embedded mutations on each call.
 pub struct StdScheduledMutator {
-    mutations: <Self as ComposedByMutations>::MutatorsTuple,
+    mutations: <Self as ComposedByMutations>::Mutations,
     max_stack_pow: u64,
 }
 
@@ -128,13 +128,13 @@ where
 {
     /// Get the mutations
     #[inline]
-    fn mutations(&self) -> &Self::MutatorsTuple {
+    fn mutations(&self) -> &Self::Mutations {
         &self.mutations
     }
 
     // Get the mutations (mutable)
     #[inline]
-    fn mutations_mut(&mut self) -> &mut Self::MutatorsTuple {
+    fn mutations_mut(&mut self) -> &mut Self::Mutations {
         &mut self.mutations
     }
 }
@@ -160,7 +160,7 @@ where
     <Self as Mutator>::State: HasRand,
 {
     /// Create a new [`StdScheduledMutator`] instance specifying mutations
-    pub fn new(mutations: <Self as ComposedByMutations>::MutatorsTuple) -> Self {
+    pub fn new(mutations: <Self as ComposedByMutations>::Mutations) -> Self {
         StdScheduledMutator {
             mutations,
             max_stack_pow: 7,
@@ -169,7 +169,7 @@ where
 
     /// Create a new [`StdScheduledMutator`] instance specifying mutations and the maximun number of iterations
     pub fn with_max_stack_pow(
-        mutations: <Self as ComposedByMutations>::MutatorsTuple,
+        mutations: <Self as ComposedByMutations>::Mutations,
         max_stack_pow: u64,
     ) -> Self {
         StdScheduledMutator {
@@ -308,16 +308,16 @@ where
 
 impl<SM> ComposedByMutations for LoggerScheduledMutator<SM>
 where
-    Self::MutatorsTuple: NamedTuple,
+    Self::Mutations: NamedTuple,
     SM: ScheduledMutator,
 {
     #[inline]
-    fn mutations(&self) -> &Self::MutatorsTuple {
+    fn mutations(&self) -> &Self::Mutations {
         self.scheduled.mutations()
     }
 
     #[inline]
-    fn mutations_mut(&mut self) -> &mut Self::MutatorsTuple {
+    fn mutations_mut(&mut self) -> &mut Self::Mutations {
         self.scheduled.mutations_mut()
     }
 }
@@ -467,7 +467,11 @@ pub mod pybind {
     /// Python class for StdHavocMutator
     pub struct PythonStdHavocMutator {
         /// Rust wrapped StdHavocMutator object
-        pub inner: StdScheduledMutator<BytesInput, HavocMutationsType, PythonStdState>,
+        pub inner: StdScheduledMutator<
+            Input = BytesInput,
+            Mutations = HavocMutationsType,
+            State = PythonStdState,
+        >,
     }
 
     #[pymethods]

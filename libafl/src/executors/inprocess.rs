@@ -1687,7 +1687,11 @@ pub mod pybind {
     /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
     pub struct PythonOwnedInProcessExecutor {
         /// Rust wrapped OwnedInProcessExecutor object
-        pub inner: OwnedInProcessExecutor<BytesInput, PythonObserversTuple, PythonStdState>,
+        pub inner: OwnedInProcessExecutor<
+            BytesInput,
+            Observers = PythonObserversTuple,
+            State = PythonStdState,
+        >,
     }
 
     #[pymethods]

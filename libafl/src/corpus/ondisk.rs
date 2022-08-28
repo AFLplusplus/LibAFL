@@ -217,7 +217,7 @@ pub mod pybind {
     /// Python class for OnDiskCorpus
     pub struct PythonOnDiskCorpus {
         /// Rust wrapped OnDiskCorpus object
-        pub inner: OnDiskCorpus<BytesInput>,
+        pub inner: OnDiskCorpus<Input = BytesInput>,
     }
 
     #[pymethods]
