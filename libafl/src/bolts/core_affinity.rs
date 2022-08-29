@@ -193,24 +193,29 @@ pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
 
 // Linux Section
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     linux::get_core_ids()
 }
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     linux::set_for_current(core_id)
 }
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 mod linux {
     use alloc::{string::ToString, vec::Vec};
     use std::mem;
 
+    #[cfg(target_os = "dragonfly")]
+    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
+    #[cfg(not(target_os = "dragonfly"))]
     use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
+    #[cfg(target_os = "dragonfly")]
+    const CPU_SETSIZE: libc::c_int = 256;
 
     use super::CoreId;
     use crate::Error;
