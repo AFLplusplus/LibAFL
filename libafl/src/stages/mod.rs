@@ -260,6 +260,77 @@ where
     }
 }
 
+/// The decision if the [`SkippableStage`] should be skipped
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum SkippableStageDecision {
+    /// Return to indicate that this [`Stage`] should be executed
+    Perform,
+    /// Return to indicate that this [`Stage`] should be skipped
+    Skip,
+}
+
+impl From<bool> for SkippableStageDecision {
+    fn from(b: bool) -> SkippableStageDecision {
+        if b {
+            SkippableStageDecision::Perform
+        } else {
+            SkippableStageDecision::Skip
+        }
+    }
+}
+
+/// The [`SkippableStage`] wraps any [`Stage`] so that it can be skipped, according to a condition.
+#[derive(Debug, Clone)]
+pub struct SkippableStage<CD, E, EM, S, ST, Z>
+where
+    CD: FnMut(&mut S) -> SkippableStageDecision,
+    ST: Stage<E, EM, S, Z>,
+{
+    wrapped_stage: ST,
+    condition: CD,
+    phantom: PhantomData<(E, EM, S, Z)>,
+}
+
+impl<CD, E, EM, S, ST, Z> SkippableStage<CD, E, EM, S, ST, Z>
+where
+    CD: FnMut(&mut S) -> SkippableStageDecision,
+    ST: Stage<E, EM, S, Z>,
+{
+    /// Create a new [`SkippableStage`]
+    pub fn new(wrapped_stage: ST, condition: CD) -> Self {
+        Self {
+            wrapped_stage,
+            condition,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<CD, E, EM, S, ST, Z> Stage<E, EM, S, Z> for SkippableStage<CD, E, EM, S, ST, Z>
+where
+    CD: FnMut(&mut S) -> SkippableStageDecision,
+    ST: Stage<E, EM, S, Z>,
+{
+    /// Run the stage
+    #[inline]
+    fn perform(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        state: &mut S,
+        manager: &mut EM,
+        corpus_idx: usize,
+    ) -> Result<(), Error> {
+        let condition = &mut self.condition;
+        if condition(state) == SkippableStageDecision::Perform {
+            self.wrapped_stage
+                .perform(fuzzer, executor, state, manager, corpus_idx)
+        } else {
+            Ok(())
+        }
+    }
+}
+
 /// `Stage` Python bindings
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
