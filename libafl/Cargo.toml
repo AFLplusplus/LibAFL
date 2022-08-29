@@ -26,6 +26,7 @@ qemu_cli = ["cli"]
 frida_cli = ["cli"]
 afl_exec_sec = [] # calculate exec/sec like AFL
 errors_backtrace = ["backtrace"]
+cmin = ["z3"] # corpus minimisation
 
 # features hiding dependencies licensed under GPL
 gpl = []

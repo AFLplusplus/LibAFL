@@ -43,6 +43,22 @@ impl Input for GeneralizedInput {
         format!("{:016x}", hasher.finish())
     }
 
+    /// Load from a plain file of bytes
+    #[cfg(feature = "std")]
+    fn from_file<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::open(path)?;
+        let mut bytes: Vec<u8> = vec![];
+        file.read_to_end(&mut bytes)?;
+        Ok(Self {
+            bytes,
+            generalized: None,
+            grimoire_mutated: false,
+        })
+    }
+
     /// An hook executed before being added to the corpus
     fn wrapped_as_testcase(&mut self) {
         // remove generalized for inputs generated with bit-level mutations
@@ -205,21 +221,5 @@ impl GeneralizedInput {
     /// Get the generalized input (mutable)
     pub fn generalized_mut(&mut self) -> &mut Option<Vec<GeneralizedItem>> {
         &mut self.generalized
-    }
-
-    /// Load from a plain file of bytes
-    #[cfg(feature = "std")]
-    pub fn from_bytes_file<P>(path: P) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-    {
-        let mut file = File::open(path)?;
-        let mut bytes: Vec<u8> = vec![];
-        file.read_to_end(&mut bytes)?;
-        Ok(Self {
-            bytes,
-            generalized: None,
-            grimoire_mutated: false,
-        })
     }
 }

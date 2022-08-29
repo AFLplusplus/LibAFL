@@ -667,14 +667,7 @@ fn fuzz_text(
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_from_directory(
-                &mut fuzzer,
-                &mut executor,
-                &mut mgr,
-                &seed_dir,
-                false,
-                &mut |_, _, path| GeneralizedInput::from_bytes_file(path),
-            )
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
             .unwrap_or_else(|_| {
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);
