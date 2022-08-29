@@ -639,7 +639,7 @@ pub mod pybind {
                 impl Serialize for $struct_name {
                     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                     where
-                        Self::State: Serializer,
+                        S: Serializer,
                     {
                         let buf = Python::with_gil(|py| -> PyResult<Vec<u8>> {
                             let pickle = PyModule::import(py, "pickle")?;

@@ -127,7 +127,15 @@ where
 
 /// A [`Stage`] that will call a closure
 #[derive(Debug)]
-pub struct ClosureStage<CB> {
+pub struct ClosureStage<CB>
+where
+    CB: FnMut(
+        &mut <Self as Stage>::Fuzzer,
+        &mut <Self as Stage>::Executor,
+        &mut <Self as Stage>::State,
+        &mut <Self as Stage>::EventManager,
+    ),
+{
     closure: CB,
 }
 
@@ -149,21 +157,13 @@ where
         manager: &mut Self::EventManager,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        (self.closure)(fuzzer, executor, state, manager, corpus_idx)
+        Ok(())
+        //(self.closure)(fuzzer, executor, state, manager, corpus_idx)
     }
 }
 
 /// A stage that takes a closure
-impl<CB> ClosureStage<CB>
-where
-    CB: FnMut(
-        &mut <Self as Stage>::Fuzzer,
-        &mut <Self as Stage>::Executor,
-        &mut <Self as Stage>::State,
-        &mut <Self as Stage>::EventManager,
-        usize,
-    ) -> Result<(), Error>,
-{
+impl<CB> ClosureStage<CB> {
     /// Create a new [`ClosureStage`]
     #[must_use]
     pub fn new(closure: CB) -> Self {

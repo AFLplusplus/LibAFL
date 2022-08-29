@@ -844,7 +844,7 @@ pub mod pybind {
         }
     }
 
-    impl ObserversTuple<BytesInput, PythonStdState> for PythonObserversTuple {
+    impl ObserversTuple<Input = BytesInput, State = PythonStdState> for PythonObserversTuple {
         fn pre_exec_all(
             &mut self,
             state: &mut PythonStdState,

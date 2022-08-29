@@ -1888,13 +1888,13 @@ pub mod pybind {
                 }
             }
 
-            impl AsSlice<$datatype> for $struct_name_trait {
+            impl AsSlice<Item = $datatype> for $struct_name_trait {
                 fn as_slice(&self) -> &[$datatype] {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_slice()) }} )
                 }
             }
 
-            impl AsMutSlice<$datatype> for $struct_name_trait {
+            impl AsMutSlice<Item = $datatype> for $struct_name_trait {
                 fn as_mut_slice(&mut self) -> &mut [$datatype] {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_mut_slice()) }} )
                 }
@@ -1975,8 +1975,9 @@ pub mod pybind {
                 }
             }
 
-            impl<I, S> Observer for $struct_name_trait
+            impl<I, S> Observer<I, S> for $struct_name_trait
             where
+                I: Input,
                 Self: MapObserver,
             {
                 #[inline]
