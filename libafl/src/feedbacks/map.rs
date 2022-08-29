@@ -633,7 +633,9 @@ where
         }
     }
 
-    /// Create new `MapFeedback`
+    /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
+    /// feedback is needed twice, but with a different history. Using `new()` always results in the
+    /// same name and therefore also the same history.
     #[must_use]
     pub fn with_name(name: &'static str, map_observer: &O) -> Self {
         Self {
