@@ -716,17 +716,13 @@ mod netbsd {
     use alloc::vec::Vec;
     use std::thread::available_parallelism;
 
-    use libc::{_cpuset, pthread_self, pthread_setaffinity_np};
+    use libc::{
+        _cpuset, _cpuset_create, _cpuset_destroy, _cpuset_set, _cpuset_size, pthread_self,
+        pthread_setaffinity_np,
+    };
 
     use super::CoreId;
     use crate::Error;
-
-    extern "C" {
-        fn _cpuset_create() -> *mut _cpuset;
-        fn _cpuset_destroy(c: *mut _cpuset);
-        fn _cpuset_set(i: usize, c: *mut _cpuset) -> i32;
-        fn _cpuset_size(c: *const _cpuset) -> usize;
-    }
 
     #[allow(trivial_numeric_casts)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
@@ -739,7 +735,7 @@ mod netbsd {
     pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         let set = new_cpuset();
 
-        unsafe { _cpuset_set(core_id.id, set) };
+        unsafe { _cpuset_set(core_id.id as u64, set) };
         // Set the current thread's core affinity.
         let result = unsafe {
             pthread_setaffinity_np(
