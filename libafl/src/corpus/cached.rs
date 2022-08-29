@@ -46,7 +46,7 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         // TODO finish
         self.inner.replace(idx, testcase)
     }
