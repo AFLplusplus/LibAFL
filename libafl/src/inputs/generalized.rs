@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::Error;
 use crate::{
     bolts::{ownedref::OwnedSlice, HasLen},
-    inputs::{HasBytesVec, HasTargetBytes, Input},
+    inputs::{BytesInput, HasBytesVec, HasTargetBytes, Input},
 };
 
 /// An item of the generalized input
@@ -119,6 +119,18 @@ impl From<Vec<u8>> for GeneralizedInput {
 impl From<&[u8]> for GeneralizedInput {
     fn from(bytes: &[u8]) -> Self {
         Self::new(bytes.to_owned())
+    }
+}
+
+impl From<BytesInput> for GeneralizedInput {
+    fn from(bytes_input: BytesInput) -> Self {
+        Self::new(bytes_input.bytes)
+    }
+}
+
+impl From<&BytesInput> for GeneralizedInput {
+    fn from(bytes_input: &BytesInput) -> Self {
+        bytes_input.bytes().into()
     }
 }
 

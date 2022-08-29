@@ -20,7 +20,7 @@ use crate::{
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BytesInput {
     /// The raw input bytes
-    bytes: Vec<u8>,
+    pub(crate) bytes: Vec<u8>,
 }
 
 impl Input for BytesInput {
