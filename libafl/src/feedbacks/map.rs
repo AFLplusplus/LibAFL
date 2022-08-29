@@ -633,6 +633,21 @@ where
         }
     }
 
+    /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
+    /// feedback is needed twice, but with a different history. Using `new()` always results in the
+    /// same name and therefore also the same history.
+    #[must_use]
+    pub fn with_name(name: &'static str, map_observer: &O) -> Self {
+        Self {
+            indexes: None,
+            novelties: None,
+            name: name.to_string(),
+            observer_name: map_observer.name().to_string(),
+            stats_name: create_stats_name(name),
+            phantom: PhantomData,
+        }
+    }
+
     /// Create new `MapFeedback` specifying if it must track indexes of used entries and/or novelties
     #[must_use]
     pub fn with_names_tracking(
