@@ -13,11 +13,13 @@ use std::sync::Arc;
 use deno_core::{v8, ModuleId, ModuleSpecifier};
 use deno_runtime::worker::MainWorker;
 use libafl::{
+    events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
+    feedbacks::Feedback,
     inputs::Input,
     observers::ObserversTuple,
-    state::State,
-    Error,
+    state::{HasClientPerfMonitor, HasSolutions, State},
+    Error, HasObjective,
 };
 use tokio::runtime::Runtime;
 use v8::{Function, Local, TryCatch};
@@ -25,7 +27,7 @@ use v8::{Function, Local, TryCatch};
 use crate::{values::IntoJSValue, Mutex};
 
 /// Executor which executes JavaScript using Deno and V8.
-pub struct V8Executor<'rt, EM, I, OT, S, Z>
+pub struct V8Executor<'rt, I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
@@ -35,17 +37,17 @@ where
     observers: OT,
     rt: &'rt Runtime,
     worker: Arc<Mutex<MainWorker>>,
-    phantom: PhantomData<(EM, I, S, Z)>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<'rt, EM, I, OT, S, Z> V8Executor<'rt, EM, I, OT, S, Z>
+impl<'rt, I, OT, S> V8Executor<'rt, I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
     S: State,
 {
     /// Create a new V8 executor.
-    pub fn new(
+    pub fn new<EM, OF, Z>(
         rt: &'rt Runtime,
         worker: Arc<Mutex<MainWorker>>,
         main_module: ModuleSpecifier,
@@ -53,7 +55,13 @@ where
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
-    ) -> Result<Self, Error> {
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<I> + EventRestarter<S>,
+        OF: Feedback<I, S>,
+        S: HasSolutions<I> + HasClientPerfMonitor,
+        Z: HasObjective<I, OF, S>,
+    {
         let copy = worker.clone();
         let id = match rt.block_on(async {
             let mut locked = copy.lock().await;
@@ -100,6 +108,10 @@ where
                         let input = input.to_js_value(try_catch)?;
                         let res = func.call(try_catch, recv.into(), &[input]);
                         if res.is_none() {
+                            println!(
+                                "{}",
+                                crate::js_err_to_libafl(try_catch).unwrap().to_string()
+                            );
                             Ok(ExitKind::Crash)
                         } else {
                             Ok(ExitKind::Ok)
@@ -125,7 +137,7 @@ where
     }
 }
 
-impl<'rt, EM, I, OT, S, Z> Executor<EM, I, S, Z> for V8Executor<'rt, EM, I, OT, S, Z>
+impl<'rt, EM, I, OT, S, Z> Executor<EM, I, S, Z> for V8Executor<'rt, I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
@@ -142,7 +154,7 @@ where
     }
 }
 
-impl<'rt, EM, I, OT, S, Z> HasObservers<I, OT, S> for V8Executor<'rt, EM, I, OT, S, Z>
+impl<'rt, I, OT, S> HasObservers<I, OT, S> for V8Executor<'rt, I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
@@ -157,7 +169,7 @@ where
     }
 }
 
-impl<'rt, EM, I, OT, S, Z> Debug for V8Executor<'rt, EM, I, OT, S, Z>
+impl<'rt, I, OT, S> Debug for V8Executor<'rt, I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,

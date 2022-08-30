@@ -1,7 +1,8 @@
 //! Value types for inputs passed to JavaScript targets
 
 use libafl::{
-    inputs::{BytesInput, HasBytesVec},
+    bolts::AsSlice,
+    inputs::{HasTargetBytes, Input},
     Error,
 };
 
@@ -13,9 +14,11 @@ pub trait IntoJSValue {
     fn to_js_value<'s>(&self, scope: &mut HandleScope<'s>) -> Result<Local<'s, Value>, Error>;
 }
 
-impl IntoJSValue for BytesInput {
+impl<B: HasTargetBytes + Input> IntoJSValue for B {
     fn to_js_value<'s>(&self, scope: &mut HandleScope<'s>) -> Result<Local<'s, Value>, Error> {
-        let store = ArrayBuffer::new_backing_store_from_vec(Vec::from(self.bytes())).make_shared();
+        let store =
+            ArrayBuffer::new_backing_store_from_vec(Vec::from(self.target_bytes().as_slice()))
+                .make_shared();
         let buffer = ArrayBuffer::with_backing_store(scope, &store);
         Ok(buffer.into())
     }
