@@ -98,11 +98,15 @@ impl JSTypeMapper {
 }
 
 /// Observer which inspects JavaScript type usage for parameters and return values
+///
+/// This observer must not have its contents reused by other fuzzer instances; use
+/// EventConfig::AlwaysUnique or *this will crash*.
 #[derive(Serialize, Deserialize)]
 pub struct JSTypeObserver {
     initial: u8,
     initialized: bool,
-    last_coverage: Vec<u8>,
+    #[serde(skip, default)]
+    last_coverage: Option<Vec<u8>>,
     name: String,
     mapper: JSTypeMapper,
     #[serde(skip, default)]
@@ -116,7 +120,7 @@ impl JSTypeObserver {
         Ok(Self {
             initial: u8::default(),
             initialized: false,
-            last_coverage: Vec::new(),
+            last_coverage: Some(Vec::new()),
             name: name.to_string(),
             mapper: JSTypeMapper::new(),
             inspector: Some(create_inspector()),
@@ -190,7 +194,7 @@ where
                 .insert::<JSTypeMapper>(JSTypeMapper::new());
             state.metadata_mut().get_mut::<JSTypeMapper>().unwrap()
         };
-        mapper.process_coverage(coverage, &mut self.last_coverage);
+        mapper.process_coverage(coverage, self.last_coverage.as_mut().unwrap());
         Ok(())
     }
 
@@ -210,7 +214,7 @@ where
 
 impl HasLen for JSTypeObserver {
     fn len(&self) -> usize {
-        self.last_coverage.len()
+        self.last_coverage.as_ref().unwrap().len()
     }
 }
 
@@ -219,13 +223,13 @@ impl<'it> AsIter<'it> for JSTypeObserver {
     type IntoIter = Iter<'it, u8>;
 
     fn as_iter(&'it self) -> Self::IntoIter {
-        self.last_coverage.as_slice().iter()
+        self.last_coverage.as_ref().unwrap().as_slice().iter()
     }
 }
 
 impl AsMutSlice<u8> for JSTypeObserver {
     fn as_mut_slice(&mut self) -> &mut [u8] {
-        self.last_coverage.as_mut_slice()
+        self.last_coverage.as_mut().unwrap().as_mut_slice()
     }
 }
 
@@ -233,24 +237,29 @@ impl MapObserver for JSTypeObserver {
     type Entry = u8;
 
     fn get(&self, idx: usize) -> &Self::Entry {
-        &self.last_coverage[idx]
+        &self.last_coverage.as_ref().unwrap()[idx]
     }
 
     fn get_mut(&mut self, idx: usize) -> &mut Self::Entry {
-        &mut self.last_coverage[idx]
+        &mut self.last_coverage.as_mut().unwrap()[idx]
     }
 
     fn usable_count(&self) -> usize {
-        self.last_coverage.len()
+        self.last_coverage.as_ref().unwrap().len()
     }
 
     fn count_bytes(&self) -> u64 {
-        self.last_coverage.iter().filter(|&&e| e != 0).count() as u64
+        self.last_coverage
+            .as_ref()
+            .unwrap()
+            .iter()
+            .filter(|&&e| e != 0)
+            .count() as u64
     }
 
     fn hash(&self) -> u64 {
         let mut hasher = AHasher::default();
-        self.last_coverage.hash(&mut hasher);
+        self.last_coverage.as_ref().unwrap().hash(&mut hasher);
         hasher.finish()
     }
 
@@ -265,7 +274,7 @@ impl MapObserver for JSTypeObserver {
     fn reset_map(&mut self) -> Result<(), Error> {
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.last_coverage.as_mut_slice();
+        let map = self.last_coverage.as_mut().unwrap().as_mut_slice();
         for x in map[0..cnt].iter_mut() {
             *x = initial;
         }
@@ -273,13 +282,13 @@ impl MapObserver for JSTypeObserver {
     }
 
     fn to_vec(&self) -> Vec<Self::Entry> {
-        self.last_coverage.clone()
+        self.last_coverage.as_ref().unwrap().clone()
     }
 
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         let initial = self.initial();
         let cnt = self.usable_count();
-        let map = self.last_coverage.as_slice();
+        let map = self.last_coverage.as_ref().unwrap().as_slice();
         let mut res = 0;
         for i in indexes {
             if *i < cnt && map[*i] != initial {
