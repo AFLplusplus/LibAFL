@@ -95,9 +95,9 @@ pub use values::*;
 use crate::v8::{HandleScope, Local, TryCatch};
 
 /// Runtime for the libafl v8 crate. Must be accessed from the main fuzzer thread.
-pub(crate) static mut RUNTIME: Option<SendWrapper<Runtime>> = None;
-/// Worker for the libafl v8 crate. Must be accessed from the v8 worker thread.
-pub(crate) static mut WORKER: Option<SendWrapper<MainWorker>> = None;
+pub static mut RUNTIME: Option<SendWrapper<Runtime>> = None;
+/// Worker for the libafl v8 crate. Must be accessed from the v8 worker thread, via `RUNTIME`.
+pub static mut WORKER: Option<SendWrapper<MainWorker>> = None;
 
 /// Create an inspector for this fuzzer instance
 pub(crate) fn create_inspector() -> Arc<Mutex<LocalInspectorSession>> {
