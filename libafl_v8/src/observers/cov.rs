@@ -10,7 +10,6 @@ use std::{
 
 use ahash::AHasher;
 use deno_core::LocalInspectorSession;
-use deno_runtime::worker::MainWorker;
 use libafl::{
     bolts::{AsIter, AsMutSlice, HasLen},
     executors::ExitKind,
@@ -19,11 +18,11 @@ use libafl::{
     Error,
 };
 use serde::{Deserialize, Serialize};
-use tokio::{runtime::Runtime, sync::Mutex};
+use tokio::sync::Mutex;
 
 pub use super::inspector_api::StartPreciseCoverageParameters;
 use super::inspector_api::TakePreciseCoverageReturnObject;
-use crate::forbid_deserialization;
+use crate::{create_inspector, RUNTIME, WORKER};
 
 // while collisions are theoretically possible, the likelihood is vanishingly small
 #[derive(Debug, Eq, Hash, PartialEq, Serialize, Deserialize, Clone)]
@@ -115,34 +114,24 @@ impl JSCoverageMapper {
 
 /// Observer which inspects JavaScript coverage at either a block or function level
 #[derive(Serialize, Deserialize)]
-pub struct JSMapObserver<'rt> {
+pub struct JSMapObserver {
     initial: u8,
     initialized: bool,
     last_coverage: Vec<u8>,
     mapper: JSCoverageMapper,
     name: String,
     params: StartPreciseCoverageParameters,
-    #[serde(skip, default = "forbid_deserialization")]
-    rt: &'rt Runtime,
-    #[serde(skip, default = "forbid_deserialization")]
-    worker: Arc<Mutex<MainWorker>>,
-    #[serde(skip, default = "forbid_deserialization")]
+    #[serde(skip, default = "create_inspector")]
     inspector: Arc<Mutex<LocalInspectorSession>>,
 }
 
-impl<'rt> JSMapObserver<'rt> {
+impl JSMapObserver {
     /// Create the observer with the provided name to use the provided asynchronous runtime and JS
     /// worker to push inspector data. If you don't know what kind of coverage you want, use this
     /// constructor.
-    pub fn new(
-        name: &str,
-        rt: &'rt Runtime,
-        worker: Arc<Mutex<MainWorker>>,
-    ) -> Result<Self, Error> {
+    pub fn new(name: &str) -> Result<Self, Error> {
         Self::new_with_parameters(
             name,
-            rt,
-            worker,
             StartPreciseCoverageParameters {
                 call_count: true,
                 detailed: true,
@@ -155,27 +144,8 @@ impl<'rt> JSMapObserver<'rt> {
     /// worker to push inspector data, and the parameters with which coverage is collected.
     pub fn new_with_parameters(
         name: &str,
-        rt: &'rt Runtime,
-        worker: Arc<Mutex<MainWorker>>,
         params: StartPreciseCoverageParameters,
     ) -> Result<Self, Error> {
-        let inspector = {
-            let copy = worker.clone();
-            rt.block_on(async {
-                let mut locked = copy.lock().await;
-                let mut session = locked.create_inspector_session().await;
-                if let Err(e) = locked
-                    .with_event_loop(Box::pin(
-                        session.post_message::<()>("Profiler.enable", None),
-                    ))
-                    .await
-                {
-                    Err(Error::unknown(e.to_string()))
-                } else {
-                    Ok(session)
-                }
-            })?
-        };
         Ok(Self {
             initial: u8::default(),
             initialized: false,
@@ -183,20 +153,18 @@ impl<'rt> JSMapObserver<'rt> {
             mapper: JSCoverageMapper::new(params.call_count),
             name: name.to_string(),
             params,
-            rt,
-            worker,
-            inspector: Arc::new(Mutex::new(inspector)),
+            inspector: create_inspector(),
         })
     }
 }
 
-impl<'rt> Named for JSMapObserver<'rt> {
+impl Named for JSMapObserver {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<'rt> Debug for JSMapObserver<'rt> {
+impl Debug for JSMapObserver {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("JSMapObserver")
             .field("initialized", &self.initialized)
@@ -207,17 +175,16 @@ impl<'rt> Debug for JSMapObserver<'rt> {
     }
 }
 
-impl<'rt, I, S> Observer<I, S> for JSMapObserver<'rt> {
+impl<I, S> Observer<I, S> for JSMapObserver {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()?;
         if !self.initialized {
             let inspector = self.inspector.clone();
             let params = self.params.clone();
-            let copy = self.worker.clone();
-            self.rt.block_on(async {
-                let mut locked = copy.lock().await;
+            unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
+                let worker = unsafe { WORKER.as_mut() }.unwrap();
                 let mut session = inspector.lock().await;
-                if let Err(e) = locked
+                if let Err(e) = worker
                     .with_event_loop(Box::pin(
                         session.post_message("Profiler.startPreciseCoverage", Some(&params)),
                     ))
@@ -240,11 +207,10 @@ impl<'rt, I, S> Observer<I, S> for JSMapObserver<'rt> {
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         let session = self.inspector.clone();
-        let copy = self.worker.clone();
-        let coverage = self.rt.block_on(async {
-            let mut locked = copy.lock().await;
+        let coverage = unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
+            let worker = unsafe { WORKER.as_mut() }.unwrap();
             let mut session = session.lock().await;
-            match locked
+            match worker
                 .with_event_loop(Box::pin(
                     session.post_message::<()>("Profiler.takePreciseCoverage", None),
                 ))
@@ -273,13 +239,13 @@ impl<'rt, I, S> Observer<I, S> for JSMapObserver<'rt> {
     }
 }
 
-impl<'rt> HasLen for JSMapObserver<'rt> {
+impl HasLen for JSMapObserver {
     fn len(&self) -> usize {
         self.last_coverage.len()
     }
 }
 
-impl<'rt, 'it> AsIter<'it> for JSMapObserver<'rt> {
+impl<'it> AsIter<'it> for JSMapObserver {
     type Item = u8;
     type IntoIter = Iter<'it, u8>;
 
@@ -288,13 +254,13 @@ impl<'rt, 'it> AsIter<'it> for JSMapObserver<'rt> {
     }
 }
 
-impl<'rt> AsMutSlice<u8> for JSMapObserver<'rt> {
+impl AsMutSlice<u8> for JSMapObserver {
     fn as_mut_slice(&mut self) -> &mut [u8] {
         self.last_coverage.as_mut_slice()
     }
 }
 
-impl<'rt> MapObserver for JSMapObserver<'rt> {
+impl MapObserver for JSMapObserver {
     type Entry = u8;
 
     fn get(&self, idx: usize) -> &Self::Entry {

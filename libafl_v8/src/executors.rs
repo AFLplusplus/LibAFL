@@ -8,10 +8,8 @@ use core::{
     fmt::{Debug, Formatter},
     marker::PhantomData,
 };
-use std::sync::Arc;
 
 use deno_core::{v8, ModuleId, ModuleSpecifier};
-use deno_runtime::worker::MainWorker;
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
@@ -21,13 +19,12 @@ use libafl::{
     state::{HasClientPerfMonitor, HasSolutions, State},
     Error, HasObjective,
 };
-use tokio::runtime::Runtime;
 use v8::{Function, Local, TryCatch};
 
-use crate::{values::IntoJSValue, Mutex};
+use crate::{values::IntoJSValue, RUNTIME, WORKER};
 
 /// Executor which executes JavaScript using Deno and V8.
-pub struct V8Executor<'rt, I, OT, S>
+pub struct V8Executor<I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
@@ -35,12 +32,10 @@ where
 {
     id: ModuleId,
     observers: OT,
-    rt: &'rt Runtime,
-    worker: Arc<Mutex<MainWorker>>,
     phantom: PhantomData<(I, S)>,
 }
 
-impl<'rt, I, OT, S> V8Executor<'rt, I, OT, S>
+impl<I, OT, S> V8Executor<I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
@@ -48,8 +43,6 @@ where
 {
     /// Create a new V8 executor.
     pub fn new<EM, OF, Z>(
-        rt: &'rt Runtime,
-        worker: Arc<Mutex<MainWorker>>,
         main_module: ModuleSpecifier,
         observers: OT,
         _fuzzer: &mut Z,
@@ -62,16 +55,19 @@ where
         S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
-        let copy = worker.clone();
-        let id = match rt.block_on(async {
-            let mut locked = copy.lock().await;
-            let mod_id = locked.preload_main_module(&main_module).await?;
-            let handle = locked.js_runtime.mod_evaluate(mod_id);
-            locked.run_event_loop(false).await?;
-            handle.await??;
+        let id = match unsafe { RUNTIME.as_ref() }
+            .expect("Runtime must be initialized before creating executors; use initialize_v8!")
+            .block_on(async {
+                let worker = unsafe { WORKER.as_mut() }.expect(
+                    "Worker must be initialized before creating executors; use initialize_v8!",
+                );
+                let mod_id = worker.preload_main_module(&main_module).await?;
+                let handle = worker.js_runtime.mod_evaluate(mod_id);
+                worker.run_event_loop(false).await?;
+                handle.await??;
 
-            Ok::<ModuleId, deno_core::anyhow::Error>(mod_id)
-        }) {
+                Ok::<ModuleId, deno_core::anyhow::Error>(mod_id)
+            }) {
             Err(e) => return Err(Error::unknown(e.to_string())),
             Ok(id) => id,
         };
@@ -79,21 +75,18 @@ where
         Ok(Self {
             id,
             observers,
-            rt,
-            worker,
             phantom: Default::default(),
         })
     }
 
     fn invoke_harness_func(&self, input: &I) -> Result<ExitKind, Error> {
         let id = self.id;
-        let copy = self.worker.clone();
-        self.rt.block_on(async {
-            let mut locked = copy.lock().await;
+        unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
+            let worker = unsafe { WORKER.as_mut() }.unwrap();
 
             let res = {
-                let module_namespace = locked.js_runtime.get_module_namespace(id).unwrap();
-                let mut scope = locked.js_runtime.handle_scope();
+                let module_namespace = worker.js_runtime.get_module_namespace(id).unwrap();
+                let mut scope = worker.js_runtime.handle_scope();
                 let module_namespace = Local::<v8::Object>::new(&mut scope, module_namespace);
 
                 let default_export_name = v8::String::new(&mut scope, "default").unwrap();
@@ -124,7 +117,7 @@ where
                 }
             };
 
-            if let Err(e) = locked.run_event_loop(false).await {
+            if let Err(e) = worker.run_event_loop(false).await {
                 return Err(Error::illegal_state(e.to_string()));
             }
             res
@@ -137,7 +130,7 @@ where
     }
 }
 
-impl<'rt, EM, I, OT, S, Z> Executor<EM, I, S, Z> for V8Executor<'rt, I, OT, S>
+impl<EM, I, OT, S, Z> Executor<EM, I, S, Z> for V8Executor<I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
@@ -154,7 +147,7 @@ where
     }
 }
 
-impl<'rt, I, OT, S> HasObservers<I, OT, S> for V8Executor<'rt, I, OT, S>
+impl<I, OT, S> HasObservers<I, OT, S> for V8Executor<I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,
@@ -169,7 +162,7 @@ where
     }
 }
 
-impl<'rt, I, OT, S> Debug for V8Executor<'rt, I, OT, S>
+impl<I, OT, S> Debug for V8Executor<I, OT, S>
 where
     I: Input + IntoJSValue,
     OT: ObserversTuple<I, S>,

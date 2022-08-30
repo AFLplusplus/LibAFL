@@ -8,7 +8,6 @@ use std::{
 
 use ahash::AHasher;
 use deno_core::LocalInspectorSession;
-use deno_runtime::worker::MainWorker;
 use libafl::{
     bolts::{AsIter, AsMutSlice, HasLen},
     executors::ExitKind,
@@ -17,9 +16,11 @@ use libafl::{
     Error,
 };
 use serde::{Deserialize, Serialize};
-use tokio::{runtime::Runtime, sync::Mutex};
+use tokio::sync::Mutex;
 
-use crate::{forbid_deserialization, observers::inspector_api::TakeTypeProfileReturnObject};
+use crate::{
+    create_inspector, observers::inspector_api::TakeTypeProfileReturnObject, RUNTIME, WORKER,
+};
 
 // while collisions are theoretically possible, the likelihood is vanishingly small
 #[derive(Debug, Eq, Hash, PartialEq, Serialize, Deserialize, Clone)]
@@ -95,65 +96,38 @@ impl JSTypeMapper {
 
 /// Observer which inspects JavaScript type usage for parameters and return values
 #[derive(Serialize, Deserialize)]
-pub struct JSTypeObserver<'rt> {
+pub struct JSTypeObserver {
     initial: u8,
     initialized: bool,
     last_coverage: Vec<u8>,
     name: String,
     mapper: JSTypeMapper,
-    #[serde(skip, default = "forbid_deserialization")]
-    rt: &'rt Runtime,
-    #[serde(skip, default = "forbid_deserialization")]
-    worker: Arc<Mutex<MainWorker>>,
-    #[serde(skip, default = "forbid_deserialization")]
+    #[serde(skip, default = "create_inspector")]
     inspector: Arc<Mutex<LocalInspectorSession>>,
 }
 
-impl<'rt> JSTypeObserver<'rt> {
+impl JSTypeObserver {
     /// Create the observer with the provided name to use the provided asynchronous runtime, JS
     /// worker to push inspector data, and the parameters with which coverage is collected.
-    pub fn new(
-        name: &str,
-        rt: &'rt Runtime,
-        worker: Arc<Mutex<MainWorker>>,
-    ) -> Result<Self, Error> {
-        let inspector = {
-            let copy = worker.clone();
-            rt.block_on(async {
-                let mut locked = copy.lock().await;
-                let mut session = locked.create_inspector_session().await;
-                if let Err(e) = locked
-                    .with_event_loop(Box::pin(
-                        session.post_message::<()>("Profiler.enable", None),
-                    ))
-                    .await
-                {
-                    Err(Error::unknown(e.to_string()))
-                } else {
-                    Ok(session)
-                }
-            })?
-        };
+    pub fn new(name: &str) -> Result<Self, Error> {
         Ok(Self {
             initial: u8::default(),
             initialized: false,
             last_coverage: Vec::new(),
             name: name.to_string(),
             mapper: JSTypeMapper::new(),
-            rt,
-            worker,
-            inspector: Arc::new(Mutex::new(inspector)),
+            inspector: create_inspector(),
         })
     }
 }
 
-impl<'rt> Named for JSTypeObserver<'rt> {
+impl Named for JSTypeObserver {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<'rt> Debug for JSTypeObserver<'rt> {
+impl Debug for JSTypeObserver {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("JSTypeObserver")
             .field("initialized", &self.initialized)
@@ -163,16 +137,15 @@ impl<'rt> Debug for JSTypeObserver<'rt> {
     }
 }
 
-impl<'rt, I, S> Observer<I, S> for JSTypeObserver<'rt> {
+impl<I, S> Observer<I, S> for JSTypeObserver {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()?;
         if !self.initialized {
             let inspector = self.inspector.clone();
-            let copy = self.worker.clone();
-            self.rt.block_on(async {
-                let mut locked = copy.lock().await;
+            unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
+                let worker = unsafe { WORKER.as_mut() }.unwrap();
                 let mut session = inspector.lock().await;
-                if let Err(e) = locked
+                if let Err(e) = worker
                     .with_event_loop(Box::pin(
                         session.post_message::<()>("Profiler.startTypeProfile", None),
                     ))
@@ -194,12 +167,11 @@ impl<'rt, I, S> Observer<I, S> for JSTypeObserver<'rt> {
         _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
-        let session = self.inspector.clone();
-        let copy = self.worker.clone();
-        let coverage = self.rt.block_on(async {
-            let mut locked = copy.lock().await;
-            let mut session = session.lock().await;
-            match locked
+        let inspector = self.inspector.clone();
+        let coverage = unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
+            let worker = unsafe { WORKER.as_mut() }.unwrap();
+            let mut session = inspector.lock().await;
+            match worker
                 .with_event_loop(Box::pin(
                     session.post_message::<()>("Profiler.takeTypeProfile", None),
                 ))
@@ -228,13 +200,13 @@ impl<'rt, I, S> Observer<I, S> for JSTypeObserver<'rt> {
     }
 }
 
-impl<'rt> HasLen for JSTypeObserver<'rt> {
+impl HasLen for JSTypeObserver {
     fn len(&self) -> usize {
         self.last_coverage.len()
     }
 }
 
-impl<'rt, 'it> AsIter<'it> for JSTypeObserver<'rt> {
+impl<'it> AsIter<'it> for JSTypeObserver {
     type Item = u8;
     type IntoIter = Iter<'it, u8>;
 
@@ -243,13 +215,13 @@ impl<'rt, 'it> AsIter<'it> for JSTypeObserver<'rt> {
     }
 }
 
-impl<'rt> AsMutSlice<u8> for JSTypeObserver<'rt> {
+impl AsMutSlice<u8> for JSTypeObserver {
     fn as_mut_slice(&mut self) -> &mut [u8] {
         self.last_coverage.as_mut_slice()
     }
 }
 
-impl<'rt> MapObserver for JSTypeObserver<'rt> {
+impl MapObserver for JSTypeObserver {
     type Entry = u8;
 
     fn get(&self, idx: usize) -> &Self::Entry {

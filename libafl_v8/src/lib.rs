@@ -77,23 +77,69 @@ pub mod loader;
 pub mod observers;
 pub mod values;
 
-use std::iter;
+use std::{io, iter, sync::Arc};
 
+use deno_core::LocalInspectorSession;
 pub use deno_core::{self, v8};
 pub use deno_runtime;
+use deno_runtime::worker::MainWorker;
 pub use executors::*;
 use libafl::Error;
 pub use loader::*;
 pub use observers::*;
-pub use tokio::{runtime, sync::Mutex};
+use send_wrapper::SendWrapper;
+pub use tokio::runtime;
+use tokio::{runtime::Runtime, sync::Mutex};
 pub use values::*;
 
 use crate::v8::{HandleScope, Local, TryCatch};
 
-pub(crate) fn forbid_deserialization<T>() -> T {
-    unimplemented!(
-        "Deserialization is forbidden for this type; cannot cross a serialization boundary"
-    )
+/// Runtime for the libafl v8 crate. Must be accessed from the main fuzzer thread.
+pub(crate) static mut RUNTIME: Option<SendWrapper<Runtime>> = None;
+/// Worker for the libafl v8 crate. Must be accessed from the v8 worker thread.
+pub(crate) static mut WORKER: Option<SendWrapper<MainWorker>> = None;
+
+/// Create an inspector for this fuzzer instance
+pub(crate) fn create_inspector() -> Arc<Mutex<LocalInspectorSession>> {
+    let inspector = unsafe { RUNTIME.as_ref() }
+            .expect("Runtime must be initialized before creating inspector sessions; use libafl_v8::initialize_v8!")
+            .block_on(async {
+                let worker = unsafe { WORKER.as_mut() }
+                    .expect(
+                        "Worker must be initialized before creating inspector sessions; use libafl_v8::initialize_v8!",
+                    );
+                let mut session = worker.create_inspector_session().await;
+                if let Err(e) = worker
+                    .with_event_loop(Box::pin(
+                        session.post_message::<()>("Profiler.enable", None),
+                    ))
+                    .await
+                {
+                    Err(Error::unknown(e.to_string()))
+                } else {
+                    Ok(session)
+                }
+            }).expect("Couldn't create the inspector");
+    Arc::new(Mutex::new(inspector))
+}
+
+/// Initialize the v8 execution environment for this fuzzer instance
+pub fn initialize_v8(worker: MainWorker) -> io::Result<()> {
+    let runtime = runtime::Builder::new_current_thread().build()?;
+    runtime.block_on(async {
+        unsafe {
+            WORKER = Some(SendWrapper::new(worker));
+        }
+    });
+    unsafe {
+        RUNTIME = Some(SendWrapper::new(runtime));
+    }
+    Ok(())
+}
+
+/// Check if the v8 execution environment is initialized for this fuzzer instance
+pub fn v8_is_initialized() -> bool {
+    unsafe { RUNTIME.is_some() }
 }
 
 /// Convert a JS error from a try/catch scope into a libafl error
