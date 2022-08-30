@@ -38,7 +38,11 @@ impl Corpus for CachedOnDiskCorpus {
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<Self::Input>) -> Result<(), Error> {
+    fn replace(
+        &mut self,
+        idx: usize,
+        testcase: Testcase<Self::Input>,
+    ) -> Result<Testcase<Self::Input>, Error> {
         // TODO finish
         self.inner.replace(idx, testcase)
     }

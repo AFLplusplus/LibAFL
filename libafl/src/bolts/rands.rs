@@ -26,7 +26,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     /// Gets the next 64 bit value
     fn next(&mut self) -> u64;
 
-    /// Gets a value below the given 64 bit val (inclusive)
+    /// Gets a value below the given 64 bit val (exclusive)
     fn below(&mut self, upper_bound_excl: u64) -> u64 {
         if upper_bound_excl <= 1 {
             return 0;

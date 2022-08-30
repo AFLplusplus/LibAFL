@@ -60,6 +60,96 @@ impl Corpus for OnDiskCorpus {
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, mut testcase: Testcase<Self::Input>) -> Result<usize, Error> {
+        self.save_testcase(&mut testcase)?;
+        self.entries.push(RefCell::new(testcase));
+        Ok(self.entries.len() - 1)
+    }
+
+    /// Replaces the testcase at the given idx
+    #[inline]
+    fn replace(
+        &mut self,
+        idx: usize,
+        mut testcase: Testcase<Self::Input>,
+    ) -> Result<Testcase<Self::Input>, Error> {
+        if idx >= self.entries.len() {
+            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
+        }
+        self.save_testcase(&mut testcase)?;
+        let previous = self.entries[idx].replace(testcase);
+        self.remove_testcase(&previous)?;
+        Ok(previous)
+    }
+
+    /// Removes an entry from the corpus, returning it if it was present.
+    #[inline]
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<Self::Input>>, Error> {
+        if idx >= self.entries.len() {
+            Ok(None)
+        } else {
+            let prev = self.entries.remove(idx).into_inner();
+            self.remove_testcase(&prev)?;
+            Ok(Some(prev))
+        }
+    }
+
+    /// Get by id
+    #[inline]
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
+        Ok(&self.entries[idx])
+    }
+
+    /// Current testcase scheduled
+    #[inline]
+    fn current(&self) -> &Option<usize> {
+        &self.current
+    }
+
+    /// Current testcase scheduled (mutable)
+    #[inline]
+    fn current_mut(&mut self) -> &mut Option<usize> {
+        &mut self.current
+    }
+}
+
+impl OnDiskCorpus {
+    /// Creates the [`OnDiskCorpus`].
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn new<P>(dir_path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        fn new(dir_path: PathBuf) -> Result<OnDiskCorpus, Error> {
+            fs::create_dir_all(&dir_path)?;
+            Ok(OnDiskCorpus {
+                entries: vec![],
+                current: None,
+                dir_path,
+                meta_format: None,
+            })
+        }
+        new(dir_path.as_ref().to_path_buf())
+    }
+
+    /// Creates the [`OnDiskCorpus`] specifying the type of `Metadata` to be saved to disk.
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn new_save_meta(
+        dir_path: PathBuf,
+        meta_format: Option<OnDiskMetadataFormat>,
+    ) -> Result<Self, Error> {
+        fs::create_dir_all(&dir_path)?;
+        Ok(Self {
+            entries: vec![],
+            current: None,
+            dir_path,
+            meta_format,
+        })
+    }
+
+    fn save_testcase(
+        &mut self,
+        testcase: &mut Testcase<<Self as Corpus>::Input>,
+    ) -> Result<(), Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase
@@ -121,81 +211,25 @@ impl Corpus for OnDiskCorpus {
         testcase
             .store_input()
             .expect("Could not save testcase to disk");
-        self.entries.push(RefCell::new(testcase));
-        Ok(self.entries.len() - 1)
-    }
-
-    /// Replaces the testcase at the given idx
-    #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<Self::Input>) -> Result<(), Error> {
-        if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
-        }
-        self.entries[idx] = RefCell::new(testcase);
         Ok(())
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
-    #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<Self::Input>>, Error> {
-        if idx >= self.entries.len() {
-            Ok(None)
-        } else {
-            Ok(Some(self.entries.remove(idx).into_inner()))
+    fn remove_testcase(
+        &mut self,
+        testcase: &Testcase<<Self as Corpus>::Input>,
+    ) -> Result<(), Error> {
+        if let Some(filename) = testcase.filename() {
+            fs::remove_file(filename)?;
         }
-    }
-
-    /// Get by id
-    #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<Self::Input>>, Error> {
-        Ok(&self.entries[idx])
-    }
-
-    /// Current testcase scheduled
-    #[inline]
-    fn current(&self) -> &Option<usize> {
-        &self.current
-    }
-
-    /// Current testcase scheduled (mutable)
-    #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
-        &mut self.current
-    }
-}
-
-impl OnDiskCorpus {
-    /// Creates the [`OnDiskCorpus`].
-    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
-    pub fn new<P>(dir_path: P) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-    {
-        fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus, Error> {
-            fs::create_dir_all(&dir_path)?;
-            Ok(OnDiskCorpus {
-                entries: vec![],
-                current: None,
-                dir_path,
-                meta_format: None,
-            })
+        if self.meta_format.is_some() {
+            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
+            filename.set_file_name(format!(
+                ".{}.metadata",
+                filename.file_name().unwrap().to_string_lossy()
+            ));
+            fs::remove_file(filename)?;
         }
-        new(dir_path.as_ref().to_path_buf())
-    }
-
-    /// Creates the [`OnDiskCorpus`] specifying the type of `Metadata` to be saved to disk.
-    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
-    pub fn new_save_meta(
-        dir_path: PathBuf,
-        meta_format: Option<OnDiskMetadataFormat>,
-    ) -> Result<Self, Error> {
-        fs::create_dir_all(&dir_path)?;
-        Ok(Self {
-            entries: vec![],
-            current: None,
-            dir_path,
-            meta_format,
-        })
+        Ok(())
     }
 }
 #[cfg(feature = "python")]

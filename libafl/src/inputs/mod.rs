@@ -62,7 +62,6 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     }
 
     /// Load the content of this input from a file
-    #[cfg(feature = "std")]
     fn from_file<P>(path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,

@@ -289,6 +289,61 @@ pub trait FeedbackLogic: 'static + Debug {
         OT: ObserversTuple;
 }
 
+/// Factory for feedbacks which should be sensitive to an existing context, e.g. observer(s) from a
+/// specific execution
+pub trait FeedbackFactory<F, I, S, T>
+where
+    F: Feedback<Input = I, State = S>,
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    /// Create the feedback from the provided context
+    fn create_feedback(&self, ctx: &T) -> F;
+}
+
+impl<FE, FU, I, S, T> FeedbackFactory<FE, I, S, T> for FU
+where
+    FU: Fn(&T) -> FE,
+    FE: Feedback<Input = I, State = S>,
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    fn create_feedback(&self, ctx: &T) -> FE {
+        self(ctx)
+    }
+}
+
+/// A feedback factory which merely invokes `::default()` for the feedback type provided
+#[derive(Default, Debug, Copy, Clone)]
+pub struct DefaultFeedbackFactory<F>
+where
+    F: Default,
+{
+    phantom: PhantomData<F>,
+}
+
+impl<F> DefaultFeedbackFactory<F>
+where
+    F: Default,
+{
+    /// Create the feedback factory
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl<F, I, S, T> FeedbackFactory<F, I, S, T> for DefaultFeedbackFactory<F>
+where
+    F: Feedback<Input = I, State = S> + Default,
+    I: Input,
+    S: HasClientPerfMonitor,
+{
+    fn create_feedback(&self, _ctx: &T) -> F {
+        F::default()
+    }
+}
+
 /// Eager `OR` combination of two feedbacks
 #[derive(Debug, Clone)]
 pub struct LogicEagerOr {}
@@ -740,6 +795,9 @@ impl Default for CrashFeedback {
     }
 }
 
+/// A feedback factory for crash feedbacks
+pub type CrashFeedbackFactory = DefaultFeedbackFactory<CrashFeedback>;
+
 /// A [`TimeoutFeedback`] reduces the timeout value of a run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TimeoutFeedback {}
@@ -789,6 +847,9 @@ impl Default for TimeoutFeedback {
         Self::new()
     }
 }
+
+/// A feedback factory for timeout feedbacks
+pub type TimeoutFeedbackFactory = DefaultFeedbackFactory<TimeoutFeedback>;
 
 /// Nop feedback that annotates execution time in the new testcase, if any
 /// for this Feedback, the testcase is never interesting (use with an OR).

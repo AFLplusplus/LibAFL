@@ -34,12 +34,15 @@ impl Corpus for InMemoryCorpus {
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<Self::Input>) -> Result<(), Error> {
+    fn replace(
+        &mut self,
+        idx: usize,
+        testcase: Testcase<Self::Input>,
+    ) -> Result<Testcase<Self::Input>, Error> {
         if idx >= self.entries.len() {
             return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
         }
-        self.entries[idx] = RefCell::new(testcase);
-        Ok(())
+        Ok(self.entries[idx].replace(testcase))
     }
 
     /// Removes an entry from the corpus, returning it if it was present.

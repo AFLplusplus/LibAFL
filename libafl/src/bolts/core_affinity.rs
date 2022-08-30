@@ -193,24 +193,29 @@ pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
 
 // Linux Section
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     linux::get_core_ids()
 }
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     linux::set_for_current(core_id)
 }
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 mod linux {
     use alloc::{string::ToString, vec::Vec};
     use std::mem;
 
+    #[cfg(target_os = "dragonfly")]
+    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
+    #[cfg(not(target_os = "dragonfly"))]
     use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
+    #[cfg(target_os = "dragonfly")]
+    const CPU_SETSIZE: libc::c_int = 256;
 
     use super::CoreId;
     use crate::Error;
@@ -694,6 +699,97 @@ mod freebsd {
 
             assert!(is_equal);
         }
+    }
+}
+
+// NetBSD Section
+
+#[cfg(target_os = "netbsd")]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    netbsd::get_core_ids()
+}
+
+#[cfg(target_os = "netbsd")]
+#[inline]
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    netbsd::set_for_current(core_id)
+}
+
+#[cfg(target_os = "netbsd")]
+mod netbsd {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use libc::{
+        _cpuset, _cpuset_create, _cpuset_destroy, _cpuset_set, _cpuset_size, pthread_self,
+        pthread_setaffinity_np,
+    };
+
+    use super::CoreId;
+    use crate::Error;
+
+    #[allow(trivial_numeric_casts)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+        let set = new_cpuset();
+
+        unsafe { _cpuset_set(core_id.id as u64, set) };
+        // Set the current thread's core affinity.
+        let result = unsafe {
+            pthread_setaffinity_np(
+                pthread_self(), // Defaults to current thread
+                _cpuset_size(set),
+                set,
+            )
+        };
+
+        unsafe { _cpuset_destroy(set) };
+
+        if result < 0 {
+            Err(Error::unknown("Failed to set_for_current"))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn new_cpuset() -> *mut _cpuset {
+        unsafe { _cpuset_create() }
+    }
+}
+
+#[cfg(target_os = "openbsd")]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    openbsd::get_core_ids()
+}
+
+#[cfg(target_os = "openbsd")]
+#[inline]
+fn set_for_current_helper(_: CoreId) -> Result<(), Error> {
+    Ok(()) // There is no notion of cpu affinity on this platform
+}
+
+#[cfg(target_os = "openbsd")]
+mod openbsd {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use super::CoreId;
+    use crate::Error;
+
+    #[allow(trivial_numeric_casts)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
     }
 }
 

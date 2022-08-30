@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, SchedulerTestcaseMetaData},
+    corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
@@ -257,6 +257,27 @@ where
         Ok(())
     }
 
+    fn on_replace(
+        &self,
+        state: &mut Self::State,
+        idx: usize,
+        _testcase: &Testcase<Self::Input>,
+    ) -> Result<(), Error> {
+        // Recreate the alias table
+        self.on_add(state, idx)
+    }
+
+    fn on_remove(
+        &self,
+        state: &mut Self::State,
+        _idx: usize,
+        _testcase: &Option<Testcase<Self::Input>>,
+    ) -> Result<(), Error> {
+        // Recreate the alias table
+        self.create_alias_table(state)?;
+        Ok(())
+    }
+
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&self, state: &mut <Self as Scheduler>::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
@@ -276,7 +297,7 @@ where
 
             let current_cycles = wsmeta.runs_in_current_cycle();
 
-            if current_cycles > corpus_counts {
+            if current_cycles >= corpus_counts {
                 wsmeta.set_runs_current_cycle(0);
             } else {
                 wsmeta.set_runs_current_cycle(current_cycles + 1);

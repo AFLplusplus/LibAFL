@@ -1,11 +1,11 @@
 //! Generators may generate bytes or, in general, data, for inputs.
 
 use alloc::vec::Vec;
-use core::cmp::min;
+use core::{cmp::min, marker::PhantomData};
 
 use crate::{
     bolts::rands::Rand,
-    inputs::{bytes::BytesInput, Input},
+    inputs::{bytes::BytesInput, GeneralizedInput, Input},
     state::HasRand,
     Error,
 };
@@ -31,6 +31,51 @@ pub trait Generator {
 
     /// Generate a new dummy input
     fn generate_dummy(&self, state: &mut Self::State) -> Self::Input;
+}
+
+/// A Generator that produces [`GeneralizedInput`]s from a wrapped [`BytesInput`] generator
+#[derive(Clone, Debug)]
+pub struct GeneralizedInputBytesGenerator<G, S> {
+    bytes_generator: G,
+    phantom: PhantomData<S>,
+}
+
+impl<G, S> GeneralizedInputBytesGenerator<G, S>
+where
+    S: HasRand,
+    G: Generator<Input = BytesInput, State = S>,
+{
+    /// Creates a new [`GeneralizedInputBytesGenerator`] by wrapping a bytes generator.
+    pub fn new(bytes_generator: G) -> Self {
+        Self {
+            bytes_generator,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<G, S> From<G> for GeneralizedInputBytesGenerator<G, S>
+where
+    S: HasRand,
+    G: Generator<Input = BytesInput, State = S>,
+{
+    fn from(bytes_generator: G) -> Self {
+        Self::new(bytes_generator)
+    }
+}
+
+impl<G, S> Generator for GeneralizedInputBytesGenerator<G, S>
+where
+    S: HasRand,
+    G: Generator<Input = BytesInput, State = S>,
+{
+    fn generate(&mut self, state: &mut S) -> Result<GeneralizedInput, Error> {
+        Ok(self.bytes_generator.generate(state)?.into())
+    }
+
+    fn generate_dummy(&self, state: &mut S) -> GeneralizedInput {
+        self.bytes_generator.generate_dummy(state).into()
+    }
 }
 
 #[derive(Clone, Debug)]

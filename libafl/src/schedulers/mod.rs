@@ -39,22 +39,22 @@ pub trait Scheduler {
     type Input: Input;
     type State;
 
-    /// Add an entry to the corpus and return its index
+    /// Added an entry to the corpus at the given index
     fn on_add(&self, _state: &mut Self::State, _idx: usize) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Replaces the testcase at the given idx
+    /// Replaced the given testcase at the given idx
     fn on_replace(
         &self,
         _state: &mut Self::State,
         _idx: usize,
-        _testcase: &Testcase<Self::Input>,
+        _prev: &Testcase<Self::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removed the given entry from the corpus at the given index
     fn on_remove(
         &self,
         _state: &mut Self::State,
@@ -68,7 +68,7 @@ pub trait Scheduler {
     fn next(&self, state: &mut Self::State) -> Result<usize, Error>;
 }
 
-/// Feed the fuzzer simpply with a random testcase on request
+/// Feed the fuzzer simply with a random testcase on request
 #[derive(Debug, Clone)]
 pub struct RandScheduler;
 
