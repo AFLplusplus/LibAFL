@@ -11,6 +11,7 @@ use core::marker::PhantomData;
 pub use mutational::{MutationalStage, StdMutationalStage};
 
 pub mod tmin;
+use regex::internal::Exec;
 pub use tmin::{
     MapEqualityFactory, MapEqualityFeedback, StdTMinMutationalStage, TMinMutationalStage,
 };
@@ -50,7 +51,7 @@ use crate::{
     executors::HasObservers,
     inputs::Input,
     state::{HasClientPerfMonitor, HasCorpus},
-    Error, Evaluator, ExecutesInput,
+    Error, Evaluator, ExecutesInput, Fuzzer,
 };
 
 /// A stage is one step in the fuzzing process.
@@ -155,6 +156,12 @@ where
         &mut Self::EventManager,
         usize,
     ) -> Result<(), Error>,
+    Self::Fuzzer: Fuzzer<
+        Executor = Self::Executor,
+        Input = Self::Input,
+        State = Self::State,
+        EventManager = Self::EventManager,
+    >,
 {
     fn perform(
         &mut self,
