@@ -89,7 +89,7 @@ pub fn main() {
     }
 
     impl CommandConfigurator for MyExecutor {
-        fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &Self::Input) -> Result<Child, Error> {
+        fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
             let mut command = Command::new("./test_command");
 
             let command = command

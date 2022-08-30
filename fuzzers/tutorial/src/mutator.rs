@@ -18,7 +18,7 @@ pub struct LainMutator {
 impl<S: HasRand> Mutator<PacketData, S> for LainMutator {
     fn mutate(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         input: &mut PacketData,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
