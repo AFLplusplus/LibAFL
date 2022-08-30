@@ -15,6 +15,7 @@ use libafl::{
     executors::ExitKind,
     observers::{MapObserver, Observer},
     prelude::Named,
+    state::HasMetadata,
     Error,
 };
 use serde::{Deserialize, Serialize};
@@ -33,11 +34,13 @@ struct JSCoverageEntry {
     end_char_offset: usize,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 struct JSCoverageMapper {
     count: bool,
     idx_map: HashMap<JSCoverageEntry, usize>,
 }
+
+libafl::impl_serdeany!(JSCoverageMapper);
 
 impl JSCoverageMapper {
     fn new(count: bool) -> Self {
@@ -118,11 +121,10 @@ pub struct JSMapObserver {
     initial: u8,
     initialized: bool,
     last_coverage: Vec<u8>,
-    mapper: JSCoverageMapper,
     name: String,
     params: StartPreciseCoverageParameters,
-    #[serde(skip, default = "create_inspector")]
-    inspector: Arc<Mutex<LocalInspectorSession>>,
+    #[serde(skip, default)]
+    inspector: Option<Arc<Mutex<LocalInspectorSession>>>,
 }
 
 impl JSMapObserver {
@@ -150,10 +152,9 @@ impl JSMapObserver {
             initial: u8::default(),
             initialized: false,
             last_coverage: Vec::new(),
-            mapper: JSCoverageMapper::new(params.call_count),
             name: name.to_string(),
             params,
-            inspector: create_inspector(),
+            inspector: Some(create_inspector()),
         })
     }
 }
@@ -175,11 +176,14 @@ impl Debug for JSMapObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for JSMapObserver {
+impl<I, S> Observer<I, S> for JSMapObserver
+where
+    S: HasMetadata,
+{
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()?;
         if !self.initialized {
-            let inspector = self.inspector.clone();
+            let inspector = self.inspector.as_ref().unwrap().clone();
             let params = self.params.clone();
             unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
                 let worker = unsafe { WORKER.as_mut() }.unwrap();
@@ -200,13 +204,8 @@ impl<I, S> Observer<I, S> for JSMapObserver {
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &I,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        let session = self.inspector.clone();
+    fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
+        let session = self.inspector.as_ref().unwrap().clone();
         let coverage = unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
             let worker = unsafe { WORKER.as_mut() }.unwrap();
             let mut session = session.lock().await;
@@ -220,8 +219,15 @@ impl<I, S> Observer<I, S> for JSMapObserver {
                 Err(e) => return Err(Error::unknown(e.to_string())),
             }
         })?;
-        self.mapper
-            .process_coverage(coverage, &mut self.last_coverage);
+        let mapper = if let Some(mapper) = state.metadata_mut().get_mut::<JSCoverageMapper>() {
+            mapper
+        } else {
+            state
+                .metadata_mut()
+                .insert::<JSCoverageMapper>(JSCoverageMapper::new(self.params.call_count));
+            state.metadata_mut().get_mut::<JSCoverageMapper>().unwrap()
+        };
+        mapper.process_coverage(coverage, &mut self.last_coverage);
         Ok(())
     }
 

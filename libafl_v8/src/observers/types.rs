@@ -13,6 +13,7 @@ use libafl::{
     executors::ExitKind,
     observers::{MapObserver, Observer},
     prelude::Named,
+    state::HasMetadata,
     Error,
 };
 use serde::{Deserialize, Serialize};
@@ -30,10 +31,12 @@ struct JSTypeEntry {
     name_hash: u64,
 }
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Debug)]
 struct JSTypeMapper {
     idx_map: HashMap<JSTypeEntry, usize>,
 }
+
+libafl::impl_serdeany!(JSTypeMapper);
 
 impl JSTypeMapper {
     fn new() -> Self {
@@ -102,8 +105,8 @@ pub struct JSTypeObserver {
     last_coverage: Vec<u8>,
     name: String,
     mapper: JSTypeMapper,
-    #[serde(skip, default = "create_inspector")]
-    inspector: Arc<Mutex<LocalInspectorSession>>,
+    #[serde(skip, default)]
+    inspector: Option<Arc<Mutex<LocalInspectorSession>>>,
 }
 
 impl JSTypeObserver {
@@ -116,7 +119,7 @@ impl JSTypeObserver {
             last_coverage: Vec::new(),
             name: name.to_string(),
             mapper: JSTypeMapper::new(),
-            inspector: create_inspector(),
+            inspector: Some(create_inspector()),
         })
     }
 }
@@ -137,11 +140,14 @@ impl Debug for JSTypeObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for JSTypeObserver {
+impl<I, S> Observer<I, S> for JSTypeObserver
+where
+    S: HasMetadata,
+{
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         self.reset_map()?;
         if !self.initialized {
-            let inspector = self.inspector.clone();
+            let inspector = self.inspector.as_ref().unwrap().clone();
             unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
                 let worker = unsafe { WORKER.as_mut() }.unwrap();
                 let mut session = inspector.lock().await;
@@ -161,13 +167,8 @@ impl<I, S> Observer<I, S> for JSTypeObserver {
         Ok(())
     }
 
-    fn post_exec(
-        &mut self,
-        _state: &mut S,
-        _input: &I,
-        _exit_kind: &ExitKind,
-    ) -> Result<(), Error> {
-        let inspector = self.inspector.clone();
+    fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
+        let inspector = self.inspector.as_ref().unwrap().clone();
         let coverage = unsafe { RUNTIME.as_ref() }.unwrap().block_on(async {
             let worker = unsafe { WORKER.as_mut() }.unwrap();
             let mut session = inspector.lock().await;
@@ -181,8 +182,15 @@ impl<I, S> Observer<I, S> for JSTypeObserver {
                 Err(e) => return Err(Error::unknown(e.to_string())),
             }
         })?;
-        self.mapper
-            .process_coverage(coverage, &mut self.last_coverage);
+        let mapper = if let Some(mapper) = state.metadata_mut().get_mut::<JSTypeMapper>() {
+            mapper
+        } else {
+            state
+                .metadata_mut()
+                .insert::<JSTypeMapper>(JSTypeMapper::new());
+            state.metadata_mut().get_mut::<JSTypeMapper>().unwrap()
+        };
+        mapper.process_coverage(coverage, &mut self.last_coverage);
         Ok(())
     }
 
