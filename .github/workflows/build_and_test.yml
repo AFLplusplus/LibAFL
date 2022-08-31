@@ -302,7 +302,7 @@ jobs:
           freebsd-version
           . "$HOME/.cargo/env"
           rustup toolchain install nightly
-          export LLVM_CONFIG=/usr/local/bin/llvm-config-14
+          export LLVM_CONFIG=/usr/local/bin/llvm-config14
           pwd
           ls -lah
           echo "local/bin"
@@ -311,3 +311,4 @@ jobs:
           cargo clippy
           chmod +x ./scripts/clippy.sh
           ./scripts/clippy.sh
+          cargo test
