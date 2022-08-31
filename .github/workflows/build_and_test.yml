@@ -309,5 +309,6 @@ jobs:
           ls -lah /usr/local/bin/
           which llvm-config
           chmod +x ./scripts/clippy.sh
+          bash ./scripts/shmem_limits_fbsd.sh
           bash ./scripts/clippy.sh
           cargo test
