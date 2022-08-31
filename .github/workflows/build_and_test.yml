@@ -295,9 +295,6 @@ jobs:
           curl https://sh.rustup.rs -sSf | sh -s -- -y
 
         run: |
-          pwd
-          ls -lah
-          whoami
-          env
           freebsd-version
-          cargo build
+          source "$HOME/.cargo/env"
+          cargo clippy
