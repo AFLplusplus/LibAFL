@@ -304,4 +304,8 @@ jobs:
           . "$HOME/.cargo/env"
           rustup toolchain install nightly
           export LLVM_CONFIG=/usr/local/bin/llvm-config-14
+          pwd
+          ls -lah
+          cargo clippy
+          chmod +x ./scripts/clippy.sh
           ./scripts/clippy.sh
