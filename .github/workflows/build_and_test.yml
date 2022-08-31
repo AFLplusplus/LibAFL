@@ -296,5 +296,5 @@ jobs:
 
         run: |
           freebsd-version
-          source "$HOME/.cargo/env"
+          . "$HOME/.cargo/env"
           cargo clippy
