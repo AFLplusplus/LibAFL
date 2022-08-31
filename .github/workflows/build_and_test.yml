@@ -279,3 +279,25 @@ jobs:
     #  run: clang -v
     #- name: Windows Test
     #  run: C:\Rust\.cargo\bin\cargo.exe test --verbose
+
+  freebsd:
+    runs-on: macos-12
+    name: Simple build in FreeBSD
+    steps:
+    - uses: actions/checkout@v2
+    - name: Test in FreeBSD
+      id: test
+      uses: vmactions/freebsd-vm@v0
+      with:
+        usesh: true
+        prepare: |
+          pkg install -y curl
+          curl https://sh.rustup.rs -sSf | sh
+
+        run: |
+          pwd
+          ls -lah
+          whoami
+          env
+          freebsd-version
+          cargo build
