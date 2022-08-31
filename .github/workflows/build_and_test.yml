@@ -308,7 +308,6 @@ jobs:
           echo "local/bin"
           ls -lah /usr/local/bin/
           which llvm-config
-          cargo clippy
           chmod +x ./scripts/clippy.sh
-          ./scripts/clippy.sh
+          bash ./scripts/clippy.sh
           cargo test
