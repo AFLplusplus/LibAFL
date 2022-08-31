@@ -290,15 +290,18 @@ jobs:
       uses: vmactions/freebsd-vm@v0
       with:
         usesh: true
+        sync: rsync
+        copyback: false
+        mem: 2048
+        release: 13.1
         prepare: |
           pkg install -y curl bash
           pkg add -y llvm-14
           curl https://sh.rustup.rs -sSf | sh -s -- -y
-          . "$HOME/.cargo/env"
-          rustup toolchain install nightly
 
         run: |
           freebsd-version
           . "$HOME/.cargo/env"
+          rustup toolchain install nightly
           export LLVM_CONFIG=/usr/local/bin/llvm-config-14
           ./scripts/clippy.sh
