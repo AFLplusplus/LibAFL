@@ -294,9 +294,11 @@ jobs:
           pkg install -y curl bash
           pkg add -y llvm-14
           curl https://sh.rustup.rs -sSf | sh -s -- -y
+          . "$HOME/.cargo/env"
+          rustup toolchain install nightly
 
         run: |
           freebsd-version
           . "$HOME/.cargo/env"
           export LLVM_CONFIG=/usr/local/bin/llvm-config-14
-          cargo clippy
+          ./scripts/clippy.sh

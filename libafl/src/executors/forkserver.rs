@@ -126,7 +126,7 @@ impl ConfigTarget for Command {
         }
     }
 
-    #[allow(trivial_numeric_casts)]
+    #[allow(trivial_numeric_casts, clippy::cast_possible_wrap)]
     fn setlimit(&mut self, memlimit: u64) -> &mut Self {
         if memlimit == 0 {
             return self;
