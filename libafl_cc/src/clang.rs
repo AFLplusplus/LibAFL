@@ -377,7 +377,7 @@ impl ClangWrapper {
             optimize: true,
             wrapped_cc: CLANG_PATH.into(),
             wrapped_cxx: CLANGXX_PATH.into(),
-            name: "".into(),
+            name: String::new(),
             is_cpp: false,
             linking: false,
             shared: false,
