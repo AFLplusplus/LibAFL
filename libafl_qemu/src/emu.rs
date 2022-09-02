@@ -1,12 +1,12 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
+#[cfg(feature = "usermode")]
+use core::ptr::copy_nonoverlapping;
 use core::{
     convert::Into,
     ffi::c_void,
     ptr::{addr_of, addr_of_mut, null},
 };
-#[cfg(feature = "usermode")]
-use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(feature = "usermode")]
@@ -391,7 +391,7 @@ impl Iterator for GuestMaps {
             return None;
         }
         unsafe {
-            let mut ret: MapInfo = MaybeUninit::uninit().assume_init();
+            let mut ret = core::mem::zeroed();
             self.c_iter = libafl_maps_next(self.c_iter, addr_of_mut!(ret));
             if self.c_iter.is_null() {
                 None
