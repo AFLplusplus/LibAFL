@@ -9,8 +9,6 @@ pub mod tui;
 
 #[cfg(feature = "std")]
 pub mod disk;
-#[cfg(feature = "introspection")]
-use alloc::string::ToString;
 use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
 
@@ -346,7 +344,7 @@ where
             (self.print_fn)(fmt);
 
             // Separate the spacing just a bit
-            (self.print_fn)("".to_string());
+            (self.print_fn)(String::new());
         }
     }
 }

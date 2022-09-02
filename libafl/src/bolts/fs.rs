@@ -154,9 +154,9 @@ mod test {
     #[test]
     fn test_atomic_file_write() {
         let path = "test_atomic_file_write.tmp";
-        write_file_atomic(&path, b"test").unwrap();
-        let content = fs::read_to_string(&path).unwrap();
-        fs::remove_file(&path).unwrap();
+        write_file_atomic(path, b"test").unwrap();
+        let content = fs::read_to_string(path).unwrap();
+        fs::remove_file(path).unwrap();
         assert_eq!(content, "test");
     }
 
