@@ -295,7 +295,7 @@ jobs:
         mem: 2048
         release: 13.1
         prepare: |
-          pkg install -y curl bash llvm14
+          pkg install -y curl bash sudo llvm14
           curl https://sh.rustup.rs -sSf | sh -s -- -y
 
         run: |
