@@ -160,7 +160,7 @@ pub fn build() {
             //.arg("--as-static-lib")
             .arg("--as-shared-lib")
             .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
-            .args(&["--disable-blobs", "--disable-bsd-user", "--disable-fdt"])
+            .args(["--disable-blobs", "--disable-bsd-user", "--disable-fdt"])
             .status()
             .expect("Configure failed");
         #[cfg(not(feature = "usermode"))]
@@ -210,7 +210,7 @@ pub fn build() {
 
     #[cfg(feature = "usermode")]
     Command::new("ld")
-        .current_dir(&out_dir_path)
+        .current_dir(out_dir_path)
         .arg("-o")
         .arg("libqemu-partially-linked.o")
         .arg("-r")
@@ -284,7 +284,7 @@ pub fn build() {
         .expect("Partial linked failure");
 
     Command::new("ar")
-        .current_dir(&out_dir_path)
+        .current_dir(out_dir_path)
         .arg("crus")
         .arg("libqemu-partially-linked.a")
         .arg("libqemu-partially-linked.o")
@@ -354,11 +354,11 @@ pub fn build() {
     #[cfg(feature = "usermode")]
     {
         let qasan_dir = Path::new("libqasan");
-        let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
+        let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
         let src_dir = Path::new("src");
 
         assert!(Command::new("make")
-            .current_dir(&out_dir_path)
+            .current_dir(out_dir_path)
             .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)
             .arg("-C")
@@ -368,7 +368,7 @@ pub fn build() {
             .expect("make failed")
             .success());
         assert!(Command::new("make")
-            .current_dir(&out_dir_path)
+            .current_dir(out_dir_path)
             .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)
             .arg("-C")

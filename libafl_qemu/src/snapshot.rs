@@ -85,7 +85,7 @@ impl QemuSnapshotHelper {
                 };
                 if map.flags().is_w() {
                     unsafe {
-                        info.data = Some(Box::new(core::mem::MaybeUninit::uninit().assume_init()));
+                        info.data = Some(Box::new(core::mem::zeroed()));
                         emulator.read_mem(addr, &mut info.data.as_mut().unwrap()[..]);
                     }
                 }
