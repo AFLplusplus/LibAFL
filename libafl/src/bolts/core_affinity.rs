@@ -618,7 +618,7 @@ mod freebsd {
     use alloc::vec::Vec;
     use std::{mem, thread::available_parallelism};
 
-    use libc::{cpuset_setaffinity, cpuset_t, CPU_SET};
+    use libc::{cpuset_getaffinity, cpuset_setaffinity, cpuset_t, CPU_ISSET, CPU_SET};
 
     use super::CoreId;
     use crate::Error;
@@ -658,6 +658,29 @@ mod freebsd {
         }
     }
 
+    fn get_affinity_mask() -> Result<cpuset_t, Error> {
+        let mut set = new_cpuset();
+
+        // Try to get current core affinity mask.
+        let result = unsafe {
+            cpuset_getaffinity(
+                CPU_LEVEL_WHICH,
+                CPU_WHICH_PID,
+                -1, // Defaults to current thread
+                mem::size_of::<cpuset_t>(),
+                &mut set,
+            )
+        };
+
+        if result == 0 {
+            Ok(set)
+        } else {
+            Err(Error::unknown(
+                "Failed to retrieve affinity using cpuset_getaffinity",
+            ))
+        }
+    }
+
     fn new_cpuset() -> cpuset_t {
         unsafe { mem::zeroed::<cpuset_t>() }
     }
@@ -667,6 +690,11 @@ mod freebsd {
         use super::*;
 
         #[test]
+        fn test_freebsd_get_affinity_mask() {
+            get_affinity_mask().unwrap();
+        }
+
+        #[test]
         fn test_freebsd_set_for_current() {
             let ids = get_core_ids().unwrap();
 
@@ -674,8 +702,25 @@ mod freebsd {
 
             ids[0].set_affinity().unwrap();
 
-            // TODO: Ensure that the system pinned the current thread
+            // Ensure that the system pinned the current thread
             // to the specified core.
+            let mut core_mask = new_cpuset();
+            unsafe { CPU_SET(ids[0].id, &mut core_mask) };
+
+            let new_mask = get_affinity_mask().unwrap();
+
+            let mut is_equal = true;
+
+            for i in 0..256 as usize {
+                let is_set1 = unsafe { CPU_ISSET(i, &core_mask) };
+                let is_set2 = unsafe { CPU_ISSET(i, &new_mask) };
+
+                if is_set1 != is_set2 {
+                    is_equal = false;
+                }
+            }
+
+            assert!(is_equal);
         }
     }
 }
