@@ -667,11 +667,6 @@ mod freebsd {
         use super::*;
 
         #[test]
-        fn test_freebsd_get_affinity_mask() {
-            get_affinity_mask().unwrap();
-        }
-
-        #[test]
         fn test_freebsd_set_for_current() {
             let ids = get_core_ids().unwrap();
 
@@ -679,25 +674,8 @@ mod freebsd {
 
             ids[0].set_affinity().unwrap();
 
-            // Ensure that the system pinned the current thread
+            // TODO: Ensure that the system pinned the current thread
             // to the specified core.
-            let mut core_mask = new_cpuset();
-            unsafe { CPU_SET(ids[0].id, &mut core_mask) };
-
-            let new_mask = get_affinity_mask().unwrap();
-
-            let mut is_equal = true;
-
-            for i in 0..CPU_SETSIZE as usize {
-                let is_set1 = unsafe { CPU_ISSET(i, &core_mask) };
-                let is_set2 = unsafe { CPU_ISSET(i, &new_mask) };
-
-                if is_set1 != is_set2 {
-                    is_equal = false;
-                }
-            }
-
-            assert!(is_equal);
         }
     }
 }
