@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasBytesVec, Input},
+    inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
@@ -30,7 +30,7 @@ impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
 
 impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxExecutor<'a, I, S, OT>
 where
-    I: Input + HasBytesVec,
+    I: Input + HasTargetBytes,
 {
     fn run_target(
         &mut self,
