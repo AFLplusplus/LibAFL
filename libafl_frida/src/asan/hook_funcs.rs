@@ -1158,4 +1158,85 @@ impl AsanRuntime {
         }
         unsafe { wcscmp(s1, s2) }
     }
+
+    #[cfg(target_vendor = "apple")]
+    #[inline]
+    pub fn hook_memset_pattern4(&mut self, s: *mut c_void, p4: *const c_void, n: usize) {
+        extern "C" {
+            fn memset_pattern4(s: *mut c_void, p4: *const c_void, n: usize);
+        }
+        if !(self.shadow_check_func().unwrap())(s, n) {
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memset_pattern4".to_string(),
+                self.real_address_for_stalked(AsanRuntime::pc()),
+                s as usize,
+                n,
+                Backtrace::new(),
+            )));
+        }
+        if !(self.shadow_check_func().unwrap())(p4, n / 4) {
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memset_pattern4".to_string(),
+                self.real_address_for_stalked(AsanRuntime::pc()),
+                p4 as usize,
+                n / 4,
+                Backtrace::new(),
+            )));
+        }
+        unsafe { memset_pattern4(s, p4, n) }
+    }
+
+    #[cfg(target_vendor = "apple")]
+    #[inline]
+    pub fn hook_memset_pattern8(&mut self, s: *mut c_void, p8: *const c_void, n: usize) {
+        extern "C" {
+            fn memset_pattern8(s: *mut c_void, p8: *const c_void, n: usize);
+        }
+        if !(self.shadow_check_func().unwrap())(s, n) {
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memset_pattern8".to_string(),
+                self.real_address_for_stalked(AsanRuntime::pc()),
+                s as usize,
+                n,
+                Backtrace::new(),
+            )));
+        }
+        if !(self.shadow_check_func().unwrap())(p8, n / 8) {
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memset_pattern8".to_string(),
+                self.real_address_for_stalked(AsanRuntime::pc()),
+                p8 as usize,
+                n / 8,
+                Backtrace::new(),
+            )));
+        }
+        unsafe { memset_pattern8(s, p8, n) }
+    }
+
+    #[cfg(target_vendor = "apple")]
+    #[inline]
+    pub fn hook_memset_pattern16(&mut self, s: *mut c_void, p16: *const c_void, n: usize) {
+        extern "C" {
+            fn memset_pattern16(s: *mut c_void, p16: *const c_void, n: usize);
+        }
+        if !(self.shadow_check_func().unwrap())(s, n) {
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memset_pattern16".to_string(),
+                self.real_address_for_stalked(AsanRuntime::pc()),
+                s as usize,
+                n,
+                Backtrace::new(),
+            )));
+        }
+        if !(self.shadow_check_func().unwrap())(p16, n / 16) {
+            AsanErrors::get_mut().report_error(AsanError::BadFuncArgWrite((
+                "memset_pattern16".to_string(),
+                self.real_address_for_stalked(AsanRuntime::pc()),
+                p16 as usize,
+                n / 16,
+                Backtrace::new(),
+            )));
+        }
+        unsafe { memset_pattern16(s, p16, n) }
+    }
 }
