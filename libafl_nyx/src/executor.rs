@@ -1,6 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
+    bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
@@ -39,7 +40,8 @@ where
         _mgr: &mut EM,
         input: &I,
     ) -> Result<libafl::executors::ExitKind, libafl::Error> {
-        let input = input.bytes();
+        let input_owned = input.target_bytes();
+        let input = input_owned.as_slice();
         self.helper.nyx_process.set_input(input, input.len() as u32);
 
         // exec will take care of trace_bits, so no need to reset
