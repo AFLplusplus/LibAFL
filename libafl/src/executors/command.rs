@@ -621,7 +621,7 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(any(all(feature = "std", unix), doc))]
+#[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator: Sized + Debug {
     /// Spawns a new process with the given configuration.
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
