@@ -865,6 +865,27 @@ impl AsanRuntime {
             *mut wchar_t
         );
         hook_func!(None, wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
+        #[cfg(target_vendor = "apple")]
+        hook_func!(
+            None,
+            memset_pattern4,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
+        #[cfg(target_vendor = "apple")]
+        hook_func!(
+            None,
+            memset_pattern8,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
+        #[cfg(target_vendor = "apple")]
+        hook_func!(
+            None,
+            memset_pattern16,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
     }
 
     #[cfg(target_arch = "x86_64")]
