@@ -29,11 +29,11 @@ pub use shadow::ShadowExecutor;
 pub mod with_observers;
 pub use with_observers::WithObservers;
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(any(all(feature = "std", unix), doc))]
 pub mod command;
 use core::fmt::Debug;
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(any(all(feature = "std", unix), doc))]
 pub use command::CommandExecutor;
 use serde::{Deserialize, Serialize};
 
