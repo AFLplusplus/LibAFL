@@ -593,7 +593,8 @@ impl CommandExecutorBuilder {
 
 /// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
 /// # Example
-/// ```
+#[cfg_attr(all(feature = "std", unix), doc = " ```")]
+#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}};
 /// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
 /// #[derive(Debug)]
