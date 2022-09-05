@@ -199,7 +199,6 @@ pub struct StdState<C, I, R, SC> {
 
 impl<C, I, R, SC> State for StdState<C, I, R, SC>
 where
-    Self: HasCorpus<Corpus = C> + HasRand<Rand = R> + HasSolutions<Solutions = SC>,
     C: Corpus<Input = I>,
     I: Input,
     R: Rand,
@@ -339,10 +338,6 @@ impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC> {
 #[cfg(feature = "std")]
 impl<C, I, R, SC> StdState<C, I, R, SC>
 where
-    Self: HasCorpus<Input = I, Corpus = C>
-        + HasRand<Rand = R>
-        + HasSolutions<Input = I, Solutions = SC>
-        + State<Input = I>,
     C: Corpus<Input = I>,
     I: Input,
     R: Rand,
@@ -463,10 +458,6 @@ where
 
 impl<C, I, R, SC> StdState<C, I, R, SC>
 where
-    Self: HasCorpus<Input = I, Corpus = C>
-        + HasRand<Rand = R>
-        + HasSolutions<Input = I, Solutions = SC>
-        + State<Input = I>,
     C: Corpus<Input = I>,
     I: Input,
     R: Rand,
