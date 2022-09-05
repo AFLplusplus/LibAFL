@@ -1629,6 +1629,7 @@ pub mod child_signal_handlers {
 mod tests {
     use core::marker::PhantomData;
 
+    #[cfg(all(feature = "std", feature = "fork", unix))]
     use serial_test::serial;
 
     #[cfg(all(feature = "std", feature = "fork", unix))]

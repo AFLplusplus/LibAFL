@@ -459,7 +459,19 @@ where
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
+}
 
+impl<C, I, R, SC> StdState<C, I, R, SC>
+where
+    Self: HasCorpus<Input = I, Corpus = C>
+        + HasRand<Rand = R>
+        + HasSolutions<Input = I, Solutions = SC>
+        + State<Input = I>,
+    C: Corpus<Input = I>,
+    I: Input,
+    R: Rand,
+    SC: Corpus<Input = I>,
+{
     fn generate_initial_internal<G, E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
