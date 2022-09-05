@@ -51,7 +51,7 @@ use libafl_qemu::{
     emu::Emulator,
     filter_qemu_args,
     hooks::QemuHooks,
-    MmapPerms, QemuForkExecutor, Regs,
+    GuestUsize, MmapPerms, QemuForkExecutor, Regs,
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
@@ -309,7 +309,7 @@ fn fuzz(
             emu.write_mem(input_addr, buf);
 
             emu.write_reg(Regs::Rdi, input_addr).unwrap();
-            emu.write_reg(Regs::Rsi, len).unwrap();
+            emu.write_reg(Regs::Rsi, len as GuestUsize).unwrap();
             emu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
             emu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 

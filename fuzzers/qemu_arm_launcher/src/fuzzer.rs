@@ -34,6 +34,7 @@ use libafl_qemu::{
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
     emu::Emulator,
+    GuestUsize,
     MmapPerms,
     QemuExecutor,
     QemuHooks,
@@ -94,7 +95,7 @@ pub fn fuzz() {
             emu.write_mem(input_addr, buf);
 
             emu.write_reg(Regs::R0, input_addr).unwrap();
-            emu.write_reg(Regs::R1, len).unwrap();
+            emu.write_reg(Regs::R1, len as GuestUsize).unwrap();
             emu.write_reg(Regs::Pc, test_one_input_ptr).unwrap();
             emu.write_reg(Regs::Lr, ret_addr).unwrap();
 

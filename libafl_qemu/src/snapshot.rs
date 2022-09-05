@@ -15,9 +15,9 @@ use crate::{
     GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
     SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
-#[cfg(cpu_target = "arm")]
+#[cfg(any(cpu_target = "arm", cpu_target = "armeb"))]
 use crate::{SYS_fstatat64, SYS_mmap2};
-#[cfg(not(cpu_target = "arm"))]
+#[cfg(not(any(cpu_target = "arm", cpu_target = "armeb")))]
 use crate::{SYS_mmap, SYS_newfstatat};
 
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
@@ -322,14 +322,14 @@ where
             let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
             h.access(a0 as GuestAddr, a3 as usize);
         }
-        #[cfg(not(cpu_target = "arm"))]
+        #[cfg(not(any(cpu_target = "arm", cpu_target = "armeb")))]
         SYS_newfstatat => {
             if a2 != 0 {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                 h.access(a2 as GuestAddr, 4096); // stat is not greater than a page
             }
         }
-        #[cfg(cpu_target = "arm")]
+        #[cfg(any(cpu_target = "arm", cpu_target = "armeb"))]
         SYS_fstatat64 => {
             if a2 != 0 {
                 let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -352,7 +352,7 @@ where
                 return result;
             }
 
-            #[cfg(cpu_target = "arm")]
+            #[cfg(any(cpu_target = "arm", cpu_target = "armeb"))]
             if i64::from(sys_num) == SYS_mmap2 {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -368,7 +368,7 @@ where
                 }
             }
 
-            #[cfg(not(cpu_target = "arm"))]
+            #[cfg(not(any(cpu_target = "arm", cpu_target = "armeb")))]
             if i64::from(sys_num) == SYS_mmap {
                 if let Ok(prot) = MmapPerms::try_from(a2 as i32) {
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();

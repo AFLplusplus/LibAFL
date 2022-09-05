@@ -12,7 +12,7 @@ use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 #[cfg(feature = "usermode")]
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use num_traits::Num;
+use num_traits::{Num, Zero};
 use strum_macros::EnumIter;
 
 #[cfg(not(any(cpu_target = "x86_64", cpu_target = "aarch64")))]
@@ -517,11 +517,17 @@ impl CPU {
 
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
-        T: Num + PartialOrd + Copy,
+        T: Num + PartialOrd + Copy + Into<GuestUsize>,
         R: Into<i32>,
     {
         let reg = reg.into();
-        let success = unsafe { libafl_qemu_write_reg(self.ptr, reg, addr_of!(val) as *const u8) };
+        let reg_val: GuestUsize = val.into();
+
+        #[cfg(cpu_target = "armeb")]
+        let reg_val = GuestUsize::from_be(reg_val);
+
+        let success =
+            unsafe { libafl_qemu_write_reg(self.ptr, reg, addr_of!(reg_val) as *const u8) };
         if success == 0 {
             Err(format!("Failed to write to register {}", reg))
         } else {
@@ -531,16 +537,19 @@ impl CPU {
 
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
-        T: Num + PartialOrd + Copy,
+        T: Num + PartialOrd + Copy + From<GuestUsize>,
         R: Into<i32>,
     {
         let reg = reg.into();
-        let mut val = T::zero();
+        let mut val = GuestUsize::zero();
         let success = unsafe { libafl_qemu_read_reg(self.ptr, reg, addr_of_mut!(val) as *mut u8) };
         if success == 0 {
             Err(format!("Failed to read register {}", reg))
         } else {
-            Ok(val)
+            #[cfg(cpu_target = "armeb")]
+            let val = GuestUsize::from_be(val);
+
+            Ok(val.into())
         }
     }
 }
@@ -668,7 +677,7 @@ impl Emulator {
 
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
-        T: Num + PartialOrd + Copy,
+        T: Num + PartialOrd + Copy + Into<GuestUsize>,
         R: Into<i32>,
     {
         self.current_cpu().unwrap().write_reg(reg, val)
@@ -676,7 +685,7 @@ impl Emulator {
 
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
-        T: Num + PartialOrd + Copy,
+        T: Num + PartialOrd + Copy + From<GuestUsize>,
         R: Into<i32>,
     {
         self.current_cpu().unwrap().read_reg(reg)

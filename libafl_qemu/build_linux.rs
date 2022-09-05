@@ -40,6 +40,8 @@ pub fn build() {
         "x86_64".to_string()
     } else if cfg!(feature = "arm") {
         "arm".to_string()
+    } else if cfg!(feature = "armeb") {
+        "armeb".to_string()
     } else if cfg!(feature = "aarch64") {
         "aarch64".to_string()
     } else if cfg!(feature = "i386") {
@@ -47,7 +49,7 @@ pub fn build() {
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             println!(
-                "cargo:warning=No architecture feature enabled or CPU_TARGET env specified for libafl_qemu, supported: arm, aarch64, i386, x86_64 - defaulting to x86_64"
+                "cargo:warning=No architecture feature enabled or CPU_TARGET env specified for libafl_qemu, supported: arm, armeb, aarch64, i386, x86_64 - defaulting to x86_64"
             );
             "x86_64".to_string()
         })

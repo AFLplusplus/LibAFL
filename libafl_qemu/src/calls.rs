@@ -92,7 +92,7 @@ where
         GuestAddr::from_le_bytes(ret_addr)
     };
 
-    #[cfg(any(cpu_target = "arm", cpu_target = "aarch64"))]
+    #[cfg(any(cpu_target = "arm", cpu_target = "armeb", cpu_target = "aarch64"))]
     let ret_addr = {
         let emu = hooks.emulator();
         let ret_addr: GuestAddr = emu.read_reg(Regs::Lr).unwrap();

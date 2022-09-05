@@ -37,6 +37,7 @@ use libafl_qemu::{
     elf::EasyElf,
     emu::Emulator,
     filter_qemu_args,
+    GuestUsize,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
     QemuExecutor,
@@ -100,7 +101,7 @@ pub fn fuzz() {
             emu.write_mem(input_addr, buf);
 
             emu.write_reg(Regs::Rdi, input_addr).unwrap();
-            emu.write_reg(Regs::Rsi, len).unwrap();
+            emu.write_reg(Regs::Rsi, len as GuestUsize).unwrap();
             emu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
             emu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 

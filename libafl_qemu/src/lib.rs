@@ -24,9 +24,9 @@ pub mod aarch64;
 #[cfg(all(cpu_target = "aarch64", not(feature = "clippy")))]
 pub use aarch64::*;
 
-#[cfg(cpu_target = "arm")]
+#[cfg(any(cpu_target = "arm", cpu_target = "armeb"))]
 pub mod arm;
-#[cfg(all(cpu_target = "arm", not(feature = "clippy")))]
+#[cfg(all(any(cpu_target = "arm", cpu_target = "armeb"), not(feature = "clippy")))]
 pub use arm::*;
 
 #[cfg(cpu_target = "i386")]

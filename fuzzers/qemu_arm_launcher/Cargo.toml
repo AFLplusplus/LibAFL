@@ -7,6 +7,8 @@ edition = "2018"
 [features]
 default = ["std"]
 std = []
+arm = ["libafl_qemu/arm"] # build qemu for arm
+armeb = ["libafl_qemu/armeb"] # build qemu for armeb
 
 [profile.release]
 #lto = true
@@ -16,4 +18,4 @@ debug = true
 
 [dependencies]
 libafl = { path = "../../libafl/" }
-libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode", "arm"] }
+libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }
