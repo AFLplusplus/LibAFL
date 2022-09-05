@@ -41,7 +41,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     current_corpus_idx: Option<usize>,
@@ -62,7 +62,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Gets the number of iterations as a random number
@@ -85,7 +85,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
@@ -196,7 +196,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     type Item = Result<I, Error>;
@@ -213,7 +213,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage

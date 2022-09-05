@@ -31,7 +31,7 @@ where
     I: Input,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
+    S: HasCorpus<Input = I> + HasMetadata + HasNamedMetadata,
 {
     map_observer_name: String,
     map_name: String,
@@ -50,7 +50,7 @@ where
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
+    S: HasCorpus<Input = I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -233,7 +233,7 @@ where
     I: Input,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
+    S: HasCorpus<Input = I> + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]

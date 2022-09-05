@@ -42,10 +42,10 @@ pub enum MutationResult {
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<I, S>
-where
-    I: Input,
-{
+pub trait Mutator<I, S> {
+    //type Input: Input;
+    //type State: State<Input = Self::Input>;
+
     /// Mutate a given input
     fn mutate(
         &mut self,

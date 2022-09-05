@@ -311,7 +311,7 @@ where
     I: Input,
     OF: Feedback<I, S>,
     OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
@@ -425,7 +425,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]
@@ -456,7 +456,7 @@ where
     F: Feedback<I, S>,
     I: Input,
     OF: Feedback<I, S>,
-    S: HasCorpus<I> + HasSolutions<I> + HasClientPerfMonitor + HasExecutions,
+    S: HasCorpus<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor + HasExecutions,
 {
     /// Process one input, adding to the respective corpuses if needed and firing the right events
     #[inline]

@@ -10,7 +10,7 @@ pub struct QueueScheduler;
 
 impl<I, S> Scheduler<I, S> for QueueScheduler
 where
-    S: HasCorpus<I>,
+    S: HasCorpus<Input = I>,
     I: Input,
 {
     /// Gets the next entry in the queue

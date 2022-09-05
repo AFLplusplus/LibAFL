@@ -22,7 +22,7 @@ pub struct ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
     phantom: PhantomData<(F, I, S)>,
 }
@@ -59,7 +59,7 @@ impl<F, I, S> ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
     /// Creates a new [`struct@ProbabilitySamplingScheduler`]
     #[must_use]
@@ -94,7 +94,7 @@ impl<F, I, S> Scheduler<I, S> for ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
@@ -131,7 +131,7 @@ impl<F, I, S> Default for ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
     fn default() -> Self {
         Self::new()
@@ -165,7 +165,7 @@ mod tests {
     impl<I, S> TestcaseScore<I, S> for UniformDistribution<I>
     where
         I: Input,
-        S: HasMetadata + HasCorpus<I>,
+        S: HasMetadata + HasCorpus<Input = I>,
     {
         fn compute(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
             Ok(FACTOR)

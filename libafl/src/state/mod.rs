@@ -30,12 +30,18 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any timme.
-pub trait State: Serialize + DeserializeOwned {}
+pub trait State: Serialize + DeserializeOwned {
+    /// The Input type used in this state
+    type Input: Input;
+}
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus<I: Input> {
+pub trait HasCorpus {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus<I>;
+    type Corpus: Corpus<Input = Self::Input>;
+    /// The input type used for this corpus
+    type Input: Input;
+
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
     /// The testcase corpus (mutable)
@@ -51,9 +57,11 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions<I: Input> {
+pub trait HasSolutions {
     /// The associated type implementing [`Corpus`] for solutions
-    type Solutions: Corpus<I>;
+    type Solutions: Corpus<Input = Self::Input>;
+    /// The [Input] type used for solutions
+    type Input: Input;
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
     /// The solutions corpus (mutable)
@@ -157,14 +165,12 @@ pub trait HasStartTime {
 
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(bound = "C: serde::Serialize + for<'a> serde::Deserialize<'a>")]
-pub struct StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
+#[serde(bound = "
+        C: serde::Serialize + for<'a> serde::Deserialize<'a>,
+        SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
+        R: serde::Serialize + for<'a> serde::Deserialize<'a>
+    ")]
+pub struct StdState<C, I, R, SC> {
     /// RNG instance
     rand: R,
     /// How many times the executor ran the harness/target
@@ -193,19 +199,18 @@ where
 
 impl<C, I, R, SC> State for StdState<C, I, R, SC>
 where
-    C: Corpus<I>,
+    Self: HasCorpus<Corpus = C> + HasRand<Rand = R> + HasSolutions<Solutions = SC>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
+    type Input = I;
 }
 
 impl<C, I, R, SC> HasRand for StdState<C, I, R, SC>
 where
-    C: Corpus<I>,
-    I: Input,
     R: Rand,
-    SC: Corpus<I>,
 {
     type Rand = R;
 
@@ -222,36 +227,35 @@ where
     }
 }
 
-impl<C, I, R, SC> HasCorpus<I> for StdState<C, I, R, SC>
+impl<C, I, R, SC> HasCorpus for StdState<C, I, R, SC>
 where
-    C: Corpus<I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
-    SC: Corpus<I>,
 {
     type Corpus = C;
+    type Input = I;
 
     /// Returns the corpus
     #[inline]
-    fn corpus(&self) -> &C {
+    fn corpus(&self) -> &Self::Corpus {
         &self.corpus
     }
 
     /// Returns the mutable corpus
     #[inline]
-    fn corpus_mut(&mut self) -> &mut C {
+    fn corpus_mut(&mut self) -> &mut Self::Corpus {
         &mut self.corpus
     }
 }
 
-impl<C, I, R, SC> HasSolutions<I> for StdState<C, I, R, SC>
+impl<C, I, R, SC> HasSolutions for StdState<C, I, R, SC>
 where
-    C: Corpus<I>,
     I: Input,
-    R: Rand,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     type Solutions = SC;
+    type Input = I;
 
     /// Returns the solutions corpus
     #[inline]
@@ -266,13 +270,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
+impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata(&self) -> &SerdeAnyMap {
@@ -286,13 +284,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
+impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn named_metadata(&self) -> &NamedSerdeAnyMap {
@@ -306,13 +298,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
+impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC> {
     /// The executions counter
     #[inline]
     fn executions(&self) -> &usize {
@@ -326,13 +312,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
+impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC> {
     fn max_size(&self) -> usize {
         self.max_size
     }
@@ -342,13 +322,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
+impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC> {
     /// The starting time
     #[inline]
     fn start_time(&self) -> &Duration {
@@ -365,10 +339,14 @@ where
 #[cfg(feature = "std")]
 impl<C, I, R, SC> StdState<C, I, R, SC>
 where
-    C: Corpus<I>,
+    Self: HasCorpus<Input = I, Corpus = C>
+        + HasRand<Rand = R>
+        + HasSolutions<Input = I, Solutions = SC>
+        + State<Input = I>,
+    C: Corpus<Input = I>,
     I: Input,
     R: Rand,
-    SC: Corpus<I>,
+    SC: Corpus<Input = I>,
 {
     /// Loads inputs from a directory.
     /// If `forced` is `true`, the value will be loaded,
@@ -383,7 +361,7 @@ where
         loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, I, Self>,
+        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -426,8 +404,8 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I>,
+        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
+        EM: EventFirer<<Self as State>::Input>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(
@@ -436,7 +414,7 @@ where
                 manager,
                 in_dir,
                 forced,
-                &mut |_, _, path| I::from_file(&path),
+                &mut |_, _, path| <Self as State>::Input::from_file(&path),
             )?;
         }
         manager.fire(
@@ -461,8 +439,8 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I>,
+        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
+        EM: EventFirer<<Self as State>::Input>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
     }
@@ -476,20 +454,12 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I>,
+        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
+        EM: EventFirer<<Self as State>::Input>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
-}
 
-impl<C, I, R, SC> StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
     fn generate_initial_internal<G, E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -500,9 +470,9 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        G: Generator<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I>,
+        G: Generator<<Self as State>::Input, Self>,
+        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
+        EM: EventFirer<<Self as State>::Input>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -538,9 +508,9 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        G: Generator<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I>,
+        G: Generator<<Self as State>::Input, Self>,
+        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
+        EM: EventFirer<<Self as State>::Input>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
     }
@@ -555,9 +525,9 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        G: Generator<I, Self>,
-        Z: Evaluator<E, EM, I, Self>,
-        EM: EventFirer<I>,
+        G: Generator<<Self as State>::Input, Self>,
+        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
+        EM: EventFirer<<Self as State>::Input>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
@@ -571,8 +541,8 @@ where
         objective: &mut O,
     ) -> Result<Self, Error>
     where
-        F: Feedback<I, Self>,
-        O: Feedback<I, Self>,
+        F: Feedback<<Self as State>::Input, Self>,
+        O: Feedback<<Self as State>::Input, Self>,
     {
         let mut state = Self {
             rand,
@@ -595,13 +565,7 @@ where
 }
 
 #[cfg(feature = "introspection")]
-impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
+impl HasClientPerfMonitor for StdState {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         &self.introspection_monitor
     }
@@ -624,13 +588,7 @@ where
 }
 
 #[cfg(not(feature = "introspection"))]
-impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC>
-where
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-    SC: Corpus<I>,
-{
+impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         unimplemented!()
     }

@@ -41,7 +41,7 @@ pub struct SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     sync_dir: PathBuf,
@@ -54,7 +54,7 @@ impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, 
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -98,7 +98,7 @@ impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z>
 where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`]
@@ -162,7 +162,7 @@ pub type SyncFromDiskFunction<I, S, Z> = fn(&mut Z, &mut S, &Path) -> Result<I, 
 impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs

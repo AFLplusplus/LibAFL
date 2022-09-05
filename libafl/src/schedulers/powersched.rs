@@ -154,7 +154,7 @@ pub struct PowerQueueScheduler {
 
 impl<I, S> Scheduler<I, S> for PowerQueueScheduler
 where
-    S: HasCorpus<I> + HasMetadata,
+    S: HasCorpus<Input = I> + HasMetadata,
     I: Input,
 {
     /// Add an entry to the corpus and return its index

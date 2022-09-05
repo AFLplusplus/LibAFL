@@ -901,7 +901,7 @@ pub struct CrossoverInsertMutator;
 impl<I, S> Mutator<I, S> for CrossoverInsertMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I> + HasMaxSize,
+    S: HasRand + HasCorpus<Input = I> + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -976,7 +976,7 @@ pub struct CrossoverReplaceMutator;
 impl<I, S> Mutator<I, S> for CrossoverReplaceMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
 {
     fn mutate(
         &mut self,
@@ -1059,7 +1059,7 @@ pub struct SpliceMutator;
 impl<I, S> Mutator<I, S> for SpliceMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
 {
     #[allow(clippy::cast_sign_loss)]
     fn mutate(
@@ -1181,7 +1181,7 @@ mod tests {
     fn test_mutations<I, S>() -> impl MutatorsTuple<I, S>
     where
         I: Input + HasBytesVec,
-        S: HasRand + HasCorpus<I> + HasMetadata + HasMaxSize,
+        S: HasRand + HasCorpus<Input = I> + HasMetadata + HasMaxSize,
     {
         tuple_list!(
             BitFlipMutator::new(),

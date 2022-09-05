@@ -69,7 +69,7 @@ pub struct RandScheduler;
 
 impl<I, S> Scheduler<I, S> for RandScheduler
 where
-    S: HasCorpus<I> + HasRand,
+    S: HasCorpus<Input = I> + HasRand,
     I: Input,
 {
     /// Gets the next entry at random

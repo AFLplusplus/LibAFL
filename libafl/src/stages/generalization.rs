@@ -64,7 +64,7 @@ pub struct GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
     OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
@@ -76,7 +76,7 @@ where
     O: MapObserver,
     E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
     OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     #[inline]
     #[allow(clippy::too_many_lines)]
@@ -351,7 +351,7 @@ impl<EM, O, OT, S, Z> GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
     OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]

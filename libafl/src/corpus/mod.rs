@@ -26,10 +26,10 @@ pub use minimizer::*;
 use crate::{inputs::Input, Error};
 
 /// Corpus with all current testcases
-pub trait Corpus<I>: serde::Serialize + for<'de> serde::Deserialize<'de>
-where
-    I: Input,
-{
+pub trait Corpus: serde::Serialize + for<'de> serde::Deserialize<'de> {
+    /// The [`Input`] type used in this [`Corpus`]
+    type Input: Input;
+
     /// Returns the number of elements
     fn count(&self) -> usize;
 
@@ -39,16 +39,20 @@ where
     }
 
     /// Add an entry to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error>;
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<usize, Error>;
 
     /// Replaces the testcase at the given idx, returning the existing.
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error>;
+    fn replace(
+        &mut self,
+        idx: usize,
+        testcase: Testcase<Self::Input>,
+    ) -> Result<Testcase<Self::Input>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error>;
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<Self::Input>>, Error>;
 
     /// Get by id
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error>;
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<usize>;

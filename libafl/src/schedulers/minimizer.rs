@@ -67,7 +67,7 @@ where
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata,
+    S: HasCorpus<Input = I> + HasMetadata,
 {
     base: CS,
     skip_non_favored_prob: u64,
@@ -80,7 +80,7 @@ where
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
@@ -188,7 +188,7 @@ where
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]

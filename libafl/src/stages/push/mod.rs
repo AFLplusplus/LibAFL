@@ -38,7 +38,7 @@ where
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// The [`crate::state::State`]
@@ -58,7 +58,7 @@ where
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
@@ -82,7 +82,7 @@ where
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// If this stage has already been initalized.
@@ -113,7 +113,7 @@ where
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageHelper`]
@@ -186,7 +186,7 @@ where
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Gets the [`PushStageHelper`]

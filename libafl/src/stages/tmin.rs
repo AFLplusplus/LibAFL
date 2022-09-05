@@ -42,7 +42,7 @@ where
     I: Input + Hash + HasLen,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasExecutions + HasMaxSize,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<I, OT, S>
         + ExecutesInput<I, OT, S, Z>
         + HasFeedback<F1, I, S>
@@ -189,7 +189,7 @@ where
     I: Input + Hash + HasLen,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasExecutions + HasMaxSize,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<I, OT, S>
         + ExecutesInput<I, OT, S, Z>
         + HasFeedback<F1, I, S>
@@ -238,7 +238,7 @@ where
     I: Input + HasLen + Hash,
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasExecutions + HasMaxSize,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<I, OT, S>
         + ExecutesInput<I, OT, S, Z>
         + HasFeedback<F1, I, S>

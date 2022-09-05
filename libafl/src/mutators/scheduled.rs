@@ -283,7 +283,7 @@ pub struct LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
     MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
     SM: ScheduledMutator<I, MT, S>,
 {
     scheduled: SM,
@@ -295,7 +295,7 @@ impl<I, MT, S, SM> Debug for LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
     MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
     SM: ScheduledMutator<I, MT, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -312,7 +312,7 @@ impl<I, MT, S, SM> Mutator<I, S> for LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
     MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
     SM: ScheduledMutator<I, MT, S>,
 {
     fn mutate(
@@ -350,7 +350,7 @@ impl<I, MT, S, SM> ComposedByMutations<I, MT, S> for LoggerScheduledMutator<I, M
 where
     I: Input,
     MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
     SM: ScheduledMutator<I, MT, S>,
 {
     #[inline]
@@ -368,7 +368,7 @@ impl<I, MT, S, SM> ScheduledMutator<I, MT, S> for LoggerScheduledMutator<I, MT, 
 where
     I: Input,
     MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
     SM: ScheduledMutator<I, MT, S>,
 {
     /// Compute the number of iterations used to apply stacked mutations
@@ -411,7 +411,7 @@ impl<I, MT, S, SM> LoggerScheduledMutator<I, MT, S, SM>
 where
     I: Input,
     MT: MutatorsTuple<I, S> + NamedTuple,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
     SM: ScheduledMutator<I, MT, S>,
 {
     /// Create a new [`StdScheduledMutator`] instance without mutations and corpus

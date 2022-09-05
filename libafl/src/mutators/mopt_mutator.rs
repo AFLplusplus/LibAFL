@@ -374,7 +374,7 @@ pub struct StdMOptMutator<I, MT, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    S: HasRand + HasMetadata + HasCorpus<Input = I> + HasSolutions<Input = I>,
 {
     mode: MOptMode,
     finds_before: usize,
@@ -387,7 +387,7 @@ impl<I, MT, S> Debug for StdMOptMutator<I, MT, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    S: HasRand + HasMetadata + HasCorpus<Input = I> + HasSolutions<Input = I>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -403,7 +403,7 @@ impl<I, MT, S> Mutator<I, S> for StdMOptMutator<I, MT, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    S: HasRand + HasMetadata + HasCorpus<Input = I> + HasSolutions<Input = I>,
 {
     #[inline]
     fn mutate(
@@ -539,7 +539,7 @@ impl<I, MT, S> StdMOptMutator<I, MT, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    S: HasRand + HasMetadata + HasCorpus<Input = I> + HasSolutions<Input = I>,
 {
     /// Create a new [`StdMOptMutator`].
     pub fn new(
@@ -631,7 +631,7 @@ impl<I, MT, S> ComposedByMutations<I, MT, S> for StdMOptMutator<I, MT, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    S: HasRand + HasMetadata + HasCorpus<Input = I> + HasSolutions<Input = I>,
 {
     /// Get the mutations
     #[inline]
@@ -650,7 +650,7 @@ impl<I, MT, S> ScheduledMutator<I, MT, S> for StdMOptMutator<I, MT, S>
 where
     I: Input,
     MT: MutatorsTuple<I, S>,
-    S: HasRand + HasMetadata + HasCorpus<I> + HasSolutions<I>,
+    S: HasRand + HasMetadata + HasCorpus<Input = I> + HasSolutions<Input = I>,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &I) -> u64 {

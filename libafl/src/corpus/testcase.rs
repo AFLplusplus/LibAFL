@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{serdeany::SerdeAnyMap, HasLen},
     inputs::Input,
-    state::HasMetadata,
+    prelude::HasMetadata,
     Error,
 };
 

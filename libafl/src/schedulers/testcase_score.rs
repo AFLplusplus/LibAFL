@@ -19,7 +19,7 @@ use crate::{
 pub trait TestcaseScore<I, S>
 where
     I: Input,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
 {
     /// Computes the favor factor of a [`Testcase`]. Lower is better.
     fn compute(entry: &mut Testcase<I>, state: &S) -> Result<f64, Error>;
@@ -31,7 +31,7 @@ where
 pub struct LenTimeMulTestcaseScore<I, S>
 where
     I: Input + HasLen,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
 {
     phantom: PhantomData<(I, S)>,
 }
@@ -39,7 +39,7 @@ where
 impl<I, S> TestcaseScore<I, S> for LenTimeMulTestcaseScore<I, S>
 where
     I: Input + HasLen,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
 {
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]
     fn compute(entry: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
@@ -59,7 +59,7 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 pub struct CorpusPowerTestcaseScore<I, S>
 where
     I: Input + HasLen,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
 {
     phantom: PhantomData<(I, S)>,
 }
@@ -67,7 +67,7 @@ where
 impl<I, S> TestcaseScore<I, S> for CorpusPowerTestcaseScore<I, S>
 where
     I: Input + HasLen,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
 {
     /// Compute the `power` we assign to each corpus entry
     #[allow(
@@ -297,7 +297,7 @@ where
 pub struct CorpusWeightTestcaseScore<I, S>
 where
     I: Input + HasLen,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
 {
     phantom: PhantomData<(I, S)>,
 }
@@ -305,7 +305,7 @@ where
 impl<I, S> TestcaseScore<I, S> for CorpusWeightTestcaseScore<I, S>
 where
     I: Input + HasLen,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
 {
     /// Compute the `weight` used in weighted corpus entry selection algo
     #[allow(clippy::cast_precision_loss, clippy::cast_lossless)]

@@ -27,7 +27,7 @@ where
     M: Mutator<I, S>,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     map_observer_name: String,
@@ -45,7 +45,7 @@ where
     M: Mutator<I, S>,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     /// The mutator, added to this stage
@@ -138,7 +138,7 @@ where
     M: Mutator<I, S>,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata + HasRand,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata + HasRand,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -164,7 +164,7 @@ where
     M: Mutator<I, S>,
     O: MapObserver,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata,
     Z: Evaluator<E, EM, I, S>,
 {
     /// Creates a new [`PowerMutationalStage`]

@@ -23,7 +23,7 @@ where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     tracer_executor: TE,
     #[allow(clippy::type_complexity)]
@@ -35,7 +35,7 @@ where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     #[inline]
     fn perform(
@@ -84,7 +84,7 @@ where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     /// Creates a new default stage
     pub fn new(tracer_executor: TE) -> Self {
@@ -114,7 +114,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I> + Debug,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I> + Debug,
 {
     #[inline]
     fn perform(
@@ -166,7 +166,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {

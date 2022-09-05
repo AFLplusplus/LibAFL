@@ -390,7 +390,7 @@ where
     #[allow(clippy::similar_names)]
     pub fn launch(mut monitor: MT, shmem_provider: &mut SP) -> Result<(Option<S>, Self), Error>
     where
-        S: DeserializeOwned + Serialize + HasCorpus<I> + HasSolutions<I>,
+        S: DeserializeOwned + Serialize + HasCorpus + HasSolutions,
         MT: Debug,
     {
         // We start ourself as child process to actually fuzz

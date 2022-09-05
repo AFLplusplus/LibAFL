@@ -24,7 +24,7 @@ fn extend_with_random_generalized<S>(
     gap_indices: &mut Vec<usize>,
 ) -> Result<(), Error>
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
 {
     let rand_idx = state.rand_mut().next() as usize;
 
@@ -130,7 +130,7 @@ pub struct GrimoireExtensionMutator {
 
 impl<S> Mutator<GeneralizedInput, S> for GrimoireExtensionMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
 {
     fn mutate(
         &mut self,
@@ -178,7 +178,7 @@ pub struct GrimoireRecursiveReplacementMutator {
 
 impl<S> Mutator<GeneralizedInput, S> for GrimoireRecursiveReplacementMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
 {
     fn mutate(
         &mut self,
@@ -353,7 +353,7 @@ pub struct GrimoireRandomDeleteMutator {
 
 impl<S> Mutator<GeneralizedInput, S> for GrimoireRandomDeleteMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
 {
     fn mutate(
         &mut self,

@@ -98,7 +98,7 @@ impl<F, I, S> Default for WeightedScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
     fn default() -> Self {
         Self::new()
@@ -109,7 +109,7 @@ impl<F, I, S> WeightedScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
     /// Create a new [`WeightedScheduler`] without any scheduling strategy
     #[must_use]
@@ -222,7 +222,7 @@ where
 impl<F, I, S> Scheduler<I, S> for WeightedScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    S: HasCorpus<Input = I> + HasMetadata + HasRand,
     I: Input,
 {
     /// Add an entry to the corpus and return its index

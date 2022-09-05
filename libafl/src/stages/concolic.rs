@@ -24,7 +24,7 @@ where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     inner: TracingStage<EM, I, OT, S, TE, Z>,
     observer_name: String,
@@ -35,7 +35,7 @@ where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     #[inline]
     fn perform(
@@ -72,7 +72,7 @@ where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
     pub fn new(inner: TracingStage<EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
@@ -343,7 +343,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 pub struct SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     _phantom: PhantomData<(EM, I, S, Z)>,
 }
@@ -352,7 +352,7 @@ where
 impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input + HasBytesVec,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
     Z: Evaluator<E, EM, I, S>,
 {
     #[inline]
@@ -395,7 +395,7 @@ where
 impl<EM, I, S, Z> Default for SimpleConcolicMutationalStage<EM, I, S, Z>
 where
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     fn default() -> Self {
         Self {

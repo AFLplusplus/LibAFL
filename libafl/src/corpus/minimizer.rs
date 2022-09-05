@@ -28,7 +28,7 @@ use crate::{
 pub trait CorpusMinimizer<I, S>
 where
     I: Input,
-    S: HasCorpus<I>,
+    S: HasCorpus<Input = I>,
 {
     /// Minimize the corpus of the provided state.
     fn minimize<CS, EX, EM, OT, Z>(
@@ -55,7 +55,7 @@ where
     E: Copy + Hash + Eq,
     I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
     TS: TestcaseScore<I, S>,
 {
     obs_name: String,
@@ -71,7 +71,7 @@ where
     E: Copy + Hash + Eq,
     I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
     TS: TestcaseScore<I, S>,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
@@ -89,7 +89,7 @@ where
     E: Copy + Hash + Eq,
     I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
-    S: HasMetadata + HasCorpus<I>,
+    S: HasMetadata + HasCorpus<Input = I>,
     TS: TestcaseScore<I, S>,
 {
     fn minimize<CS, EX, EM, OT, Z>(
