@@ -229,7 +229,7 @@ where
         self.temp.clear();
         self.temp.extend_from_slice(&input.terminals()[idx_2..]);
 
-        input.terminals_mut().truncate(idx_2);
+        input.terminals_mut().truncate(idx_1);
         input.terminals_mut().extend_from_slice(&self.temp);
 
         Ok(MutationResult::Mutated)
