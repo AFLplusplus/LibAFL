@@ -12,6 +12,9 @@ pub use gramatron::*;
 pub mod generalized;
 pub use generalized::*;
 
+pub mod sequence;
+pub use sequence::*;
+
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 use alloc::{
