@@ -391,12 +391,12 @@ impl Iterator for GuestMaps {
             return None;
         }
         unsafe {
-            let mut ret: MapInfo = MaybeUninit::uninit().assume_init();
-            self.c_iter = libafl_maps_next(self.c_iter, addr_of_mut!(ret));
+            let mut ret = MaybeUninit::uninit();
+            self.c_iter = libafl_maps_next(self.c_iter, ret.as_mut_ptr());
             if self.c_iter.is_null() {
                 None
             } else {
-                Some(ret)
+                Some(ret.assume_init())
             }
         }
     }

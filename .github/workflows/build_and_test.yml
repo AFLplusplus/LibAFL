@@ -213,6 +213,8 @@ jobs:
       uses: actions-rs/cargo@v1
       with:
         command: clippy
+    - name: Build docs
+      run: cargo doc
     - name: Install LLVM and Clang # required for bindgen to work, see https://github.com/rust-lang/rust-bindgen/issues/1797
       uses: KyleMayes/install-llvm-action@32c4866ebb71e0949e8833eb49beeebed48532bd
       with:
@@ -279,3 +281,36 @@ jobs:
     #  run: clang -v
     #- name: Windows Test
     #  run: C:\Rust\.cargo\bin\cargo.exe test --verbose
+
+  freebsd:
+    runs-on: macos-12
+    name: Simple build in FreeBSD
+    steps:
+    - uses: actions/checkout@v2
+    - name: Test in FreeBSD
+      id: test
+      uses: vmactions/freebsd-vm@v0
+      with:
+        usesh: true
+        sync: rsync
+        copyback: false
+        mem: 2048
+        release: 13.1
+        prepare: |
+          pkg install -y curl bash sudo llvm14
+          curl https://sh.rustup.rs -sSf | sh -s -- -y
+
+        run: |
+          freebsd-version
+          . "$HOME/.cargo/env"
+          rustup toolchain install nightly
+          export LLVM_CONFIG=/usr/local/bin/llvm-config14
+          pwd
+          ls -lah
+          echo "local/bin"
+          ls -lah /usr/local/bin/
+          which llvm-config
+          chmod +x ./scripts/clippy.sh
+          bash ./scripts/shmem_limits_fbsd.sh
+          bash ./scripts/clippy.sh
+          cargo test

@@ -623,7 +623,7 @@ token1="A\x41A"
 token2="B"
         "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
-        let tokens = Tokens::from_file(&"test.tkns").unwrap();
+        let tokens = Tokens::from_file("test.tkns").unwrap();
         #[cfg(feature = "std")]
         println!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);

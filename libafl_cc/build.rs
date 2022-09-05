@@ -92,7 +92,7 @@ fn exec_llvm_config(args: &[&str]) -> String {
 /// Use `xcrun` to get the path to the Xcode SDK tools library path, for linking
 fn find_macos_sdk_libs() -> String {
     let sdk_path_out = Command::new("xcrun")
-        .args(&["--show-sdk-path"])
+        .arg("--show-sdk-path")
         .output()
         .expect("Failed to execute xcrun. Make sure you have Xcode installed and executed `sudo xcode-select --install`");
     format!(
@@ -129,7 +129,7 @@ fn build_pass(
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(ldflags)
-            .args(&["-o"])
+            .arg("-o")
             .arg(out_dir.join(format!("{}.{}", src_stub, dll_extension())))
             .status()
             .unwrap_or_else(|_| panic!("Failed to compile {}", src_file))

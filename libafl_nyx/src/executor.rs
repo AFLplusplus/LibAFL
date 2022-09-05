@@ -1,8 +1,9 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
+    bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasBytesVec, Input},
+    inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     Error,
 };
@@ -30,7 +31,7 @@ impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
 
 impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxExecutor<'a, I, S, OT>
 where
-    I: Input + HasBytesVec,
+    I: Input + HasTargetBytes,
 {
     fn run_target(
         &mut self,
@@ -39,7 +40,8 @@ where
         _mgr: &mut EM,
         input: &I,
     ) -> Result<libafl::executors::ExitKind, libafl::Error> {
-        let input = input.bytes();
+        let input_owned = input.target_bytes();
+        let input = input_owned.as_slice();
         self.helper.nyx_process.set_input(input, input.len() as u32);
 
         // exec will take care of trace_bits, so no need to reset

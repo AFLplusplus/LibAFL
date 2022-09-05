@@ -414,7 +414,7 @@ where
                 manager,
                 in_dir,
                 forced,
-                &mut |_, _, path| <Self as State>::Input::from_file(&path),
+                &mut |_, _, path| I::from_file(path),
             )?;
         }
         manager.fire(
