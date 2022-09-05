@@ -435,7 +435,7 @@ pub fn build() {
     }
 
     Command::new("ar")
-        .current_dir(&out_dir_path)
+        .current_dir(out_dir_path)
         .arg("crs")
         .arg("libqemu-partially-linked.a")
         .arg("libqemu-partially-linked.o")
