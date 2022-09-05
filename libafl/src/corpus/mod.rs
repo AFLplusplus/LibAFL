@@ -174,7 +174,9 @@ pub mod pybind {
         }
     }
 
-    impl Corpus<BytesInput> for PythonCorpus {
+    impl Corpus for PythonCorpus {
+        type Input = BytesInput;
+
         #[inline]
         fn count(&self) -> usize {
             unwrap_me!(self.wrapper, c, { c.count() })
