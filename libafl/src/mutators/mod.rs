@@ -43,7 +43,6 @@ pub enum MutationResult {
 /// A mutator takes input, and mutates it.
 /// Simple as that.
 pub trait Mutator<I, S> {
-
     /// Mutate a given input
     fn mutate(
         &mut self,
