@@ -3,6 +3,7 @@
 use core::time::Duration;
 use std::{env, path::PathBuf, process};
 
+use clap::{self, StructOpt};
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -13,14 +14,14 @@ use libafl::{
         tuples::tuple_list,
         AsSlice,
     },
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, OnDiskCorpus},
     events::EventConfig,
     executors::{ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    monitors::MultiMonitor,
+    monitors::{tui::TuiMonitor, MultiMonitor},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
@@ -41,17 +42,56 @@ use libafl_qemu::{
     Regs,
 };
 
+/// The commandline args this fuzzer accepts
+#[derive(Debug, StructOpt)]
+#[clap(
+    name = "qemu_arm_launcher",
+    about = "A QEMU based fuzzer for libpng with a launcher"
+)]
+struct Opt {
+    #[clap(
+        short,
+        long,
+        parse(try_from_str = Cores::from_cmdline),
+        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+        name = "CORES",
+        default_value = "all"
+    )]
+    cores: Cores,
+
+    #[clap(value_parser, required(false))]
+    args: Vec<String>,
+
+    #[clap(short, long)]
+    tui: bool,
+
+    #[clap(short, long)]
+    verbose: bool,
+
+    #[clap(short, long, value_parser, required(true))]
+    input: Vec<String>,
+
+    #[clap(short, long, value_parser, required(true))]
+    output: String,
+}
+
 pub fn fuzz() {
+    let mut opt = Opt::parse();
+
     // Hardcoded parameters
     let timeout = Duration::from_secs(1);
     let broker_port = 1337;
-    let cores = Cores::from_cmdline("0-11").unwrap();
-    let corpus_dirs = [PathBuf::from("./corpus")];
+    let corpus_dirs = opt.input.iter().map(|x| PathBuf::from(x)).collect::<Vec<PathBuf>>();
+
     let objective_dir = PathBuf::from("./crashes");
 
     // Initialize QEMU
     env::remove_var("LD_LIBRARY_PATH");
-    let args: Vec<String> = env::args().collect();
+
+    let argv0 = env::args().nth(0).unwrap();
+    let mut args: Vec<String> = vec![argv0];
+    args.append(&mut opt.args);
+
     let env: Vec<(String, String)> = env::vars().collect();
     let emu = Emulator::new(&args, &env);
 
@@ -133,7 +173,7 @@ pub fn fuzz() {
                 // RNG
                 StdRand::with_seed(current_nanos()),
                 // Corpus that will be evolved, we keep it in memory for performance
-                InMemoryCorpus::new(),
+                OnDiskCorpus::new(opt.output.clone()).unwrap(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
                 OnDiskCorpus::new(objective_dir.clone()).unwrap(),
@@ -189,21 +229,31 @@ pub fn fuzz() {
     // The shared memory allocator
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    // The stats reporter for the broker
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let output = if opt.verbose { Some("/dev/stdout") } else { Some ("/dev/null")};
 
-    // Build and run a Launcher
-    match Launcher::builder()
-        .shmem_provider(shmem_provider)
-        .broker_port(broker_port)
-        .configuration(EventConfig::from_build_id())
-        .monitor(monitor)
-        .run_client(&mut run_client)
-        .cores(&cores)
-        .stdout_file(Some("/dev/null"))
-        .build()
-        .launch()
-    {
+    match if opt.tui {
+        Launcher::builder()
+            .shmem_provider(shmem_provider)
+            .broker_port(broker_port)
+            .configuration(EventConfig::from_build_id())
+            .monitor(TuiMonitor::new(String::from("QEMU Arm Launcher"), false))
+            .run_client(&mut run_client)
+            .cores(&opt.cores)
+            .stdout_file(output)
+            .build()
+            .launch()
+    } else {
+        Launcher::builder()
+            .shmem_provider(shmem_provider)
+            .broker_port(broker_port)
+            .configuration(EventConfig::from_build_id())
+            .monitor(MultiMonitor::new(|s| println!("{}", s)))
+            .run_client(&mut run_client)
+            .cores(&opt.cores)
+            .stdout_file(output)
+            .build()
+            .launch()
+    } {
         Ok(()) => (),
         Err(Error::ShuttingDown) => println!("Fuzzing stopped by user. Good bye."),
         Err(err) => panic!("Failed to run launcher: {:?}", err),

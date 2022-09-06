@@ -19,3 +19,4 @@ debug = true
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["usermode"] }
+clap = { version = "3.2", features = ["derive"] }
