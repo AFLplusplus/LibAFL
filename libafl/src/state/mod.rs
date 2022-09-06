@@ -29,7 +29,7 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
-/// Will be used to restart the fuzzing process at any timme.
+/// Will be used to restart the fuzzing process at any time.
 pub trait State: Serialize + DeserializeOwned {
     /// The Input type used in this state
     type Input: Input;
@@ -170,7 +170,7 @@ pub trait HasStartTime {
         SC: serde::Serialize + for<'a> serde::Deserialize<'a>,
         R: serde::Serialize + for<'a> serde::Deserialize<'a>
     ")]
-pub struct StdState<C, I, R, SC> {
+pub struct StdState<C, R, SC> {
     /// RNG instance
     rand: R,
     /// How many times the executor ran the harness/target
@@ -193,11 +193,9 @@ pub struct StdState<C, I, R, SC> {
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
-
-    phantom: PhantomData<I>,
 }
 
-impl<C, I, R, SC> State for StdState<C, I, R, SC>
+impl<C, I, R, SC> State for StdState<C, R, SC>
 where
     C: Corpus<Input = I>,
     I: Input,
@@ -207,7 +205,7 @@ where
     type Input = I;
 }
 
-impl<C, I, R, SC> HasRand for StdState<C, I, R, SC>
+impl<C, R, SC> HasRand for StdState<C, R, SC>
 where
     R: Rand,
 {
@@ -226,7 +224,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasCorpus for StdState<C, I, R, SC>
+impl<C, I, R, SC> HasCorpus for StdState<C, R, SC>
 where
     C: Corpus<Input = I>,
     I: Input,
@@ -248,13 +246,13 @@ where
     }
 }
 
-impl<C, I, R, SC> HasSolutions for StdState<C, I, R, SC>
+impl<C, R, SC> HasSolutions for StdState<C, R, SC>
 where
-    I: Input,
-    SC: Corpus<Input = I>,
+    SC::Input: Input,
+    SC: Corpus,
 {
     type Solutions = SC;
-    type Input = I;
+    type Input = SC::Input;
 
     /// Returns the solutions corpus
     #[inline]
@@ -269,7 +267,7 @@ where
     }
 }
 
-impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC> {
+impl<C, R, SC> HasMetadata for StdState<C, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn metadata(&self) -> &SerdeAnyMap {
@@ -283,7 +281,7 @@ impl<C, I, R, SC> HasMetadata for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC> {
+impl<C, R, SC> HasNamedMetadata for StdState<C, R, SC> {
     /// Get all the metadata into an [`hashbrown::HashMap`]
     #[inline]
     fn named_metadata(&self) -> &NamedSerdeAnyMap {
@@ -297,7 +295,7 @@ impl<C, I, R, SC> HasNamedMetadata for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC> {
+impl<C, R, SC> HasExecutions for StdState<C, R, SC> {
     /// The executions counter
     #[inline]
     fn executions(&self) -> &usize {
@@ -311,7 +309,7 @@ impl<C, I, R, SC> HasExecutions for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC> {
+impl<C, R, SC> HasMaxSize for StdState<C, R, SC> {
     fn max_size(&self) -> usize {
         self.max_size
     }
@@ -321,7 +319,7 @@ impl<C, I, R, SC> HasMaxSize for StdState<C, I, R, SC> {
     }
 }
 
-impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC> {
+impl<C, R, SC> HasStartTime for StdState<C, R, SC> {
     /// The starting time
     #[inline]
     fn start_time(&self) -> &Duration {
@@ -336,7 +334,7 @@ impl<C, I, R, SC> HasStartTime for StdState<C, I, R, SC> {
 }
 
 #[cfg(feature = "std")]
-impl<C, I, R, SC> StdState<C, I, R, SC>
+impl<C, I, R, SC> StdState<C, R, SC>
 where
     C: Corpus<Input = I>,
     I: Input,
@@ -456,7 +454,7 @@ where
     }
 }
 
-impl<C, I, R, SC> StdState<C, I, R, SC>
+impl<C, I, R, SC> StdState<C, R, SC>
 where
     C: Corpus<Input = I>,
     I: Input,
@@ -559,7 +557,6 @@ where
             max_size: DEFAULT_MAX_SIZE,
             #[cfg(feature = "introspection")]
             introspection_monitor: ClientPerfMonitor::new(),
-            phantom: PhantomData,
         };
         feedback.init_state(&mut state)?;
         objective.init_state(&mut state)?;
@@ -568,7 +565,7 @@ where
 }
 
 #[cfg(feature = "introspection")]
-impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
+impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         &self.introspection_monitor
     }
@@ -591,7 +588,7 @@ impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
 }
 
 #[cfg(not(feature = "introspection"))]
-impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, I, R, SC> {
+impl<C, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         unimplemented!()
     }
