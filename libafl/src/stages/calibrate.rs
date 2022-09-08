@@ -109,7 +109,7 @@ where
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
-        let mut unstable_entries: usize = 0;
+        let mut unstable_entries: Vec<usize> = vec![];
         let map_len: usize = map_first.len();
         while i < iter {
             let input = state
@@ -161,12 +161,12 @@ where
                 history_map.resize(map_len, O::Entry::default());
             }
 
-            for (first, (cur, history)) in
-                map_first.iter().zip(map.iter().zip(history_map.iter_mut()))
+            for (idx, (first, (cur, history))) in
+                map_first.iter().zip(map.iter().zip(history_map.iter_mut())).enumerate()
             {
                 if *first != *cur && *history != O::Entry::max_value() {
                     *history = O::Entry::max_value();
-                    unstable_entries += 1;
+                    unstable_entries.push(idx);
                 };
             }
 
@@ -174,8 +174,8 @@ where
         }
 
         #[allow(clippy::cast_precision_loss)]
-        if unstable_entries != 0 {
-            *state.stability_mut() = Some((map_len - unstable_entries) as f32 / (map_len as f32));
+        if unstable_entries.len() != 0 {
+            *state.stability_mut() = Some((map_len - unstable_entries.len()) as f32 / (map_len as f32));
 
             if iter < CAL_STAGE_MAX {
                 iter += 2;
