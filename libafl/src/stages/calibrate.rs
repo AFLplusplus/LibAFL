@@ -1,7 +1,7 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
 use alloc::string::{String, ToString};
-use core::{fmt::Debug, iter::FromIterator, marker::PhantomData, time::Duration};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
 use num_traits::Bounded;
