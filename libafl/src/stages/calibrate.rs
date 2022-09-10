@@ -1,9 +1,6 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
 use core::{fmt::Debug, iter::FromIterator, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
@@ -74,8 +71,8 @@ where
     phantom: PhantomData<(I, O, OT, S)>,
 }
 
-const CAL_STAGE_START: usize = 4;
-const CAL_STAGE_MAX: usize = 16;
+const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
+const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
 impl<E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S>
 where
@@ -144,7 +141,7 @@ where
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
-        let mut unstable_entries: Vec<usize> = vec![];
+        let mut unstable_entries: HashSet<usize> = HashSet::new();
         let map_len: usize = map_first.len();
         while i < iter {
             let input = state
@@ -203,10 +200,15 @@ where
             {
                 if *first != *cur && *history != O::Entry::max_value() {
                     *history = O::Entry::max_value();
-                    unstable_entries.push(idx);
+                    unstable_entries.insert(idx);
                 };
             }
 
+            if !unstable_entries.is_empty() {
+                if iter < CAL_STAGE_MAX {
+                    iter += 2;
+                }
+            }
             i += 1;
         }
 

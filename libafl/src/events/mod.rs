@@ -386,7 +386,7 @@ where
                 self.fire(
                     state,
                     Event::UpdateUserStats {
-                        name: "stability (unstable_entries / map_len)".to_string(),
+                        name: "stability".to_string(),
                         value: UserStats::Ratio(unstable_entries as u64, map_len as u64),
                         phantom: PhantomData,
                     },
