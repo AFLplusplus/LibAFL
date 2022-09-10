@@ -51,7 +51,7 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 

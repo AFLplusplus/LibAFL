@@ -381,14 +381,13 @@ where
 
             if state.has_metadata::<UnstableEntriesMetadata>() {
                 let unstable = state.metadata().get::<UnstableEntriesMetadata>().unwrap();
-                let stability: f64 = f64::from(
-                    (unstable.unstable_entries().len() as f64) / unstable.map_len() as f64,
-                );
+                let unstable_entries = unstable.unstable_entries().len();
+                let map_len = unstable.map_len();
                 self.fire(
                     state,
                     Event::UpdateUserStats {
-                        name: "stability".to_string(),
-                        value: UserStats::Float(stability),
+                        name: "stability (unstable_entries / map_len)".to_string(),
+                        value: UserStats::Ratio(unstable_entries as u64, map_len as u64),
                         phantom: PhantomData,
                     },
                 )?;

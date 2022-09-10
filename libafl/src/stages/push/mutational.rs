@@ -18,7 +18,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
