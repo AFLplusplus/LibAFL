@@ -208,7 +208,6 @@ where
             i += 1;
         }
 
-        println!("A: {:#?}", unstable_entries);
         #[allow(clippy::cast_precision_loss)]
         if unstable_entries.len() != 0 {
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
@@ -225,7 +224,6 @@ where
                 for item in unstable_entries {
                     existing.unstable_entries.insert(item); // Insert newly found items
                 }
-                println!("B {:#?}", existing.unstable_entries());
                 existing.map_len = map_len;
             }
 
