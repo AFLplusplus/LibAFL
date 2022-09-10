@@ -599,18 +599,6 @@ where
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         &mut self.introspection_monitor
     }
-
-    /// This node's stability
-    #[inline]
-    fn stability(&self) -> &Option<f32> {
-        &self.stability
-    }
-
-    /// This node's stability (mutable)
-    #[inline]
-    fn stability_mut(&mut self) -> &mut Option<f32> {
-        &mut self.stability
-    }
 }
 
 #[cfg(not(feature = "introspection"))]

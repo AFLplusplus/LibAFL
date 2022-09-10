@@ -47,11 +47,13 @@ impl UnstableEntriesMetadata {
     }
 
     /// Getter
+    #[must_use]
     pub fn unstable_entries(&self) -> &HashSet<usize> {
         &self.unstable_entries
     }
 
     /// Getter
+    #[must_use]
     pub fn map_len(&self) -> usize {
         self.map_len
     }
@@ -209,14 +211,9 @@ where
         }
 
         #[allow(clippy::cast_precision_loss)]
-        if unstable_entries.len() != 0 {
+        if !unstable_entries.is_empty() {
             // If we see new stable entries executing this new corpus entries, then merge with the existing one
-            if !state.has_metadata::<UnstableEntriesMetadata>() {
-                state.add_metadata::<UnstableEntriesMetadata>(UnstableEntriesMetadata::new(
-                    HashSet::from_iter(unstable_entries),
-                    map_len,
-                ))
-            } else {
+            if state.has_metadata::<UnstableEntriesMetadata>() {
                 let existing = state
                     .metadata_mut()
                     .get_mut::<UnstableEntriesMetadata>()
@@ -225,6 +222,11 @@ where
                     existing.unstable_entries.insert(item); // Insert newly found items
                 }
                 existing.map_len = map_len;
+            } else {
+                state.add_metadata::<UnstableEntriesMetadata>(UnstableEntriesMetadata::new(
+                    HashSet::from_iter(unstable_entries),
+                    map_len,
+                ));
             }
 
             if iter < CAL_STAGE_MAX {
