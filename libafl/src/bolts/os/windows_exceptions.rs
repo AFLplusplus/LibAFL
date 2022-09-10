@@ -362,9 +362,10 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
         signal(SIGABRT, handle_signal);
     }
     // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
-    // See https://github.com/AFLplusplus/LibAFL/pull/403
+    // See <https://github.com/AFLplusplus/LibAFL/pull/403>
+    // and also <https://github.com/frida/frida-gum/issues/565>
     AddVectoredExceptionHandler(
-        1,
+        0, // Set this to 0 because we want want ASAN's exception handler to execute first..? See <https://github.com/AFLplusplus/LibAFL/issues/769>
         Some(core::mem::transmute(handle_exception as *const c_void)),
     );
     Ok(())
