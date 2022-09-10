@@ -228,10 +228,6 @@ where
                     map_len,
                 ));
             }
-
-            if iter < CAL_STAGE_MAX {
-                iter += 2;
-            }
         };
 
         // If weighted scheduler or powerscheduler is used, update it
