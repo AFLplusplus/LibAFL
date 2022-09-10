@@ -17,7 +17,7 @@ use crate::{
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, HasMetadata},
     Error,
 };
 
@@ -150,7 +150,7 @@ pub trait Fuzzer<E, EM, I, S, ST>
 where
     I: Input,
     EM: ProgressReporter<I>,
-    S: HasExecutions + HasClientPerfMonitor,
+    S: HasExecutions + HasClientPerfMonitor + HasMetadata,
 {
     /// Fuzz for a single iteration.
     /// Returns the index of the last fuzzed corpus item.
@@ -519,7 +519,7 @@ where
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata,
     OF: Feedback<I, S>,
     ST: StagesTuple<E, EM, S, Self>,
 {

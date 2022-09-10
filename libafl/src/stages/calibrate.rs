@@ -1,8 +1,12 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use alloc::string::{String, ToString};
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{fmt::Debug, iter::FromIterator, marker::PhantomData, time::Duration};
 
+use hashbrown::HashSet;
 use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
@@ -23,6 +27,35 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata},
     Error,
 };
+
+crate::impl_serdeany!(UnstableEntriesMetadata);
+/// The metadata to keep unstable entries
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UnstableEntriesMetadata {
+    unstable_entries: HashSet<usize>,
+    map_len: usize,
+}
+
+impl UnstableEntriesMetadata {
+    #[must_use]
+    /// Create a new [`struct@UnstableEntriesMetadata`]
+    pub fn new(entries: HashSet<usize>, map_len: usize) -> Self {
+        Self {
+            unstable_entries: entries,
+            map_len,
+        }
+    }
+
+    /// Getter
+    pub fn unstable_entries(&self) -> &HashSet<usize> {
+        &self.unstable_entries
+    }
+
+    /// Getter
+    pub fn map_len(&self) -> usize {
+        self.map_len
+    }
+}
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
@@ -161,8 +194,10 @@ where
                 history_map.resize(map_len, O::Entry::default());
             }
 
-            for (idx, (first, (cur, history))) in
-                map_first.iter().zip(map.iter().zip(history_map.iter_mut())).enumerate()
+            for (idx, (first, (cur, history))) in map_first
+                .iter()
+                .zip(map.iter().zip(history_map.iter_mut()))
+                .enumerate()
             {
                 if *first != *cur && *history != O::Entry::max_value() {
                     *history = O::Entry::max_value();
@@ -173,9 +208,26 @@ where
             i += 1;
         }
 
+        println!("A: {:#?}", unstable_entries);
         #[allow(clippy::cast_precision_loss)]
         if unstable_entries.len() != 0 {
-            *state.stability_mut() = Some((map_len - unstable_entries.len()) as f32 / (map_len as f32));
+            // If we see new stable entries executing this new corpus entries, then merge with the existing one
+            if !state.has_metadata::<UnstableEntriesMetadata>() {
+                state.add_metadata::<UnstableEntriesMetadata>(UnstableEntriesMetadata::new(
+                    HashSet::from_iter(unstable_entries),
+                    map_len,
+                ))
+            } else {
+                let existing = state
+                    .metadata_mut()
+                    .get_mut::<UnstableEntriesMetadata>()
+                    .unwrap();
+                for item in unstable_entries {
+                    existing.unstable_entries.insert(item); // Insert newly found items
+                }
+                println!("B {:#?}", existing.unstable_entries());
+                existing.map_len = map_len;
+            }
 
             if iter < CAL_STAGE_MAX {
                 iter += 2;

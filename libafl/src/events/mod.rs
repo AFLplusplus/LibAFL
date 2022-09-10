@@ -22,6 +22,8 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
+    prelude::HasMetadata,
+    stages::calibrate::UnstableEntriesMetadata,
     state::{HasClientPerfMonitor, HasExecutions},
     Error,
 };
@@ -360,7 +362,7 @@ where
         monitor_timeout: Duration,
     ) -> Result<Duration, Error>
     where
-        S: HasExecutions + HasClientPerfMonitor,
+        S: HasExecutions + HasClientPerfMonitor + HasMetadata,
     {
         let executions = *state.executions();
         let cur = current_time();
@@ -377,8 +379,11 @@ where
                 },
             )?;
 
-            if let Some(x) = state.stability() {
-                let stability = f64::from(*x);
+            if state.has_metadata::<UnstableEntriesMetadata>() {
+                let unstable = state.metadata().get::<UnstableEntriesMetadata>().unwrap();
+                let stability: f64 = f64::from(
+                    (unstable.unstable_entries().len() as f64) / unstable.map_len() as f64,
+                );
                 self.fire(
                     state,
                     Event::UpdateUserStats {

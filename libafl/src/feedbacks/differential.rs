@@ -224,14 +224,6 @@ mod tests {
         fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
             unimplemented!()
         }
-
-        fn stability(&self) -> &Option<f32> {
-            unimplemented!()
-        }
-
-        fn stability_mut(&mut self) -> &mut Option<f32> {
-            unimplemented!()
-        }
     }
 
     fn test_diff(should_equal: bool) {
