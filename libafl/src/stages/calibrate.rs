@@ -68,6 +68,7 @@ where
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
+    track_stability: bool,
     phantom: PhantomData<(I, O, OT, S)>,
 }
 
@@ -136,13 +137,13 @@ where
             .match_name::<O>(&self.map_observer_name)
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .to_vec();
+        let mut unstable_entries: HashSet<usize> = HashSet::new();
+        let map_len: usize = map_first.len();
 
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
-        let mut unstable_entries: HashSet<usize> = HashSet::new();
-        let map_len: usize = map_first.len();
         while i < iter {
             let input = state
                 .corpus()
@@ -177,35 +178,36 @@ where
                 .observers_mut()
                 .post_exec_all(state, &input, &exit_kind)?;
 
-            let map = &executor
-                .observers()
-                .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
-                .to_vec();
+            if self.track_stability {
+                let map = &executor
+                    .observers()
+                    .match_name::<O>(&self.map_observer_name)
+                    .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+                    .to_vec();
 
-            let history_map = &mut state
-                .named_metadata_mut()
-                .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
-                .unwrap()
-                .history_map;
+                let history_map = &mut state
+                    .named_metadata_mut()
+                    .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
+                    .unwrap()
+                    .history_map;
 
-            if history_map.len() < map_len {
-                history_map.resize(map_len, O::Entry::default());
-            }
+                if history_map.len() < map_len {
+                    history_map.resize(map_len, O::Entry::default());
+                }
 
-            for (idx, (first, (cur, history))) in map_first
-                .iter()
-                .zip(map.iter().zip(history_map.iter_mut()))
-                .enumerate()
-            {
-                if *first != *cur && *history != O::Entry::max_value() {
-                    *history = O::Entry::max_value();
-                    unstable_entries.insert(idx);
-                };
-            }
-
-            if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
-                iter += 2;
+                for (idx, (first, (cur, history))) in map_first
+                    .iter()
+                    .zip(map.iter().zip(history_map.iter_mut()))
+                    .enumerate()
+                {
+                    if *first != *cur && *history != O::Entry::max_value() {
+                        *history = O::Entry::max_value();
+                        unstable_entries.insert(idx);
+                    };
+                }
+                if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
+                    iter += 2;
+                }
             }
             i += 1;
         }
@@ -285,7 +287,10 @@ where
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new<N, R>(map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>) -> Self
+    pub fn new<N, R>(
+        map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>,
+        track_stability: bool,
+    ) -> Self
     where
         O::Entry:
             PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -297,6 +302,7 @@ where
             map_observer_name: map_feedback.observer_name().to_string(),
             map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
+            track_stability,
             phantom: PhantomData,
         }
     }

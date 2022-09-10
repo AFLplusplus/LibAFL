@@ -242,7 +242,7 @@ fn fuzz(
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new(&map_feedback, true);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

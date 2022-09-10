@@ -322,7 +322,7 @@ fn fuzz_binary(
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new(&map_feedback, true);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
@@ -534,7 +534,7 @@ fn fuzz_text(
     // New maximization map feedback linked to the edges observer and the feedback state
     let mut map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
 
-    let calibration = CalibrationStage::new(&map_feedback);
+    let calibration = CalibrationStage::new(&map_feedback, true);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
