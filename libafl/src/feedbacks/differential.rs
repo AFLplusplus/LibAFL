@@ -16,8 +16,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{Observer, ObserversTuple},
-    prelude::State,
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata, State},
     Error,
 };
 
@@ -200,7 +199,11 @@ mod tests {
     }
 
     struct NopEventFirer;
-    impl<I: Input> EventFirer for NopEventFirer {
+    impl<I, S> EventFirer for NopEventFirer
+    where
+        I: Input,
+        S: State<Input = I>,
+    {
         fn fire(
             &mut self,
             _state: &mut S,

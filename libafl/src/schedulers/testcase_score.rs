@@ -1,7 +1,6 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
-use core::marker::PhantomData;
-
 use alloc::string::{String, ToString};
+use core::marker::PhantomData;
 
 use crate::{
     bolts::{HasLen, HasRefCnt},

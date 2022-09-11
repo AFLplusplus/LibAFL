@@ -24,7 +24,7 @@ use crate::{
     observers::ObserversTuple,
     prelude::State,
     state::{HasClientPerfMonitor, HasExecutions},
-    Error, Fuzzer,
+    Error, EvaluatorObservers, ExecutionProcessor, Fuzzer,
 };
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
@@ -445,14 +445,17 @@ pub trait EventProcessor {
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<E, Z>(
+    fn process<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: HasObservers<Input = <Self::State as State>::Input>;
+        E: HasObservers<Input = Self::Input, State = Self::State>,
+        EM: EventManager<Input = Self::Input, State = Self::State>,
+        Z: ExecutionProcessor<Input = Self::Input, State = Self::State>
+            + EvaluatorObservers<E, EM, Z>;
 
     /// Deserialize all observers for this type and manager
     fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
@@ -534,12 +537,17 @@ where
 
     type Input = <S as State>::Input;
 
-    fn process<E, Z>(
+    fn process<E, EM, Z>(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut Self::State,
         _executor: &mut E,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, Error>
+    where
+        E: HasObservers<Input = Self::Input, State = Self::State>,
+        Z: ExecutionProcessor<Input = Self::Input, Observers = E::Observers, State = S>
+            + EvaluatorObservers<E, Self, Z>,
+    {
         Ok(0)
     }
 }
@@ -690,7 +698,10 @@ pub mod pybind {
         }
     }
 
-    impl EventFirer<BytesInput> for PythonEventManager {
+    impl EventFirer for PythonEventManager {
+        type Input = BytesInput;
+        type State = StdPythonState;
+
         fn fire(&mut self, state: &mut S, event: Event<BytesInput>) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
         }
@@ -698,9 +709,10 @@ pub mod pybind {
 
     impl<S> EventRestarter for PythonEventManager {}
 
-    impl EventProcessor<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
-        for PythonEventManager
-    {
+    impl EventProcessor for PythonEventManager {
+        type Input = BytesInput;
+        type State = PythonStdState;
+
         fn process(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
@@ -711,7 +723,10 @@ pub mod pybind {
         }
     }
 
-    impl ProgressReporter<BytesInput> for PythonEventManager {}
+    impl ProgressReporter for PythonEventManager {
+        type Input = BytesInput;
+        type State = PythonStdState;
+    }
 
     impl HasEventManagerId for PythonEventManager {
         fn mgr_id(&self) -> EventManagerId {
@@ -719,9 +734,9 @@ pub mod pybind {
         }
     }
 
-    impl EventManager<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
-        for PythonEventManager
-    {
+    impl EventManager for PythonEventManager {
+        type Input = BytesInput;
+        type State = PythonStdState;
     }
 
     /// Register the classes to the python module

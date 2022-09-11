@@ -41,9 +41,9 @@ where
     where
         CS: Scheduler<Input = I, State = S>,
         EX: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventManager<EX, I, S, Z>,
+        EM: EventManager<Input = I, State = S>,
         OT: ObserversTuple<Input = I, State = S>,
-        Z: Evaluator<State: S, Input: I> + HasScheduler<CS, I, S>;
+        Z: Evaluator<E, EM, State = S, Input = I> + HasScheduler<CS, I, S>;
 }
 
 /// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
@@ -56,7 +56,7 @@ where
     I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
     S: HasMetadata + HasCorpus<Input = I>,
-    TS: TestcaseScore,
+    TS: TestcaseScore<I, S>,
 {
     obs_name: String,
     phantom: PhantomData<(E, I, O, S, TS)>,
@@ -71,7 +71,7 @@ where
     I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
     S: HasMetadata + HasCorpus<Input = I>,
-    TS: TestcaseScore,
+    TS: TestcaseScore<I, S>,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
     /// in the future to get observed maps from an executed input.
@@ -89,7 +89,7 @@ where
     I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
     S: HasMetadata + HasCorpus<Input = I>,
-    TS: TestcaseScore,
+    TS: TestcaseScore<I, S>,
 {
     fn minimize<CS, EX, EM, OT, Z>(
         &self,
@@ -101,7 +101,7 @@ where
     where
         CS: Scheduler<Input = I, State = S>,
         EX: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventManager<EX, I, S, Z>,
+        EM: EventManager<Input = I, State = S>,
         OT: ObserversTuple<Input = I, State = S>,
         Z: Evaluator<E, EM, Input = I, State = S> + HasScheduler<CS, I, S>,
     {

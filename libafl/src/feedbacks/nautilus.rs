@@ -76,10 +76,13 @@ impl<'a> Named for NautilusFeedback<'a> {
     }
 }
 
-impl<'a, S> Feedback<NautilusInput, S> for NautilusFeedback<'a>
+impl<'a, S> Feedback for NautilusFeedback<'a>
 where
-    S: HasMetadata + HasClientPerfMonitor,
+    S: HasMetadata + HasClientPerfMonitor + State,
 {
+    type Input = <S as State>::Input;
+    type State = S;
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
@@ -90,7 +93,7 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<NautilusInput>,
+        EM: EventFirer<Input = NautilusInput>,
         OT: ObserversTuple<Input = NautilusInput, State = S>,
     {
         Ok(false)

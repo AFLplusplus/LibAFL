@@ -249,6 +249,7 @@ pub struct LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
+    S: State<Input = I>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -266,6 +267,7 @@ where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider + 'static,
+    S: State<Input = I>,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("LlmpEventManager");
@@ -285,6 +287,7 @@ where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider + 'static,
+    S: State<Input = I>,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -296,6 +299,7 @@ impl<I, OT, S, SP> LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
+    S: State<Input = I>,
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw llmp client
@@ -439,9 +443,13 @@ impl<I, OT, S, SP> EventFirer for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
+    S: State<Input = I>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
+    type Input = I;
+
+    type State = S;
     #[cfg(feature = "llmp_compression")]
     fn fire(&mut self, _state: &mut Self::State, event: Event<Self::Input>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
@@ -478,9 +486,13 @@ impl<I, OT, S, SP> EventRestarter for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
+    S: State<Input = I>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
+    type Input = I;
+
+    type State = S;
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     fn await_restart_safe(&mut self) {
@@ -491,18 +503,26 @@ where
 
 impl<I, OT, S, SP> EventProcessor for LlmpEventManager<I, OT, S, SP>
 where
-    SP: ShMemProvider,
     I: Input,
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    S: State<Input = I>,
+    SP: ShMemProvider,
 {
+    type Input = I;
     type State = S;
 
-    fn process<E, Z>(
+    fn process<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut E,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, Error>
+    where
+        E: HasObservers<Input = Self::Input, State = Self::State>,
+        EM: EventManager<Input = Self::Input, State = Self::State>,
+        Z: ExecutionProcessor<Input = Self::Input, State = Self::State>
+            + EvaluatorObservers<E, EM, Z>,
+    {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender.id;
         let mut count = 0;
@@ -538,14 +558,19 @@ impl<I, OT, S, SP> EventManager for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    S: State<Input = I>,
     SP: ShMemProvider,
 {
+    type State = S;
+
+    type Input = I;
 }
 
 impl<I, OT, S, SP> HasCustomBufHandlers<S> for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
+    S: State<Input = I>,
     SP: ShMemProvider,
 {
     fn add_custom_buf_handler(
@@ -559,15 +584,21 @@ where
 impl<I, OT, S, SP> ProgressReporter for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
+    S: State<Input = I>,
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    S: State<Input = I>,
     SP: ShMemProvider,
 {
+    type State = S;
+
+    type Input = I;
 }
 
 impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    S: State<Input = I>,
     SP: ShMemProvider,
 {
     /// Gets the id assigned to this staterestorer.
@@ -585,6 +616,7 @@ pub struct LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
+    S: State<Input = I>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -602,6 +634,9 @@ where
     S: Serialize + State<Input = I>,
     SP: ShMemProvider,
 {
+    type State = S;
+
+    type Input = I;
 }
 
 #[cfg(feature = "std")]
@@ -632,10 +667,14 @@ impl<I, OT, S, SP> EventRestarter for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S>,
-    S: Serialize,
+    S: Serialize + State<Input = I>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
 {
+    type Input = I;
+
+    type State = S;
+
     /// The llmp client needs to wait until a broker mapped all pages, before shutting down.
     /// Otherwise, the OS may already have removed the shared maps,
     #[inline]
@@ -665,15 +704,17 @@ where
 
     type Input = I;
 
-    fn process<E, Z>(
+    fn process<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
-            + EvaluatorObservers<E, Self, Z>,
+        E: HasObservers<Input = Self::Input, State = Self::State>,
+        EM: EventManager<Input = Self::Input, State = Self::State>,
+        Z: ExecutionProcessor<Input = Self::Input, State = Self::State>
+            + EvaluatorObservers<E, EM, Z>,
     {
         self.llmp_mgr.process(fuzzer, state, executor)
     }
@@ -698,7 +739,7 @@ impl<I, OT, S, SP> HasEventManagerId for LlmpRestartingEventManager<I, OT, S, SP
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
-    S: Serialize,
+    S: Serialize + State<Input = I>,
     SP: ShMemProvider + 'static,
 {
     fn mgr_id(&self) -> EventManagerId {
@@ -717,6 +758,7 @@ impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    S: State<Input = I>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -774,7 +816,7 @@ where
     I: Input,
     MT: Monitor + Clone,
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
-    S: DeserializeOwned,
+    S: DeserializeOwned + State<Input = I>,
 {
     RestartingMgr::builder()
         .shmem_provider(StdShMemProvider::new()?)
@@ -829,6 +871,7 @@ where
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider,
+    S: State<Input = I>,
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager

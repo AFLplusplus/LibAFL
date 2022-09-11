@@ -305,7 +305,11 @@ pub mod pybind {
         }
     }
 
-    impl HasObservers<BytesInput, PythonObserversTuple, PythonStdState> for PyObjectExecutor {
+    impl HasObservers for PyObjectExecutor {
+        type Observers = PythonObserversTuple;
+        type Input = BytesInput;
+        type State = PythonStdState;
+
         #[inline]
         fn observers(&self) -> &PythonObserversTuple {
             &self.tuple
@@ -416,7 +420,11 @@ pub mod pybind {
         }
     }
 
-    impl HasObservers<BytesInput, PythonObserversTuple, PythonStdState> for PythonExecutor {
+    impl HasObservers {
+        type Input = BytesInput;
+        type Observers = PythonObserversTuple;
+        type State = PythonStdState;
+
         #[inline]
         fn observers(&self) -> &PythonObserversTuple {
             let ptr = unwrap_me!(self.wrapper, e, {

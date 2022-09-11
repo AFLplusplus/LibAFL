@@ -28,10 +28,11 @@ use crate::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
     },
+    executors::HasObservers,
     inputs::Input,
     monitors::Monitor,
     prelude::State,
-    Error,
+    Error, EvaluatorObservers, ExecutionProcessor,
 };
 
 /// The llmp connection from the actual fuzzer to the process supervising it
@@ -91,21 +92,31 @@ where
 impl<I, MT, S> EventRestarter for SimpleEventManager<I, MT, S>
 where
     I: Input,
+    S: State<Input = I>,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
+    type Input = I;
+
+    type State = S;
 }
 
 impl<I, MT, S> EventProcessor for SimpleEventManager<I, MT, S>
 where
     I: Input,
+    S: State<Input = I>,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn process<E, Z>(
+    fn process<E, EM, Z>(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
         _executor: &mut E,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, Error>
+    where
+        E: HasObservers<Input = I, State = S>,
+        Z: ExecutionProcessor<Input = I, Observers = E::Observers, State = S>
+            + EvaluatorObservers<E, Self, Z>,
+    {
         let count = self.events.len();
         while !self.events.is_empty() {
             let event = self.events.pop().unwrap();
@@ -113,6 +124,10 @@ where
         }
         Ok(count)
     }
+
+    type State = S;
+
+    type Input = I;
 }
 
 impl<I, MT, S> EventManager for SimpleEventManager<I, MT, S>
@@ -146,6 +161,9 @@ where
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
     S: State<Input = I>,
 {
+    type State = S;
+
+    type Input = I;
 }
 
 impl<I, MT, S> HasEventManagerId for SimpleEventManager<I, MT, S>
@@ -298,6 +316,10 @@ where
     S: State<Input = I>,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
+    type Input = I;
+
+    type State = S;
+
     fn fire(&mut self, _state: &mut Self::State, event: Event<Self::Input>) -> Result<(), Error> {
         self.simple_event_mgr.fire(_state, event)
     }
@@ -307,10 +329,13 @@ where
 impl<I, MT, S, SP> EventRestarter for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
-    S: Serialize,
+    S: Serialize + State<Input = I>,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
+    type Input = I;
+
+    type State = S;
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
@@ -323,16 +348,24 @@ where
 impl<I, S, SP, MT> EventProcessor for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
-    S: Serialize,
+    S: Serialize + State<Input = I>,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn process<E, Z>(
+    type State = S;
+
+    type Input = I;
+    fn process<E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut E,
-    ) -> Result<usize, Error> {
+    ) -> Result<usize, Error>
+    where
+        E: HasObservers<Input = I, State = S>,
+        Z: ExecutionProcessor<Input = I, Observers = E::Observers, State = S>
+            + EvaluatorObservers<E, Self, Z>,
+    {
         self.simple_event_mgr.process(fuzzer, state, executor)
     }
 }
@@ -373,6 +406,9 @@ where
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
+    type State = S;
+
+    type Input = I;
 }
 
 #[cfg(feature = "std")]

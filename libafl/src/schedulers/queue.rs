@@ -1,8 +1,7 @@
 //! The queue corpus scheduler implements an AFL-like queue mechanism
 
-use core::marker::PhantomData;
-
 use alloc::borrow::ToOwned;
+use core::marker::PhantomData;
 
 use crate::{
     corpus::Corpus, inputs::Input, prelude::State, schedulers::Scheduler, state::HasCorpus, Error,

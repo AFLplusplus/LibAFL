@@ -451,7 +451,7 @@ where
     F: Feedback<Input = I, State = S>,
     I: Input,
     E: Executor<EM, I, S, Self> + HasObservers<Observers = OT, Input = I, State = S>,
-    EM: EventManager<State = S>,
+    EM: EventManager<Input = I, State = S>,
     OF: Feedback<Input = I, State = S>,
     S: HasCorpus<Input = I>
         + HasSolutions<Input = I>
@@ -473,7 +473,7 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        EM: EventManager<State = S>,
+        EM: EventManager<Input = I, State = S>,
         E: HasObservers<Observers = OT, Input = I, State = S>,
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
@@ -746,7 +746,9 @@ pub mod pybind {
 
     /// `StdFuzzer` with fixed generics
     pub type PythonStdFuzzer = StdFuzzer<
-        QueueScheduler,
+        QueueScheduler<I, S>,
+        PythonExecutor,
+        PythonEventManager,
         PythonFeedback,
         BytesInput,
         PythonFeedback,

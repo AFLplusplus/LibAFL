@@ -40,6 +40,7 @@ use crate::{
     inputs::Input,
     monitors::Monitor,
     observers::ObserversTuple,
+    state::State,
     Error,
 };
 
@@ -56,7 +57,7 @@ where
     MT: Monitor,
     SP: ShMemProvider + 'static,
     OT: ObserversTuple<Input = I, State = S> + 'a,
-    S: DeserializeOwned + 'a,
+    S: DeserializeOwned + State<Input = I> + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -96,7 +97,7 @@ where
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned,
+    S: DeserializeOwned + State<Input = I>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -118,7 +119,7 @@ where
     OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned,
+    S: DeserializeOwned + State<Input = I>,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std", feature = "fork"))]

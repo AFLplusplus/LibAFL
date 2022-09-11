@@ -96,6 +96,10 @@ where
     I: Input,
     S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
+    type Input = I;
+
+    type State = S;
+
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
@@ -162,17 +166,17 @@ mod tests {
         phantom: PhantomData<I>,
     }
 
-    impl<I, S> TestcaseScore for UniformDistribution<I>
+    impl<I, S> TestcaseScore<I, S> for UniformDistribution<I>
     where
         I: Input,
         S: HasMetadata + HasCorpus<Input = I>,
     {
-        fn compute<I, S>(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
+        fn compute(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }
 
-    pub type UniformProbabilitySamplingScheduler =
+    pub type UniformProbabilitySamplingScheduler<I, S> =
         ProbabilitySamplingScheduler<UniformDistribution<I>, I, S>;
 
     #[test]

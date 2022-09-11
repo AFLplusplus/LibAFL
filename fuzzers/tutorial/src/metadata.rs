@@ -55,7 +55,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<PacketData>,
-        OT: ObserversTuple<Input = I, State =S><PacketData, S>,
+        OT: ObserversTuple<Input = PacketData, State = S>,
     {
         self.len = input.length;
         Ok(false)

@@ -31,7 +31,6 @@ use core::{
 pub use nautilus::*;
 use serde::{Deserialize, Serialize};
 
-use crate::prelude::State;
 use crate::{
     bolts::tuples::Named,
     corpus::Testcase,
@@ -39,6 +38,7 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     observers::{ListObserver, ObserversTuple, TimeObserver},
+    prelude::State,
     state::HasClientPerfMonitor,
     Error,
 };
@@ -1190,7 +1190,7 @@ pub mod pybind {
         }
     }
 
-    impl Feedback<BytesInput, PythonStdState> for PyObjectFeedback {
+    impl Feedback<Input = BytesInput, State = PythonStdState> for PyObjectFeedback {
         fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner
@@ -1209,7 +1209,7 @@ pub mod pybind {
             exit_kind: &ExitKind,
         ) -> Result<bool, Error>
         where
-            EM: EventFirer<BytesInput>,
+            EM: EventFirer<State = PythonStdState, Input = BytesInput>,
             OT: ObserversTuple<Input = BytesInput, State = PythonStdState>,
         {
             // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
@@ -1275,7 +1275,7 @@ pub mod pybind {
     #[derive(Clone, Debug)]
     #[pyclass(unsendable, name = "CrashFeedback")]
     pub struct PythonCrashFeedback {
-        pub inner: CrashFeedback,
+        pub inner: CrashFeedback<PythonState>,
     }
 
     #[pymethods]
@@ -1296,7 +1296,7 @@ pub mod pybind {
     #[derive(Clone, Debug)]
     #[pyclass(unsendable, name = "ConstFeedback")]
     pub struct PythonConstFeedback {
-        pub inner: ConstFeedback,
+        pub inner: ConstFeedback<S>,
     }
 
     #[pymethods]
@@ -1646,7 +1646,7 @@ pub mod pybind {
         }
     }
 
-    impl Feedback<BytesInput, PythonStdState> for PythonFeedback {
+    impl Feedback<Input = BytesInput, State = PythonStdState> for PythonFeedback {
         fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, f, {
                 Feedback::<BytesInput, PythonStdState>::init_state(f, state)
@@ -1662,7 +1662,7 @@ pub mod pybind {
             exit_kind: &ExitKind,
         ) -> Result<bool, Error>
         where
-            EM: EventFirer<BytesInput>,
+            EM: EventFirer<State = PythonStdState, Input = BytesInput>,
             OT: ObserversTuple<Input = BytesInput, State = PythonStdState>,
         {
             unwrap_me_mut!(self.wrapper, f, {
