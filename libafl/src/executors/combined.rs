@@ -6,7 +6,6 @@ use core::fmt::Debug;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
-    observers::ObserversTuple,
     Error,
 };
 
@@ -44,6 +43,7 @@ where
     A: Executor<EM, I, S, Z>,
     B: Executor<EM, I, S, Z>,
     I: Input,
+    Z: Sized,
 {
     fn run_target(
         &mut self,
@@ -59,19 +59,24 @@ where
     }
 }
 
-impl<A, B, I, OT, S> HasObservers<I, OT, S> for CombinedExecutor<A, B>
+impl<A, B> HasObservers for CombinedExecutor<A, B>
 where
-    A: HasObservers<I, OT, S>,
+    A: HasObservers,
     B: Debug,
-    OT: ObserversTuple<I, S>,
 {
+    type Input = A::Input;
+
+    type State = A::State;
+
+    type Observers = A::Observers;
+
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.primary.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.primary.observers_mut()
     }
 }

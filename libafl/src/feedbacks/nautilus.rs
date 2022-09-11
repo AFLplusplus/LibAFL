@@ -91,7 +91,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<NautilusInput>,
-        OT: ObserversTuple<NautilusInput, S>,
+        OT: ObserversTuple<Input = NautilusInput, State = S>,
     {
         Ok(false)
     }

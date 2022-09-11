@@ -219,12 +219,15 @@ where
     }
 }
 
-impl<F, I, S> Scheduler<I, S> for WeightedScheduler<F, I, S>
+impl<F, I, S> Scheduler for WeightedScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     S: HasCorpus<Input = I> + HasMetadata + HasRand,
     I: Input,
 {
+    type Input = I;
+
+    type State = S;
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {

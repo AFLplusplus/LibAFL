@@ -1,6 +1,7 @@
 //! The `TestcaseScore` is an evaluator providing scores of corpus items.
-use alloc::string::{String, ToString};
 use core::marker::PhantomData;
+
+use alloc::string::{String, ToString};
 
 use crate::{
     bolts::{HasLen, HasRefCnt},
@@ -28,11 +29,7 @@ where
 /// Multiply the testcase size with the execution time.
 /// This favors small and quick testcases.
 #[derive(Debug, Clone)]
-pub struct LenTimeMulTestcaseScore<I, S>
-where
-    I: Input + HasLen,
-    S: HasMetadata + HasCorpus<Input = I>,
-{
+pub struct LenTimeMulTestcaseScore<I, S> {
     phantom: PhantomData<(I, S)>,
 }
 
@@ -56,18 +53,14 @@ const HAVOC_MAX_MULT: f64 = 64.0;
 /// The power assigned to each corpus entry
 /// This result is used for power scheduling
 #[derive(Debug, Clone)]
-pub struct CorpusPowerTestcaseScore<I, S>
-where
-    I: Input + HasLen,
-    S: HasMetadata + HasCorpus<Input = I>,
-{
+pub struct CorpusPowerTestcaseScore<I, S> {
     phantom: PhantomData<(I, S)>,
 }
 
 impl<I, S> TestcaseScore<I, S> for CorpusPowerTestcaseScore<I, S>
 where
-    I: Input + HasLen,
-    S: HasMetadata + HasCorpus<Input = I>,
+    I: Input,
+    S: HasCorpus<Input = I> + HasMetadata,
 {
     /// Compute the `power` we assign to each corpus entry
     #[allow(
@@ -294,11 +287,7 @@ where
 /// The weight for each corpus entry
 /// This result is used for corpus scheduling
 #[derive(Debug, Clone)]
-pub struct CorpusWeightTestcaseScore<I, S>
-where
-    I: Input + HasLen,
-    S: HasMetadata + HasCorpus<Input = I>,
-{
+pub struct CorpusWeightTestcaseScore<I, S> {
     phantom: PhantomData<(I, S)>,
 }
 

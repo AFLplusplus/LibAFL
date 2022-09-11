@@ -24,7 +24,7 @@ impl<S> TestcaseScore<PacketData, S> for PacketLenTestcaseScore
 where
     S: HasCorpus<Input = PacketData> + HasMetadata,
 {
-    fn compute(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
+    fn compute<I, S>(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
         Ok(entry
             .metadata()
             .get::<PacketLenMetadata>()
@@ -55,7 +55,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<PacketData>,
-        OT: ObserversTuple<PacketData, S>,
+        OT: ObserversTuple<Input = I, State =S><PacketData, S>,
     {
         self.len = input.length;
         Ok(false)

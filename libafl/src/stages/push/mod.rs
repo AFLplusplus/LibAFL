@@ -34,12 +34,14 @@ const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 #[derive(Clone, Debug)]
 pub struct PushStageSharedState<CS, EM, I, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// The [`crate::state::State`]
     pub state: S,
@@ -54,12 +56,14 @@ where
 
 impl<CS, EM, I, OT, S, Z> PushStageSharedState<CS, EM, I, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
@@ -78,12 +82,14 @@ where
 #[derive(Clone, Debug)]
 pub struct PushStageHelper<CS, EM, I, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
@@ -109,12 +115,14 @@ where
 
 impl<CS, EM, I, OT, S, Z> PushStageHelper<CS, EM, I, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageHelper`]
     #[must_use]
@@ -182,12 +190,17 @@ where
 /// After it has finished once, we will call it agan for the next fuzzer round.
 pub trait PushStage<CS, EM, I, OT, S, Z>: Iterator
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S>
+        + EventRestarter
+        + HasEventManagerId
+        + ProgressReporter<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// Gets the [`PushStageHelper`]
     fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, I, OT, S, Z>;

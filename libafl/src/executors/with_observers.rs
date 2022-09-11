@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
-    observers::ObserversTuple,
+    observers::{Observer, ObserversTuple},
     Error,
 };
 
@@ -18,9 +18,10 @@ pub struct WithObservers<E: Debug, OT: Debug> {
 
 impl<E, EM, I, OT, S, Z> Executor<EM, I, S, Z> for WithObservers<E, OT>
 where
+    E: Debug + Executor<EM, I, S, Z>,
     I: Input,
-    E: Executor<EM, I, S, Z>,
     OT: Debug,
+    Z: Sized,
 {
     fn run_target(
         &mut self,
@@ -33,11 +34,17 @@ where
     }
 }
 
-impl<I, E: Debug, OT: Debug, S> HasObservers<I, OT, S> for WithObservers<E, OT>
+impl<E, OT> HasObservers for WithObservers<E, OT>
 where
-    I: Input,
-    OT: ObserversTuple<I, S>,
+    E: Debug,
+    OT: Debug + ObserversTuple,
 {
+    type Input = <OT as ObserversTuple>::State;
+
+    type State = <OT as ObserversTuple>::Input;
+
+    type Observers = OT;
+
     fn observers(&self) -> &OT {
         &self.observers
     }

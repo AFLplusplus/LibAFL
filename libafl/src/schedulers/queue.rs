@@ -1,20 +1,30 @@
 //! The queue corpus scheduler implements an AFL-like queue mechanism
 
+use core::marker::PhantomData;
+
 use alloc::borrow::ToOwned;
 
-use crate::{corpus::Corpus, inputs::Input, schedulers::Scheduler, state::HasCorpus, Error};
+use crate::{
+    corpus::Corpus, inputs::Input, prelude::State, schedulers::Scheduler, state::HasCorpus, Error,
+};
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueScheduler;
+pub struct QueueScheduler<I, S> {
+    phantom: PhantomData<(I, S)>,
+}
 
-impl<I, S> Scheduler<I, S> for QueueScheduler
+impl<I, S> Scheduler for QueueScheduler<I, S>
 where
-    S: HasCorpus<Input = I>,
     I: Input,
+    S: State<Input = I> + HasCorpus,
 {
+    type Input = I;
+
+    type State = S;
+
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
@@ -34,15 +44,17 @@ where
     }
 }
 
-impl QueueScheduler {
+impl<I, S> QueueScheduler<I, S> {
     /// Creates a new `QueueScheduler`
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 
-impl Default for QueueScheduler {
+impl<I, S> Default for QueueScheduler<I, S> {
     fn default() -> Self {
         Self::new()
     }

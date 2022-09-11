@@ -42,7 +42,7 @@ where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     sync_dir: PathBuf,
     load_callback: CB,
@@ -55,7 +55,7 @@ where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     #[inline]
     fn perform(
@@ -99,7 +99,7 @@ where
     CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
@@ -163,7 +163,7 @@ impl<E, EM, I, S, Z> SyncFromDiskStage<SyncFromDiskFunction<I, S, Z>, E, EM, I, 
 where
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]

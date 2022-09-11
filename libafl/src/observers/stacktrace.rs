@@ -17,7 +17,6 @@ use super::ObserverWithHashField;
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
-    inputs::Input,
     observers::Observer,
     Error,
 };
@@ -97,10 +96,7 @@ impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
     }
 }
 
-impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a>
-where
-    I: Input + Debug,
-{
+impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a> {
     fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
             if exit_kind == &ExitKind::Crash {
@@ -240,10 +236,7 @@ impl Default for ASANBacktraceObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for ASANBacktraceObserver
-where
-    I: Debug,
-{
+impl<I, S> Observer<I, S> for ASANBacktraceObserver {
     fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }

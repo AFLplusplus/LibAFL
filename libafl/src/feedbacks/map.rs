@@ -24,6 +24,7 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
+    prelude::State,
     state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
     Error,
 };
@@ -356,7 +357,7 @@ where
     phantom: PhantomData<(I, N, S, R, O, T)>,
 }
 
-impl<I, N, O, R, S, T> Feedback<I, S> for MapFeedback<I, N, O, R, S, T>
+impl<I, N, O, R, S, T> Feedback for MapFeedback<I, N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
@@ -364,8 +365,12 @@ where
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State<Input = I>,
 {
+    type Input = I;
+
+    type State = S;
+
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
         // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
@@ -383,8 +388,8 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = I, State = S>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -399,8 +404,8 @@ where
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = I, State = S>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -431,7 +436,7 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<I, O, S> Feedback<I, S> for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
+impl<I, O, S> Feedback for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
     for<'it> O: AsIter<'it, Item = u8>,
@@ -449,8 +454,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = I, State = S>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
@@ -678,8 +683,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = I, State = S>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -735,13 +740,13 @@ where
 
 /// A [`ReachabilityFeedback`] reports if a target has been reached.
 #[derive(Clone, Debug)]
-pub struct ReachabilityFeedback<O> {
+pub struct ReachabilityFeedback<I, O, S> {
     name: String,
     target_idx: Vec<usize>,
-    phantom: PhantomData<O>,
+    phantom: PhantomData<(I, O, S)>,
 }
 
-impl<O> ReachabilityFeedback<O>
+impl<I, O, S> ReachabilityFeedback<I, O, S>
 where
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
@@ -767,25 +772,29 @@ where
     }
 }
 
-impl<I, O, S> Feedback<I, S> for ReachabilityFeedback<O>
+impl<I, O, S> Feedback for ReachabilityFeedback<I, O, S>
 where
     I: Input,
+    S: State<Input = I> + Debug,
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
-    S: HasClientPerfMonitor,
 {
+    type Input = I;
+
+    type State = S;
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = I, State = S>,
+        OT: ObserversTuple,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();
@@ -804,7 +813,11 @@ where
         }
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        testcase: &mut Testcase<Self::Input>,
+    ) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
             testcase.add_metadata(meta);
@@ -812,13 +825,17 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())
     }
 }
 
-impl<O> Named for ReachabilityFeedback<O>
+impl<I, O, S> Named for ReachabilityFeedback<I, O, S>
 where
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,

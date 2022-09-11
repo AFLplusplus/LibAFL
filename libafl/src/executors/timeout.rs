@@ -1,5 +1,6 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
+use core::marker::PhantomData;
 #[cfg(target_os = "linux")]
 use core::ptr::{addr_of, addr_of_mut};
 #[cfg(all(windows, feature = "std"))]
@@ -34,7 +35,6 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
-    observers::ObserversTuple,
     Error,
 };
 
@@ -76,7 +76,8 @@ extern "C" {
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout executor is a wrapper that sets a timeout before each run
-pub struct TimeoutExecutor<E> {
+pub struct TimeoutExecutor<E, EM, Z> {
+    /// The wrapped [`Executor`]
     executor: E,
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
@@ -90,9 +91,10 @@ pub struct TimeoutExecutor<E> {
     tp_timer: *mut TP_TIMER,
     #[cfg(windows)]
     critical: RTL_CRITICAL_SECTION,
+    phantom: PhantomData<(EM, Z)>,
 }
 
-impl<E: Debug> Debug for TimeoutExecutor<E> {
+impl<E: Debug, EM, Z> Debug for TimeoutExecutor<E, EM, Z> {
     #[cfg(windows)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
@@ -180,7 +182,7 @@ impl<E> TimeoutExecutor<E> {
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E> TimeoutExecutor<E> {
+impl<E, EM, Z> TimeoutExecutor<E, EM, Z> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
@@ -200,6 +202,7 @@ impl<E> TimeoutExecutor<E> {
         Self {
             executor,
             itimerval,
+            phantom: PhantomData,
         }
     }
 
@@ -263,13 +266,13 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z> + HasInProcessHandlers,
     I: Input,
 {
     #[allow(clippy::cast_sign_loss)]
-    fn run_target(
+    fn run_target<EM, I, S, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -333,12 +336,12 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
+    E: Executor,
     I: Input,
 {
-    fn run_target(
+    fn run_target<EM, I, S, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -364,10 +367,11 @@ where
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E, EM, Z>
 where
     E: Executor<EM, I, S, Z>,
     I: Input,
+    Z: Sized,
 {
     fn run_target(
         &mut self,
@@ -393,18 +397,19 @@ where
     }
 }
 
-impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> HasObservers for TimeoutExecutor<E, EM, Z>
 where
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    E: HasObservers<Input = I, State = S> + Executor<EM, I, S, Z>,
+    I: Input,
+    Z: Sized,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.executor.observers_mut()
     }
 }

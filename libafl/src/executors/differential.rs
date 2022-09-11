@@ -1,5 +1,5 @@
 //! Executor for differential fuzzing.
-//! It wraps two exeutors that will be run after each other with the same input.
+//! It wraps two executors that will be run after each other with the same input.
 //! In comparison to the [`crate::executors::CombinedExecutor`] it also runs the secondary executor in `run_target`.
 //!
 use core::fmt::Debug;
@@ -7,7 +7,6 @@ use core::fmt::Debug;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
-    observers::ObserversTuple,
     Error,
 };
 
@@ -33,6 +32,7 @@ where
         A: Executor<EM, I, S, Z>,
         B: Executor<EM, I, S, Z>,
         I: Input,
+        Z: Sized,
     {
         Self { primary, secondary }
     }
@@ -53,6 +53,7 @@ where
     A: Executor<EM, I, S, Z>,
     B: Executor<EM, I, S, Z>,
     I: Input,
+    Z: Sized,
 {
     fn run_target(
         &mut self,
@@ -77,19 +78,24 @@ where
     }
 }
 
-impl<A, B, I, OT, S> HasObservers<I, OT, S> for DiffExecutor<A, B>
+impl<A, B> HasObservers for DiffExecutor<A, B>
 where
-    A: HasObservers<I, OT, S>,
-    B: Debug,
-    OT: ObserversTuple<I, S>,
+    A: HasObservers,
+    B: HasObservers<Input = A::Input, State = A::State, Observers = A::Observers>,
 {
+    type Input = A::Input;
+
+    type State = A::State;
+
+    type Observers = A::Observers;
+
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.primary.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.primary.observers_mut()
     }
 }

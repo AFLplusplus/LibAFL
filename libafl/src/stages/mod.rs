@@ -174,13 +174,18 @@ where
 #[derive(Debug)]
 pub struct PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S>
+        + EventRestarter
+        + HasEventManagerId
+        + ProgressReporter<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     push_stage: PS,
     phantom: PhantomData<(CS, EM, I, OT, S, Z)>,
@@ -188,13 +193,18 @@ where
 
 impl<CS, EM, I, OT, PS, S, Z> PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S>
+        + EventRestarter
+        + HasEventManagerId
+        + ProgressReporter<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
@@ -209,16 +219,19 @@ where
 
 impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, S, Z>
 where
-    CS: Scheduler<I, S>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    CS: Scheduler<Input = I, State = S>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S>
+        + EventRestarter
+        + HasEventManagerId
+        + ProgressReporter<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutesInput<I, OT, S, Z>
-        + ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
+    Z: ExecutesInput<E, EM, Input = I, State = S>
+        + ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {
     fn perform(

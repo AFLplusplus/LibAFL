@@ -31,7 +31,7 @@ pub use with_observers::WithObservers;
 
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub mod command;
-use core::fmt::Debug;
+use core::{fmt::Debug, marker::PhantomData};
 
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub use command::CommandExecutor;
@@ -41,6 +41,7 @@ use crate::{
     bolts::AsSlice,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
+    prelude::State,
     Error,
 };
 
@@ -100,21 +101,26 @@ impl From<ExitKind> for DiffExitKind {
 crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers<I, OT, S>: Debug
-where
-    OT: ObserversTuple<I, S>,
-{
+pub trait HasObservers: Debug {
+    /// The [`Input`]
+    type Input: Input;
+    /// The [`State`]
+    type State: State<Input = Self::Input>;
+    /// The observers type
+    type Observers: ObserversTuple;
+
     /// Get the linked observers
-    fn observers(&self) -> &OT;
+    fn observers(&self) -> &Self::Observers;
 
     /// Get the linked observers (mutable)
-    fn observers_mut(&mut self) -> &mut OT;
+    fn observers_mut(&mut self) -> &mut Self::Observers;
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
 pub trait Executor<EM, I, S, Z>: Debug
 where
     I: Input,
+    Z: Sized,
 {
     /// Instruct the target about the input and run
     fn run_target(
@@ -132,7 +138,7 @@ where
     fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
     where
         Self: Sized,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         WithObservers::new(self, observers)
     }
@@ -145,11 +151,14 @@ where
 /// A simple executor that does nothing.
 /// If intput len is 0, `run_target` will return Err
 #[derive(Debug)]
-struct NopExecutor {}
+struct NopExecutor<I, S> {
+    phantom: PhantomData<(I, S)>,
+}
 
-impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor
+impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor<I, S>
 where
     I: Input + HasTargetBytes,
+    S: State<Input = I> + Debug,
 {
     fn run_target(
         &mut self,
@@ -168,6 +177,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use core::marker::PhantomData;
+
     use super::{Executor, NopExecutor};
     use crate::inputs::BytesInput;
 
@@ -175,7 +186,9 @@ mod test {
     fn nop_executor() {
         let empty_input = BytesInput::new(vec![]);
         let nonempty_input = BytesInput::new(vec![1u8]);
-        let mut executor = NopExecutor {};
+        let mut executor = NopExecutor {
+            phantom: PhantomData,
+        };
         executor
             .run_target(&mut (), &mut (), &mut (), &empty_input)
             .unwrap_err();
@@ -308,7 +321,7 @@ pub mod pybind {
         for PyObjectExecutor
     {
         #[inline]
-        fn run_target(
+        fn run_target<EM, I, S, Z>(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
             state: &mut PythonStdState,
@@ -343,7 +356,7 @@ pub mod pybind {
 
     #[pyclass(unsendable, name = "Executor")]
     #[derive(Clone, Debug)]
-    /// Executor + HasObservers Trait binding
+    /// Executor<Input = I> + HasObservers Trait binding
     pub struct PythonExecutor {
         wrapper: PythonExecutorWrapper,
     }
@@ -423,7 +436,7 @@ pub mod pybind {
 
     impl Executor<PythonEventManager, BytesInput, PythonStdState, PythonStdFuzzer> for PythonExecutor {
         #[inline]
-        fn run_target(
+        fn run_target<EM, I, S, Z>(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
             state: &mut PythonStdState,

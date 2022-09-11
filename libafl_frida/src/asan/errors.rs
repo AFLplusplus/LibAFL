@@ -611,7 +611,7 @@ pub struct AsanErrorsFeedback {
     errors: Option<AsanErrors>,
 }
 
-impl<I, S> Feedback<I, S> for AsanErrorsFeedback
+impl<I, S> Feedback<Input = I, State = S> for AsanErrorsFeedback
 where
     I: Input + HasTargetBytes,
     S: HasClientPerfMonitor,
@@ -626,8 +626,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = I, State = S>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         let observer = observers
             .match_name::<AsanErrorsObserver>("AsanErrors")

@@ -7,7 +7,11 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{current_time, tuples::Named, AsIter},
+    bolts::{
+        current_time,
+        tuples::{MatchName, Named},
+        AsIter,
+    },
     corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
@@ -30,7 +34,7 @@ pub struct CalibrationStage<I, O, OT, S>
 where
     I: Input,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasCorpus<Input = I> + HasMetadata + HasNamedMetadata,
 {
     map_observer_name: String,
@@ -44,14 +48,14 @@ const CAL_STAGE_MAX: usize = 16;
 
 impl<E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S>,
     I: Input,
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasCorpus<Input = I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     #[inline]
     #[allow(clippy::let_and_return, clippy::too_many_lines)]
@@ -232,7 +236,7 @@ impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
 where
     I: Input,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasCorpus<Input = I> + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].

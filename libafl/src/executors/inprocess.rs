@@ -46,6 +46,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
+    prelude::State,
     state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
@@ -64,7 +65,7 @@ where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
@@ -80,7 +81,7 @@ where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessExecutor")
@@ -95,7 +96,7 @@ where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     fn run_target(
         &mut self,
@@ -114,12 +115,12 @@ where
     }
 }
 
-impl<H, HB, I, OT, S> HasObservers<I, OT, S> for GenericInProcessExecutor<H, HB, I, OT, S>
+impl<H, HB, I, OT, S> HasObservers for GenericInProcessExecutor<H, HB, I, OT, S>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -137,7 +138,7 @@ where
     H: FnMut(&I) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -153,8 +154,8 @@ where
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I> + EventRestarter<S>,
-        OF: Feedback<I, S>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
@@ -219,7 +220,7 @@ impl<'a, H, I, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, I, OT, S
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     /// the timeout handler
     #[inline]
@@ -309,10 +310,10 @@ impl InProcessHandlers {
     pub fn new<E, EM, I, OF, OT, S, Z, H>() -> Result<Self, Error>
     where
         I: Input,
-        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OF: Feedback<I, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+        OT: ObserversTuple<Input = I, State = S>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
         H: FnMut(&I) -> ExitKind + ?Sized,
@@ -581,10 +582,10 @@ mod unix_signal_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
     where
-        E: HasObservers<I, OT, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: HasObservers<Observers = OT>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OT: ObserversTuple<Input = I, State = S>,
+        OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
@@ -656,10 +657,10 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers<I, OT, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: HasObservers<Observers = OT>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OT: ObserversTuple<Input = I, State = S>,
+        OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
@@ -736,10 +737,10 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OT: ObserversTuple<Input = I, State = S>,
+        OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
@@ -921,10 +922,10 @@ mod windows_exception_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
     where
-        E: HasObservers<I, OT, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: HasObservers<OT>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OT: ObserversTuple<Input = I, State = S>,
+        OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
@@ -1013,10 +1014,10 @@ mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers<I, OT, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: HasObservers<OT>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OT: ObserversTuple<Input = I, State = S>,
+        OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
@@ -1109,10 +1110,10 @@ mod windows_exception_handler {
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-        EM: EventFirer<I> + EventRestarter<S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<I, S>,
+        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OT: ObserversTuple<Input = I, State = S>,
+        OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
@@ -1280,8 +1281,8 @@ impl InChildProcessHandlers {
     pub fn new<E, I, OT, S>() -> Result<Self, Error>
     where
         I: Input,
-        E: HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>,
+        E: HasObservers<Observers = OT>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
@@ -1394,7 +1395,7 @@ pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
     harness_fn: &'a mut H,
@@ -1409,7 +1410,7 @@ impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1426,7 +1427,8 @@ impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    S: State<Input = I>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
     #[allow(unreachable_code)]
@@ -1492,7 +1494,7 @@ impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
     /// Creates a new [`InProcessForkExecutor`]
@@ -1505,9 +1507,9 @@ where
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I> + EventRestarter<S>,
-        OF: Feedback<I, S>,
-        S: HasSolutions<Input = I> + HasClientPerfMonitor,
+        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        OF: Feedback<Input = I, State = S>,
+        S: HasSolutions<Input = I> + HasClientPerfMonitor + State<Input = I>,
         Z: HasObjective<I, OF, S>,
     {
         let handlers = InChildProcessHandlers::new::<Self, I, OT, S>()?;
@@ -1534,13 +1536,20 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, H, I, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
-    OT: ObserversTuple<I, S>,
+    S: State<Input = I>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
+    type Input = I;
+
+    type State = S;
+
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers
@@ -1571,8 +1580,8 @@ pub mod child_signal_handlers {
     /// invokes the `post_exec_child` hook on all observer in case the child process panics
     pub fn setup_child_panic_hook<E, I, OT, S>()
     where
-        E: HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>,
+        E: HasObservers<Observers = OT>,
+        OT: ObserversTuple<Input = I, State = S>,
         I: Input,
     {
         let old_hook = panic::take_hook();
@@ -1607,8 +1616,8 @@ pub mod child_signal_handlers {
         _context: &mut ucontext_t,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
-        E: HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>,
+        E: HasObservers<Observers = OT>,
+        OT: ObserversTuple<Input = I, State = S>,
         I: Input,
     {
         if data.is_valid() {

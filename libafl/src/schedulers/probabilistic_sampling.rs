@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<F, I, S> Scheduler<I, S> for ProbabilitySamplingScheduler<F, I, S>
+impl<F, I, S> Scheduler for ProbabilitySamplingScheduler<F, I, S>
 where
     F: TestcaseScore<I, S>,
     I: Input,
@@ -162,17 +162,17 @@ mod tests {
         phantom: PhantomData<I>,
     }
 
-    impl<I, S> TestcaseScore<I, S> for UniformDistribution<I>
+    impl<I, S> TestcaseScore for UniformDistribution<I>
     where
         I: Input,
         S: HasMetadata + HasCorpus<Input = I>,
     {
-        fn compute(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
+        fn compute<I, S>(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }
 
-    pub type UniformProbabilitySamplingScheduler<I, S> =
+    pub type UniformProbabilitySamplingScheduler =
         ProbabilitySamplingScheduler<UniformDistribution<I>, I, S>;
 
     #[test]

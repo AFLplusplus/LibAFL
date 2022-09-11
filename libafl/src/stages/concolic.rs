@@ -22,8 +22,8 @@ use crate::{
 pub struct ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     inner: TracingStage<EM, I, OT, S, TE, Z>,
@@ -33,8 +33,8 @@ where
 impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     #[inline]
@@ -70,8 +70,8 @@ where
 impl<EM, I, OT, S, TE, Z> ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
@@ -353,7 +353,7 @@ impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<EM, I,
 where
     I: Input + HasBytesVec,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     #[inline]
     fn perform(

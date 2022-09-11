@@ -29,6 +29,7 @@ use crate::{
     },
     inputs::HasTargetBytes,
     observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
+    prelude::State,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
@@ -377,9 +378,19 @@ where
     }
 }
 
-impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
+impl<EM, I, OT: ObserversTuple<Input = I, State = S>, S, T: Debug, Z> HasObservers
     for CommandExecutor<EM, I, OT, S, T, Z>
+where
+    I: Input,
+    S: State<Input = I>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
+    type Input = I;
+
+    type State = S;
+
+    type Observers = OT;
+
     fn observers(&self) -> &OT {
         &self.observers
     }
@@ -618,7 +629,7 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, I, S, Z> {
+/// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```

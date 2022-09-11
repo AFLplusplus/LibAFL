@@ -63,7 +63,7 @@ impl Default for TopRatedsMetadata {
 #[derive(Debug, Clone)]
 pub struct MinimizerScheduler<CS, F, I, M, S>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler<Input = I, State = S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
@@ -74,9 +74,9 @@ where
     phantom: PhantomData<(F, I, M, S)>,
 }
 
-impl<CS, F, I, M, S> Scheduler<I, S> for MinimizerScheduler<CS, F, I, M, S>
+impl<CS, F, I, M, S> Scheduler for MinimizerScheduler<CS, F, I, M, S>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler<Input = I, State = S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
@@ -184,7 +184,7 @@ where
 
 impl<CS, F, I, M, S> MinimizerScheduler<CS, F, I, M, S>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler<Input = I, State = S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,

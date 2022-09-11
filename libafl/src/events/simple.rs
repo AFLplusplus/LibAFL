@@ -21,7 +21,6 @@ use crate::bolts::os::{fork, ForkResult};
 use crate::{
     bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
     corpus::Corpus,
-    executors::Executor,
     state::{HasCorpus, HasSolutions},
 };
 use crate::{
@@ -31,6 +30,7 @@ use crate::{
     },
     inputs::Input,
     monitors::Monitor,
+    prelude::State,
     Error,
 };
 
@@ -69,12 +69,17 @@ where
     }
 }
 
-impl<I, MT, S> EventFirer<I> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventFirer for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
+    S: State<Input = I>,
 {
-    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
+    type Input = I;
+
+    type State = S;
+
+    fn fire(&mut self, _state: &mut Self::State, event: Event<Self::Input>) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
             BrokerEventResult::Handled => (),
@@ -83,19 +88,19 @@ where
     }
 }
 
-impl<I, MT, S> EventRestarter<S> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventRestarter for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
 }
 
-impl<E, I, MT, S, Z> EventProcessor<E, I, S, Z> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventProcessor for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn process(
+    fn process<E, Z>(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
@@ -110,11 +115,15 @@ where
     }
 }
 
-impl<E, I, MT, S, Z> EventManager<E, I, S, Z> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> EventManager for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
+    S: State<Input = I>,
 {
+    type State = S;
+
+    type Input = I;
 }
 
 impl<I, MT, S> HasCustomBufHandlers<S> for SimpleEventManager<I, MT, S>
@@ -131,10 +140,11 @@ where
     }
 }
 
-impl<I, MT, S> ProgressReporter<I> for SimpleEventManager<I, MT, S>
+impl<I, MT, S> ProgressReporter for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
+    S: State<Input = I>,
 {
 }
 
@@ -281,19 +291,20 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> EventFirer<I> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SP> EventFirer for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
     SP: ShMemProvider,
+    S: State<Input = I>,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn fire<S2>(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut Self::State, event: Event<Self::Input>) -> Result<(), Error> {
         self.simple_event_mgr.fire(_state, event)
     }
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> EventRestarter<S> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SP> EventRestarter for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
     S: Serialize,
@@ -309,27 +320,34 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, MT, Z> EventProcessor<E, I, S, Z> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, S, SP, MT> EventProcessor for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
     S: Serialize,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error> {
+    fn process<E, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        executor: &mut E,
+    ) -> Result<usize, Error> {
         self.simple_event_mgr.process(fuzzer, state, executor)
     }
 }
 
 #[cfg(feature = "std")]
-impl<E, I, S, SP, MT, Z> EventManager<E, I, S, Z> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SP> EventManager for SimpleRestartingEventManager<I, MT, S, SP>
 where
-    E: Executor<Self, I, S, Z>,
     I: Input,
-    S: Serialize,
+    S: Serialize + State<Input = I>,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
+    type State = S;
+
+    type Input = I;
 }
 
 #[cfg(feature = "std")]
@@ -348,9 +366,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, S, SP> ProgressReporter<I> for SimpleRestartingEventManager<I, MT, S, SP>
+impl<I, MT, S, SP> ProgressReporter for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
+    S: State<Input = I>,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {

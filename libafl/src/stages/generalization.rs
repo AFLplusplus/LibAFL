@@ -1,4 +1,4 @@
-//! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
+//! The tracing stage can trace the target and enrich a [`crate::corpus::Testcase`] with metadata, for example for `CmpLog`.
 
 use alloc::{
     string::{String, ToString},
@@ -63,7 +63,7 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 pub struct GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
+    OT: ObserversTuple<Input = GeneralizedInput, State = S>,
     S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     map_observer_name: String,
@@ -74,8 +74,9 @@ where
 impl<E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
-    OT: ObserversTuple<GeneralizedInput, S>,
+    E: Executor<EM, GeneralizedInput, S, Z>
+        + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
+    OT: ObserversTuple<Input = GeneralizedInput, State = S>,
     S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     #[inline]
@@ -350,7 +351,7 @@ where
 impl<EM, O, OT, S, Z> GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
+    OT: ObserversTuple<Input = GeneralizedInput, State = S>,
     S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     /// Create a new [`GeneralizationStage`].
@@ -381,7 +382,8 @@ where
         input: &GeneralizedInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
+        E: Executor<EM, GeneralizedInput, S, Z>
+            + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -426,7 +428,8 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
+        E: Executor<EM, GeneralizedInput, S, Z>
+            + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -468,7 +471,8 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
+        E: Executor<EM, GeneralizedInput, S, Z>
+            + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
     {
         let mut index = 0;
         while index < payload.len() {

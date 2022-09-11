@@ -3,6 +3,8 @@
 //! This feedback should be used in combination with another feedback as this feedback always considers testcases
 //! to be not interesting.
 //! Requires a [`ConcolicObserver`] to observe the concolic trace.
+use core::{fmt::Debug, marker::PhantomData};
+
 use alloc::{borrow::ToOwned, string::String};
 
 use crate::{
@@ -16,7 +18,8 @@ use crate::{
         concolic::{ConcolicMetadata, ConcolicObserver},
         ObserversTuple,
     },
-    state::{HasClientPerfMonitor, HasMetadata},
+    prelude::State,
+    state::HasMetadata,
     Error,
 };
 
@@ -25,12 +28,13 @@ use crate::{
 /// to be not interesting.
 /// Requires a [`ConcolicObserver`] to observe the concolic trace.
 #[derive(Debug)]
-pub struct ConcolicFeedback {
+pub struct ConcolicFeedback<I, S> {
     name: String,
     metadata: Option<ConcolicMetadata>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl ConcolicFeedback {
+impl<I, S> ConcolicFeedback<I, S> {
     /// Creates a concolic feedback from an observer
     #[allow(unused)]
     #[must_use]
@@ -38,33 +42,38 @@ impl ConcolicFeedback {
         Self {
             name: observer.name().to_owned(),
             metadata: None,
+            phantom: PhantomData,
         }
     }
 }
 
-impl Named for ConcolicFeedback {
+impl<I, S> Named for ConcolicFeedback<I, S> {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<I, S> Feedback<I, S> for ConcolicFeedback
+impl<I, S> Feedback for ConcolicFeedback<I, S>
 where
     I: Input,
-    S: HasClientPerfMonitor,
+    S: State<Input = I> + Debug,
 {
+    type Input = I;
+
+    type State = S;
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut S,
+        _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = I, State = S>,
+        OT: ObserversTuple,
     {
         self.metadata = observers
             .match_name::<ConcolicObserver>(&self.name)
@@ -74,8 +83,8 @@ where
 
     fn append_metadata(
         &mut self,
-        _state: &mut S,
-        _testcase: &mut Testcase<I>,
+        _state: &mut Self::State,
+        _testcase: &mut Testcase<Self::Input>,
     ) -> Result<(), Error> {
         if let Some(metadata) = self.metadata.take() {
             _testcase.metadata_mut().insert(metadata);
@@ -83,7 +92,11 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

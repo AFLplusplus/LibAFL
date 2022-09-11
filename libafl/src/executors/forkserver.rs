@@ -34,6 +34,7 @@ use crate::{
     inputs::{HasTargetBytes, Input},
     mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
+    prelude::State,
     Error,
 };
 
@@ -352,13 +353,14 @@ pub trait HasForkserver {
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
 #[derive(Debug)]
-pub struct TimeoutForkserverExecutor<E: Debug> {
+pub struct TimeoutForkserverExecutor<E: Debug, I, S> {
     executor: E,
     timeout: TimeSpec,
     signal: Signal,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<E: Debug> TimeoutForkserverExecutor<E> {
+impl<E: Debug, I, S> TimeoutForkserverExecutor<E, I, S> {
     /// Create a new [`TimeoutForkserverExecutor`]
     pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let signal = Signal::SIGKILL;
@@ -373,14 +375,16 @@ impl<E: Debug> TimeoutForkserverExecutor<E> {
             executor,
             timeout,
             signal,
+            phantom: PhantomData,
         })
     }
 }
 
-impl<E: Debug, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E>
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E, I, S>
 where
+    E: Executor<EM, I, S, Z> + HasForkserver + Debug,
     I: Input + HasTargetBytes,
-    E: Executor<EM, I, S, Z> + HasForkserver,
+    S: State<Input = I> + Debug,
 {
     #[inline]
     fn run_target(
@@ -517,7 +521,7 @@ impl ForkserverExecutor<(), (), (), StdShMemProvider> {
 impl<I, OT, S, SP> ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -563,7 +567,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
     where
         I: Input + HasTargetBytes,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<Input = I, State = S>,
         SP: ShMemProvider,
     {
         let input_filename = match &self.input_filename {
@@ -851,7 +855,7 @@ impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
 impl<EM, I, OT, S, SP, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
     #[inline]
@@ -937,10 +941,10 @@ where
     }
 }
 
-impl<I, OT, S, SP> HasObservers<I, OT, S> for ForkserverExecutor<I, OT, S, SP>
+impl<I, OT, S, SP> HasObservers for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
     #[inline]
@@ -957,7 +961,7 @@ where
 impl<I, OT, S, SP> HasForkserver for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     SP: ShMemProvider,
 {
     type SP = SP;
@@ -993,18 +997,19 @@ where
     }
 }
 
-impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutForkserverExecutor<E>
+impl<E, I, S> HasObservers for TimeoutForkserverExecutor<E, I, S>
 where
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    E: HasObservers,
+    I: Debug,
+    S: Debug,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.executor.observers_mut()
     }
 }

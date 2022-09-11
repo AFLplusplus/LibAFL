@@ -354,7 +354,7 @@ where
         loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
+        Z: Evaluator<E, EM, Input = I, State = Self>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -397,8 +397,8 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
-        EM: EventFirer<<Self as State>::Input>,
+        Z: Evaluator<E, EM, Input = I, State = Self>,
+        EM: EventFirer<Input = I, State = Self>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(
@@ -415,7 +415,7 @@ where
             Event::Log {
                 severity_level: LogSeverity::Debug,
                 message: format!("Loaded {} initial testcases.", self.corpus().count()), // get corpus count
-                phantom: PhantomData,
+                phantom: PhantomData::<I>,
             },
         )?;
         Ok(())
@@ -432,8 +432,8 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
-        EM: EventFirer<<Self as State>::Input>,
+        Z: Evaluator<E, EM, Input = I, State = Self>,
+        EM: EventFirer<Input = I, State = Self>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
     }
@@ -447,8 +447,8 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
-        EM: EventFirer<<Self as State>::Input>,
+        Z: Evaluator<E, EM, Input = I, State = Self>,
+        EM: EventFirer<Input = I, State = Self>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
@@ -472,8 +472,8 @@ where
     ) -> Result<(), Error>
     where
         G: Generator<<Self as State>::Input, Self>,
-        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
-        EM: EventFirer<<Self as State>::Input>,
+        Z: Evaluator<E, EM, Input = I, State = Self>,
+        EM: EventFirer<Input = I, State = Self>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -510,8 +510,8 @@ where
     ) -> Result<(), Error>
     where
         G: Generator<<Self as State>::Input, Self>,
-        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
-        EM: EventFirer<<Self as State>::Input>,
+        Z: Evaluator<E, EM, Input = I, State = Self>,
+        EM: EventFirer<Input = I, State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
     }
@@ -527,8 +527,8 @@ where
     ) -> Result<(), Error>
     where
         G: Generator<<Self as State>::Input, Self>,
-        Z: Evaluator<E, EM, <Self as State>::Input, Self>,
-        EM: EventFirer<<Self as State>::Input>,
+        Z: Evaluator<E, EM, Input = I, State = Self>,
+        EM: EventFirer<Input = I, State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
@@ -542,8 +542,8 @@ where
         objective: &mut O,
     ) -> Result<Self, Error>
     where
-        F: Feedback<<Self as State>::Input, Self>,
-        O: Feedback<<Self as State>::Input, Self>,
+        F: Feedback<Input = <Self as State>::Input, State = Self>,
+        O: Feedback<Input = <Self as State>::Input, State = Self>,
     {
         let mut state = Self {
             rand,

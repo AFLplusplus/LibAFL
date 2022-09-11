@@ -36,13 +36,15 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 #[derive(Clone, Debug)]
 pub struct StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     current_corpus_idx: Option<usize>,
     testcases_to_do: usize,
@@ -57,13 +59,15 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
@@ -80,13 +84,18 @@ where
 impl<CS, EM, I, M, OT, S, Z> PushStage<CS, EM, I, OT, S, Z>
     for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S>
+        + EventRestarter
+        + HasEventManagerId
+        + ProgressReporter<Input = I, State = S>,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
     fn init(
@@ -191,13 +200,18 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> Iterator for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S>
+        + EventRestarter
+        + HasEventManagerId
+        + ProgressReporter<Input = I, State = S>,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     type Item = Result<I, Error>;
 
@@ -208,13 +222,15 @@ where
 
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
 where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId,
+    CS: Scheduler<Input = I, State = S>,
+    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
     M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + HasScheduler<CS, I, S>,
 {
     /// Creates a new default mutational stage
     #[must_use]

@@ -18,12 +18,13 @@ use uuid::Uuid;
 
 use crate::{
     bolts::current_time,
-    executors::ExitKind,
+    executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
+    prelude::State,
     state::{HasClientPerfMonitor, HasExecutions},
-    Error,
+    Error, Fuzzer,
 };
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
@@ -299,10 +300,10 @@ where
 }
 
 /// [`EventFirer`] fire an event.
-pub trait EventFirer<I>
-where
-    I: Input,
-{
+pub trait EventFirer {
+    type Input: Input;
+    type State: State<Input = Self::Input>;
+
     /// Send off an [`Event`] to the broker
     ///
     /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
@@ -311,13 +312,17 @@ where
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-case.
-    fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+    fn fire(
+        &mut self,
+        state: &mut Self::State,
+        event: Event<<Self::State as State>::Input>,
+    ) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
-    fn log<S>(
+    fn log(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         severity_level: LogSeverity,
         message: String,
     ) -> Result<(), Error> {
@@ -332,9 +337,9 @@ where
     }
 
     /// Serialize all observers for this type and manager
-    fn serialize_observers<OT, S>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<I, S> + Serialize,
+        OT: ObserversTuple + Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -346,22 +351,21 @@ where
 }
 
 /// [`ProgressReporter`] report progress to the broker.
-pub trait ProgressReporter<I>: EventFirer<I>
-where
-    I: Input,
+pub trait ProgressReporter:
+    EventFirer<Input = <Self as ProgressReporter>::Input, State = <Self as ProgressReporter>::State>
 {
+    type State: State<Input = <Self as ProgressReporter>::Input>;
+    type Input: Input;
+
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
     /// Will return an [`crate::Error`], if the stats could not be sent.
-    fn maybe_report_progress<S>(
+    fn maybe_report_progress(
         &mut self,
-        state: &mut S,
+        state: &mut <Self as ProgressReporter>::State,
         last_report_time: Duration,
         monitor_timeout: Duration,
-    ) -> Result<Duration, Error>
-    where
-        S: HasExecutions + HasClientPerfMonitor,
-    {
+    ) -> Result<Duration, Error> {
         let executions = *state.executions();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
@@ -418,10 +422,13 @@ where
 }
 
 /// Restartable trait
-pub trait EventRestarter<S> {
+pub trait EventRestarter {
+    type Input: Input;
+    type State: State<Input = Self::Input>;
+
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
-    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
+    fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         Ok(())
     }
 
@@ -431,15 +438,26 @@ pub trait EventRestarter<S> {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, I, S, Z> {
+pub trait EventProcessor {
+    /// The [`State`]
+    type State: State<Input = Self::Input>;
+    type Input;
+
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
+    fn process<E, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        executor: &mut E,
+    ) -> Result<usize, Error>
+    where
+        E: HasObservers<Input = <Self::State as State>::Input>;
 
     /// Deserialize all observers for this type and manager
     fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
     where
-        OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
+        OT: ObserversTuple + serde::de::DeserializeOwned,
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }
@@ -455,15 +473,15 @@ pub trait HasEventManagerId {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager<E, I, S, Z>:
-    EventFirer<I>
-    + EventProcessor<E, I, S, Z>
-    + EventRestarter<S>
+pub trait EventManager:
+    EventFirer<State = <Self as EventManager>::State, Input = <Self as EventManager>::Input>
+    + EventProcessor<State = <Self as EventManager>::State, Input = <Self as EventManager>::Input>
+    + EventRestarter<State = <Self as EventManager>::State, Input = <Self as EventManager>::Input>
     + HasEventManagerId
-    + ProgressReporter<I>
-where
-    I: Input,
+    + ProgressReporter<State = <Self as EventManager>::State, Input = <Self as EventManager>::Input>
 {
+    type State: State<Input = <Self as EventManager>::Input>;
+    type Input;
 }
 
 /// The handler function for custom buffers exchanged via [`EventManager`]
@@ -478,33 +496,64 @@ pub trait HasCustomBufHandlers<S> {
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
-pub struct NopEventManager {}
+pub struct NopEventManager<S> {
+    phantom: PhantomData<S>,
+}
 
-impl<I> EventFirer<I> for NopEventManager
+impl<S> EventFirer for NopEventManager<S>
 where
-    I: Input,
+    S: State,
 {
-    fn fire<S>(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
+    type Input = <S as State>::Input;
+
+    type State = S;
+
+    fn fire(
+        &mut self,
+        _state: &mut Self::State,
+        _event: Event<<Self::State as State>::Input>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<S> EventRestarter<S> for NopEventManager {}
+impl<S> EventRestarter for NopEventManager<S>
+where
+    S: State,
+{
+    type Input = <S as State>::Input;
 
-impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
-    fn process(
+    type State = S;
+}
+
+impl<S> EventProcessor for NopEventManager<S>
+where
+    S: State,
+{
+    type State = S;
+
+    type Input = <S as State>::Input;
+
+    fn process<E, Z>(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _executor: &mut E,
     ) -> Result<usize, Error> {
         Ok(0)
     }
 }
 
-impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
+impl<S> EventManager for NopEventManager<S>
+where
+    S: State,
+{
+    type State = S;
 
-impl<S> HasCustomBufHandlers<S> for NopEventManager {
+    type Input = <S as State>::Input;
+}
+
+impl<S> HasCustomBufHandlers<S> for NopEventManager<S> {
     fn add_custom_buf_handler(
         &mut self,
         _handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
@@ -512,9 +561,16 @@ impl<S> HasCustomBufHandlers<S> for NopEventManager {
     }
 }
 
-impl<I> ProgressReporter<I> for NopEventManager where I: Input {}
+impl<S> ProgressReporter for NopEventManager<S>
+where
+    S: State,
+{
+    type State = S;
 
-impl HasEventManagerId for NopEventManager {
+    type Input = <S as State>::Input;
+}
+
+impl<S> HasEventManagerId for NopEventManager<S> {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId { id: 0 }
     }
@@ -635,12 +691,12 @@ pub mod pybind {
     }
 
     impl EventFirer<BytesInput> for PythonEventManager {
-        fn fire<S>(&mut self, state: &mut S, event: Event<BytesInput>) -> Result<(), Error> {
+        fn fire(&mut self, state: &mut S, event: Event<BytesInput>) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
         }
     }
 
-    impl<S> EventRestarter<S> for PythonEventManager {}
+    impl<S> EventRestarter for PythonEventManager {}
 
     impl EventProcessor<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
         for PythonEventManager

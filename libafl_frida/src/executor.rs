@@ -23,7 +23,7 @@ pub struct FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     base: InProcessExecutor<'a, H, I, OT, S>,
     /// Frida's dynamic rewriting engine
@@ -38,7 +38,7 @@ impl<'a, 'b, 'c, H, I, OT, RT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, H
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")
@@ -49,17 +49,17 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, H, I, OT, RT, S, Z> Executor<EM, I, S, Z>
+impl<'a, 'b, 'c, EM, H, I, OT, RT, S, Z> Executor
     for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     RT: FridaRuntimeTuple,
 {
     /// Instruct the target about the input and run
     #[inline]
-    fn run_target(
+    fn run_target<EM, I, S, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -92,12 +92,12 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, I, OT, RT, S> HasObservers<I, OT, S>
+impl<'a, 'b, 'c, H, I, OT, RT, S> HasObservers
     for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -114,7 +114,7 @@ impl<'a, 'b, 'c, H, I, OT, S, RT> FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, R
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`]
@@ -162,7 +162,7 @@ impl<'a, 'b, 'c, H, I, OT, RT, S> HasInProcessHandlers
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     RT: FridaRuntimeTuple,
 {
     /// the timeout handler

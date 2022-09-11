@@ -8,12 +8,13 @@ use crate::monitors::PerfFeature;
 use crate::{
     bolts::current_time,
     corpus::{Corpus, Testcase},
-    events::{Event, EventConfig, EventFirer, EventManager, ProgressReporter},
+    events::{Event, EventConfig, EventFirer, EventManager, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
+    prelude::State,
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
@@ -27,7 +28,7 @@ const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 /// Holds a scheduler
 pub trait HasScheduler<CS, I, S>
 where
-    CS: Scheduler<I, S>,
+    CS: Scheduler<Input = I, State = S>,
     I: Input,
 {
     /// The scheduler
@@ -40,7 +41,7 @@ where
 /// Holds an feedback
 pub trait HasFeedback<F, I, S>
 where
-    F: Feedback<I, S>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
     S: HasClientPerfMonitor,
 {
@@ -54,7 +55,7 @@ where
 /// Holds an objective feedback
 pub trait HasObjective<I, OF, S>
 where
-    OF: Feedback<I, S>,
+    OF: Feedback<Input = I, State = S>,
     I: Input,
     S: HasClientPerfMonitor,
 {
@@ -66,56 +67,67 @@ where
 }
 
 /// Evaluate if an input is interesting using the feedback
-pub trait ExecutionProcessor<I, OT, S>
-where
-    OT: ObserversTuple<I, S>,
-    I: Input,
-{
+pub trait ExecutionProcessor {
+    /// The [`Observers`]
+    type Observers: ObserversTuple<Input = Self::Input, State = Self::State>;
+    /// The [`Input`]
+    type Input: Input;
+    /// The [`State`]
+    type State: State<Input = Self::Input>;
+
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: I,
-        observers: &OT,
+        input: Self::Input,
+        observers: &Self::Observers,
         exit_kind: &ExitKind,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        EM: EventFirer<I>;
+        EM: EventFirer;
 }
 
 /// Evaluate an input modifying the state of the fuzzer
-pub trait EvaluatorObservers<I, OT, S>: Sized
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
+pub trait EvaluatorObservers<E, EM, Z>: Sized {
+    /// The [`Input`] used
+    type Input: Input;
+    /// The [`State`]
+    type State: State<Input = Self::Input>;
+
     /// Runs the input and triggers observers and feedback,
-    /// returns if is interesting an (option) the index of the new testcase in the corpus
-    fn evaluate_input_with_observers<E, EM>(
+    /// returns if is interesting an (option) the index of the new
+    /// [`crate::corpus::Testcase`] in the [`crate::corpus::Corpus`]
+    fn evaluate_input_with_observers(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: Self::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-        EM: EventManager<E, I, S, Self>;
+        E: Executor<EM, Self::Input, Self::State, Z>
+            + HasObservers<Input = Self::Input, State = Self::State>,
+        EM: EventManager;
 }
 
 /// Evaluate an input modifying the state of the fuzzer
-pub trait Evaluator<E, EM, I, S> {
+pub trait Evaluator<E, EM> {
+    /// The [`Input`]
+    type Input: Input;
+    /// The [`State`]
+    type State: State<Input = Self::Input>;
+
     /// Runs the input and triggers observers and feedback,
-    /// returns if is interesting an (option) the index of the new testcase in the corpus
+    /// returns if is interesting an (option) the index of the new [`crate::corpus::Testcase`] in the corpus
     fn evaluate_input(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: Self::Input,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
         self.evaluate_input_events(state, executor, manager, input, true)
     }
@@ -125,10 +137,10 @@ pub trait Evaluator<E, EM, I, S> {
     /// This version has a boolean to decide if send events to the manager.
     fn evaluate_input_events(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: Self::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>;
 
@@ -138,10 +150,10 @@ pub trait Evaluator<E, EM, I, S> {
     /// Usually, you want to use [`Evaluator::evaluate_input`], unless you know what you are doing.
     fn add_input(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: I,
+        input: Self::Input,
     ) -> Result<usize, Error>;
 }
 
@@ -149,7 +161,7 @@ pub trait Evaluator<E, EM, I, S> {
 pub trait Fuzzer<E, EM, I, S, ST>
 where
     I: Input,
-    EM: ProgressReporter<I>,
+    EM: ProgressReporter<Input = I, State = S>,
     S: HasExecutions + HasClientPerfMonitor,
 {
     /// Fuzz for a single iteration.
@@ -239,26 +251,28 @@ pub enum ExecuteInputResult {
 
 /// Your default fuzzer instance, for everyday use.
 #[derive(Debug)]
-pub struct StdFuzzer<CS, F, I, OF, OT, S>
+pub struct StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: Executor<EM, I, S, Self>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OF: Feedback<I, S>,
+    OF: Feedback<Input = I, State = S>,
     S: HasClientPerfMonitor,
 {
     scheduler: CS,
     feedback: F,
     objective: OF,
-    phantom: PhantomData<(I, OT, S)>,
+    phantom: PhantomData<(E, EM, I, OT, S)>,
 }
 
-impl<CS, F, I, OF, OT, S> HasScheduler<CS, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S> HasScheduler<CS, I, S> for StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: Executor<EM, I, S, Self>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OF: Feedback<I, S>,
+    OF: Feedback<Input = I, State = S>,
     S: HasClientPerfMonitor,
 {
     fn scheduler(&self) -> &CS {
@@ -270,12 +284,13 @@ where
     }
 }
 
-impl<CS, F, I, OF, OT, S> HasFeedback<F, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S> HasFeedback<F, I, S> for StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: Executor<EM, I, S, Self>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OF: Feedback<I, S>,
+    OF: Feedback<Input = I, State = S>,
     S: HasClientPerfMonitor,
 {
     fn feedback(&self) -> &F {
@@ -287,12 +302,13 @@ where
     }
 }
 
-impl<CS, F, I, OF, OT, S> HasObjective<I, OF, S> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S> HasObjective<I, OF, S> for StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: Executor<EM, I, S, Self>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OF: Feedback<I, S>,
+    OF: Feedback<Input = I, State = S>,
     S: HasClientPerfMonitor,
 {
     fn objective(&self) -> &OF {
@@ -304,17 +320,26 @@ where
     }
 }
 
-impl<CS, F, I, OF, OT, S> ExecutionProcessor<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S> ExecutionProcessor for StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: Executor<EM, I, S, Self>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OF: Feedback<I, S>,
-    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    S: HasCorpus<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor + HasExecutions,
+    OF: Feedback<Input = I, State = S>,
+    OT: ObserversTuple<Input = I, State = S> + serde::Serialize + serde::de::DeserializeOwned,
+    S: HasCorpus<Input = I>
+        + HasSolutions<Input = I>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + State<Input = I>,
 {
+    type Observers = OT;
+    type Input = I;
+    type State = S;
+
     /// Evaluate if a set of observation channels has an interesting state
-    fn process_execution<EM>(
+    fn process_execution(
         &mut self,
         state: &mut S,
         manager: &mut EM,
@@ -324,7 +349,7 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        EM: EventFirer<I>,
+        EM: EventFirer<Input = I, State = S>,
     {
         let mut res = ExecuteInputResult::None;
 
@@ -377,7 +402,7 @@ where
                     let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
                         None
                     } else {
-                        Some(manager.serialize_observers(observers)?)
+                        Some(manager.serialize_observers::<OT>(observers)?)
                     };
                     manager.fire(
                         state,
@@ -418,18 +443,28 @@ where
     }
 }
 
-impl<CS, F, I, OF, OT, S> EvaluatorObservers<I, OT, S> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S> EvaluatorObservers<E, EM, Self>
+    for StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    OT: ObserversTuple<Input = I, State = S> + serde::Serialize + serde::de::DeserializeOwned,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OF: Feedback<I, S>,
-    S: HasCorpus<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor + HasExecutions,
+    E: Executor<EM, I, S, Self> + HasObservers<Observers = OT, Input = I, State = S>,
+    EM: EventManager<State = S>,
+    OF: Feedback<Input = I, State = S>,
+    S: HasCorpus<Input = I>
+        + HasSolutions<Input = I>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + State<Input = I>,
 {
-    /// Process one input, adding to the respective corpuses if needed and firing the right events
+    type Input = I;
+    type State = S;
+
+    /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
-    fn evaluate_input_with_observers<E, EM>(
+    fn evaluate_input_with_observers(
         &mut self,
         state: &mut S,
         executor: &mut E,
@@ -438,8 +473,8 @@ where
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-        EM: EventManager<E, I, S, Self>,
+        EM: EventManager<State = S>,
+        E: HasObservers<Observers = OT, Input = I, State = S>,
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
@@ -447,18 +482,25 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, OF, OT, S> Evaluator<E, EM, I, S> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S> Evaluator<E, EM> for StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S> + serde::Serialize + serde::de::DeserializeOwned,
-    EM: EventManager<E, I, S, Self>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: HasObservers<State = S, Observers = OT, Input = I> + Executor<EM, I, S, Self>,
+    EM: EventFirer<Input = I, State = S> + EventManager<Input = I, State = S>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OF: Feedback<I, S>,
-    S: HasCorpus<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor + HasExecutions,
+    OF: Feedback<Input = I, State = S>,
+    OT: ObserversTuple<Input = I, State = S> + serde::Serialize + serde::de::DeserializeOwned,
+    S: HasCorpus<Input = I>
+        + HasSolutions<Input = I>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + State<Input = I>,
 {
-    /// Process one input, adding to the respective corpuses if needed and firing the right events
+    type Input = I;
+    type State = S;
+
+    /// Process one input, adding to the respective corpora if needed and firing the right events
     #[inline]
     fn evaluate_input_events(
         &mut self,
@@ -471,7 +513,7 @@ where
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
 
-    /// Adds an input, even if it's not conisered `interesting` by any of the executors
+    /// Adds an input, even if it's not considered `interesting` by any of the executors
     fn add_input(
         &mut self,
         state: &mut S,
@@ -495,7 +537,7 @@ where
         let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
             None
         } else {
-            Some(manager.serialize_observers(observers)?)
+            Some(manager.serialize_observers::<OT>(observers)?)
         };
         manager.fire(
             state,
@@ -513,14 +555,17 @@ where
     }
 }
 
-impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST>
+    for StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    EM: EventManager<E, I, S, Self>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: HasObservers<Input = I, State = S, Observers = OT> + Executor<EM, I, S, Self>,
+    EM: EventManager<Input = I, State = S> + EventProcessor<Input = I, State = S>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions,
-    OF: Feedback<I, S>,
+    S: HasClientPerfMonitor + HasExecutions + State<Input = I>,
+    OF: Feedback<Input = I, State = S>,
+    OT: ObserversTuple<Input = I, State = S>,
     ST: StagesTuple<E, EM, S, Self>,
 {
     fn fuzz_one(
@@ -563,12 +608,13 @@ where
     }
 }
 
-impl<CS, F, I, OF, OT, S> StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S> StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: Executor<EM, I, S, Self>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OF: Feedback<I, S>,
+    OF: Feedback<Input = I, State = S>,
     S: HasExecutions + HasClientPerfMonitor,
 {
     /// Create a new `StdFuzzer` with standard behavior.
@@ -582,7 +628,7 @@ where
     }
 
     /// Runs the input and triggers observers and feedback
-    pub fn execute_input<E, EM>(
+    pub fn execute_input(
         &mut self,
         state: &mut S,
         executor: &mut E,
@@ -590,8 +636,8 @@ where
         input: &I,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>,
+        E: Executor<EM, I, S, Self> + HasObservers<Input = I, Observers = OT, State = S>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -614,35 +660,39 @@ where
 }
 
 /// Structs with this trait will execute an [`Input`]
-pub trait ExecutesInput<I, OT, S, Z>
-where
-    I: Input,
-    OT: ObserversTuple<I, S>,
-{
+pub trait ExecutesInput<E, EM> {
+    /// The [`Input`] executed
+    type Input: Input;
+    /// The [`State`] for this executor
+    type State: State<Input = Self::Input>;
+
     /// Runs the input and triggers observers and feedback
-    fn execute_input<E, EM>(
+    fn execute_input(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &I,
-    ) -> Result<ExitKind, Error>
-    where
-        E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>;
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error>;
 }
 
-impl<CS, F, I, OF, OT, S> ExecutesInput<I, OT, S, Self> for StdFuzzer<CS, F, I, OF, OT, S>
+impl<CS, E, EM, F, I, OF, OT, S> ExecutesInput<E, EM> for StdFuzzer<CS, E, EM, F, I, OF, OT, S>
 where
-    CS: Scheduler<I, S>,
-    F: Feedback<I, S>,
+    CS: Scheduler<Input = I, State = S>,
+    E: Executor<EM, I, S, Self>,
+    F: Feedback<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<I, S>,
-    OF: Feedback<I, S>,
-    S: HasExecutions + HasClientPerfMonitor,
+    //Self: ExecutesInput<Input = I>,
+    OT: ObserversTuple<Input = I, State = S>,
+    OF: Feedback<Input = I, State = S>,
+    E: Executor<EM, I, S, Self> + HasObservers<State = S, Input = I, Observers = OT>,
+    S: HasExecutions + HasClientPerfMonitor + State<Input = I>,
 {
+    type Input = I;
+    type State = S;
+
     /// Runs the input and triggers observers and feedback
-    fn execute_input<E, EM>(
+    fn execute_input(
         &mut self,
         state: &mut S,
         executor: &mut E,
@@ -650,8 +700,8 @@ where
         input: &I,
     ) -> Result<ExitKind, Error>
     where
-        E: Executor<EM, I, S, Self> + HasObservers<I, OT, S>,
-        OT: ObserversTuple<I, S>,
+        E: Executor<EM, I, S, Self>,
+        OT: ObserversTuple<Input = I, State = S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;

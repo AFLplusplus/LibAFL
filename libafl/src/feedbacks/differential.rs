@@ -16,6 +16,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{Observer, ObserversTuple},
+    prelude::State,
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
@@ -48,7 +49,7 @@ impl DiffResult {
 
 /// A [`DiffFeedback`] compares the content of two [`Observer`]s using the given compare function.
 #[derive(Serialize, Deserialize)]
-pub struct DiffFeedback<F, O1, O2>
+pub struct DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
 {
@@ -60,10 +61,10 @@ where
     o2_name: String,
     /// The function used to compare the two observers
     compare_fn: F,
-    phantomm: PhantomData<(O1, O2)>,
+    phantomm: PhantomData<(O1, O2, I, S)>,
 }
 
-impl<F, O1, O2> DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     O1: Named,
@@ -90,7 +91,7 @@ where
     }
 }
 
-impl<F, O1, O2> Named for DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> Named for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     O1: Named,
@@ -101,7 +102,7 @@ where
     }
 }
 
-impl<F, O1, O2> Debug for DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> Debug for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     O1: Named,
@@ -116,14 +117,17 @@ where
     }
 }
 
-impl<F, I, O1, O2, S> Feedback<I, S> for DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> Feedback for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
-    S: HasMetadata + HasClientPerfMonitor,
+    S: HasMetadata + HasClientPerfMonitor + State<Input = I>,
     O1: Observer<I, S> + PartialEq<O2>,
     O2: Observer<I, S>,
 {
+    type Input = I;
+    type State = S;
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
@@ -134,8 +138,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S> + MatchName,
+        EM: EventFirer<Input = I, State = S>,
+        OT: ObserversTuple<Input = I, State = S> + MatchName,
     {
         fn err(name: &str) -> Error {
             Error::illegal_argument(format!("DiffFeedback: observer {} not found", name))
@@ -196,8 +200,8 @@ mod tests {
     }
 
     struct NopEventFirer;
-    impl<I: Input> EventFirer<I> for NopEventFirer {
-        fn fire<S>(
+    impl<I: Input> EventFirer for NopEventFirer {
+        fn fire(
             &mut self,
             _state: &mut S,
             _event: crate::events::Event<I>,

@@ -29,11 +29,11 @@ impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxExecutor<'a, I, S, OT>
+impl<'a, EM, I, S, Z, OT> Executor for NyxExecutor<'a, I, S, OT>
 where
     I: Input + HasTargetBytes,
 {
-    fn run_target(
+    fn run_target<EM, I, S, Z>(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut S,
@@ -83,10 +83,10 @@ impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, I, S, OT> HasObservers<I, OT, S> for NyxExecutor<'a, I, S, OT>
+impl<'a, I, S, OT> HasObservers for NyxExecutor<'a, I, S, OT>
 where
     I: Input,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
 {
     fn observers(&self) -> &OT {
         &self.observers

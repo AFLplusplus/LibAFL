@@ -21,14 +21,14 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     map_observer_name: String,
     mutator: M,
@@ -39,14 +39,14 @@ where
 impl<E, F, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
     for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -132,14 +132,14 @@ where
 impl<E, F, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z>
     for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -158,14 +158,14 @@ where
 
 impl<E, F, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
+    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
     F: TestcaseScore<I, S>,
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<Input = I, State = S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M, map_observer_name: &O) -> Self {

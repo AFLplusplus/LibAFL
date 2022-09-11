@@ -17,7 +17,7 @@ class FooFeedback(BaseFeedback):
         return ob.n % 10000 == 0
 
 class FooExecutor(BaseExecutor):
-    def __init__(self, harness, observers: ObserversTuple):
+    def __init__(self, harness, observers: ObserversTuple<Input = I, State =S>):
         self.h = harness
         self.o = observers
     def observers(self):

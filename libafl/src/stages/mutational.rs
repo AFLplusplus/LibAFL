@@ -28,7 +28,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I>,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -87,7 +87,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     mutator: M,
     #[allow(clippy::type_complexity)]
@@ -99,7 +99,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -124,7 +124,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -150,7 +150,7 @@ where
     M: Mutator<I, S>,
     I: Input,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: Evaluator<E, EM, I, S>,
+    Z: Evaluator<E, EM, Input = I, State = S>,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
