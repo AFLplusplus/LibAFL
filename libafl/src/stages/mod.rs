@@ -51,7 +51,7 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
@@ -179,7 +179,7 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions + HasMetadata,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     push_stage: PS,
@@ -193,7 +193,7 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions + HasMetadata,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
@@ -215,7 +215,7 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions + HasMetadata,
     Z: ExecutesInput<I, OT, S, Z>
         + ExecutionProcessor<I, OT, S>
         + EvaluatorObservers<I, OT, S>
