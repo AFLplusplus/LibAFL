@@ -22,9 +22,8 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    prelude::HasMetadata,
     stages::calibrate::UnstableEntriesMetadata,
-    state::{HasClientPerfMonitor, HasExecutions},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
 
@@ -379,10 +378,10 @@ where
                 },
             )?;
 
-            if state.has_metadata::<UnstableEntriesMetadata>() {
-                let unstable = state.metadata().get::<UnstableEntriesMetadata>().unwrap();
-                let unstable_entries = unstable.unstable_entries().len();
-                let map_len = unstable.map_len();
+            /// Send the stability event to the broker
+            if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
+                let unstable_entries = meta.unstable_entries().len();
+                let map_len = meta.map_len();
                 self.fire(
                     state,
                     Event::UpdateUserStats {

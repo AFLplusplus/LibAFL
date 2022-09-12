@@ -1,7 +1,10 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use alloc::string::{String, ToString};
-use core::{fmt::Debug, iter::FromIterator, marker::PhantomData, time::Duration};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use hashbrown::HashSet;
 use num_traits::Bounded;
@@ -27,6 +30,8 @@ use crate::{
 
 crate::impl_serdeany!(UnstableEntriesMetadata);
 /// The metadata to keep unstable entries
+/// In libafl, the stability is the number of the unstable entries divided by the size of the map
+/// This is different from AFL++, which shows the number of the unstable entries divided by the number of filled entries.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnstableEntriesMetadata {
     unstable_entries: HashSet<usize>,
@@ -144,6 +149,8 @@ where
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
+        let mut unstable_entries: Vec<usize> = vec![];
+        let map_len: usize = map_first.len();
         while i < iter {
             let input = state
                 .corpus()
@@ -208,6 +215,21 @@ where
                 if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
                     iter += 2;
                 }
+            }
+
+            for (idx, (first, (cur, history))) in map_first
+                .iter()
+                .zip(map.iter().zip(history_map.iter_mut()))
+                .enumerate()
+            {
+                if *first != *cur && *history != O::Entry::max_value() {
+                    *history = O::Entry::max_value();
+                    unstable_entries.push(idx);
+                };
+            }
+
+            if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
+                iter += 2;
             }
             i += 1;
         }
