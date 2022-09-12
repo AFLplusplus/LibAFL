@@ -433,11 +433,7 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
         let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Emulator, &'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         let emu = Emulator::new_empty();
-        if closure(&emu, cmd) {
-            1
-        } else {
-            0
-        }
+        i32::from(closure(&emu, cmd))
     }
 }
 
