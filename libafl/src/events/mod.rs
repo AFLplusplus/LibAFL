@@ -378,6 +378,7 @@ where
                 },
             )?;
 
+            /// Send the stability event to the broker
             if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
                 let unstable_entries = meta.unstable_entries().len();
                 let map_len = meta.map_len();

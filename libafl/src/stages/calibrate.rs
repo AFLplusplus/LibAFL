@@ -30,6 +30,8 @@ use crate::{
 
 crate::impl_serdeany!(UnstableEntriesMetadata);
 /// The metadata to keep unstable entries
+/// In libafl, the stability is the number of the unstable entries divided by the size of the map
+/// This is different from AFL++, which shows the number of the unstable entries divided by the number of filled entries.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnstableEntriesMetadata {
     unstable_entries: HashSet<usize>,
