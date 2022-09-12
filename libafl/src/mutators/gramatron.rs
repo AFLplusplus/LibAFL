@@ -79,6 +79,7 @@ crate::impl_serdeany!(GramatronIdxMapMetadata);
 impl GramatronIdxMapMetadata {
     /// Creates a new [`struct@GramatronIdxMapMetadata`].
     #[must_use]
+    #[allow(clippy::or_fun_call)]
     pub fn new(input: &GramatronInput) -> Self {
         let mut map = HashMap::default();
         for i in 0..input.terminals().len() {
