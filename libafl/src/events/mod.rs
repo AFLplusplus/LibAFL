@@ -378,10 +378,9 @@ where
                 },
             )?;
 
-            if state.has_metadata::<UnstableEntriesMetadata>() {
-                let unstable = state.metadata().get::<UnstableEntriesMetadata>().unwrap();
-                let unstable_entries = unstable.unstable_entries().len();
-                let map_len = unstable.map_len();
+            if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
+                let unstable_entries = meta.unstable_entries().len();
+                let map_len = meta.map_len();
                 self.fire(
                     state,
                     Event::UpdateUserStats {
