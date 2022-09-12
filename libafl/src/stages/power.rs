@@ -26,7 +26,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata,
     Z: Evaluator<E, EM, Input = I, State = S>,
 {
@@ -44,7 +44,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata + HasRand,
     Z: Evaluator<E, EM, Input = I, State = S>,
 {
@@ -137,7 +137,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata + HasRand,
     Z: Evaluator<E, EM, Input = I, State = S>,
 {
@@ -163,7 +163,7 @@ where
     I: Input,
     M: Mutator<I, S>,
     O: MapObserver,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasMetadata,
     Z: Evaluator<E, EM, Input = I, State = S>,
 {

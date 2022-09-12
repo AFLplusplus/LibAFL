@@ -1,6 +1,8 @@
 //! Schedule the access to the Corpus.
 
 pub mod queue;
+use core::marker::PhantomData;
+
 pub use queue::QueueScheduler;
 
 pub mod probabilistic_sampling;
@@ -29,8 +31,7 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, Testcase},
     inputs::Input,
-    prelude::State,
-    state::{HasCorpus, HasRand},
+    state::{HasCorpus, HasRand, State},
     Error,
 };
 
@@ -73,9 +74,19 @@ pub trait Scheduler {
 
 /// Feed the fuzzer simply with a random testcase on request
 #[derive(Debug, Clone)]
-pub struct RandScheduler;
+pub struct RandScheduler<I, S> {
+    phantom: PhantomData<(I, S)>,
+}
 
-impl Scheduler for RandScheduler {
+impl<I, S> Scheduler for RandScheduler<I, S>
+where
+    I: Input,
+    S: State<Input = I> + HasCorpus<Input = I> + HasRand,
+{
+    type Input = I;
+
+    type State = S;
+
     /// Gets the next entry at random
     fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
@@ -89,7 +100,7 @@ impl Scheduler for RandScheduler {
     }
 }
 
-impl RandScheduler {
+impl<I, S> RandScheduler<I, S> {
     /// Create a new [`RandScheduler`] that just schedules randomly.
     #[must_use]
     pub fn new() -> Self {
@@ -97,7 +108,7 @@ impl RandScheduler {
     }
 }
 
-impl Default for RandScheduler {
+impl<I, S> Default for RandScheduler<I, S> {
     fn default() -> Self {
         Self::new()
     }
@@ -105,4 +116,4 @@ impl Default for RandScheduler {
 
 /// A [`StdScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s.
 /// The current `Std` is a [`RandScheduler`], although this may change in the future, if another [`Scheduler`] delivers better results.
-pub type StdScheduler = RandScheduler;
+pub type StdScheduler<I, S> = RandScheduler<I, S>;

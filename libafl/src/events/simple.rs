@@ -28,10 +28,10 @@ use crate::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
     },
-    executors::HasObservers,
+    executors::{Executor, HasObservers},
     inputs::Input,
     monitors::Monitor,
-    prelude::State,
+    prelude::{HasClientPerfMonitor, HasExecutions, State},
     Error, EvaluatorObservers, ExecutionProcessor,
 };
 
@@ -102,11 +102,18 @@ where
 
 impl<I, MT, S> EventProcessor for SimpleEventManager<I, MT, S>
 where
+    Self: EventManager<Input = I, State = S>,
     I: Input,
     S: State<Input = I>,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    fn process<E, EM, Z>(
+    type State = S;
+
+    type Input = I;
+
+    type EventManager = Self;
+
+    fn process<E, Z>(
         &mut self,
         _fuzzer: &mut Z,
         state: &mut S,
@@ -114,8 +121,12 @@ where
     ) -> Result<usize, Error>
     where
         E: HasObservers<Input = I, State = S>,
-        Z: ExecutionProcessor<Input = I, Observers = E::Observers, State = S>
-            + EvaluatorObservers<E, Self, Z>,
+        Z: ExecutionProcessor<
+                Input = I,
+                Observers = E::Observers,
+                State = S,
+                EventManager = Self::EventManager,
+            > + EvaluatorObservers<E, Self::EventManager, Z>,
     {
         let count = self.events.len();
         while !self.events.is_empty() {
@@ -124,17 +135,13 @@ where
         }
         Ok(count)
     }
-
-    type State = S;
-
-    type Input = I;
 }
 
 impl<I, MT, S> EventManager for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
-    S: State<Input = I>,
+    S: State<Input = I> + HasClientPerfMonitor + HasExecutions,
 {
     type State = S;
 
@@ -159,7 +166,7 @@ impl<I, MT, S> ProgressReporter for SimpleEventManager<I, MT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
-    S: State<Input = I>,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
 {
     type State = S;
 
@@ -347,24 +354,32 @@ where
 #[cfg(feature = "std")]
 impl<I, S, SP, MT> EventProcessor for SimpleRestartingEventManager<I, MT, S, SP>
 where
+    Self: EventManager<Input = I, State = S>,
     I: Input,
-    S: Serialize + State<Input = I>,
+    S: Serialize + State<Input = I> + HasClientPerfMonitor + HasExecutions,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
+    type EventManager = SimpleEventManager<I, MT, S>;
+
     type State = S;
 
     type Input = I;
-    fn process<E, EM, Z>(
+
+    fn process<E, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: HasObservers<Input = I, State = S>,
-        Z: ExecutionProcessor<Input = I, Observers = E::Observers, State = S>
-            + EvaluatorObservers<E, Self, Z>,
+        E: HasObservers<Input = I, State = S> + Executor<SimpleEventManager<I, MT, S>, I, S, Z>,
+        Z: ExecutionProcessor<
+                Input = I,
+                Observers = E::Observers,
+                State = S,
+                EventManager = Self::EventManager,
+            > + EvaluatorObservers<E, Self::EventManager, Z>,
     {
         self.simple_event_mgr.process(fuzzer, state, executor)
     }
@@ -373,8 +388,9 @@ where
 #[cfg(feature = "std")]
 impl<I, MT, S, SP> EventManager for SimpleRestartingEventManager<I, MT, S, SP>
 where
+    Self: EventManager<Input = I, State = S>,
     I: Input,
-    S: Serialize + State<Input = I>,
+    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
@@ -402,7 +418,7 @@ where
 impl<I, MT, S, SP> ProgressReporter for SimpleRestartingEventManager<I, MT, S, SP>
 where
     I: Input,
-    S: State<Input = I>,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {

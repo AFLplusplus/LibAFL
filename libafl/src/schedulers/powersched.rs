@@ -4,13 +4,15 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::time::Duration;
+use core::{marker::PhantomData, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
+    inputs::Input,
     schedulers::Scheduler,
+    state::State,
     state::{HasCorpus, HasMetadata},
     Error,
 };
@@ -147,11 +149,20 @@ pub enum PowerSchedule {
 
 /// A corpus scheduler using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler {
+pub struct PowerQueueScheduler<I, S> {
     strat: PowerSchedule,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl Scheduler for PowerQueueScheduler {
+impl<I, S> Scheduler for PowerQueueScheduler<I, S>
+where
+    I: Input,
+    S: State<Input = I> + HasCorpus<Input = I>,
+{
+    type Input = I;
+
+    type State = S;
+
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
@@ -227,10 +238,13 @@ impl Scheduler for PowerQueueScheduler {
     }
 }
 
-impl PowerQueueScheduler {
+impl<I, S> PowerQueueScheduler<I, S> {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
     pub fn new(strat: PowerSchedule) -> Self {
-        PowerQueueScheduler { strat }
+        PowerQueueScheduler {
+            strat,
+            phantom: PhantomData,
+        }
     }
 }

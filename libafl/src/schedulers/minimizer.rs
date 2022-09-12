@@ -82,6 +82,10 @@ where
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
     S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
+    type Input = I;
+
+    type State = S;
+
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         self.update_score(state, idx)?;

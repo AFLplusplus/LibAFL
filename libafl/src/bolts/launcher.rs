@@ -56,7 +56,7 @@ where
     I: Input + 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    OT: ObserversTuple<Input = I, State = S> + 'a,
+    OT: ObserversTuple<I, S> + 'a,
     S: DeserializeOwned + State<Input = I> + 'a,
 {
     /// The ShmemProvider to use
@@ -94,7 +94,7 @@ impl<CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned + State<Input = I>,
@@ -116,7 +116,7 @@ impl<'a, CF, I, MT, OT, S, SP> Launcher<'a, CF, I, MT, OT, S, SP>
 where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
     S: DeserializeOwned + State<Input = I>,

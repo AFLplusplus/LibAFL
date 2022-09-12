@@ -42,7 +42,7 @@ where
         CS: Scheduler<Input = I, State = S>,
         EX: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
         EM: EventManager<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
         Z: Evaluator<E, EM, State = S, Input = I> + HasScheduler<CS, I, S>;
 }
 
@@ -102,7 +102,7 @@ where
         CS: Scheduler<Input = I, State = S>,
         EX: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
         EM: EventManager<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
         Z: Evaluator<E, EM, Input = I, State = S> + HasScheduler<CS, I, S>,
     {
         let cfg = Config::default();

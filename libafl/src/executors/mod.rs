@@ -107,7 +107,7 @@ pub trait HasObservers: Debug {
     /// The [`State`]
     type State: State<Input = Self::Input>;
     /// The observers type
-    type Observers: ObserversTuple;
+    type Observers: ObserversTuple<Self::Input, Self::State>;
 
     /// Get the linked observers
     fn observers(&self) -> &Self::Observers;
@@ -138,7 +138,7 @@ where
     fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
     where
         Self: Sized,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         WithObservers::new(self, observers)
     }

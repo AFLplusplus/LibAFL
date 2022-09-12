@@ -22,7 +22,7 @@ pub struct TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     tracer_executor: TE,
@@ -34,7 +34,7 @@ impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for TracingStage<EM, I, OT, S, T
 where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     #[inline]
@@ -83,7 +83,7 @@ impl<EM, I, OT, S, TE, Z> TracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     /// Creates a new default stage
@@ -112,8 +112,8 @@ impl<E, EM, I, OT, S, SOT, Z> Stage<ShadowExecutor<E, I, S, SOT>, EM, S, Z>
 where
     I: Input,
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<Input = I, State = S>,
-    SOT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
+    SOT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I> + Debug,
 {
     #[inline]
@@ -164,8 +164,8 @@ impl<E, EM, I, OT, S, SOT, Z> ShadowTracingStage<E, EM, I, OT, S, SOT, Z>
 where
     I: Input,
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<Input = I, State = S>,
-    SOT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
+    SOT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     /// Creates a new default stage

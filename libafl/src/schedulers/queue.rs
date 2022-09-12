@@ -16,7 +16,7 @@ pub struct QueueScheduler<I, S> {
 impl<I, S> Scheduler for QueueScheduler<I, S>
 where
     I: Input,
-    S: State<Input = I> + HasCorpus,
+    S: State<Input = I> + HasCorpus<Input = I>,
 {
     type Input = I;
 

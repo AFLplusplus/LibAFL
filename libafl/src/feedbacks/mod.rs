@@ -68,7 +68,7 @@ pub trait Feedback: Named + Debug {
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Input = Self::Input, State = Self::State>;
+        OT: ObserversTuple<Self::Input, Self::State>;
 
     /// Returns if the result of a run is interesting and the value input should be stored in a corpus.
     /// It also keeps track of introspection stats.
@@ -85,7 +85,7 @@ pub trait Feedback: Named + Debug {
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         // Start a timer for this feedback
         let start_time = crate::bolts::cpu::read_time_counter();
@@ -211,7 +211,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         FL::is_pair_interesting(
             &mut self.first,
@@ -236,7 +236,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         FL::is_pair_interesting_introspection(
             &mut self.first,
@@ -285,7 +285,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>;
+        OT: ObserversTuple<I, S>;
 
     /// If this pair is interesting (with introspection features enabled)
     #[cfg(feature = "introspection")]
@@ -301,7 +301,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>;
+        OT: ObserversTuple<I, S>;
 }
 
 /// Factory for feedbacks which should be sensitive to an existing context, e.g. observer(s) from a
@@ -397,7 +397,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -416,7 +416,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -448,7 +448,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         if a {
@@ -470,7 +470,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -505,7 +505,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         let b = second.is_interesting(state, manager, input, observers, exit_kind)?;
@@ -524,7 +524,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -556,7 +556,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         let a = first.is_interesting(state, manager, input, observers, exit_kind)?;
         if !a {
@@ -578,7 +578,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         // Execute this feedback
         let a = first.is_interesting_introspection(state, manager, input, observers, exit_kind)?;
@@ -663,7 +663,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         Ok(!self
             .first
@@ -787,7 +787,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = Self::Input, State = S>,
-        OT: ObserversTuple<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         if let ExitKind::Crash = exit_kind {
             Ok(true)
@@ -848,7 +848,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         if let ExitKind::Timeout = exit_kind {
             Ok(true)
@@ -913,7 +913,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<TimeObserver>(self.name()).unwrap();
@@ -1005,7 +1005,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers
@@ -1080,7 +1080,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         Ok(match self {
             ConstFeedback::True { .. } => true,

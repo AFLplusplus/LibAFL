@@ -72,7 +72,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         self.metadata = observers
             .match_name::<ConcolicObserver>(&self.name)

@@ -24,7 +24,7 @@ use crate::{
     observers::ObserversTuple,
     prelude::State,
     state::{HasClientPerfMonitor, HasExecutions},
-    Error, EvaluatorObservers, ExecutionProcessor, Fuzzer,
+    Error, EvaluatorObservers, ExecutionProcessor,
 };
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
@@ -339,7 +339,7 @@ pub trait EventFirer {
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple + Serialize,
+        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -354,7 +354,9 @@ pub trait EventFirer {
 pub trait ProgressReporter:
     EventFirer<Input = <Self as ProgressReporter>::Input, State = <Self as ProgressReporter>::State>
 {
-    type State: State<Input = <Self as ProgressReporter>::Input>;
+    type State: State<Input = <Self as ProgressReporter>::Input>
+        + HasClientPerfMonitor
+        + HasExecutions;
     type Input: Input;
 
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
@@ -441,26 +443,32 @@ pub trait EventRestarter {
 pub trait EventProcessor {
     /// The [`State`]
     type State: State<Input = Self::Input>;
+    type EventManager: EventManager<State = Self::State, Input = Self::Input>;
     type Input;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<E, EM, Z>(
+    fn process<E, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: HasObservers<Input = Self::Input, State = Self::State>,
-        EM: EventManager<Input = Self::Input, State = Self::State>,
-        Z: ExecutionProcessor<Input = Self::Input, State = Self::State>
-            + EvaluatorObservers<E, EM, Z>;
+        E: HasObservers<Input = Self::Input, State = Self::State>
+            + Executor<Self::EventManager, Self::Input, Self::State, Z>,
+        Z: ExecutionProcessor<
+                Input = Self::Input,
+                Observers = E::Observers,
+                State = Self::State,
+                EventManager = Self::EventManager,
+            > + EvaluatorObservers<E, Self::EventManager, Z>,
+        <Self as EventProcessor>::Input: Input;
 
     /// Deserialize all observers for this type and manager
     fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
     where
-        OT: ObserversTuple + serde::de::DeserializeOwned,
+        OT: ObserversTuple<Self::Input, Self::State> + serde::de::DeserializeOwned,
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }
@@ -531,13 +539,15 @@ where
 
 impl<S> EventProcessor for NopEventManager<S>
 where
-    S: State,
+    S: State + HasClientPerfMonitor + HasExecutions,
 {
     type State = S;
 
     type Input = <S as State>::Input;
 
-    fn process<E, EM, Z>(
+    type EventManager = Self;
+
+    fn process<E, Z>(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut Self::State,
@@ -545,8 +555,12 @@ where
     ) -> Result<usize, Error>
     where
         E: HasObservers<Input = Self::Input, State = Self::State>,
-        Z: ExecutionProcessor<Input = Self::Input, Observers = E::Observers, State = S>
-            + EvaluatorObservers<E, Self, Z>,
+        Z: ExecutionProcessor<
+                Input = Self::Input,
+                Observers = E::Observers,
+                State = S,
+                EventManager = Self::EventManager,
+            > + EvaluatorObservers<E, Self::EventManager, Z>,
     {
         Ok(0)
     }
@@ -554,7 +568,7 @@ where
 
 impl<S> EventManager for NopEventManager<S>
 where
-    S: State,
+    S: State + HasClientPerfMonitor + HasExecutions,
 {
     type State = S;
 
@@ -571,7 +585,7 @@ impl<S> HasCustomBufHandlers<S> for NopEventManager<S> {
 
 impl<S> ProgressReporter for NopEventManager<S>
 where
-    S: State,
+    S: State + HasClientPerfMonitor + HasExecutions,
 {
     type State = S;
 

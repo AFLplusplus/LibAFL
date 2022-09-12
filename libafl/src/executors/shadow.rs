@@ -18,7 +18,7 @@ pub struct ShadowExecutor<E, I, S, SOT>
 where
     E: HasObservers<Input = I, State = S> + Debug,
     I: Debug,
-    SOT: Debug + ObserversTuple<Input = I, State = S>,
+    SOT: Debug + ObserversTuple<I, S>,
 {
     /// The wrapped executor
     executor: E,
@@ -32,7 +32,7 @@ impl<E, I, S, SOT> Debug for ShadowExecutor<E, I, S, SOT>
 where
     E: HasObservers<Input = I, State = S> + Debug,
     I: Debug,
-    SOT: Debug + ObserversTuple<Input = I, State = S>,
+    SOT: Debug + ObserversTuple<I, S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ShadowExecutor")
@@ -44,10 +44,10 @@ where
 
 impl<E, I, S, SOT> ShadowExecutor<E, I, S, SOT>
 where
-    SOT: ObserversTuple<Input = I, State = S>,
+    SOT: ObserversTuple<I, S>,
     E: HasObservers<Input = I, State = S> + Debug,
     I: Debug,
-    SOT: Debug + ObserversTuple<Input = I, State = S>,
+    SOT: Debug + ObserversTuple<I, S>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {
@@ -75,7 +75,7 @@ impl<E, EM, I, S, SOT, Z> Executor<EM, I, S, Z> for ShadowExecutor<E, I, S, SOT>
 where
     E: Executor<EM, I, S, Z> + HasObservers<Input = I, State = S>,
     I: Input,
-    SOT: ObserversTuple<Input = I, State = S>,
+    SOT: ObserversTuple<I, S>,
 {
     fn run_target(
         &mut self,
@@ -93,7 +93,7 @@ where
     I: Debug + Input,
     S: Debug + State<Input = I>,
     E: HasObservers<State = S, Input = I>,
-    SOT: ObserversTuple<Input = I, State = S>,
+    SOT: ObserversTuple<I, S>,
 {
     type Input = I;
 

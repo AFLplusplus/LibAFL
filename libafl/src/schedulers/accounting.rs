@@ -110,6 +110,9 @@ where
     I: Input + HasLen,
     S: HasCorpus<Input = I> + HasMetadata + HasRand,
 {
+    type Input = I;
+
+    type State = S;
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)

@@ -180,10 +180,10 @@ where
         + HasEventManagerId
         + ProgressReporter<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
         + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {
@@ -199,10 +199,10 @@ where
         + HasEventManagerId
         + ProgressReporter<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
         + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {
@@ -226,11 +226,11 @@ where
         + HasEventManagerId
         + ProgressReporter<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
     Z: ExecutesInput<E, EM, Input = I, State = S>
-        + ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
         + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {

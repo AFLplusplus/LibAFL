@@ -627,7 +627,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         let observer = observers
             .match_name::<AsanErrorsObserver>("AsanErrors")

@@ -5,7 +5,7 @@ use core::fmt::Debug;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
-    observers::{Observer, ObserversTuple},
+    observers::ObserversTuple,
     Error,
 };
 
@@ -36,12 +36,12 @@ where
 
 impl<E, OT> HasObservers for WithObservers<E, OT>
 where
-    E: Debug,
-    OT: Debug + ObserversTuple,
+    E: Debug + HasObservers,
+    OT: Debug + ObserversTuple<E::Input, E::State>,
 {
-    type Input = <OT as ObserversTuple>::State;
+    type Input = E::Input;
 
-    type State = <OT as ObserversTuple>::Input;
+    type State = E::State;
 
     type Observers = OT;
 

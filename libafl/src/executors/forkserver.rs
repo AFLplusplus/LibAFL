@@ -521,7 +521,7 @@ impl ForkserverExecutor<(), (), (), StdShMemProvider> {
 impl<I, OT, S, SP> ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -567,7 +567,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
     where
         I: Input + HasTargetBytes,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
         SP: ShMemProvider,
     {
         let input_filename = match &self.input_filename {
@@ -855,7 +855,7 @@ impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
 impl<EM, I, OT, S, SP, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
     #[inline]
@@ -944,9 +944,16 @@ where
 impl<I, OT, S, SP> HasObservers for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
+    S: State<Input = I>,
     SP: ShMemProvider,
 {
+    type Input = I;
+
+    type State = S;
+
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers
@@ -961,7 +968,7 @@ where
 impl<I, OT, S, SP> HasForkserver for ForkserverExecutor<I, OT, S, SP>
 where
     I: Input + HasTargetBytes,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
     type SP = SP;
@@ -999,10 +1006,16 @@ where
 
 impl<E, I, S> HasObservers for TimeoutForkserverExecutor<E, I, S>
 where
-    E: HasObservers,
-    I: Debug,
-    S: Debug,
+    E: HasObservers<Input = I, State = S>,
+    I: Input + Debug,
+    S: State<Input = I> + Debug,
 {
+    type Input = I;
+
+    type State = S;
+
+    type Observers = E::Observers;
+
     #[inline]
     fn observers(&self) -> &Self::Observers {
         self.executor.observers()

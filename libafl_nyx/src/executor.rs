@@ -86,7 +86,7 @@ impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
 impl<'a, I, S, OT> HasObservers for NyxExecutor<'a, I, S, OT>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
 {
     fn observers(&self) -> &OT {
         &self.observers

@@ -34,7 +34,7 @@ pub struct CalibrationStage<I, O, OT, S>
 where
     I: Input,
     O: MapObserver,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus<Input = I> + HasMetadata + HasNamedMetadata,
 {
     map_observer_name: String,
@@ -53,7 +53,7 @@ where
     I: Input,
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus<Input = I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
     Z: Evaluator<E, EM, Input = I, State = S>,
 {
@@ -236,7 +236,7 @@ impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
 where
     I: Input,
     O: MapObserver,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasCorpus<Input = I> + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].

@@ -35,6 +35,7 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
+    state::State,
     Error,
 };
 
@@ -401,8 +402,15 @@ impl<E, EM, I, S, Z> HasObservers for TimeoutExecutor<E, EM, Z>
 where
     E: HasObservers<Input = I, State = S> + Executor<EM, I, S, Z>,
     I: Input,
+    S: State<Input = I>,
     Z: Sized,
 {
+    type Input = I;
+
+    type State = S;
+
+    type Observers = E::Observers;
+
     #[inline]
     fn observers(&self) -> &Self::Observers {
         self.executor.observers()

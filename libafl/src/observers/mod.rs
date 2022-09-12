@@ -37,8 +37,6 @@ use crate::{
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
-    inputs::Input,
-    prelude::State,
     Error,
 };
 
@@ -88,80 +86,62 @@ pub trait Observer<I, S>: Named + Debug {
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple: MatchName + Debug {
-    /// The [`Input`] used for this [`ObserversTuple`]
-    type Input: Input;
-    /// The [`State`] used for this [`ObserversTuple`]
-    type State: State<Input = Self::Input>;
-
+pub trait ObserversTuple<I, S>: MatchName + Debug {
     /// This is called right before the next execution.
-    fn pre_exec_all(&mut self, state: &mut Self::State, input: &Self::Input) -> Result<(), Error>;
+    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 
     /// This is called right after the last execution
     fn post_exec_all(
         &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
+        state: &mut S,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 
     /// This is called right before the next execution in the child process, if any.
-    fn pre_exec_child_all(
-        &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
-    ) -> Result<(), Error>;
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
 
     /// This is called right after the last execution in the child process, if any.
     fn post_exec_child_all(
         &mut self,
-        state: &mut Self::State,
-        input: &Self::Input,
+        state: &mut S,
+        input: &I,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 }
 
-impl ObserversTuple for () {
-    fn pre_exec_all(
-        &mut self,
-        _state: &mut Self::State,
-        _input: &Self::Input,
-    ) -> Result<(), Error> {
+impl<I, S> ObserversTuple<I, S> for () {
+    fn pre_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec_all(
         &mut self,
-        _state: &mut Self::State,
-        _input: &Self::Input,
+        _state: &mut S,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
 
-    fn pre_exec_child_all(
-        &mut self,
-        _state: &mut Self::State,
-        _input: &Self::Input,
-    ) -> Result<(), Error> {
+    fn pre_exec_child_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec_child_all(
         &mut self,
-        _state: &mut Self::State,
-        _input: &Self::Input,
+        _state: &mut S,
+        _input: &I,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<Head, Tail, S, I> ObserversTuple for (Head, Tail)
+impl<Head, Tail, I, S> ObserversTuple<I, S> for (Head, Tail)
 where
     Head: Observer<I, S>,
-    Tail: ObserversTuple<Input = I, State = S>,
-    S: State<Input = I>,
+    Tail: ObserversTuple<I, S>,
 {
     fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.0.pre_exec(state, input)?;
@@ -845,7 +825,7 @@ pub mod pybind {
         }
     }
 
-    impl ObserversTuple<Input = BytesInput, State = PythonStdState> for PythonObserversTuple {
+    impl ObserversTuple<BytesInput, PythonStdState> for PythonObserversTuple {
         fn pre_exec_all(
             &mut self,
             state: &mut PythonStdState,

@@ -63,7 +63,7 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 pub struct GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    OT: ObserversTuple<Input = GeneralizedInput, State = S>,
+    OT: ObserversTuple<GeneralizedInput, S>,
     S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     map_observer_name: String,
@@ -76,7 +76,7 @@ where
     O: MapObserver,
     E: Executor<EM, GeneralizedInput, S, Z>
         + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
-    OT: ObserversTuple<Input = GeneralizedInput, State = S>,
+    OT: ObserversTuple<GeneralizedInput, S>,
     S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     #[inline]
@@ -351,7 +351,7 @@ where
 impl<EM, O, OT, S, Z> GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    OT: ObserversTuple<Input = GeneralizedInput, State = S>,
+    OT: ObserversTuple<GeneralizedInput, S>,
     S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     /// Create a new [`GeneralizationStage`].

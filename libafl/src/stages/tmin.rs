@@ -24,7 +24,7 @@ use crate::{
     schedulers::Scheduler,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, State},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 
@@ -41,12 +41,13 @@ where
     F2: Feedback<Input = I, State = S>,
     I: Input + Hash + HasLen,
     M: Mutator<I, S>,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize,
-    Z: ExecutionProcessor
+    Z: ExecutionProcessor<Observers = OT, Input = I, State = S, EventManager = EM>
         + ExecutesInput<E, EM, Input = I, State = S>
         + HasFeedback<F1, I, S>
-        + HasScheduler<CS, I, S>,
+        + HasScheduler<CS, I, S>
+        + ExecutionProcessor<Observers = OT, Input = I, State = S, EventManager = EM>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -169,6 +170,8 @@ pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, I, M, S, T, Z>
 where
     I: Input + HasLen,
     M: Mutator<I, S>,
+    S: State<Input = I>,
+    Z: ExecutionProcessor<Input = I, State = S, EventManager = EM>,
 {
     mutator: M,
     factory: FF,
@@ -188,9 +191,9 @@ where
     FF: FeedbackFactory<F2, I, S, OT>,
     I: Input + Hash + HasLen,
     M: Mutator<I, S>,
-    OT: ObserversTuple<Input = I, State = S>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize,
-    Z: ExecutionProcessor
+    OT: ObserversTuple<I, S>,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize + State<Input = I>,
+    Z: ExecutionProcessor<Observers = OT, Input = I, State = S, EventManager = EM>
         + ExecutesInput<E, EM, Input = I, State = S>
         + HasFeedback<F1, I, S>
         + HasScheduler<CS, I, S>,
@@ -219,7 +222,8 @@ where
     FF: FeedbackFactory<F2, I, S, T>,
     I: Input + HasLen,
     M: Mutator<I, S>,
-    S: HasClientPerfMonitor,
+    S: HasClientPerfMonitor + State<Input = I>,
+    Z: ExecutionProcessor<Input = I, State = S, EventManager = EM>,
 {
     fn create_feedback(&self, ctx: &T) -> F2 {
         self.factory.create_feedback(ctx)
@@ -237,9 +241,9 @@ where
     FF: FeedbackFactory<F2, I, S, OT>,
     I: Input + HasLen + Hash,
     M: Mutator<I, S>,
-    OT: ObserversTuple<Input = I, State = S>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize,
-    Z: ExecutionProcessor
+    OT: ObserversTuple<I, S>,
+    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize + State<Input = I>,
+    Z: ExecutionProcessor<Observers = OT, Input = I, State = S, EventManager = EM>
         + ExecutesInput<E, EM, Input = I, State = S>
         + HasFeedback<F1, I, S>
         + HasScheduler<CS, I, S>,
@@ -267,6 +271,8 @@ impl<CS, E, EM, F1, F2, FF, I, M, S, T, Z>
 where
     I: Input + HasLen,
     M: Mutator<I, S>,
+    S: State<Input = I>,
+    Z: ExecutionProcessor<Input = I, State = S, EventManager = EM>,
 {
     /// Creates a new minimising mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
@@ -282,14 +288,14 @@ where
 /// A feedback which checks if the hash of the currently observed map is equal to the original hash
 /// provided
 #[derive(Clone, Debug)]
-pub struct MapEqualityFeedback<M> {
+pub struct MapEqualityFeedback<I, M, S> {
     name: String,
     obs_name: String,
     orig_hash: u64,
-    phantom: PhantomData<M>,
+    phantom: PhantomData<(I, M, S)>,
 }
 
-impl<M> MapEqualityFeedback<M> {
+impl<I, M, S> MapEqualityFeedback<I, M, S> {
     /// Create a new map equality feedback -- can be used with feedback logic
     #[must_use]
     pub fn new(name: &str, obs_name: &str, orig_hash: u64) -> Self {
@@ -302,22 +308,28 @@ impl<M> MapEqualityFeedback<M> {
     }
 }
 
-impl<M> Named for MapEqualityFeedback<M> {
+impl<I, M, S> Named for MapEqualityFeedback<I, M, S> {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<M> HasObserverName for MapEqualityFeedback<M> {
+impl<I, M, S> HasObserverName for MapEqualityFeedback<I, M, S> {
     fn observer_name(&self) -> &str {
         &self.obs_name
     }
 }
 
-impl<M> Feedback for MapEqualityFeedback<M>
+impl<I, M, S> Feedback for MapEqualityFeedback<I, M, S>
 where
-    M: MapObserver,
+    I: Input,
+    M: MapObserver + Debug,
+    S: State<Input = I> + Debug,
 {
+    type Input = I;
+
+    type State = S;
+
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut Self::State,
@@ -328,10 +340,10 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         let obs = observers
-            .match_name::<M>(self.observer_name())
+            .match_name::<I, M, S>(self.observer_name())
             .expect("Should have been provided valid observer name.");
         Ok(obs.hash() == self.orig_hash)
     }
@@ -339,12 +351,12 @@ where
 
 /// A feedback factory for ensuring that the maps for minimized inputs are the same
 #[derive(Debug, Clone)]
-pub struct MapEqualityFactory<M> {
+pub struct MapEqualityFactory<I, M, S> {
     obs_name: String,
-    phantom: PhantomData<M>,
+    phantom: PhantomData<(I, M, S)>,
 }
 
-impl<M> MapEqualityFactory<M>
+impl<I, M, S> MapEqualityFactory<I, M, S>
 where
     M: MapObserver,
 {
@@ -357,22 +369,23 @@ where
     }
 }
 
-impl<M> HasObserverName for MapEqualityFactory<M> {
+impl<I, M, S> HasObserverName for MapEqualityFactory<I, M, S> {
     fn observer_name(&self) -> &str {
         &self.obs_name
     }
 }
 
-impl<I, M, OT, S> FeedbackFactory<MapEqualityFeedback<M>, I, S, OT> for MapEqualityFactory<M>
+impl<I, M, OT, S> FeedbackFactory<MapEqualityFeedback<I, M, S>, I, S, OT>
+    for MapEqualityFactory<I, M, S>
 where
     I: Input,
     M: MapObserver,
-    OT: ObserversTuple<Input = I, State = S>,
-    S: HasClientPerfMonitor,
+    OT: ObserversTuple<I, S>,
+    S: HasClientPerfMonitor + Debug + State<Input = I>,
 {
-    fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M> {
+    fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<I, M, S> {
         let obs = observers
-            .match_name::<M>(self.observer_name())
+            .match_name::<I, M, S>(self.observer_name())
             .expect("Should have been provided valid observer name.");
         MapEqualityFeedback {
             name: "MapEq".to_string(),

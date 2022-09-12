@@ -389,7 +389,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -405,7 +405,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -441,8 +441,11 @@ where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State<Input = I>,
 {
+    type Input = I;
+    type State = S;
+
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
     fn is_interesting<EM, OT>(
@@ -455,7 +458,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
@@ -597,7 +600,7 @@ where
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
     I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State<Input = I>,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -684,7 +687,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S>,
+        OT: ObserversTuple<I, S>,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -794,7 +797,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();

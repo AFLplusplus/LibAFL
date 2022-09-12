@@ -138,7 +138,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<Input = I, State = S> + MatchName,
+        OT: ObserversTuple<I, S> + MatchName,
     {
         fn err(name: &str) -> Error {
             Error::illegal_argument(format!("DiffFeedback: observer {} not found", name))
@@ -157,6 +157,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use core::marker::PhantomData;
+
     use alloc::string::{String, ToString};
 
     use crate::{
@@ -170,7 +172,7 @@ mod tests {
         inputs::{BytesInput, Input},
         monitors::ClientPerfMonitor,
         observers::Observer,
-        state::{HasClientPerfMonitor, HasMetadata},
+        state::{HasClientPerfMonitor, HasMetadata, State},
     };
 
     #[derive(Debug)]
@@ -198,12 +200,18 @@ mod tests {
         }
     }
 
-    struct NopEventFirer;
-    impl<I, S> EventFirer for NopEventFirer
+    struct NopEventFirer<I, S> {
+        phantom: PhantomData<(I, S)>,
+    }
+    impl<I, S> EventFirer for NopEventFirer<I, S>
     where
         I: Input,
         S: State<Input = I>,
     {
+        type Input = I;
+
+        type State = S;
+
         fn fire(
             &mut self,
             _state: &mut S,
@@ -261,7 +269,9 @@ mod tests {
             diff_feedback
                 .is_interesting(
                     &mut nop_state,
-                    &mut NopEventFirer {},
+                    &mut NopEventFirer {
+                        phantom: PhantomData
+                    },
                     &BytesInput::new(vec![0]),
                     &observers,
                     &ExitKind::Ok

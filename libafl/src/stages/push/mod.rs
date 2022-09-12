@@ -37,9 +37,9 @@ where
     CS: Scheduler<Input = I, State = S>,
     EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
         + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {
@@ -59,9 +59,9 @@ where
     CS: Scheduler<Input = I, State = S>,
     EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
         + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {
@@ -85,9 +85,9 @@ where
     CS: Scheduler<Input = I, State = S>,
     EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
         + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {
@@ -118,9 +118,9 @@ where
     CS: Scheduler<Input = I, State = S>,
     EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
         + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {
@@ -196,9 +196,9 @@ where
         + HasEventManagerId
         + ProgressReporter<Input = I, State = S>,
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
         + EvaluatorObservers<(), EM, Z, Input = I, State = S>
         + HasScheduler<CS, I, S>,
 {

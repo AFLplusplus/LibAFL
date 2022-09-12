@@ -101,7 +101,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple,
+        OT: ObserversTuple<I, S>,
     {
         let observer = observers
             .match_name::<O>(&self.observer_name)

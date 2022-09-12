@@ -23,7 +23,7 @@ pub struct ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     inner: TracingStage<EM, I, OT, S, TE, Z>,
@@ -34,7 +34,7 @@ impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<EM, I, 
 where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     #[inline]
@@ -71,7 +71,7 @@ impl<EM, I, OT, S, TE, Z> ConcolicTracingStage<EM, I, OT, S, TE, Z>
 where
     I: Input,
     TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.

@@ -378,12 +378,12 @@ where
     }
 }
 
-impl<EM, I, OT: ObserversTuple<Input = I, State = S>, S, T: Debug, Z> HasObservers
+impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers
     for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input,
     S: State<Input = I>,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
 {
     type Input = I;
 

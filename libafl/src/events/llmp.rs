@@ -45,7 +45,7 @@ use crate::{
     inputs::Input,
     monitors::Monitor,
     observers::ObserversTuple,
-    prelude::State,
+    prelude::{HasClientPerfMonitor, HasExecutions, State},
     Error,
 };
 
@@ -248,7 +248,7 @@ where
 pub struct LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: State<Input = I>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
@@ -265,7 +265,7 @@ where
 impl<I, OT, S, SP> core::fmt::Debug for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
     S: State<Input = I>,
 {
@@ -285,7 +285,7 @@ where
 impl<I, OT, S, SP> Drop for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider + 'static,
     S: State<Input = I>,
 {
@@ -298,8 +298,8 @@ where
 impl<I, OT, S, SP> LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
-    S: State<Input = I>,
+    OT: ObserversTuple<I, S>,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw llmp client
@@ -388,9 +388,9 @@ where
         event: Event<I>,
     ) -> Result<(), Error>
     where
-        OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
-        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        OT: ObserversTuple<I, S> + DeserializeOwned,
+        E: Executor<Self, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+        Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = Self>
             + EvaluatorObservers<E, Self, Z, Input = I, State = S>,
     {
         match event {
@@ -442,7 +442,7 @@ where
 impl<I, OT, S, SP> EventFirer for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: State<Input = I>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
@@ -485,7 +485,7 @@ where
 impl<I, OT, S, SP> EventRestarter for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: State<Input = I>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
@@ -504,24 +504,25 @@ where
 impl<I, OT, S, SP> EventProcessor for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
-    S: State<Input = I>,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
+    S: State<Input = I> + HasClientPerfMonitor + HasExecutions,
     SP: ShMemProvider,
 {
+    type EventManager = Self;
     type Input = I;
     type State = S;
 
-    fn process<E, EM, Z>(
+    fn process<E, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: HasObservers<Input = Self::Input, State = Self::State>,
-        EM: EventManager<Input = Self::Input, State = Self::State>,
-        Z: ExecutionProcessor<Input = Self::Input, State = Self::State>
-            + EvaluatorObservers<E, EM, Z>,
+        E: HasObservers<Input = Self::Input, State = Self::State>
+            + Executor<Self::EventManager, I, S, Z>,
+        Z: ExecutionProcessor<Input = Self::Input, State = Self::State, EventManager = Self>
+            + EvaluatorObservers<E, Self::EventManager, Z>,
     {
         // TODO: Get around local event copy by moving handle_in_client
         let self_id = self.llmp.sender.id;
@@ -557,8 +558,8 @@ where
 impl<I, OT, S, SP> EventManager for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
-    S: State<Input = I>,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider,
 {
     type State = S;
@@ -569,7 +570,7 @@ where
 impl<I, OT, S, SP> HasCustomBufHandlers<S> for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: State<Input = I>,
     SP: ShMemProvider,
 {
@@ -584,8 +585,8 @@ where
 impl<I, OT, S, SP> ProgressReporter for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    S: State<Input = I>,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: State<Input = I>,
     SP: ShMemProvider,
 {
@@ -597,7 +598,7 @@ where
 impl<I, OT, S, SP> HasEventManagerId for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: State<Input = I>,
     SP: ShMemProvider,
 {
@@ -615,7 +616,7 @@ where
 pub struct LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: State<Input = I>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
@@ -630,8 +631,8 @@ where
 impl<I, OT, S, SP> ProgressReporter for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
-    S: Serialize + State<Input = I>,
+    OT: ObserversTuple<I, S>,
+    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider,
 {
     type State = S;
@@ -643,7 +644,7 @@ where
 impl<I, OT, S, SP> EventFirer for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
     S: State<Input = I>,
     //CE: CustomEvent<I>,
@@ -666,7 +667,7 @@ where
 impl<I, OT, S, SP> EventRestarter for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S>,
+    OT: ObserversTuple<I, S>,
     S: Serialize + State<Input = I>,
     SP: ShMemProvider,
     //CE: CustomEvent<I>,
@@ -695,8 +696,8 @@ where
 impl<I, OT, S, SP> EventProcessor for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
-    S: State<Input = I>,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -704,17 +705,19 @@ where
 
     type Input = I;
 
-    fn process<E, EM, Z>(
+    type EventManager = Self;
+
+    fn process<E, Z>(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         executor: &mut E,
     ) -> Result<usize, Error>
     where
-        E: HasObservers<Input = Self::Input, State = Self::State>,
-        EM: EventManager<Input = Self::Input, State = Self::State>,
-        Z: ExecutionProcessor<Input = Self::Input, State = Self::State>
-            + EvaluatorObservers<E, EM, Z>,
+        E: HasObservers<Input = Self::Input, State = Self::State>
+            + Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z>,
+        Z: ExecutionProcessor<Input = Self::Input, State = Self::State, EventManager = Self>
+            + EvaluatorObservers<E, Self::EventManager, Z>,
     {
         self.llmp_mgr.process(fuzzer, state, executor)
     }
@@ -724,8 +727,8 @@ where
 impl<I, OT, S, SP> EventManager for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    S: Serialize + State<Input = I>,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -738,7 +741,7 @@ where
 impl<I, OT, S, SP> HasEventManagerId for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: Serialize + State<Input = I>,
     SP: ShMemProvider + 'static,
 {
@@ -757,7 +760,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: State<Input = I>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
@@ -815,7 +818,7 @@ pub fn setup_restarting_mgr_std<I, MT, OT, S>(
 where
     I: Input,
     MT: Monitor + Clone,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned + State<Input = I>,
 {
     RestartingMgr::builder()
@@ -836,7 +839,7 @@ where
 pub struct RestartingMgr<I, MT, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider + 'static,
     MT: Monitor,
@@ -868,7 +871,7 @@ where
 impl<I, MT, OT, S, SP> RestartingMgr<I, MT, OT, S, SP>
 where
     I: Input,
-    OT: ObserversTuple<Input = I, State = S> + DeserializeOwned,
+    OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider,
     S: State<Input = I>,
