@@ -217,9 +217,6 @@ where
                 }
             }
 
-            if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
-                iter += 2;
-            }
             i += 1;
         }
 
