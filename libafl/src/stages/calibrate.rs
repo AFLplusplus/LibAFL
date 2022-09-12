@@ -217,17 +217,6 @@ where
                 }
             }
 
-            for (idx, (first, (cur, history))) in map_first
-                .iter()
-                .zip(map.iter().zip(history_map.iter_mut()))
-                .enumerate()
-            {
-                if *first != *cur && *history != O::Entry::max_value() {
-                    *history = O::Entry::max_value();
-                    unstable_entries.push(idx);
-                };
-            }
-
             if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
                 iter += 2;
             }
