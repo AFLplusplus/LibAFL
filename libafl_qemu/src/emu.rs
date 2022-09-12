@@ -428,7 +428,6 @@ pub(crate) struct FatPtr(*const c_void, *const c_void);
 
 static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
 
-#[allow(clippy::bool-to-int-with-if)]
 extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
     unsafe {
         let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Emulator, &'r str) -> bool>);
