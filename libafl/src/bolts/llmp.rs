@@ -74,6 +74,7 @@ use core::{
     time::Duration,
 };
 #[cfg(all(unix, feature = "std"))]
+#[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use std::os::unix::io::AsRawFd;
 #[cfg(feature = "std")]
 use std::{
@@ -87,6 +88,7 @@ use std::{
 #[cfg(all(debug_assertions, feature = "llmp_debug", feature = "std"))]
 use backtrace::Backtrace;
 #[cfg(all(unix, feature = "std"))]
+#[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
 use nix::sys::socket::{self, sockopt::ReusePort};
 use serde::{Deserialize, Serialize};
 
@@ -380,6 +382,7 @@ fn tcp_bind(port: u16) -> Result<TcpListener, Error> {
     let listener = TcpListener::bind((_LLMP_BIND_ADDR, port))?;
 
     #[cfg(unix)]
+    #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
     socket::setsockopt(listener.as_raw_fd(), ReusePort, &true)?;
 
     Ok(listener)

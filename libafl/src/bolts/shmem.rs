@@ -800,12 +800,22 @@ pub mod unix_shmem {
 
         impl CommonUnixShMem {
             /// Create a new shared memory mapping, using shmget/shmat
+            #[allow(unused_qualifications)]
             pub fn new(map_size: usize) -> Result<Self, Error> {
+                #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+                const SHM_R: libc::c_int = 0o400;
+                #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
+                const SHM_R: libc::c_int = libc::SHM_R;
+                #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+                const SHM_W: libc::c_int = 0o200;
+                #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
+                const SHM_W: libc::c_int = libc::SHM_W;
+
                 unsafe {
                     let os_id = shmget(
                         libc::IPC_PRIVATE,
                         map_size,
-                        libc::IPC_CREAT | libc::IPC_EXCL | libc::SHM_R | libc::SHM_W,
+                        libc::IPC_CREAT | libc::IPC_EXCL | SHM_R | SHM_W,
                     );
 
                     if os_id < 0_i32 {
