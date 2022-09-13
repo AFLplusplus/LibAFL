@@ -1110,18 +1110,6 @@ impl<I, S> ConstFeedback<I, S> {
     pub fn new(val: bool) -> Self {
         Self::from(val)
     }
-
-    /// Creates a new [`ConstFeedback`]
-    /// that always returns `true` on `is_interesting`
-    pub fn t() -> Self {
-        Self::new(true)
-    }
-
-    /// Creates a new [`ConstFeedback`]
-    /// that always returns `false` on `is_interesting`
-    pub fn f() -> Self {
-        Self::new(false)
-    }
 }
 
 impl<I, S> From<bool> for ConstFeedback<I, S> {
@@ -1673,9 +1661,7 @@ pub mod pybind {
         type State = PythonStdState;
 
         fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, f, {
-                Feedback::<Input = BytesInput, State = PythonStdState>::init_state(f, state)
-            })
+            unwrap_me_mut!(self.wrapper, f, { Feedback::init_state(f, state) })
         }
 
         fn is_interesting<EM, OT>(

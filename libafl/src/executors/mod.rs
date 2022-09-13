@@ -189,7 +189,7 @@ mod test {
         let mut executor = NopExecutor {
             phantom: PhantomData,
         };
-        let fuzzer = NopFuzzer::new();
+        let mut fuzzer = NopFuzzer::new();
 
         let mut state = NopState::new();
 

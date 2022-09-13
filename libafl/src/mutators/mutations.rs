@@ -1227,8 +1227,8 @@ mod tests {
         let rand = StdRand::with_seed(1337);
         let mut corpus = InMemoryCorpus::new();
 
-        let feedback = ConstFeedback::new(false);
-        let objective = ConstFeedback::new(false);
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
 
         corpus
             .add(BytesInput::new(vec![0x42; 0x1337]).into())

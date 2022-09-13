@@ -40,7 +40,7 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
 use crate::{
-    events::{EventFirer, EventRestarter},
+    events::{EventFirer, EventManager, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
@@ -324,10 +324,7 @@ impl InProcessHandlers {
         I: Input,
         E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
         OT: ObserversTuple<I, S>,
-        EM: EventFirer<Input = I, State = S>
-            + EventRestarter
-            + EventRestarter<State = S>
-            + EventRestarter<State = S>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter<State = S>,
         OF: Feedback<Input = I, State = S>,
         S: HasSolutions<Input = I> + HasClientPerfMonitor + State<Input = I>,
         Z: HasObjective<I, OF, S>,
@@ -1440,6 +1437,7 @@ where
 impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
     for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
+    EM: EventManager<Self, I, S, Z>,
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
     S: State<Input = I>,
@@ -1656,11 +1654,6 @@ mod tests {
     #[cfg(all(feature = "std", feature = "fork", unix))]
     use serial_test::serial;
 
-    #[cfg(all(feature = "std", feature = "fork", unix))]
-    use crate::{
-        bolts::shmem::{ShMemProvider, StdShMemProvider},
-        executors::InProcessForkExecutor,
-    };
     use crate::{
         bolts::tuples::tuple_list,
         executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
@@ -1688,14 +1681,18 @@ mod tests {
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
         use crate::{
-            events::SimpleEventManager, executors::inprocess::InChildProcessHandlers,
-            state::NopState, NopFuzzer,
+            bolts::shmem::{ShMemProvider, StdShMemProvider},
+            events::SimpleEventManager,
+            executors::inprocess::InChildProcessHandlers,
+            executors::InProcessForkExecutor,
+            state::NopState,
+            NopFuzzer,
         };
 
         let provider = StdShMemProvider::new().unwrap();
 
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
-        let mut in_process_fork_executor = InProcessForkExecutor::<_, NopInput, (), (), _> {
+        let mut in_process_fork_executor = InProcessForkExecutor::<_, NopInput, (), _, _> {
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
@@ -1703,9 +1700,9 @@ mod tests {
             phantom: PhantomData,
         };
         let input = NopInput {};
-        let fuzzer = NopFuzzer::new();
-        let state = NopState::new();
-        let mgr = SimpleEventManager::printing();
+        let mut fuzzer = NopFuzzer::new();
+        let mut state = NopState::new();
+        let mut mgr: SimpleEventManager<_, _, (), _> = SimpleEventManager::printing();
         in_process_fork_executor
             .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();

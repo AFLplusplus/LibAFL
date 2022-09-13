@@ -509,9 +509,19 @@ pub trait HasCustomBufHandlers<S> {
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct NopEventManager<OT, S> {
     phantom: PhantomData<(OT, S)>,
+}
+
+impl<OT, S> NopEventManager<OT, S> {
+    /// Creates a new [`NopEventManager`]
+    #[must_use]
+    pub fn new() -> Self {
+        NopEventManager {
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<OT, S> EventFirer for NopEventManager<OT, S>
@@ -663,7 +673,7 @@ pub mod pybind {
         executors::pybind::PythonExecutor,
         fuzzer::pybind::PythonStdFuzzer,
         inputs::BytesInput,
-        observers::PythonObserversTuple,
+        observers::pybind::PythonObserversTuple,
         state::pybind::PythonStdState,
         Error,
     };

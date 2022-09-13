@@ -178,6 +178,7 @@ where
     I: Input,
 {
     /// Creates a [`SimpleEventManager`] that just prints to `stdout`.
+    #[must_use]
     pub fn printing() -> Self {
         Self::new(SimplePrintingMonitor::new())
     }

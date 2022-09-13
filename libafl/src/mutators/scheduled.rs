@@ -450,8 +450,8 @@ mod tests {
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
-        let feedback = ConstFeedback::new(false);
-        let objective = ConstFeedback::new(false);
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
 
         let mut state = StdState::new(
             rand,
@@ -487,8 +487,8 @@ mod tests {
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 
-        let feedback = ConstFeedback::new(false);
-        let objective = ConstFeedback::new(false);
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
 
         let mut state = StdState::new(
             rand,

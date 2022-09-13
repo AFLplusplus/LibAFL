@@ -557,21 +557,11 @@ where
 impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: Scheduler<Input = I, State = S>,
-    E: HasObservers<Input = I, State = S, Observers = OT>
-        + Executor<EM, I, S, Self>
-        + Executor<EM, I, S, StdFuzzer<CS, F, I, OF, OT, S>>,
-    EM: EventProcessor<E, Self, Input = I, State = S, Observers = OT>
-        + ProgressReporter<Input = I, State = S>,
+    EM: ProgressReporter<Input = I, State = S> + EventProcessor<E, Self, Input = I, State = S>,
     F: Feedback<Input = I, State = S>,
     I: Input,
-    S: HasClientPerfMonitor
-        + HasExecutions
-        + State<Input = I>
-        + HasCorpus<Corpus = I>
-        + HasSolutions<Input = I>
-        + HasCorpus<Input = I>,
     OF: Feedback<Input = I, State = S>,
-    OT: ObserversTuple<I, S> + Serialize + DeserializeOwned,
+    S: HasClientPerfMonitor + HasExecutions,
     ST: StagesTuple<E, EM, S, Self>,
 {
     fn fuzz_one(
@@ -747,10 +737,10 @@ where
 {
     fn fuzz_one(
         &mut self,
-        stages: &mut ST,
-        executor: &mut E,
-        state: &mut NopState<I>,
-        manager: &mut EM,
+        _stages: &mut ST,
+        _executor: &mut E,
+        _state: &mut NopState<I>,
+        _manager: &mut EM,
     ) -> Result<usize, Error> {
         unimplemented!()
     }
@@ -769,7 +759,7 @@ pub mod pybind {
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         feedbacks::pybind::PythonFeedback,
-        fuzzer::{Evaluator, StdFuzzer},
+        fuzzer::{Evaluator, Fuzzer, StdFuzzer},
         inputs::BytesInput,
         observers::pybind::PythonObserversTuple,
         schedulers::QueueScheduler,

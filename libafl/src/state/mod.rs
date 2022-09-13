@@ -577,7 +577,7 @@ impl<C, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
 }
 
 #[cfg(test)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
     phantom: PhantomData<I>,
 }
@@ -585,6 +585,7 @@ pub struct NopState<I> {
 #[cfg(test)]
 impl<I> NopState<I> {
     /// Create a new State that does nothing (for tests)
+    #[must_use]
     pub fn new() -> Self {
         NopState {
             phantom: PhantomData,

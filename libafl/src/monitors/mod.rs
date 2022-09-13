@@ -288,6 +288,7 @@ pub struct SimplePrintingMonitor {
 #[cfg(feature = "std")]
 impl SimplePrintingMonitor {
     /// Create a new [`SimplePrintingMonitor`]
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -332,7 +333,7 @@ impl Monitor for SimplePrintingMonitor {
                 sender_id, self.client_stats[sender_id as usize].introspection_monitor
             );
             // Separate the spacing just a bit
-            println("");
+            println!();
         }
     }
 }

@@ -452,13 +452,14 @@ pub mod prelude {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "std")]
-    use crate::events::SimpleEventManager;
+
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, Testcase},
+        events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
+        fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
@@ -477,8 +478,8 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]);
         corpus.add(testcase).unwrap();
 
-        let feedback = ConstFeedback::new(false);
-        let objective = ConstFeedback::new(false);
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
 
         let mut state = StdState::new(
             rand,
@@ -489,13 +490,13 @@ mod tests {
         )
         .unwrap();
 
-        let monitor = SimpleMonitor::new(|s| {
+        let _monitor = SimpleMonitor::new(|s| {
             println!("{}", s);
         });
-        let mut event_manager = SimpleEventManager::new(monitor);
+        let mut event_manager = NopEventManager::<(), _>::new();
 
-        let mut feedback = ConstFeedback::new(false);
-        let mut objective = ConstFeedback::new(false);
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
 
         let scheduler = RandScheduler::new();
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);

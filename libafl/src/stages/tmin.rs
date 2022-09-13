@@ -46,8 +46,7 @@ where
     Z: ExecutionProcessor<Observers = OT, Input = I, State = S>
         + ExecutesInput<E, EM, Input = I, State = S>
         + HasFeedback<F1, I, S>
-        + HasScheduler<CS, I, S>
-        + ExecutionProcessor<Observers = OT, Input = I, State = S>,
+        + HasScheduler<CS, I, S>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;

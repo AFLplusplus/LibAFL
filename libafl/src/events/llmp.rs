@@ -1067,6 +1067,7 @@ mod tests {
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
         executors::{ExitKind, InProcessExecutor},
         feedbacks::ConstFeedback,
+        fuzzer::Fuzzer,
         inputs::BytesInput,
         mutators::BitFlipMutator,
         schedulers::RandScheduler,
@@ -1111,8 +1112,8 @@ mod tests {
 
         let scheduler = RandScheduler::new();
 
-        let mut feedback = ConstFeedback::new(true);
-        let mut objective = ConstFeedback::new(false);
+        let feedback = ConstFeedback::new(true);
+        let objective = ConstFeedback::new(false);
 
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
