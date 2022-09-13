@@ -473,7 +473,7 @@ where
     }
 
     #[cfg(not(feature = "llmp_compression"))]
-    fn fire(&mut self, _state: &mut S2, event: Event<I>) -> Result<(), Error> {
+    fn fire(&mut self, _state: &mut Self::State, event: Event<Self::Input>) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
         Ok(())

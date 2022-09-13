@@ -49,7 +49,7 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, H, I, OT, RT, S, Z> Executor
+impl<'a, 'b, 'c, EM, H, I, OT, RT, S, Z> Executor<EM, I, S, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
 where
     H: FnMut(&I) -> ExitKind,
@@ -59,7 +59,7 @@ where
 {
     /// Instruct the target about the input and run
     #[inline]
-    fn run_target<EM, I, S, Z>(
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,

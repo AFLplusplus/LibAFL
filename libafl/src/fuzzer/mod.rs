@@ -557,7 +557,8 @@ where
 impl<CS, E, EM, F, I, OF, OT, S, ST> Fuzzer<E, EM, I, S, ST> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: Scheduler<Input = I, State = S>,
-    EM: ProgressReporter<Input = I, State = S> + EventProcessor<E, Self, Input = I, State = S>,
+    EM: ProgressReporter<Input = I, State = S>
+        + EventProcessor<E, Self, Input = I, State = S, Observers = OT>,
     F: Feedback<Input = I, State = S>,
     I: Input,
     OF: Feedback<Input = I, State = S>,

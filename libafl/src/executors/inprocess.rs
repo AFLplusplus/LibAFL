@@ -33,14 +33,17 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
-#[cfg(all(feature = "std", unix))]
-use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
 #[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
+#[cfg(all(feature = "std", unix))]
 use crate::{
-    events::{EventFirer, EventManager, EventRestarter},
+    bolts::os::unix_signals::{ucontext_t, Handler, Signal},
+    events::EventManager,
+};
+use crate::{
+    events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,

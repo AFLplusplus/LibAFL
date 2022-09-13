@@ -21,6 +21,7 @@ use crate::bolts::os::{fork, ForkResult};
 use crate::{
     bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
     corpus::Corpus,
+    monitors::SimplePrintingMonitor,
     state::{HasCorpus, HasSolutions},
 };
 use crate::{
@@ -31,7 +32,7 @@ use crate::{
     inputs::Input,
     monitors::Monitor,
     observers::ObserversTuple,
-    prelude::{HasClientPerfMonitor, HasExecutions, HasMetadata, SimplePrintingMonitor, State},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, State},
     Error,
 };
 
