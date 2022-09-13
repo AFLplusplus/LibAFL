@@ -39,8 +39,8 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
-        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<Input = I, State = S, Observers = OT>
         + HasScheduler<CS, I, S>,
 {
     /// The [`crate::state::State`]
@@ -61,8 +61,8 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
-        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<Input = I, State = S, Observers = OT>
         + HasScheduler<CS, I, S>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
@@ -87,8 +87,8 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
-        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<Input = I, State = S, Observers = OT>
         + HasScheduler<CS, I, S>,
 {
     /// If this stage has already been initalized.
@@ -120,8 +120,8 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
-        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<Input = I, State = S, Observers = OT>
         + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageHelper`]
@@ -198,8 +198,8 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
-        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<Input = I, State = S, Observers = OT>
         + HasScheduler<CS, I, S>,
 {
     /// Gets the [`PushStageHelper`]

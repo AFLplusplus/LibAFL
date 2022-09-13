@@ -857,6 +857,8 @@ where
     I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
+    S: State<Input = I>,
+    Self: HasObservers<Input = I, State = S, Observers = OT>,
 {
     #[inline]
     fn run_target(

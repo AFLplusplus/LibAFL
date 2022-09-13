@@ -33,6 +33,7 @@ use crate::bolts::core_affinity::CoreId;
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::bolts::os::{dup2, fork, ForkResult};
+use crate::prelude::{HasClientPerfMonitor, HasExecutions};
 #[cfg(feature = "std")]
 use crate::{
     bolts::{core_affinity::Cores, shmem::ShMemProvider},
@@ -118,8 +119,8 @@ where
     I: Input,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     MT: Monitor + Clone,
+    S: DeserializeOwned + State<Input = I> + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + State<Input = I>,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std", feature = "fork"))]

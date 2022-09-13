@@ -41,7 +41,7 @@ where
     where
         CS: Scheduler<Input = I, State = S>,
         EX: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventManager<Input = I, State = S>,
+        EM: EventManager<Input = I, State = S, Observers = OT>,
         OT: ObserversTuple<I, S>,
         Z: Evaluator<E, EM, State = S, Input = I> + HasScheduler<CS, I, S>;
 }
@@ -101,7 +101,7 @@ where
     where
         CS: Scheduler<Input = I, State = S>,
         EX: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventManager<Input = I, State = S>,
+        EM: EventManager<Input = I, State = S, Observers = OT>,
         OT: ObserversTuple<I, S>,
         Z: Evaluator<E, EM, Input = I, State = S> + HasScheduler<CS, I, S>,
     {

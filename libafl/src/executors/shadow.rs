@@ -17,8 +17,9 @@ use crate::{
 pub struct ShadowExecutor<E, I, S, SOT>
 where
     E: HasObservers<Input = I, State = S> + Debug,
-    I: Debug,
+    I: Debug + Input,
     SOT: Debug + ObserversTuple<I, S>,
+    S: State<Input = I>,
 {
     /// The wrapped executor
     executor: E,
@@ -31,7 +32,8 @@ where
 impl<E, I, S, SOT> Debug for ShadowExecutor<E, I, S, SOT>
 where
     E: HasObservers<Input = I, State = S> + Debug,
-    I: Debug,
+    I: Debug + Input,
+    S: State<Input = I>,
     SOT: Debug + ObserversTuple<I, S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -46,7 +48,8 @@ impl<E, I, S, SOT> ShadowExecutor<E, I, S, SOT>
 where
     SOT: ObserversTuple<I, S>,
     E: HasObservers<Input = I, State = S> + Debug,
-    I: Debug,
+    I: Debug + Input,
+    S: State<Input = I>,
     SOT: Debug + ObserversTuple<I, S>,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
@@ -75,6 +78,7 @@ impl<E, EM, I, S, SOT, Z> Executor<EM, I, S, Z> for ShadowExecutor<E, I, S, SOT>
 where
     E: Executor<EM, I, S, Z> + HasObservers<Input = I, State = S>,
     I: Input,
+    S: State<Input = I>,
     SOT: ObserversTuple<I, S>,
 {
     fn run_target(

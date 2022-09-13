@@ -183,8 +183,8 @@ where
     OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
-        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<Input = I, State = S, Observers = OT>
         + HasScheduler<CS, I, S>,
 {
     push_stage: PS,
@@ -202,8 +202,8 @@ where
     OT: ObserversTuple<I, S>,
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
-        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<Input = I, State = S, Observers = OT>
         + HasScheduler<CS, I, S>,
 {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
@@ -230,8 +230,8 @@ where
     PS: PushStage<CS, EM, I, OT, S, Z>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
     Z: ExecutesInput<E, EM, Input = I, State = S>
-        + ExecutionProcessor<Input = I, Observers = OT, State = S, EventManager = EM>
-        + EvaluatorObservers<(), EM, Z, Input = I, State = S>
+        + ExecutionProcessor<Input = I, Observers = OT, State = S>
+        + EvaluatorObservers<Input = I, State = S, Observers = OT>
         + HasScheduler<CS, I, S>,
 {
     fn perform(

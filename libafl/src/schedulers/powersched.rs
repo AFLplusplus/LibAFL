@@ -157,7 +157,7 @@ pub struct PowerQueueScheduler<I, S> {
 impl<I, S> Scheduler for PowerQueueScheduler<I, S>
 where
     I: Input,
-    S: State<Input = I> + HasCorpus<Input = I>,
+    S: State<Input = I> + HasCorpus<Input = I> + HasMetadata,
 {
     type Input = I;
 

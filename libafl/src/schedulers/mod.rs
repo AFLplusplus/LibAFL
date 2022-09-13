@@ -104,7 +104,9 @@ impl<I, S> RandScheduler<I, S> {
     /// Create a new [`RandScheduler`] that just schedules randomly.
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 

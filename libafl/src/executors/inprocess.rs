@@ -46,7 +46,7 @@ use crate::{
     fuzzer::HasObjective,
     inputs::Input,
     observers::ObserversTuple,
-    prelude::State,
+    prelude::{HasCorpus, HasExecutions, State},
     state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
@@ -146,7 +146,11 @@ where
     HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: State<Input = I>,
+    S: State<Input = I>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasCorpus<Input = I>
+        + HasSolutions<Input = I>,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -162,9 +166,9 @@ where
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        Self: Executor<EM, I, S, Z>,
+        EM: EventFirer<Input = I, State = S> + EventRestarter<Input = I, State = S>,
         OF: Feedback<Input = I, State = S>,
-        S: HasSolutions<Input = I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z, H>()?;

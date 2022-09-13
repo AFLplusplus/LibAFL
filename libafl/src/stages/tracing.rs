@@ -12,7 +12,7 @@ use crate::{
     observers::ObserversTuple,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, State},
     Error,
 };
 
@@ -114,7 +114,7 @@ where
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
     OT: ObserversTuple<I, S>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I> + Debug,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I> + Debug + State<Input = I>,
 {
     #[inline]
     fn perform(
@@ -165,8 +165,8 @@ where
     I: Input,
     E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
     OT: ObserversTuple<I, S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I> + State<Input = I>,
     SOT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, I, S, SOT>) -> Self {

@@ -43,11 +43,11 @@ where
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize,
-    Z: ExecutionProcessor<Observers = OT, Input = I, State = S, EventManager = EM>
+    Z: ExecutionProcessor<Observers = OT, Input = I, State = S>
         + ExecutesInput<E, EM, Input = I, State = S>
         + HasFeedback<F1, I, S>
         + HasScheduler<CS, I, S>
-        + ExecutionProcessor<Observers = OT, Input = I, State = S, EventManager = EM>,
+        + ExecutionProcessor<Observers = OT, Input = I, State = S>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -171,7 +171,7 @@ where
     I: Input + HasLen,
     M: Mutator<I, S>,
     S: State<Input = I>,
-    Z: ExecutionProcessor<Input = I, State = S, EventManager = EM>,
+    Z: ExecutionProcessor<Input = I, State = S>,
 {
     mutator: M,
     factory: FF,
@@ -193,7 +193,7 @@ where
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize + State<Input = I>,
-    Z: ExecutionProcessor<Observers = OT, Input = I, State = S, EventManager = EM>
+    Z: ExecutionProcessor<Observers = OT, Input = I, State = S>
         + ExecutesInput<E, EM, Input = I, State = S>
         + HasFeedback<F1, I, S>
         + HasScheduler<CS, I, S>,
@@ -223,7 +223,7 @@ where
     I: Input + HasLen,
     M: Mutator<I, S>,
     S: HasClientPerfMonitor + State<Input = I>,
-    Z: ExecutionProcessor<Input = I, State = S, EventManager = EM>,
+    Z: ExecutionProcessor<Input = I, State = S>,
 {
     fn create_feedback(&self, ctx: &T) -> F2 {
         self.factory.create_feedback(ctx)
@@ -243,7 +243,7 @@ where
     M: Mutator<I, S>,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + HasCorpus<Input = I> + HasExecutions + HasMaxSize + State<Input = I>,
-    Z: ExecutionProcessor<Observers = OT, Input = I, State = S, EventManager = EM>
+    Z: ExecutionProcessor<Observers = OT, Input = I, State = S>
         + ExecutesInput<E, EM, Input = I, State = S>
         + HasFeedback<F1, I, S>
         + HasScheduler<CS, I, S>,
@@ -272,7 +272,7 @@ where
     I: Input + HasLen,
     M: Mutator<I, S>,
     S: State<Input = I>,
-    Z: ExecutionProcessor<Input = I, State = S, EventManager = EM>,
+    Z: ExecutionProcessor<Input = I, State = S>,
 {
     /// Creates a new minimising mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {
@@ -343,7 +343,7 @@ where
         OT: ObserversTuple<Self::Input, Self::State>,
     {
         let obs = observers
-            .match_name::<I, M, S>(self.observer_name())
+            .match_name::<M>(self.observer_name())
             .expect("Should have been provided valid observer name.");
         Ok(obs.hash() == self.orig_hash)
     }
@@ -378,14 +378,14 @@ impl<I, M, S> HasObserverName for MapEqualityFactory<I, M, S> {
 impl<I, M, OT, S> FeedbackFactory<MapEqualityFeedback<I, M, S>, I, S, OT>
     for MapEqualityFactory<I, M, S>
 where
-    I: Input,
+    I: Input + Hasher,
     M: MapObserver,
     OT: ObserversTuple<I, S>,
     S: HasClientPerfMonitor + Debug + State<Input = I>,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<I, M, S> {
         let obs = observers
-            .match_name::<I, M, S>(self.observer_name())
+            .match_name::<M>(self.observer_name())
             .expect("Should have been provided valid observer name.");
         MapEqualityFeedback {
             name: "MapEq".to_string(),

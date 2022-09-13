@@ -18,13 +18,13 @@ use uuid::Uuid;
 
 use crate::{
     bolts::current_time,
-    executors::{Executor, ExitKind, HasObservers},
+    executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
     prelude::State,
     state::{HasClientPerfMonitor, HasExecutions},
-    Error, EvaluatorObservers, ExecutionProcessor,
+    Error,
 };
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
@@ -440,35 +440,25 @@ pub trait EventRestarter {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor {
+pub trait EventProcessor<E, Z> {
+    type Observers: ObserversTuple<Self::Input, Self::State>;
     /// The [`State`]
     type State: State<Input = Self::Input>;
-    type EventManager: EventManager<State = Self::State, Input = Self::Input>;
     type Input;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process<E, Z>(
+    fn process(
         &mut self,
         fuzzer: &mut Z,
         state: &mut Self::State,
         executor: &mut E,
-    ) -> Result<usize, Error>
-    where
-        E: HasObservers<Input = Self::Input, State = Self::State>
-            + Executor<Self::EventManager, Self::Input, Self::State, Z>,
-        Z: ExecutionProcessor<
-                Input = Self::Input,
-                Observers = E::Observers,
-                State = Self::State,
-                EventManager = Self::EventManager,
-            > + EvaluatorObservers<E, Self::EventManager, Z>,
-        <Self as EventProcessor>::Input: Input;
+    ) -> Result<usize, Error>;
 
     /// Deserialize all observers for this type and manager
-    fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
+    fn deserialize_observers(&mut self, observers_buf: &[u8]) -> Result<Self::Observers, Error>
     where
-        OT: ObserversTuple<Self::Input, Self::State> + serde::de::DeserializeOwned,
+        Self::Observers: serde::de::DeserializeOwned,
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }
@@ -484,15 +474,16 @@ pub trait HasEventManagerId {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager:
-    EventFirer<State = <Self as EventManager>::State, Input = <Self as EventManager>::Input>
-    + EventProcessor<State = <Self as EventManager>::State, Input = <Self as EventManager>::Input>
-    + EventRestarter<State = <Self as EventManager>::State, Input = <Self as EventManager>::Input>
+pub trait EventManager<E, I, S, Z>:
+    EventFirer<Input = I, State = S>
+    + EventProcessor<E, Z, Input = I, State = S>
+    + EventRestarter<Input = I, State = S>
     + HasEventManagerId
-    + ProgressReporter<State = <Self as EventManager>::State, Input = <Self as EventManager>::Input>
+    + ProgressReporter<Input = I, State = S>
+where
+    I: Input,
+    S: State<Input = I>,
 {
-    type State: State<Input = <Self as EventManager>::Input>;
-    type Input;
 }
 
 /// The handler function for custom buffers exchanged via [`EventManager`]
@@ -507,11 +498,11 @@ pub trait HasCustomBufHandlers<S> {
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug)]
-pub struct NopEventManager<S> {
-    phantom: PhantomData<S>,
+pub struct NopEventManager<OT, S> {
+    phantom: PhantomData<(OT, S)>,
 }
 
-impl<S> EventFirer for NopEventManager<S>
+impl<OT, S> EventFirer for NopEventManager<OT, S>
 where
     S: State,
 {
@@ -528,7 +519,7 @@ where
     }
 }
 
-impl<S> EventRestarter for NopEventManager<S>
+impl<OT, S> EventRestarter for NopEventManager<OT, S>
 where
     S: State,
 {
@@ -537,45 +528,36 @@ where
     type State = S;
 }
 
-impl<S> EventProcessor for NopEventManager<S>
+impl<E, OT, S, Z> EventProcessor<E, Z> for NopEventManager<OT, S>
 where
     S: State + HasClientPerfMonitor + HasExecutions,
+    OT: ObserversTuple<<S as State>::Input, S>,
 {
     type State = S;
 
     type Input = <S as State>::Input;
 
-    type EventManager = Self;
+    type Observers = OT;
 
-    fn process<E, Z>(
+    fn process(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut Self::State,
         _executor: &mut E,
-    ) -> Result<usize, Error>
-    where
-        E: HasObservers<Input = Self::Input, State = Self::State>,
-        Z: ExecutionProcessor<
-                Input = Self::Input,
-                Observers = E::Observers,
-                State = S,
-                EventManager = Self::EventManager,
-            > + EvaluatorObservers<E, Self::EventManager, Z>,
-    {
+    ) -> Result<usize, Error> {
         Ok(0)
     }
 }
 
-impl<S> EventManager for NopEventManager<S>
+impl<E, I, OT, S, Z> EventManager<E, I, S, Z> for NopEventManager<OT, S>
 where
-    S: State + HasClientPerfMonitor + HasExecutions,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    S: State<Input = I> + HasClientPerfMonitor + HasExecutions,
 {
-    type State = S;
-
-    type Input = <S as State>::Input;
 }
 
-impl<S> HasCustomBufHandlers<S> for NopEventManager<S> {
+impl<OT, S> HasCustomBufHandlers<S> for NopEventManager<OT, S> {
     fn add_custom_buf_handler(
         &mut self,
         _handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
@@ -583,7 +565,7 @@ impl<S> HasCustomBufHandlers<S> for NopEventManager<S> {
     }
 }
 
-impl<S> ProgressReporter for NopEventManager<S>
+impl<OT, S> ProgressReporter for NopEventManager<OT, S>
 where
     S: State + HasClientPerfMonitor + HasExecutions,
 {
@@ -592,7 +574,7 @@ where
     type Input = <S as State>::Input;
 }
 
-impl<S> HasEventManagerId for NopEventManager<S> {
+impl<OT, S> HasEventManagerId for NopEventManager<OT, S> {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId { id: 0 }
     }
@@ -723,7 +705,7 @@ pub mod pybind {
 
     impl<S> EventRestarter for PythonEventManager {}
 
-    impl EventProcessor for PythonEventManager {
+    impl<E, Z> EventProcessor<E, Z> for PythonEventManager {
         type Input = BytesInput;
         type State = PythonStdState;
 
