@@ -477,12 +477,15 @@ mod tests {
         let testcase = Testcase::new(vec![0; 4]);
         corpus.add(testcase).unwrap();
 
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
+
         let mut state = StdState::new(
             rand,
             corpus,
             InMemoryCorpus::<BytesInput>::new(),
-            &mut (),
-            &mut (),
+            &mut feedback,
+            &mut objective,
         )
         .unwrap();
 

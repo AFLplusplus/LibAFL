@@ -45,7 +45,7 @@ use crate::{
     inputs::Input,
     monitors::Monitor,
     observers::ObserversTuple,
-    prelude::{HasClientPerfMonitor, HasExecutions, State},
+    prelude::{HasClientPerfMonitor, HasExecutions, HasMetadata, State},
     Error,
 };
 
@@ -558,7 +558,7 @@ impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpEventManager<I, OT, S,
 where
     I: Input,
     OT: ObserversTuple<I, S> + DeserializeOwned,
-    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<Input = I, State = S, Observers = OT> + Executor<Self, I, S, Z>,
     Z: EvaluatorObservers<Input = I, State = S, Observers = OT>
@@ -584,7 +584,7 @@ where
 impl<I, OT, S, SP> ProgressReporter for LlmpEventManager<I, OT, S, SP>
 where
     I: Input,
-    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     S: State<Input = I>,
     SP: ShMemProvider,
@@ -631,7 +631,7 @@ impl<I, OT, S, SP> ProgressReporter for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
 {
     type State = S;
@@ -718,7 +718,7 @@ where
 impl<E, I, OT, S, SP, Z> EventManager<E, I, S, Z> for LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
-    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
     OT: ObserversTuple<I, S> + DeserializeOwned,
     SP: ShMemProvider + 'static,
     E: HasObservers<Input = I, State = S, Observers = OT>

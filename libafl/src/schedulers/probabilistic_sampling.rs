@@ -150,6 +150,7 @@ mod tests {
     use crate::{
         bolts::rands::StdRand,
         corpus::{Corpus, InMemoryCorpus, Testcase},
+        feedbacks::ConstFeedback,
         inputs::{bytes::BytesInput, Input},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::{HasCorpus, HasMetadata, StdState},
@@ -186,6 +187,9 @@ mod tests {
 
         let scheduler = UniformProbabilitySamplingScheduler::new();
 
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
+
         let mut corpus = InMemoryCorpus::new();
         let t1 = Testcase::with_filename(BytesInput::new(vec![0_u8; 4]), "1".into());
         let t2 = Testcase::with_filename(BytesInput::new(vec![1_u8; 4]), "2".into());
@@ -193,8 +197,14 @@ mod tests {
         let idx1 = corpus.add(t1).unwrap();
         let idx2 = corpus.add(t2).unwrap();
 
-        let mut state =
-            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
         scheduler.on_add(state.borrow_mut(), idx1).unwrap();
         scheduler.on_add(state.borrow_mut(), idx2).unwrap();
         let next_idx1 = scheduler.next(&mut state).unwrap();

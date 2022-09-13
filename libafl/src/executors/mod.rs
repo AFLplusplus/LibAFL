@@ -180,7 +180,7 @@ mod test {
     use core::marker::PhantomData;
 
     use super::{Executor, NopExecutor};
-    use crate::inputs::BytesInput;
+    use crate::{inputs::BytesInput, state::NopState, NopFuzzer};
 
     #[test]
     fn nop_executor() {
@@ -189,11 +189,15 @@ mod test {
         let mut executor = NopExecutor {
             phantom: PhantomData,
         };
+        let fuzzer = NopFuzzer::new();
+
+        let mut state = NopState::new();
+
         executor
-            .run_target(&mut (), &mut (), &mut (), &empty_input)
+            .run_target(&mut fuzzer, &mut state, &mut (), &empty_input)
             .unwrap_err();
         executor
-            .run_target(&mut (), &mut (), &mut (), &nonempty_input)
+            .run_target(&mut fuzzer, &mut state, &mut (), &nonempty_input)
             .unwrap();
     }
 }

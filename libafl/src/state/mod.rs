@@ -85,12 +85,6 @@ pub trait HasClientPerfMonitor {
 
     /// Mutatable ref to [`ClientPerfMonitor`]
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
-
-    /// This node's stability
-    fn stability(&self) -> &Option<f32>;
-
-    /// This node's stability (mutable)
-    fn stability_mut(&mut self) -> &mut Option<f32>;
 }
 
 /// Trait for elements offering metadata
@@ -187,9 +181,6 @@ pub struct StdState<C, R, SC> {
     named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
-    /// The stability of the current fuzzing process
-    stability: Option<f32>,
-
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
@@ -548,7 +539,6 @@ where
         let mut state = Self {
             rand,
             executions: 0,
-            stability: None,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
@@ -573,18 +563,6 @@ impl<C, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         &mut self.introspection_monitor
     }
-
-    /// This node's stability
-    #[inline]
-    fn stability(&self) -> &Option<f32> {
-        &self.stability
-    }
-
-    /// This node's stability (mutable)
-    #[inline]
-    fn stability_mut(&mut self) -> &mut Option<f32> {
-        &mut self.stability
-    }
 }
 
 #[cfg(not(feature = "introspection"))]
@@ -596,22 +574,10 @@ impl<C, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         unimplemented!()
     }
-
-    /// This node's stability
-    #[inline]
-    fn stability(&self) -> &Option<f32> {
-        &self.stability
-    }
-
-    /// This node's stability (mutable)
-    #[inline]
-    fn stability_mut(&mut self) -> &mut Option<f32> {
-        &mut self.stability
-    }
 }
 
 #[cfg(test)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct NopState<I> {
     phantom: PhantomData<I>,
 }
@@ -623,6 +589,17 @@ impl<I> NopState<I> {
         NopState {
             phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(test)]
+impl<I> HasExecutions for NopState<I> {
+    fn executions(&self) -> &usize {
+        unimplemented!()
+    }
+
+    fn executions_mut(&mut self) -> &mut usize {
+        unimplemented!()
     }
 }
 
@@ -644,14 +621,6 @@ impl<I> HasClientPerfMonitor for NopState<I> {
     }
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-        unimplemented!()
-    }
-
-    fn stability(&self) -> &Option<f32> {
-        unimplemented!()
-    }
-
-    fn stability_mut(&mut self) -> &mut Option<f32> {
         unimplemented!()
     }
 }

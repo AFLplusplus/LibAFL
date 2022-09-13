@@ -1687,7 +1687,10 @@ mod tests {
     #[serial]
     #[cfg(all(feature = "std", feature = "fork", unix))]
     fn test_inprocessfork_exec() {
-        use crate::executors::inprocess::InChildProcessHandlers;
+        use crate::{
+            events::SimpleEventManager, executors::inprocess::InChildProcessHandlers,
+            state::NopState, NopFuzzer,
+        };
 
         let provider = StdShMemProvider::new().unwrap();
 
@@ -1700,8 +1703,11 @@ mod tests {
             phantom: PhantomData,
         };
         let input = NopInput {};
+        let fuzzer = NopFuzzer::new();
+        let state = NopState::new();
+        let mgr = SimpleEventManager::printing();
         in_process_fork_executor
-            .run_target(&mut (), &mut (), &mut (), &input)
+            .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();
     }
 }

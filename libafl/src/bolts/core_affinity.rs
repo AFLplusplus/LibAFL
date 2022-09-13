@@ -816,6 +816,51 @@ mod openbsd {
     }
 }
 
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    solaris::get_core_ids()
+}
+
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+#[inline]
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    solaris::set_for_current(core_id)
+}
+
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+mod solaris {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use super::CoreId;
+    use crate::Error;
+
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+        let result = unsafe {
+            libc::processor_bind(
+                libc::P_PID,
+                libc::PS_MYID,
+                core_id.id as i32,
+                std::ptr::null_mut(),
+            )
+        };
+        if result < 0 {
+            Err(Error::unknown("Failed to processor_bind"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::thread::available_parallelism;

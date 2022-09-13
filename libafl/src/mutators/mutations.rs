@@ -1173,6 +1173,7 @@ mod tests {
             tuples::{tuple_list, HasConstLen},
         },
         corpus::{Corpus, InMemoryCorpus},
+        feedbacks::ConstFeedback,
         inputs::BytesInput,
         mutators::MutatorsTuple,
         state::{HasMetadata, StdState},
@@ -1226,12 +1227,21 @@ mod tests {
         let rand = StdRand::with_seed(1337);
         let mut corpus = InMemoryCorpus::new();
 
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
+
         corpus
             .add(BytesInput::new(vec![0x42; 0x1337]).into())
             .unwrap();
 
-        let mut state =
-            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
 
         let mut mutations = test_mutations();
         for _ in 0..2 {

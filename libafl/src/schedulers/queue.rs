@@ -68,6 +68,7 @@ mod tests {
     use crate::{
         bolts::rands::StdRand,
         corpus::{Corpus, OnDiskCorpus, Testcase},
+        feedbacks::ConstFeedback,
         inputs::bytes::BytesInput,
         schedulers::{QueueScheduler, Scheduler},
         state::{HasCorpus, StdState},
@@ -90,7 +91,10 @@ mod tests {
             OnDiskCorpus::<BytesInput>::new(PathBuf::from("target/.test/fancy/objective/path"))
                 .unwrap();
 
-        let mut state = StdState::new(rand, q, objective_q, &mut (), &mut ()).unwrap();
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
+
+        let mut state = StdState::new(rand, q, objective_q, &mut feedback, &mut objective).unwrap();
 
         let next_idx = scheduler.next(&mut state).unwrap();
         let filename = state

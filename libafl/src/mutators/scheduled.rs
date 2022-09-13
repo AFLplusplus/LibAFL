@@ -429,6 +429,7 @@ mod tests {
     use crate::{
         bolts::rands::{Rand, StdRand, XkcdRand},
         corpus::{Corpus, InMemoryCorpus, Testcase},
+        feedbacks::ConstFeedback,
         inputs::{BytesInput, HasBytesVec},
         mutators::{
             mutations::SpliceMutator,
@@ -449,8 +450,17 @@ mod tests {
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
 
-        let mut state =
-            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
+
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
 
         rand.set_seed(5);
 
@@ -477,8 +487,17 @@ mod tests {
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
         let input_prior = input.clone();
 
-        let mut state =
-            StdState::new(rand, corpus, InMemoryCorpus::new(), &mut (), &mut ()).unwrap();
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
+
+        let mut state = StdState::new(
+            rand,
+            corpus,
+            InMemoryCorpus::new(),
+            &mut feedback,
+            &mut objective,
+        )
+        .unwrap();
 
         let mut havoc = StdScheduledMutator::new(havoc_mutations());
 

@@ -31,7 +31,7 @@ use crate::{
     inputs::Input,
     monitors::Monitor,
     observers::ObserversTuple,
-    prelude::{HasClientPerfMonitor, HasExecutions, State},
+    prelude::{HasClientPerfMonitor, HasExecutions, HasMetadata, SimplePrintingMonitor, State},
     Error,
 };
 
@@ -133,7 +133,7 @@ where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
     OT: ObserversTuple<I, S>,
-    S: State<Input = I> + HasClientPerfMonitor + HasExecutions,
+    S: State<Input = I> + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
 }
 
@@ -155,7 +155,7 @@ impl<I, MT, OT, S> ProgressReporter for SimpleEventManager<I, MT, OT, S>
 where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
-    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
 {
     type State = S;
 
@@ -169,6 +169,17 @@ where
 {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId { id: 0 }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<I, OT, S> SimpleEventManager<I, SimplePrintingMonitor, OT, S>
+where
+    I: Input,
+{
+    /// Creates a [`SimpleEventManager`] that just prints to `stdout`.
+    pub fn printing() -> Self {
+        Self::new(SimplePrintingMonitor::new())
     }
 }
 
@@ -374,7 +385,7 @@ where
     I: Input,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
     OT: ObserversTuple<I, S>,
-    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
 {
 }
@@ -398,7 +409,7 @@ where
 impl<I, MT, OT, S, SP> ProgressReporter for SimpleRestartingEventManager<I, MT, OT, S, SP>
 where
     I: Input,
-    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {

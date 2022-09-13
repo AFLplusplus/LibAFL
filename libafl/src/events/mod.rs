@@ -23,7 +23,8 @@ use crate::{
     monitors::UserStats,
     observers::ObserversTuple,
     prelude::State,
-    state::{HasClientPerfMonitor, HasExecutions},
+    stages::calibrate::UnstableEntriesMetadata,
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
 
@@ -361,6 +362,7 @@ pub trait ProgressReporter:
     /// [`State`] for this fuzzing campaign
     type State: State<Input = <Self as ProgressReporter>::Input>
         + HasClientPerfMonitor
+        + HasMetadata
         + HasExecutions;
 
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
@@ -387,13 +389,15 @@ pub trait ProgressReporter:
                 },
             )?;
 
-            if let Some(x) = state.stability() {
-                let stability = f64::from(*x);
+            // Send the stability event to the broker
+            if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
+                let unstable_entries = meta.unstable_entries().len();
+                let map_len = meta.map_len();
                 self.fire(
                     state,
                     Event::UpdateUserStats {
                         name: "stability".to_string(),
-                        value: UserStats::Float(stability),
+                        value: UserStats::Ratio(unstable_entries as u64, map_len as u64),
                         phantom: PhantomData,
                     },
                 )?;
@@ -561,7 +565,7 @@ impl<E, I, OT, S, Z> EventManager<E, I, S, Z> for NopEventManager<OT, S>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: State<Input = I> + HasClientPerfMonitor + HasExecutions,
+    S: State<Input = I> + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
 }
 
@@ -575,7 +579,7 @@ impl<OT, S> HasCustomBufHandlers<S> for NopEventManager<OT, S> {
 
 impl<OT, S> ProgressReporter for NopEventManager<OT, S>
 where
-    S: State + HasClientPerfMonitor + HasExecutions,
+    S: State + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
     type State = S;
 

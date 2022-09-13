@@ -7,6 +7,8 @@ use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
+#[cfg(test)]
+use crate::state::NopState;
 use crate::{
     bolts::current_time,
     corpus::{Corpus, Testcase},
@@ -16,10 +18,10 @@ use crate::{
     inputs::Input,
     mark_feature_time,
     observers::ObserversTuple,
-    prelude::State,
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
+    state::State,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
     Error,
 };
@@ -723,6 +725,34 @@ where
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(exit_kind)
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone, Debug)]
+pub(crate) struct NopFuzzer;
+
+#[cfg(test)]
+impl NopFuzzer {
+    pub fn new() -> Self {
+        NopFuzzer {}
+    }
+}
+
+#[cfg(test)]
+impl<ST, E, I, EM> Fuzzer<E, EM, I, NopState<I>, ST> for NopFuzzer
+where
+    I: Input,
+    EM: ProgressReporter<Input = I, State = NopState<I>>,
+{
+    fn fuzz_one(
+        &mut self,
+        stages: &mut ST,
+        executor: &mut E,
+        state: &mut NopState<I>,
+        manager: &mut EM,
+    ) -> Result<usize, Error> {
+        unimplemented!()
     }
 }
 

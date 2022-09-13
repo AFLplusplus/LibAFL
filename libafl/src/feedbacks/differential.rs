@@ -161,17 +161,13 @@ mod tests {
     use core::marker::PhantomData;
 
     use crate::{
-        bolts::{
-            serdeany::SerdeAnyMap,
-            tuples::{tuple_list, Named},
-        },
+        bolts::tuples::{tuple_list, Named},
         events::EventFirer,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
         inputs::{BytesInput, Input},
-        monitors::ClientPerfMonitor,
         observers::Observer,
-        state::{HasClientPerfMonitor, HasMetadata, NopState, State},
+        state::{NopState, State},
     };
 
     #[derive(Debug)]
@@ -219,6 +215,7 @@ mod tests {
             Ok(())
         }
     }
+
     fn test_diff(should_equal: bool) {
         let mut nop_state = NopState::new();
 
