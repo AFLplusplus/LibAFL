@@ -13,7 +13,7 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     inputs::Input,
     observers::{ObserverWithHashField, ObserversTuple},
-    prelude::State,
+    prelude::{HasClientPerfMonitor, State},
     state::HasNamedMetadata,
     Error,
 };
@@ -79,7 +79,7 @@ impl<I, O, S> Feedback for NewHashFeedback<I, O, S>
 where
     I: Input,
     O: ObserverWithHashField + Named + Debug,
-    S: State<Input = I> + Debug + HasNamedMetadata,
+    S: State<Input = I> + Debug + HasNamedMetadata + HasClientPerfMonitor,
 {
     type Input = I;
 

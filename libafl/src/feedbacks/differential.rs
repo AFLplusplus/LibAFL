@@ -157,9 +157,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use core::marker::PhantomData;
-
     use alloc::string::{String, ToString};
+    use core::marker::PhantomData;
 
     use crate::{
         bolts::{
@@ -172,7 +171,7 @@ mod tests {
         inputs::{BytesInput, Input},
         monitors::ClientPerfMonitor,
         observers::Observer,
-        state::{HasClientPerfMonitor, HasMetadata, State},
+        state::{HasClientPerfMonitor, HasMetadata, NopState, State},
     };
 
     #[derive(Debug)]
@@ -220,37 +219,8 @@ mod tests {
             Ok(())
         }
     }
-
-    struct NopState;
-    impl HasMetadata for NopState {
-        fn metadata(&self) -> &SerdeAnyMap {
-            unimplemented!()
-        }
-
-        fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
-            unimplemented!()
-        }
-    }
-    impl HasClientPerfMonitor for NopState {
-        fn introspection_monitor(&self) -> &ClientPerfMonitor {
-            unimplemented!()
-        }
-
-        fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-            unimplemented!()
-        }
-
-        fn stability(&self) -> &Option<f32> {
-            unimplemented!()
-        }
-
-        fn stability_mut(&mut self) -> &mut Option<f32> {
-            unimplemented!()
-        }
-    }
-
     fn test_diff(should_equal: bool) {
-        let mut nop_state = NopState;
+        let mut nop_state = NopState::new();
 
         let o1 = NopObserver::new("o1", true);
         let o2 = NopObserver::new("o2", should_equal);

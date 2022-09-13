@@ -19,30 +19,32 @@ use crate::{
     inputs::Input,
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata},
+    state::{HasCorpus, HasMetadata, State},
     Error, Evaluator, HasScheduler,
 };
 
 /// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for
 /// details.
-pub trait CorpusMinimizer<I, S>
+pub trait CorpusMinimizer<E, I, S>
 where
     I: Input,
     S: HasCorpus<Input = I>,
 {
     /// Minimize the corpus of the provided state.
-    fn minimize<CS, EX, EM, OT, Z>(
+    fn minimize<CS, EM, OT, Z>(
         &self,
         fuzzer: &mut Z,
-        executor: &mut EX,
+        executor: &mut E,
         manager: &mut EM,
         state: &mut S,
     ) -> Result<(), Error>
     where
         CS: Scheduler<Input = I, State = S>,
-        EX: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventManager<Input = I, State = S, Observers = OT>,
+        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+        EM: EventManager<E, I, S, Z>,
+        I: Input,
         OT: ObserversTuple<I, S>,
+        S: State<Input = I>,
         Z: Evaluator<E, EM, State = S, Input = I> + HasScheduler<CS, I, S>;
 }
 
@@ -63,7 +65,8 @@ where
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<E, I, O, S> = MapCorpusMinimizer<E, I, O, S, LenTimeMulTestcaseScore>;
+pub type StdCorpusMinimizer<E, I, O, S> =
+    MapCorpusMinimizer<E, I, O, S, LenTimeMulTestcaseScore<I, S>>;
 
 impl<E, I, O, S, TS> MapCorpusMinimizer<E, I, O, S, TS>
 where
@@ -83,7 +86,7 @@ where
     }
 }
 
-impl<E, I, O, S, TS> CorpusMinimizer<I, S> for MapCorpusMinimizer<E, I, O, S, TS>
+impl<E, I, O, S, TS> CorpusMinimizer<E, I, S> for MapCorpusMinimizer<E, I, O, S, TS>
 where
     E: Copy + Hash + Eq,
     I: Input,
@@ -91,18 +94,20 @@ where
     S: HasMetadata + HasCorpus<Input = I>,
     TS: TestcaseScore<I, S>,
 {
-    fn minimize<CS, EX, EM, OT, Z>(
+    fn minimize<CS, EM, OT, Z>(
         &self,
         fuzzer: &mut Z,
-        executor: &mut EX,
+        executor: &mut E,
         manager: &mut EM,
         state: &mut S,
     ) -> Result<(), Error>
     where
         CS: Scheduler<Input = I, State = S>,
-        EX: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventManager<Input = I, State = S, Observers = OT>,
+        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
+        EM: EventManager<E, I, S, Z>,
+        I: Input,
         OT: ObserversTuple<I, S>,
+        S: State<Input = I>,
         Z: Evaluator<E, EM, Input = I, State = S> + HasScheduler<CS, I, S>,
     {
         let cfg = Config::default();

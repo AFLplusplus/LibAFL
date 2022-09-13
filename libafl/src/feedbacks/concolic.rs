@@ -17,7 +17,7 @@ use crate::{
         concolic::{ConcolicMetadata, ConcolicObserver},
         ObserversTuple,
     },
-    prelude::State,
+    prelude::{HasClientPerfMonitor, State},
     state::HasMetadata,
     Error,
 };
@@ -55,7 +55,7 @@ impl<I, S> Named for ConcolicFeedback<I, S> {
 impl<I, S> Feedback for ConcolicFeedback<I, S>
 where
     I: Input,
-    S: State<Input = I> + Debug,
+    S: State<Input = I> + Debug + HasClientPerfMonitor,
 {
     type Input = I;
 

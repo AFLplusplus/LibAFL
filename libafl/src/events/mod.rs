@@ -301,7 +301,9 @@ where
 
 /// [`EventFirer`] fire an event.
 pub trait EventFirer {
+    /// [`Input`] for this fuzzing campaign
     type Input: Input;
+    /// [`State`] for this fuzzing campaign
     type State: State<Input = Self::Input>;
 
     /// Send off an [`Event`] to the broker
@@ -354,10 +356,12 @@ pub trait EventFirer {
 pub trait ProgressReporter:
     EventFirer<Input = <Self as ProgressReporter>::Input, State = <Self as ProgressReporter>::State>
 {
+    /// [`Input`] for this fuzzing campaign
+    type Input: Input;
+    /// [`State`] for this fuzzing campaign
     type State: State<Input = <Self as ProgressReporter>::Input>
         + HasClientPerfMonitor
         + HasExecutions;
-    type Input: Input;
 
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -425,7 +429,9 @@ pub trait ProgressReporter:
 
 /// Restartable trait
 pub trait EventRestarter {
+    /// [`Input`] for this fuzzing campaign
     type Input: Input;
+    /// [`State`] for this fuzzing campaign
     type State: State<Input = Self::Input>;
 
     /// For restarting event managers, implement a way to forward state to their next peers.
@@ -441,10 +447,12 @@ pub trait EventRestarter {
 
 /// [`EventProcessor`] process all the incoming messages
 pub trait EventProcessor<E, Z> {
-    type Observers: ObserversTuple<Self::Input, Self::State>;
     /// The [`State`]
     type State: State<Input = Self::Input>;
+    /// The [`Input`]
     type Input;
+    /// The [`Observers`]
+    type Observers: ObserversTuple<Self::Input, Self::State>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
@@ -651,6 +659,7 @@ pub mod pybind {
         executors::pybind::PythonExecutor,
         fuzzer::pybind::PythonStdFuzzer,
         inputs::BytesInput,
+        observers::PythonObserversTuple,
         state::pybind::PythonStdState,
         Error,
     };
@@ -696,18 +705,26 @@ pub mod pybind {
 
     impl EventFirer for PythonEventManager {
         type Input = BytesInput;
-        type State = StdPythonState;
+        type State = PythonStdState;
 
-        fn fire(&mut self, state: &mut S, event: Event<BytesInput>) -> Result<(), Error> {
+        fn fire(
+            &mut self,
+            state: &mut Self::State,
+            event: Event<Self::Input>,
+        ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
         }
     }
 
-    impl<S> EventRestarter for PythonEventManager {}
-
-    impl<E, Z> EventProcessor<E, Z> for PythonEventManager {
+    impl EventRestarter for PythonEventManager {
         type Input = BytesInput;
         type State = PythonStdState;
+    }
+
+    impl EventProcessor<PythonExecutor, PythonStdFuzzer> for PythonEventManager {
+        type Input = BytesInput;
+        type State = PythonStdState;
+        type Observers = PythonObserversTuple;
 
         fn process(
             &mut self,
@@ -730,9 +747,9 @@ pub mod pybind {
         }
     }
 
-    impl EventManager for PythonEventManager {
-        type Input = BytesInput;
-        type State = PythonStdState;
+    impl EventManager<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
+        for PythonEventManager
+    {
     }
 
     /// Register the classes to the python module

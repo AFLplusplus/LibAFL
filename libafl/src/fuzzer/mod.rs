@@ -2,6 +2,7 @@
 
 use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
+
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg(feature = "introspection")]
@@ -96,6 +97,7 @@ pub trait EvaluatorObservers: Sized {
     type Input: Input;
     /// The [`State`]
     type State: State<Input = Self::Input>;
+    /// The [`Observers`]
     type Observers: ObserversTuple<Self::Input, Self::State>;
 
     /// Runs the input and triggers observers and feedback,
@@ -737,7 +739,7 @@ pub mod pybind {
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         feedbacks::pybind::PythonFeedback,
-        fuzzer::{Evaluator, Fuzzer, StdFuzzer},
+        fuzzer::{Evaluator, StdFuzzer},
         inputs::BytesInput,
         observers::pybind::PythonObserversTuple,
         schedulers::QueueScheduler,
@@ -747,9 +749,7 @@ pub mod pybind {
 
     /// `StdFuzzer` with fixed generics
     pub type PythonStdFuzzer = StdFuzzer<
-        QueueScheduler<I, S>,
-        PythonExecutor,
-        PythonEventManager,
+        QueueScheduler<BytesInput, PythonStdState>,
         PythonFeedback,
         BytesInput,
         PythonFeedback,

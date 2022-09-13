@@ -443,9 +443,6 @@ where
     I: Input,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug + State<Input = I>,
 {
-    type Input = I;
-    type State = S;
-
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
     fn is_interesting<EM, OT>(
@@ -778,7 +775,7 @@ where
 impl<I, O, S> Feedback for ReachabilityFeedback<I, O, S>
 where
     I: Input,
-    S: State<Input = I> + Debug,
+    S: State<Input = I> + Debug + HasClientPerfMonitor,
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {

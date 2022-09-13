@@ -1,6 +1,6 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
 use alloc::string::String;
-use core::fmt::Debug;
+use core::{fmt::Debug, marker::PhantomData};
 use std::fs::create_dir_all;
 
 use grammartec::{chunkstore::ChunkStore, context::Context};
@@ -16,7 +16,7 @@ use crate::{
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata, State},
     Error,
 };
 
@@ -52,35 +52,39 @@ impl NautilusChunksMetadata {
 }
 
 /// A nautilus feedback for grammar fuzzing
-pub struct NautilusFeedback<'a> {
+pub struct NautilusFeedback<'a, S> {
     ctx: &'a Context,
+    phantom: PhantomData<S>,
 }
 
-impl Debug for NautilusFeedback<'_> {
+impl<S> Debug for NautilusFeedback<'_, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "NautilusFeedback {{}}")
     }
 }
 
-impl<'a> NautilusFeedback<'a> {
+impl<'a, S> NautilusFeedback<'a, S> {
     /// Create a new [`NautilusFeedback`]
     #[must_use]
     pub fn new(context: &'a NautilusContext) -> Self {
-        Self { ctx: &context.ctx }
+        Self {
+            ctx: &context.ctx,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<'a> Named for NautilusFeedback<'a> {
+impl<'a, S> Named for NautilusFeedback<'a, S> {
     fn name(&self) -> &str {
         "NautilusFeedback"
     }
 }
 
-impl<'a, S> Feedback for NautilusFeedback<'a>
+impl<'a, S> Feedback for NautilusFeedback<'a, S>
 where
-    S: HasMetadata + HasClientPerfMonitor + State,
+    S: HasMetadata + HasClientPerfMonitor + State<Input = NautilusInput>,
 {
-    type Input = <S as State>::Input;
+    type Input = NautilusInput;
     type State = S;
 
     #[allow(clippy::wrong_self_convention)]
@@ -94,7 +98,7 @@ where
     ) -> Result<bool, Error>
     where
         EM: EventFirer<Input = NautilusInput>,
-        OT: ObserversTuple<Input = NautilusInput, State = S>,
+        OT: ObserversTuple<NautilusInput, S>,
     {
         Ok(false)
     }

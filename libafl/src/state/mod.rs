@@ -565,7 +565,7 @@ where
 }
 
 #[cfg(feature = "introspection")]
-impl<C, I, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
+impl<C, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         &self.introspection_monitor
     }
@@ -610,6 +610,60 @@ impl<C, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
     }
 }
 
+#[cfg(test)]
+#[derive(Serialize, Deserialize)]
+pub struct NopState<I> {
+    phantom: PhantomData<I>,
+}
+
+#[cfg(test)]
+impl<I> NopState<I> {
+    /// Create a new State that does nothing (for tests)
+    pub fn new() -> Self {
+        NopState {
+            phantom: PhantomData,
+        }
+    }
+}
+
+#[cfg(test)]
+impl<I> HasMetadata for NopState<I> {
+    fn metadata(&self) -> &SerdeAnyMap {
+        unimplemented!()
+    }
+
+    fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+impl<I> HasClientPerfMonitor for NopState<I> {
+    fn introspection_monitor(&self) -> &ClientPerfMonitor {
+        unimplemented!()
+    }
+
+    fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
+        unimplemented!()
+    }
+
+    fn stability(&self) -> &Option<f32> {
+        unimplemented!()
+    }
+
+    fn stability_mut(&mut self) -> &mut Option<f32> {
+        unimplemented!()
+    }
+}
+
+#[cfg(test)]
+impl<I> State for NopState<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 /// `State` Python bindings
@@ -627,7 +681,6 @@ pub mod pybind {
         feedbacks::pybind::PythonFeedback,
         fuzzer::pybind::PythonStdFuzzerWrapper,
         generators::pybind::PythonGenerator,
-        inputs::BytesInput,
         pybind::PythonMetadata,
         state::{
             HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,

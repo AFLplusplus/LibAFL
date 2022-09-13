@@ -325,7 +325,7 @@ pub mod pybind {
         for PyObjectExecutor
     {
         #[inline]
-        fn run_target<EM, I, S, Z>(
+        fn run_target(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
             state: &mut PythonStdState,
@@ -420,7 +420,7 @@ pub mod pybind {
         }
     }
 
-    impl HasObservers {
+    impl HasObservers for PythonExecutor {
         type Input = BytesInput;
         type Observers = PythonObserversTuple;
         type State = PythonStdState;
@@ -444,7 +444,7 @@ pub mod pybind {
 
     impl Executor<PythonEventManager, BytesInput, PythonStdState, PythonStdFuzzer> for PythonExecutor {
         #[inline]
-        fn run_target<EM, I, S, Z>(
+        fn run_target(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
             state: &mut PythonStdState,

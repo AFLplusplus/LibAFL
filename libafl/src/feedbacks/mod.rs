@@ -47,8 +47,10 @@ use crate::{
 /// Basically, they reduce the information provided by an observer to a value,
 /// indicating the "interestingness" of the last run.
 pub trait Feedback: Named + Debug {
+    /// The [`Input`]
     type Input: Input;
-    type State: State<Input = Self::Input>;
+    /// The [`State`]
+    type State: State<Input = Self::Input> + HasClientPerfMonitor;
 
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
@@ -77,9 +79,9 @@ pub trait Feedback: Named + Debug {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting_introspection<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -770,7 +772,7 @@ pub struct CrashFeedback<S> {
 
 impl<S> Feedback for CrashFeedback<S>
 where
-    S: State + Debug,
+    S: State + Debug + HasClientPerfMonitor,
 {
     type Input = <S as State>::Input;
 
@@ -831,7 +833,7 @@ pub struct TimeoutFeedback<S> {
 
 impl<S> Feedback for TimeoutFeedback<S>
 where
-    S: State + Debug,
+    S: State + Debug + HasClientPerfMonitor,
 {
     type Input = <S as State>::Input;
 
@@ -896,7 +898,7 @@ pub struct TimeFeedback<S> {
 
 impl<S> Feedback for TimeFeedback<S>
 where
-    S: State + Debug,
+    S: State + Debug + HasClientPerfMonitor,
 {
     type Input = <S as State>::Input;
 
@@ -988,7 +990,7 @@ impl<I, S, T> Feedback for ListFeedback<I, S, T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
     I: Input + Debug,
-    S: State<Input = I> + Debug,
+    S: State<Input = I> + Debug + HasClientPerfMonitor,
 {
     type Input = I;
 
@@ -1054,15 +1056,21 @@ where
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConstFeedback<I, S> {
     /// Always returns `true`
-    True { phantom: PhantomData<(I, S)> },
+    True {
+        /// [`PhantomData`]
+        phantom: PhantomData<(I, S)>,
+    },
     /// Always returns `false`
-    False { phantom: PhantomData<(I, S)> },
+    False {
+        /// [`PhantomData`]
+        phantom: PhantomData<(I, S)>,
+    },
 }
 
 impl<I, S> Feedback for ConstFeedback<I, S>
 where
     I: Input + Debug,
-    S: State<Input = I> + Debug,
+    S: State<Input = I> + Debug + HasClientPerfMonitor,
 {
     type Input = I;
 
@@ -1101,6 +1109,18 @@ impl<I, S> ConstFeedback<I, S> {
     #[must_use]
     pub fn new(val: bool) -> Self {
         Self::from(val)
+    }
+
+    /// Creates a new [`ConstFeedback`]
+    /// that always returns `true` on `is_interesting`
+    pub fn t() -> Self {
+        Self::new(true)
+    }
+
+    /// Creates a new [`ConstFeedback`]
+    /// that always returns `false` on `is_interesting`
+    pub fn f() -> Self {
+        Self::new(false)
     }
 }
 
@@ -1190,7 +1210,9 @@ pub mod pybind {
         }
     }
 
-    impl Feedback<Input = BytesInput, State = PythonStdState> for PyObjectFeedback {
+    impl Feedback for PyObjectFeedback {
+        type Input = BytesInput;
+        type State = PythonStdState;
         fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner
@@ -1210,7 +1232,7 @@ pub mod pybind {
         ) -> Result<bool, Error>
         where
             EM: EventFirer<State = PythonStdState, Input = BytesInput>,
-            OT: ObserversTuple<Input = BytesInput, State = PythonStdState>,
+            OT: ObserversTuple<BytesInput, PythonStdState>,
         {
             // SAFETY: We use this observer in Python ony when the ObserverTuple is PythonObserversTuple
             let dont_look_at_this: &PythonObserversTuple =
@@ -1275,7 +1297,7 @@ pub mod pybind {
     #[derive(Clone, Debug)]
     #[pyclass(unsendable, name = "CrashFeedback")]
     pub struct PythonCrashFeedback {
-        pub inner: CrashFeedback<PythonState>,
+        pub inner: CrashFeedback<PythonStdState>,
     }
 
     #[pymethods]
@@ -1296,7 +1318,7 @@ pub mod pybind {
     #[derive(Clone, Debug)]
     #[pyclass(unsendable, name = "ConstFeedback")]
     pub struct PythonConstFeedback {
-        pub inner: ConstFeedback<S>,
+        pub inner: ConstFeedback<BytesInput, PythonStdState>,
     }
 
     #[pymethods]
@@ -1646,10 +1668,13 @@ pub mod pybind {
         }
     }
 
-    impl Feedback<Input = BytesInput, State = PythonStdState> for PythonFeedback {
+    impl Feedback for PythonFeedback {
+        type Input = BytesInput;
+        type State = PythonStdState;
+
         fn init_state(&mut self, state: &mut PythonStdState) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, f, {
-                Feedback::<BytesInput, PythonStdState>::init_state(f, state)
+                Feedback::<Input = BytesInput, State = PythonStdState>::init_state(f, state)
             })
         }
 
@@ -1663,7 +1688,7 @@ pub mod pybind {
         ) -> Result<bool, Error>
         where
             EM: EventFirer<State = PythonStdState, Input = BytesInput>,
-            OT: ObserversTuple<Input = BytesInput, State = PythonStdState>,
+            OT: ObserversTuple<BytesInput, PythonStdState>,
         {
             unwrap_me_mut!(self.wrapper, f, {
                 f.is_interesting(state, manager, input, observers, exit_kind)

@@ -324,7 +324,7 @@ impl<I, M, S> Feedback for MapEqualityFeedback<I, M, S>
 where
     I: Input,
     M: MapObserver + Debug,
-    S: State<Input = I> + Debug,
+    S: State<Input = I> + Debug + HasClientPerfMonitor,
 {
     type Input = I;
 

@@ -7,11 +7,7 @@ use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{
-        current_time,
-        tuples::{MatchName, Named},
-        AsIter,
-    },
+    bolts::{current_time, tuples::Named, AsIter},
     corpus::{Corpus, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},

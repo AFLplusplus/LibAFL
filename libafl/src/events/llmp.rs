@@ -1066,12 +1066,13 @@ mod tests {
         corpus::{Corpus, InMemoryCorpus, Testcase},
         events::{llmp::_ENV_FUZZER_SENDER, LlmpEventManager},
         executors::{ExitKind, InProcessExecutor},
+        feedbacks::ConstFeedback,
         inputs::BytesInput,
         mutators::BitFlipMutator,
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::StdState,
-        Fuzzer, StdFuzzer,
+        StdFuzzer,
     };
 
     #[test]
@@ -1085,7 +1086,11 @@ mod tests {
 
         let solutions = InMemoryCorpus::<BytesInput>::new();
 
-        let mut state = StdState::new(rand, corpus, solutions, &mut (), &mut ()).unwrap();
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
+
+        let mut state =
+            StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
 
         let mut shmem_provider = StdShMemProvider::new().unwrap();
 
@@ -1106,7 +1111,10 @@ mod tests {
 
         let scheduler = RandScheduler::new();
 
-        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+        let mut feedback = ConstFeedback::new(true);
+        let mut objective = ConstFeedback::new(false);
+
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(

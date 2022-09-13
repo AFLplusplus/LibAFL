@@ -551,6 +551,7 @@ pub mod pybind {
         events::{pybind::PythonEventManager, SimpleEventManager},
         inputs::BytesInput,
         monitors::pybind::PythonMonitor,
+        observers::pybind::PythonObserversTuple,
         state::pybind::PythonStdState,
     };
 
@@ -559,7 +560,8 @@ pub mod pybind {
     /// Python class for SimpleEventManager
     pub struct PythonSimpleEventManager {
         /// Rust wrapped SimpleEventManager object
-        pub inner: SimpleEventManager<BytesInput, PythonMonitor, PythonStdState>,
+        pub inner:
+            SimpleEventManager<BytesInput, PythonMonitor, PythonObserversTuple, PythonStdState>,
     }
 
     #[pymethods]

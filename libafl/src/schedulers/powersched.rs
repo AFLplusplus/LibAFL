@@ -12,8 +12,7 @@ use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
     inputs::Input,
     schedulers::Scheduler,
-    state::State,
-    state::{HasCorpus, HasMetadata},
+    state::{HasCorpus, HasMetadata, State},
     Error,
 };
 /// The n fuzz size

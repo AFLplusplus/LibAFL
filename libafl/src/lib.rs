@@ -458,13 +458,14 @@ mod tests {
         bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, Testcase},
         executors::{ExitKind, InProcessExecutor},
+        feedbacks::ConstFeedback,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        Fuzzer, StdFuzzer,
+        StdFuzzer,
     };
 
     #[test]
@@ -490,8 +491,11 @@ mod tests {
         });
         let mut event_manager = SimpleEventManager::new(monitor);
 
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
+
         let scheduler = RandScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
