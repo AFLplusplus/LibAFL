@@ -20,6 +20,7 @@ rand_trait = ["rand_core"] # If set, libafl's rand implementations will implemen
 introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
 python = ["pyo3"]
+prelude = [] # Expose libafl::prelude for access without additional using directives
 tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
 cli = ["clap"]  # expose bolts::cli
 qemu_cli = ["cli"]
