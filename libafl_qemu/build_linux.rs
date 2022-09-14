@@ -36,7 +36,12 @@ pub fn build() {
     // Else, we default to `x86_64` - having a default makes CI easier :)
     assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
 
-    let cpu_target = if cfg!(feature = "x86_64") {
+    // Make sure that we don't have BE set for any architecture other than arm
+    // Sure aarch64 may support BE, but its not in common usage and we don't
+    // need it yet and so haven't tested it
+    assert_unique_feature!("be", "aarch64", "i386", "i86_64");
+
+    let mut cpu_target = if cfg!(feature = "x86_64") {
         "x86_64".to_string()
     } else if cfg!(feature = "arm") {
         "arm".to_string()
@@ -62,6 +67,20 @@ pub fn build() {
     });
 
     println!("cargo:rustc-cfg=cpu_target=\"{}\"", cpu_target);
+
+    // qemu-system-arm supports both big and little endian configurations and so
+    // therefore the "be" feature should ignored in this configuration. Also
+    // ignore the feature if we are running in clippy which enables all the
+    // features at once (disabling the check for mutually exclusive options)
+    // resulting in cpu_target being set to 'x86_64' above which obviously
+    // doesn't support BE.
+    if cfg!(feature = "be") && cfg!(feature = "usermode") && !cfg!(feature = "clippy") {
+        // We have told rustc which CPU target to use above (it doesn't need
+        // to make any changes for endianness), however, we need QEMU to be
+        // built for the right endian-ness, so we update the cpu_target for
+        // here on down
+        cpu_target += "eb";
+    }
 
     if std::env::var("DOCS_RS").is_ok() {
         return; // only build when we're not generating docs
