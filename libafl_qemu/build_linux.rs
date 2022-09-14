@@ -74,7 +74,7 @@ pub fn build() {
     // features at once (disabling the check for mutually exclusive options)
     // resulting in cpu_target being set to 'x86_64' above which obviously
     // doesn't support BE.
-    if cfg!(feature = "be") && cfg!(feature = "usermode") && !cfg!(feature = "clippy") {
+    if cfg!(feature = "be") && cfg!(feature = "arm") && cfg!(feature = "usermode") && !cfg!(feature = "clippy"){
         // We have told rustc which CPU target to use above (it doesn't need
         // to make any changes for endianness), however, we need QEMU to be
         // built for the right endian-ness, so we update the cpu_target for
