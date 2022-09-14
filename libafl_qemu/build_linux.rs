@@ -85,9 +85,9 @@ pub fn build() {
     let qemu_path = if let Some(qemu_dir) = custum_qemu_dir.as_ref() {
         Path::new(&qemu_dir).to_path_buf()
     } else {
-        let qemu_path = out_dir_path.join(QEMU_DIRNAME);
+        let qemu_path = target_dir.join(QEMU_DIRNAME);
 
-        let qemu_rev = out_dir_path.join("QEMU_REVISION");
+        let qemu_rev = target_dir.join("QEMU_REVISION");
         if qemu_rev.exists()
             && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != QEMU_REVISION
         {
@@ -139,7 +139,11 @@ pub fn build() {
     #[cfg(not(feature = "usermode"))]
     let target_suffix = "softmmu";
 
-    let build_dir = qemu_path.join("build");
+    let build_dir = out_dir_path.join("build");
+    if !build_dir.is_dir() {
+        fs::create_dir_all(&build_dir).unwrap();
+    }
+
     #[cfg(feature = "usermode")]
     let output_lib = build_dir.join(&format!("libqemu-{}.so", cpu_target));
     #[cfg(not(feature = "usermode"))]
@@ -154,9 +158,11 @@ pub fn build() {
                 .arg("distclean")
                 .status(),
         );*/
+        let configure = qemu_path.join("configure");
+
         #[cfg(feature = "usermode")]
-        Command::new("./configure")
-            .current_dir(&qemu_path)
+        Command::new(configure)
+            .current_dir(&build_dir)
             //.arg("--as-static-lib")
             .arg("--as-shared-lib")
             .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
@@ -164,8 +170,8 @@ pub fn build() {
             .status()
             .expect("Configure failed");
         #[cfg(not(feature = "usermode"))]
-        Command::new("./configure")
-            .current_dir(&qemu_path)
+        Command::new(configure)
+            .current_dir(&build_dir)
             //.arg("--as-static-lib")
             .arg("--as-shared-lib")
             .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
@@ -173,14 +179,14 @@ pub fn build() {
             .expect("Configure failed");
         if let Ok(j) = jobs {
             Command::new("make")
-                .current_dir(&qemu_path)
+                .current_dir(&build_dir)
                 .arg("-j")
                 .arg(&j)
                 .status()
                 .expect("Make failed");
         } else {
             Command::new("make")
-                .current_dir(&qemu_path)
+                .current_dir(&build_dir)
                 .arg("-j")
                 .status()
                 .expect("Make failed");
