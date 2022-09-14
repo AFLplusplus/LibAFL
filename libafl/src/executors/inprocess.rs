@@ -54,14 +54,19 @@ use crate::{
 pub type InProcessExecutor<'a, H, I, OT, S> = GenericInProcessExecutor<H, &'a mut H, I, OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<I, OT, S> =
-    GenericInProcessExecutor<dyn FnMut(&I) -> ExitKind, Box<dyn FnMut(&I) -> ExitKind>, I, OT, S>;
+pub type OwnedInProcessExecutor<I, OT, S> = GenericInProcessExecutor<
+    dyn FnMut(&I, &mut OT) -> ExitKind,
+    Box<dyn FnMut(&I, &mut OT) -> ExitKind>,
+    I,
+    OT,
+    S,
+>;
 
 /// The inmem executor simply calls a target function, then returns afterwards.
 #[allow(dead_code)]
 pub struct GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -77,7 +82,7 @@ where
 
 impl<H, HB, I, OT, S> Debug for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -92,7 +97,7 @@ where
 
 impl<EM, H, HB, I, OT, S, Z> Executor<EM, I, S, Z> for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -107,7 +112,7 @@ where
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
 
-        let ret = (self.harness_fn.borrow_mut())(input);
+        let ret = (self.harness_fn.borrow_mut())(input, &mut self.observers);
 
         self.handlers.post_run_target();
         Ok(ret)
@@ -116,7 +121,7 @@ where
 
 impl<H, HB, I, OT, S> HasObservers<I, OT, S> for GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -134,7 +139,7 @@ where
 
 impl<H, HB, I, OT, S> GenericInProcessExecutor<H, HB, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     I: Input,
     OT: ObserversTuple<I, S>,
@@ -217,7 +222,7 @@ pub trait HasInProcessHandlers {
 #[cfg(windows)]
 impl<'a, H, I, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, I, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
+    H: FnMut(&I, &mut OT) -> ExitKind,
     I: Input,
     OT: ObserversTuple<I, S>,
 {
@@ -315,7 +320,7 @@ impl InProcessHandlers {
         OF: Feedback<I, S>,
         S: HasSolutions<I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
-        H: FnMut(&I) -> ExitKind + ?Sized,
+        H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {
@@ -1392,7 +1397,7 @@ impl Handler for InProcessForkExecutorGlobalData {
 #[cfg(all(feature = "std", unix))]
 pub struct InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1407,7 +1412,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1424,7 +1429,7 @@ where
 impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
     for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1451,7 +1456,7 @@ where
                         .pre_exec_child_all(state, input)
                         .expect("Failed to run post_exec on observers");
 
-                    (self.harness_fn)(input);
+                    (self.harness_fn)(input, &mut self.observers);
 
                     self.observers
                         .post_exec_child_all(state, input, &ExitKind::Ok)
@@ -1490,7 +1495,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1536,7 +1541,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S> for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
-    H: FnMut(&I) -> ExitKind + ?Sized,
+    H: FnMut(&I, &mut OT) -> ExitKind + ?Sized,
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
@@ -1644,7 +1649,7 @@ mod tests {
 
     #[test]
     fn test_inmem_exec() {
-        let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        let mut harness = |_buf: &NopInput, _: &mut _| ExitKind::Ok;
 
         let mut in_process_executor = InProcessExecutor::<_, NopInput, (), ()> {
             harness_fn: &mut harness,
@@ -1666,7 +1671,7 @@ mod tests {
 
         let provider = StdShMemProvider::new().unwrap();
 
-        let mut harness = |_buf: &NopInput| ExitKind::Ok;
+        let mut harness = |_buf: &NopInput, _: &mut _| ExitKind::Ok;
         let mut in_process_fork_executor = InProcessForkExecutor::<_, NopInput, (), (), _> {
             harness_fn: &mut harness,
             shmem_provider: provider,
@@ -1718,7 +1723,7 @@ pub mod pybind {
         ) -> Self {
             Self {
                 inner: OwnedInProcessExecutor::new(
-                    Box::new(move |input: &BytesInput| {
+                    Box::new(move |input: &BytesInput, _| {
                         Python::with_gil(|py| -> PyResult<()> {
                             let args = (PyBytes::new(py, input.bytes()),);
                             harness.call1(py, args)?;
