@@ -355,7 +355,45 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
-#[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
+#[cfg(target_os = "freebsd")]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        signal, ucontext.uc_mcontext.mc_rip, ucontext.uc_mcontext.mc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "openbsd")]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        signal, ucontext.sc_rip, ucontext.sc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(not(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd"
+)))]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
