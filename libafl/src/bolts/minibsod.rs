@@ -184,12 +184,45 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
+/// Write the content of all important registers
+#[cfg(all(target_os = "netbsd", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(writer, "r8 : {:#016x}, ", mcontext.__gregs[4])?;
+    write!(writer, "r9 : {:#016x}, ", mcontext.__gregs[5])?;
+    write!(writer, "r10: {:#016x}, ", mcontext.__gregs[6])?;
+    writeln!(writer, "r11: {:#016x}, ", mcontext.__gregs[7])?;
+    write!(writer, "r12: {:#016x}, ", mcontext.__gregs[8])?;
+    write!(writer, "r13: {:#016x}, ", mcontext.__gregs[9])?;
+    write!(writer, "r14: {:#016x}, ", mcontext.__gregs[10])?;
+    writeln!(writer, "r15: {:#016x}, ", mcontext.__gregs[11])?;
+    write!(writer, "rdi: {:#016x}, ", mcontext.__gregs[0])?;
+    write!(writer, "rsi: {:#016x}, ", mcontext.__gregs[1])?;
+    write!(writer, "rbp: {:#016x}, ", mcontext.__gregs[12])?;
+    writeln!(writer, "rbx: {:#016x}, ", mcontext.__gregs[13])?;
+    write!(writer, "rdx: {:#016x}, ", mcontext.__gregs[2])?;
+    write!(writer, "rax: {:#016x}, ", mcontext.__gregs[14])?;
+    write!(writer, "rcx: {:#016x}, ", mcontext.__gregs[3])?;
+    writeln!(writer, "rsp: {:#016x}, ", mcontext.__gregs[24])?;
+    write!(writer, "rip: {:#016x}, ", mcontext.__gregs[21])?;
+    write!(writer, "cs: {:#016x}, ", mcontext.__gregs[22])?;
+    writeln!(writer, "rflags: {:#016x}, ", mcontext.__gregs[23])?;
+
+    Ok(())
+}
+
 #[allow(clippy::unnecessary_wraps)]
 #[cfg(not(any(
     target_vendor = "apple",
     target_os = "linux",
     target_os = "android",
-    target_os = "freebsd"
+    target_os = "freebsd",
+    target_os = "netbsd"
 )))]
 fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
