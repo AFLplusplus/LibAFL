@@ -387,12 +387,28 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(all(target_os = "netbsd", target_arch = "x86_64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#016x}, fault address: {:#016x}",
+        signal, ucontext.uc_mcontext.__gregs[21], ucontext.uc_mcontext.__gregs[16]
+    )?;
+
+    Ok(())
+}
+
 #[cfg(not(any(
     target_vendor = "apple",
     target_os = "linux",
     target_os = "android",
     target_os = "freebsd",
-    target_os = "openbsd"
+    target_os = "openbsd",
+    target_os = "netbsd"
 )))]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
