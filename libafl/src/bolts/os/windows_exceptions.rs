@@ -80,6 +80,7 @@ pub const STATUS_INVALID_CRUNTIME_PARAMETER: i32 = 0xC0000417;
 pub const STATUS_ASSERTION_FAILURE: i32 = 0xC0000420;
 pub const STATUS_SXS_EARLY_DEACTIVATION: i32 = 0xC015000F;
 pub const STATUS_SXS_INVALID_DEACTIVATION: i32 = 0xC0150010;
+pub const STATUS_NOT_IMPLEMENTED: i32 = 0xC0000002;
 
 #[derive(Debug, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
@@ -131,6 +132,7 @@ pub enum ExceptionCode {
     AssertionFailure = STATUS_ASSERTION_FAILURE,
     SXSEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
     SXSInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
+    NotImplemented = STATUS_NOT_IMPLEMENTED,
     #[num_enum(default)]
     Other,
 }
@@ -150,7 +152,6 @@ pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
     ExceptionCode::HeapCorruption,
     ExceptionCode::StackBufferOverrun,
     ExceptionCode::AssertionFailure,
-    ExceptionCode::Other,
 ];
 
 impl PartialEq for ExceptionCode {
@@ -213,6 +214,7 @@ impl Display for ExceptionCode {
             ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE")?,
             ExceptionCode::SXSEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION")?,
             ExceptionCode::SXSInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION")?,
+            ExceptionCode::NotImplemented => write!(f, "STATUS_NOT_IMPLEMENTED")?,
             ExceptionCode::Other => write!(f, "Other/User defined exception")?,
         };
 
@@ -220,7 +222,7 @@ impl Display for ExceptionCode {
     }
 }
 
-pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 46] = [
+pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 47] = [
     ExceptionCode::AccessViolation,
     ExceptionCode::ArrayBoundsExceeded,
     ExceptionCode::Breakpoint,
@@ -266,6 +268,7 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 46] = [
     ExceptionCode::AssertionFailure,
     ExceptionCode::SXSEarlyDeactivation,
     ExceptionCode::SXSInvalidDeactivation,
+    ExceptionCode::NotImplemented,
     ExceptionCode::Other,
 ];
 
