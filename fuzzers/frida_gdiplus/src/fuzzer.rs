@@ -48,9 +48,12 @@ use libafl_frida::{
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 pub fn main() {
-    #[cfg(unix)]
-    panic!("This example only works on Windows");
 
+    #[cfg(unix)]
+    {
+        eprintln!("This example only works on Windows");
+        return;
+    }
     color_backtrace::install();
 
 
