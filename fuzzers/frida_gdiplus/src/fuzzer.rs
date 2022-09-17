@@ -1,6 +1,5 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for gdiplus.
-
 use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
@@ -21,8 +20,8 @@ use libafl::{
     corpus::{ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
-    feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedback_and_fast, feedback_or, feedback_or_fast,
+    feedbacks::{ConstFeedback, CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -36,6 +35,10 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
+#[cfg(unix)]
+use libafl_frida::asan::asan_rt::AsanRuntime;
+#[cfg(unix)]
+use libafl_frida::asan::errors::{AsanErrorsFeedback, AsanErrorsObserver, ASAN_ERRORS};
 use libafl_frida::{
     cmplog_rt::CmpLogRuntime,
     coverage_rt::{CoverageRuntime, MAP_SIZE},
@@ -44,15 +47,12 @@ use libafl_frida::{
 };
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
+/// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
-    #[cfg(unix)]
-    {
-        eprintln!("This example only works on Windows");
-        return;
-    }
     color_backtrace::install();
 
     let options = parse_args();
+
     unsafe {
         match fuzz(options) {
             Ok(()) | Err(Error::ShuttingDown) => println!("\nFinished fuzzing. Good bye."),
@@ -93,7 +93,12 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 let gum = Gum::obtain();
 
                 let coverage = CoverageRuntime::new();
+                #[cfg(unix)]
+                let asan = AsanRuntime::new(options.clone());
 
+                #[cfg(unix)]
+                let mut frida_helper =
+                    FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage, asan));
                 #[cfg(windows)]
                 let mut frida_helper =
                     FridaInstrumentationHelper::new(&gum, &options, tuple_list!(coverage));
@@ -117,6 +122,14 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     TimeFeedback::new_with_observer(&time_observer)
                 );
 
+                // Feedbacks to recognize an input as solution
+                #[cfg(unix)]
+                let mut objective = feedback_or_fast!(
+                    CrashFeedback::new(),
+                    TimeoutFeedback::new(),
+                    // true enables the AsanErrorFeedback
+                    feedback_and_fast!(ConstFeedback::from(true), AsanErrorsFeedback::new())
+                );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
@@ -162,6 +175,12 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+                #[cfg(unix)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                );
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer);
 
@@ -223,6 +242,12 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     TimeFeedback::new_with_observer(&time_observer)
                 );
 
+                #[cfg(unix)]
+                let mut objective = feedback_or_fast!(
+                    CrashFeedback::new(),
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
@@ -268,6 +293,12 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+                #[cfg(unix)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                );
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
@@ -344,6 +375,12 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                     TimeFeedback::new_with_observer(&time_observer)
                 );
 
+                #[cfg(unix)]
+                let mut objective = feedback_or_fast!(
+                    CrashFeedback::new(),
+                    TimeoutFeedback::new(),
+                    feedback_and_fast!(ConstFeedback::from(false), AsanErrorsFeedback::new())
+                );
                 #[cfg(windows)]
                 let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
@@ -389,6 +426,12 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 // A fuzzer with feedbacks and a corpus scheduler
                 let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
+                #[cfg(unix)]
+                let observers = tuple_list!(
+                    edges_observer,
+                    time_observer,
+                    AsanErrorsObserver::new(&ASAN_ERRORS)
+                );
                 #[cfg(windows)]
                 let observers = tuple_list!(edges_observer, time_observer,);
 
