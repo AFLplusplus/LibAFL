@@ -21,11 +21,8 @@ use libafl::{
     corpus::{ondisk::OnDiskMetadataFormat, CachedOnDiskCorpus, Corpus, OnDiskCorpus},
     events::{llmp::LlmpRestartingEventManager, EventConfig},
     executors::{inprocess::InProcessExecutor, ExitKind, ShadowExecutor},
-    //feedback_and_fast, 
     feedback_or, feedback_or_fast,
-    feedbacks::{
-        //ConstFeedback, 
-        CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
@@ -48,14 +45,12 @@ use libafl_frida::{
 use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
 
 pub fn main() {
-
     #[cfg(unix)]
     {
         eprintln!("This example only works on Windows");
         return;
     }
     color_backtrace::install();
-
 
     let options = parse_args();
     unsafe {
