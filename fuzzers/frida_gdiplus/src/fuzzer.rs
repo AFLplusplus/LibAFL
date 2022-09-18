@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for gdiplus.
-//! NOTE: This file is 1-to-1 copy of the ../../frida-gdiplus/fuzzer.rs, which 
+//! NOTE: This file is 1-to-1 copy of the ../../frida-gdiplus/fuzzer.rs, which
 //! is platform independent. Hence, this file contains code for other platforms
 //! but it's only meaningful for Windows because of the gdiplus target. If you
 //! going to make it compilable only for windows, don't foret to modify the
