@@ -295,7 +295,7 @@ where
                     continue;
                 }
                 let mut i = 0;
-                while (i < bytes.len() - token_1.len()) {
+                while i < bytes.len() - token_1.len() {
                     if bytes[i..].starts_with(token_1) {
                         bytes.splice(i..(i + token_1.len()), token_2.clone());
 
@@ -315,7 +315,7 @@ where
                         continue;
                     }
                     let mut i = 0;
-                    while (i < bytes.len() - token_1.len()) {
+                    while i < bytes.len() - token_1.len() {
                         if bytes[i..].starts_with(token_1) {
                             bytes.splice(i..(i + token_1.len()), token_2.clone());
 
