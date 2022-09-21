@@ -294,7 +294,8 @@ where
                 if bytes.len() < token_1.len() {
                     continue;
                 }
-                for i in 0..(bytes.len() - token_1.len()) {
+                let mut i = 0;
+                while (i < bytes.len() - token_1.len()) {
                     if bytes[i..].starts_with(token_1) {
                         bytes.splice(i..(i + token_1.len()), token_2.clone());
 
@@ -303,6 +304,7 @@ where
                             break 'first;
                         }
                     }
+                    i += 1;
                 }
             }
         }
@@ -312,7 +314,8 @@ where
                     if bytes.len() < token_1.len() {
                         continue;
                     }
-                    for i in 0..(bytes.len() - token_1.len()) {
+                    let mut i = 0;
+                    while (i < bytes.len() - token_1.len()) {
                         if bytes[i..].starts_with(token_1) {
                             bytes.splice(i..(i + token_1.len()), token_2.clone());
 
@@ -321,6 +324,7 @@ where
                                 break 'second;
                             }
                         }
+                        i += 1;
                     }
                 }
             }
