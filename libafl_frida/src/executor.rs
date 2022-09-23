@@ -18,6 +18,9 @@ use libafl::{
 use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 
+#[cfg(windows)]
+use crate::windows_hooks::initialize;
+
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
 pub struct FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
 where
@@ -145,6 +148,9 @@ where
                 range.end - range.start,
             ));
         }
+
+        #[cfg(windows)]
+        initialize();
 
         Self {
             base,

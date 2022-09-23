@@ -316,7 +316,7 @@ unsafe fn internal_handle_exception(
 }
 
 /// Internal function that is being called whenever an exception arrives (stdcall).
-unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_POINTERS) -> c_long {
+pub unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_POINTERS) -> c_long {
     let code = exception_pointers
         .as_mut()
         .unwrap()
