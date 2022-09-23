@@ -50,7 +50,7 @@ But why do we want to do so? well, under some circumstances, you may find your h
 
 However, we have to take care of the shared memory, it's the child process that runs the harness code and writes the coverage to the map.
 
-We have to make the map shared between the parent process and the child process, so we'll use shared memory again. You should compile your harness with `pointer_maps` (for `libafl_targes`) features enabled, this way, we can have a pointer; `EDGES_MAP_PTR` that can point to any coverage map.
+We have to make the map shared between the parent process and the child process, so we'll use shared memory again. You should compile your harness with `pointer_maps` (for `libafl_targets`) features enabled, this way, we can have a pointer; `EDGES_MAP_PTR` that can point to any coverage map.
 
 On your fuzzer side, you can allocate a shared memory region and make the `EDGES_MAP_PTR` point to your shared memory.
 
