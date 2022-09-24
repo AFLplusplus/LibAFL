@@ -462,13 +462,13 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     /// The timeout handler fn
     timeout_handler: ptr::null(),
     #[cfg(windows)]
-    tp_timer: ptr::null_mut(),
+    tp_timer: null_mut(),
     #[cfg(windows)]
     in_target: 0,
     #[cfg(windows)]
-    critical: ptr::null_mut(),
+    critical: null_mut(),
     #[cfg(windows)]
-    timeout_input_ptr: ptr::null_mut(),
+    timeout_input_ptr: null_mut(),
 };
 
 /// Get the inprocess [`crate::state::State`]
