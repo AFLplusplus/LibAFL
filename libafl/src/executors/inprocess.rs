@@ -11,9 +11,10 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr::{self, addr_of_mut, null_mut},
-    time::Duration,
+    ptr::{self, null_mut},
 };
+#[cfg(all(unix, feature = "std"))]
+use core::{ptr::addr_of_mut, time::Duration};
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ptr::write_volatile,
