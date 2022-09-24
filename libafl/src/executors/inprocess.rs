@@ -13,7 +13,7 @@ use core::{
     marker::PhantomData,
     ptr::{self, null_mut},
 };
-#[cfg(all(unix, feature = "std"))]
+#[cfg(all(target_os = "linux", feature = "std"))]
 use core::{ptr::addr_of_mut, time::Duration};
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
@@ -1442,7 +1442,7 @@ where
 }
 
 /// Timeout executor for [`InProcessForkExecutor`]
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", target_os = "linux"))]
 pub struct TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
@@ -1474,7 +1474,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, H, I, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
@@ -1558,7 +1558,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
     for TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
 where
@@ -1691,7 +1691,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, H, I, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
@@ -1772,7 +1772,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S>
     for TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
 where
