@@ -151,7 +151,7 @@ where
     I: Input,
     EM: ProgressReporter<I>,
     S: HasExecutions + HasClientPerfMonitor + HasMetadata,
-    ST: ?Sized
+    ST: ?Sized,
 {
     /// Fuzz for a single iteration.
     /// Returns the index of the last fuzzed corpus item.
