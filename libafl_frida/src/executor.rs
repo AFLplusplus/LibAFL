@@ -17,7 +17,6 @@ use libafl::{
 #[cfg(unix)]
 use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
-
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
 
