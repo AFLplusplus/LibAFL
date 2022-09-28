@@ -315,7 +315,9 @@ unsafe fn internal_handle_exception(
     }
 }
 
-/// Internal function that is being called whenever an exception arrives (stdcall).
+/// Function that is being called whenever an exception arrives (stdcall).
+/// # Safety
+/// This function is unsafe because it is called by the OS
 pub unsafe extern "system" fn handle_exception(
     exception_pointers: *mut EXCEPTION_POINTERS,
 ) -> c_long {
