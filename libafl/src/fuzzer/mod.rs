@@ -151,6 +151,7 @@ where
     I: Input,
     EM: ProgressReporter<I>,
     S: HasExecutions + HasClientPerfMonitor + HasMetadata,
+    ST: ?Sized,
 {
     /// Fuzz for a single iteration.
     /// Returns the index of the last fuzzed corpus item.
@@ -521,7 +522,7 @@ where
     I: Input,
     S: HasClientPerfMonitor + HasExecutions + HasMetadata,
     OF: Feedback<I, S>,
-    ST: StagesTuple<E, EM, S, Self>,
+    ST: StagesTuple<E, EM, S, Self> + ?Sized,
 {
     fn fuzz_one(
         &mut self,
