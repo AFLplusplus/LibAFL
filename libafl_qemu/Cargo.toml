@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["usermode"]
+default = ["usermode", "fork"]
 python = ["pyo3", "pyo3-build-config"]
 fork = ["libafl/fork"]
 
