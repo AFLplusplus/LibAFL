@@ -21,6 +21,7 @@ introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
 python = ["pyo3"]
 tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
+prometheus_monitor = []
 cli = ["clap"]  # expose bolts::cli
 qemu_cli = ["cli"]
 frida_cli = ["cli"]
