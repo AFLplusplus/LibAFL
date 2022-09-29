@@ -28,7 +28,7 @@ usermode = []
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.8.1", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait"] }
+libafl = { path = "../libafl", version = "0.8.1", default-features = false, features = ["std", "derive", "llmp_compression"] }
 libafl_targets = { path = "../libafl_targets", version = "0.8.1" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
