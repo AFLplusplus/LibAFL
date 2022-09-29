@@ -12,22 +12,23 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["usermode"]
+default = ["fork"]
 python = ["pyo3", "pyo3-build-config"]
+fork = ["libafl/fork"]
 
 # The following architecture features are mutually exclusive.
 x86_64 = [] # build qemu for x86_64 (default)
 i386 = [] # build qemu for i386
 arm = [] # build qemu for arm
 aarch64 = [] # build qemu for aarch64
-be = []
 
 usermode = []
+systemmode = []
 
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.8.1" }
+libafl = { path = "../libafl", version = "0.8.1", default-features = false, features = ["std", "derive", "llmp_compression", "rand_trait"] }
 libafl_targets = { path = "../libafl_targets", version = "0.8.1" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib

@@ -62,7 +62,9 @@ pub use asan::{init_with_asan, QemuAsanHelper};
 pub mod calls;
 
 pub mod executor;
-pub use executor::{QemuExecutor, QemuForkExecutor};
+pub use executor::QemuExecutor;
+#[cfg(feature = "fork")]
+pub use executor::QemuForkExecutor;
 
 pub mod emu;
 pub use emu::*;
