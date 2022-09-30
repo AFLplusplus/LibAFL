@@ -392,12 +392,16 @@ pub(crate) struct InProcessExecutorHandlerData {
     #[allow(unused)] // for no_std
     timeout_handler: *const c_void,
     #[cfg(windows)]
+    #[allow(unused)] // for no_std
     pub tp_timer: *mut c_void,
     #[cfg(windows)]
+    #[allow(unused)] // for no_std
     pub in_target: u64,
     #[cfg(windows)]
+    #[allow(unused)] // for no_std
     pub critical: *mut c_void,
     #[cfg(windows)]
+    #[allow(unused)] // for no_std
     pub timeout_input_ptr: *mut c_void,
 }
 
