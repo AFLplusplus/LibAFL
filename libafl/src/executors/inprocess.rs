@@ -1629,8 +1629,6 @@ pub mod child_signal_handlers {
 mod tests {
     use core::marker::PhantomData;
 
-    use serial_test::serial;
-
     #[cfg(all(feature = "std", feature = "fork", unix))]
     use crate::{
         bolts::shmem::{ShMemProvider, StdShMemProvider},

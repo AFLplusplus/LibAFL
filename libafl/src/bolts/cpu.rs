@@ -32,7 +32,7 @@ pub fn read_time_counter() -> u64 {
 /// Read a timestamp for measurements
 ///
 /// Fetches the counter-virtual count register
-/// as we do not need to remove the cntvct_el2 offset.
+/// as we do not need to remove the `cntvct_el2` offset.
 #[cfg(target_arch = "aarch64")]
 #[must_use]
 pub fn read_time_counter() -> u64 {
