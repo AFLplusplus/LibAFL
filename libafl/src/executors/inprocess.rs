@@ -1881,7 +1881,7 @@ pub mod child_signal_handlers {
             let state = data.state_mut::<S>();
             let input = data.take_current_input::<I>();
             observers
-                .post_exec_child_all(state, input, &ExitKind::Crash)
+                .post_exec_child_all(state, input, &ExitKind::Timeout)
                 .expect("Failed to run post_exec on observers");
         }
         libc::_exit(128 + (_signal as i32));
