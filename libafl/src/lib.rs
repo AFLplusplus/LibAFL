@@ -425,6 +425,7 @@ impl From<pyo3::PyErr> for Error {
 impl std::error::Error for Error {}
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
+#[cfg(feature = "prelude")]
 pub mod prelude {
     pub use super::{
         bolts::{bolts_prelude::*, *},
