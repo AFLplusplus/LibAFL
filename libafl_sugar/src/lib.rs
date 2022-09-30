@@ -15,7 +15,7 @@
     clippy::module_name_repetitions,
     clippy::unreadable_literal
 )]
-#![cfg_attr(debug_assertions, warn(
+#![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -25,7 +25,7 @@
     unused_qualifications,
     //unused_results
 ))]
-#![cfg_attr(not(debug_assertions), deny(
+#![cfg_attr(test, deny(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -33,10 +33,12 @@
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
+    unused_must_use,
+    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
-    not(debug_assertions),
+    test,
     deny(
         bad_style,
         const_err,

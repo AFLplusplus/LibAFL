@@ -27,7 +27,7 @@ Welcome to `LibAFL`
     clippy::module_name_repetitions,
     clippy::unreadable_literal
 )]
-#![cfg_attr(debug_assertions, warn(
+#![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -37,7 +37,7 @@ Welcome to `LibAFL`
     unused_qualifications,
     //unused_results
 ))]
-#![cfg_attr(not(debug_assertions), deny(
+#![cfg_attr(test, deny(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -50,7 +50,7 @@ Welcome to `LibAFL`
     //unused_results
 ))]
 #![cfg_attr(
-    not(debug_assertions),
+    test,
     deny(
         bad_style,
         const_err,
@@ -70,9 +70,6 @@ Welcome to `LibAFL`
         while_true
     )
 )]
-// Till they fix this buggy lint in clippy
-#![allow(clippy::borrow_as_ptr)]
-#![allow(clippy::borrow_deref_ref)]
 
 #[cfg(feature = "std")]
 #[macro_use]
