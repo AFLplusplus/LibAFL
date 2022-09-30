@@ -7,7 +7,7 @@ cd "$SCRIPT_DIR/.." || exit 1
 
 echo "Welcome to the happy fmt script. :)"
 echo "[*] Running fmt for the main crates"
-cargo fmt
+cargo +nightly fmt
 
 echo "[*] Formatting C(pp) files"
 # shellcheck disable=SC2046
@@ -23,6 +23,6 @@ for fuzzer in $(echo "$fuzzers" "$backtrace_fuzzers");
 do
     pushd "$fuzzer" || exit 1
     echo "[*] Running fmt for $fuzzer"
-    cargo fmt --all
+    cargo +nightly fmt --all
     popd || exit 1
 done

@@ -97,7 +97,7 @@ fn main() {
         std::env::set_var(EXPRESSION_PRUNING, "1");
     }
 
-    let res = Command::new(&opt.program.first().expect("no program argument given"))
+    let res = Command::new(opt.program.first().expect("no program argument given"))
         .args(opt.program.iter().skip(1))
         .status()
         .expect("failed to spawn program");

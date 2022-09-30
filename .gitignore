@@ -46,3 +46,6 @@ __pycache__
 *.lafl_lock
 
 *atomic_file_testfile*
+**/libxml2
+**/corpus_discovered
+**/libxml2-*.tar.gz

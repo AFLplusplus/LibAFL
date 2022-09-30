@@ -92,7 +92,7 @@ fn exec_llvm_config(args: &[&str]) -> String {
 /// Use `xcrun` to get the path to the Xcode SDK tools library path, for linking
 fn find_macos_sdk_libs() -> String {
     let sdk_path_out = Command::new("xcrun")
-        .args(&["--show-sdk-path"])
+        .arg("--show-sdk-path")
         .output()
         .expect("Failed to execute xcrun. Make sure you have Xcode installed and executed `sudo xcode-select --install`");
     format!(
@@ -129,7 +129,7 @@ fn build_pass(
             .args(cxxflags)
             .arg(src_dir.join(src_file))
             .args(ldflags)
-            .args(&["-o"])
+            .arg("-o")
             .arg(out_dir.join(format!("{}.{}", src_stub, dll_extension())))
             .status()
             .unwrap_or_else(|_| panic!("Failed to compile {}", src_file))
@@ -204,19 +204,7 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
     cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={}", acc_map_size));
 
-    let llvm_version = match find_llvm_config()
-        .unwrap()
-        .split('-')
-        .collect::<Vec<&str>>()
-        .get(2)
-    {
-        Some(ver) => ver.parse::<usize>().ok(),
-        None => None,
-    };
-    // The approach below causes issues with arguments to optimization passes.
-    // An example is fuzzers/libfuzzer_libpng_accounting which passes -granularity=FUNC.
-    // In CI/CD, the new pass manager is not used. For now, maintain the same behavior.
-    //let llvm_version = find_llvm_version();
+    let llvm_version = find_llvm_version();
 
     if let Some(ver) = llvm_version {
         if ver >= 14 {

@@ -391,12 +391,12 @@ impl Iterator for GuestMaps {
             return None;
         }
         unsafe {
-            let mut ret: MapInfo = MaybeUninit::uninit().assume_init();
-            self.c_iter = libafl_maps_next(self.c_iter, addr_of_mut!(ret));
+            let mut ret = MaybeUninit::uninit();
+            self.c_iter = libafl_maps_next(self.c_iter, ret.as_mut_ptr());
             if self.c_iter.is_null() {
                 None
             } else {
-                Some(ret)
+                Some(ret.assume_init())
             }
         }
     }
@@ -433,11 +433,7 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
         let closure = &mut *(data as *mut Box<dyn for<'r> FnMut(&Emulator, &'r str) -> bool>);
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         let emu = Emulator::new_empty();
-        if closure(&emu, cmd) {
-            1
-        } else {
-            0
-        }
+        i32::from(closure(&emu, cmd))
     }
 }
 

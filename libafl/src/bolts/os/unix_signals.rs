@@ -439,20 +439,24 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
 #[inline(always)]
 pub fn ucontext() -> Result<ucontext_t, Error> {
     let mut ucontext = unsafe { mem::zeroed() };
-    if unsafe { getcontext(&mut ucontext) } == 0 {
-        Ok(ucontext)
-    } else {
-        #[cfg(not(feature = "std"))]
-        unsafe {
-            libc::perror(b"Failed to get ucontext\n".as_ptr() as _);
-        };
-        #[cfg(not(feature = "std"))]
-        return Err(Error::unknown("Failed to get ucontex"));
+    if cfg!(not(target_os = "openbsd")) {
+        if unsafe { getcontext(&mut ucontext) } == 0 {
+            Ok(ucontext)
+        } else {
+            #[cfg(not(feature = "std"))]
+            unsafe {
+                libc::perror(b"Failed to get ucontext\n".as_ptr() as _);
+            };
+            #[cfg(not(feature = "std"))]
+            return Err(Error::unknown("Failed to get ucontex"));
 
-        #[cfg(feature = "std")]
-        Err(Error::unknown(format!(
-            "Failed to get ucontext: {:?}",
-            Errno::from_i32(errno())
-        )))
+            #[cfg(feature = "std")]
+            Err(Error::unknown(format!(
+                "Failed to get ucontext: {:?}",
+                Errno::from_i32(errno())
+            )))
+        }
+    } else {
+        Ok(ucontext)
     }
 }

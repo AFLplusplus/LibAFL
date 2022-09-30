@@ -2,7 +2,13 @@
 
 use alloc::{string::String, vec::Vec};
 use core::time::Duration;
-use std::{fs::File, io::Write, path::PathBuf};
+use std::{
+    fs::{File, OpenOptions},
+    io::Write,
+    path::PathBuf,
+};
+
+use serde_json::json;
 
 use crate::{
     bolts::{current_time, format_duration_hms},
@@ -131,5 +137,78 @@ impl OnDiskTOMLMonitor<NopMonitor> {
         P: Into<PathBuf>,
     {
         Self::new(filename, NopMonitor::new())
+    }
+}
+
+#[derive(Debug, Clone)]
+/// Wraps a base monitor and continuously appends the current statistics to a JSON lines file.
+pub struct OnDiskJSONMonitor<F, M>
+where
+    F: FnMut(&mut M) -> bool,
+    M: Monitor,
+{
+    base: M,
+    path: PathBuf,
+    /// A function that has the current runtime as argument and decides, whether a record should be logged
+    log_record: F,
+}
+
+impl<F, M> OnDiskJSONMonitor<F, M>
+where
+    F: FnMut(&mut M) -> bool,
+    M: Monitor,
+{
+    /// Create a new [`OnDiskJSONMonitor`]
+    pub fn new<P>(filename: P, base: M, log_record: F) -> Self
+    where
+        P: Into<PathBuf>,
+    {
+        let path = filename.into();
+
+        Self {
+            base,
+            path,
+            log_record,
+        }
+    }
+}
+
+impl<F, M> Monitor for OnDiskJSONMonitor<F, M>
+where
+    F: FnMut(&mut M) -> bool,
+    M: Monitor,
+{
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+        self.base.client_stats_mut()
+    }
+
+    fn client_stats(&self) -> &[ClientStats] {
+        self.base.client_stats()
+    }
+
+    fn start_time(&mut self) -> Duration {
+        self.base.start_time()
+    }
+
+    fn display(&mut self, event_msg: String, sender_id: u32) {
+        if (self.log_record)(&mut self.base) {
+            let file = OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(&self.path)
+                .expect("Failed to open logging file");
+
+            let line = json!({
+                "run_time": current_time() - self.base.start_time(),
+                "clients": self.base.client_stats().len(),
+                "corpus": self.base.corpus_size(),
+                "objectives": self.base.objective_size(),
+                "executions": self.base.total_execs(),
+                "exec_sec": self.base.execs_per_sec(),
+                "clients": &self.client_stats()[1..]
+            });
+            writeln!(&file, "{}", line).expect("Unable to write JSON to file");
+        }
+        self.base.display(event_msg, sender_id);
     }
 }

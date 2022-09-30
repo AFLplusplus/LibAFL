@@ -53,7 +53,7 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
@@ -70,7 +70,7 @@ pub fn libafl_main() {
     //RegistryBuilder::register::<Tokens>();
 
     let res = match Command::new("libafl_fuzzbench")
-        .version("0.8.0")
+        .version("0.8.1")
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
@@ -427,7 +427,7 @@ fn fuzz_binary(
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         {
             toks += autotokens()?;
         }
@@ -654,7 +654,7 @@ fn fuzz_text(
         if let Some(tokenfile) = tokenfile {
             toks.add_from_file(tokenfile)?;
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         {
             toks += autotokens()?;
         }
@@ -667,14 +667,7 @@ fn fuzz_text(
     // In case the corpus is empty (on first run), reset
     if state.corpus().count() < 1 {
         state
-            .load_from_directory(
-                &mut fuzzer,
-                &mut executor,
-                &mut mgr,
-                &seed_dir,
-                false,
-                &mut |_, _, path| GeneralizedInput::from_bytes_file(path),
-            )
+            .load_initial_inputs(&mut fuzzer, &mut executor, &mut mgr, &[seed_dir.clone()])
             .unwrap_or_else(|_| {
                 println!("Failed to load initial corpus at {:?}", &seed_dir);
                 process::exit(0);

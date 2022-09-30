@@ -22,7 +22,7 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -186,7 +186,7 @@ where
     EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions,
+    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions + HasMetadata,
     Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
 {
     /// Gets the [`PushStageHelper`]

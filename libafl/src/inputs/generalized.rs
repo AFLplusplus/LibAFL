@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::Error;
 use crate::{
     bolts::{ownedref::OwnedSlice, HasLen},
-    inputs::{HasBytesVec, HasTargetBytes, Input},
+    inputs::{BytesInput, HasBytesVec, HasTargetBytes, Input},
 };
 
 /// An item of the generalized input
@@ -41,6 +41,22 @@ impl Input for GeneralizedInput {
         // TODO add generalized
         hasher.write(self.bytes());
         format!("{:016x}", hasher.finish())
+    }
+
+    /// Load from a plain file of bytes
+    #[cfg(feature = "std")]
+    fn from_file<P>(path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        let mut file = File::open(path)?;
+        let mut bytes: Vec<u8> = vec![];
+        file.read_to_end(&mut bytes)?;
+        Ok(Self {
+            bytes,
+            generalized: None,
+            grimoire_mutated: false,
+        })
     }
 
     /// An hook executed before being added to the corpus
@@ -103,6 +119,18 @@ impl From<Vec<u8>> for GeneralizedInput {
 impl From<&[u8]> for GeneralizedInput {
     fn from(bytes: &[u8]) -> Self {
         Self::new(bytes.to_owned())
+    }
+}
+
+impl From<BytesInput> for GeneralizedInput {
+    fn from(bytes_input: BytesInput) -> Self {
+        Self::new(bytes_input.bytes)
+    }
+}
+
+impl From<&BytesInput> for GeneralizedInput {
+    fn from(bytes_input: &BytesInput) -> Self {
+        bytes_input.bytes().into()
     }
 }
 
@@ -205,21 +233,5 @@ impl GeneralizedInput {
     /// Get the generalized input (mutable)
     pub fn generalized_mut(&mut self) -> &mut Option<Vec<GeneralizedItem>> {
         &mut self.generalized
-    }
-
-    /// Load from a plain file of bytes
-    #[cfg(feature = "std")]
-    pub fn from_bytes_file<P>(path: P) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-    {
-        let mut file = File::open(path)?;
-        let mut bytes: Vec<u8> = vec![];
-        file.read_to_end(&mut bytes)?;
-        Ok(Self {
-            bytes,
-            generalized: None,
-            grimoire_mutated: false,
-        })
     }
 }

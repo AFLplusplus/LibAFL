@@ -17,7 +17,7 @@ use crate::{
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions},
     Error,
 };
 
@@ -150,10 +150,14 @@ pub trait Fuzzer<E, EM, I, S, ST>
 where
     I: Input,
     EM: ProgressReporter<I>,
-    S: HasExecutions + HasClientPerfMonitor,
+    S: HasExecutions + HasClientPerfMonitor + HasMetadata,
+    ST: ?Sized,
 {
     /// Fuzz for a single iteration.
     /// Returns the index of the last fuzzed corpus item.
+    /// (Note: An iteration represents a complete run of every stage.
+    /// Therefore it does not mean that the harness is executed for once,
+    /// because each stage could run the harness for multiple times)
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
@@ -184,6 +188,9 @@ where
 
     /// Fuzz for n iterations.
     /// Returns the index of the last fuzzed corpus item.
+    /// (Note: An iteration represents a complete run of every stage.
+    /// therefore the number n is not always equal to the number of the actual harness executions,
+    /// because each stage could run the harness for multiple times)
     ///
     /// If you use this fn in a restarting scenario to only run for `n` iterations,
     /// before exiting, make sure you call `event_mgr.on_restart(&mut state)?;`.
@@ -513,9 +520,9 @@ where
     EM: EventManager<E, I, S, Self>,
     F: Feedback<I, S>,
     I: Input,
-    S: HasClientPerfMonitor + HasExecutions,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata,
     OF: Feedback<I, S>,
-    ST: StagesTuple<E, EM, S, Self>,
+    ST: StagesTuple<E, EM, S, Self> + ?Sized,
 {
     fn fuzz_one(
         &mut self,

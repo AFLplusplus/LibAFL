@@ -125,6 +125,10 @@ impl CompilerWrapper for ClangWrapper {
         let mut shared = false;
         // Detect stray -v calls from ./configure scripts.
         if args.len() > 1 && args[1].as_ref() == "-v" {
+            if args.len() == 2 {
+                self.base_args.push(args[1].as_ref().into());
+                return Ok(self);
+            }
             linking = false;
         }
 
@@ -264,7 +268,10 @@ impl CompilerWrapper for ClangWrapper {
 
         if cfg!(unix) {
             if cfg!(target_vendor = "apple") {
-                self.add_link_arg(lib_file)
+                // Same as --whole-archive on linux
+                // Without this option, the linker picks the first symbols it finds and does not care if it's a weak or a strong symbol
+                // See: <https://stackoverflow.com/questions/13089166/how-to-make-gcc-link-strong-symbol-in-static-library-to-overwrite-weak-symbol>
+                self.add_link_arg("-Wl,-force_load").add_link_arg(lib_file)
             } else {
                 self.add_link_arg("-Wl,--whole-archive")
                     .add_link_arg(lib_file)
@@ -294,6 +301,14 @@ impl CompilerWrapper for ClangWrapper {
         }
         for pass in &self.passes {
             if self.use_new_pm {
+                // https://github.com/llvm/llvm-project/issues/56137
+                // Need this -Xclang -load -Xclang -<pass>.so thing even with the new PM
+                // to pass the arguments to LLVM Passes
+                args.push("-Xclang".into());
+                args.push("-load".into());
+                args.push("-Xclang".into());
+                args.push(pass.path().into_os_string().into_string().unwrap());
+                args.push("-Xclang".into());
                 args.push(format!(
                     "-fpass-plugin={}",
                     pass.path().into_os_string().into_string().unwrap()
@@ -366,7 +381,7 @@ impl ClangWrapper {
             optimize: true,
             wrapped_cc: CLANG_PATH.into(),
             wrapped_cxx: CLANGXX_PATH.into(),
-            name: "".into(),
+            name: String::new(),
             is_cpp: false,
             linking: false,
             shared: false,

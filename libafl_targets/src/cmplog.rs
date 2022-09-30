@@ -155,6 +155,7 @@ impl CmpMap for CmpLogMap {
 
 /// The global `CmpLog` map for the current `LibAFL` run.
 #[no_mangle]
+#[allow(clippy::large_stack_arrays)]
 pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
     headers: [CmpLogHeader {
         hits: 0,

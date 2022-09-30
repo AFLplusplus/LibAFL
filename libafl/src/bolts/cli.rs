@@ -64,11 +64,8 @@
 //!```
 
 #[cfg(feature = "frida_cli")]
-use alloc::boxed::Box;
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, string::ToString};
+use alloc::{string::String, vec::Vec};
 #[cfg(feature = "frida_cli")]
 use std::error;
 use std::{net::SocketAddr, path::PathBuf, time::Duration};

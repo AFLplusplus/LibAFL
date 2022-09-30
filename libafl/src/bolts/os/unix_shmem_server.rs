@@ -14,7 +14,6 @@ use core::{mem::ManuallyDrop, ptr::addr_of};
 #[cfg(target_vendor = "apple")]
 use std::fs;
 use std::{
-    borrow::BorrowMut,
     cell::RefCell,
     env,
     io::{Read, Write},
@@ -225,8 +224,8 @@ where
     fn post_fork(&mut self, is_child: bool) -> Result<(), Error> {
         if is_child {
             // After fork, only the parent keeps the join handle.
-            if let ShMemService::Started { bg_thread, .. } = &mut self.service {
-                bg_thread.borrow_mut().lock().unwrap().join_handle = None;
+            if let ShMemService::Started { bg_thread, .. } = &self.service {
+                bg_thread.lock().unwrap().join_handle = None;
             }
             //fn connect(&mut self) -> Result<Self, Error> {
             //self.stream = UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
@@ -371,7 +370,7 @@ impl Drop for ShMemServiceThread {
                 .expect("Error in ShMemService background thread!");
             // try to remove the file from fs, and ignore errors.
             #[cfg(target_vendor = "apple")]
-            fs::remove_file(&UNIX_SERVER_NAME).unwrap();
+            fs::remove_file(UNIX_SERVER_NAME).unwrap();
 
             env::remove_var(AFL_SHMEM_SERVICE_STARTED);
         }

@@ -154,8 +154,105 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
+/// Write the content of all important registers
+#[cfg(all(target_os = "freebsd", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(writer, "r8 : {:#016x}, ", mcontext.mc_r8)?;
+    write!(writer, "r9 : {:#016x}, ", mcontext.mc_r9)?;
+    write!(writer, "r10 : {:#016x}, ", mcontext.mc_r10)?;
+    write!(writer, "r11 : {:#016x}, ", mcontext.mc_r11)?;
+    write!(writer, "r12 : {:#016x}, ", mcontext.mc_r12)?;
+    write!(writer, "r13 : {:#016x}, ", mcontext.mc_r13)?;
+    write!(writer, "r14 : {:#016x}, ", mcontext.mc_r14)?;
+    write!(writer, "r15 : {:#016x}, ", mcontext.mc_r15)?;
+    write!(writer, "rdi : {:#016x}, ", mcontext.mc_rdi)?;
+    write!(writer, "rsi : {:#016x}, ", mcontext.mc_rsi)?;
+    write!(writer, "rbp : {:#016x}, ", mcontext.mc_rbp)?;
+    write!(writer, "rbx : {:#016x}, ", mcontext.mc_rbx)?;
+    write!(writer, "rdx : {:#016x}, ", mcontext.mc_rdx)?;
+    write!(writer, "rax : {:#016x}, ", mcontext.mc_rax)?;
+    write!(writer, "rcx : {:#016x}, ", mcontext.mc_rcx)?;
+    write!(writer, "rsp : {:#016x}, ", mcontext.mc_rsp)?;
+    write!(writer, "rflags : {:#016x}, ", mcontext.mc_rflags)?;
+    write!(writer, "cs : {:#016x}, ", mcontext.mc_cs)?;
+    Ok(())
+}
+
+/// Write the content of all important registers
+#[cfg(all(target_os = "netbsd", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(writer, "r8 : {:#016x}, ", mcontext.__gregs[4])?;
+    write!(writer, "r9 : {:#016x}, ", mcontext.__gregs[5])?;
+    write!(writer, "r10: {:#016x}, ", mcontext.__gregs[6])?;
+    writeln!(writer, "r11: {:#016x}, ", mcontext.__gregs[7])?;
+    write!(writer, "r12: {:#016x}, ", mcontext.__gregs[8])?;
+    write!(writer, "r13: {:#016x}, ", mcontext.__gregs[9])?;
+    write!(writer, "r14: {:#016x}, ", mcontext.__gregs[10])?;
+    writeln!(writer, "r15: {:#016x}, ", mcontext.__gregs[11])?;
+    write!(writer, "rdi: {:#016x}, ", mcontext.__gregs[0])?;
+    write!(writer, "rsi: {:#016x}, ", mcontext.__gregs[1])?;
+    write!(writer, "rbp: {:#016x}, ", mcontext.__gregs[12])?;
+    writeln!(writer, "rbx: {:#016x}, ", mcontext.__gregs[13])?;
+    write!(writer, "rdx: {:#016x}, ", mcontext.__gregs[2])?;
+    write!(writer, "rax: {:#016x}, ", mcontext.__gregs[14])?;
+    write!(writer, "rcx: {:#016x}, ", mcontext.__gregs[3])?;
+    writeln!(writer, "rsp: {:#016x}, ", mcontext.__gregs[24])?;
+    write!(writer, "rip: {:#016x}, ", mcontext.__gregs[21])?;
+    write!(writer, "cs: {:#016x}, ", mcontext.__gregs[22])?;
+    writeln!(writer, "rflags: {:#016x}, ", mcontext.__gregs[23])?;
+
+    Ok(())
+}
+
+/// Write the content of all important registers
+#[cfg(all(target_os = "openbsd", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    write!(writer, "r8 : {:#016x}, ", ucontext.sc_r8)?;
+    write!(writer, "r9 : {:#016x}, ", ucontext.sc_r9)?;
+    write!(writer, "r10 : {:#016x}, ", ucontext.sc_r10)?;
+    write!(writer, "r11 : {:#016x}, ", ucontext.sc_r11)?;
+    write!(writer, "r12 : {:#016x}, ", ucontext.sc_r12)?;
+    write!(writer, "r13 : {:#016x}, ", ucontext.sc_r13)?;
+    write!(writer, "r14 : {:#016x}, ", ucontext.sc_r14)?;
+    write!(writer, "r15 : {:#016x}, ", ucontext.sc_r15)?;
+    write!(writer, "rdi : {:#016x}, ", ucontext.sc_rdi)?;
+    write!(writer, "rsi : {:#016x}, ", ucontext.sc_rsi)?;
+    write!(writer, "rbp : {:#016x}, ", ucontext.sc_rbp)?;
+    write!(writer, "rbx : {:#016x}, ", ucontext.sc_rbx)?;
+    write!(writer, "rdx : {:#016x}, ", ucontext.sc_rdx)?;
+    write!(writer, "rax : {:#016x}, ", ucontext.sc_rax)?;
+    write!(writer, "rcx : {:#016x}, ", ucontext.sc_rcx)?;
+    write!(writer, "rsp : {:#016x}, ", ucontext.sc_rsp)?;
+    write!(writer, "rflags : {:#016x}, ", ucontext.sc_rflags)?;
+    write!(writer, "cs : {:#016x}, ", ucontext.sc_cs)?;
+    Ok(())
+}
+
 #[allow(clippy::unnecessary_wraps)]
-#[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
+#[cfg(not(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+)))]
 fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     _ucontext: &ucontext_t,
@@ -258,7 +355,61 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
-#[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
+#[cfg(target_os = "freebsd")]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        signal, ucontext.uc_mcontext.mc_rip, ucontext.uc_mcontext.mc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "openbsd")]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        signal, ucontext.sc_rip, ucontext.sc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "netbsd", target_arch = "x86_64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#016x}, fault address: {:#016x}",
+        signal, ucontext.uc_mcontext.__gregs[21], ucontext.uc_mcontext.__gregs[16]
+    )?;
+
+    Ok(())
+}
+
+#[cfg(not(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd"
+)))]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
