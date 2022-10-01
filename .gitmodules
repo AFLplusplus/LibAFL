@@ -7,3 +7,7 @@
 [submodule "libafl_nyx/packer"]
 	path = libafl_nyx/packer
 	url = https://github.com/syheliel/packer.git
+[submodule "libafl_tinyinst/TinyInst"]
+	path = libafl_tinyinst/TinyInst
+	url = git@github.com:elbiazo/TinyInst.git
+	branch = libafl_tinyinst

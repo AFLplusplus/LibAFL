@@ -1,25 +1,36 @@
+use core::marker::PhantomData;
 use core::pin::Pin;
 use std::{ffi::CString, os::raw::c_char};
 
 use cxx::UniquePtr;
 use libafl::{
-    executors::{Executor, ExitKind},
+    executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
+    observers::ObserversTuple,
+    state::State,
     Error,
 };
 
 use crate::tinyinst::litecov::{self, Coverage, DebuggerStatus, LiteCov};
 
-pub struct TinyInstExecutor {
+pub struct TinyInstExecutor<I, S, OT>
+where
+    OT: ObserversTuple<I, S>,
+{
     instrumentation_ptr: UniquePtr<LiteCov>,
     coverage_ptr: UniquePtr<Coverage>,
     newcoverage_ptr: UniquePtr<Coverage>,
     argc: usize,
     argv: Vec<*mut c_char>,
     timeout: u32,
+    observers: OT,
+    phantom: PhantomData<(I, OT, S)>,
 }
 
-impl std::fmt::Debug for TinyInstExecutor {
+impl<I, S, OT> std::fmt::Debug for TinyInstExecutor<I, S, OT>
+where
+    OT: ObserversTuple<I, S>,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TinyInstExecutor")
             .field("argc", &self.argc)
@@ -29,9 +40,10 @@ impl std::fmt::Debug for TinyInstExecutor {
     }
 }
 
-impl<EM, I, S, Z> Executor<EM, I, S, Z> for TinyInstExecutor
+impl<EM, I, S, Z, OT> Executor<EM, I, S, Z> for TinyInstExecutor<I, S, OT>
 where
     I: Input,
+    OT: ObserversTuple<I, S>,
 {
     #[inline]
     fn run_target(
@@ -63,12 +75,15 @@ where
     }
 }
 
-impl TinyInstExecutor {
-    pub unsafe fn new(args: Vec<String>, timeout: u32) -> Self {
+impl<I, S, OT> TinyInstExecutor<I, S, OT>
+where
+    OT: ObserversTuple<I, S>,
+{
+    pub unsafe fn new(args: Vec<String>, timeout: u32, observers: OT) -> Self {
         let mut instrumentation_ptr = LiteCov::new();
         let instrumentation = instrumentation_ptr.pin_mut();
 
-        let argc = args.len() + 1;
+        let argc = args.len();
         let vec_cstr: Vec<CString> = args
             .iter()
             .map(|arg| CString::new(arg.as_str()).unwrap())
@@ -78,7 +93,13 @@ impl TinyInstExecutor {
             argv.push(arg.as_ptr() as *mut c_char);
         }
         argv.push(core::ptr::null_mut()); //Null terminator
+        println!("initing {} {:?}", &argc, &argv);
+        for c in &argv {
+            println!("{:?}", c);
+        }
+
         instrumentation.Init(argc as i32, argv.as_mut_ptr());
+        println!("post init");
 
         let coverage_ptr = Coverage::new();
         let newcoverage_ptr = Coverage::new();
@@ -90,6 +111,60 @@ impl TinyInstExecutor {
             argc,
             argv,
             timeout,
+            observers,
+            phantom: PhantomData,
         }
+    }
+
+    pub fn test(&mut self, args: Vec<String>) {
+        let argc = args.len();
+        let vec_cstr: Vec<CString> = args
+            .iter()
+            .map(|arg| CString::new(arg.as_str()).unwrap())
+            .collect();
+        let mut argv: Vec<*mut c_char> = Vec::with_capacity(argc + 1);
+        for arg in &vec_cstr {
+            argv.push(arg.as_ptr() as *mut c_char);
+        }
+        argv.push(core::ptr::null_mut()); //Null terminator
+        let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
+
+        println!("testing!");
+        unsafe {
+            println!("argc {}", argc);
+            println!("timeout {}", self.timeout);
+            println!("{:?}", argv);
+
+            status = self.instrumentation_ptr.pin_mut().Run(
+                argc as i32,
+                argv.as_mut_ptr(),
+                self.timeout,
+            );
+        }
+        println!("post!");
+
+        match status {
+            DebuggerStatus::DEBUGGER_CRASHED | DebuggerStatus::DEBUGGER_HANGED => {
+                println!("Crashed!");
+            }
+            DebuggerStatus::DEBUGGER_NONE => {
+                println!("The harness was not run");
+            }
+            _ => println!("OK"),
+        }
+    }
+}
+
+impl<I, S, OT> HasObservers<I, OT, S> for TinyInstExecutor<I, S, OT>
+where
+    I: Input,
+    OT: ObserversTuple<I, S>,
+{
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
     }
 }

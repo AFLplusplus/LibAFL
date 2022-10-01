@@ -33,7 +33,7 @@ fn main() {
         .unwrap();
 
     // shim
-    std::fs::copy("./src/shim.cpp", "./tinyinst/shim.cpp").unwrap();
+    std::fs::copy("./src/shim.cc", "./tinyinst/shim.cc").unwrap();
 
     std::fs::copy("./src/shim.h", "./tinyinst/shim.h").unwrap();
 
@@ -57,4 +57,5 @@ fn main() {
     println!("cargo:rerun-if-changed=src/");
     println!("cargo:rerun-if-changed=src/tinyinst.rs");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=Tinyinst/litecov.cpp");
 }
