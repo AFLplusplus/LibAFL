@@ -13,7 +13,10 @@ use std::os::raw::{c_long, c_void};
 use num_enum::TryFromPrimitive;
 pub use windows::Win32::{
     Foundation::NTSTATUS,
-    System::Diagnostics::Debug::{AddVectoredExceptionHandler, EXCEPTION_POINTERS},
+    System::{
+        Diagnostics::Debug::{AddVectoredExceptionHandler, EXCEPTION_POINTERS},
+        Threading::{IsProcessorFeaturePresent, PROCESSOR_FEATURE_ID},
+    },
 };
 
 use crate::Error;

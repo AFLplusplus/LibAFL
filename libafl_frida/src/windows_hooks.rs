@@ -1,20 +1,12 @@
 // Based on the example of setting hooks: https://github.com/frida/frida-rust/blob/main/examples/gum/hook_open/src/lib.rs
-use std::{cell::UnsafeCell, sync::Mutex};
-
 use frida_gum::{interceptor::Interceptor, Gum, Module, NativePointer};
 use lazy_static::lazy_static;
-use libafl::bolts::os::windows_exceptions::{handle_exception, EXCEPTION_POINTERS};
-
-type IsProcessorFeaturePresentFunc = unsafe extern "C" fn(feature: u32) -> bool;
-type UnhandledExceptionFilterFunc =
-    unsafe extern "C" fn(exceptioninfo: *mut EXCEPTION_POINTERS) -> i32;
+use libafl::bolts::os::windows_exceptions::{
+    handle_exception, IsProcessorFeaturePresent, EXCEPTION_POINTERS, PROCESSOR_FEATURE_ID,
+};
 
 lazy_static! {
     static ref GUM: Gum = unsafe { Gum::obtain() };
-    static ref IS_PROCESSOR_FEATURE_PRESENT: Mutex<UnsafeCell<Option<IsProcessorFeaturePresentFunc>>> =
-        Mutex::new(UnsafeCell::new(None));
-    static ref UNHANDLED_EXCEPTION_FILTER: Mutex<UnsafeCell<Option<UnhandledExceptionFilterFunc>>> =
-        Mutex::new(UnsafeCell::new(None));
 }
 
 /// Initialize the hooks
@@ -35,41 +27,28 @@ pub fn initialize() {
     let mut interceptor = Interceptor::obtain(&GUM);
     use std::ffi::c_void;
 
-    unsafe {
-        *IS_PROCESSOR_FEATURE_PRESENT.lock().unwrap().get_mut() = Some(std::mem::transmute(
-            interceptor
-                .replace(
-                    is_processor_feature_present,
-                    NativePointer(is_processor_feature_present_detour as *mut c_void),
-                    NativePointer(std::ptr::null_mut()),
-                )
-                .unwrap()
-                .0,
-        ));
-        *UNHANDLED_EXCEPTION_FILTER.lock().unwrap().get_mut() = Some(std::mem::transmute(
-            interceptor
-                .replace(
-                    unhandled_exception_filter,
-                    NativePointer(unhandled_exception_filter_detour as *mut c_void),
-                    NativePointer(std::ptr::null_mut()),
-                )
-                .unwrap()
-                .0,
-        ));
-    }
+    interceptor
+        .replace(
+            is_processor_feature_present,
+            NativePointer(is_processor_feature_present_detour as *mut c_void),
+            NativePointer(std::ptr::null_mut()),
+        )
+        .unwrap();
+
+    interceptor
+        .replace(
+            unhandled_exception_filter,
+            NativePointer(unhandled_exception_filter_detour as *mut c_void),
+            NativePointer(std::ptr::null_mut()),
+        )
+        .unwrap();
 
     unsafe extern "C" fn is_processor_feature_present_detour(feature: u32) -> bool {
-        let func = IS_PROCESSOR_FEATURE_PRESENT
-            .lock()
-            .unwrap()
-            .get()
-            .as_ref()
-            .unwrap()
-            .unwrap();
+        println!("IsProcessorFeaturePresent called with feature {}", feature);
 
         let result = match feature {
             0x17 => false,
-            _ => func(feature),
+            _ => IsProcessorFeaturePresent(PROCESSOR_FEATURE_ID(feature)).as_bool(),
         };
         println!(
             "IsProcessorFeaturePresent({}) returning {}",
@@ -81,18 +60,8 @@ pub fn initialize() {
     unsafe extern "C" fn unhandled_exception_filter_detour(
         exception_pointers: *mut EXCEPTION_POINTERS,
     ) -> i32 {
-        let func = UNHANDLED_EXCEPTION_FILTER
-            .lock()
-            .unwrap()
-            .get()
-            .as_ref()
-            .unwrap()
-            .unwrap();
-
         println!("Calling handle_exception");
         handle_exception(exception_pointers);
-        println!("UnhandledExceptionFilter() calling the orig function...");
-        let result = func(exception_pointers);
-        result
+        unreachable!("handle_exception should not return");
     }
 }
