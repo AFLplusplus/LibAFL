@@ -386,19 +386,17 @@ pub(crate) struct InProcessExecutorHandlerData {
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
     /// The timeout handler
-    #[cfg(any(unix, all(windows, feature = "std")))]
     crash_handler: *const c_void,
     /// The timeout handler
-    #[cfg(any(unix, all(windows, feature = "std")))]
     timeout_handler: *const c_void,
-    #[cfg(all(windows, feature = "std"))]
-    pub tp_timer: *mut c_void,
-    #[cfg(all(windows, feature = "std"))]
-    pub in_target: u64,
-    #[cfg(all(windows, feature = "std"))]
-    pub critical: *mut c_void,
-    #[cfg(all(windows, feature = "std"))]
-    pub timeout_input_ptr: *mut c_void,
+    #[cfg(windows)]
+    pub(crate) tp_timer: *mut c_void,
+    #[cfg(windows)]
+    pub(crate) in_target: u64,
+    #[cfg(windows)]
+    pub(crate) critical: *mut c_void,
+    #[cfg(windows)]
+    pub(crate) timeout_input_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
