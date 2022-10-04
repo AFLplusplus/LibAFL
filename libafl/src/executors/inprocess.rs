@@ -386,22 +386,18 @@ pub(crate) struct InProcessExecutorHandlerData {
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
     /// The timeout handler
-    #[allow(unused)] // for no_std
+    #[cfg(unix)]
     crash_handler: *const c_void,
     /// The timeout handler
-    #[allow(unused)] // for no_std
+    #[cfg(unix)]
     timeout_handler: *const c_void,
-    #[cfg(windows)]
-    #[allow(unused)] // for no_std
+    #[cfg(all(windows, feature = "std"))]
     pub tp_timer: *mut c_void,
-    #[cfg(windows)]
-    #[allow(unused)] // for no_std
+    #[cfg(all(windows, feature = "std"))]
     pub in_target: u64,
-    #[cfg(windows)]
-    #[allow(unused)] // for no_std
+    #[cfg(all(windows, feature = "std"))]
     pub critical: *mut c_void,
-    #[cfg(windows)]
-    #[allow(unused)] // for no_std
+    #[cfg(all(windows, feature = "std"))]
     pub timeout_input_ptr: *mut c_void,
 }
 
