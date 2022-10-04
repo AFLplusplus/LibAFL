@@ -264,6 +264,7 @@ where
                 // I am a broker
                 // before going to the broker loop, spawn n clients
 
+                #[cfg(windows)]
                 if self.stdout_file.is_some() {
                     println!("Child process file stdio is not supported on Windows yet. Dumping to stdout instead...");
                 }

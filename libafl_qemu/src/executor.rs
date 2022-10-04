@@ -4,7 +4,6 @@ use core::fmt::{self, Debug, Formatter};
 #[cfg(feature = "fork")]
 use libafl::executors::InProcessForkExecutor;
 use libafl::{
-    bolts::shmem::ShMemProvider,
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     feedbacks::Feedback,
@@ -14,6 +13,9 @@ use libafl::{
     state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
+
+#[cfg(feature = "fork")]
+use libafl::bolts::shmem::ShMemProvider;
 
 pub use crate::emu::SyscallHookResult;
 use crate::{emu::Emulator, helper::QemuHelperTuple, hooks::QemuHooks};
