@@ -1,16 +1,11 @@
 // Based on the example of setting hooks: https://github.com/frida/frida-rust/blob/main/examples/gum/hook_open/src/lib.rs
 use frida_gum::{interceptor::Interceptor, Gum, Module, NativePointer};
-use lazy_static::lazy_static;
 use libafl::bolts::os::windows_exceptions::{
     handle_exception, IsProcessorFeaturePresent, EXCEPTION_POINTERS, PROCESSOR_FEATURE_ID,
 };
 
-lazy_static! {
-    static ref GUM: Gum = unsafe { Gum::obtain() };
-}
-
 /// Initialize the hooks
-pub fn initialize() {
+pub fn initialize(gum: &Gum) {
     let is_processor_feature_present =
         Module::find_export_by_name(Some("kernel32.dll"), "IsProcessorFeaturePresent");
     let is_processor_feature_present = is_processor_feature_present.unwrap();
@@ -24,7 +19,7 @@ pub fn initialize() {
         panic!("UnhandledExceptionFilter not found");
     }
 
-    let mut interceptor = Interceptor::obtain(&GUM);
+    let mut interceptor = Interceptor::obtain(&gum);
     use std::ffi::c_void;
 
     interceptor
