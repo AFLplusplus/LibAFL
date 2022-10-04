@@ -386,10 +386,10 @@ pub(crate) struct InProcessExecutorHandlerData {
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
     /// The timeout handler
-    #[cfg(unix)]
+    #[cfg(any(unix, all(windows, feature = "std")))]
     crash_handler: *const c_void,
     /// The timeout handler
-    #[cfg(unix)]
+    #[cfg(any(unix, all(windows, feature = "std")))]
     timeout_handler: *const c_void,
     #[cfg(all(windows, feature = "std"))]
     pub tp_timer: *mut c_void,
