@@ -11,6 +11,7 @@ pub mod tui;
 #[allow(missing_docs)]
 pub mod prometheus; // use the prometheus module if the above feature is enabled. EDIT: disabled feature flag for now
 pub use prometheus::PrometheusMonitor;
+pub use prometheus::serve_metrics;
 
 #[cfg(feature = "std")]
 pub mod disk;

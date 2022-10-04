@@ -55,7 +55,8 @@ tuple_list = { version = "0.1.3" }
 hashbrown =  { version = "0.12", features = ["serde", "ahash-compile-time-rng"], default-features=false } # A faster hashmap, nostd compatible
 num-traits = { version = "0.2", default-features = false }
 xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
-serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] } # serialization lib
+# added "derive" feature to above bc of tide
 erased-serde = { version = "0.3.21", default-features = false, features = ["alloc"] } # erased serde
 postcard = { version = "1.0", features = ["alloc"] } # no_std compatible serde serialization fromat
 bincode = {version = "1.3", optional = true }
@@ -80,6 +81,11 @@ libm = "0.2.2"
 tui = { version = "0.18", default-features = false, features = ['crossterm'], optional = true }
 crossterm = { version = "0.24", optional = true }
 clap = {version = "3.2", features = ["derive", "wrap_help"], optional = true}
+
+prometheus-client = "0.18.0" # may need to add option = true?
+tide = "0.16.0" # same as above
+async-std = { version = "1.8.0", features = ["attributes"] } # tide cratesio says to add this
+# serde = { version = "1.0", features = ["derive"] } # tide cratesio says to add this
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
