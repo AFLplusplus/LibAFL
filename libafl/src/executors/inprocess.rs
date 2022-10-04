@@ -415,18 +415,22 @@ unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
 impl InProcessExecutorHandlerData {
+    #[cfg(any(unix, feature = "std"))]
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
         unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
@@ -436,6 +440,7 @@ impl InProcessExecutorHandlerData {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
         self.current_input_ptr = ptr::null();
@@ -447,7 +452,7 @@ impl InProcessExecutorHandlerData {
         self.in_target == 1
     }
 
-    #[cfg(not(all(windows, feature = "std")))]
+    #[cfg(not(windows))]
     fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
