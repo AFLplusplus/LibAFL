@@ -55,7 +55,6 @@ jobs:
         swap-size-mb: 1024
         remove-dotnet: 'true'
         remove-haskell: 'true'
-        remove-android: 'true'
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
