@@ -244,7 +244,9 @@ extern "C" {
 
     static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 
+    #[allow(unused)]
     fn libafl_save_qemu_snapshot(name: *const u8);
+    #[allow(unused)]
     fn libafl_load_qemu_snapshot(name: *const u8);
 }
 
@@ -357,6 +359,8 @@ extern "C" {
         data: *const (),
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
+
+    fn cpu_reset(cpu: CPUStatePtr);
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -538,6 +542,10 @@ impl CPU {
         } else {
             Ok(val)
         }
+    }
+
+    pub fn reset_cpu(&self) {
+        unsafe { cpu_reset(self.ptr) };
     }
 }
 
