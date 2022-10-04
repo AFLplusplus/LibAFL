@@ -431,7 +431,7 @@ impl InProcessExecutorHandlerData {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
-    #[cfg(feature = "std")]
+    #[cfg(all(unix, feature = "std"))]
     fn current_input<'a, I>(&self) -> &'a I {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
     }
