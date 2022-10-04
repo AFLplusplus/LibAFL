@@ -232,8 +232,10 @@ where
 #[derive(Debug)]
 pub struct InProcessHandlers {
     /// On crash C function pointer
+    #[cfg(any(unix, feature = "std"))]
     pub crash_handler: *const c_void,
     /// On timeout C function pointer
+    #[cfg(any(unix, feature = "std"))]
     pub timeout_handler: *const c_void,
 }
 
@@ -360,20 +362,26 @@ impl InProcessHandlers {
                 > as *const c_void,
             })
         }
-        #[cfg(not(any(unix, all(windows, feature = "std"))))]
-        Ok(Self {
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
-        })
+        #[cfg(not(any(unix, feature = "std")))]
+        Ok(Self {})
     }
 
     /// Replace the handlers with `nop` handlers, deactivating the handlers
     #[must_use]
     pub fn nop() -> Self {
-        Self {
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
+        let ret;
+        #[cfg(any(unix, feature = "std"))]
+        {
+            ret = Self {
+                crash_handler: ptr::null(),
+                timeout_handler: ptr::null(),
+            };
         }
+        #[cfg(not(any(unix, feature = "std")))]
+        {
+            ret = Self {};
+        }
+        ret
     }
 }
 
@@ -386,23 +394,24 @@ pub(crate) struct InProcessExecutorHandlerData {
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
     /// The timeout handler
+    #[cfg(any(unix, feature = "std"))]
     crash_handler: *const c_void,
     /// The timeout handler
+    #[cfg(any(unix, feature = "std"))]
     timeout_handler: *const c_void,
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     pub(crate) tp_timer: *mut c_void,
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     pub(crate) in_target: u64,
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     pub(crate) critical: *mut c_void,
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     pub(crate) timeout_input_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
-#[allow(unused)]
 impl InProcessExecutorHandlerData {
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
@@ -420,6 +429,7 @@ impl InProcessExecutorHandlerData {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
+    #[cfg(feature = "std")]
     fn current_input<'a, I>(&self) -> &'a I {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
     }
@@ -457,13 +467,13 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     crash_handler: ptr::null(),
     /// The timeout handler fn
     timeout_handler: ptr::null(),
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     tp_timer: ptr::null_mut(),
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     in_target: 0,
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     critical: ptr::null_mut(),
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     timeout_input_ptr: ptr::null_mut(),
 };
 
