@@ -442,12 +442,12 @@ impl InProcessExecutorHandlerData {
         r
     }
 
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     fn is_valid(&self) -> bool {
         self.in_target == 1
     }
 
-    #[cfg(not(windows))]
+    #[cfg(not(all(windows, feature = "std")))]
     fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
