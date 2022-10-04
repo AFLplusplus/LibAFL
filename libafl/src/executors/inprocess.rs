@@ -466,8 +466,10 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     /// The current input for signal handling
     current_input_ptr: ptr::null(),
     /// The crash handler fn
+    #[cfg(any(unix, feature = "std"))]
     crash_handler: ptr::null(),
     /// The timeout handler fn
+    #[cfg(any(unix, feature = "std"))]
     timeout_handler: ptr::null(),
     #[cfg(all(windows, feature = "std"))]
     tp_timer: null_mut(),
