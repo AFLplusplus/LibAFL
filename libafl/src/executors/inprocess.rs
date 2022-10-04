@@ -234,8 +234,10 @@ where
 #[derive(Debug)]
 pub struct InProcessHandlers {
     /// On crash C function pointer
+    #[cfg(any(unix, feature = "std"))]
     pub crash_handler: *const c_void,
     /// On timeout C function pointer
+    #[cfg(any(unix, feature = "std"))]
     pub timeout_handler: *const c_void,
 }
 
@@ -362,20 +364,26 @@ impl InProcessHandlers {
                 > as *const c_void,
             })
         }
-        #[cfg(not(any(unix, all(windows, feature = "std"))))]
-        Ok(Self {
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
-        })
+        #[cfg(not(any(unix, feature = "std")))]
+        Ok(Self {})
     }
 
     /// Replace the handlers with `nop` handlers, deactivating the handlers
     #[must_use]
     pub fn nop() -> Self {
-        Self {
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
+        let ret;
+        #[cfg(any(unix, feature = "std"))]
+        {
+            ret = Self {
+                crash_handler: ptr::null(),
+                timeout_handler: ptr::null(),
+            };
         }
+        #[cfg(not(any(unix, feature = "std")))]
+        {
+            ret = Self {};
+        }
+        ret
     }
 }
 
@@ -388,53 +396,58 @@ pub(crate) struct InProcessExecutorHandlerData {
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
     /// The timeout handler
-    #[allow(unused)] // for no_std
+    #[cfg(any(unix, feature = "std"))]
     crash_handler: *const c_void,
     /// The timeout handler
-    #[allow(unused)] // for no_std
+    #[cfg(any(unix, feature = "std"))]
     timeout_handler: *const c_void,
-    #[cfg(windows)]
-    pub tp_timer: *mut c_void,
-    #[cfg(windows)]
-    pub in_target: u64,
-    #[cfg(windows)]
-    pub critical: *mut c_void,
-    #[cfg(windows)]
-    pub timeout_input_ptr: *mut c_void,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) tp_timer: *mut c_void,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) in_target: u64,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) critical: *mut c_void,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) timeout_input_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
-#[allow(unused)]
 impl InProcessExecutorHandlerData {
+    #[cfg(any(unix, feature = "std"))]
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
         unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
+    #[cfg(all(unix, feature = "std"))]
     fn current_input<'a, I>(&self) -> &'a I {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
         self.current_input_ptr = ptr::null();
         r
     }
 
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     fn is_valid(&self) -> bool {
         self.in_target == 1
     }
@@ -458,16 +471,18 @@ pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExec
     /// The current input for signal handling
     current_input_ptr: ptr::null(),
     /// The crash handler fn
+    #[cfg(any(unix, feature = "std"))]
     crash_handler: ptr::null(),
     /// The timeout handler fn
+    #[cfg(any(unix, feature = "std"))]
     timeout_handler: ptr::null(),
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     tp_timer: null_mut(),
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     in_target: 0,
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     critical: null_mut(),
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     timeout_input_ptr: null_mut(),
 };
 
@@ -1892,6 +1907,7 @@ pub mod child_signal_handlers {
 mod tests {
     use core::marker::PhantomData;
 
+    #[cfg(all(feature = "std", feature = "fork", unix))]
     use serial_test::serial;
 
     #[cfg(all(feature = "std", feature = "fork", unix))]
