@@ -2,9 +2,11 @@
 use core::fmt::{self, Debug, Formatter};
 
 #[cfg(feature = "fork")]
+use libafl::bolts::shmem::ShMemProvider;
+#[cfg(feature = "fork")]
 use libafl::executors::InProcessForkExecutor;
+
 use libafl::{
-    bolts::shmem::ShMemProvider,
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     feedbacks::Feedback,
