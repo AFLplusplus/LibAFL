@@ -1,31 +1,22 @@
 // Based on the example of setting hooks: Https://github.com/frida/frida-rust/blob/main/examples/gum/hook_open/src/lib.rs
 use frida_gum::{interceptor::Interceptor, Gum, Module, NativePointer};
-use libafl::{
-    bolts::os::windows_exceptions::{
-        handle_exception, IsProcessorFeaturePresent, EXCEPTION_POINTERS, PROCESSOR_FEATURE_ID,
-    },
-    Error, ErrorBacktrace,
+use libafl::bolts::os::windows_exceptions::{
+    handle_exception, IsProcessorFeaturePresent, EXCEPTION_POINTERS, PROCESSOR_FEATURE_ID,
 };
 
 /// Initialize the hooks
-pub fn initialize(gum: &Gum) -> Result<(), Error> {
+pub fn initialize(gum: &Gum) {
     let is_processor_feature_present =
         Module::find_export_by_name(Some("kernel32.dll"), "IsProcessorFeaturePresent");
     let is_processor_feature_present = is_processor_feature_present.unwrap();
     if is_processor_feature_present.is_null() {
-        return Err(Error::Unknown(
-            "IsProcessorFeaturePresent not found".to_string(),
-            ErrorBacktrace::new(),
-        ));
+        panic!("IsProcessorFeaturePresent not found");
     }
     let unhandled_exception_filter =
         Module::find_export_by_name(Some("kernel32.dll"), "UnhandledExceptionFilter");
     let unhandled_exception_filter = unhandled_exception_filter.unwrap();
     if unhandled_exception_filter.is_null() {
-        return Err(Error::Unknown(
-            "UnhandledExceptionFilter not found".to_string(),
-            ErrorBacktrace::new(),
-        ));
+        panic!("UnhandledExceptionFilter not found");
     }
 
     let mut interceptor = Interceptor::obtain(&gum);
@@ -61,5 +52,4 @@ pub fn initialize(gum: &Gum) -> Result<(), Error> {
         handle_exception(exception_pointers);
         unreachable!("handle_exception should not return");
     }
-    Ok(())
 }

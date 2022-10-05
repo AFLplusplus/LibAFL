@@ -149,7 +149,7 @@ where
         }
 
         #[cfg(windows)]
-        initialize(&gum).unwrap();
+        initialize(&gum);
 
         Self {
             base,
