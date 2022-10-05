@@ -5,7 +5,6 @@ use core::fmt::{self, Debug, Formatter};
 use libafl::bolts::shmem::ShMemProvider;
 #[cfg(feature = "fork")]
 use libafl::executors::InProcessForkExecutor;
-
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
