@@ -1,5 +1,6 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper};
 use std::env;
+
+use libafl_cc::{ClangWrapper, CompilerWrapper};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
