@@ -48,8 +48,8 @@ jobs:
   ubuntu:
     runs-on: ubuntu-22.04
     steps:
-    - name: Remove Dotnet
-      run: rm -rf /usr/share/dotnet
+    - name: Remove Dotnet & Haskell
+      run: rm -rf /usr/share/dotnet && rm -rf /opt/ghc
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
