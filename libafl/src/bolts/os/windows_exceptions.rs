@@ -13,7 +13,10 @@ use std::os::raw::{c_long, c_void};
 use num_enum::TryFromPrimitive;
 pub use windows::Win32::{
     Foundation::NTSTATUS,
-    System::Diagnostics::Debug::{AddVectoredExceptionHandler, EXCEPTION_POINTERS},
+    System::{
+        Diagnostics::Debug::{AddVectoredExceptionHandler, EXCEPTION_POINTERS},
+        Threading::{IsProcessorFeaturePresent, PROCESSOR_FEATURE_ID},
+    },
 };
 
 use crate::Error;
@@ -315,8 +318,12 @@ unsafe fn internal_handle_exception(
     }
 }
 
-/// Internal function that is being called whenever an exception arrives (stdcall).
-unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_POINTERS) -> c_long {
+/// Function that is being called whenever an exception arrives (stdcall).
+/// # Safety
+/// This function is unsafe because it is called by the OS
+pub unsafe extern "system" fn handle_exception(
+    exception_pointers: *mut EXCEPTION_POINTERS,
+) -> c_long {
     let code = exception_pointers
         .as_mut()
         .unwrap()

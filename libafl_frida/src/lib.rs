@@ -69,6 +69,10 @@ pub mod alloc;
 #[cfg(unix)]
 pub mod asan;
 
+#[cfg(windows)]
+/// Windows specific hooks to catch __fastfail like exceptions with Frida, see https://github.com/AFLplusplus/LibAFL/issues/395 for more details
+pub mod windows_hooks;
+
 pub mod coverage_rt;
 
 #[cfg(feature = "cmplog")]
