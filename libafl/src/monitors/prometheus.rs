@@ -9,15 +9,10 @@
 // == how to use it ===
 // in your fuzzer, include:
 // use libafl::monitors::PrometheusMonitor;
-// use libafl::monitors::prometheus;
-// use futures::executor::block_on;
-// use std::thread;
 // as well as:
 // let mon = PrometheusMonitor::new(|s| println!("{}", s));
-// and finally:
-//  thread::spawn(move || {
-//    block_on(prometheus::serve_metrics()).map_err(|err| println!("{:?}", err)).ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
-//  });
+// and then like with any other monitor, pass it into the event manager like so:
+// let mut mgr = SimpleEventManager::new(mon);
 
 
 // imports
@@ -44,7 +39,8 @@
 
 #[cfg(feature = "introspection")]
 use alloc::string::ToString;
-use alloc::{fmt::Debug, string::String, vec::Vec, boxed::Box}; // Box added for tide
+// use alloc::{fmt::Debug, string::String, vec::Vec, boxed::Box}; // Box added for tide
+use alloc::{fmt::Debug, string::String, vec::Vec};
 // use core::{fmt::Write, time::Duration};
 // alloc::boxed::Box
 use core::{fmt, time::Duration};
@@ -55,18 +51,25 @@ use crate::{
 };
 
 // stuff for prometheus
+// using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
 use prometheus_client::encoding::text::encode;
 // use prometheus_client::encoding::Encode;
-use prometheus_client::encoding::text::Encode;
+// use prometheus_client::encoding::text::Encode;
 use prometheus_client::metrics::gauge::Gauge;
-use prometheus_client::metrics::family::Family;
+// use prometheus_client::metrics::family::Family;
 use prometheus_client::registry::Registry;
 
 use std::sync::Arc;
-use crate::std::string::ToString;
+use std::thread; // to start the HTTP server in a separate thread
+use futures::executor::block_on;
+// use std::string::ToString;
 
-use tide::{Middleware, Next, Request, Result};
+// Using tide for the HTTP server library. fast, async, simple
+// use tide::{Middleware, Next, Request, Result};
+use tide::Request;
 // end of stuff for prometheus
+
+// static registry: Registry = Registry::default(); // creates more type issues
 
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]
@@ -77,6 +80,7 @@ where
     print_fn: F,
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+    // registry: Registry<Family<Labels,Gauge>>
 }
 
 impl<F> Debug for PrometheusMonitor<F>
@@ -148,16 +152,24 @@ where
 
 impl<F> PrometheusMonitor<F>
 where
-    F: FnMut(String),
+    F: FnMut(String), // shouldn't need this generic. can get rid of it
 {
     /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
-        // the function that is passed when initializing a new monitor in a fuzzer is "print_fn"
+        // registry should be created here, and added into the Struct, so can access with self
+            // problem is.. "Clone" not implemented issues blah blah blah figure this out. implement manually if needed
+            // also potential issue of passing btwn threads?
+        // need to run the metrics server in a diff thread to avoid blocking
+        thread::spawn(move || {
+            block_on(serve_metrics()).map_err(|err| println!("{:?}", err)).ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
+        });
+        // the function that is passed when initializing a new monitor in a fuzzer is "print_fn". in this case don't need it.
         Self {
             print_fn,
             start_time: current_time(),
             client_stats: vec![],
         }
+        
     }
 
     /// Creates the monitor with a given `start_time`.
@@ -172,9 +184,10 @@ where
 
 // ----------------------------------------------------------
 // using https://github.com/prometheus/client_rust/blob/master/examples/tide.rs as a base server
-
+// static registry: Registry<Gauge>= Registry::default();
+// apparently using lazy static is quite slow https://stackoverflow.com/questions/64719104/what-is-better-in-rust-defining-a-static-variable-to-access-it-globally-or-pass
 // #[async_std::main]
-pub async fn serve_metrics() -> std::result::Result<(), std::io::Error> {
+pub async fn serve_metrics() -> Result<(), std::io::Error> {
     tide::log::start();
     println!("we're in tide"); // debugging
 
@@ -184,7 +197,8 @@ pub async fn serve_metrics() -> std::result::Result<(), std::io::Error> {
     // the prometheus_client code in PrometheusMonitor should add all data to the registry
 
     let mut registry = Registry::default();
-    let executions = Family::<Labels, Gauge>::default();
+    // let executions = Family::<Labels, Gauge>::default();
+    let executions = Gauge::default();
     registry.register(
         "executions_total",
         "Number of executions the fuzzer has done",
@@ -192,14 +206,18 @@ pub async fn serve_metrics() -> std::result::Result<(), std::io::Error> {
     );
     // ... do for all stats
 
-    let middleware = MetricsMiddleware {
-        executions,
-    };
+    // let middleware = MetricsMiddleware {
+    //     executions,
+    // };
+    // let updatemetrics = UpdateRegistry {
+    //     executions,
+    // };
+
     let mut app = tide::with_state(State {
         registry: Arc::new(registry),
     });
 
-    app.with(middleware);
+    // app.with(middleware);
     app.at("/").get(|_| async { Ok("Wassup") });
     app.at("/metrics")
         .get(|req: Request<State>| async move {
@@ -216,38 +234,50 @@ pub async fn serve_metrics() -> std::result::Result<(), std::io::Error> {
     Ok(())
 }
 
-pub fn update_registry(corpus_size: u64, objective_size: u64, total_execs: u64, execs_per_sec: u64) {
+pub fn update_registry(_corpus_size: u64, _objective_size: u64, _total_execs: u64, _execs_per_sec: u64) {
     // TODO: set vals in registry to the passed values
-
-    // println!("{}", corpus_size) // just a test to see if it gets updated... and it does!
+    // executions.set(_total_execs); // NEED TO BE ABLE TO ACCESS IN THIS SCOPE WHY IS THIS DIFFICULT LOL
+    println!("{}", _corpus_size) // just a test to see if it gets updated... and it does!
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, Encode)]
-struct Labels {
-    path: String,
-}
+// #[derive(Clone, Hash, PartialEq, Eq, Encode)]
+// struct Labels {
+//     being_fuzzed: String,
+// }
 
 #[derive(Clone)]
 struct State {
     #[allow(dead_code)]
-    registry: Arc<Registry<Family<Labels, Gauge>>>,
+    registry: Arc<Registry<Gauge>>,
 }
 
-#[derive(Default)]
-struct MetricsMiddleware {
-    executions: Family<Labels, Gauge>,
-}
+// #[derive(Default)]
+// struct UpdateRegistry {
+//     executions: Family<Labels, Gauge>,
+// }
 
-#[tide::utils::async_trait]
-impl Middleware<State> for MetricsMiddleware {
-    async fn handle(&self, req: Request<State>, next: Next<'_, State>) -> Result {
-        let path = req.url().path().to_string();
-        let _count = self
-            .executions
-            .get_or_create(&Labels { path })
-            .inc();
+// impl UpdateRegistry {
+//     fn update_registry(&mut self, _corpus_size: u64, _objective_size: u64, _total_execs: u64, _execs_per_sec: u64) {
+//         self.executions.set(_total_execs);
+//     }
+// }
 
-        let res = next.run(req).await;
-        Ok(res)
-    }
-}
+// #[derive(Default)]
+// struct MetricsMiddleware {
+//     executions: Family<Labels, Gauge>,
+// }
+
+// #[tide::utils::async_trait]
+// impl Middleware<State> for MetricsMiddleware {
+//     // likely don't need middleware
+//     async fn handle(&self, req: Request<State>, next: Next<'_, State>) -> Result {
+//         let path = req.url().path().to_string();
+//         let _count = self
+//             .executions
+//             .get_or_create(&Labels { path })
+//             .inc();
+
+//         let res = next.run(req).await;
+//         Ok(res)
+//     }
+// }

@@ -86,6 +86,7 @@ prometheus-client = "0.18.0" # may need to add option = true?
 tide = "0.16.0" # same as above
 async-std = { version = "1.8.0", features = ["attributes"] } # tide cratesio says to add this
 # serde = { version = "1.0", features = ["derive"] } # tide cratesio says to add this
+futures = "0.3.24" # to use block_on()
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
