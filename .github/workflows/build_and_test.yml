@@ -48,6 +48,8 @@ jobs:
   ubuntu:
     runs-on: ubuntu-22.04
     steps:
+    - name: Remove Dotnet
+      run: rm -rf /usr/share/dotnet
     - uses: actions-rs/toolchain@v1
       with:
         profile: minimal
