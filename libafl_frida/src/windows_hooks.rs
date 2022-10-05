@@ -39,24 +39,16 @@ pub fn initialize(gum: &Gum) {
         .unwrap();
 
     unsafe extern "C" fn is_processor_feature_present_detour(feature: u32) -> bool {
-        println!("IsProcessorFeaturePresent called with feature {}", feature);
-
         let result = match feature {
             0x17 => false,
             _ => IsProcessorFeaturePresent(PROCESSOR_FEATURE_ID(feature)).as_bool(),
         };
-        println!(
-            "IsProcessorFeaturePresent({}) returning {}",
-            feature, result
-        );
         result
     }
 
     unsafe extern "C" fn unhandled_exception_filter_detour(
         exception_pointers: *mut EXCEPTION_POINTERS,
     ) -> i32 {
-        println!("Calling handle_exception");
-        handle_exception(exception_pointers);
         unreachable!("handle_exception should not return");
     }
 }
