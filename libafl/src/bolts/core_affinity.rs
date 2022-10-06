@@ -658,7 +658,8 @@ mod freebsd {
         }
     }
 
-    pub fn get_affinity_mask() -> Result<cpuset_t, Error> {
+    #[cfg(test)]
+    fn get_affinity_mask() -> Result<cpuset_t, Error> {
         let mut set = new_cpuset();
 
         // Try to get current core affinity mask.
@@ -688,6 +689,7 @@ mod freebsd {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use libc::CPU_ISSET;
 
         #[test]
         fn test_freebsd_get_affinity_mask() {
