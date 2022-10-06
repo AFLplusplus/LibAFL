@@ -1,44 +1,23 @@
 // ===== overview for prommon =====
-// Need to run a prometheus server (can use precompiled binary or docker), which scrapes / stores data from the client.
-// It is configurable via a yaml file.
+// The client (i.e., the fuzzer) sets up an HTTP endpoint (/metrics). 
+// The endpoint contains metrics such as execution rate.
 
-// Need the application to be instrumented with the Rust client library. Lets you define metrics,
-// then you expose them via an HTTP endpoint for the server to scrape.
-// ^^ this file! ^^
+// A prometheus server (can use precompiled binary or docker) then scrapes \
+// the endpoint at regular intervals (configurable via yaml file).
 // ====================
+//
 // == how to use it ===
-// in your fuzzer, include:
+// This monitor should plug into any fuzzer similar to other monitors.
+// In your fuzzer, include:
 // use libafl::monitors::PrometheusMonitor;
 // as well as:
 // let mon = PrometheusMonitor::new(|s| println!("{}", s));
 // and then like with any other monitor, pass it into the event manager like so:
 // let mut mgr = SimpleEventManager::new(mon);
+// ====================
 
-
-// imports
-    // will need to use an HTTP library (tide?-- want something extremely lightweight)
-    // will need the prometheus rust client lib : https://github.com/prometheus/client_rust
-
-// check for introspection feature config
-    // if so, do appropriate imports
-    // alternatively: node exporter via prometheus?
-
-
-// on each 'update', will need to keep track of prev metric value to take delta
-    // with delta, add it to the counter / guage. Note that delta MUST be signed to account for decreases (only applicable to guages)
-    // alternatively: does prometheus allow just a straight numeric update? rather than increment / decrement. Would save some cycles.
-    // should have easy access to ClientStats vector.
-
-// counters: runtime (sec), executions (int), objectives (size)
-// guages: clients (int), corpus (size), execution rate (exec/sec)
-    // NOTE: set() only available with guages (not counters).
-        // - may have to just make everything a guage
-
-// set up HTTP listener on /metrics, port 9090 (or just default)
-    // example using tide: https://github.com/prometheus/client_rust/blob/master/examples/tide.rs
-
-#[cfg(feature = "introspection")]
-use alloc::string::ToString;
+// #[cfg(feature = "introspection")]
+// use alloc::string::ToString;
 use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
 
@@ -47,20 +26,21 @@ use crate::{
     monitors::{ClientStats, Monitor},
 };
 
-// stuff for prometheus
+// -- imports for prometheus instrumentation --
 // using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
 use prometheus_client::encoding::text::encode;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::registry::Registry;
+// use prometheus_client::registry::Unit;
 
 use std::sync::Arc;
-use std::thread; // to start the HTTP server in a separate thread
+// using thread in order to start the HTTP server in a separate thread
+use std::thread;
 use futures::executor::block_on;
-// use std::string::ToString;
 
-// Using tide for the HTTP server library. fast, async, simple
+// using tide for the HTTP server library (fast, async, simple)
 use tide::Request;
-// end of stuff for prometheus
+// -- end of imports for instrumentation --
 
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]
@@ -76,6 +56,7 @@ where
     objective_count: Gauge,
     executions: Gauge,
     exec_rate: Gauge,
+    runtime: Gauge
 }
 
 impl<F> Debug for PrometheusMonitor<F>
@@ -111,7 +92,7 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         
-        // update the prometheus metrics
+        // Update the prometheus metrics
         let corpus_size = self.corpus_size();
         self.corpus_count.set(corpus_size);
         let objective_size = self.objective_size();
@@ -120,12 +101,11 @@ where
         self.executions.set(total_execs);
         let execs_per_sec = self.execs_per_sec();
         self.exec_rate.set(execs_per_sec);
-
-        // there's more stats we can get with introspection enabled.
-            // TODO: get these as well ^^
+        let run_time = (current_time() - self.start_time).as_secs();
+        self.runtime.set(run_time); // run time in seconds, which can be converted to a time format by Grafana or similar
 
         // display stats in a SimpleMonitor format
-            // TODO: put this behind a configuration flag / feature
+        // TODO: put this behind a configuration flag / feature
         let fmt = format!(
             "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
@@ -146,7 +126,7 @@ where
             let fmt = format!(
                 "Client {:03}:\n{}",
                 sender_id, self.client_stats[sender_id as usize].introspection_monitor
-            );
+            ); // can access things w introspection_monitor"."
             (self.print_fn)(fmt);
             // might need to use this version? from multi.
             // for (i, client) in self.client_stats.iter().skip(1).enumerate() {
@@ -164,7 +144,6 @@ impl<F> PrometheusMonitor<F>
 where
     F: FnMut(String), // shouldn't need this generic. can get rid of it
 {
-    /// Creates the monitor, using the `current_time` as `start_time`.
     pub fn new(print_fn: F) -> Self {
         // note that Gauge's clone does Arc stuff, so ~shouldn't~ need to worry about passing btwn threads
         let corpus_count = Gauge::default();
@@ -175,12 +154,13 @@ where
         let executions_clone = executions.clone();
         let exec_rate = Gauge::default();
         let exec_rate_clone = exec_rate.clone();
+        let runtime = Gauge::default();
+        let runtime_clone = runtime.clone();
 
-        // need to run the metrics server in a diff thread to avoid blocking
+        // Need to run the metrics server in a diff thread to avoid blocking
         thread::spawn(move || {
-            block_on(serve_metrics(corpus_count_clone, objective_count_clone, executions_clone, exec_rate_clone)).map_err(|err| println!("{:?}", err)).ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
+            block_on(serve_metrics(corpus_count_clone, objective_count_clone, executions_clone, exec_rate_clone, runtime_clone)).map_err(|err| println!("{:?}", err)).ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
         });
-        // the function that is passed when initializing a new monitor in a fuzzer is "print_fn". in this case don't need it.
         Self {
             print_fn,
             start_time: current_time(),
@@ -189,10 +169,11 @@ where
             objective_count: objective_count,
             executions: executions,
             exec_rate: exec_rate,
+            runtime: runtime,
         }
 
     }
-
+    // TODO: add metrics creations
     /// Creates the monitor with a given `start_time`.
     pub fn with_time(print_fn: F, start_time: Duration) -> Self {
         Self {
@@ -203,21 +184,17 @@ where
             objective_count: Gauge::default(),
             executions: Gauge::default(),
             exec_rate: Gauge::default(),
+            runtime: Gauge::default(),
         }
     }
 }
 
-// ----------------------------------------------------------
-// using https://github.com/prometheus/client_rust/blob/master/examples/tide.rs as a base server
 
-pub async fn serve_metrics(corpus: Gauge, objectives: Gauge, executions: Gauge, exec_rate: Gauge) -> Result<(), std::io::Error> {
+// Using https://github.com/prometheus/client_rust/blob/master/examples/tide.rs as a base server
+
+// set up an HTTP endpoint, /metrics, localhost:8080
+pub async fn serve_metrics(corpus: Gauge, objectives: Gauge, executions: Gauge, exec_rate: Gauge, runtime: Gauge) -> Result<(), std::io::Error> {
     tide::log::start();
-    println!("we're in tide"); // debugging
-
-    // will need to move all the prometheus_client stuff into PrometheusMonitor
-        // TODO: THIS ^^^^^^
-    // this tide stuff should just stand up the endpoint, pulling data from the registry
-    // the prometheus_client code in PrometheusMonitor should add all data to the registry
 
     let mut registry = Registry::default();
     registry.register(
@@ -239,6 +216,11 @@ pub async fn serve_metrics(corpus: Gauge, objectives: Gauge, executions: Gauge, 
         "execution_rate",
         "Rate of executions per second",
         exec_rate,
+    );
+    registry.register(
+        "runtime", 
+        "How long the fuzzer has been running for (seconds)", 
+        runtime,
     );
 
     let mut app = tide::with_state(State {
