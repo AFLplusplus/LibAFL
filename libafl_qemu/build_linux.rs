@@ -198,7 +198,7 @@ pub fn build() {
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
-                .args(&["--disable-blobs", "--disable-bsd-user", "--disable-fdt", "--disable-system"])
+                .args(["--disable-blobs", "--disable-bsd-user", "--disable-fdt", "--disable-system"])
                 .status()
                 .expect("Configure failed");
         }else{
@@ -359,7 +359,7 @@ pub fn build() {
 
     if emulation_mode == "usermode" {
         Command::new("ld")
-            .current_dir(&out_dir_path)
+            .current_dir(out_dir_path)
             .arg("-o")
             .arg("libqemu-partially-linked.o")
             .arg("-r")
