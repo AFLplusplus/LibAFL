@@ -382,7 +382,7 @@ pub fn build() {
             .expect("Partial linked failure");
     }else{
         Command::new("ld")
-            .current_dir(&out_dir_path)
+            .current_dir(out_dir_path)
             .arg("-o")
             .arg("libqemu-partially-linked.o")
             .arg("-r")
