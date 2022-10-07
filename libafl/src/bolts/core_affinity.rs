@@ -691,7 +691,6 @@ mod freebsd {
         use libc::CPU_ISSET;
 
         use super::*;
-        use libc::CPU_ISSET;
 
         #[test]
         fn test_freebsd_get_affinity_mask() {
