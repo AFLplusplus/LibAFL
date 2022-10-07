@@ -688,6 +688,8 @@ mod freebsd {
 
     #[cfg(test)]
     mod tests {
+        use libc::CPU_ISSET;
+
         use super::*;
         use libc::CPU_ISSET;
 
