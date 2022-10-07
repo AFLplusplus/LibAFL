@@ -5,7 +5,7 @@ use std::{ffi::CString, os::raw::c_char};
 use cxx::UniquePtr;
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
+    inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     state::State,
     Error,
@@ -13,7 +13,7 @@ use libafl::{
 
 use crate::tinyinst::litecov::{self, Coverage, DebuggerStatus, LiteCov};
 
-pub struct TinyInstExecutor<I, S, OT>
+pub struct TinyInstExecutor<I, OT, S>
 where
     OT: ObserversTuple<I, S>,
 {
@@ -24,10 +24,10 @@ where
     argv: Vec<*mut c_char>,
     timeout: u32,
     observers: OT,
-    phantom: PhantomData<(I, OT, S)>,
+    phantom: PhantomData<(I, S, OT)>,
 }
 
-impl<I, S, OT> std::fmt::Debug for TinyInstExecutor<I, S, OT>
+impl<I, OT, S> std::fmt::Debug for TinyInstExecutor<I, OT, S>
 where
     OT: ObserversTuple<I, S>,
 {
@@ -40,9 +40,9 @@ where
     }
 }
 
-impl<EM, I, S, Z, OT> Executor<EM, I, S, Z> for TinyInstExecutor<I, S, OT>
+impl<EM, I, S, Z, OT> Executor<EM, I, S, Z> for TinyInstExecutor<I, OT, S>
 where
-    I: Input,
+    I: Input + HasTargetBytes,
     OT: ObserversTuple<I, S>,
 {
     #[inline]
@@ -54,6 +54,7 @@ where
         _input: &I,
     ) -> Result<ExitKind, Error> {
         let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
+        self.observers.pre_exec_all(_state, _input)?;
 
         unsafe {
             status = self.instrumentation_ptr.pin_mut().Run(
@@ -65,6 +66,7 @@ where
 
         match status {
             DebuggerStatus::DEBUGGER_CRASHED | DebuggerStatus::DEBUGGER_HANGED => {
+                // set the observer here
                 Ok(ExitKind::Crash)
             }
             DebuggerStatus::DEBUGGER_NONE => {
@@ -75,7 +77,7 @@ where
     }
 }
 
-impl<I, S, OT> TinyInstExecutor<I, S, OT>
+impl<I, OT, S> TinyInstExecutor<I, OT, S>
 where
     OT: ObserversTuple<I, S>,
 {
@@ -115,47 +117,9 @@ where
             phantom: PhantomData,
         }
     }
-
-    pub fn test(&mut self, args: Vec<String>) {
-        let argc = args.len();
-        let vec_cstr: Vec<CString> = args
-            .iter()
-            .map(|arg| CString::new(arg.as_str()).unwrap())
-            .collect();
-        let mut argv: Vec<*mut c_char> = Vec::with_capacity(argc + 1);
-        for arg in &vec_cstr {
-            argv.push(arg.as_ptr() as *mut c_char);
-        }
-        argv.push(core::ptr::null_mut()); //Null terminator
-        let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
-
-        println!("testing!");
-        unsafe {
-            println!("argc {}", argc);
-            println!("timeout {}", self.timeout);
-            println!("{:?}", argv);
-
-            status = self.instrumentation_ptr.pin_mut().Run(
-                argc as i32,
-                argv.as_mut_ptr(),
-                self.timeout,
-            );
-        }
-        println!("post!");
-
-        match status {
-            DebuggerStatus::DEBUGGER_CRASHED | DebuggerStatus::DEBUGGER_HANGED => {
-                println!("Crashed!");
-            }
-            DebuggerStatus::DEBUGGER_NONE => {
-                println!("The harness was not run");
-            }
-            _ => println!("OK"),
-        }
-    }
 }
 
-impl<I, S, OT> HasObservers<I, OT, S> for TinyInstExecutor<I, S, OT>
+impl<I, OT, S> HasObservers<I, OT, S> for TinyInstExecutor<I, OT, S>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
