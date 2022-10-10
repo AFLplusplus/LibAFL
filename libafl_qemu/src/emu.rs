@@ -544,7 +544,7 @@ impl CPU {
         }
     }
 
-    pub fn reset_cpu(&self) {
+    pub fn cpu_reset(&self) {
         unsafe { cpu_reset(self.ptr) };
     }
 }
