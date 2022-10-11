@@ -73,9 +73,9 @@ fn main() {
         }
 
         sancov_cmp
-            .define("CMP_MAP_SIZE", Some(&*format!("{}", cmp_map_size)))
-            .define("CMPLOG_MAP_W", Some(&*format!("{}", cmplog_map_w)))
-            .define("CMPLOG_MAP_H", Some(&*format!("{}", cmplog_map_h)))
+            .define("CMP_MAP_SIZE", Some(&*format!("{cmp_map_size}")))
+            .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+            .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
             .file(src_dir.join("sancov_cmp.c"))
             .compile("sancov_cmp");
     }
@@ -105,16 +105,16 @@ fn main() {
 
     cc::Build::new()
         .file(src_dir.join("coverage.c"))
-        .define("EDGES_MAP_SIZE", Some(&*format!("{}", edges_map_size)))
-        .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{}", acc_map_size)))
+        .define("EDGES_MAP_SIZE", Some(&*format!("{edges_map_size}")))
+        .define("ACCOUNTING_MAP_SIZE", Some(&*format!("{acc_map_size}")))
         .compile("coverage");
 
     println!("cargo:rerun-if-changed=src/cmplog.h");
     println!("cargo:rerun-if-changed=src/cmplog.c");
 
     cc::Build::new()
-        .define("CMPLOG_MAP_W", Some(&*format!("{}", cmplog_map_w)))
-        .define("CMPLOG_MAP_H", Some(&*format!("{}", cmplog_map_h)))
+        .define("CMPLOG_MAP_W", Some(&*format!("{cmplog_map_w}")))
+        .define("CMPLOG_MAP_H", Some(&*format!("{cmplog_map_h}")))
         .file(src_dir.join("cmplog.c"))
         .compile("cmplog");
 

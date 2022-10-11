@@ -208,9 +208,9 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
     #[cfg(feature = "std")]
     fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
         let map_size = self.len();
-        let map_size_env = format!("{}_SIZE", env_name);
+        let map_size_env = format!("{env_name}_SIZE");
         env::set_var(env_name, self.id().to_string());
-        env::set_var(map_size_env, format!("{}", map_size));
+        env::set_var(map_size_env, format!("{map_size}"));
         Ok(())
     }
 }
@@ -261,7 +261,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
     #[cfg(feature = "std")]
     fn existing_from_env(&mut self, env_name: &str) -> Result<Self::ShMem, Error> {
         let map_shm_str = env::var(env_name)?;
-        let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
+        let map_size = str::parse::<usize>(&env::var(format!("{env_name}_SIZE"))?)?;
         self.shmem_from_description(ShMemDescription::from_string_and_size(
             &map_shm_str,
             map_size,
@@ -666,7 +666,7 @@ pub mod unix_shmem {
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{}", shm_fd)),
+                        id: ShMemId::from_string(&format!("{shm_fd}")),
                     })
                 }
             }
@@ -698,7 +698,7 @@ pub mod unix_shmem {
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{}", shm_fd)),
+                        id: ShMemId::from_string(&format!("{shm_fd}")),
                     })
                 }
             }
@@ -819,7 +819,7 @@ pub mod unix_shmem {
                     );
 
                     if os_id < 0_i32 {
-                        return Err(Error::unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
+                        return Err(Error::unknown(format!("Failed to allocate a shared mapping of size {map_size} - check OS limits (i.e shmall, shmmax)")));
                     }
 
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
@@ -975,8 +975,7 @@ pub mod unix_shmem {
                         if let Ok(boot_id) =
                             std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
                         {
-                            let path_str =
-                                format!("{}{}", "/dev/ashmem", boot_id).trim().to_string();
+                            let path_str = format!("/dev/ashmem{boot_id}").trim().to_string();
                             if std::path::Path::new(&path_str).exists() {
                                 path_str
                             } else {
@@ -1025,7 +1024,7 @@ pub mod unix_shmem {
                     }
 
                     Ok(Self {
-                        id: ShMemId::from_string(&format!("{}", fd)),
+                        id: ShMemId::from_string(&format!("{fd}")),
                         map: map as *mut u8,
                         map_size,
                     })

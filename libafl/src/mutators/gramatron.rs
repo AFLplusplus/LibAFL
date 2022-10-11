@@ -16,6 +16,8 @@ use crate::{
     Error,
 };
 
+const RECUR_THRESHOLD: u64 = 5;
+
 /// A random mutator for grammar fuzzing
 #[derive(Debug)]
 pub struct GramatronRandomMutator<'a, S>
@@ -163,7 +165,8 @@ impl GramatronSpliceMutator {
 pub struct GramatronRecursionMutator {
     counters: HashMap<usize, (usize, usize, usize)>,
     states: Vec<usize>,
-    temp: Vec<Terminal>,
+    suffix: Vec<Terminal>,
+    feature: Vec<Terminal>,
 }
 
 impl<S> Mutator<GramatronInput, S> for GramatronRecursionMutator
@@ -227,11 +230,20 @@ where
         }
         debug_assert!(idx_1 < idx_2);
 
-        self.temp.clear();
-        self.temp.extend_from_slice(&input.terminals()[idx_2..]);
+        self.suffix.clear();
+        self.suffix.extend_from_slice(&input.terminals()[idx_2..]);
 
-        input.terminals_mut().truncate(idx_2);
-        input.terminals_mut().extend_from_slice(&self.temp);
+        self.feature.clear();
+        self.feature
+            .extend_from_slice(&input.terminals()[idx_1..idx_2]);
+
+        input.terminals_mut().truncate(idx_1);
+
+        for _ in 0..state.rand_mut().below(RECUR_THRESHOLD) {
+            input.terminals_mut().extend_from_slice(&self.feature);
+        }
+
+        input.terminals_mut().extend_from_slice(&self.suffix);
 
         Ok(MutationResult::Mutated)
     }

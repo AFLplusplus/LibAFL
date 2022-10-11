@@ -234,7 +234,7 @@ where
                 let (_, _) = (severity_level, message);
                 // TODO rely on Monitor
                 #[cfg(feature = "std")]
-                println!("[LOG {}]: {}", severity_level, message);
+                println!("[LOG {severity_level}]: {message}");
                 Ok(BrokerEventResult::Handled)
             }
             Event::CustomBuf { .. } => Ok(BrokerEventResult::Forward),
@@ -421,7 +421,7 @@ where
                 };
                 #[cfg(feature = "std")]
                 if let Some(item) = _res.1 {
-                    println!("Added received Testcase as item #{}", item);
+                    println!("Added received Testcase as item #{item}");
                 }
                 Ok(())
             }
@@ -938,7 +938,7 @@ where
 
             if let Some(core_id) = core_id {
                 let core_id: CoreId = core_id;
-                println!("Setting core affinity to {:?}", core_id);
+                println!("Setting core affinity to {core_id:?}");
                 core_id.set_affinity()?;
             }
 
@@ -954,7 +954,7 @@ where
             let mut ctr: u64 = 0;
             // Client->parent loop
             loop {
-                println!("Spawning next client (id {})", ctr);
+                println!("Spawning next client (id {ctr})");
 
                 // On Unix, we fork
                 #[cfg(all(unix, feature = "fork"))]
@@ -990,7 +990,7 @@ where
                     }
 
                     // Storing state in the last round did not work
-                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {})", child_status);
+                    panic!("Fuzzer-respawner: Storing state in crashed fuzzer instance did not work, no point to spawn the next client! This can happen if the child calls `exit()`, in that case make sure it uses `abort()`, if it got killed unrecoverable (OOM), or if there is a bug in the fuzzer itself. (Child exited with: {child_status})");
                 }
 
                 ctr = ctr.wrapping_add(1);

@@ -29,7 +29,7 @@ In LibAFL, We use struct `FridaInstrumentationHelper` to manage all the stuff re
 
 We have `CoverageRuntime` that has tracks the edge coverage,  `AsanRuntime` for address sanitizer, `DrCovRuntime` that uses [__DrCov__](https://dynamorio.org/page_drcov.html) for coverage collection, and `CmpLogRuntime` for cmplog instrumentation. All these runtimes can be used by slotting them into `FridaInstrumentationHelper`
 
-Combined with any `Runtime` you'd like to use, you can initialize the `FridaInstrumentationHelpe`r like this:
+Combined with any `Runtime` you'd like to use, you can initialize the `FridaInstrumentationHelper` like this:
 ```rust
 
         let gum = Gum::obtain();

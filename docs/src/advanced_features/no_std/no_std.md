@@ -1,6 +1,6 @@
 # Using LibAFL in `no_std` environments
 
-It is possible to use LibAFL in `no_std` environments e.g. custom platforms like microcontrolles, kernels, hypervisors, and more.
+It is possible to use LibAFL in `no_std` environments e.g. custom platforms like microcontrollers, kernels, hypervisors, and more.
 
 You can simply add LibAFL to your `Cargo.toml` file:
 

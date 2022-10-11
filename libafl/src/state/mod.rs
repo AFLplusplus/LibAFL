@@ -483,7 +483,7 @@ where
             self,
             Event::Log {
                 severity_level: LogSeverity::Debug,
-                message: format!("Loaded {} over {} initial testcases", added, num),
+                message: format!("Loaded {added} over {num} initial testcases"),
                 phantom: PhantomData,
             },
         )?;

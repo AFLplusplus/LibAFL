@@ -216,11 +216,7 @@ impl MOpt {
                         * (self.g_best[i] - self.x_now[swarm][i]);
                 self.x_now[swarm][i] += self.v_now[swarm][i];
 
-                if self.x_now[swarm][i] > V_MAX {
-                    self.x_now[swarm][i] = V_MAX;
-                } else if self.x_now[swarm][i] < V_MIN {
-                    self.x_now[swarm][i] = V_MIN;
-                }
+                self.x_now[swarm][i] = self.x_now[swarm][i].clamp(V_MIN, V_MAX);
 
                 x_sum += self.x_now[swarm][i];
             }
@@ -287,11 +283,8 @@ impl MOpt {
                         * (self.g_best[i] - self.x_now[swarm][i]);
                 self.x_now[swarm][i] += self.v_now[swarm][i];
 
-                if self.x_now[swarm][i] > V_MAX {
-                    self.x_now[swarm][i] = V_MAX;
-                } else if self.x_now[swarm][i] < V_MIN {
-                    self.x_now[swarm][i] = V_MIN;
-                }
+                self.x_now[swarm][i] = self.x_now[swarm][i].clamp(V_MIN, V_MAX);
+
                 x_sum += self.x_now[swarm][i];
             }
 

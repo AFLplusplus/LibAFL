@@ -108,7 +108,7 @@ extern "C" fn asan_giovese_printaddr(_addr: u64) -> *const u8 {
 #[no_mangle]
 unsafe extern "C" fn asan_giovese_populate_context(ctx: *mut CallContext, _pc: u64) {
     let ctx = ctx.as_mut().unwrap();
-    ctx.tid = libc::gettid() as i32;
+    ctx.tid = libc::gettid();
     ctx.size = 0;
 }
 

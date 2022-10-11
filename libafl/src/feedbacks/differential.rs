@@ -141,7 +141,7 @@ where
         OT: ObserversTuple<I, S> + MatchName,
     {
         fn err(name: &str) -> Error {
-            Error::illegal_argument(format!("DiffFeedback: observer {} not found", name))
+            Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))
         }
 
         let o1: &O1 = observers

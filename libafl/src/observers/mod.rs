@@ -18,16 +18,18 @@ pub use stacktrace::*;
 
 pub mod concolic;
 
-#[cfg(unstable_feature)]
-pub mod owned;
+// Rust is breaking this with 'error: intrinsic safety mismatch between list of intrinsics within the compiler and core library intrinsics for intrinsic `type_id`' and so we disable this component for the moment
+//#[cfg(unstable_feature)]
+//pub mod owned;
+//#[cfg(unstable_feature)]
+//pub use owned::*;
+
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{fmt::Debug, time::Duration};
 
-#[cfg(unstable_feature)]
-pub use owned::*;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -183,6 +185,7 @@ pub trait ObserverWithHashField {
     /// clears the current value of the hash and sets it to None
     fn clear_hash(&mut self);
 }
+
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
@@ -1079,7 +1082,7 @@ mod tests {
             StdMapObserver::new("map", unsafe { &mut MAP })
         );
         let vec = postcard::to_allocvec(&obv).unwrap();
-        println!("{:?}", vec);
+        println!("{vec:?}");
         let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32>) =
             postcard::from_bytes(&vec).unwrap();
         assert_eq!(obv.0.name(), obv2.0.name());

@@ -141,7 +141,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| println!("{}", s));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _>,

@@ -24,6 +24,7 @@ pub enum Regs {
     R13 = 13,
     R14 = 14,
     R15 = 15,
+    R25 = 25,
 }
 
 /// alias registers
@@ -36,6 +37,7 @@ impl Regs {
     pub const Sl: Regs = Regs::R10;
     pub const Fp: Regs = Regs::R11;
     pub const Ip: Regs = Regs::R12;
+    pub const Cpsr: Regs = Regs::R25;
 }
 
 #[cfg(feature = "python")]

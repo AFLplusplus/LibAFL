@@ -194,6 +194,8 @@ where
             unsafe {
                 MAX_EDGES_NUM = meta.current_id as usize;
             }
+            // GuestAddress is u32 for 32 bit guests
+            #[allow(clippy::unnecessary_cast)]
             Some(id as u64)
         }
     }
@@ -229,6 +231,8 @@ where
             return None;
         }
     }
+    // GuestAddress is u32 for 32 bit guests
+    #[allow(clippy::unnecessary_cast)]
     Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (unsafe { EDGES_MAP_PTR_SIZE } as u64 - 1))
 }
 
@@ -255,6 +259,8 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
+    // GuestAddress is u32 for 32 bit guests
+    #[allow(clippy::unnecessary_cast)]
     Some(pc as u64)
 }
 
@@ -267,6 +273,8 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
+    // GuestAddress is u32 for 32 bit guests
+    #[allow(clippy::unnecessary_cast)]
     Some(hash_me(pc as u64))
 }
 

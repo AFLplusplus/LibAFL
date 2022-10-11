@@ -44,6 +44,6 @@ On Windows, the Launcher will restart each client, while on Unix, it will use `f
 
 ## Other ways
 
-The LlmpEvenManager family is the easiest way to do spawn instances, but for obscure targets, you may need to come up with other solutions.
+The LlmpEventManager family is the easiest way to spawn instances, but for obscure targets, you may need to come up with other solutions.
 LLMP is even, in theory, `no_std` compatible, and even completely different EventManagers can be used for message passing.
 If you are in this situation, please either read through the current implementations and/or reach out to us.

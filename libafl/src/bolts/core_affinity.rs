@@ -618,7 +618,7 @@ mod freebsd {
     use alloc::vec::Vec;
     use std::{mem, thread::available_parallelism};
 
-    use libc::{cpuset_getaffinity, cpuset_setaffinity, cpuset_t, CPU_ISSET, CPU_SET};
+    use libc::{cpuset_getaffinity, cpuset_setaffinity, cpuset_t, CPU_SET};
 
     use super::CoreId;
     use crate::Error;
@@ -658,6 +658,7 @@ mod freebsd {
         }
     }
 
+    #[cfg(test)]
     fn get_affinity_mask() -> Result<cpuset_t, Error> {
         let mut set = new_cpuset();
 
@@ -687,6 +688,8 @@ mod freebsd {
 
     #[cfg(test)]
     mod tests {
+        use libc::CPU_ISSET;
+
         use super::*;
 
         #[test]
@@ -711,7 +714,7 @@ mod freebsd {
 
             let mut is_equal = true;
 
-            for i in 0..256 as usize {
+            for i in 0..256 {
                 let is_set1 = unsafe { CPU_ISSET(i, &core_mask) };
                 let is_set2 = unsafe { CPU_ISSET(i, &new_mask) };
 

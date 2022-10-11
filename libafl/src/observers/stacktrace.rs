@@ -189,7 +189,7 @@ impl ASANBacktraceObserver {
 
     /// read ASAN output from the log file and parse it.
     pub fn parse_asan_output_from_asan_log_file(&mut self, pid: i32) -> Result<(), Error> {
-        let log_path = format!("{}.{}", ASAN_LOG_PATH, pid);
+        let log_path = format!("{ASAN_LOG_PATH}.{pid}");
         let mut asan_output = File::open(Path::new(&log_path))?;
 
         let mut buf = String::new();

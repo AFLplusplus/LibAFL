@@ -11,8 +11,10 @@ use core::{
     ffi::c_void,
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
-    ptr,
+    ptr::{self, null_mut},
 };
+#[cfg(all(target_os = "linux", feature = "std"))]
+use core::{ptr::addr_of_mut, time::Duration};
 #[cfg(any(unix, all(windows, feature = "std")))]
 use core::{
     ptr::write_volatile,
@@ -248,8 +250,10 @@ where
 #[derive(Debug)]
 pub struct InProcessHandlers {
     /// On crash C function pointer
+    #[cfg(any(unix, feature = "std"))]
     pub crash_handler: *const c_void,
     /// On timeout C function pointer
+    #[cfg(any(unix, feature = "std"))]
     pub timeout_handler: *const c_void,
 }
 
@@ -376,20 +380,26 @@ impl InProcessHandlers {
                 > as *const c_void,
             })
         }
-        #[cfg(not(any(unix, all(windows, feature = "std"))))]
-        Ok(Self {
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
-        })
+        #[cfg(not(any(unix, feature = "std")))]
+        Ok(Self {})
     }
 
     /// Replace the handlers with `nop` handlers, deactivating the handlers
     #[must_use]
     pub fn nop() -> Self {
-        Self {
-            crash_handler: ptr::null(),
-            timeout_handler: ptr::null(),
+        let ret;
+        #[cfg(any(unix, feature = "std"))]
+        {
+            ret = Self {
+                crash_handler: ptr::null(),
+                timeout_handler: ptr::null(),
+            };
         }
+        #[cfg(not(any(unix, feature = "std")))]
+        {
+            ret = Self {};
+        }
+        ret
     }
 }
 
@@ -402,53 +412,58 @@ pub(crate) struct InProcessExecutorHandlerData {
     executor_ptr: *const c_void,
     pub current_input_ptr: *const c_void,
     /// The timeout handler
-    #[allow(unused)] // for no_std
+    #[cfg(any(unix, feature = "std"))]
     crash_handler: *const c_void,
     /// The timeout handler
-    #[allow(unused)] // for no_std
+    #[cfg(any(unix, feature = "std"))]
     timeout_handler: *const c_void,
-    #[cfg(windows)]
-    pub tp_timer: *mut c_void,
-    #[cfg(windows)]
-    pub in_target: u64,
-    #[cfg(windows)]
-    pub critical: *mut c_void,
-    #[cfg(windows)]
-    pub timeout_input_ptr: *mut c_void,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) tp_timer: *mut c_void,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) in_target: u64,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) critical: *mut c_void,
+    #[cfg(all(windows, feature = "std"))]
+    pub(crate) timeout_input_ptr: *mut c_void,
 }
 
 unsafe impl Send for InProcessExecutorHandlerData {}
 unsafe impl Sync for InProcessExecutorHandlerData {}
 
-#[allow(unused)]
 impl InProcessExecutorHandlerData {
+    #[cfg(any(unix, feature = "std"))]
     fn executor_mut<'a, E>(&self) -> &'a mut E {
         unsafe { (self.executor_ptr as *mut E).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn state_mut<'a, S>(&self) -> &'a mut S {
         unsafe { (self.state_ptr as *mut S).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn event_mgr_mut<'a, EM>(&self) -> &'a mut EM {
         unsafe { (self.event_mgr_ptr as *mut EM).as_mut().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn fuzzer_mut<'a, Z>(&self) -> &'a mut Z {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
+    #[cfg(all(unix, feature = "std"))]
     fn current_input<'a, I>(&self) -> &'a I {
         unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
     }
 
+    #[cfg(any(unix, feature = "std"))]
     fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
         self.current_input_ptr = ptr::null();
         r
     }
 
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
     fn is_valid(&self) -> bool {
         self.in_target == 1
     }
@@ -462,27 +477,29 @@ impl InProcessExecutorHandlerData {
 /// Exception handling needs some nasty unsafe.
 pub(crate) static mut GLOBAL_STATE: InProcessExecutorHandlerData = InProcessExecutorHandlerData {
     /// The state ptr for signal handling
-    state_ptr: ptr::null_mut(),
+    state_ptr: null_mut(),
     /// The event manager ptr for signal handling
-    event_mgr_ptr: ptr::null_mut(),
+    event_mgr_ptr: null_mut(),
     /// The fuzzer ptr for signal handling
-    fuzzer_ptr: ptr::null_mut(),
+    fuzzer_ptr: null_mut(),
     /// The executor ptr for signal handling
     executor_ptr: ptr::null(),
     /// The current input for signal handling
     current_input_ptr: ptr::null(),
     /// The crash handler fn
+    #[cfg(any(unix, feature = "std"))]
     crash_handler: ptr::null(),
     /// The timeout handler fn
+    #[cfg(any(unix, feature = "std"))]
     timeout_handler: ptr::null(),
-    #[cfg(windows)]
-    tp_timer: ptr::null_mut(),
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "std"))]
+    tp_timer: null_mut(),
+    #[cfg(all(windows, feature = "std"))]
     in_target: 0,
-    #[cfg(windows)]
-    critical: ptr::null_mut(),
-    #[cfg(windows)]
-    timeout_input_ptr: ptr::null_mut(),
+    #[cfg(all(windows, feature = "std"))]
+    critical: null_mut(),
+    #[cfg(all(windows, feature = "std"))]
+    timeout_input_ptr: null_mut(),
 };
 
 /// Get the inprocess [`crate::state::State`]
@@ -765,7 +782,7 @@ mod unix_signal_handler {
             as *mut libc::c_void as *mut ucontext_t);
 
         #[cfg(feature = "std")]
-        eprintln!("Crashed with {}", signal);
+        eprintln!("Crashed with {signal}");
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
@@ -1270,6 +1287,8 @@ pub(crate) type ForkHandlerFuncPtr =
 pub struct InChildProcessHandlers {
     /// On crash C function pointer
     pub crash_handler: *const c_void,
+    /// On timeout C function pointer
+    pub timeout_handler: *const c_void,
 }
 
 #[cfg(all(feature = "std", unix))]
@@ -1288,6 +1307,7 @@ impl InChildProcessHandlers {
             );
             write_volatile(&mut data.state_ptr, state as *mut _ as *mut c_void);
             data.crash_handler = self.crash_handler;
+            data.timeout_handler = self.timeout_handler;
             compiler_fence(Ordering::SeqCst);
         }
     }
@@ -1301,11 +1321,33 @@ impl InChildProcessHandlers {
     {
         unsafe {
             let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
-            child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
+            // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
                 crash_handler: child_signal_handlers::child_crash_handler::<E, I, OT, S>
+                    as *const c_void,
+                timeout_handler: ptr::null(),
+            })
+        }
+    }
+
+    /// Create new [`InChildProcessHandlers`].
+    pub fn with_timeout<E, I, OT, S>() -> Result<Self, Error>
+    where
+        I: Input,
+        E: HasObservers<I, OT, S>,
+        OT: ObserversTuple<I, S>,
+    {
+        unsafe {
+            let data = &mut FORK_EXECUTOR_GLOBAL_DATA;
+            // child_signal_handlers::setup_child_panic_hook::<E, I, OT, S>();
+            setup_signal_handler(data)?;
+            compiler_fence(Ordering::SeqCst);
+            Ok(Self {
+                crash_handler: child_signal_handlers::child_crash_handler::<E, I, OT, S>
+                    as *const c_void,
+                timeout_handler: child_signal_handlers::child_timeout_handler::<E, I, OT, S>
                     as *const c_void,
             })
         }
@@ -1316,6 +1358,7 @@ impl InChildProcessHandlers {
     pub fn nop() -> Self {
         Self {
             crash_handler: ptr::null(),
+            timeout_handler: ptr::null(),
         }
     }
 }
@@ -1332,6 +1375,8 @@ pub(crate) struct InProcessForkExecutorGlobalData {
     pub current_input_ptr: *const c_void,
     /// Stores a pointer to the crash_handler function
     pub crash_handler: *const c_void,
+    /// Stores a pointer to the timeout_handler function
+    pub timeout_handler: *const c_void,
 }
 
 #[cfg(all(feature = "std", unix))]
@@ -1369,16 +1414,23 @@ impl InProcessForkExecutorGlobalData {
 pub(crate) static mut FORK_EXECUTOR_GLOBAL_DATA: InProcessForkExecutorGlobalData =
     InProcessForkExecutorGlobalData {
         executor_ptr: ptr::null(),
-        crash_handler: ptr::null(),
         state_ptr: ptr::null(),
         current_input_ptr: ptr::null(),
+        crash_handler: ptr::null(),
+        timeout_handler: ptr::null(),
     };
 
 #[cfg(all(feature = "std", unix))]
 impl Handler for InProcessForkExecutorGlobalData {
     fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
         match signal {
-            Signal::SigUser2 | Signal::SigAlarm => (),
+            Signal::SigUser2 | Signal::SigAlarm => unsafe {
+                if !FORK_EXECUTOR_GLOBAL_DATA.timeout_handler.is_null() {
+                    let func: ForkHandlerFuncPtr =
+                        transmute(FORK_EXECUTOR_GLOBAL_DATA.timeout_handler);
+                    (func)(signal, info, context, &mut FORK_EXECUTOR_GLOBAL_DATA);
+                }
+            },
             _ => unsafe {
                 if !FORK_EXECUTOR_GLOBAL_DATA.crash_handler.is_null() {
                     let func: ForkHandlerFuncPtr =
@@ -1420,6 +1472,23 @@ where
     phantom: PhantomData<(I, S)>,
 }
 
+/// Timeout executor for [`InProcessForkExecutor`]
+#[cfg(all(feature = "std", target_os = "linux"))]
+pub struct TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    harness_fn: &'a mut H,
+    shmem_provider: SP,
+    observers: OT,
+    handlers: InChildProcessHandlers,
+    itimerspec: libc::itimerspec,
+    phantom: PhantomData<(I, S)>,
+}
+
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> Debug for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
@@ -1432,6 +1501,23 @@ where
         f.debug_struct("InProcessForkExecutor")
             .field("observers", &self.observers)
             .field("shmem_provider", &self.shmem_provider)
+            .finish()
+    }
+}
+
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<'a, H, I, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TimeoutInProcessForkExecutor")
+            .field("observers", &self.observers)
+            .field("shmem_provider", &self.shmem_provider)
+            .field("itimerspec", &self.itimerspec)
             .finish()
     }
 }
@@ -1505,6 +1591,93 @@ where
     }
 }
 
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<'a, EM, H, I, OT, S, SP, Z> Executor<EM, I, S, Z>
+    for TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    #[allow(unreachable_code)]
+    #[inline]
+    fn run_target(
+        &mut self,
+        _fuzzer: &mut Z,
+        state: &mut S,
+        _mgr: &mut EM,
+        input: &I,
+    ) -> Result<ExitKind, Error> {
+        unsafe {
+            self.shmem_provider.pre_fork()?;
+            match fork() {
+                Ok(ForkResult::Child) => {
+                    // Child
+                    self.shmem_provider.post_fork(true)?;
+
+                    self.handlers.pre_run_target(self, state, input);
+
+                    self.observers
+                        .pre_exec_child_all(state, input)
+                        .expect("Failed to run post_exec on observers");
+
+                    let mut timerid: libc::timer_t = null_mut();
+                    // creates a new per-process interval timer
+                    // we can't do this from the parent, timerid is unique to each process.
+                    libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
+
+                    println!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
+                    let v =
+                        libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
+                    println!("{v:#?} {}", nix::errno::errno());
+                    (self.harness_fn)(input);
+
+                    self.observers
+                        .post_exec_child_all(state, input, &ExitKind::Ok)
+                        .expect("Failed to run post_exec on observers");
+
+                    std::process::exit(0);
+
+                    Ok(ExitKind::Ok)
+                }
+                Ok(ForkResult::Parent { child }) => {
+                    // Parent
+                    // println!("from parent {} child is {}", std::process::id(), child);
+                    self.shmem_provider.post_fork(false)?;
+
+                    let res = waitpid(child, None)?;
+                    println!("{res:#?}");
+                    match res {
+                        WaitStatus::Signaled(_, signal, _) => match signal {
+                            nix::sys::signal::Signal::SIGALRM
+                            | nix::sys::signal::Signal::SIGUSR2 => Ok(ExitKind::Timeout),
+                            _ => Ok(ExitKind::Crash),
+                        },
+                        WaitStatus::Exited(_, code) => {
+                            if code > 128 && code < 160 {
+                                // Signal exit codes
+                                let signal = code - 128;
+                                if signal == Signal::SigAlarm as libc::c_int
+                                    || signal == Signal::SigUser2 as libc::c_int
+                                {
+                                    Ok(ExitKind::Timeout)
+                                } else {
+                                    Ok(ExitKind::Crash)
+                                }
+                            } else {
+                                Ok(ExitKind::Ok)
+                            }
+                        }
+                        _ => Ok(ExitKind::Ok),
+                    }
+                }
+                Err(e) => Err(Error::from(e)),
+            }
+        }
+    }
+}
+
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
@@ -1551,6 +1724,68 @@ where
     }
 }
 
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<'a, H, I, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
+    /// Creates a new [`TimeoutInProcessForkExecutor`]
+    pub fn new<EM, OF, Z>(
+        harness_fn: &'a mut H,
+        observers: OT,
+        _fuzzer: &mut Z,
+        _state: &mut S,
+        _event_mgr: &mut EM,
+        timeout: Duration,
+        shmem_provider: SP,
+    ) -> Result<Self, Error>
+    where
+        EM: EventFirer<I> + EventRestarter<S>,
+        OF: Feedback<I, S>,
+        S: HasSolutions<I> + HasClientPerfMonitor,
+        Z: HasObjective<I, OF, S>,
+    {
+        let handlers = InChildProcessHandlers::with_timeout::<Self, I, OT, S>()?;
+        let milli_sec = timeout.as_millis();
+        let it_value = libc::timespec {
+            tv_sec: (milli_sec / 1000) as _,
+            tv_nsec: ((milli_sec % 1000) * 1000 * 1000) as _,
+        };
+        let it_interval = libc::timespec {
+            tv_sec: 0,
+            tv_nsec: 0,
+        };
+        let itimerspec = libc::itimerspec {
+            it_interval,
+            it_value,
+        };
+
+        Ok(Self {
+            harness_fn,
+            shmem_provider,
+            observers,
+            handlers,
+            itimerspec,
+            phantom: PhantomData,
+        })
+    }
+
+    /// Retrieve the harness function.
+    #[inline]
+    pub fn harness(&self) -> &H {
+        self.harness_fn
+    }
+
+    /// Retrieve the harness function for a mutable reference.
+    #[inline]
+    pub fn harness_mut(&mut self) -> &mut H {
+        self.harness_fn
+    }
+}
+
 #[cfg(all(feature = "std", unix))]
 impl<'a, H, I, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, I, OT, S, SP>
 where
@@ -1566,6 +1801,26 @@ where
 
     type Observers = OT;
 
+    #[inline]
+    fn observers(&self) -> &OT {
+        &self.observers
+    }
+
+    #[inline]
+    fn observers_mut(&mut self) -> &mut OT {
+        &mut self.observers
+    }
+}
+
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S>
+    for TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
+where
+    H: FnMut(&I) -> ExitKind + ?Sized,
+    I: Input,
+    OT: ObserversTuple<I, S>,
+    SP: ShMemProvider,
+{
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers
@@ -1646,6 +1901,29 @@ pub mod child_signal_handlers {
                 .expect("Failed to run post_exec on observers");
         }
 
+        libc::_exit(128 + (_signal as i32));
+    }
+
+    #[cfg(unix)]
+    pub(crate) unsafe fn child_timeout_handler<E, I, OT, S>(
+        _signal: Signal,
+        _info: siginfo_t,
+        _context: &mut ucontext_t,
+        data: &mut InProcessForkExecutorGlobalData,
+    ) where
+        E: HasObservers<I, OT, S>,
+        OT: ObserversTuple<I, S>,
+        I: Input,
+    {
+        if data.is_valid() {
+            let executor = data.executor_mut::<E>();
+            let observers = executor.observers_mut();
+            let state = data.state_mut::<S>();
+            let input = data.take_current_input::<I>();
+            observers
+                .post_exec_child_all(state, input, &ExitKind::Timeout)
+                .expect("Failed to run post_exec on observers");
+        }
         libc::_exit(128 + (_signal as i32));
     }
 }
