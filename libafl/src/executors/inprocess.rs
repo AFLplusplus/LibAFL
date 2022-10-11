@@ -1609,7 +1609,7 @@ where
                     // we can't do this from the parent, timerid is unique to each process.
                     libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
 
-                    println!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
+                    println!("Set timer! {self.itimerspec:#?} {timerid:#?}");
                     let v =
                         libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
                     println!("{v:#?} {}", nix::errno::errno());
