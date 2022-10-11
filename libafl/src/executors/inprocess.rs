@@ -1336,7 +1336,7 @@ impl InChildProcessHandlers {
     pub fn with_timeout<E, I, OT, S>() -> Result<Self, Error>
     where
         I: Input,
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<Input = I, Observers = OT, State = S>,
         OT: ObserversTuple<I, S>,
     {
         unsafe {
@@ -1911,7 +1911,7 @@ pub mod child_signal_handlers {
         _context: &mut ucontext_t,
         data: &mut InProcessForkExecutorGlobalData,
     ) where
-        E: HasObservers<I, OT, S>,
+        E: HasObservers<Input = I, Observers = OT, State = S>,
         OT: ObserversTuple<I, S>,
         I: Input,
     {
@@ -1964,8 +1964,7 @@ mod tests {
         use crate::{
             bolts::shmem::{ShMemProvider, StdShMemProvider},
             events::SimpleEventManager,
-            executors::inprocess::InChildProcessHandlers,
-            executors::InProcessForkExecutor,
+            executors::{inprocess::InChildProcessHandlers, InProcessForkExecutor},
             state::NopState,
             NopFuzzer,
         };

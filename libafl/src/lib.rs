@@ -492,7 +492,7 @@ mod tests {
         .unwrap();
 
         let _monitor = SimpleMonitor::new(|s| {
-            println!("{}", s);
+            println!("{s}");
         });
         let mut event_manager = NopEventManager::<(), _>::new();
 

@@ -686,7 +686,7 @@ mod tests {
     fn test_builder() {
         let mut mgr = SimpleEventManager::<BytesInput, _, (), NopState<BytesInput>>::new(
             SimpleMonitor::new(|status| {
-                println!("{}", status);
+                println!("{status}");
             }),
         );
 
@@ -714,7 +714,7 @@ mod tests {
 
         let mut mgr = SimpleEventManager::<BytesInput, _, (), NopState<BytesInput>>::new(
             SimpleMonitor::new(|status| {
-                println!("{}", status);
+                println!("{status}");
             }),
         );
 
