@@ -766,7 +766,7 @@ mod unix_signal_handler {
             as *mut libc::c_void as *mut ucontext_t);
 
         #[cfg(feature = "std")]
-        eprintln!("Crashed with {}", signal);
+        eprintln!("Crashed with {signal}");
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
@@ -1609,10 +1609,10 @@ where
                     // we can't do this from the parent, timerid is unique to each process.
                     libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
 
-                    println!("Set timer! {:#?} {:#?}", self.itimerspec, timerid);
+                    println!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
                     let v =
                         libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
-                    println!("{:#?} {}", v, nix::errno::errno());
+                    println!("{v:#?} {}", nix::errno::errno());
                     (self.harness_fn)(input);
 
                     self.observers
@@ -1629,7 +1629,7 @@ where
                     self.shmem_provider.post_fork(false)?;
 
                     let res = waitpid(child, None)?;
-                    println!("{:#?}", res);
+                    println!("{res:#?}");
                     match res {
                         WaitStatus::Signaled(_, signal, _) => match signal {
                             nix::sys::signal::Signal::SIGALRM

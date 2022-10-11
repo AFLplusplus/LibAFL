@@ -74,9 +74,10 @@ where
 impl InputDecoder for TokenInputEncoderDecoder {
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
         for id in input.codes() {
-            let tok = self.id_table.get(&(id % self.next_id)).ok_or_else(|| {
-                Error::illegal_state(format!("Id {} not in the decoder table", id))
-            })?;
+            let tok = self
+                .id_table
+                .get(&(id % self.next_id))
+                .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
             bytes.extend_from_slice(tok.as_bytes());
             bytes.push(b' ');
         }

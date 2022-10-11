@@ -1082,7 +1082,7 @@ mod tests {
             StdMapObserver::new("map", unsafe { &mut MAP })
         );
         let vec = postcard::to_allocvec(&obv).unwrap();
-        println!("{:?}", vec);
+        println!("{vec:?}");
         let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32>) =
             postcard::from_bytes(&vec).unwrap();
         assert_eq!(obv.0.name(), obv2.0.name());

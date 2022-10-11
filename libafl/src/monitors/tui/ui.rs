@@ -305,12 +305,12 @@ impl TuiUI {
                     .bounds([min_y as f64, max_y as f64])
                     .labels(vec![
                         Span::styled(
-                            format!("{}", min_y),
+                            format!("{min_y}"),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
                         Span::raw(format!("{}", (max_y - min_y) / 2)),
                         Span::styled(
-                            format!("{}", max_y),
+                            format!("{max_y}"),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
                     ]),
@@ -452,7 +452,7 @@ impl TuiUI {
                     ]));
                     for i in 0..client.stages.len() {
                         items.push(Row::new(vec![
-                            Cell::from(Span::raw(format!("stage {}", i))),
+                            Cell::from(Span::raw(format!("stage {i}"))),
                             Cell::from(Span::raw("")),
                         ]));
 

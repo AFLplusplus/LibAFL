@@ -39,14 +39,14 @@ pub enum UserStats {
 impl fmt::Display for UserStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UserStats::Number(n) => write!(f, "{}", n),
-            UserStats::Float(n) => write!(f, "{}", n),
-            UserStats::String(s) => write!(f, "{}", s),
+            UserStats::Number(n) => write!(f, "{n}"),
+            UserStats::Float(n) => write!(f, "{n}"),
+            UserStats::String(s) => write!(f, "{s}"),
             UserStats::Ratio(a, b) => {
                 if *b == 0 {
-                    write!(f, "{}/{}", a, b)
+                    write!(f, "{a}/{b}")
                 } else {
-                    write!(f, "{}/{} ({}%)", a, b, a * 100 / b)
+                    write!(f, "{a}/{b} ({}%)", a * 100 / b)
                 }
             }
         }
@@ -513,7 +513,7 @@ impl From<usize> for PerfFeature {
             7 => PerfFeature::PostExecObservers,
             8 => PerfFeature::GetFeedbackInterestingAll,
             9 => PerfFeature::GetObjectivesInterestingAll,
-            _ => panic!("Unknown PerfFeature: {}", val),
+            _ => panic!("Unknown PerfFeature: {val}"),
         }
     }
 }
@@ -773,7 +773,7 @@ impl core::fmt::Display for ClientPerfMonitor {
         // Make sure we only iterate over used stages
         for (stage_index, features) in self.used_stages() {
             // Write the stage header
-            writeln!(f, "  Stage {}:", stage_index)?;
+            writeln!(f, "  Stage {stage_index}:")?;
 
             for (feature_index, feature) in features.iter().enumerate() {
                 // Calculate this current stage's percentage
@@ -791,7 +791,7 @@ impl core::fmt::Display for ClientPerfMonitor {
                 let feature: PerfFeature = feature_index.into();
 
                 // Write the percentage for this feature
-                writeln!(f, "    {:6.4}: {:?}", feature_percent, feature)?;
+                writeln!(f, "    {feature_percent:6.4}: {feature:?}")?;
             }
         }
 
@@ -810,10 +810,10 @@ impl core::fmt::Display for ClientPerfMonitor {
             other_percent -= feedback_percent;
 
             // Write the percentage for this feedback
-            writeln!(f, "    {:6.4}: {}", feedback_percent, feedback_name)?;
+            writeln!(f, "    {feedback_percent:6.4}: {feedback_name}")?;
         }
 
-        write!(f, "  {:6.4}: Not Measured", other_percent)?;
+        write!(f, "  {other_percent:6.4}: Not Measured")?;
 
         Ok(())
     }
