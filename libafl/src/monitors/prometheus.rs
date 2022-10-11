@@ -11,7 +11,8 @@
 // In your fuzzer, include:
 // use libafl::monitors::PrometheusMonitor;
 // as well as:
-// let mon = PrometheusMonitor::new(|s| println!("{}", s));
+// let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
+// let mon = PrometheusMonitor::new(listener, |s| println!("{}", s));
 // and then like with any other monitor, pass it into the event manager like so:
 // let mut mgr = SimpleEventManager::new(mon);
 // ====================
@@ -144,7 +145,7 @@ impl<F> PrometheusMonitor<F>
 where
     F: FnMut(String), // shouldn't need this generic. can get rid of it
 {
-    pub fn new(print_fn: F) -> Self {
+    pub fn new(listener: String, print_fn: F) -> Self {
         // note that Gauge's clone does Arc stuff, so ~shouldn't~ need to worry about passing btwn threads
         let corpus_count = Gauge::default();
         let corpus_count_clone = corpus_count.clone();
@@ -159,7 +160,7 @@ where
 
         // Need to run the metrics server in a diff thread to avoid blocking
         thread::spawn(move || {
-            block_on(serve_metrics(corpus_count_clone, objective_count_clone, executions_clone, exec_rate_clone, runtime_clone)).map_err(|err| println!("{:?}", err)).ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
+            block_on(serve_metrics(listener, corpus_count_clone, objective_count_clone, executions_clone, exec_rate_clone, runtime_clone)).map_err(|err| println!("{:?}", err)).ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
         });
         Self {
             print_fn,
@@ -193,8 +194,11 @@ where
 // Using https://github.com/prometheus/client_rust/blob/master/examples/tide.rs as a base server
 
 // set up an HTTP endpoint, /metrics, localhost:8080
-pub async fn serve_metrics(corpus: Gauge, objectives: Gauge, executions: Gauge, exec_rate: Gauge, runtime: Gauge) -> Result<(), std::io::Error> {
+pub async fn serve_metrics(listener: String, corpus: Gauge, objectives: Gauge, executions: Gauge, exec_rate: Gauge, runtime: Gauge) -> Result<(), std::io::Error> {
     tide::log::start();
+
+    // TODO: give listener a default value if user didn't pass one to new()
+        // optional params don't seem to be a thing in Rust, but there's probably a work around
 
     let mut registry = Registry::default();
     registry.register(
@@ -238,7 +242,7 @@ pub async fn serve_metrics(corpus: Gauge, objectives: Gauge, executions: Gauge, 
                 .build();
             Ok(response)
         });
-    app.listen("127.0.0.1:8080").await?;
+    app.listen(listener).await?;
 
     Ok(())
 }
