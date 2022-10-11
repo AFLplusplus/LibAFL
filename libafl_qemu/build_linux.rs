@@ -7,7 +7,7 @@ const QEMU_REVISION: &str = "ebda58f3e94a82f769890814339295b467f16680";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
-        which(tool).unwrap_or_else(|_| panic!("Build tool {} not found", tool));
+        which(tool).unwrap_or_else(|_| panic!("Build tool {tool} not found"));
     }
 }
 
@@ -62,11 +62,11 @@ pub fn build() {
 
     #[cfg(feature = "usermode")]
     let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
-        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({}) is not the host arch ({}))", cpu_target, env::consts::ARCH);
+        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
         "cc".to_owned()
     });
 
-    println!("cargo:rustc-cfg=cpu_target=\"{}\"", cpu_target);
+    println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
 
     // qemu-system-arm supports both big and little endian configurations and so
     // therefore the "be" feature should ignored in this configuration. Also
@@ -164,7 +164,7 @@ pub fn build() {
     }
 
     #[cfg(feature = "usermode")]
-    let output_lib = build_dir.join(&format!("libqemu-{}.so", cpu_target));
+    let output_lib = build_dir.join(&format!("libqemu-{cpu_target}.so"));
     #[cfg(not(feature = "usermode"))]
     let output_lib = build_dir.join(&format!("libqemu-system-{}.so", cpu_target));
 
@@ -184,7 +184,7 @@ pub fn build() {
             .current_dir(&build_dir)
             //.arg("--as-static-lib")
             .arg("--as-shared-lib")
-            .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
+            .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
             .args(["--disable-blobs", "--disable-bsd-user", "--disable-fdt"])
             .status()
             .expect("Configure failed");
@@ -215,7 +215,7 @@ pub fn build() {
     let mut objects = vec![];
     for dir in &[
         build_dir.join("libcommon.fa.p"),
-        build_dir.join(&format!("libqemu-{}-{}.fa.p", cpu_target, target_suffix)),
+        build_dir.join(&format!("libqemu-{cpu_target}-{target_suffix}.fa.p")),
     ] {
         for path in fs::read_dir(dir).unwrap() {
             let path = path.unwrap().path();
@@ -316,7 +316,7 @@ pub fn build() {
         .status()
         .expect("Ar creation");
 
-    println!("cargo:rustc-link-search=native={}", out_dir);
+    println!("cargo:rustc-link-search=native={out_dir}");
     println!("cargo:rustc-link-lib=static=qemu-partially-linked");
 
     #[cfg(not(feature = "usermode"))]

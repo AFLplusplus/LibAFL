@@ -65,7 +65,7 @@ fn find_llvm_config() -> Result<String, String> {
 
     #[cfg(not(target_vendor = "apple"))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
-        let llvm_config_name: String = format!("llvm-config-{}", version);
+        let llvm_config_name: String = format!("llvm-config-{version}");
         if which(&llvm_config_name).is_ok() {
             return Ok(llvm_config_name);
         }

@@ -220,7 +220,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "{}: 0x{:016x} ", name, error.registers[reg]).unwrap();
+                    write!(output, "{name}: 0x{:016x} ", error.registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -488,7 +488,7 @@ impl AsanErrors {
                 }
 
                 #[cfg(target_arch = "x86_64")]
-                writeln!(output, "Rip: 0x{:016x}", pc).unwrap();
+                writeln!(output, "Rip: 0x{pc:016x}").unwrap();
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();

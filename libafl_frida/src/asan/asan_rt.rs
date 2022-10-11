@@ -913,7 +913,7 @@ impl AsanRuntime {
             .expect("Failed to disassmeble");
 
         let insn = instructions.as_ref().first().unwrap(); // This is the very instruction that has triggered fault
-        println!("{:#?}", insn);
+        println!("{insn:#?}");
         let operands = cs.insn_detail(insn).unwrap().arch_detail().operands();
 
         let mut access_type: Option<RegAccessType> = None;

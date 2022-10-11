@@ -194,7 +194,7 @@ where
             unsafe {
                 MAX_EDGES_NUM = meta.current_id as usize;
             }
-            Some(id as u64)
+            Some(id)
         }
     }
 }
@@ -229,7 +229,7 @@ where
             return None;
         }
     }
-    Some((hash_me(src as u64) ^ hash_me(dest as u64)) & (unsafe { EDGES_MAP_PTR_SIZE } as u64 - 1))
+    Some((hash_me(src) ^ hash_me(dest)) & (unsafe { EDGES_MAP_PTR_SIZE } as u64 - 1))
 }
 
 pub extern "C" fn trace_edge_hitcount_ptr(id: u64, _data: u64) {
@@ -255,7 +255,7 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    Some(pc as u64)
+    Some(pc)
 }
 
 pub fn gen_hashed_block_ids<I, QT, S>(
@@ -267,7 +267,7 @@ where
     I: Input,
     QT: QemuHelperTuple<I, S>,
 {
-    Some(hash_me(pc as u64))
+    Some(hash_me(pc))
 }
 
 pub extern "C" fn trace_block_transition_hitcount(id: u64, _data: u64) {
