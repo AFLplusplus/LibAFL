@@ -21,7 +21,10 @@ where
     coverage_ptr: UniquePtr<Coverage>,
     newcoverage_ptr: UniquePtr<Coverage>,
     argc: usize,
-    argv: Vec<*mut c_char>,
+    // argv: Vec<*mut c_char>,
+    argv: Vec<CString>,
+    tinyinst_argc: usize,
+    tinyinst_argv: Vec<*mut c_char>,
     timeout: u32,
     observers: OT,
     phantom: PhantomData<(I, S, OT)>,
@@ -56,12 +59,23 @@ where
         let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
         self.observers.pre_exec_all(_state, _input)?;
 
+        let mut argv: Vec<*mut c_char> = Vec::with_capacity(self.argc + 1);
+        for arg in &self.argv {
+            argv.push(arg.as_ptr() as *mut c_char);
+        }
+        argv.push(core::ptr::null_mut());
+
         unsafe {
             status = self.instrumentation_ptr.pin_mut().Run(
+                // self.tinyinst_argc as i32,
                 self.argc as i32,
-                self.argv.as_mut_ptr(),
+                argv.as_mut_ptr(),
                 self.timeout,
             );
+
+            self.instrumentation_ptr
+                .pin_mut()
+                .GetCoverage(self.coverage_ptr.pin_mut(), true);
         }
 
         match status {
@@ -72,6 +86,7 @@ where
             DebuggerStatus::DEBUGGER_NONE => {
                 Err(Error::unknown("The harness was not run.".to_string()))
             }
+
             _ => Ok(ExitKind::Ok),
         }
     }
@@ -81,26 +96,43 @@ impl<I, OT, S> TinyInstExecutor<I, OT, S>
 where
     OT: ObserversTuple<I, S>,
 {
-    pub unsafe fn new(args: Vec<String>, timeout: u32, observers: OT) -> Self {
+    pub unsafe fn new(
+        tinyinst_args: Vec<String>,
+        args: Vec<String>,
+        timeout: u32,
+        observers: OT,
+    ) -> Self {
         let mut instrumentation_ptr = LiteCov::new();
         let instrumentation = instrumentation_ptr.pin_mut();
 
+        // Convert args into c string vector
         let argc = args.len();
-        let vec_cstr: Vec<CString> = args
+        let argv_vec_cstr: Vec<CString> = args
             .iter()
             .map(|arg| CString::new(arg.as_str()).unwrap())
             .collect();
         let mut argv: Vec<*mut c_char> = Vec::with_capacity(argc + 1);
-        for arg in &vec_cstr {
+        for arg in &argv_vec_cstr {
             argv.push(arg.as_ptr() as *mut c_char);
         }
         argv.push(core::ptr::null_mut()); //Null terminator
-        println!("initing {} {:?}", &argc, &argv);
-        for c in &argv {
-            println!("{:?}", c);
-        }
 
-        instrumentation.Init(argc as i32, argv.as_mut_ptr());
+        // Get tinyinst argv and argc
+        let tinyinst_argc = tinyinst_args.len();
+        let vec_cstr: Vec<CString> = tinyinst_args
+            .iter()
+            .map(|arg| CString::new(arg.as_str()).unwrap())
+            .collect();
+
+        let mut tinyinst_argv: Vec<*mut c_char> = Vec::with_capacity(tinyinst_argc + 1);
+        for arg in &vec_cstr {
+            tinyinst_argv.push(arg.as_ptr() as *mut c_char);
+        }
+        tinyinst_argv.push(core::ptr::null_mut()); //Null terminator
+
+        println!("initing {} {:?}", &argc, &argv);
+
+        instrumentation.Init(tinyinst_argc as i32, tinyinst_argv.as_mut_ptr());
         println!("post init");
 
         let coverage_ptr = Coverage::new();
@@ -111,7 +143,9 @@ where
             coverage_ptr,
             newcoverage_ptr,
             argc,
-            argv,
+            argv: argv_vec_cstr,
+            tinyinst_argc,
+            tinyinst_argv,
             timeout,
             observers,
             phantom: PhantomData,
