@@ -766,7 +766,7 @@ mod unix_signal_handler {
             as *mut libc::c_void as *mut ucontext_t);
 
         #[cfg(feature = "std")]
-        eprintln!("Crashed with {}", signal);
+        eprintln!("Crashed with {signal}");
         if data.is_valid() {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor

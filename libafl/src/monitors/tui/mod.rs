@@ -136,7 +136,7 @@ impl PerfTuiContext {
 
                 // Get the actual feature from the feature index for printing its name
                 let feature: PerfFeature = feature_index.into();
-                features_percentages.push((format!("{:?}", feature), feature_percent));
+                features_percentages.push((format!("{feature:?}"), feature_percent));
             }
 
             self.stages.push(features_percentages);
@@ -276,19 +276,19 @@ impl Monitor for TuiMonitor {
         let client = self.client_stats_mut_for(sender_id);
         let exec_sec = client.execs_per_sec(cur_time);
 
-        let sender = format!("#{}", sender_id);
+        let sender = format!("#{sender_id}");
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {
             String::new()
         };
-        let head = format!("{}{} {}", event_msg, pad, sender);
+        let head = format!("{event_msg}{pad} {sender}");
         let mut fmt = format!(
             "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {
-            write!(fmt, ", {}: {}", key, val).unwrap();
+            write!(fmt, ", {key}: {val}").unwrap();
         }
 
         {

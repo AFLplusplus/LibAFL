@@ -44,7 +44,6 @@ It can report coverage and, on supported architecutres, even reports memory acce
     test,
     deny(
         bad_style,
-        const_err,
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
@@ -203,7 +202,7 @@ impl FridaOptions {
                         cmplog_cores = Cores::from_cmdline(value).ok();
                     }
                     _ => {
-                        panic!("unknown FRIDA option: '{}'", option);
+                        panic!("unknown FRIDA option: '{option}'");
                     }
                 }
             } // end of for loop

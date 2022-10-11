@@ -176,8 +176,8 @@ impl AsanErrors {
                 } else {
                     writeln!(
                         output,
-                        " at 0x{:x}, faulting address 0x{:x}",
-                        error.pc, fault_address
+                        " at 0x{:x}, faulting address 0x{fault_address:x}",
+                        error.pc
                     )
                     .unwrap();
                 }
@@ -196,7 +196,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, error.registers[reg]).unwrap();
+                    write!(output, "x{reg:02}: 0x{:016x} ", error.registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -264,10 +264,10 @@ impl AsanErrors {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
+                        writeln!(output, "\t => {insn}").unwrap();
                         output.reset().unwrap();
                     } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
+                        writeln!(output, "\t    {insn}").unwrap();
                     }
                 }
                 backtrace_printer
@@ -332,7 +332,7 @@ impl AsanErrors {
                         )
                         .unwrap();
                     } else {
-                        writeln!(output, " at 0x{:x}", _pc).unwrap();
+                        writeln!(output, " at 0x{_pc:x}").unwrap();
                     }
 
                     #[allow(clippy::non_ascii_literal)]
@@ -344,7 +344,7 @@ impl AsanErrors {
                                 .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                                 .unwrap();
                         }
-                        write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
+                        write!(output, "x{reg:02}: 0x{val:016x} ").unwrap();
                         output.reset().unwrap();
                         if reg % 4 == 3 {
                             writeln!(output).unwrap();
@@ -358,7 +358,7 @@ impl AsanErrors {
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
             AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
-                writeln!(output, " of {:?}", ptr).unwrap();
+                writeln!(output, " of {ptr:?}").unwrap();
                 output.reset().unwrap();
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
 
@@ -389,12 +389,12 @@ impl AsanErrors {
                 }
             }
             AsanError::UnallocatedFree((ptr, backtrace)) => {
-                writeln!(output, " of {:#016x}", ptr).unwrap();
+                writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
             AsanError::Leak((ptr, mut metadata)) => {
-                writeln!(output, " of {:#016x}", ptr).unwrap();
+                writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
 
                 #[allow(clippy::non_ascii_literal)]
@@ -455,14 +455,14 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
+                    write!(output, "x{reg:02}: 0x{val:016x} ").unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
                     }
                 }
                 #[cfg(target_arch = "aarch64")]
-                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
+                writeln!(output, "pc : 0x{pc:016x} ").unwrap();
 
                 #[cfg(target_arch = "x86_64")]
                 for reg in 0..ASAN_SAVE_REGISTER_COUNT {
@@ -524,10 +524,10 @@ impl AsanErrors {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
+                        writeln!(output, "\t => {insn}").unwrap();
                         output.reset().unwrap();
                     } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
+                        writeln!(output, "\t    {insn}").unwrap();
                     }
                 }
                 backtrace_printer.print_trace(&backtrace, output).unwrap();

@@ -87,7 +87,7 @@ where
 {
     fn id(&self) -> ShMemId {
         let client_id = self.inner.id();
-        ShMemId::from_string(&format!("{}:{}", self.server_fd, client_id))
+        ShMemId::from_string(&format!("{}:{client_id}", self.server_fd))
     }
 
     fn len(&self) -> usize {
@@ -191,10 +191,12 @@ where
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
         Ok(ServedShMem {
-            inner: ManuallyDrop::new(self.inner.shmem_from_id_and_size(
-                ShMemId::from_string(&format!("{}", client_fd)),
-                map_size,
-            )?),
+            inner: ManuallyDrop::new(
+                self.inner.shmem_from_id_and_size(
+                    ShMemId::from_string(&format!("{client_fd}")),
+                    map_size,
+                )?,
+            ),
             server_fd,
         })
     }
@@ -207,10 +209,8 @@ where
         ))?;
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
-                self.inner.shmem_from_id_and_size(
-                    ShMemId::from_string(&format!("{}", client_fd)),
-                    size,
-                )?,
+                self.inner
+                    .shmem_from_id_and_size(ShMemId::from_string(&format!("{client_fd}")), size)?,
             ),
             server_fd,
         })
@@ -405,12 +405,12 @@ where
                     *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                     cvar.notify_one();
 
-                    println!("Error creating ShMemService: {:?}", e);
+                    println!("Error creating ShMemService: {e:?}");
                     return Err(e);
                 }
             };
             if let Err(e) = worker.listen(UNIX_SERVER_NAME, &childsyncpair) {
-                println!("Error spawning ShMemService: {:?}", e);
+                println!("Error spawning ShMemService: {e:?}");
                 Err(e)
             } else {
                 Ok(())
@@ -447,7 +447,7 @@ where
                 let err = err.expect_err("Expected service start to have failed, but it didn't?");
 
                 Self::Failed {
-                    err_msg: format!("{}", err),
+                    err_msg: format!("{err}"),
                     phantom: PhantomData,
                 }
             }
@@ -642,7 +642,7 @@ where
                 cvar.notify_one();
 
                 return Err(Error::unknown(format!(
-                    "The ShMem server appears to already be running. We are probably a client. Error: {:?}", err)));
+                    "The ShMem server appears to already be running. We are probably a client. Error: {err:?}")));
             }
         };
 
@@ -660,7 +660,7 @@ where
                 Ok(num_fds) if num_fds > 0 => (),
                 Ok(_) => continue,
                 Err(e) => {
-                    println!("Error polling for activity: {:?}", e);
+                    println!("Error polling for activity: {e:?}");
                     continue;
                 }
             };
@@ -684,12 +684,12 @@ where
                         let (stream, _addr) = match listener.accept_unix_addr() {
                             Ok(stream_val) => stream_val,
                             Err(e) => {
-                                println!("Error accepting client: {:?}", e);
+                                println!("Error accepting client: {e:?}");
                                 continue;
                             }
                         };
 
-                        println!("Recieved connection from {:?}", _addr);
+                        println!("Recieved connection from {_addr:?}");
                         let pollfd = PollFd::new(
                             stream.as_raw_fd(),
                             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,

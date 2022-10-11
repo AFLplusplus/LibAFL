@@ -157,7 +157,7 @@ where
                         self.shmem_provider.post_fork(false)?;
                         handles.push(child.pid);
                         #[cfg(feature = "std")]
-                        println!("child spawned and bound to core {}", id);
+                        println!("child spawned and bound to core {id}");
                     }
                     ForkResult::Child => {
                         println!("{:?} PostFork", unsafe { libc::getpid() });
@@ -221,7 +221,7 @@ where
                 unsafe {
                     libc::waitpid(*handle, &mut status, 0);
                     if status != 0 {
-                        println!("Client with pid {} exited with status {}", handle, status);
+                        println!("Client with pid {handle} exited with status {status}");
                     }
                 }
             }

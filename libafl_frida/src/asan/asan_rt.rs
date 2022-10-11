@@ -2564,7 +2564,7 @@ impl AsanRuntime {
                             .to_le_bytes(),
                     );
                 } else {
-                    panic!("extender: {:?}, shift: {:?}", extender, shift);
+                    panic!("extender: {extender:?}, shift: {shift:?}");
                 }
             };
         }

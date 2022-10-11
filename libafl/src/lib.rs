@@ -53,7 +53,6 @@ Welcome to `LibAFL`
     test,
     deny(
         bad_style,
-        const_err,
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
@@ -138,7 +137,7 @@ impl ErrorBacktrace {
 
 #[cfg(feature = "errors_backtrace")]
 fn display_error_backtrace(f: &mut fmt::Formatter, err: &ErrorBacktrace) -> fmt::Result {
-    write!(f, "\nBacktrace: {:?}", err)
+    write!(f, "\nBacktrace: {err:?}")
 }
 #[cfg(not(feature = "errors_backtrace"))]
 fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fmt::Result {
@@ -343,7 +342,7 @@ impl fmt::Display for Error {
 /// Stringify the postcard serializer error
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
-        Self::serialize(format!("{:?}", err))
+        Self::serialize(format!("{err:?}"))
     }
 }
 
@@ -351,14 +350,14 @@ impl From<postcard::Error> for Error {
 #[cfg(feature = "std")]
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
-        Self::serialize(format!("{:?}", err))
+        Self::serialize(format!("{err:?}"))
     }
 }
 
 #[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
-        Self::unknown(format!("Unix error: {:?}", err))
+        Self::unknown(format!("Unix error: {err:?}"))
     }
 }
 
@@ -372,32 +371,32 @@ impl From<io::Error> for Error {
 
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
-        Self::unknown(format!("Could not convert byte / utf-8: {:?}", err))
+        Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
 }
 
 #[cfg(feature = "std")]
 impl From<VarError> for Error {
     fn from(err: VarError) -> Self {
-        Self::empty(format!("Could not get env var: {:?}", err))
+        Self::empty(format!("Could not get env var: {err:?}"))
     }
 }
 
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
-        Self::unknown(format!("Failed to parse Int: {:?}", err))
+        Self::unknown(format!("Failed to parse Int: {err:?}"))
     }
 }
 
 impl From<TryFromIntError> for Error {
     fn from(err: TryFromIntError) -> Self {
-        Self::illegal_state(format!("Expected conversion failed: {:?}", err))
+        Self::illegal_state(format!("Expected conversion failed: {err:?}"))
     }
 }
 
 impl From<TryFromSliceError> for Error {
     fn from(err: TryFromSliceError) -> Self {
-        Self::illegal_argument(format!("Could not convert slice: {:?}", err))
+        Self::illegal_argument(format!("Could not convert slice: {err:?}"))
     }
 }
 
@@ -418,7 +417,7 @@ impl From<pyo3::PyErr> for Error {
             ) {
                 Self::shutting_down()
             } else {
-                Self::illegal_state(format!("Python exception: {:?}", err))
+                Self::illegal_state(format!("Python exception: {err:?}"))
             }
         })
     }
@@ -487,7 +486,7 @@ mod tests {
         .unwrap();
 
         let monitor = SimpleMonitor::new(|s| {
-            println!("{}", s);
+            println!("{s}");
         });
         let mut event_manager = SimpleEventManager::new(monitor);
 
@@ -510,7 +509,7 @@ mod tests {
         for i in 0..1000 {
             fuzzer
                 .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
-                .unwrap_or_else(|_| panic!("Error in iter {}", i));
+                .unwrap_or_else(|_| panic!("Error in iter {i}"));
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();

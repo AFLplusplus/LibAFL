@@ -74,7 +74,7 @@ pub unsafe fn fork() -> Result<ForkResult, Error> {
                 let err_str = CString::new("Fork failed").unwrap();
                 libc::perror(err_str.as_ptr());
             }
-            Err(Error::unknown(format!("Fork failed ({})", pid)))
+            Err(Error::unknown(format!("Fork failed ({pid})")))
         }
         _ => Ok(ForkResult::Child),
     }
