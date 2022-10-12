@@ -41,7 +41,7 @@ pub fn build() {
             "usermode".to_string()
         })
     };
-    println!("cargo:rustc-cfg=emulation_mode=\"{}\"", emulation_mode);
+    println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/asan-giovese.c");
@@ -178,9 +178,9 @@ pub fn build() {
     };
 
     let output_lib = if emulation_mode == "usermode" {
-        build_dir.join(&format!("libqemu-{}.so", cpu_target))
+        build_dir.join(&format!("libqemu-{cpu_target}.so"))
     }else{
-        build_dir.join(&format!("libqemu-system-{}.so", cpu_target))
+        build_dir.join(&format!("libqemu-system-{cpu_target}.so"))
     };
 
     println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
@@ -197,7 +197,7 @@ pub fn build() {
                 .current_dir(&qemu_path)
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
-                .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
+                .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
                 .args(["--disable-blobs", "--disable-bsd-user", "--disable-fdt", "--disable-system"])
                 .status()
                 .expect("Configure failed");
@@ -206,7 +206,7 @@ pub fn build() {
                 .current_dir(&qemu_path)
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
-                .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
+                .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
                 .arg("--enable-slirp=internal")
                 .arg("--enable-fdt=internal")
                 .arg("--audio-drv-list=")
