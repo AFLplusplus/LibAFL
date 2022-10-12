@@ -523,7 +523,7 @@ impl CPU {
         let reg = reg.into();
         let success = unsafe { libafl_qemu_write_reg(self.ptr, reg, addr_of!(val) as *const u8) };
         if success == 0 {
-            Err(format!("Failed to write to register {}", reg))
+            Err(format!("Failed to write to register {reg}"))
         } else {
             Ok(())
         }
@@ -538,7 +538,7 @@ impl CPU {
         let mut val = T::zero();
         let success = unsafe { libafl_qemu_read_reg(self.ptr, reg, addr_of_mut!(val) as *mut u8) };
         if success == 0 {
-            Err(format!("Failed to read register {}", reg))
+            Err(format!("Failed to read register {reg}"))
         } else {
             Ok(val)
         }
@@ -789,7 +789,7 @@ impl Emulator {
         perms: MmapPerms,
     ) -> Result<GuestAddr, String> {
         self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
-            .map_err(|_| format!("Failed to map {}", addr))
+            .map_err(|_| format!("Failed to map {addr}"))
             .map(|addr| addr as GuestAddr)
     }
 
@@ -806,7 +806,7 @@ impl Emulator {
             perms,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
-        .map_err(|_| format!("Failed to map {}", addr))
+        .map_err(|_| format!("Failed to map {addr}"))
         .map(|addr| addr as GuestAddr)
     }
 
@@ -816,7 +816,7 @@ impl Emulator {
         if res == 0 {
             Ok(())
         } else {
-            Err(format!("Failed to mprotect {}", addr))
+            Err(format!("Failed to mprotect {addr}"))
         }
     }
 
@@ -825,7 +825,7 @@ impl Emulator {
         if unsafe { target_munmap(addr.into(), size as u64) } == 0 {
             Ok(())
         } else {
-            Err(format!("Failed to unmap {}", addr))
+            Err(format!("Failed to unmap {addr}"))
         }
     }
 
