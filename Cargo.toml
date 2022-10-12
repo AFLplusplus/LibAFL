@@ -33,3 +33,5 @@ exclude = [
     "bindings",
     "scripts",
 ]
+[workspace.package]
+version = "0.8.1"

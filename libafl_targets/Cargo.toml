@@ -1,6 +1,6 @@
 [package]
 name = "libafl_targets"
-version = "0.8.1"
+version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "Common code for target instrumentation that can be used combined with LibAFL"
 documentation = "https://docs.rs/libafl_targets"
@@ -30,7 +30,7 @@ clippy = [] # Ignore compiler warnings during clippy
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.8.1", default-features = false, features = [] }
+libafl = { path = "../libafl",  default-features = false, features = [] }
 
 rangemap = "1.0"
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib

@@ -1,6 +1,6 @@
 [package]
 name = "libafl_frida"
-version = "0.8.1"
+version.workspace = true
 authors = ["s1341 <github@shmarya.net>"]
 description = "Frida backend library for LibAFL"
 documentation = "https://docs.rs/libafl_frida"
@@ -19,8 +19,8 @@ cmplog = []
 cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.8.1", features = ["std", "libafl_derive", "frida_cli"] }
-libafl_targets = { path = "../libafl_targets", version = "0.8.1", features = ["std", "sancov_cmplog"] }
+libafl = { path = "../libafl", features = ["std", "libafl_derive", "frida_cli"] }
+libafl_targets = { path = "../libafl_targets", features = ["std", "sancov_cmplog"] }
 
 nix = "0.24"
 libc = "0.2"
@@ -28,7 +28,7 @@ hashbrown = "0.12"
 libloading = "0.7"
 rangemap = "1.0"
 frida-gum-sys = { version = "0.4.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
-frida-gum = { version = "0.8.1", features = [ "auto-download", "event-sink", "invocation-listener"] }
+frida-gum = { features = [ "auto-download", "event-sink", "invocation-listener"] }
 regex = "1"
 dynasmrt = "1.2"
 capstone = "0.11.0"
