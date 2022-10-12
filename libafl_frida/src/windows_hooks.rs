@@ -1,7 +1,8 @@
 // Based on the example of setting hooks: Https://github.com/frida/frida-rust/blob/main/examples/gum/hook_open/src/lib.rs
 use frida_gum::{interceptor::Interceptor, Gum, Module, NativePointer};
 use libafl::bolts::os::windows_exceptions::{
-    handle_exception, IsProcessorFeaturePresent, EXCEPTION_POINTERS, PROCESSOR_FEATURE_ID,
+    handle_exception, IsProcessorFeaturePresent, UnhandledExceptionFilter, EXCEPTION_POINTERS,
+    PROCESSOR_FEATURE_ID,
 };
 
 /// Initialize the hooks
@@ -50,6 +51,6 @@ pub fn initialize(gum: &Gum) {
         exception_pointers: *mut EXCEPTION_POINTERS,
     ) -> i32 {
         handle_exception(exception_pointers);
-        unreachable!("handle_exception should not return");
+        UnhandledExceptionFilter(exception_pointers)
     }
 }
