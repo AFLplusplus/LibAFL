@@ -1,6 +1,6 @@
 [package]
 name = "libafl"
-version = "0.8.1"
+version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Slot your own fuzzers together and extend their features using Rust"
 documentation = "https://docs.rs/libafl"
@@ -48,7 +48,7 @@ serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
 serial_test = "0.8"
 
 [dependencies]
-libafl_derive = { version = "0.8.1", optional = true, path = "../libafl_derive" }
+libafl_derive = { version = "0.8.2", optional = true, path = "../libafl_derive" }
 
 rustversion = "1.0"
 tuple_list = { version = "0.1.3" }
