@@ -1,5 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData};
 
+use libafl::state::State;
 use libafl::{
     bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
@@ -29,11 +30,11 @@ impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, EM, I, S, Z, OT> Executor for NyxExecutor<'a, I, S, OT>
+impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxExecutor<'a, I, S, OT>
 where
     I: Input + HasTargetBytes,
 {
-    fn run_target<EM, I, S, Z>(
+    fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut S,
@@ -86,8 +87,13 @@ impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
 impl<'a, I, S, OT> HasObservers for NyxExecutor<'a, I, S, OT>
 where
     I: Input,
+    S: State<Input = I>,
     OT: ObserversTuple<I, S>,
 {
+    type Input = I;
+    type State = S;
+    type Observers = OT;
+
     fn observers(&self) -> &OT {
         &self.observers
     }

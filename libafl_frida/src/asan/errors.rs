@@ -1,5 +1,7 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
+use std::fmt::Debug;
 use std::io::Write;
+use std::marker::PhantomData;
 
 use backtrace::Backtrace;
 use capstone::{arch::BuildsCapstone, Capstone};
@@ -7,6 +9,7 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
+use libafl::state::State;
 use libafl::{
     bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
@@ -607,15 +610,19 @@ impl AsanErrorsObserver {
 
 /// A feedback reporting potential [`struct@AsanErrors`] from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AsanErrorsFeedback {
+pub struct AsanErrorsFeedback<I, S> {
     errors: Option<AsanErrors>,
+    phantom: PhantomData<(I, S)>,
 }
 
-impl<I, S> Feedback<Input = I, State = S> for AsanErrorsFeedback
+impl<I, S> Feedback for AsanErrorsFeedback<I, S>
 where
     I: Input + HasTargetBytes,
-    S: HasClientPerfMonitor,
+    S: State<Input = I> + Debug + HasClientPerfMonitor,
 {
+    type Input = I;
+    type State = S;
+
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
@@ -659,22 +666,25 @@ where
     }
 }
 
-impl Named for AsanErrorsFeedback {
+impl<I, S> Named for AsanErrorsFeedback<I, S> {
     #[inline]
     fn name(&self) -> &str {
         "AsanErrors"
     }
 }
 
-impl AsanErrorsFeedback {
+impl<I, S> AsanErrorsFeedback<I, S> {
     /// Create a new `AsanErrorsFeedback`
     #[must_use]
     pub fn new() -> Self {
-        Self { errors: None }
+        Self {
+            errors: None,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl Default for AsanErrorsFeedback {
+impl<I, S> Default for AsanErrorsFeedback<I, S> {
     fn default() -> Self {
         Self::new()
     }

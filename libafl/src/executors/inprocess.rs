@@ -1729,6 +1729,7 @@ impl<'a, H, I, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
+    S: State<Input = I>,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
@@ -1743,9 +1744,9 @@ where
         shmem_provider: SP,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<I> + EventRestarter<S>,
-        OF: Feedback<I, S>,
-        S: HasSolutions<I> + HasClientPerfMonitor,
+        EM: EventFirer<Input = I> + EventRestarter<State = S>,
+        OF: Feedback<Input = I, State = S>,
+        S: HasSolutions<Input = I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self, I, OT, S>()?;
@@ -1813,14 +1814,18 @@ where
 }
 
 #[cfg(all(feature = "std", target_os = "linux"))]
-impl<'a, H, I, OT, S, SP> HasObservers<I, OT, S>
-    for TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
+impl<'a, H, I, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, I, OT, S, SP>
 where
     H: FnMut(&I) -> ExitKind + ?Sized,
     I: Input,
+    S: State<Input = I>,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
 {
+    type Input = I;
+    type State = S;
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers

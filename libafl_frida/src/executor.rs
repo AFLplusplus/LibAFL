@@ -7,6 +7,7 @@ use frida_gum::{
 };
 #[cfg(windows)]
 use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
+use libafl::state::State;
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{HasTargetBytes, Input},
@@ -99,8 +100,13 @@ impl<'a, 'b, 'c, H, I, OT, RT, S> HasObservers
 where
     H: FnMut(&I) -> ExitKind,
     I: Input + HasTargetBytes,
+    S: State<Input = I>,
     OT: ObserversTuple<I, S>,
 {
+    type Input = I;
+    type State = S;
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> &OT {
         self.base.observers()

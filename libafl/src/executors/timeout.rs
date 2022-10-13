@@ -1,6 +1,5 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
-use core::marker::PhantomData;
 #[cfg(target_os = "linux")]
 use core::ptr::{addr_of, addr_of_mut};
 #[cfg(all(windows, feature = "std"))]
@@ -77,7 +76,7 @@ extern "C" {
 const ITIMER_REAL: c_int = 0;
 
 /// The timeout executor is a wrapper that sets a timeout before each run
-pub struct TimeoutExecutor<E, EM, Z> {
+pub struct TimeoutExecutor<E> {
     /// The wrapped [`Executor`]
     executor: E,
     #[cfg(target_os = "linux")]
@@ -92,10 +91,9 @@ pub struct TimeoutExecutor<E, EM, Z> {
     tp_timer: *mut TP_TIMER,
     #[cfg(windows)]
     critical: RTL_CRITICAL_SECTION,
-    phantom: PhantomData<(EM, Z)>,
 }
 
-impl<E: Debug, EM, Z> Debug for TimeoutExecutor<E, EM, Z> {
+impl<E: Debug> Debug for TimeoutExecutor<E> {
     #[cfg(windows)]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("TimeoutExecutor")
@@ -267,13 +265,13 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, I, S, Z> + HasInProcessHandlers,
     I: Input,
 {
     #[allow(clippy::cast_sign_loss)]
-    fn run_target<EM, I, S, Z>(
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -337,12 +335,12 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, I, S, Z> Executor for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor,
+    E: Executor<EM, I, S, Z>,
     I: Input,
 {
-    fn run_target<EM, I, S, Z>(
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -372,7 +370,6 @@ impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E, EM, Z>
 where
     E: Executor<EM, I, S, Z>,
     I: Input,
-    Z: Sized,
 {
     fn run_target(
         &mut self,
@@ -398,12 +395,11 @@ where
     }
 }
 
-impl<E, EM, I, S, Z> HasObservers for TimeoutExecutor<E, EM, Z>
+impl<E, I, S> HasObservers for TimeoutExecutor<E>
 where
-    E: HasObservers<Input = I, State = S> + Executor<EM, I, S, Z>,
+    E: HasObservers<Input = I, State = S>,
     I: Input,
     S: State<Input = I>,
-    Z: Sized,
 {
     type Input = I;
 
