@@ -957,7 +957,7 @@ mod windows_exception_handler {
         EM: EventFirer<Input = I, State = S> + EventRestarter,
         OT: ObserversTuple<I, S>,
         OF: Feedback<Input = I, State = S>,
-        S: HasSolutions<Input = I> + HasClientPerfMonitor,
+        S: State<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -1046,10 +1046,10 @@ mod windows_exception_handler {
         _p1: *mut u8,
     ) where
         E: HasObservers<Input = I, State = S, Observers = OT>,
-        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        EM: EventFirer<Input = I, State = S> + EventRestarter<State = S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<Input = I, State = S>,
-        S: HasSolutions<Input = I> + HasClientPerfMonitor,
+        S: State<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
@@ -1142,10 +1142,10 @@ mod windows_exception_handler {
         data: &mut InProcessExecutorHandlerData,
     ) where
         E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        EM: EventFirer<Input = I, State = S> + EventRestarter<State = S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<Input = I, State = S>,
-        S: HasSolutions<Input = I> + HasClientPerfMonitor,
+        S: State<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor,
         I: Input,
         Z: HasObjective<I, OF, S>,
     {
