@@ -46,7 +46,6 @@ where
 
 impl<E, I, S, SOT> ShadowExecutor<E, I, S, SOT>
 where
-    SOT: ObserversTuple<I, S>,
     E: HasObservers<Input = I, State = S> + Debug,
     I: Debug + Input,
     S: State<Input = I>,

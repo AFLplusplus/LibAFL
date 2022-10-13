@@ -674,7 +674,6 @@ pub trait ExecutesInput<E, EM> {
 impl<CS, E, EM, F, I, OF, OT, S> ExecutesInput<E, EM> for StdFuzzer<CS, F, I, OF, OT, S>
 where
     CS: Scheduler<Input = I, State = S>,
-    E: Executor<EM, I, S, Self>,
     F: Feedback<Input = I, State = S>,
     I: Input,
     //Self: ExecutesInput<Input = I>,

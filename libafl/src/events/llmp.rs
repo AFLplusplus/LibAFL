@@ -586,7 +586,6 @@ where
     I: Input,
     S: State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
     OT: ObserversTuple<I, S> + DeserializeOwned,
-    S: State<Input = I>,
     SP: ShMemProvider,
 {
     type State = S;

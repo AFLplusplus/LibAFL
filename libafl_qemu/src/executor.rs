@@ -3,8 +3,11 @@ use core::fmt::{self, Debug, Formatter};
 
 #[cfg(feature = "fork")]
 use libafl::bolts::shmem::ShMemProvider;
+use libafl::events::EventManager;
 #[cfg(feature = "fork")]
 use libafl::executors::InProcessForkExecutor;
+use libafl::prelude::{HasCorpus, HasExecutions};
+use libafl::state::State;
 use libafl::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
@@ -61,9 +64,13 @@ where
         event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        EM: EventFirer<Input = I, State = S> + EventRestarter<Input = I, State = S>,
         OF: Feedback<Input = I, State = S>,
-        S: HasSolutions<Input = I> + HasClientPerfMonitor,
+        S: State<Input = I>
+            + HasExecutions
+            + HasCorpus<Input = I>
+            + HasSolutions<Input = I>
+            + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         Ok(Self {
@@ -93,14 +100,14 @@ where
     }
 }
 
-impl<'a, EM, H, I, OT, QT, S, Z> Executor for QemuExecutor<'a, H, I, OT, QT, S>
+impl<'a, EM, H, I, OT, QT, S, Z> Executor<EM, I, S, Z> for QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
 {
-    fn run_target<EM, I, S, Z>(
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -119,9 +126,14 @@ impl<'a, H, I, OT, QT, S> HasObservers for QemuExecutor<'a, H, I, OT, QT, S>
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
+    S: State<Input = I>,
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
 {
+    type Input = I;
+    type State = S;
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> &OT {
         self.inner.observers()
@@ -184,7 +196,7 @@ where
     where
         EM: EventFirer<Input = I, State = S> + EventRestarter,
         OF: Feedback<Input = I, State = S>,
-        S: HasSolutions<Input = I> + HasClientPerfMonitor,
+        S: State<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor,
         Z: HasObjective<I, OF, S>,
     {
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
@@ -224,15 +236,18 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, EM, H, I, OT, QT, S, Z, SP> Executor for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
+impl<'a, EM, H, I, OT, QT, S, Z, SP> Executor<EM, I, S, Z>
+    for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
 where
+    EM: EventManager<InProcessForkExecutor<'a, H, I, OT, S, SP>, I, S, Z>,
     H: FnMut(&I) -> ExitKind,
     I: Input,
+    S: State<Input = I>,
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
     SP: ShMemProvider,
 {
-    fn run_target<EM, I, S, Z>(
+    fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
@@ -252,10 +267,15 @@ impl<'a, H, I, OT, QT, S, SP> HasObservers for QemuForkExecutor<'a, H, I, OT, QT
 where
     H: FnMut(&I) -> ExitKind,
     I: Input,
+    S: State<Input = I>,
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
     SP: ShMemProvider,
 {
+    type Input = I;
+    type State = S;
+    type Observers = OT;
+
     #[inline]
     fn observers(&self) -> &OT {
         self.inner.observers()
