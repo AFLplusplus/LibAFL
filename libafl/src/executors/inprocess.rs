@@ -954,7 +954,7 @@ mod windows_exception_handler {
     pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
     where
         E: HasObservers<Input = I, State = S, Observers = OT>,
-        EM: EventFirer<Input = I, State = S> + EventRestarter,
+        EM: EventFirer<Input = I, State = S> + EventRestarter<State = S>,
         OT: ObserversTuple<I, S>,
         OF: Feedback<Input = I, State = S>,
         S: State<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor,
