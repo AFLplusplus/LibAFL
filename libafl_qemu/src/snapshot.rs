@@ -46,14 +46,35 @@ impl SnapshotAccessInfo {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
+pub struct MappingInfo {
+    pub tree: IntervalTree<GuestAddr, Option<MmapPerms>>,
+    pub size: usize
+}
+
 pub struct QemuSnapshotHelper {
     pub accesses: ThreadLocal<UnsafeCell<SnapshotAccessInfo>>,
-    pub new_maps: Mutex<IntervalTree<GuestAddr, Option<MmapPerms>>>,
+    pub new_maps: Mutex<MappingInfo>,
     pub pages: HashMap<GuestAddr, SnapshotPageInfo>,
     pub brk: GuestAddr,
     pub mmap_start: GuestAddr,
+    pub mmap_limit: usize,
+    pub stop_execution: Box<dyn FnMut()>,
     pub empty: bool,
+}
+
+impl core::fmt::Debug for QemuSnapshotHelper {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("QemuSnapshotHelper")
+            .field("accesses", &self.accesses)
+            .field("new_maps", &self.new_maps)
+            .field("pages", &self.pages)
+            .field("brk", &self.brk)
+            .field("mmap_start", &self.mmap_start)
+            .field("mmap_limit", &self.mmap_limit)
+            .field("empty", &self.empty)
+            .finish()
+    }
 }
 
 impl QemuSnapshotHelper {
@@ -61,10 +82,26 @@ impl QemuSnapshotHelper {
     pub fn new() -> Self {
         Self {
             accesses: ThreadLocal::new(),
-            new_maps: Mutex::new(IntervalTree::new()),
+            new_maps: Mutex::new(MappingInfo::default()),
             pages: HashMap::default(),
             brk: 0,
             mmap_start: 0,
+            mmap_limit: 0,
+            stop_execution: Box::new(|| {}),
+            empty: true,
+        }
+    }
+
+    #[must_use]
+    pub fn with_mmap_limit(mmap_limit: usize, stop_execution: Box<dyn FnMut()>) -> Self {
+        Self {
+            accesses: ThreadLocal::new(),
+            new_maps: Mutex::new(MappingInfo::default()),
+            pages: HashMap::default(),
+            brk: 0,
+            mmap_start: 0,
+            mmap_limit,
+            stop_execution,
             empty: true,
         }
     }
@@ -146,15 +183,27 @@ impl QemuSnapshotHelper {
         if size % SNAPSHOT_PAGE_SIZE != 0 {
             size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
         }
-        self.new_maps
+        let mut mapping = self.new_maps
             .lock()
-            .unwrap()
-            .insert(start..start + (size as GuestAddr), perms);
+            .unwrap();
+        mapping.tree.insert(start..start + (size as GuestAddr), perms);
+        mapping.size += size;
+    }
+
+    pub fn remove_mapped(&mut self, start: GuestAddr, mut size: usize) {
+        if size % SNAPSHOT_PAGE_SIZE != 0 {
+            size = size + (SNAPSHOT_PAGE_SIZE - size % SNAPSHOT_PAGE_SIZE);
+        }
+        let mut mapping = self.new_maps
+            .lock()
+            .unwrap();
+        mapping.tree.insert(start..start + (size as GuestAddr), perms);
+        mapping.size += size;
     }
 
     pub fn reset_maps(&mut self, emulator: &Emulator) {
         let new_maps = self.new_maps.get_mut().unwrap();
-        for r in new_maps.find(0..GuestAddr::MAX) {
+        for r in new_maps.tree.find(0..GuestAddr::MAX) {
             let addr = r.interval().start;
             let end = r.interval().end;
             let perms = r.data();
@@ -182,7 +231,7 @@ impl QemuSnapshotHelper {
                 drop(emulator.unmap(addr, size));
             }
         }
-        *new_maps = IntervalTree::new();
+        *new_maps = MappingInfo::default();
     }
 }
 
@@ -382,6 +431,9 @@ where
                     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
                     h.add_mapped(a0 as GuestAddr, a2 as usize, Some(prot));
                 }
+            } else if i64::from(sys_num) == SYS_munmap {
+                let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
+                h.remove_mapped(a1 as GuestAddr, a2 as usize);
             }
         }
     }
