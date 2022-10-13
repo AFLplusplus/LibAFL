@@ -20,8 +20,10 @@ windows_alias = "unsupported"
 [tasks.zlib_unix_wget]
 condition = { files_not_exist = [ "./zlib-1.2.12" ] }
 script_runner="@shell"
+# NOTE: There's no specific reason we're using an old version of zlib,
+# but newer versions get moved to fossils/ after a while.
 script='''
-wget http://www.zlib.net/zlib-1.2.12.tar.gz
+wget https://zlib.net/fossils/zlib-1.2.12.tar.gz
 tar -xvf zlib-1.2.12.tar.gz
 '''
 
