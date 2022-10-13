@@ -13,8 +13,7 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     inputs::Input,
     observers::{ObserverWithHashField, ObserversTuple},
-    prelude::{HasClientPerfMonitor, State},
-    state::HasNamedMetadata,
+    state::{HasClientPerfMonitor, HasNamedMetadata, State},
     Error,
 };
 

@@ -192,7 +192,6 @@ where
     S: HasClientPerfMonitor + Debug + State<Input = I>,
 {
     type Input = I;
-
     type State = S;
 
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {

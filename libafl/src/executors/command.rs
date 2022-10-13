@@ -29,7 +29,7 @@ use crate::{
     },
     inputs::HasTargetBytes,
     observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
-    prelude::State,
+    state::State,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};

@@ -17,8 +17,7 @@ use crate::{
         concolic::{ConcolicMetadata, ConcolicObserver},
         ObserversTuple,
     },
-    prelude::{HasClientPerfMonitor, State},
-    state::HasMetadata,
+    state::{HasClientPerfMonitor, HasMetadata, State},
     Error,
 };
 

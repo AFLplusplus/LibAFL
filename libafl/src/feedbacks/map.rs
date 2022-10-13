@@ -367,10 +367,9 @@ where
     S: HasNamedMetadata + HasClientPerfMonitor + Debug + State<Input = I>,
 {
     type Input = I;
-
     type State = S;
 
-    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
+    fn init_state(&mut self, state: &mut Self::State) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
         // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
         state.add_named_metadata(MapFeedbackMetadata::<T>::default(), &self.name);
@@ -380,15 +379,15 @@ where
     #[rustversion::nightly]
     default fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -396,20 +395,24 @@ where
     #[rustversion::not(nightly)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        input: &I,
+        input: &Self::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        testcase: &mut Testcase<Self::Input>,
+    ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             let meta = MapIndexesMetadata::new(core::mem::take(v));
             testcase.add_metadata(meta);
@@ -422,7 +425,7 @@ where
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
         }
@@ -446,15 +449,15 @@ where
     #[allow(clippy::needless_range_loop)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
-        _input: &I,
+        _input: &Self::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = Self::Input, State = Self::State>,
+        OT: ObserversTuple<Self::Input, Self::State>,
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;

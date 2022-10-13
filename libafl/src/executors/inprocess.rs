@@ -953,7 +953,7 @@ mod windows_exception_handler {
     #[cfg(feature = "std")]
     pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
     where
-        E: HasObservers<OT>,
+        E: HasObservers<Input = I, State = S, Observers = OT>,
         EM: EventFirer<Input = I, State = S> + EventRestarter,
         OT: ObserversTuple<I, S>,
         OF: Feedback<Input = I, State = S>,
@@ -1045,7 +1045,7 @@ mod windows_exception_handler {
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers<OT>,
+        E: HasObservers<Input = I, State = S, Observers = OT>,
         EM: EventFirer<Input = I, State = S> + EventRestarter,
         OT: ObserversTuple<I, S>,
         OF: Feedback<Input = I, State = S>,
