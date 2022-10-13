@@ -9,7 +9,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
     observers::ObserversTuple,
-    prelude::State,
+    state::State,
     Error,
 };
 

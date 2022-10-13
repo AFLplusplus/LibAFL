@@ -676,7 +676,6 @@ where
     CS: Scheduler<Input = I, State = S>,
     F: Feedback<Input = I, State = S>,
     I: Input,
-    //Self: ExecutesInput<Input = I>,
     OT: ObserversTuple<I, S>,
     OF: Feedback<Input = I, State = S>,
     E: Executor<EM, I, S, Self> + HasObservers<State = S, Input = I, Observers = OT>,

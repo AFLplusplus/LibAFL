@@ -4,7 +4,11 @@ use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::Corpus, inputs::Input, prelude::State, schedulers::Scheduler, state::HasCorpus, Error,
+    corpus::Corpus,
+    inputs::Input,
+    schedulers::Scheduler,
+    state::{HasCorpus, State},
+    Error,
 };
 
 /// Walk the corpus in a queue-like fashion

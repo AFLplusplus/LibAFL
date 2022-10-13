@@ -22,9 +22,8 @@ use crate::{
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    prelude::State,
     stages::calibrate::UnstableEntriesMetadata,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, State},
     Error,
 };
 

@@ -41,7 +41,7 @@ use crate::{
     bolts::AsSlice,
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
-    prelude::State,
+    state::State,
     Error,
 };
 

@@ -38,8 +38,7 @@ use crate::{
     executors::ExitKind,
     inputs::Input,
     observers::{ListObserver, ObserversTuple, TimeObserver},
-    prelude::State,
-    state::HasClientPerfMonitor,
+    state::{HasClientPerfMonitor, State},
     Error,
 };
 

@@ -45,7 +45,7 @@ use crate::{
     inputs::Input,
     monitors::Monitor,
     observers::ObserversTuple,
-    prelude::{HasClientPerfMonitor, HasExecutions, HasMetadata, State},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, State},
     Error,
 };
 
@@ -324,7 +324,7 @@ where
         configuration: EventConfig,
     ) -> Result<Self, Error> {
         Ok(Self {
-            llmp: llmp::LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
+            llmp: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
@@ -362,7 +362,7 @@ where
         configuration: EventConfig,
     ) -> Result<Self, Error> {
         Ok(Self {
-            llmp: llmp::LlmpClient::existing_client_from_description(shmem_provider, description)?,
+            llmp: LlmpClient::existing_client_from_description(shmem_provider, description)?,
             #[cfg(feature = "llmp_compression")]
             compressor: GzipCompressor::new(COMPRESS_THRESHOLD),
             configuration,
