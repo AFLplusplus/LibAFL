@@ -301,10 +301,8 @@ where
 
 /// [`EventFirer`] fire an event.
 pub trait EventFirer {
-    /// [`Input`] for this fuzzing campaign
-    type Input: Input;
     /// [`State`] for this fuzzing campaign
-    type State: State<Input = Self::Input>;
+    type State: State;
 
     /// Send off an [`Event`] to the broker
     ///
@@ -341,7 +339,7 @@ pub trait EventFirer {
     /// Serialize all observers for this type and manager
     fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<Self::Input, Self::State> + Serialize,
+        OT: ObserversTuple<Self::State> + Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -353,16 +351,9 @@ pub trait EventFirer {
 }
 
 /// [`ProgressReporter`] report progress to the broker.
-pub trait ProgressReporter:
-    EventFirer<Input = <Self as ProgressReporter>::Input, State = <Self as ProgressReporter>::State>
-{
-    /// [`Input`] for this fuzzing campaign
-    type Input: Input;
+pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State> {
     /// [`State`] for this fuzzing campaign
-    type State: State<Input = <Self as ProgressReporter>::Input>
-        + HasClientPerfMonitor
-        + HasMetadata
-        + HasExecutions;
+    type State: State + HasClientPerfMonitor + HasMetadata + HasExecutions;
 
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -432,10 +423,8 @@ pub trait ProgressReporter:
 
 /// Restartable trait
 pub trait EventRestarter {
-    /// [`Input`] for this fuzzing campaign
-    type Input: Input;
     /// [`State`] for this fuzzing campaign
-    type State: State<Input = Self::Input>;
+    type State: State;
 
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
@@ -451,11 +440,9 @@ pub trait EventRestarter {
 /// [`EventProcessor`] process all the incoming messages
 pub trait EventProcessor<E, Z> {
     /// The [`State`]
-    type State: State<Input = Self::Input>;
-    /// The [`Input`]
-    type Input;
+    type State: State;
     /// The [`Observers`]
-    type Observers: ObserversTuple<Self::Input, Self::State>;
+    type Observers: ObserversTuple<Self::State>;
 
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
@@ -485,15 +472,14 @@ pub trait HasEventManagerId {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager<E, I, S, Z>:
-    EventFirer<Input = I, State = S>
-    + EventProcessor<E, Z, Input = I, State = S>
-    + EventRestarter<Input = I, State = S>
+pub trait EventManager<E, S, Z>:
+    EventFirer<State = S>
+    + EventProcessor<E, Z, State = S>
+    + EventRestarter<State = S>
     + HasEventManagerId
-    + ProgressReporter<Input = I, State = S>
+    + ProgressReporter<State = S>
 where
-    I: Input,
-    S: State<Input = I>,
+    S: State,
 {
 }
 
@@ -527,8 +513,6 @@ impl<OT, S> EventFirer for NopEventManager<OT, S>
 where
     S: State,
 {
-    type Input = <S as State>::Input;
-
     type State = S;
 
     fn fire(
@@ -544,19 +528,15 @@ impl<OT, S> EventRestarter for NopEventManager<OT, S>
 where
     S: State,
 {
-    type Input = <S as State>::Input;
-
     type State = S;
 }
 
 impl<E, OT, S, Z> EventProcessor<E, Z> for NopEventManager<OT, S>
 where
     S: State + HasClientPerfMonitor + HasExecutions,
-    OT: ObserversTuple<<S as State>::Input, S>,
+    OT: ObserversTuple<S>,
 {
     type State = S;
-
-    type Input = <S as State>::Input;
 
     type Observers = OT;
 
@@ -570,11 +550,10 @@ where
     }
 }
 
-impl<E, I, OT, S, Z> EventManager<E, I, S, Z> for NopEventManager<OT, S>
+impl<E, OT, S, Z> EventManager<E, S, Z> for NopEventManager<OT, S>
 where
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    S: State<Input = I> + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    OT: ObserversTuple<S>,
+    S: State + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
 }
 
@@ -591,8 +570,6 @@ where
     S: State + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
     type State = S;
-
-    type Input = <S as State>::Input;
 }
 
 impl<OT, S> HasEventManagerId for NopEventManager<OT, S> {

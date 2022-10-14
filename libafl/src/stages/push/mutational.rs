@@ -34,17 +34,16 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 ///
 /// The default mutational push stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
+pub struct StdMutationalPushStage<CS, EM, M, OT, Z>
 where
-    CS: Scheduler<Input = I, State = S>,
-    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
-    I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
-        + EvaluatorObservers<Input = I, State = S, Observers = OT>
-        + HasScheduler<CS, I, S>,
+    CS: Scheduler,
+    EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
+    M: Mutator<<CS::State as HasCorpus>::Input, CS::State>,
+    OT: ObserversTuple<<CS::State as HasCorpus>::Input, CS::State>,
+    CS::State: HasClientPerfMonitor + HasRand,
+    Z: ExecutionProcessor<Observers = OT, State = CS::State>
+        + EvaluatorObservers<Observers = OT, State = CS::State>
+        + HasScheduler<CS>,
 {
     current_corpus_idx: Option<usize>,
     testcases_to_do: usize,
@@ -54,7 +53,7 @@ where
 
     mutator: M,
 
-    psh: PushStageHelper<CS, EM, I, OT, S, Z>,
+    psh: PushStageHelper<CS, EM, OT, Z>,
 }
 
 impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>

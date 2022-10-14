@@ -30,7 +30,6 @@ pub use powersched::PowerQueueScheduler;
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, Testcase},
-    inputs::Input,
     state::{HasCorpus, HasRand, State},
     Error,
 };
@@ -38,10 +37,8 @@ use crate::{
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
 pub trait Scheduler {
-    /// The [`Input`]
-    type Input: Input;
     /// The [`State`]
-    type State: HasCorpus<Input = Self::Input>;
+    type State: HasCorpus;
 
     /// Added an entry to the corpus at the given index
     fn on_add(&self, _state: &mut Self::State, _idx: usize) -> Result<(), Error> {
@@ -53,7 +50,7 @@ pub trait Scheduler {
         &self,
         _state: &mut Self::State,
         _idx: usize,
-        _prev: &Testcase<Self::Input>,
+        _prev: &Testcase<<Self::State as HasCorpus>::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -63,7 +60,7 @@ pub trait Scheduler {
         &self,
         _state: &mut Self::State,
         _idx: usize,
-        _testcase: &Option<Testcase<Self::Input>>,
+        _testcase: &Option<Testcase<<Self::State as HasCorpus>::Input>>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -74,17 +71,14 @@ pub trait Scheduler {
 
 /// Feed the fuzzer simply with a random testcase on request
 #[derive(Debug, Clone)]
-pub struct RandScheduler<I, S> {
-    phantom: PhantomData<(I, S)>,
+pub struct RandScheduler<S> {
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> Scheduler for RandScheduler<I, S>
+impl<S> Scheduler for RandScheduler<S>
 where
-    I: Input,
-    S: State<Input = I> + HasCorpus<Input = I> + HasRand,
+    S: State + HasCorpus<Input = <S as State>::Input> + HasRand,
 {
-    type Input = I;
-
     type State = S;
 
     /// Gets the next entry at random
@@ -100,7 +94,7 @@ where
     }
 }
 
-impl<I, S> RandScheduler<I, S> {
+impl<S> RandScheduler<S> {
     /// Create a new [`RandScheduler`] that just schedules randomly.
     #[must_use]
     pub fn new() -> Self {
@@ -110,7 +104,7 @@ impl<I, S> RandScheduler<I, S> {
     }
 }
 
-impl<I, S> Default for RandScheduler<I, S> {
+impl<S> Default for RandScheduler<S> {
     fn default() -> Self {
         Self::new()
     }
@@ -118,4 +112,4 @@ impl<I, S> Default for RandScheduler<I, S> {
 
 /// A [`StdScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s.
 /// The current `Std` is a [`RandScheduler`], although this may change in the future, if another [`Scheduler`] delivers better results.
-pub type StdScheduler<I, S> = RandScheduler<I, S>;
+pub type StdScheduler<S> = RandScheduler<S>;

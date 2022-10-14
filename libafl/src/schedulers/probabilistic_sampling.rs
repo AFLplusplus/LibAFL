@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
-    inputs::Input,
     schedulers::{Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
@@ -18,13 +17,12 @@ use crate::{
 
 /// Conduct reservoir sampling (probabilistic sampling) over all corpus elements.
 #[derive(Debug, Clone)]
-pub struct ProbabilitySamplingScheduler<F, I, S>
+pub struct ProbabilitySamplingScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
-    phantom: PhantomData<(F, I, S)>,
+    phantom: PhantomData<(F, S)>,
 }
 
 /// A state metadata holding a map of probability of corpus elements.
@@ -55,11 +53,10 @@ impl Default for ProbabilityMetadata {
     }
 }
 
-impl<F, I, S> ProbabilitySamplingScheduler<F, I, S>
+impl<F, S> ProbabilitySamplingScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Creates a new [`struct@ProbabilitySamplingScheduler`]
     #[must_use]
@@ -90,17 +87,14 @@ where
     }
 }
 
-impl<F, I, S> Scheduler for ProbabilitySamplingScheduler<F, I, S>
+impl<F, S> Scheduler for ProbabilitySamplingScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
-    type Input = I;
-
     type State = S;
 
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());
         }
@@ -109,7 +103,7 @@ where
 
     /// Gets the next entry
     #[allow(clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
@@ -131,11 +125,10 @@ where
     }
 }
 
-impl<F, I, S> Default for ProbabilitySamplingScheduler<F, I, S>
+impl<F, S> Default for ProbabilitySamplingScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<Input = I> + HasMetadata + HasRand,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     fn default() -> Self {
         Self::new()
@@ -167,18 +160,17 @@ mod tests {
         phantom: PhantomData<I>,
     }
 
-    impl<I, S> TestcaseScore<I, S> for UniformDistribution<I>
+    impl<S> TestcaseScore<S> for UniformDistribution<I>
     where
-        I: Input,
-        S: HasMetadata + HasCorpus<Input = I>,
+        S: HasMetadata + HasCorpus,
     {
         fn compute(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }
 
-    pub type UniformProbabilitySamplingScheduler<I, S> =
-        ProbabilitySamplingScheduler<UniformDistribution<I>, I, S>;
+    pub type UniformProbabilitySamplingScheduler<S> =
+        ProbabilitySamplingScheduler<UniformDistribution<S::Input>, S>;
 
     #[test]
     fn test_prob_sampling() {

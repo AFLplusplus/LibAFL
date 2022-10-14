@@ -121,10 +121,9 @@ where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
     S: HasMetadata + HasClientPerfMonitor + State<Input = I>,
-    O1: Observer<I, S> + PartialEq<O2>,
-    O2: Observer<I, S>,
+    O1: Observer<S> + PartialEq<O2>,
+    O2: Observer<S>,
 {
-    type Input = I;
     type State = S;
 
     #[allow(clippy::wrong_self_convention)]
@@ -137,8 +136,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S> + MatchName,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S> + MatchName,
     {
         fn err(name: &str) -> Error {
             Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))

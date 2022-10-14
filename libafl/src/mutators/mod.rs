@@ -22,7 +22,7 @@ pub use nautilus::*;
 
 use crate::{
     bolts::tuples::{HasConstLen, Named},
-    inputs::Input,
+    state::State,
     Error,
 };
 
@@ -42,12 +42,15 @@ pub enum MutationResult {
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<I, S> {
+pub trait Mutator<S>
+where
+    S: State,
+{
     /// Mutate a given input
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -63,15 +66,15 @@ pub trait Mutator<I, S> {
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
-pub trait MutatorsTuple<I, S>: HasConstLen
+pub trait MutatorsTuple<S>: HasConstLen
 where
-    I: Input,
+    S: State,
 {
     /// Runs the `mutate` function on all `Mutators` in this `Tuple`.
     fn mutate_all(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -88,7 +91,7 @@ where
         &mut self,
         index: usize,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -102,14 +105,14 @@ where
     ) -> Result<(), Error>;
 }
 
-impl<I, S> MutatorsTuple<I, S> for ()
+impl<S> MutatorsTuple<S> for ()
 where
-    I: Input,
+    S: State,
 {
     fn mutate_all(
         &mut self,
         _state: &mut S,
-        _input: &mut I,
+        _input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         Ok(MutationResult::Skipped)
@@ -128,7 +131,7 @@ where
         &mut self,
         _index: usize,
         _state: &mut S,
-        _input: &mut I,
+        _input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         Ok(MutationResult::Skipped)
@@ -145,16 +148,16 @@ where
     }
 }
 
-impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
+impl<Head, Tail, S> MutatorsTuple<S> for (Head, Tail)
 where
-    Head: Mutator<I, S> + Named,
-    Tail: MutatorsTuple<I, S>,
-    I: Input,
+    Head: Mutator<S> + Named,
+    Tail: MutatorsTuple<S>,
+    S: State,
 {
     fn mutate_all(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let r = self.0.mutate(state, input, stage_idx)?;
@@ -179,7 +182,7 @@ where
         &mut self,
         index: usize,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if index == 0 {
@@ -231,7 +234,7 @@ pub mod pybind {
         }
     }
 
-    impl Mutator<BytesInput, PythonStdState> for PyObjectMutator {
+    impl Mutator<PythonStdState> for PyObjectMutator {
         fn mutate(
             &mut self,
             state: &mut PythonStdState,
@@ -326,7 +329,7 @@ pub mod pybind {
         }
     }
 
-    impl Mutator<BytesInput, PythonStdState> for PythonMutator {
+    impl Mutator<PythonStdState> for PythonMutator {
         fn mutate(
             &mut self,
             state: &mut PythonStdState,

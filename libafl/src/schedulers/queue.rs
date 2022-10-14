@@ -5,7 +5,6 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::Corpus,
-    inputs::Input,
     schedulers::Scheduler,
     state::{HasCorpus, State},
     Error,
@@ -13,17 +12,14 @@ use crate::{
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
-pub struct QueueScheduler<I, S> {
-    phantom: PhantomData<(I, S)>,
+pub struct QueueScheduler<S> {
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> Scheduler for QueueScheduler<I, S>
+impl<S> Scheduler for QueueScheduler<S>
 where
-    I: Input,
-    S: State<Input = I> + HasCorpus<Input = I>,
+    S: State + HasCorpus<Input = <S as State>::Input>,
 {
-    type Input = I;
-
     type State = S;
 
     /// Gets the next entry in the queue
@@ -47,7 +43,7 @@ where
     }
 }
 
-impl<I, S> QueueScheduler<I, S> {
+impl<S> QueueScheduler<S> {
     /// Creates a new `QueueScheduler`
     #[must_use]
     pub fn new() -> Self {
@@ -57,7 +53,7 @@ impl<I, S> QueueScheduler<I, S> {
     }
 }
 
-impl<I, S> Default for QueueScheduler<I, S> {
+impl<S> Default for QueueScheduler<S> {
     fn default() -> Self {
         Self::new()
     }

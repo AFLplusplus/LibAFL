@@ -6,7 +6,7 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
+    state::State,
     Error,
 };
 
@@ -27,11 +27,10 @@ where
     B: Debug,
 {
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
+    pub fn new<EM, S, Z>(primary: A, secondary: B) -> Self
     where
-        A: Executor<EM, I, S, Z>,
-        B: Executor<EM, I, S, Z>,
-        I: Input,
+        A: Executor<EM, S, Z>,
+        B: Executor<EM, S, Z>,
         Z: Sized,
     {
         Self { primary, secondary }
@@ -48,11 +47,11 @@ where
     }
 }
 
-impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for DiffExecutor<A, B>
+impl<A, B, EM, S, Z> Executor<EM, S, Z> for DiffExecutor<A, B>
 where
-    A: Executor<EM, I, S, Z>,
-    B: Executor<EM, I, S, Z>,
-    I: Input,
+    A: Executor<EM, S, Z>,
+    B: Executor<EM, S, Z>,
+    S: State,
     Z: Sized,
 {
     fn run_target(
@@ -60,7 +59,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
         self.primary.post_run_reset();
@@ -81,10 +80,8 @@ where
 impl<A, B> HasObservers for DiffExecutor<A, B>
 where
     A: HasObservers,
-    B: HasObservers<Input = A::Input, State = A::State, Observers = A::Observers>,
+    B: HasObservers<State = A::State, Observers = A::Observers>,
 {
-    type Input = A::Input;
-
     type State = A::State;
 
     type Observers = A::Observers;

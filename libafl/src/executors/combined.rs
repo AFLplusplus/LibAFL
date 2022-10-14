@@ -5,7 +5,7 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
+    state::State,
     Error,
 };
 
@@ -18,11 +18,10 @@ pub struct CombinedExecutor<A: Debug, B: Debug> {
 
 impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
+    pub fn new<EM, S, Z>(primary: A, secondary: B) -> Self
     where
-        A: Executor<EM, I, S, Z>,
-        B: Executor<EM, I, S, Z>,
-        I: Input,
+        A: Executor<EM, S, Z>,
+        B: Executor<EM, S, Z>,
     {
         Self { primary, secondary }
     }
@@ -38,11 +37,11 @@ impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
     }
 }
 
-impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for CombinedExecutor<A, B>
+impl<A, B, EM, S, Z> Executor<EM, S, Z> for CombinedExecutor<A, B>
 where
-    A: Executor<EM, I, S, Z>,
-    B: Executor<EM, I, S, Z>,
-    I: Input,
+    A: Executor<EM, S, Z>,
+    B: Executor<EM, S, Z>,
+    S: State,
     Z: Sized,
 {
     fn run_target(
@@ -50,7 +49,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         let ret = self.primary.run_target(fuzzer, state, mgr, input);
         self.primary.post_run_reset();
@@ -64,10 +63,7 @@ where
     A: HasObservers,
     B: Debug,
 {
-    type Input = A::Input;
-
     type State = A::State;
-
     type Observers = A::Observers;
 
     #[inline]

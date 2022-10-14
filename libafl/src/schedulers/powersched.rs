@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
-    inputs::Input,
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata, State},
     Error,
@@ -148,18 +147,15 @@ pub enum PowerSchedule {
 
 /// A corpus scheduler using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler<I, S> {
+pub struct PowerQueueScheduler<S> {
     strat: PowerSchedule,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> Scheduler for PowerQueueScheduler<I, S>
+impl<S> Scheduler for PowerQueueScheduler<S>
 where
-    I: Input,
-    S: State<Input = I> + HasCorpus<Input = I> + HasMetadata,
+    S: State + HasCorpus<Input = <S as State>::Input> + HasMetadata,
 {
-    type Input = I;
-
     type State = S;
 
     /// Add an entry to the corpus and return its index
@@ -237,7 +233,7 @@ where
     }
 }
 
-impl<I, S> PowerQueueScheduler<I, S> {
+impl<S> PowerQueueScheduler<S> {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
     pub fn new(strat: PowerSchedule) -> Self {

@@ -29,10 +29,9 @@ use crate::{
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
-pub trait HasScheduler<CS, I, S>
+pub trait HasScheduler<CS>
 where
-    CS: Scheduler<Input = I, State = S>,
-    I: Input,
+    CS: Scheduler,
 {
     /// The scheduler
     fn scheduler(&self) -> &CS;
@@ -42,11 +41,9 @@ where
 }
 
 /// Holds an feedback
-pub trait HasFeedback<F, I, S>
+pub trait HasFeedback<F>
 where
-    F: Feedback<Input = I, State = S>,
-    I: Input,
-    S: HasClientPerfMonitor,
+    F: Feedback,
 {
     /// The feedback
     fn feedback(&self) -> &F;
@@ -56,10 +53,9 @@ where
 }
 
 /// Holds an objective feedback
-pub trait HasObjective<I, OF, S>
+pub trait HasObjective<OF, S>
 where
-    OF: Feedback<Input = I, State = S>,
-    I: Input,
+    OF: Feedback<State = S>,
     S: HasClientPerfMonitor,
 {
     /// The objective feedback
@@ -73,8 +69,6 @@ where
 pub trait ExecutionProcessor {
     /// The [`Observers`]
     type Observers: ObserversTuple<Self::Input, Self::State>;
-    /// The [`Input`]
-    type Input: Input;
     /// The [`State`]
     type State: State<Input = Self::Input>;
 
@@ -94,12 +88,10 @@ pub trait ExecutionProcessor {
 
 /// Evaluate an input modifying the state of the fuzzer
 pub trait EvaluatorObservers: Sized {
-    /// The [`Input`] used
-    type Input: Input;
-    /// The [`State`]
-    type State: State<Input = Self::Input>;
     /// The [`Observers`]
     type Observers: ObserversTuple<Self::Input, Self::State>;
+    /// The [`State`]
+    type State: State<Input = Self::Input>;
 
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new
@@ -335,7 +327,6 @@ where
         + State<Input = I>,
 {
     type Observers = OT;
-    type Input = I;
     type State = S;
 
     /// Evaluate if a set of observation channels has an interesting state
@@ -456,7 +447,6 @@ where
         + HasExecutions
         + State<Input = I>,
 {
-    type Input = I;
     type State = S;
     type Observers = OT;
 

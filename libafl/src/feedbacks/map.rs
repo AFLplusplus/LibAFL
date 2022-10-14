@@ -363,7 +363,6 @@ where
     N: IsNovel<T>,
     S: HasNamedMetadata + HasClientPerfMonitor + Debug + State,
 {
-    type Input = S::Input;
     type State = S;
 
     fn init_state(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -378,13 +377,13 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: &Self::Input,
+        input: &<Self::State as State>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Self::Input, Self::State>,
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -394,13 +393,13 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: &Self::Input,
+        input: &<Self::State as State>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Self::Input, Self::State>,
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -408,7 +407,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        testcase: &mut Testcase<Self::Input>,
+        testcase: &mut Testcase<<Self::State as State>::Input>,
     ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             let meta = MapIndexesMetadata::new(core::mem::take(v));
@@ -425,7 +424,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut Self::State,
-        _input: &Self::Input,
+        _input: &<Self::State as State>::Input,
     ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
@@ -451,13 +450,13 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        _input: &Self::Input,
+        _input: &<Self::State as State>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Self::Input, Self::State>,
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State>,
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
@@ -684,8 +683,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = S::Input, State = S>,
-        OT: ObserversTuple<S::Input, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -779,7 +778,6 @@ where
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {
-    type Input = S::Input;
     type State = S;
 
     #[allow(clippy::wrong_self_convention)]
@@ -787,13 +785,13 @@ where
         &mut self,
         _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &Self::Input,
+        _input: &<Self::State as State>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = S::Input, State = S>,
-        OT: ObserversTuple<S::Input, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();
@@ -815,7 +813,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        testcase: &mut Testcase<Self::Input>,
+        testcase: &mut Testcase<<Self::State as State>::Input>,
     ) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
@@ -827,7 +825,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut Self::State,
-        _input: &Self::Input,
+        _input: &<Self::State as State>::Input,
     ) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())

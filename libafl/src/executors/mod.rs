@@ -38,11 +38,7 @@ pub use command::CommandExecutor;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::AsSlice,
-    inputs::{HasTargetBytes, Input},
-    observers::ObserversTuple,
-    state::State,
-    Error,
+    bolts::AsSlice, inputs::HasTargetBytes, observers::ObserversTuple, state::State, Error,
 };
 
 /// How an execution finished.
@@ -102,12 +98,10 @@ crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
 pub trait HasObservers: Debug {
-    /// The [`Input`]
-    type Input: Input;
     /// The [`State`]
-    type State: State<Input = Self::Input>;
+    type State: State;
     /// The observers type
-    type Observers: ObserversTuple<Self::Input, Self::State>;
+    type Observers: ObserversTuple<Self::State>;
 
     /// Get the linked observers
     fn observers(&self) -> &Self::Observers;
@@ -117,9 +111,9 @@ pub trait HasObservers: Debug {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, I, S, Z>: Debug
+pub trait Executor<EM, S, Z>: Debug
 where
-    I: Input,
+    S: State,
     Z: Sized,
 {
     /// Instruct the target about the input and run
@@ -128,7 +122,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error>;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
@@ -138,7 +132,7 @@ where
     fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
     where
         Self: Sized,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
     {
         WithObservers::new(self, observers)
     }
@@ -151,21 +145,21 @@ where
 /// A simple executor that does nothing.
 /// If intput len is 0, `run_target` will return Err
 #[derive(Debug)]
-struct NopExecutor<I, S> {
-    phantom: PhantomData<(I, S)>,
+struct NopExecutor<S> {
+    phantom: PhantomData<S>,
 }
 
-impl<EM, I, S, Z> Executor<EM, I, S, Z> for NopExecutor<I, S>
+impl<EM, S, Z> Executor<EM, S, Z> for NopExecutor<S>
 where
-    I: Input + HasTargetBytes,
-    S: State<Input = I> + Debug,
+    S: State + Debug,
+    S::Input: HasTargetBytes,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::empty("Input Empty"))

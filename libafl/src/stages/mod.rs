@@ -48,10 +48,8 @@ use self::push::PushStage;
 use crate::{
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
-    inputs::Input,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
@@ -172,39 +170,35 @@ where
 /// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
 #[allow(clippy::type_complexity)]
 #[derive(Debug)]
-pub struct PushStageAdapter<CS, EM, I, OT, PS, S, Z>
+pub struct PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: Scheduler<Input = I, State = S>,
-    EM: EventFirer<Input = I, State = S>
+    CS: Scheduler,
+    EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId
-        + ProgressReporter<Input = I, State = S>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
-        + EvaluatorObservers<Input = I, State = S, Observers = OT>
-        + HasScheduler<CS, I, S>,
+        + ProgressReporter<State = CS::State>,
+    OT: ObserversTuple<CS::State>,
+    PS: PushStage<CS, EM, OT, Z>,
+    Z: ExecutionProcessor<Observers = OT, State = CS::State>
+        + EvaluatorObservers<Observers = OT, State = CS::State>
+        + HasScheduler<CS>,
 {
     push_stage: PS,
-    phantom: PhantomData<(CS, EM, I, OT, S, Z)>,
+    phantom: PhantomData<(CS, EM, OT, Z)>,
 }
 
-impl<CS, EM, I, OT, PS, S, Z> PushStageAdapter<CS, EM, I, OT, PS, S, Z>
+impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: Scheduler<Input = I, State = S>,
-    EM: EventFirer<Input = I, State = S>
+    CS: Scheduler,
+    EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId
-        + ProgressReporter<Input = I, State = S>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
-        + EvaluatorObservers<Input = I, State = S, Observers = OT>
-        + HasScheduler<CS, I, S>,
+        + ProgressReporter<State = CS::State>,
+    OT: ObserversTuple<CS::State>,
+    PS: PushStage<CS, EM, OT, Z>,
+    Z: ExecutionProcessor<Observers = OT, State = CS::State>
+        + EvaluatorObservers<Observers = OT, State = CS::State>
+        + HasScheduler<CS>,
 {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
@@ -217,28 +211,26 @@ where
     }
 }
 
-impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, S, Z>
+impl<CS, E, EM, OT, PS, Z> Stage<E, EM, CS::State, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: Scheduler<Input = I, State = S>,
-    E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    EM: EventFirer<Input = I, State = S>
+    CS: Scheduler,
+    E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
+    EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId
-        + ProgressReporter<Input = I, State = S>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutesInput<E, EM, Input = I, State = S>
-        + ExecutionProcessor<Input = I, Observers = OT, State = S>
-        + EvaluatorObservers<Input = I, State = S, Observers = OT>
-        + HasScheduler<CS, I, S>,
+        + ProgressReporter<State = CS::State>,
+    OT: ObserversTuple<CS::State>,
+    PS: PushStage<CS, EM, OT, Z>,
+    Z: ExecutesInput<E, EM, State = CS::State>
+        + ExecutionProcessor<Observers = OT, State = CS::State>
+        + EvaluatorObservers<Observers = OT, State = CS::State>
+        + HasScheduler<CS>,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut CS::State,
         event_mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {

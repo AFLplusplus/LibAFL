@@ -11,7 +11,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named, AsMutSlice, AsSlice},
     observers::Observer,
-    state::HasMetadata,
+    state::{HasMetadata, State},
     Error,
 };
 
@@ -111,7 +111,7 @@ pub trait CmpMap: Debug {
 }
 
 /// A [`CmpObserver`] observes the traced comparisons during the current execution using a [`CmpMap`]
-pub trait CmpObserver<CM, I, S>: Observer<I, S>
+pub trait CmpObserver<CM, S>: Observer<S>
 where
     CM: CmpMap,
 {
@@ -203,7 +203,7 @@ where
     name: String,
 }
 
-impl<'a, CM, I, S> CmpObserver<CM, I, S> for StdCmpObserver<'a, CM>
+impl<'a, CM, S> CmpObserver<CM, S> for StdCmpObserver<'a, CM>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
 {
@@ -224,11 +224,12 @@ where
     }
 }
 
-impl<'a, CM, I, S> Observer<I, S> for StdCmpObserver<'a, CM>
+impl<'a, CM, S> Observer<S> for StdCmpObserver<'a, CM>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
+    S: State,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
         Ok(())
     }
