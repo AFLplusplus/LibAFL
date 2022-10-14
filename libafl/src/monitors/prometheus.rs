@@ -34,6 +34,10 @@ use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::registry::Registry;
 // use prometheus_client::registry::Unit;
 
+// For labels
+use prometheus_client::encoding::text::Encode;
+use prometheus_client::metrics::family::Family;
+
 use std::sync::Arc;
 // using thread in order to start the HTTP server in a separate thread
 use std::thread;
@@ -53,11 +57,12 @@ where
     start_time: Duration,
     client_stats: Vec<ClientStats>,
     // registry: Registry<Family<Labels,Gauge>>
-    corpus_count: Gauge,
-    objective_count: Gauge,
-    executions: Gauge,
-    exec_rate: Gauge,
-    runtime: Gauge
+    corpus_count: Family<Labels, Gauge>,
+    objective_count: Family<Labels, Gauge>,
+    executions: Family<Labels, Gauge>,
+    exec_rate: Family<Labels, Gauge>,
+    runtime: Family<Labels, Gauge>,
+    clients_count: Family<Labels, Gauge>,
 }
 
 impl<F> Debug for PrometheusMonitor<F>
@@ -94,16 +99,20 @@ where
     fn display(&mut self, event_msg: String, sender_id: u32) {
         
         // Update the prometheus metrics
+        // Label each metric with the sender / client_id
         let corpus_size = self.corpus_size();
-        self.corpus_count.set(corpus_size);
+        self.corpus_count.get_or_create(&Labels {client: sender_id}).set(corpus_size);
         let objective_size = self.objective_size();
-        self.objective_count.set(objective_size);
+        self.objective_count.get_or_create(&Labels {client: sender_id}).set(objective_size);
         let total_execs = self.total_execs();
-        self.executions.set(total_execs);
+        self.executions.get_or_create(&Labels {client: sender_id}).set(total_execs);
         let execs_per_sec = self.execs_per_sec();
-        self.exec_rate.set(execs_per_sec);
+        self.exec_rate.get_or_create(&Labels {client: sender_id}).set(execs_per_sec);
         let run_time = (current_time() - self.start_time).as_secs();
-        self.runtime.set(run_time); // run time in seconds, which can be converted to a time format by Grafana or similar
+        self.runtime.get_or_create(&Labels {client: sender_id}).set(run_time); // run time in seconds, which can be converted to a time format by Grafana or similar
+        let total_clients = self.client_stats().len().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
+        self.clients_count.get_or_create(&Labels {client: sender_id}).set(total_clients);
+
 
         // display stats in a SimpleMonitor format
         // TODO: put this behind a configuration flag / feature
@@ -147,20 +156,22 @@ where
 {
     pub fn new(listener: String, print_fn: F) -> Self {
         // note that Gauge's clone does Arc stuff, so ~shouldn't~ need to worry about passing btwn threads
-        let corpus_count = Gauge::default();
+        let corpus_count = Family::<Labels, Gauge>::default();
         let corpus_count_clone = corpus_count.clone();
-        let objective_count = Gauge::default();
+        let objective_count = Family::<Labels, Gauge>::default();
         let objective_count_clone = objective_count.clone();
-        let executions = Gauge::default();
+        let executions = Family::<Labels, Gauge>::default();
         let executions_clone = executions.clone();
-        let exec_rate = Gauge::default();
+        let exec_rate = Family::<Labels, Gauge>::default();
         let exec_rate_clone = exec_rate.clone();
-        let runtime = Gauge::default();
+        let runtime = Family::<Labels, Gauge>::default();
         let runtime_clone = runtime.clone();
+        let clients_count = Family::<Labels,Gauge>::default();
+        let clients_count_clone = clients_count.clone();
 
         // Need to run the metrics server in a diff thread to avoid blocking
         thread::spawn(move || {
-            block_on(serve_metrics(listener, corpus_count_clone, objective_count_clone, executions_clone, exec_rate_clone, runtime_clone)).map_err(|err| println!("{:?}", err)).ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
+            block_on(serve_metrics(listener, corpus_count_clone, objective_count_clone, executions_clone, exec_rate_clone, runtime_clone, clients_count_clone)).map_err(|err| println!("{:?}", err)).ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
         });
         Self {
             print_fn,
@@ -171,6 +182,7 @@ where
             executions: executions,
             exec_rate: exec_rate,
             runtime: runtime,
+            clients_count: clients_count,
         }
 
     }
@@ -181,11 +193,12 @@ where
             print_fn,
             start_time,
             client_stats: vec![],
-            corpus_count: Gauge::default(),
-            objective_count: Gauge::default(),
-            executions: Gauge::default(),
-            exec_rate: Gauge::default(),
-            runtime: Gauge::default(),
+            corpus_count: Family::<Labels, Gauge>::default(),
+            objective_count: Family::<Labels, Gauge>::default(),
+            executions: Family::<Labels, Gauge>::default(),
+            exec_rate: Family::<Labels, Gauge>::default(),
+            runtime: Family::<Labels, Gauge>::default(),
+            clients_count: Family::<Labels, Gauge>::default(),
         }
     }
 }
@@ -194,7 +207,7 @@ where
 // Using https://github.com/prometheus/client_rust/blob/master/examples/tide.rs as a base server
 
 // set up an HTTP endpoint, /metrics, localhost:8080
-pub async fn serve_metrics(listener: String, corpus: Gauge, objectives: Gauge, executions: Gauge, exec_rate: Gauge, runtime: Gauge) -> Result<(), std::io::Error> {
+pub async fn serve_metrics(listener: String, corpus: Family<Labels, Gauge>, objectives: Family<Labels, Gauge>, executions: Family<Labels, Gauge>, exec_rate: Family<Labels, Gauge>, runtime: Family<Labels, Gauge>, clients_count: Family<Labels, Gauge>) -> Result<(), std::io::Error> {
     tide::log::start();
 
     // TODO: give listener a default value if user didn't pass one to new()
@@ -226,7 +239,12 @@ pub async fn serve_metrics(listener: String, corpus: Gauge, objectives: Gauge, e
         "How long the fuzzer has been running for (seconds)", 
         runtime,
     );
-
+    registry.register(
+        "clients_count",
+        "How many clients have been spawned for the fuzzing job",
+        clients_count,
+    )
+;
     let mut app = tide::with_state(State {
         registry: Arc::new(registry),
     });
@@ -247,8 +265,14 @@ pub async fn serve_metrics(listener: String, corpus: Gauge, objectives: Gauge, e
     Ok(())
 }
 
+#[derive(Clone, Hash, PartialEq, Eq, Encode, Debug)]
+pub struct Labels {
+    // to differentiate between clients when multiple are spawned.
+    client: u32, // sender_id: u32
+}
+
 #[derive(Clone)]
 struct State {
     #[allow(dead_code)]
-    registry: Arc<Registry<Gauge>>,
+    registry: Arc<Registry<Family<Labels, Gauge>>>,
 }
