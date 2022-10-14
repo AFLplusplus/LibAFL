@@ -610,7 +610,7 @@ where
     F: Feedback<Input = I, State = S>,
     I: Input + Debug,
     OF: Feedback<Input = I, State = S>,
-    S: HasExecutions + HasClientPerfMonitor,
+    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {

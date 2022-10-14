@@ -52,7 +52,7 @@ use crate::{
     inputs::Input,
     observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State},
-    Error,
+    Error, ExecutionProcessor,
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
@@ -173,7 +173,7 @@ where
         Self: Executor<EM, I, S, Z>,
         EM: EventFirer<Input = I, State = S> + EventRestarter<Input = I, State = S>,
         OF: Feedback<Input = I, State = S>,
-        Z: HasObjective<I, OF, S>,
+        Z: HasObjective<I, OF, S> + ExecutionProcessor<Observers = OT>,
     {
         let handlers = InProcessHandlers::new::<Self, EM, I, OF, OT, S, Z, H>()?;
         #[cfg(windows)]

@@ -21,7 +21,6 @@ use crate::{
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
-    inputs::Input,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata, State},
@@ -32,20 +31,19 @@ use crate::{
 pub const MAPFEEDBACK_PREFIX: &str = "mapfeedback_metadata_";
 
 /// A [`MapFeedback`] that implements the AFL algorithm using an [`OrReducer`] combining the bits for the history map and the bit from ``HitcountsMapObserver``.
-pub type AflMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, OrReducer, S, T>;
+pub type AflMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, OrReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents.
-pub type MaxMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to minimize the map contents.
-pub type MinMapFeedback<I, O, S, T> = MapFeedback<I, DifferentIsNovel, O, MinReducer, S, T>;
+pub type MinMapFeedback<O, S, T> = MapFeedback<DifferentIsNovel, O, MinReducer, S, T>;
 
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapPow2Feedback<I, O, S, T> = MapFeedback<I, NextPow2IsNovel, O, MaxReducer, S, T>;
+pub type MaxMapPow2Feedback<O, S, T> = MapFeedback<NextPow2IsNovel, O, MaxReducer, S, T>;
 /// A [`MapFeedback`] that strives to maximize the map contents,
 /// but only, if a value is larger than `pow2` of the previous.
-pub type MaxMapOneOrFilledFeedback<I, O, S, T> =
-    MapFeedback<I, OneOrFilledIsNovel, O, MaxReducer, S, T>;
+pub type MaxMapOneOrFilledFeedback<O, S, T> = MapFeedback<OneOrFilledIsNovel, O, MaxReducer, S, T>;
 
 /// A `Reducer` function is used to aggregate values for the novelty search
 pub trait Reducer<T>: 'static + Debug
@@ -333,7 +331,7 @@ where
 
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
-pub struct MapFeedback<I, N, O, R, S, T>
+pub struct MapFeedback<N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
@@ -353,20 +351,19 @@ where
     /// Name of the feedback as shown in the `UserStats`
     stats_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(I, N, S, R, O, T)>,
+    phantom: PhantomData<(N, S, R, O, T)>,
 }
 
-impl<I, N, O, R, S, T> Feedback for MapFeedback<I, N, O, R, S, T>
+impl<N, O, R, S, T> Feedback for MapFeedback<N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State<Input = I>,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State,
 {
-    type Input = I;
+    type Input = S::Input;
     type State = S;
 
     fn init_state(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -425,7 +422,11 @@ where
     }
 
     /// Discard the stored metadata in case that the testcase is not added to the corpus
-    fn discard_metadata(&mut self, _state: &mut Self::State, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut Self::State,
+        _input: &Self::Input,
+    ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
         }
@@ -438,12 +439,11 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<I, O, S> Feedback for MapFeedback<I, DifferentIsNovel, O, MaxReducer, S, u8>
+impl<O, S> Feedback for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
     for<'it> O: AsIter<'it, Item = u8>,
-    I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State<Input = I>,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -557,7 +557,7 @@ where
     }
 }
 
-impl<I, N, O, R, S, T> Named for MapFeedback<I, N, O, R, S, T>
+impl<N, O, R, S, T> Named for MapFeedback<N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
@@ -572,7 +572,7 @@ where
     }
 }
 
-impl<I, N, O, R, S, T> HasObserverName for MapFeedback<I, N, O, R, S, T>
+impl<N, O, R, S, T> HasObserverName for MapFeedback<N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
@@ -591,15 +591,14 @@ fn create_stats_name(name: &str) -> String {
     name.to_lowercase()
 }
 
-impl<I, N, O, R, S, T> MapFeedback<I, N, O, R, S, T>
+impl<N, O, R, S, T> MapFeedback<N, O, R, S, T>
 where
     T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
     R: Reducer<T>,
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    I: Input,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State<Input = I>,
+    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -680,13 +679,13 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        _input: &I,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = S::Input, State = S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         let mut interesting = false;
         // TODO Replace with match_name_type when stable
@@ -742,13 +741,13 @@ where
 
 /// A [`ReachabilityFeedback`] reports if a target has been reached.
 #[derive(Clone, Debug)]
-pub struct ReachabilityFeedback<I, O, S> {
+pub struct ReachabilityFeedback<O, S> {
     name: String,
     target_idx: Vec<usize>,
-    phantom: PhantomData<(I, O, S)>,
+    phantom: PhantomData<(O, S)>,
 }
 
-impl<I, O, S> ReachabilityFeedback<I, O, S>
+impl<O, S> ReachabilityFeedback<O, S>
 where
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
@@ -774,15 +773,13 @@ where
     }
 }
 
-impl<I, O, S> Feedback for ReachabilityFeedback<I, O, S>
+impl<O, S> Feedback for ReachabilityFeedback<O, S>
 where
-    I: Input,
-    S: State<Input = I> + Debug + HasClientPerfMonitor,
+    S: State + Debug + HasClientPerfMonitor,
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {
-    type Input = I;
-
+    type Input = S::Input;
     type State = S;
 
     #[allow(clippy::wrong_self_convention)]
@@ -795,8 +792,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<Input = S::Input, State = S>,
+        OT: ObserversTuple<S::Input, S>,
     {
         // TODO Replace with match_name_type when stable
         let observer = observers.match_name::<O>(&self.name).unwrap();
@@ -837,7 +834,7 @@ where
     }
 }
 
-impl<I, O, S> Named for ReachabilityFeedback<I, O, S>
+impl<O, S> Named for ReachabilityFeedback<O, S>
 where
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
