@@ -16,16 +16,16 @@ GdiplusStartupInput gdiplusStartupInput;
 ULONG_PTR           gdiplusToken;
 
 // Some DLLs are lazily loaded during image loading
-// FridaInstrumentationHelper doesn't instrument DLLs that are loaded after init,
-// so they're manually loaded here
+// FridaInstrumentationHelper doesn't instrument DLLs that are loaded after
+// init, so they're manually loaded here
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
-    switch (fdwReason) {
-        case DLL_PROCESS_ATTACH:
-            LoadLibraryA("gdi32full.dll");
-            LoadLibraryA("WindowsCodecs.dll");
-            break;
-    }
-    return TRUE;
+  switch (fdwReason) {
+    case DLL_PROCESS_ATTACH:
+      LoadLibraryA("gdi32full.dll");
+      LoadLibraryA("WindowsCodecs.dll");
+      break;
+  }
+  return TRUE;
 }
 
 extern "C" __declspec(dllexport) int LLVMFuzzerTestOneInput(const uint8_t *data,
