@@ -28,6 +28,8 @@ where
     timeout: u32,
     observers: OT,
     phantom: PhantomData<(I, S, OT)>,
+    signals: *mut u8,
+    signals_len: usize,
 }
 
 impl<I, OT, S> std::fmt::Debug for TinyInstExecutor<I, OT, S>
@@ -58,6 +60,15 @@ where
     ) -> Result<ExitKind, Error> {
         let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
         self.observers.pre_exec_all(_state, _input)?;
+        unsafe {
+            if self.signals_len != 0 {
+                *(self.signals.add(self.signals_len)) = 1;
+
+                self.signals_len = self.signals_len - 1;
+            } else {
+                return Ok(ExitKind::Crash);
+            }
+        }
 
         let mut argv: Vec<*mut c_char> = Vec::with_capacity(self.argc + 1);
         for arg in &self.argv {
@@ -101,6 +112,8 @@ where
         args: Vec<String>,
         timeout: u32,
         observers: OT,
+        signals: *mut u8,
+        signals_len: usize,
     ) -> Self {
         let mut instrumentation_ptr = LiteCov::new();
         let instrumentation = instrumentation_ptr.pin_mut();
@@ -149,6 +162,8 @@ where
             timeout,
             observers,
             phantom: PhantomData,
+            signals,
+            signals_len,
         }
     }
 }
