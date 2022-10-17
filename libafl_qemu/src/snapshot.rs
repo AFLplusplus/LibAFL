@@ -5,7 +5,7 @@ use std::{
 };
 
 use bio::data_structures::interval_tree::IntervalTree;
-use libafl::{inputs::Input, state::HasMetadata};
+use libafl::state::{HasInput, HasMetadata};
 use thread_local::ThreadLocal;
 
 use crate::{
@@ -192,28 +192,27 @@ impl Default for QemuSnapshotHelper {
     }
 }
 
-impl<I, S> QemuHelper<I, S> for QemuSnapshotHelper
+impl<S> QemuHelper<S> for QemuSnapshotHelper
 where
-    I: Input,
-    S: HasMetadata,
+    S: HasInput + HasMetadata,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
-        QT: QemuHelperTuple<I, S>,
+        QT: QemuHelperTuple<S>,
     {
         hooks.writes(
             None,
-            Some(trace_write1_snapshot::<I, QT, S>),
-            Some(trace_write2_snapshot::<I, QT, S>),
-            Some(trace_write4_snapshot::<I, QT, S>),
-            Some(trace_write8_snapshot::<I, QT, S>),
-            Some(trace_write_n_snapshot::<I, QT, S>),
+            Some(trace_write1_snapshot::<QT, S>),
+            Some(trace_write2_snapshot::<QT, S>),
+            Some(trace_write4_snapshot::<QT, S>),
+            Some(trace_write8_snapshot::<QT, S>),
+            Some(trace_write_n_snapshot::<QT, S>),
         );
 
-        hooks.after_syscalls(trace_mmap_snapshot::<I, QT, S>);
+        hooks.after_syscalls(trace_mmap_snapshot::<QT, S>);
     }
 
-    fn pre_exec(&mut self, emulator: &Emulator, _input: &I) {
+    fn pre_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
         if self.empty {
             self.snapshot(emulator);
         } else {
@@ -222,67 +221,67 @@ where
     }
 }
 
-pub fn trace_write1_snapshot<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn trace_write1_snapshot<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: HasInput,
+    QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 1);
 }
 
-pub fn trace_write2_snapshot<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn trace_write2_snapshot<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: HasInput,
+    QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 2);
 }
 
-pub fn trace_write4_snapshot<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn trace_write4_snapshot<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: HasInput,
+    QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 4);
 }
 
-pub fn trace_write8_snapshot<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn trace_write8_snapshot<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
 ) where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: HasInput,
+    QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, 8);
 }
 
-pub fn trace_write_n_snapshot<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn trace_write_n_snapshot<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     _id: u64,
     addr: GuestAddr,
     size: usize,
 ) where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: HasInput,
+    QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
     h.access(addr, size);
@@ -290,8 +289,8 @@ pub fn trace_write_n_snapshot<I, QT, S>(
 
 #[allow(clippy::too_many_arguments)]
 #[allow(non_upper_case_globals)]
-pub fn trace_mmap_snapshot<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn trace_mmap_snapshot<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     result: u64,
     sys_num: i32,
@@ -305,8 +304,8 @@ pub fn trace_mmap_snapshot<I, QT, S>(
     _a7: u64,
 ) -> u64
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: HasInput,
+    QT: QemuHelperTuple<S>,
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS
     match i64::from(sys_num) {

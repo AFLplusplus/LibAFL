@@ -1,5 +1,5 @@
 use capstone::prelude::*;
-use libafl::inputs::Input;
+use libafl::state::HasInput;
 
 use crate::{
     capstone,
@@ -46,33 +46,33 @@ impl Default for QemuCallTracerHelper {
     }
 }
 
-impl<I, S> QemuHelper<I, S> for QemuCallTracerHelper
+impl<S> QemuHelper<S> for QemuCallTracerHelper
 where
-    I: Input,
+    S: HasInput,
 {
-    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'a, I, QT, S>)
+    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'a, QT, S>)
     where
-        QT: QemuHelperTuple<I, S>,
+        QT: QemuHelperTuple<S>,
     {
-        hooks.blocks(Some(gen_blocks_calls::<I, QT, S>), None);
+        hooks.blocks(Some(gen_blocks_calls::<QT, S>), None);
     }
 
-    fn pre_exec(&mut self, _emulator: &Emulator, _input: &I) {
+    fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {
         self.reset();
     }
 }
 
-/*pub fn on_call<I, QT, S>(hooks: &mut QemuHooks<'_, I, QT, S>, _state: Option<&mut S>, pc: GuestAddr)
+/*pub fn on_call<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, _state: Option<&mut S>, pc: GuestAddr)
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+
+    QT: QemuHelperTuple<S>,
 {
 }*/
 
-pub fn on_ret<I, QT, S>(hooks: &mut QemuHooks<'_, I, QT, S>, _state: Option<&mut S>, _pc: GuestAddr)
+pub fn on_ret<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, _state: Option<&mut S>, _pc: GuestAddr)
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: HasInput,
+    QT: QemuHelperTuple<S>,
 {
     #[cfg(cpu_target = "x86_64")]
     let ret_addr = {
@@ -113,14 +113,14 @@ where
     }
 }
 
-pub fn gen_blocks_calls<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn gen_blocks_calls<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: HasInput,
+    QT: QemuHelperTuple<S>,
 {
     let emu = hooks.emulator();
     if let Some(h) = hooks.helpers().match_first_type::<QemuCallTracerHelper>() {
@@ -155,7 +155,7 @@ where
                     capstone::InsnGroupType::CS_GRP_CALL => {
                         // hooks.instruction_closure(insn.address() as GuestAddr, on_call, false);
                         let call_len = insn.bytes().len() as GuestAddr;
-                        let call_cb = move |hooks: &mut QemuHooks<'_, I, QT, S>, _, pc| {
+                        let call_cb = move |hooks: &mut QemuHooks<'_, QT, S>, _, pc| {
                             // eprintln!("CALL @ 0x{:#x}", pc + call_len);
                             if let Some(h) = hooks
                                 .helpers_mut()
