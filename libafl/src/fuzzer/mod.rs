@@ -20,7 +20,7 @@ use crate::{
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasSolutions, State},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasSolutions},
     Error,
 };
 
@@ -66,9 +66,9 @@ where
 
 /// Evaluate if an input is interesting using the feedback
 pub trait ExecutionProcessor {
-    /// The [`Observers`]
+    /// The observers for this fuzzing campaign
     type Observers: ObserversTuple<Self::State>;
-    /// The [`State`]
+    /// The state for this fuzzing campaign
     type State: HasInput;
 
     /// Evaluate if a set of observation channels has an interesting state
@@ -87,9 +87,9 @@ pub trait ExecutionProcessor {
 
 /// Evaluate an input modifying the state of the fuzzer
 pub trait EvaluatorObservers: Sized {
-    /// The [`Observers`]
+    /// The observers which will monitor an execution
     type Observers: ObserversTuple<Self::State>;
-    /// The [`State`]
+    /// The state of this fuzzing campaign
     type State: HasInput;
 
     /// Runs the input and triggers observers and feedback,
@@ -111,7 +111,7 @@ pub trait EvaluatorObservers: Sized {
 
 /// Evaluate an input modifying the state of the fuzzer
 pub trait Evaluator<E, EM> {
-    /// The [`State`]
+    /// The state for this fuzzing campaign
     type State: HasInput;
 
     /// Runs the input and triggers observers and feedback,
@@ -618,10 +618,10 @@ where
     }
 }
 
-/// Structs with this trait will execute an [`Input`]
+/// Structs with this trait will execute an input
 pub trait ExecutesInput<E, EM> {
-    /// The [`State`] for this executor
-    type State: State;
+    /// The state for this executor
+    type State: HasInput;
 
     /// Runs the input and triggers observers and feedback
     fn execute_input(
@@ -639,7 +639,7 @@ where
     F: Feedback<State = CS::State>,
     OF: Feedback<State = CS::State>,
     E: Executor<EM, CS::State, Self> + HasObservers<State = CS::State>,
-    CS::State: State + HasExecutions + HasClientPerfMonitor,
+    CS::State: HasInput + HasExecutions + HasClientPerfMonitor,
 {
     type State = CS::State;
 

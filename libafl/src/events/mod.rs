@@ -302,7 +302,7 @@ where
 
 /// [`EventFirer`] fire an event.
 pub trait EventFirer {
-    /// [`State`] for this fuzzing campaign
+    /// State for this fuzzing campaign
     type State: HasInput;
 
     /// Send off an [`Event`] to the broker
@@ -353,7 +353,7 @@ pub trait EventFirer {
 
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State> {
-    /// [`State`] for this fuzzing campaign
+    /// State for this fuzzing campaign
     type State: HasInput + HasClientPerfMonitor + HasMetadata + HasExecutions;
 
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
@@ -424,7 +424,7 @@ pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State
 
 /// Restartable trait
 pub trait EventRestarter {
-    /// [`State`] for this fuzzing campaign
+    /// State for this fuzzing campaign
     type State: HasInput;
 
     /// For restarting event managers, implement a way to forward state to their next peers.
@@ -440,9 +440,9 @@ pub trait EventRestarter {
 
 /// [`EventProcessor`] process all the incoming messages
 pub trait EventProcessor<E, Z> {
-    /// The [`State`]
+    /// The state for this fuzzing campaign
     type State: HasInput;
-    /// The [`Observers`]
+    /// The observers for this fuzzing campaign
     type Observers: ObserversTuple<Self::State>;
 
     /// Lookup for incoming events and process them.

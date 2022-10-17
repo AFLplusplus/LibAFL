@@ -503,7 +503,7 @@ pub fn inprocess_get_executor<'a, E>() -> Option<&'a mut E> {
     unsafe { (GLOBAL_STATE.executor_ptr as *mut E).as_mut() }
 }
 
-/// Gets the inprocess [`Input`]
+/// Gets the inprocess input
 #[must_use]
 pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
     unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
@@ -886,7 +886,6 @@ mod windows_exception_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::Input,
         observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions, State},
     };
