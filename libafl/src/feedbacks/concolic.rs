@@ -25,13 +25,13 @@ use crate::{
 /// to be not interesting.
 /// Requires a [`ConcolicObserver`] to observe the concolic trace.
 #[derive(Debug)]
-pub struct ConcolicFeedback<I, S> {
+pub struct ConcolicFeedback<S> {
     name: String,
     metadata: Option<ConcolicMetadata>,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> ConcolicFeedback<I, S> {
+impl<S> ConcolicFeedback<S> {
     /// Creates a concolic feedback from an observer
     #[allow(unused)]
     #[must_use]
@@ -44,7 +44,7 @@ impl<I, S> ConcolicFeedback<I, S> {
     }
 }
 
-impl<I, S> Named for ConcolicFeedback<I, S> {
+impl<S> Named for ConcolicFeedback<S> {
     fn name(&self) -> &str {
         &self.name
     }

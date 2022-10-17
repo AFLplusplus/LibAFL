@@ -33,7 +33,7 @@ use windows::Win32::{
 use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
+    state::HasInput,
     Error,
 };
 
@@ -334,17 +334,17 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, I, S, Z> Executor<EM, S, Z> for TimeoutExecutor<E>
+impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, S, Z>,
-    I: Input,
+    S: HasInput,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());

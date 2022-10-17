@@ -1081,8 +1081,7 @@ mod tests {
             llmp_client.mark_safe_to_unmap();
         }
 
-        let mut llmp_mgr =
-            LlmpEventManager::<BytesInput, (), _, _>::new(llmp_client, "fuzzer".into()).unwrap();
+        let mut llmp_mgr = LlmpEventManager::<(), _, _>::new(llmp_client, "fuzzer".into()).unwrap();
 
         let scheduler = RandScheduler::new();
 

@@ -18,6 +18,7 @@ use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
     observers::Observer,
+    state::HasInput,
     Error,
 };
 
@@ -96,8 +97,16 @@ impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
     }
 }
 
-impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a> {
-    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+impl<'a, S> Observer<S> for BacktraceObserver<'a>
+where
+    S: HasInput,
+{
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
             if exit_kind == &ExitKind::Crash {
                 self.update_hash(collect_backtrace());
@@ -111,7 +120,7 @@ impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a> {
     fn post_exec_child(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::Child {
@@ -236,15 +245,18 @@ impl Default for ASANBacktraceObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for ASANBacktraceObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl<S> Observer<S> for ASANBacktraceObserver
+where
+    S: HasInput,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())

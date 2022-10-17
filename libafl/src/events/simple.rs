@@ -163,7 +163,10 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<OT, S> SimpleEventManager<SimplePrintingMonitor, OT, S> {
+impl<OT, S> SimpleEventManager<SimplePrintingMonitor, OT, S>
+where
+    S: HasInput,
+{
     /// Creates a [`SimpleEventManager`] that just prints to `stdout`.
     #[must_use]
     pub fn printing() -> Self {
@@ -296,6 +299,7 @@ where
 #[derive(Debug)]
 pub struct SimpleRestartingEventManager<MT, OT, S, SP>
 where
+    S: HasInput,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
@@ -377,6 +381,7 @@ where
 #[cfg(feature = "std")]
 impl<MT, OT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<MT, OT, S, SP>
 where
+    S: HasInput,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
@@ -401,6 +406,7 @@ where
 #[cfg(feature = "std")]
 impl<MT, OT, S, SP> HasEventManagerId for SimpleRestartingEventManager<MT, OT, S, SP>
 where
+    S: HasInput,
     SP: ShMemProvider,
     MT: Monitor + Debug,
 {
@@ -413,6 +419,7 @@ where
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
 impl<MT, OT, S, SP> SimpleRestartingEventManager<MT, OT, S, SP>
 where
+    S: HasInput,
     SP: ShMemProvider,
     MT: Monitor + Debug, //TODO CE: CustomEvent,
 {

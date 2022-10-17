@@ -333,9 +333,10 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
 #[cfg(feature = "std")]
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
-    C: Corpus<Input = Self::Input>,
+    I: Input,
+    C: Corpus<Input = <Self as HasInput>::Input>,
     R: Rand,
-    SC: Corpus<Input = Self::Input>,
+    SC: Corpus<Input = <Self as HasInput>::Input>,
 {
     /// Loads inputs from a directory.
     /// If `forced` is `true`, the value will be loaded,
@@ -350,7 +351,7 @@ where
         loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, Input = I, State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
     {
         for entry in fs::read_dir(in_dir)? {
             let entry = entry?;
@@ -393,8 +394,8 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, Input = I, State = Self>,
-        EM: EventFirer<Input = I, State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+        EM: EventFirer<State = Self>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(
@@ -428,8 +429,8 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, Input = I, State = Self>,
-        EM: EventFirer<Input = I, State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+        EM: EventFirer<State = Self>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
     }
@@ -443,8 +444,8 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, Input = I, State = Self>,
-        EM: EventFirer<Input = I, State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
+        EM: EventFirer<State = Self>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
@@ -633,7 +634,10 @@ impl<I> HasClientPerfMonitor for NopState<I> {
 }
 
 #[cfg(test)]
-impl<I> State for NopState<I>
+impl<I> State for NopState<I> where I: Input {}
+
+#[cfg(test)]
+impl<I> HasInput for NopState<I>
 where
     I: Input,
 {

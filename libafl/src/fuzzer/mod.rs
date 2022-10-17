@@ -683,10 +683,9 @@ impl NopFuzzer {
 }
 
 #[cfg(test)]
-impl<ST, E, I, EM> Fuzzer<E, EM, I, NopState<I>, ST> for NopFuzzer
+impl<ST, E, I, EM> Fuzzer<E, EM, NopState<I>, ST> for NopFuzzer
 where
-    I: Input,
-    EM: ProgressReporter<Input = I, State = NopState<I>>,
+    EM: ProgressReporter<State = NopState<I>>,
 {
     fn fuzz_one(
         &mut self,

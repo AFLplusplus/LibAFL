@@ -8,6 +8,7 @@ use crate::{
         concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
         Observer,
     },
+    state::HasInput,
 };
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.
@@ -18,7 +19,7 @@ pub struct ConcolicObserver<'map> {
     name: String,
 }
 
-impl<'map, I, S> Observer<I, S> for ConcolicObserver<'map> {}
+impl<'map, S> Observer<S> for ConcolicObserver<'map> where S: HasInput {}
 
 impl<'map> ConcolicObserver<'map> {
     /// Create the concolic observer metadata for this run

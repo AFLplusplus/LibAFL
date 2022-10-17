@@ -333,13 +333,13 @@ impl InProcessHandlers {
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
-            unix_signal_handler::setup_panic_hook::<E, EM, OF, OT, Z>();
+            unix_signal_handler::setup_panic_hook::<E, EM, OF, Z>();
             setup_signal_handler(data)?;
             compiler_fence(Ordering::SeqCst);
             Ok(Self {
-                crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, OT, Z>
+                crash_handler: unix_signal_handler::inproc_crash_handler::<E, EM, OF, Z>
                     as *const c_void,
-                timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, OT, Z>
+                timeout_handler: unix_signal_handler::inproc_timeout_handler::<E, EM, OF, Z>
                     as *const _,
             })
         }
@@ -548,6 +548,7 @@ mod unix_signal_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
+        inputs::Input,
         observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasInput, HasMetadata, HasSolutions},
     };
@@ -1484,7 +1485,7 @@ where
 }
 
 #[cfg(all(feature = "std", target_os = "linux"))]
-impl<'a, H, I, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
+impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
@@ -1906,13 +1907,18 @@ mod tests {
         bolts::tuples::tuple_list,
         executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
         inputs::NopInput,
+        state::HasInput,
     };
+
+    impl HasInput for () {
+        type Input = NopInput;
+    }
 
     #[test]
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<_, NopInput, (), ()> {
+        let mut in_process_executor = InProcessExecutor::<_, (), ()> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
             handlers: InProcessHandlers::nop(),
@@ -1939,7 +1945,7 @@ mod tests {
         let provider = StdShMemProvider::new().unwrap();
 
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
-        let mut in_process_fork_executor = InProcessForkExecutor::<_, NopInput, (), _, _> {
+        let mut in_process_fork_executor = InProcessForkExecutor::<_, (), _, _> {
             harness_fn: &mut harness,
             shmem_provider: provider,
             observers: tuple_list!(),
@@ -1949,7 +1955,7 @@ mod tests {
         let input = NopInput {};
         let mut fuzzer = NopFuzzer::new();
         let mut state = NopState::new();
-        let mut mgr: SimpleEventManager<_, _, (), _> = SimpleEventManager::printing();
+        let mut mgr: SimpleEventManager<_, (), _> = SimpleEventManager::printing();
         in_process_fork_executor
             .run_target(&mut fuzzer, &mut state, &mut mgr, &input)
             .unwrap();

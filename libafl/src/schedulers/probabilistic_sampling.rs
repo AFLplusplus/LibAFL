@@ -146,7 +146,7 @@ mod tests {
         feedbacks::ConstFeedback,
         inputs::{bytes::BytesInput, Input},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
-        state::{HasCorpus, HasMetadata, StdState},
+        state::{HasCorpus, HasInput, HasMetadata, StdState},
         Error,
     };
 
@@ -160,17 +160,17 @@ mod tests {
         phantom: PhantomData<I>,
     }
 
-    impl<S> TestcaseScore<S> for UniformDistribution<I>
+    impl<S> TestcaseScore<S> for UniformDistribution<S::Input>
     where
         S: HasMetadata + HasCorpus,
     {
-        fn compute(_: &mut Testcase<I>, _state: &S) -> Result<f64, Error> {
+        fn compute(_: &mut Testcase<S::Input>, _state: &S) -> Result<f64, Error> {
             Ok(FACTOR)
         }
     }
 
     pub type UniformProbabilitySamplingScheduler<S> =
-        ProbabilitySamplingScheduler<UniformDistribution<S::Input>, S>;
+        ProbabilitySamplingScheduler<UniformDistribution<<S as HasInput>::Input>, S>;
 
     #[test]
     fn test_prob_sampling() {

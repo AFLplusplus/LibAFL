@@ -39,7 +39,7 @@ use crate::{
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
-    state::{HasInput, State},
+    state::HasInput,
     Error,
 };
 
@@ -121,7 +121,7 @@ where
 
 impl<S> ObserversTuple<S> for ()
 where
-    S: State,
+    S: HasInput,
 {
     fn pre_exec_all(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
@@ -154,7 +154,7 @@ impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
 where
     Head: Observer<S>,
     Tail: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
 {
     fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.0.pre_exec(state, input)?;
@@ -225,7 +225,7 @@ impl TimeObserver {
 
 impl<S> Observer<S> for TimeObserver
 where
-    S: State,
+    S: HasInput,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
@@ -290,7 +290,7 @@ where
 
 impl<'a, S, T> Observer<S> for ListObserver<'a, T>
 where
-    S: State,
+    S: HasInput,
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {

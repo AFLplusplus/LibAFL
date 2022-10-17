@@ -164,9 +164,9 @@ mod tests {
         events::EventFirer,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
-        inputs::{BytesInput, Input},
+        inputs::BytesInput,
         observers::Observer,
-        state::{NopState, State},
+        state::{HasInput, NopState, State},
     };
 
     #[derive(Debug)]
@@ -182,7 +182,7 @@ mod tests {
             }
         }
     }
-    impl<I, S> Observer<I, S> for NopObserver {}
+    impl<S> Observer<S> for NopObserver where S: HasInput {}
     impl PartialEq for NopObserver {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value
@@ -194,22 +194,19 @@ mod tests {
         }
     }
 
-    struct NopEventFirer<I, S> {
-        phantom: PhantomData<(I, S)>,
+    struct NopEventFirer<S> {
+        phantom: PhantomData<S>,
     }
-    impl<I, S> EventFirer for NopEventFirer<I, S>
+    impl<S> EventFirer for NopEventFirer<S>
     where
-        I: Input,
-        S: State<Input = I>,
+        S: State,
     {
-        type Input = I;
-
         type State = S;
 
         fn fire(
             &mut self,
             _state: &mut S,
-            _event: crate::events::Event<I>,
+            _event: crate::events::Event<S::Input>,
         ) -> Result<(), crate::Error> {
             Ok(())
         }

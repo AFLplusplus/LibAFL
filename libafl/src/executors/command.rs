@@ -603,7 +603,7 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}};
-/// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
+/// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}, state::HasInput};
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
@@ -625,7 +625,7 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, S, Z> {
+/// fn make_executor<EM, S, Z>() -> impl Executor<EM, S, Z> where S: HasInput, S::Input: HasTargetBytes {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
@@ -680,11 +680,10 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_builder() {
-        let mut mgr = SimpleEventManager::<BytesInput, _, (), NopState<BytesInput>>::new(
-            SimpleMonitor::new(|status| {
+        let mut mgr =
+            SimpleEventManager::<_, (), NopState<BytesInput>>::new(SimpleMonitor::new(|status| {
                 println!("{status}");
-            }),
-        );
+            }));
 
         let mut executor = CommandExecutor::builder();
         executor
@@ -696,7 +695,7 @@ mod tests {
         executor
             .run_target(
                 &mut (),
-                &mut (),
+                &mut NopState::default(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )
@@ -708,11 +707,10 @@ mod tests {
     fn test_parse_afl_cmdline() {
         use alloc::string::ToString;
 
-        let mut mgr = SimpleEventManager::<BytesInput, _, (), NopState<BytesInput>>::new(
-            SimpleMonitor::new(|status| {
+        let mut mgr =
+            SimpleEventManager::<_, (), NopState<BytesInput>>::new(SimpleMonitor::new(|status| {
                 println!("{status}");
-            }),
-        );
+            }));
 
         let mut executor =
             CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], (), true)
@@ -720,7 +718,7 @@ mod tests {
         executor
             .run_target(
                 &mut (),
-                &mut (),
+                &mut NopState::default(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )

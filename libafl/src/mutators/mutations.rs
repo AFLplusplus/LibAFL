@@ -1181,8 +1181,8 @@ mod tests {
 
     fn test_mutations<S>() -> impl MutatorsTuple<S>
     where
-        I: Input + HasBytesVec,
-        S: HasRand + HasCorpus<Input = I> + HasMetadata + HasMaxSize,
+        S: HasRand + HasCorpus + HasMetadata + HasMaxSize,
+        S::Input: HasBytesVec,
     {
         tuple_list!(
             BitFlipMutator::new(),

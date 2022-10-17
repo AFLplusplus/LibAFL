@@ -25,6 +25,7 @@ use nix::{
 
 use crate::{
     bolts::{
+        bolts_prelude::MatchName,
         fs::{InputFile, INPUTFILE_STD},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
@@ -34,7 +35,6 @@ use crate::{
     inputs::{HasTargetBytes, Input},
     mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
-    prelude::State,
     state::HasInput,
     Error,
 };
@@ -383,6 +383,7 @@ impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutForkserverExecutor<E>
 where
     E: Executor<EM, S, Z> + HasForkserver + Debug,
     S: HasInput,
+    S::Input: HasTargetBytes,
 {
     #[inline]
     fn run_target(
@@ -491,7 +492,7 @@ where
     has_asan_observer: Option<bool>,
 }
 
-impl<I, OT, S, SP> Debug for ForkserverExecutor<I, OT, S, SP>
+impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
 where
     OT: Debug,
     SP: ShMemProvider,
@@ -508,7 +509,7 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), (), StdShMemProvider> {
+impl ForkserverExecutor<(), (), StdShMemProvider> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
     pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
@@ -516,10 +517,11 @@ impl ForkserverExecutor<(), (), (), StdShMemProvider> {
     }
 }
 
-impl<I, OT, S, SP> ForkserverExecutor<I, OT, S, SP>
+impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
+    S: HasInput,
+    S::Input: HasTargetBytes,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -559,13 +561,11 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     /// Builds `ForkserverExecutor`.
     #[allow(clippy::pedantic)]
-    pub fn build<I, OT, S>(
-        &mut self,
-        observers: OT,
-    ) -> Result<ForkserverExecutor<I, OT, S, SP>, Error>
+    pub fn build<OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<OT, S, SP>, Error>
     where
-        I: Input + HasTargetBytes,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
+        S: HasInput,
+        S::Input: Input + HasTargetBytes,
         SP: ShMemProvider,
     {
         let input_filename = match &self.input_filename {
@@ -856,13 +856,13 @@ impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 }
 
-impl<EM, I, OT, S, SP, Z> Executor<EM, I, S, Z> for ForkserverExecutor<I, OT, S, SP>
+impl<EM, OT, S, SP, Z> Executor<EM, S, Z> for ForkserverExecutor<OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    S: State<Input = I>,
-    Self: HasObservers<Input = I, State = S, Observers = OT>,
+    S: HasInput,
+    S::Input: HasTargetBytes,
+    Self: HasObservers,
 {
     #[inline]
     fn run_target(
@@ -870,7 +870,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
@@ -968,10 +968,11 @@ where
     }
 }
 
-impl<I, OT, S, SP> HasForkserver for ForkserverExecutor<I, OT, S, SP>
+impl<OT, S, SP> HasForkserver for ForkserverExecutor<OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    OT: ObserversTuple<S>,
+    S: HasInput,
+    S::Input: Input + HasTargetBytes,
     SP: ShMemProvider,
 {
     type SP = SP;
@@ -1039,10 +1040,10 @@ mod tests {
             AsMutSlice,
         },
         executors::forkserver::ForkserverExecutorBuilder,
-        inputs::NopInput,
         observers::{ConstMapObserver, HitcountsMapObserver},
         Error,
     };
+
     #[test]
     #[serial]
     fn test_forkserver() {
@@ -1066,7 +1067,7 @@ mod tests {
             .args(&args)
             .debug_child(false)
             .shmem_provider(&mut shmem_provider)
-            .build::<NopInput, _, ()>(tuple_list!(edges_observer));
+            .build::<_, ()>(tuple_list!(edges_observer));
 
         // Since /usr/bin/echo is not a instrumented binary file, the test will just check if the forkserver has failed at the initial handshake
         let result = match executor {

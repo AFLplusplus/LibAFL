@@ -22,7 +22,7 @@ pub use nautilus::*;
 
 use crate::{
     bolts::tuples::{HasConstLen, Named},
-    state::{HasInput, State},
+    state::HasInput,
     Error,
 };
 
@@ -107,7 +107,7 @@ where
 
 impl<S> MutatorsTuple<S> for ()
 where
-    S: State,
+    S: HasInput,
 {
     fn mutate_all(
         &mut self,
@@ -152,7 +152,7 @@ impl<Head, Tail, S> MutatorsTuple<S> for (Head, Tail)
 where
     Head: Mutator<S> + Named,
     Tail: MutatorsTuple<S>,
-    S: State,
+    S: HasInput,
 {
     fn mutate_all(
         &mut self,

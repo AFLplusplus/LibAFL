@@ -74,10 +74,9 @@ where
     }
 }
 
-impl<EM, OT, TE, Z> TracingStage<EM, OT, TE, Z>
+impl<EM, TE, Z> TracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers<Observers = OT>,
-    OT: ObserversTuple<TE::State>,
+    TE: Executor<EM, TE::State, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default stage

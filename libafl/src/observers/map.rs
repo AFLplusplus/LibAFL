@@ -25,7 +25,7 @@ use crate::{
     },
     executors::ExitKind,
     observers::Observer,
-    state::State,
+    state::HasInput,
     Error,
 };
 
@@ -201,7 +201,7 @@ where
 
 impl<'a, S, T> Observer<S> for StdMapObserver<'a, T>
 where
-    S: State,
+    S: HasInput,
     T: Bounded
         + PartialEq
         + Default
@@ -503,7 +503,7 @@ where
 
 impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
 where
-    S: State,
+    S: HasInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
@@ -775,7 +775,7 @@ where
 
 impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
 where
-    S: State,
+    S: HasInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
@@ -1045,7 +1045,7 @@ where
 impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<u8>,
-    S: State,
+    S: HasInput,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
@@ -1251,7 +1251,7 @@ impl<S, M> Observer<S> for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S>,
     for<'it> M: AsIterMut<'it, Item = u8>,
-    S: State,
+    S: HasInput,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
@@ -1447,7 +1447,7 @@ where
 
 impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T>
 where
-    S: State,
+    S: HasInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
@@ -1704,7 +1704,7 @@ where
 
 impl<S, T> Observer<S> for OwnedMapObserver<T>
 where
-    S: State,
+    S: HasInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {

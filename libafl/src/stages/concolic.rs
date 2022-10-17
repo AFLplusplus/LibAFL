@@ -77,6 +77,7 @@ where
     }
 }
 
+use crate::bolts::tuples::MatchName;
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
 #[cfg(feature = "concolic_mutation")]
