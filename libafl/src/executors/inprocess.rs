@@ -51,7 +51,7 @@ use crate::{
     fuzzer::HasObjective,
     observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasSolutions},
-    Error, ExecutionProcessor,
+    Error,
 };
 
 /// The process executor simply calls a target function, as mutable reference to a closure
@@ -167,7 +167,7 @@ where
         Self: Executor<EM, S, Z>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<State = S>,
-        Z: HasObjective<OF> + ExecutionProcessor<Observers = OT>,
+        Z: HasObjective<OF>,
     {
         let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
         #[cfg(windows)]

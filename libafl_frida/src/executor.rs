@@ -5,13 +5,11 @@ use frida_gum::{
     stalker::{NoneEventSink, Stalker},
     Gum, MemoryRange, NativePointer,
 };
-#[cfg(windows)]
-use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
-use libafl::state::State;
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{HasTargetBytes, Input},
+    inputs::HasTargetBytes,
     observers::ObserversTuple,
+    state::HasInput,
     Error,
 };
 
@@ -20,15 +18,18 @@ use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
+#[cfg(windows)]
+use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
-pub struct FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
+pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    H: FnMut(&S::Input) -> ExitKind,
+    S::Input: HasTargetBytes,
+    S: HasInput,
+    OT: ObserversTuple<S>,
 {
-    base: InProcessExecutor<'a, H, I, OT, S>,
+    base: InProcessExecutor<'a, H, OT, S>,
     /// Frida's dynamic rewriting engine
     stalker: Stalker<'a>,
     /// User provided callback for instrumentation
@@ -37,11 +38,12 @@ where
     _phantom: PhantomData<&'b u8>,
 }
 
-impl<'a, 'b, 'c, H, I, OT, RT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
+impl<'a, 'b, 'c, H, OT, RT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    H: FnMut(&S::Input) -> ExitKind,
+    S: HasInput,
+    S::Input: HasTargetBytes,
+    OT: ObserversTuple<S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("FridaInProcessExecutor")
@@ -52,12 +54,13 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, H, I, OT, RT, S, Z> Executor<EM, I, S, Z>
-    for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
+impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, S, Z>
+    for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    H: FnMut(&S::Input) -> ExitKind,
+    S: HasInput,
+    S::Input: HasTargetBytes,
+    OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
 {
     /// Instruct the target about the input and run
@@ -67,7 +70,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         self.helper.pre_exec(input)?;
         if self.helper.stalker_enabled() {
@@ -95,15 +98,13 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, I, OT, RT, S> HasObservers
-    for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
+impl<'a, 'b, 'c, H, OT, RT, S> HasObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    S: State<Input = I>,
-    OT: ObserversTuple<I, S>,
+    H: FnMut(&S::Input) -> ExitKind,
+    S::Input: HasTargetBytes,
+    S: HasInput,
+    OT: ObserversTuple<S>,
 {
-    type Input = I;
     type State = S;
     type Observers = OT;
 
@@ -118,17 +119,18 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, I, OT, S, RT> FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
+impl<'a, 'b, 'c, H, OT, S, RT> FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    H: FnMut(&S::Input) -> ExitKind,
+    S: HasInput,
+    S::Input: HasTargetBytes,
+    OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
 {
     /// Creates a new [`FridaInProcessExecutor`]
     pub fn new(
         gum: &'a Gum,
-        base: InProcessExecutor<'a, H, I, OT, S>,
+        base: InProcessExecutor<'a, H, OT, S>,
         helper: &'c mut FridaInstrumentationHelper<'b, RT>,
     ) -> Self {
         let mut stalker = Stalker::new(gum);
@@ -168,12 +170,13 @@ where
 }
 
 #[cfg(windows)]
-impl<'a, 'b, 'c, H, I, OT, RT, S> HasInProcessHandlers
-    for FridaInProcessExecutor<'a, 'b, 'c, H, I, OT, RT, S>
+impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
+    for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    H: FnMut(&I) -> ExitKind,
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
+    H: FnMut(&S::Input) -> ExitKind,
+    S: HasInput,
+    S::Input: HasTargetBytes,
+    OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
 {
     /// the timeout handler

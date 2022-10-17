@@ -9,16 +9,15 @@ use color_backtrace::{default_output_stream, BacktracePrinter, Verbosity};
 #[cfg(target_arch = "aarch64")]
 use frida_gum::interceptor::Interceptor;
 use frida_gum::ModuleDetails;
-use libafl::state::State;
 use libafl::{
     bolts::{cli::FuzzerOptions, ownedref::OwnedPtr, tuples::Named},
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::{HasTargetBytes, Input},
+    inputs::HasTargetBytes,
     observers::{Observer, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasClientPerfMonitor, HasInput, HasMetadata},
     Error, SerdeAny,
 };
 use serde::{Deserialize, Serialize};
@@ -554,8 +553,11 @@ pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl<I, S> Observer<I, S> for AsanErrorsObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl<S> Observer<S> for AsanErrorsObserver
+where
+    S: HasInput,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
@@ -610,17 +612,16 @@ impl AsanErrorsObserver {
 
 /// A feedback reporting potential [`struct@AsanErrors`] from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AsanErrorsFeedback<I, S> {
+pub struct AsanErrorsFeedback<S> {
     errors: Option<AsanErrors>,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> Feedback for AsanErrorsFeedback<I, S>
+impl<S> Feedback for AsanErrorsFeedback<S>
 where
-    I: Input + HasTargetBytes,
-    S: State<Input = I> + Debug + HasClientPerfMonitor,
+    S: HasInput + Debug + HasClientPerfMonitor,
+    S::Input: HasTargetBytes,
 {
-    type Input = I;
     type State = S;
 
     #[allow(clippy::wrong_self_convention)]
@@ -628,13 +629,13 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &I,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         let observer = observers
             .match_name::<AsanErrorsObserver>("AsanErrors")
@@ -652,7 +653,11 @@ where
         }
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }
@@ -660,20 +665,20 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.errors = None;
         Ok(())
     }
 }
 
-impl<I, S> Named for AsanErrorsFeedback<I, S> {
+impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
     fn name(&self) -> &str {
         "AsanErrors"
     }
 }
 
-impl<I, S> AsanErrorsFeedback<I, S> {
+impl<S> AsanErrorsFeedback<S> {
     /// Create a new `AsanErrorsFeedback`
     #[must_use]
     pub fn new() -> Self {
@@ -684,7 +689,7 @@ impl<I, S> AsanErrorsFeedback<I, S> {
     }
 }
 
-impl<I, S> Default for AsanErrorsFeedback<I, S> {
+impl<S> Default for AsanErrorsFeedback<S> {
     fn default() -> Self {
         Self::new()
     }

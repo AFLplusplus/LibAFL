@@ -1,10 +1,10 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use libafl::state::State;
+use libafl::bolts::AsSlice;
+use libafl::state::{HasInput, State};
 use libafl::{
-    bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input},
+    inputs::HasTargetBytes,
     observers::ObserversTuple,
     Error,
 };
@@ -13,16 +13,16 @@ use libnyx::NyxReturnValue;
 use crate::helper::NyxHelper;
 
 /// executor for nyx standalone mode
-pub struct NyxExecutor<'a, I, S, OT> {
+pub struct NyxExecutor<'a, S, OT> {
     /// implement nyx function
     pub helper: &'a mut NyxHelper,
     /// observers
     observers: OT,
     /// phantom data to keep generic type <I,S>
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
+impl<'a, S, OT> Debug for NyxExecutor<'a, S, OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NyxInprocessExecutor")
             .field("helper", &self.helper)
@@ -30,17 +30,18 @@ impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxExecutor<'a, I, S, OT>
+impl<'a, EM, S, Z, OT> Executor<EM, S, Z> for NyxExecutor<'a, S, OT>
 where
-    I: Input + HasTargetBytes,
+    S::Input: HasTargetBytes,
+    S: HasInput,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
-        input: &I,
-    ) -> Result<libafl::executors::ExitKind, libafl::Error> {
+        input: &S::Input,
+    ) -> Result<ExitKind, Error> {
         let input_owned = input.target_bytes();
         let input = input_owned.as_slice();
         self.helper.nyx_process.set_input(input, input.len() as u32);
@@ -69,7 +70,7 @@ where
     }
 }
 
-impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
+impl<'a, S, OT> NyxExecutor<'a, S, OT> {
     pub fn new(helper: &'a mut NyxHelper, observers: OT) -> Result<Self, Error> {
         Ok(Self {
             helper,
@@ -84,13 +85,11 @@ impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, I, S, OT> HasObservers for NyxExecutor<'a, I, S, OT>
+impl<'a, S, OT> HasObservers for NyxExecutor<'a, S, OT>
 where
-    I: Input,
-    S: State<Input = I>,
-    OT: ObserversTuple<I, S>,
+    S: State,
+    OT: ObserversTuple<S>,
 {
-    type Input = I;
     type State = S;
     type Observers = OT;
 
