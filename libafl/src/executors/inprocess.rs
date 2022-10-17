@@ -346,29 +346,15 @@ impl InProcessHandlers {
         unsafe {
             let data = &mut GLOBAL_STATE;
             #[cfg(feature = "std")]
-            windows_exception_handler::setup_panic_hook::<E, EM, I, OF, OT, S, Z>();
+            windows_exception_handler::setup_panic_hook::<E, EM, OF, Z>();
             setup_exception_handler(data)?;
             compiler_fence(Ordering::SeqCst);
 
             Ok(Self {
-                crash_handler: windows_exception_handler::inproc_crash_handler::<
-                    E,
-                    EM,
-                    I,
-                    OF,
-                    OT,
-                    S,
-                    Z,
-                > as *const _,
-                timeout_handler: windows_exception_handler::inproc_timeout_handler::<
-                    E,
-                    EM,
-                    I,
-                    OF,
-                    OT,
-                    S,
-                    Z,
-                > as *const c_void,
+                crash_handler: windows_exception_handler::inproc_crash_handler::<E, EM, OF, Z>
+                    as *const _,
+                timeout_handler: windows_exception_handler::inproc_timeout_handler::<E, EM, OF, Z>
+                    as *const c_void,
             })
         }
         #[cfg(not(any(unix, feature = "std")))]
@@ -932,21 +918,20 @@ mod windows_exception_handler {
         }
     }
 
+    use crate::state::HasInput;
     use windows::Win32::System::Threading::{
         EnterCriticalSection, LeaveCriticalSection, RTL_CRITICAL_SECTION,
     };
 
     /// invokes the `post_exec` hook on all observer in case of panic
     #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, I, OF, OT, S, Z>()
+    pub fn setup_panic_hook<E, EM, OF, Z>()
     where
-        E: HasObservers<Input = I, State = S, Observers = OT>,
-        EM: EventFirer<Input = I, State = S> + EventRestarter<State = S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<Input = I, State = S>,
-        S: State<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor,
-        I: Input,
-        Z: HasObjective<I, OF, S>,
+        E: HasObservers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<OF>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -973,11 +958,11 @@ mod windows_exception_handler {
                 // We are fuzzing!
                 let executor = data.executor_mut::<E>();
                 let observers = executor.observers_mut();
-                let state = data.state_mut::<S>();
+                let state = data.state_mut::<E::State>();
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
-                let input = data.take_current_input::<I>();
+                let input = data.take_current_input::<<E::State as HasInput>::Input>();
 
                 observers
                     .post_exec_all(state, input, &ExitKind::Crash)
@@ -1027,18 +1012,16 @@ mod windows_exception_handler {
         }));
     }
 
-    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, I, OF, OT, S, Z>(
+    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, OF, Z>(
         _p0: *mut u8,
         global_state: *mut c_void,
         _p1: *mut u8,
     ) where
-        E: HasObservers<Input = I, State = S, Observers = OT>,
-        EM: EventFirer<Input = I, State = S> + EventRestarter<State = S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<Input = I, State = S>,
-        S: State<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor,
-        I: Input,
-        Z: HasObjective<I, OF, S>,
+        E: HasObservers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<OF>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -1052,7 +1035,7 @@ mod windows_exception_handler {
 
         if data.in_target == 1 {
             let executor = data.executor_mut::<E>();
-            let state = data.state_mut::<S>();
+            let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let observers = executor.observers_mut();
@@ -1066,7 +1049,9 @@ mod windows_exception_handler {
                 #[cfg(feature = "std")]
                 let _res = stdout().flush();
 
-                let input = (data.timeout_input_ptr as *const I).as_ref().unwrap();
+                let input = (data.timeout_input_ptr as *const <E::State as HasInput>::Input)
+                    .as_ref()
+                    .unwrap();
                 data.timeout_input_ptr = ptr::null_mut();
 
                 observers
@@ -1124,17 +1109,15 @@ mod windows_exception_handler {
     }
 
     #[allow(clippy::too_many_lines)]
-    pub(crate) unsafe fn inproc_crash_handler<E, EM, I, OF, OT, S, Z>(
+    pub(crate) unsafe fn inproc_crash_handler<E, EM, OF, Z>(
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventFirer<Input = I, State = S> + EventRestarter<State = S>,
-        OT: ObserversTuple<I, S>,
-        OF: Feedback<Input = I, State = S>,
-        S: State<Input = I> + HasSolutions<Input = I> + HasClientPerfMonitor,
-        I: Input,
-        Z: HasObjective<I, OF, S>,
+        E: Executor<EM, E::State, Z> + HasObservers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<OF>,
     {
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
@@ -1201,7 +1184,7 @@ mod windows_exception_handler {
                 data.tp_timer = ptr::null_mut();
             }
 
-            let state = data.state_mut::<S>();
+            let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let observers = executor.observers_mut();
@@ -1212,7 +1195,7 @@ mod windows_exception_handler {
             drop(stdout().flush());
 
             // Make sure we don't crash in the crash handler forever.
-            let input = data.take_current_input::<I>();
+            let input = data.take_current_input::<<E::State as HasInput>::Input>();
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
