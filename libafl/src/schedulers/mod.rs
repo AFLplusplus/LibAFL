@@ -38,7 +38,7 @@ use crate::{
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
 pub trait Scheduler {
     /// The [`State`]
-    type State: State + HasCorpus<Corpus: Corpus<Input = <Self::State as State>::Input>>;
+    type State: State + HasCorpus;
 
     /// Added an entry to the corpus at the given index
     fn on_add(&self, _state: &mut Self::State, _idx: usize) -> Result<(), Error> {
