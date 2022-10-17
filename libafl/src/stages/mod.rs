@@ -50,6 +50,7 @@ use crate::{
     executors::{Executor, HasObservers},
     observers::ObserversTuple,
     schedulers::Scheduler,
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
@@ -173,6 +174,7 @@ where
 pub struct PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
+    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasRand,
     EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId
@@ -190,6 +192,7 @@ where
 impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
+    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasRand,
     EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId
@@ -214,6 +217,7 @@ where
 impl<CS, E, EM, OT, PS, Z> Stage<E, EM, CS::State, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
 where
     CS: Scheduler,
+    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasRand,
     E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter

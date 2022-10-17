@@ -3,12 +3,7 @@
 use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
-use crate::{
-    corpus::Corpus,
-    schedulers::Scheduler,
-    state::{HasCorpus, State},
-    Error,
-};
+use crate::{corpus::Corpus, schedulers::Scheduler, state::HasCorpus, Error};
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
@@ -18,7 +13,7 @@ pub struct QueueScheduler<S> {
 
 impl<S> Scheduler for QueueScheduler<S>
 where
-    S: State + HasCorpus<Input = <S as State>::Input>,
+    S: HasCorpus,
 {
     type State = S;
 

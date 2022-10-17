@@ -37,7 +37,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     observers::{ListObserver, ObserversTuple, TimeObserver},
-    state::{HasClientPerfMonitor, State},
+    state::{HasClientPerfMonitor, HasInput, State},
     Error,
 };
 
@@ -46,7 +46,7 @@ use crate::{
 /// indicating the "interestingness" of the last run.
 pub trait Feedback: Named + Debug {
     /// The [`State`]
-    type State: State + HasClientPerfMonitor;
+    type State: HasInput + HasClientPerfMonitor;
 
     /// Initializes the feedback state.
     /// This method is called after that the `State` is created.
@@ -60,7 +60,7 @@ pub trait Feedback: Named + Debug {
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: &<Self::State as State>::Input,
+        input: &<Self::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -107,7 +107,7 @@ pub trait Feedback: Named + Debug {
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        _testcase: &mut Testcase<<Self::State as State>::Input>,
+        _testcase: &mut Testcase<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -117,7 +117,7 @@ pub trait Feedback: Named + Debug {
     fn discard_metadata(
         &mut self,
         _state: &mut Self::State,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -193,7 +193,7 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: &<Self::State as State>::Input,
+        input: &<Self::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -241,7 +241,7 @@ where
     fn append_metadata(
         &mut self,
         state: &mut Self::State,
-        testcase: &mut Testcase<<Self::State as State>::Input>,
+        testcase: &mut Testcase<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         self.first.append_metadata(state, testcase)?;
         self.second.append_metadata(state, testcase)
@@ -251,7 +251,7 @@ where
     fn discard_metadata(
         &mut self,
         state: &mut Self::State,
-        input: &<Self::State as State>::Input,
+        input: &<Self::State as HasInput>::Input,
     ) -> Result<(), Error> {
         self.first.discard_metadata(state, input)?;
         self.second.discard_metadata(state, input)
@@ -273,7 +273,7 @@ where
         second: &mut B,
         state: &mut A::State,
         manager: &mut EM,
-        input: &<A::State as State>::Input,
+        input: &<A::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -377,7 +377,7 @@ where
         second: &mut B,
         state: &mut A::State,
         manager: &mut EM,
-        input: &<A::State as State>::Input,
+        input: &<A::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -426,7 +426,7 @@ where
         second: &mut B,
         state: &mut A::State,
         manager: &mut EM,
-        input: &<A::State as State>::Input,
+        input: &<A::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -481,7 +481,7 @@ where
         second: &mut B,
         state: &mut A::State,
         manager: &mut EM,
-        input: &<A::State as State>::Input,
+        input: &<A::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -530,7 +530,7 @@ where
         second: &mut B,
         state: &mut A::State,
         manager: &mut EM,
-        input: &<A::State as State>::Input,
+        input: &<A::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -628,7 +628,7 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: &<Self::State as State>::Input,
+        input: &<Self::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -645,7 +645,7 @@ where
     fn append_metadata(
         &mut self,
         state: &mut Self::State,
-        testcase: &mut Testcase<<Self::State as State>::Input>,
+        testcase: &mut Testcase<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         self.first.append_metadata(state, testcase)
     }
@@ -654,7 +654,7 @@ where
     fn discard_metadata(
         &mut self,
         state: &mut Self::State,
-        input: &<Self::State as State>::Input,
+        input: &<Self::State as HasInput>::Input,
     ) -> Result<(), Error> {
         self.first.discard_metadata(state, input)
     }
@@ -750,7 +750,7 @@ where
         &mut self,
         _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -809,7 +809,7 @@ where
         &mut self,
         _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
         _observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -872,7 +872,7 @@ where
         &mut self,
         _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -891,7 +891,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        testcase: &mut Testcase<<Self::State as State>::Input>,
+        testcase: &mut Testcase<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         *testcase.exec_time_mut() = self.exec_time;
         self.exec_time = None;
@@ -903,7 +903,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut Self::State,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
     ) -> Result<(), Error> {
         self.exec_time = None;
         Ok(())
@@ -961,7 +961,7 @@ where
         &mut self,
         _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -1039,7 +1039,7 @@ where
         &mut self,
         _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
         _observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>

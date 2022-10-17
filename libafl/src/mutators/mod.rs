@@ -22,7 +22,7 @@ pub use nautilus::*;
 
 use crate::{
     bolts::tuples::{HasConstLen, Named},
-    state::State,
+    state::{HasInput, State},
     Error,
 };
 
@@ -44,7 +44,7 @@ pub enum MutationResult {
 /// Simple as that.
 pub trait Mutator<S>
 where
-    S: State,
+    S: HasInput,
 {
     /// Mutate a given input
     fn mutate(
@@ -68,7 +68,7 @@ where
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
 pub trait MutatorsTuple<S>: HasConstLen
 where
-    S: State,
+    S: HasInput,
 {
     /// Runs the `mutate` function on all `Mutators` in this `Tuple`.
     fn mutate_all(

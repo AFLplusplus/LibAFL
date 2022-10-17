@@ -23,7 +23,7 @@ use crate::{
     feedbacks::{Feedback, HasObserverName},
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata, State},
+    state::{HasClientPerfMonitor, HasInput, HasMetadata, HasNamedMetadata},
     Error,
 };
 
@@ -351,7 +351,7 @@ where
     /// Name of the feedback as shown in the `UserStats`
     stats_name: String,
     /// Phantom Data of Reducer
-    phantom: PhantomData<(N, S, R, O, T)>,
+    phantom: PhantomData<(N, O, R, S, T)>,
 }
 
 impl<N, O, R, S, T> Feedback for MapFeedback<N, O, R, S, T>
@@ -361,7 +361,7 @@ where
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State,
+    S: HasInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     type State = S;
 
@@ -377,7 +377,7 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: &<Self::State as State>::Input,
+        input: &<Self::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -393,7 +393,7 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: &<Self::State as State>::Input,
+        input: &<Self::State as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -407,7 +407,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        testcase: &mut Testcase<<Self::State as State>::Input>,
+        testcase: &mut Testcase<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             let meta = MapIndexesMetadata::new(core::mem::take(v));
@@ -424,7 +424,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut Self::State,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
     ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
@@ -442,7 +442,7 @@ impl<O, S> Feedback for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
     for<'it> O: AsIter<'it, Item = u8>,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State,
+    S: HasInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -450,7 +450,7 @@ where
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -597,7 +597,7 @@ where
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    S: HasNamedMetadata + HasClientPerfMonitor + Debug + State,
+    S: HasInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -774,7 +774,7 @@ where
 
 impl<O, S> Feedback for ReachabilityFeedback<O, S>
 where
-    S: State + Debug + HasClientPerfMonitor,
+    S: HasInput + Debug + HasClientPerfMonitor,
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {
@@ -785,7 +785,7 @@ where
         &mut self,
         _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -813,7 +813,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        testcase: &mut Testcase<<Self::State as State>::Input>,
+        testcase: &mut Testcase<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
@@ -825,7 +825,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut Self::State,
-        _input: &<Self::State as State>::Input,
+        _input: &<Self::State as HasInput>::Input,
     ) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())

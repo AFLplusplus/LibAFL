@@ -12,7 +12,7 @@ use crate::{
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, State},
+    state::{HasCorpus, HasInput, HasMetadata, HasRand},
     Error,
 };
 
@@ -92,7 +92,7 @@ where
         &self,
         state: &mut CS::State,
         idx: usize,
-        testcase: &Testcase<<CS::State as State>::Input>,
+        testcase: &Testcase<<CS::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         self.base.on_replace(state, idx, testcase)
     }
@@ -102,7 +102,7 @@ where
         &self,
         state: &mut CS::State,
         idx: usize,
-        testcase: &Option<Testcase<<CS::State as State>::Input>>,
+        testcase: &Option<Testcase<<CS::State as HasInput>::Input>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, idx, testcase)?;
         let mut entries = if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {
@@ -327,10 +327,10 @@ where
 }
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`.
-pub type LenTimeMinimizerScheduler<CS: Scheduler, M> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<CS::State>, M>;
+pub type LenTimeMinimizerScheduler<CS, M> =
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as Scheduler>::State>, M>;
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
-pub type IndexesLenTimeMinimizerScheduler<CS: Scheduler> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<CS::State>, MapIndexesMetadata>;
+pub type IndexesLenTimeMinimizerScheduler<CS> =
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as Scheduler>::State>, MapIndexesMetadata>;

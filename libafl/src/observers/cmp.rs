@@ -4,14 +4,14 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::fmt::Debug;
+use core::{fmt::Debug, marker::PhantomData};
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named, AsMutSlice, AsSlice},
     observers::Observer,
-    state::{HasMetadata, State},
+    state::{HasInput, HasMetadata},
     Error,
 };
 
@@ -114,6 +114,7 @@ pub trait CmpMap: Debug {
 pub trait CmpObserver<CM, S>: Observer<S>
 where
     CM: CmpMap,
+    S: HasInput,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize;
@@ -194,18 +195,21 @@ where
 /// A standard [`CmpObserver`] observer
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "CM: serde::de::DeserializeOwned")]
-pub struct StdCmpObserver<'a, CM>
+pub struct StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize,
+    S: HasInput,
 {
     cmp_map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
     name: String,
+    phantom: PhantomData<S>,
 }
 
-impl<'a, CM, S> CmpObserver<CM, S> for StdCmpObserver<'a, CM>
+impl<'a, CM, S> CmpObserver<CM, S> for StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
+    S: HasInput + Debug,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -224,10 +228,10 @@ where
     }
 }
 
-impl<'a, CM, S> Observer<S> for StdCmpObserver<'a, CM>
+impl<'a, CM, S> Observer<S> for StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
-    S: State,
+    S: HasInput + Debug,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
@@ -235,18 +239,20 @@ where
     }
 }
 
-impl<'a, CM> Named for StdCmpObserver<'a, CM>
+impl<'a, CM, S> Named for StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
+    S: HasInput,
 {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<'a, CM> StdCmpObserver<'a, CM>
+impl<'a, CM, S> StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
+    S: HasInput,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]
@@ -255,6 +261,7 @@ where
             name: name.to_string(),
             size: None,
             cmp_map: OwnedRefMut::Ref(map),
+            phantom: PhantomData,
         }
     }
 
@@ -265,6 +272,7 @@ where
             name: name.to_string(),
             size: Some(OwnedRefMut::Ref(size)),
             cmp_map: OwnedRefMut::Ref(map),
+            phantom: PhantomData,
         }
     }
 }

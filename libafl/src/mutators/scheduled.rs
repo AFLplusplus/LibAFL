@@ -17,7 +17,7 @@ use crate::{
     },
     corpus::Corpus,
     mutators::{MutationResult, Mutator, MutatorsTuple},
-    state::{HasCorpus, HasMetadata, HasRand, State},
+    state::{HasCorpus, HasInput, HasMetadata, HasRand, State},
     Error,
 };
 
@@ -55,6 +55,7 @@ impl LogMutationMetadata {
 pub trait ComposedByMutations<MT, S>
 where
     MT: MutatorsTuple<S>,
+    S: HasInput,
 {
     /// Get the mutations
     fn mutations(&self) -> &MT;
@@ -67,7 +68,7 @@ where
 pub trait ScheduledMutator<MT, S>: ComposedByMutations<MT, S> + Mutator<S>
 where
     MT: MutatorsTuple<S>,
-    S: State,
+    S: HasInput,
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, input: &S::Input) -> u64;
@@ -274,7 +275,7 @@ pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
 pub struct LoggerScheduledMutator<MT, S, SM>
 where
     MT: MutatorsTuple<S> + NamedTuple,
-    S: State + HasRand + HasCorpus,
+    S: HasInput + HasRand + HasCorpus,
     SM: ScheduledMutator<MT, S>,
 {
     scheduled: SM,
@@ -285,7 +286,7 @@ where
 impl<MT, S, SM> Debug for LoggerScheduledMutator<MT, S, SM>
 where
     MT: MutatorsTuple<S> + NamedTuple,
-    S: State + HasRand + HasCorpus,
+    S: HasInput + HasRand + HasCorpus,
     SM: ScheduledMutator<MT, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -293,7 +294,7 @@ where
             f,
             "LoggerScheduledMutator with {} mutations for Input type {}",
             self.scheduled.mutations().len(),
-            core::any::type_name::<<S as State>::Input>()
+            core::any::type_name::<<S as HasInput>::Input>()
         )
     }
 }
@@ -307,7 +308,7 @@ where
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut <S as State>::Input,
+        input: &mut <S as HasInput>::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         self.scheduled_mutate(state, input, stage_idx)
@@ -359,12 +360,12 @@ where
     SM: ScheduledMutator<MT, S>,
 {
     /// Compute the number of iterations used to apply stacked mutations
-    fn iterations(&self, state: &mut S, _: &<S as State>::Input) -> u64 {
+    fn iterations(&self, state: &mut S, _: &<S as HasInput>::Input) -> u64 {
         1 << (1 + state.rand_mut().below(6))
     }
 
     /// Get the next mutation to apply
-    fn schedule(&self, state: &mut S, _: &<S as State>::Input) -> usize {
+    fn schedule(&self, state: &mut S, _: &<S as HasInput>::Input) -> usize {
         debug_assert!(!self.scheduled.mutations().is_empty());
         state
             .rand_mut()
@@ -374,7 +375,7 @@ where
     fn scheduled_mutate(
         &mut self,
         state: &mut S,
-        input: &mut <S as State>::Input,
+        input: &mut <S as HasInput>::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let mut r = MutationResult::Skipped;

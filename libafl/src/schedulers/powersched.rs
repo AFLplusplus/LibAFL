@@ -11,9 +11,10 @@ use serde::{Deserialize, Serialize};
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
     schedulers::Scheduler,
-    state::{HasCorpus, HasMetadata, State},
+    state::{HasCorpus, HasMetadata},
     Error,
 };
+
 /// The n fuzz size
 pub const N_FUZZ_SIZE: usize = 1 << 21;
 
@@ -154,7 +155,7 @@ pub struct PowerQueueScheduler<S> {
 
 impl<S> Scheduler for PowerQueueScheduler<S>
 where
-    S: State + HasCorpus<Input = <S as State>::Input> + HasMetadata,
+    S: HasCorpus + HasMetadata,
 {
     type State = S;
 

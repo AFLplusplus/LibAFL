@@ -22,10 +22,10 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     bolts::{rands::Rand, AsSlice},
-    inputs::{HasBytesVec, Input},
+    inputs::HasBytesVec,
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{CmpValues, CmpValuesMetadata},
-    state::{HasMaxSize, HasMetadata, HasRand},
+    state::{HasInput, HasMaxSize, HasMetadata, HasRand},
     Error,
 };
 
@@ -295,15 +295,15 @@ impl<'it> IntoIterator for &'it Tokens {
 #[derive(Debug, Default)]
 pub struct TokenInsert;
 
-impl<I, S> Mutator<I, S> for TokenInsert
+impl<S> Mutator<S> for TokenInsert
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: HasInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -361,15 +361,15 @@ impl TokenInsert {
 #[derive(Debug, Default)]
 pub struct TokenReplace;
 
-impl<I, S> Mutator<I, S> for TokenReplace
+impl<S> Mutator<S> for TokenReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: HasInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -423,16 +423,16 @@ impl TokenReplace {
 #[derive(Debug, Default)]
 pub struct I2SRandReplace;
 
-impl<I, S> Mutator<I, S> for I2SRandReplace
+impl<S> Mutator<S> for I2SRandReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: HasInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();

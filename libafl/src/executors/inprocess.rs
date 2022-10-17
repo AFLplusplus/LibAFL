@@ -49,9 +49,8 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::Input,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasSolutions},
     Error, ExecutionProcessor,
 };
 
@@ -59,9 +58,9 @@ use crate::{
 pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H, OT, S>;
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
-pub type OwnedInProcessExecutor<OT, S: State> = GenericInProcessExecutor<
-    dyn FnMut(&S::Input) -> ExitKind,
-    Box<dyn FnMut(&S::Input) -> ExitKind>,
+pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
+    dyn FnMut(&<S as HasInput>::Input) -> ExitKind,
+    Box<dyn FnMut(&<S as HasInput>::Input) -> ExitKind>,
     OT,
     S,
 >;
@@ -73,7 +72,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
@@ -89,7 +88,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessExecutor")
@@ -104,7 +103,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
 {
     fn run_target(
         &mut self,
@@ -128,10 +127,9 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
 {
     type State = S;
-
     type Observers = OT;
 
     #[inline]
@@ -147,10 +145,10 @@ where
 
 impl<H, HB, OT, S> GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&<S as State>::Input) -> ExitKind + ?Sized,
+    H: FnMut(&<S as HasInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: State + HasClientPerfMonitor + HasExecutions + HasCorpus + HasSolutions,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus + HasSolutions,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -169,9 +167,9 @@ where
         Self: Executor<EM, S, Z>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<State = S>,
-        Z: HasObjective<OF, S> + ExecutionProcessor<Observers = OT>,
+        Z: HasObjective<OF> + ExecutionProcessor<Observers = OT>,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, <S as State>::Input, OF, OT, S, Z, H>()?;
+        let handlers = InProcessHandlers::new::<Self, EM, OF, OT, Z, H>()?;
         #[cfg(windows)]
         unsafe {
             /*
@@ -321,16 +319,15 @@ impl InProcessHandlers {
     }
 
     /// Create new [`InProcessHandlers`].
-    pub fn new<E, EM, I, OF, OT, S, Z, H>() -> Result<Self, Error>
+    pub fn new<E, EM, OF, OT, Z, H>() -> Result<Self, Error>
     where
-        I: Input,
-        E: Executor<EM, S, Z> + HasObservers<Observers = OT, State = S>,
-        OT: ObserversTuple<S>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<State = S>,
-        S: HasSolutions<Input = I> + HasClientPerfMonitor + State<Input = I>,
-        Z: HasObjective<OF, S>,
-        H: FnMut(&I) -> ExitKind + ?Sized,
+        E: Executor<EM, E::State, Z> + HasObservers<Observers = OT>,
+        OT: ObserversTuple<E::State>,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<State = E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor + HasInput,
+        Z: HasObjective<OF>,
+        H: FnMut(&<E::State as HasInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {
@@ -463,7 +460,7 @@ impl InProcessExecutorHandlerData {
         self.in_target == 1
     }
 
-    #[cfg(not(windows))]
+    #[cfg(all(not(windows), feature = "std"))]
     fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }

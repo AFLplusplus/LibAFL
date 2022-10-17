@@ -14,7 +14,7 @@ use crate::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
     },
-    state::{HasCorpus, HasMaxSize, HasRand},
+    state::{HasCorpus, HasInput, HasMaxSize, HasRand},
     Error,
 };
 
@@ -22,7 +22,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct EncodedRandMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedRandMutator {
+impl<S: HasRand + HasInput<Input = EncodedInput>> Mutator<S> for EncodedRandMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -57,7 +57,7 @@ impl EncodedRandMutator {
 #[derive(Debug, Default)]
 pub struct EncodedIncMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedIncMutator {
+impl<S: HasRand + HasInput<Input = EncodedInput>> Mutator<S> for EncodedIncMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -92,7 +92,7 @@ impl EncodedIncMutator {
 #[derive(Debug, Default)]
 pub struct EncodedDecMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDecMutator {
+impl<S: HasRand + HasInput<Input = EncodedInput>> Mutator<S> for EncodedDecMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -127,7 +127,7 @@ impl EncodedDecMutator {
 #[derive(Debug, Default)]
 pub struct EncodedAddMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedAddMutator {
+impl<S: HasRand + HasInput<Input = EncodedInput>> Mutator<S> for EncodedAddMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -166,7 +166,7 @@ impl EncodedAddMutator {
 #[derive(Debug, Default)]
 pub struct EncodedDeleteMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedDeleteMutator {
+impl<S: HasRand + HasInput<Input = EncodedInput>> Mutator<S> for EncodedDeleteMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -206,9 +206,9 @@ pub struct EncodedInsertCopyMutator {
     tmp_buf: Vec<u32>,
 }
 
-impl<S> Mutator<EncodedInput, S> for EncodedInsertCopyMutator
+impl<S> Mutator<S> for EncodedInsertCopyMutator
 where
-    S: HasRand + HasMaxSize,
+    S: HasInput<Input = EncodedInput> + HasRand + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -267,7 +267,7 @@ impl EncodedInsertCopyMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCopyMutator;
 
-impl<S: HasRand> Mutator<EncodedInput, S> for EncodedCopyMutator {
+impl<S: HasInput<Input = EncodedInput> + HasRand> Mutator<S> for EncodedCopyMutator {
     fn mutate(
         &mut self,
         state: &mut S,
@@ -307,9 +307,9 @@ impl EncodedCopyMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverInsertMutator;
 
-impl<S> Mutator<EncodedInput, S> for EncodedCrossoverInsertMutator
+impl<S> Mutator<S> for EncodedCrossoverInsertMutator
 where
-    S: HasRand + HasCorpus<Input = EncodedInput> + HasMaxSize,
+    S: HasInput<Input = EncodedInput> + HasRand + HasCorpus + HasMaxSize,
 {
     fn mutate(
         &mut self,
@@ -381,9 +381,9 @@ impl EncodedCrossoverInsertMutator {
 #[derive(Debug, Default)]
 pub struct EncodedCrossoverReplaceMutator;
 
-impl<S> Mutator<EncodedInput, S> for EncodedCrossoverReplaceMutator
+impl<S> Mutator<S> for EncodedCrossoverReplaceMutator
 where
-    S: HasRand + HasCorpus<Input = EncodedInput>,
+    S: HasInput<Input = EncodedInput> + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,

@@ -2,7 +2,10 @@
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
 use alloc::rc::Rc;
-use core::cell::{Cell, RefCell};
+use core::{
+    cell::{Cell, RefCell},
+    fmt::Debug,
+};
 
 use super::{PushStage, PushStageHelper, PushStageSharedState};
 #[cfg(feature = "introspection")]
@@ -17,7 +20,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand, State},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -39,7 +42,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand,
+    CS::State: HasClientPerfMonitor + HasRand + Clone + Debug,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
         + HasScheduler<CS>,
@@ -61,7 +64,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
         + HasScheduler<CS>,
@@ -87,7 +90,7 @@ where
         + ProgressReporter<State = CS::State>,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + Clone + Debug,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
         + HasScheduler<CS>,
@@ -128,7 +131,7 @@ where
         state: &mut CS::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-    ) -> Option<Result<<CS::State as State>::Input, Error>> {
+    ) -> Option<Result<<CS::State as HasInput>::Input, Error>> {
         if self.testcases_done >= self.testcases_to_do {
             // finished with this cicle.
             return None;
@@ -164,7 +167,7 @@ where
         state: &mut CS::State,
         event_mgr: &mut EM,
         observers: &mut OT,
-        last_input: <CS::State as State>::Input,
+        last_input: <CS::State as HasInput>::Input,
         exit_kind: ExitKind,
     ) -> Result<(), Error> {
         // todo: isintersting, etc.
@@ -202,14 +205,14 @@ where
         + ProgressReporter<State = CS::State>,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + Clone + Debug,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
         + HasScheduler<CS>,
 {
-    type Item = Result<<CS::State as State>::Input, Error>;
+    type Item = Result<<CS::State as HasInput>::Input, Error>;
 
-    fn next(&mut self) -> Option<Result<<CS::State as State>::Input, Error>> {
+    fn next(&mut self) -> Option<Result<<CS::State as HasInput>::Input, Error>> {
         self.next_std()
     }
 }
@@ -220,7 +223,7 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
         + HasScheduler<CS>,

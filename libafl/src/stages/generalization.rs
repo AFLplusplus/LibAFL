@@ -21,7 +21,7 @@ use crate::{
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasMetadata},
     Error,
 };
 
@@ -63,21 +63,29 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 pub struct GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
+    OT: ObserversTuple<S>,
+    S: HasInput<Input = GeneralizedInput>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasCorpus,
 {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, O, OT, S, Z)>,
 }
 
-impl<E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for GeneralizationStage<EM, O, OT, S, Z>
+impl<E, EM, O, Z> Stage<E, EM, E::State, Z>
+    for GeneralizationStage<EM, O, E::Observers, E::State, Z>
 where
     O: MapObserver,
-    E: Executor<EM, GeneralizedInput, S, Z>
-        + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
+    E: Executor<EM, E::State, Z> + HasObservers,
+    E::Observers: ObserversTuple<E::State>,
+    E::State: HasInput<Input = GeneralizedInput>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasCorpus,
 {
     #[inline]
     #[allow(clippy::too_many_lines)]
@@ -85,7 +93,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -351,8 +359,12 @@ where
 impl<EM, O, OT, S, Z> GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
+    OT: ObserversTuple<S>,
+    S: HasInput<Input = GeneralizedInput>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasCorpus,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
@@ -382,8 +394,7 @@ where
         input: &GeneralizedInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z>
-            + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
+        E: Executor<EM, S, Z> + HasObservers<Observers = OT, State = S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -428,8 +439,7 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z>
-            + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
+        E: Executor<EM, S, Z> + HasObservers<Observers = OT, State = S>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -471,8 +481,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z>
-            + HasObservers<Observers = OT, Input = GeneralizedInput, State = S>,
+        E: Executor<EM, S, Z> + HasObservers<Observers = OT, State = S>,
     {
         let mut index = 0;
         while index < payload.len() {

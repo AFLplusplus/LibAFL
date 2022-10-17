@@ -23,7 +23,7 @@ use crate::{
     monitors::UserStats,
     observers::ObserversTuple,
     stages::calibrate::UnstableEntriesMetadata,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, State},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
 
@@ -37,6 +37,7 @@ pub struct EventManagerId {
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
+use crate::state::HasInput;
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -302,7 +303,7 @@ where
 /// [`EventFirer`] fire an event.
 pub trait EventFirer {
     /// [`State`] for this fuzzing campaign
-    type State: State;
+    type State: HasInput;
 
     /// Send off an [`Event`] to the broker
     ///
@@ -315,7 +316,7 @@ pub trait EventFirer {
     fn fire(
         &mut self,
         state: &mut Self::State,
-        event: Event<<Self::State as State>::Input>,
+        event: Event<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
@@ -353,7 +354,7 @@ pub trait EventFirer {
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State> {
     /// [`State`] for this fuzzing campaign
-    type State: State + HasClientPerfMonitor + HasMetadata + HasExecutions;
+    type State: HasInput + HasClientPerfMonitor + HasMetadata + HasExecutions;
 
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -424,7 +425,7 @@ pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State
 /// Restartable trait
 pub trait EventRestarter {
     /// [`State`] for this fuzzing campaign
-    type State: State;
+    type State: HasInput;
 
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
@@ -440,7 +441,7 @@ pub trait EventRestarter {
 /// [`EventProcessor`] process all the incoming messages
 pub trait EventProcessor<E, Z> {
     /// The [`State`]
-    type State: State;
+    type State: HasInput;
     /// The [`Observers`]
     type Observers: ObserversTuple<Self::State>;
 
@@ -479,7 +480,7 @@ pub trait EventManager<E, S, Z>:
     + HasEventManagerId
     + ProgressReporter<State = S>
 where
-    S: State,
+    S: HasInput,
 {
 }
 
@@ -511,14 +512,14 @@ impl<OT, S> NopEventManager<OT, S> {
 
 impl<OT, S> EventFirer for NopEventManager<OT, S>
 where
-    S: State,
+    S: HasInput,
 {
     type State = S;
 
     fn fire(
         &mut self,
         _state: &mut Self::State,
-        _event: Event<<Self::State as State>::Input>,
+        _event: Event<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -526,14 +527,14 @@ where
 
 impl<OT, S> EventRestarter for NopEventManager<OT, S>
 where
-    S: State,
+    S: HasInput,
 {
     type State = S;
 }
 
 impl<E, OT, S, Z> EventProcessor<E, Z> for NopEventManager<OT, S>
 where
-    S: State + HasClientPerfMonitor + HasExecutions,
+    S: HasInput + HasClientPerfMonitor + HasExecutions,
     OT: ObserversTuple<S>,
 {
     type State = S;
@@ -553,7 +554,7 @@ where
 impl<E, OT, S, Z> EventManager<E, S, Z> for NopEventManager<OT, S>
 where
     OT: ObserversTuple<S>,
-    S: State + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: HasInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
 }
 
@@ -567,7 +568,7 @@ impl<OT, S> HasCustomBufHandlers<S> for NopEventManager<OT, S> {
 
 impl<OT, S> ProgressReporter for NopEventManager<OT, S>
 where
-    S: State + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: HasInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
     type State = S;
 }
@@ -694,7 +695,6 @@ pub mod pybind {
     }
 
     impl EventFirer for PythonEventManager {
-        type Input = BytesInput;
         type State = PythonStdState;
 
         fn fire(

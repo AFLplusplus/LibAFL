@@ -5,7 +5,7 @@ use core::fmt::{self, Debug, Formatter};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     observers::ObserversTuple,
-    state::State,
+    state::HasInput,
     Error,
 };
 
@@ -70,7 +70,7 @@ where
         fuzzer: &mut Z,
         state: &mut E::State,
         mgr: &mut EM,
-        input: &<E::State as State>::Input,
+        input: &<E::State as HasInput>::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }

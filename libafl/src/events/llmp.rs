@@ -45,7 +45,7 @@ use crate::{
     inputs::Input,
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, State},
+    state::{HasClientPerfMonitor, HasExecutions, HasInput, HasMetadata},
     Error,
 };
 
@@ -248,7 +248,7 @@ where
 pub struct LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
     SP: ShMemProvider + 'static,
 {
     llmp: LlmpClient<SP>,
@@ -264,7 +264,7 @@ impl<OT, S, SP> core::fmt::Debug for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider + 'static,
-    S: State,
+    S: HasInput,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut debug_struct = f.debug_struct("LlmpEventManager");
@@ -283,7 +283,7 @@ impl<OT, S, SP> Drop for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider + 'static,
-    S: State,
+    S: HasInput,
 {
     /// LLMP clients will have to wait until their pages are mapped by somebody.
     fn drop(&mut self) {
@@ -294,7 +294,7 @@ where
 impl<OT, S, SP> LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: State + HasExecutions + HasClientPerfMonitor,
+    S: HasInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
 {
     /// Create a manager from a raw llmp client
@@ -439,7 +439,7 @@ where
 impl<OT, S, SP> EventFirer for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
     SP: ShMemProvider,
 {
     type State = S;
@@ -448,7 +448,7 @@ where
     fn fire(
         &mut self,
         _state: &mut Self::State,
-        event: Event<<Self::State as State>::Input>,
+        event: Event<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         let flags: Flags = LLMP_FLAG_INITIALIZED;
@@ -472,7 +472,7 @@ where
     fn fire(
         &mut self,
         _state: &mut Self::State,
-        event: Event<<Self::State as State>::Input>,
+        event: Event<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         let serialized = postcard::to_allocvec(&event)?;
         self.llmp.send_buf(LLMP_TAG_EVENT_TO_BOTH, &serialized)?;
@@ -487,7 +487,7 @@ where
 impl<OT, S, SP> EventRestarter for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
     SP: ShMemProvider,
 {
     type State = S;
@@ -503,7 +503,7 @@ where
 impl<E, OT, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S> + DeserializeOwned,
-    S: State + HasClientPerfMonitor + HasExecutions,
+    S: HasInput + HasClientPerfMonitor + HasExecutions,
     SP: ShMemProvider,
     E: HasObservers<State = S, Observers = OT> + Executor<Self, S, Z>,
     Z: EvaluatorObservers<State = S, Observers = OT>
@@ -552,7 +552,7 @@ where
 impl<E, OT, S, SP, Z> EventManager<E, S, Z> for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S> + DeserializeOwned,
-    S: State + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: HasInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<State = S, Observers = OT> + Executor<Self, S, Z>,
     Z: EvaluatorObservers<State = S, Observers = OT>
@@ -563,7 +563,7 @@ where
 impl<OT, S, SP> HasCustomBufHandlers<S> for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: State,
+    S: HasInput,
     SP: ShMemProvider,
 {
     fn add_custom_buf_handler(
@@ -576,7 +576,7 @@ where
 
 impl<OT, S, SP> ProgressReporter for LlmpEventManager<OT, S, SP>
 where
-    S: State + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: HasInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
     OT: ObserversTuple<S> + DeserializeOwned,
     SP: ShMemProvider,
 {
@@ -585,7 +585,7 @@ where
 
 impl<OT, S, SP> HasEventManagerId for LlmpEventManager<OT, S, SP>
 where
-    S: State,
+    S: HasInput,
     OT: ObserversTuple<S> + DeserializeOwned,
     SP: ShMemProvider,
 {
@@ -604,7 +604,7 @@ pub struct LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S>,
-    S: State<Input = I>,
+    S: HasInput<Input = I>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -633,7 +633,7 @@ where
     I: Input,
     OT: ObserversTuple<I, S>,
     SP: ShMemProvider,
-    S: State<Input = I>,
+    S: HasInput<Input = I>,
     //CE: CustomEvent<I>,
 {
     type Input = I;
@@ -684,7 +684,7 @@ impl<E, I, OT, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<I, 
 where
     I: Input,
     OT: ObserversTuple<I, S> + DeserializeOwned,
-    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: HasInput<Input = I> + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
     E: HasObservers<Input = I, State = S, Observers = OT>
         + Executor<LlmpEventManager<I, OT, S, SP>, I, S, Z>,
@@ -740,7 +740,7 @@ impl<I, OT, S, SP> LlmpRestartingEventManager<I, OT, S, SP>
 where
     I: Input,
     OT: ObserversTuple<I, S> + DeserializeOwned,
-    S: State<Input = I>,
+    S: HasInput<Input = I>,
     SP: ShMemProvider + 'static,
     //CE: CustomEvent<I>,
 {
@@ -853,7 +853,7 @@ where
     OT: ObserversTuple<I, S> + DeserializeOwned,
     S: DeserializeOwned,
     SP: ShMemProvider,
-    S: State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: HasInput<Input = I> + HasExecutions + HasClientPerfMonitor,
     MT: Monitor + Clone,
 {
     /// Launch the restarting manager

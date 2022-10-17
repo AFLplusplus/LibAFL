@@ -10,7 +10,7 @@ use crate::{
     inputs::{GeneralizedInput, GeneralizedItem},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     stages::generalization::GeneralizedIndexesMetadata,
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasInput, HasMetadata, HasRand},
     Error,
 };
 
@@ -128,9 +128,9 @@ pub struct GrimoireExtensionMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<GeneralizedInput, S> for GrimoireExtensionMutator
+impl<S> Mutator<S> for GrimoireExtensionMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
+    S: HasInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
@@ -176,9 +176,9 @@ pub struct GrimoireRecursiveReplacementMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<GeneralizedInput, S> for GrimoireRecursiveReplacementMutator
+impl<S> Mutator<S> for GrimoireRecursiveReplacementMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
+    S: HasInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
@@ -247,9 +247,9 @@ impl GrimoireRecursiveReplacementMutator {
 #[derive(Debug, Default)]
 pub struct GrimoireStringReplacementMutator {}
 
-impl<S> Mutator<GeneralizedInput, S> for GrimoireStringReplacementMutator
+impl<S> Mutator<S> for GrimoireStringReplacementMutator
 where
-    S: HasMetadata + HasRand,
+    S: HasInput<Input = GeneralizedInput> + HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,
@@ -355,9 +355,9 @@ pub struct GrimoireRandomDeleteMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<GeneralizedInput, S> for GrimoireRandomDeleteMutator
+impl<S> Mutator<S> for GrimoireRandomDeleteMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
+    S: HasInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,

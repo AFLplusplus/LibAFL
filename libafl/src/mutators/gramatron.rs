@@ -12,7 +12,7 @@ use crate::{
     generators::GramatronGenerator,
     inputs::{GramatronInput, Terminal},
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasInput, HasMetadata, HasRand},
     Error,
 };
 
@@ -27,9 +27,9 @@ where
     generator: &'a GramatronGenerator<'a, S>,
 }
 
-impl<'a, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, S>
+impl<'a, S> Mutator<S> for GramatronRandomMutator<'a, S>
 where
-    S: HasRand + HasMetadata,
+    S: HasInput<Input = GramatronInput> + HasRand + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -96,9 +96,9 @@ impl GramatronIdxMapMetadata {
 #[derive(Default, Debug)]
 pub struct GramatronSpliceMutator;
 
-impl<S> Mutator<GramatronInput, S> for GramatronSpliceMutator
+impl<S> Mutator<S> for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<Input = GramatronInput> + HasMetadata,
+    S: HasInput<Input = GramatronInput> + HasRand + HasCorpus + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -169,9 +169,9 @@ pub struct GramatronRecursionMutator {
     feature: Vec<Terminal>,
 }
 
-impl<S> Mutator<GramatronInput, S> for GramatronRecursionMutator
+impl<S> Mutator<S> for GramatronRecursionMutator
 where
-    S: HasRand + HasMetadata,
+    S: HasInput<Input = GramatronInput> + HasRand + HasMetadata,
 {
     fn mutate(
         &mut self,

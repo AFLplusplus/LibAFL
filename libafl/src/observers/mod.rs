@@ -39,7 +39,7 @@ use crate::{
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
-    state::State,
+    state::{HasInput, State},
     Error,
 };
 
@@ -47,7 +47,7 @@ use crate::{
 /// They can then be used by various sorts of feedback.
 pub trait Observer<S>: Named + Debug
 where
-    S: State,
+    S: HasInput,
 {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
@@ -94,7 +94,7 @@ where
 /// A haskell-style tuple of observers
 pub trait ObserversTuple<S>: MatchName + Debug
 where
-    S: State,
+    S: HasInput,
 {
     /// This is called right before the next execution.
     fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
