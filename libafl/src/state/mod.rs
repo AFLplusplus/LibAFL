@@ -36,9 +36,9 @@ pub trait State: Serialize + DeserializeOwned {
 }
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus {
+pub trait HasCorpus: State {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus;
+    type Corpus: Corpus<Input = <Self as State>::Input>;
 
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
@@ -55,11 +55,10 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions {
+pub trait HasSolutions: State {
     /// The associated type implementing [`Corpus`] for solutions
-    type Solutions: Corpus<Input = Self::Input>;
-    /// The [Input] type used for solutions
-    type Input: Input;
+    type Solutions: Corpus<Input = <Self as State>::Input>;
+
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
     /// The solutions corpus (mutable)
@@ -235,11 +234,9 @@ where
 
 impl<C, R, SC> HasSolutions for StdState<C, R, SC>
 where
-    SC::Input: Input,
     SC: Corpus,
 {
     type Solutions = SC;
-    type Input = SC::Input;
 
     /// Returns the solutions corpus
     #[inline]

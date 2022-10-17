@@ -274,7 +274,7 @@ pub fn tokens_mutations() -> tuple_list_type!(TokenInsert, TokenReplace) {
 pub struct LoggerScheduledMutator<MT, S, SM>
 where
     MT: MutatorsTuple<S> + NamedTuple,
-    S: State + HasRand + HasCorpus<Input = <S as State>::Input>,
+    S: State + HasRand + HasCorpus,
     SM: ScheduledMutator<MT, S>,
 {
     scheduled: SM,
@@ -285,7 +285,7 @@ where
 impl<MT, S, SM> Debug for LoggerScheduledMutator<MT, S, SM>
 where
     MT: MutatorsTuple<S> + NamedTuple,
-    S: State + HasRand + HasCorpus<Input = <S as State>::Input>,
+    S: State + HasRand + HasCorpus,
     SM: ScheduledMutator<MT, S>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -301,7 +301,7 @@ where
 impl<MT, S, SM> Mutator<S> for LoggerScheduledMutator<MT, S, SM>
 where
     MT: MutatorsTuple<S> + NamedTuple,
-    S: State + HasRand + HasCorpus<Input = <S as State>::Input>,
+    S: State + HasRand + HasCorpus,
     SM: ScheduledMutator<MT, S>,
 {
     fn mutate(
@@ -338,7 +338,7 @@ where
 impl<MT, S, SM> ComposedByMutations<MT, S> for LoggerScheduledMutator<MT, S, SM>
 where
     MT: MutatorsTuple<S> + NamedTuple,
-    S: State + HasRand + HasCorpus<Input = <S as State>::Input>,
+    S: State + HasRand + HasCorpus,
     SM: ScheduledMutator<MT, S>,
 {
     #[inline]
@@ -355,7 +355,7 @@ where
 impl<MT, S, SM> ScheduledMutator<MT, S> for LoggerScheduledMutator<MT, S, SM>
 where
     MT: MutatorsTuple<S> + NamedTuple,
-    S: State + HasRand + HasCorpus<Input = <S as State>::Input>,
+    S: State + HasRand + HasCorpus,
     SM: ScheduledMutator<MT, S>,
 {
     /// Compute the number of iterations used to apply stacked mutations
@@ -397,7 +397,7 @@ where
 impl<MT, S, SM> LoggerScheduledMutator<MT, S, SM>
 where
     MT: MutatorsTuple<S> + NamedTuple,
-    S: State + HasRand + HasCorpus<Input = <S as State>::Input>,
+    S: State + HasRand + HasCorpus,
     SM: ScheduledMutator<MT, S>,
 {
     /// Create a new [`StdScheduledMutator`] instance without mutations and corpus
