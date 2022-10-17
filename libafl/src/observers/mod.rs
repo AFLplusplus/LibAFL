@@ -374,7 +374,7 @@ pub mod pybind {
         }
     }
 
-    impl Observer<BytesInput, PythonStdState> for PyObjectObserver {
+    impl Observer<PythonStdState> for PyObjectObserver {
         fn flush(&mut self) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method0(py, "flush")?;
@@ -767,11 +767,9 @@ pub mod pybind {
         }
     }
 
-    impl Observer<BytesInput, PythonStdState> for PythonObserver {
+    impl Observer<PythonStdState> for PythonObserver {
         fn flush(&mut self) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, o, {
-                Observer::<BytesInput, PythonStdState>::flush(o)
-            })
+            unwrap_me_mut!(self.wrapper, o, { Observer::<PythonStdState>::flush(o) })
         }
 
         fn pre_exec(
@@ -843,7 +841,7 @@ pub mod pybind {
         }
     }
 
-    impl ObserversTuple<BytesInput, PythonStdState> for PythonObserversTuple {
+    impl ObserversTuple<PythonStdState> for PythonObserversTuple {
         fn pre_exec_all(
             &mut self,
             state: &mut PythonStdState,

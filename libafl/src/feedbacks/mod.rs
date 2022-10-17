@@ -1306,7 +1306,7 @@ pub mod pybind {
             #[derive(Debug)]
             #[pyclass(unsendable, name = $pystring)]
             pub struct $pyname {
-                pub inner: $feed<PythonFeedback, PythonFeedback, BytesInput, PythonStdState>,
+                pub inner: $feed<PythonFeedback, PythonFeedback>,
             }
 
             #[pymethods]

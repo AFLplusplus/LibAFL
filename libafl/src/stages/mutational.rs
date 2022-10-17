@@ -165,10 +165,8 @@ pub mod pybind {
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         fuzzer::pybind::PythonStdFuzzer,
-        inputs::BytesInput,
         mutators::pybind::PythonMutator,
         stages::{pybind::PythonStage, StdMutationalStage},
-        state::pybind::PythonStdState,
     };
 
     #[pyclass(unsendable, name = "StdMutationalStage")]

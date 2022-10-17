@@ -653,6 +653,7 @@ pub mod pybind {
 
     use pyo3::{prelude::*, types::PyDict};
 
+    use crate::prelude::BytesInput;
     use crate::{
         bolts::{ownedref::OwnedPtrMut, rands::pybind::PythonRand},
         corpus::pybind::PythonCorpus,
@@ -668,7 +669,7 @@ pub mod pybind {
     };
 
     /// `StdState` with fixed generics
-    pub type PythonStdState = StdState<PythonCorpus, PythonRand, PythonCorpus>;
+    pub type PythonStdState = StdState<BytesInput, PythonCorpus, PythonRand, PythonCorpus>;
 
     #[pyclass(unsendable, name = "StdState")]
     #[derive(Debug)]

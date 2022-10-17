@@ -859,9 +859,7 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     use super::{Debug, HasObserverName, MaxMapFeedback};
-    use crate::{
-        feedbacks::pybind::PythonFeedback, inputs::BytesInput, state::pybind::PythonStdState,
-    };
+    use crate::{feedbacks::pybind::PythonFeedback, state::pybind::PythonStdState};
 
     macro_rules! define_python_map_feedback {
         ($struct_name:ident, $py_name:tt, $datatype:ty, $map_observer_type_name: ident, $my_std_state_type_name: ident) => {
@@ -873,7 +871,6 @@ pub mod pybind {
             pub struct $struct_name {
                 /// Rust wrapped MaxMapFeedback object
                 pub inner: MaxMapFeedback<
-                    BytesInput,
                     $map_observer_type_name, /* PythonMapObserverI8 */
                     $my_std_state_type_name,
                     $datatype,

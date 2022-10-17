@@ -706,6 +706,7 @@ pub mod pybind {
 
     use pyo3::prelude::*;
 
+    use crate::observers::pybind::PythonObserversTuple;
     use crate::{
         bolts::ownedref::OwnedPtrMut,
         events::pybind::PythonEventManager,
@@ -713,7 +714,6 @@ pub mod pybind {
         feedbacks::pybind::PythonFeedback,
         fuzzer::{Evaluator, Fuzzer, StdFuzzer},
         inputs::BytesInput,
-        observers::pybind::PythonObserversTuple,
         schedulers::QueueScheduler,
         stages::pybind::PythonStagesTuple,
         state::pybind::{PythonStdState, PythonStdStateWrapper},
@@ -721,12 +721,10 @@ pub mod pybind {
 
     /// `StdFuzzer` with fixed generics
     pub type PythonStdFuzzer = StdFuzzer<
-        QueueScheduler<BytesInput, PythonStdState>,
+        QueueScheduler<PythonStdState>,
         PythonFeedback,
-        BytesInput,
         PythonFeedback,
         PythonObserversTuple,
-        PythonStdState,
     >;
 
     /// Python class for StdFuzzer

@@ -513,9 +513,7 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     use super::{havoc_mutations, Debug, HavocMutationsType, StdScheduledMutator};
-    use crate::{
-        inputs::BytesInput, mutators::pybind::PythonMutator, state::pybind::PythonStdState,
-    };
+    use crate::{mutators::pybind::PythonMutator, state::pybind::PythonStdState};
 
     #[pyclass(unsendable, name = "StdHavocMutator")]
     #[derive(Debug)]

@@ -642,6 +642,7 @@ mod tests {
 pub mod pybind {
     use pyo3::prelude::*;
 
+    use crate::inputs::BytesInput;
     use crate::{
         events::{
             simple::pybind::PythonSimpleEventManager, Event, EventFirer, EventManager,
@@ -649,7 +650,6 @@ pub mod pybind {
         },
         executors::pybind::PythonExecutor,
         fuzzer::pybind::PythonStdFuzzer,
-        inputs::BytesInput,
         observers::pybind::PythonObserversTuple,
         state::pybind::PythonStdState,
         Error,
@@ -697,22 +697,16 @@ pub mod pybind {
     impl EventFirer for PythonEventManager {
         type State = PythonStdState;
 
-        fn fire(
-            &mut self,
-            state: &mut Self::State,
-            event: Event<Self::Input>,
-        ) -> Result<(), Error> {
+        fn fire(&mut self, state: &mut Self::State, event: Event<BytesInput>) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
         }
     }
 
     impl EventRestarter for PythonEventManager {
-        type Input = BytesInput;
         type State = PythonStdState;
     }
 
     impl EventProcessor<PythonExecutor, PythonStdFuzzer> for PythonEventManager {
-        type Input = BytesInput;
         type State = PythonStdState;
         type Observers = PythonObserversTuple;
 
@@ -727,7 +721,6 @@ pub mod pybind {
     }
 
     impl ProgressReporter for PythonEventManager {
-        type Input = BytesInput;
         type State = PythonStdState;
     }
 
@@ -737,10 +730,7 @@ pub mod pybind {
         }
     }
 
-    impl EventManager<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
-        for PythonEventManager
-    {
-    }
+    impl EventManager<PythonExecutor, PythonStdState, PythonStdFuzzer> for PythonEventManager {}
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

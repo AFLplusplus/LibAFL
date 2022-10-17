@@ -1923,6 +1923,7 @@ pub mod pybind {
         Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
     use crate::observers::pybind::PythonObserver;
+    use crate::state::HasInput;
 
     #[macro_export]
     macro_rules! mapob_unwrap_me {
@@ -2256,12 +2257,13 @@ pub mod pybind {
                 }
             }
 
-            impl<I, S> Observer<I, S> for $struct_name_trait
+            impl<S> Observer<S> for $struct_name_trait
             where
                 Self: MapObserver,
+                S: HasInput,
             {
                 #[inline]
-                fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+                fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.pre_exec(state, input) })
                 }
             }
