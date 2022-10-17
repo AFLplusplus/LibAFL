@@ -19,6 +19,7 @@ use core::{
 
 #[cfg(all(unix, not(target_os = "linux")))]
 use libc::c_int;
+
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,
@@ -180,7 +181,7 @@ impl<E> TimeoutExecutor<E> {
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E, EM, Z> TimeoutExecutor<E, EM, Z> {
+impl<E> TimeoutExecutor<E> {
     /// Create a new [`TimeoutExecutor`], wrapping the given `executor` and checking for timeouts.
     /// This should usually be used for `InProcess` fuzzing.
     pub fn new(executor: E, exec_tmout: Duration) -> Self {
@@ -200,7 +201,6 @@ impl<E, EM, Z> TimeoutExecutor<E, EM, Z> {
         Self {
             executor,
             itimerval,
-            phantom: PhantomData,
         }
     }
 
@@ -365,17 +365,17 @@ where
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E, EM, Z>
+impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
-    I: Input,
+    E: Executor<EM, S, Z>,
+    S: HasInput,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
