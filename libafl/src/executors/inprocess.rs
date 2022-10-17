@@ -169,7 +169,7 @@ where
         OF: Feedback<State = S>,
         Z: HasObjective<OF> + ExecutionProcessor<Observers = OT>,
     {
-        let handlers = InProcessHandlers::new::<Self, EM, OF, OT, Z, H>()?;
+        let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
         #[cfg(windows)]
         unsafe {
             /*
@@ -226,11 +226,11 @@ pub trait HasInProcessHandlers {
 }
 
 #[cfg(windows)]
-impl<'a, H, I, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, I, OT, S>
+impl<'a, H, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, OT, S>
 where
-    H: FnMut(&I) -> ExitKind,
-    I: Input,
-    OT: ObserversTuple<I, S>,
+    H: FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    S: HasInput,
 {
     /// the timeout handler
     #[inline]
@@ -319,10 +319,9 @@ impl InProcessHandlers {
     }
 
     /// Create new [`InProcessHandlers`].
-    pub fn new<E, EM, OF, OT, Z, H>() -> Result<Self, Error>
+    pub fn new<E, EM, OF, Z, H>() -> Result<Self, Error>
     where
-        E: Executor<EM, E::State, Z> + HasObservers<Observers = OT>,
-        OT: ObserversTuple<E::State>,
+        E: Executor<EM, E::State, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<State = E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasInput,
