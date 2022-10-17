@@ -526,6 +526,8 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
 
 #[cfg(unix)]
 mod unix_signal_handler {
+    #[cfg(feature = "std")]
+    use crate::inputs::Input;
     use alloc::vec::Vec;
     #[cfg(feature = "std")]
     use alloc::{boxed::Box, string::String};
@@ -548,7 +550,6 @@ mod unix_signal_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::Input,
         observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasInput, HasMetadata, HasSolutions},
     };
@@ -1984,7 +1985,7 @@ pub mod pybind {
     /// Python class for OwnedInProcessExecutor (i.e. InProcessExecutor with owned harness)
     pub struct PythonOwnedInProcessExecutor {
         /// Rust wrapped OwnedInProcessExecutor object
-        pub inner: OwnedInProcessExecutor<BytesInput, PythonObserversTuple, PythonStdState>,
+        pub inner: OwnedInProcessExecutor<PythonObserversTuple, PythonStdState>,
     }
 
     #[pymethods]
