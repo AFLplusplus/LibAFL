@@ -33,14 +33,14 @@ use crate::bolts::core_affinity::CoreId;
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::bolts::os::{dup2, fork, ForkResult};
+use crate::state::HasInput;
 #[cfg(feature = "std")]
 use crate::{
     bolts::{core_affinity::Cores, shmem::ShMemProvider},
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
-    inputs::Input,
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, State},
+    state::{HasClientPerfMonitor, HasExecutions},
     Error,
 };
 
@@ -50,14 +50,14 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
-pub struct Launcher<'a, CF, I, MT, OT, S, SP>
+pub struct Launcher<'a, CF, MT, OT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
-    I: Input + 'a,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<OT, S, SP>, usize) -> Result<(), Error>,
+    S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    OT: ObserversTuple<I, S> + 'a,
-    S: DeserializeOwned + State<Input = I> + 'a,
+    OT: ObserversTuple<S> + 'a,
+    S: DeserializeOwned + HasInput + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -87,17 +87,16 @@ where
     #[builder(default = true)]
     spawn_broker: bool,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
+    phantom_data: PhantomData<(&'a OT, &'a S, &'a SP)>,
 }
 
-impl<CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
+impl<CF, MT, OT, S, SP> Debug for Launcher<'_, CF, MT, OT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
-    I: Input,
-    OT: ObserversTuple<I, S> + DeserializeOwned,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<OT, S, SP>, usize) -> Result<(), Error>,
+    OT: ObserversTuple<S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + State<Input = I>,
+    S: DeserializeOwned + HasInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -112,13 +111,12 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, CF, I, MT, OT, S, SP> Launcher<'a, CF, I, MT, OT, S, SP>
+impl<'a, CF, MT, OT, S, SP> Launcher<'a, CF, MT, OT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
-    I: Input,
-    OT: ObserversTuple<I, S> + DeserializeOwned,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<OT, S, SP>, usize) -> Result<(), Error>,
+    OT: ObserversTuple<S> + DeserializeOwned,
     MT: Monitor + Clone,
-    S: DeserializeOwned + State<Input = I> + HasExecutions + HasClientPerfMonitor,
+    S: DeserializeOwned + HasInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz
@@ -176,7 +174,7 @@ where
                         }
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<I, MT, OT, S, SP>::builder()
+                        let (state, mgr) = RestartingMgr::<MT, OT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -199,7 +197,7 @@ where
             println!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<I, MT, OT, S, SP>::builder()
+            RestartingMgr::<MT, OT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)

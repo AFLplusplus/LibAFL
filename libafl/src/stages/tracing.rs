@@ -17,21 +17,19 @@ use crate::{
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct TracingStage<EM, OT, TE, Z>
+pub struct TracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers<Observers = OT>,
-    OT: ObserversTuple<TE::State>,
+    TE: Executor<EM, TE::State, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     tracer_executor: TE,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, OT, TE, Z)>,
+    phantom: PhantomData<(EM, TE, Z)>,
 }
 
-impl<E, EM, OT, TE, Z> Stage<E, EM, TE::State, Z> for TracingStage<EM, OT, TE, Z>
+impl<E, EM, TE, Z> Stage<E, EM, TE::State, Z> for TracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers<Observers = OT>,
-    OT: ObserversTuple<TE::State>,
+    TE: Executor<EM, TE::State, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]

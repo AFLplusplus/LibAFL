@@ -12,12 +12,11 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::Input,
     observers::{
         concolic::{ConcolicMetadata, ConcolicObserver},
         ObserversTuple,
     },
-    state::{HasClientPerfMonitor, HasMetadata, State},
+    state::{HasClientPerfMonitor, HasInput, HasMetadata},
     Error,
 };
 
@@ -51,13 +50,10 @@ impl<I, S> Named for ConcolicFeedback<I, S> {
     }
 }
 
-impl<I, S> Feedback for ConcolicFeedback<I, S>
+impl<S> Feedback for ConcolicFeedback<S>
 where
-    I: Input,
-    S: State<Input = I> + Debug + HasClientPerfMonitor,
+    S: HasInput + Debug + HasClientPerfMonitor,
 {
-    type Input = I;
-
     type State = S;
 
     #[allow(clippy::wrong_self_convention)]
@@ -65,13 +61,13 @@ where
         &mut self,
         _state: &mut Self::State,
         _manager: &mut EM,
-        _input: &Self::Input,
+        _input: &<Self::State as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         self.metadata = observers
             .match_name::<ConcolicObserver>(&self.name)
@@ -82,7 +78,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut Self::State,
-        _testcase: &mut Testcase<Self::Input>,
+        _testcase: &mut Testcase<<Self::State as HasInput>::Input>,
     ) -> Result<(), Error> {
         if let Some(metadata) = self.metadata.take() {
             _testcase.metadata_mut().insert(metadata);
@@ -93,7 +89,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut Self::State,
-        _input: &Self::Input,
+        _input: &<Self::State as HasInput>::Input,
     ) -> Result<(), Error> {
         Ok(())
     }

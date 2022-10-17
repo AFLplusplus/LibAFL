@@ -34,7 +34,6 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::Input,
-    state::State,
     Error,
 };
 
@@ -335,9 +334,9 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, I, S, Z> Executor<EM, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
+    E: Executor<EM, S, Z>,
     I: Input,
 {
     fn run_target(
@@ -395,16 +394,11 @@ where
     }
 }
 
-impl<E, I, S> HasObservers for TimeoutExecutor<E>
+impl<E> HasObservers for TimeoutExecutor<E>
 where
-    E: HasObservers<Input = I, State = S>,
-    I: Input,
-    S: State<Input = I>,
+    E: HasObservers,
 {
-    type Input = I;
-
-    type State = S;
-
+    type State = E::State;
     type Observers = E::Observers;
 
     #[inline]

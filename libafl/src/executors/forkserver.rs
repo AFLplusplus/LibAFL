@@ -35,6 +35,7 @@ use crate::{
     mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     prelude::State,
+    state::HasInput,
     Error,
 };
 
@@ -353,14 +354,13 @@ pub trait HasForkserver {
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
 #[derive(Debug)]
-pub struct TimeoutForkserverExecutor<E: Debug, I, S> {
+pub struct TimeoutForkserverExecutor<E: Debug> {
     executor: E,
     timeout: TimeSpec,
     signal: Signal,
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<E: Debug, I, S> TimeoutForkserverExecutor<E, I, S> {
+impl<E: Debug> TimeoutForkserverExecutor<E> {
     /// Create a new [`TimeoutForkserverExecutor`]
     pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let signal = Signal::SIGKILL;
@@ -375,16 +375,14 @@ impl<E: Debug, I, S> TimeoutForkserverExecutor<E, I, S> {
             executor,
             timeout,
             signal,
-            phantom: PhantomData,
         })
     }
 }
 
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutForkserverExecutor<E, I, S>
+impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutForkserverExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasForkserver + Debug,
-    I: Input + HasTargetBytes,
-    S: State<Input = I> + Debug,
+    E: Executor<EM, S, Z> + HasForkserver + Debug,
+    S: HasInput,
 {
     #[inline]
     fn run_target(
@@ -392,7 +390,7 @@ where
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
@@ -477,7 +475,7 @@ where
 /// This [`Executor`] can run binaries compiled for AFL/AFL++ that make use of a forkserver.
 /// Shared memory feature is also available, but you have to set things up in your code.
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
-pub struct ForkserverExecutor<I, OT, S, SP>
+pub struct ForkserverExecutor<OT, S, SP>
 where
     OT: Debug,
     SP: ShMemProvider,
@@ -488,7 +486,7 @@ where
     forkserver: Forkserver,
     observers: OT,
     map: Option<SP::ShMem>,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<S>,
     /// Cache that indicates if we have a `ASan` observer registered.
     has_asan_observer: Option<bool>,
 }
@@ -949,17 +947,14 @@ where
     }
 }
 
-impl<I, OT, S, SP> HasObservers for ForkserverExecutor<I, OT, S, SP>
+impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
 where
-    I: Input + HasTargetBytes,
-    OT: ObserversTuple<I, S>,
-    S: State<Input = I>,
+    OT: ObserversTuple<S>,
+    S: HasInput,
+    S::Input: HasTargetBytes,
     SP: ShMemProvider,
 {
-    type Input = I;
-
     type State = S;
-
     type Observers = OT;
 
     #[inline]
@@ -1012,16 +1007,12 @@ where
     }
 }
 
-impl<E, I, S> HasObservers for TimeoutForkserverExecutor<E, I, S>
+impl<E> HasObservers for TimeoutForkserverExecutor<E>
 where
-    E: HasObservers<Input = I, State = S>,
-    I: Input + Debug,
-    S: State<Input = I> + Debug,
+    E: HasObservers,
+    E::State: Debug,
 {
-    type Input = I;
-
-    type State = S;
-
+    type State = E::State;
     type Observers = E::Observers;
 
     #[inline]

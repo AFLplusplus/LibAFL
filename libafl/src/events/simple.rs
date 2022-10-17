@@ -294,46 +294,44 @@ where
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
 #[derive(Debug)]
-pub struct SimpleRestartingEventManager<I, MT, OT, S, SP>
+pub struct SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    I: Input,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
     /// The actual simple event mgr
-    simple_event_mgr: SimpleEventManager<I, MT, OT, S>,
+    simple_event_mgr: SimpleEventManager<MT, OT, S>,
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SP>,
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, OT, S, SP> EventFirer for SimpleRestartingEventManager<I, MT, OT, S, SP>
+impl<MT, OT, S, SP> EventFirer for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    I: Input,
     SP: ShMemProvider,
-    S: State<Input = I>,
+    S: HasInput,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    type Input = I;
-
     type State = S;
 
-    fn fire(&mut self, _state: &mut Self::State, event: Event<Self::Input>) -> Result<(), Error> {
+    fn fire(
+        &mut self,
+        _state: &mut Self::State,
+        event: Event<<Self::State as HasInput>::Input>,
+    ) -> Result<(), Error> {
         self.simple_event_mgr.fire(_state, event)
     }
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, OT, S, SP> EventRestarter for SimpleRestartingEventManager<I, MT, OT, S, SP>
+impl<MT, OT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    I: Input,
-    S: Serialize + State<Input = I>,
+    S: HasInput + Serialize,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
-    type Input = I;
-
     type State = S;
+
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
     fn on_restart(&mut self, state: &mut S) -> Result<(), Error> {
         // First, reset the page to 0 so the next iteration can read read from the beginning of this page
@@ -343,19 +341,15 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, MT, OT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<I, MT, OT, S, SP>
+impl<E, MT, OT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    Self: EventProcessor<E, Z, Input = I, Observers = OT, State = S>,
-    I: Input,
+    Self: EventProcessor<E, Z, Observers = OT, State = S>,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
-    OT: ObserversTuple<I, S>,
-    S: Serialize + State<Input = I> + HasClientPerfMonitor + HasExecutions,
+    OT: ObserversTuple<S>,
+    S: HasInput + HasClientPerfMonitor + HasExecutions + Serialize,
     SP: ShMemProvider,
 {
     type State = S;
-
-    type Input = I;
-
     type Observers = OT;
 
     fn process(
@@ -369,22 +363,20 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, I, MT, OT, S, SP, Z> EventManager<E, I, S, Z>
-    for SimpleRestartingEventManager<I, MT, OT, S, SP>
+impl<E, MT, OT, S, SP, Z> EventManager<E, S, Z> for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    Self: EventProcessor<E, Z, Input = I, Observers = OT, State = S>,
-    I: Input,
+    Self: EventProcessor<E, Z, Observers = OT, State = S>,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
-    OT: ObserversTuple<I, S>,
-    S: Serialize + State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    OT: ObserversTuple<<Self as EventProcessor<E, Z>>::State>,
+    <Self as EventProcessor<E, Z>>::State:
+        HasInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize,
     SP: ShMemProvider,
 {
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, OT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<I, MT, OT, S, SP>
+impl<MT, OT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    I: Input,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
@@ -397,22 +389,18 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, OT, S, SP> ProgressReporter for SimpleRestartingEventManager<I, MT, OT, S, SP>
+impl<MT, OT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    I: Input,
-    S: State<Input = I> + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: HasInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
     MT: Monitor + Debug, //CE: CustomEvent<I, OT>,
 {
     type State = S;
-
-    type Input = I;
 }
 
 #[cfg(feature = "std")]
-impl<I, MT, OT, S, SP> HasEventManagerId for SimpleRestartingEventManager<I, MT, OT, S, SP>
+impl<MT, OT, S, SP> HasEventManagerId for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    I: Input,
     SP: ShMemProvider,
     MT: Monitor + Debug,
 {
@@ -423,9 +411,8 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<I, MT, OT, S, SP> SimpleRestartingEventManager<I, MT, OT, S, SP>
+impl<MT, OT, S, SP> SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    I: Input,
     SP: ShMemProvider,
     MT: Monitor + Debug, //TODO CE: CustomEvent,
 {

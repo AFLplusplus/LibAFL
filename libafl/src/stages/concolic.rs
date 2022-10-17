@@ -12,37 +12,33 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     inputs::Input,
-    observers::{concolic::ConcolicObserver, ObserversTuple},
+    observers::concolic::ConcolicObserver,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
 
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
-pub struct ConcolicTracingStage<EM, I, OT, S, TE, Z>
+pub struct ConcolicTracingStage<EM, TE, Z>
 where
-    I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
+    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
-    inner: TracingStage<EM, I, OT, S, TE, Z>,
+    inner: TracingStage<EM, TE, Z>,
     observer_name: String,
 }
 
-impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<EM, I, OT, S, TE, Z>
+impl<E, EM, TE, Z> Stage<E, EM, TE::State, Z> for ConcolicTracingStage<EM, TE, Z>
 where
-    I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
+    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut TE::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -67,15 +63,13 @@ where
     }
 }
 
-impl<EM, I, OT, S, TE, Z> ConcolicTracingStage<EM, I, OT, S, TE, Z>
+impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z>
 where
-    I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
+    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
-    pub fn new(inner: TracingStage<EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
+    pub fn new(inner: TracingStage<EM, TE, Z>, observer_name: String) -> Self {
         Self {
             inner,
             observer_name,

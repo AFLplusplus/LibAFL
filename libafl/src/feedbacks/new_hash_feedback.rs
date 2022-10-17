@@ -11,9 +11,8 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
-    inputs::Input,
     observers::{ObserverWithHashField, ObserversTuple},
-    state::{HasClientPerfMonitor, HasNamedMetadata, State},
+    state::{HasClientPerfMonitor, HasInput, HasNamedMetadata},
     Error,
 };
 
@@ -68,20 +67,17 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewHashFeedback<I, O, S> {
+pub struct NewHashFeedback<O, S> {
     name: String,
     observer_name: String,
-    o_type: PhantomData<(I, O, S)>,
+    o_type: PhantomData<(O, S)>,
 }
 
-impl<I, O, S> Feedback for NewHashFeedback<I, O, S>
+impl<O, S> Feedback for NewHashFeedback<O, S>
 where
-    I: Input,
     O: ObserverWithHashField + Named + Debug,
-    S: State<Input = I> + Debug + HasNamedMetadata + HasClientPerfMonitor,
+    S: HasInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
 {
-    type Input = I;
-
     type State = S;
 
     fn init_state(&mut self, state: &mut Self::State) -> Result<(), Error> {
@@ -94,13 +90,13 @@ where
         &mut self,
         state: &mut Self::State,
         _manager: &mut EM,
-        _input: &Self::Input,
+        _input: &<Self::State as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = I, State = S>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         let observer = observers
             .match_name::<O>(&self.observer_name)
@@ -126,21 +122,21 @@ where
     }
 }
 
-impl<I, O, S> Named for NewHashFeedback<I, O, S> {
+impl<O, S> Named for NewHashFeedback<O, S> {
     #[inline]
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<I, O, S> HasObserverName for NewHashFeedback<I, O, S> {
+impl<O, S> HasObserverName for NewHashFeedback<O, S> {
     #[inline]
     fn observer_name(&self) -> &str {
         &self.observer_name
     }
 }
 
-impl<I, O, S> NewHashFeedback<I, O, S>
+impl<O, S> NewHashFeedback<O, S>
 where
     O: ObserverWithHashField + Named + Debug,
 {
