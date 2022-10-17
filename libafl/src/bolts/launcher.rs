@@ -244,7 +244,7 @@ where
                 //todo: silence stdout and stderr for clients
 
                 // the actual client. do the fuzzing
-                let (state, mgr) = RestartingMgr::<I, MT, OT, S, SP>::builder()
+                let (state, mgr) = RestartingMgr::<MT, OT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -298,7 +298,7 @@ where
             #[cfg(feature = "std")]
             println!("I am broker!!.");
 
-            RestartingMgr::<I, MT, OT, S, SP>::builder()
+            RestartingMgr::<MT, OT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
