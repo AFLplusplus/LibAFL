@@ -331,15 +331,7 @@ where
 
 /// The most common AFL-like feedback type
 #[derive(Clone, Debug)]
-pub struct MapFeedback<N, O, R, S, T>
-where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
-    R: Reducer<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: AsIter<'it, Item = T>,
-    N: IsNovel<T>,
-    S: HasNamedMetadata,
-{
+pub struct MapFeedback<N, O, R, S, T> {
     /// Indexes used in the last observation
     indexes: Option<Vec<usize>>,
     /// New indexes observed in the last observation
@@ -356,12 +348,11 @@ where
 
 impl<N, O, R, S, T> Feedback for MapFeedback<N, O, R, S, T>
 where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
-    R: Reducer<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: AsIter<'it, Item = T>,
-    N: IsNovel<T>,
-    S: HasInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
+    N: IsNovel<T> + Debug,
+    O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T> + Debug,
+    R: Reducer<T> + Debug,
+    S: HasInput + HasClientPerfMonitor + HasNamedMetadata + Debug,
+    T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
 {
     type State = S;
 
@@ -556,15 +547,7 @@ where
     }
 }
 
-impl<N, O, R, S, T> Named for MapFeedback<N, O, R, S, T>
-where
-    T: PartialEq + Default + Copy + 'static + Serialize + DeserializeOwned + Debug,
-    R: Reducer<T>,
-    N: IsNovel<T>,
-    O: MapObserver<Entry = T>,
-    for<'it> O: AsIter<'it, Item = T>,
-    S: HasNamedMetadata,
-{
+impl<N, O, R, S, T> Named for MapFeedback<N, O, R, S, T> {
     #[inline]
     fn name(&self) -> &str {
         self.name.as_str()

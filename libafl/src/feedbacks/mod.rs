@@ -82,8 +82,8 @@ pub trait Feedback: Named + Debug {
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<Input = Self::Input, State = Self::State>,
-        OT: ObserversTuple<Self::Input, Self::State>,
+        EM: EventFirer<State = Self::State>,
+        OT: ObserversTuple<Self::State>,
     {
         // Start a timer for this feedback
         let start_time = crate::bolts::cpu::read_time_counter();
@@ -741,7 +741,7 @@ pub struct CrashFeedback<S> {
 
 impl<S> Feedback for CrashFeedback<S>
 where
-    S: State + Debug + HasClientPerfMonitor,
+    S: HasInput + Debug + HasClientPerfMonitor,
 {
     type State = S;
 
