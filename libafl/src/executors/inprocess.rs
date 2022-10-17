@@ -887,7 +887,7 @@ mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         observers::ObserversTuple,
-        state::{HasClientPerfMonitor, HasMetadata, HasSolutions, State},
+        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
