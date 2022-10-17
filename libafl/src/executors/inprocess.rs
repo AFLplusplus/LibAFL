@@ -147,14 +147,10 @@ where
 
 impl<H, HB, OT, S> GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&<S as HasCorpus>::Input) -> ExitKind + ?Sized,
+    H: FnMut(&<S as State>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: State<Input = <S as HasCorpus>::Input>
-        + HasClientPerfMonitor
-        + HasExecutions
-        + HasCorpus
-        + HasSolutions<Input = <S as HasCorpus>::Input>,
+    S: State + HasClientPerfMonitor + HasExecutions + HasCorpus + HasSolutions,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -175,8 +171,7 @@ where
         OF: Feedback<State = S>,
         Z: HasObjective<OF, S> + ExecutionProcessor<Observers = OT>,
     {
-        let handlers =
-            InProcessHandlers::new::<Self, EM, <S as HasCorpus>::Input, OF, OT, S, Z, H>()?;
+        let handlers = InProcessHandlers::new::<Self, EM, <S as State>::Input, OF, OT, S, Z, H>()?;
         #[cfg(windows)]
         unsafe {
             /*

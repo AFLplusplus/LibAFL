@@ -38,9 +38,7 @@ pub trait State: Serialize + DeserializeOwned {
 /// Trait for elements offering a corpus
 pub trait HasCorpus {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus<Input = Self::Input>;
-    /// The input type used for this corpus
-    type Input: Input;
+    type Corpus: Corpus;
 
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
@@ -217,12 +215,10 @@ where
 
 impl<C, I, R, SC> HasCorpus for StdState<C, R, SC>
 where
-    C: Corpus<Input = I>,
-    I: Input,
+    C: Corpus<Input = <Self as State>::Input>,
     R: Rand,
 {
     type Corpus = C;
-    type Input = I;
 
     /// Returns the corpus
     #[inline]
@@ -464,7 +460,7 @@ where
     where
         G: Generator<<Self as State>::Input, Self>,
         Z: Evaluator<E, EM, Input = I, State = Self>,
-        EM: EventFirer<Input = I, State = Self>,
+        EM: EventFirer<State = Self>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -502,7 +498,7 @@ where
     where
         G: Generator<<Self as State>::Input, Self>,
         Z: Evaluator<E, EM, Input = I, State = Self>,
-        EM: EventFirer<Input = I, State = Self>,
+        EM: EventFirer<State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
     }
@@ -519,7 +515,7 @@ where
     where
         G: Generator<<Self as State>::Input, Self>,
         Z: Evaluator<E, EM, Input = I, State = Self>,
-        EM: EventFirer<Input = I, State = Self>,
+        EM: EventFirer<State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
@@ -533,8 +529,8 @@ where
         objective: &mut O,
     ) -> Result<Self, Error>
     where
-        F: Feedback<Input = <Self as State>::Input, State = Self>,
-        O: Feedback<Input = <Self as State>::Input, State = Self>,
+        F: Feedback<State = Self>,
+        O: Feedback<State = Self>,
     {
         let mut state = Self {
             rand,

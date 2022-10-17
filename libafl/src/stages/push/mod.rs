@@ -21,7 +21,7 @@ use crate::{
     executors::ExitKind,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
+    state::{HasClientPerfMonitor, HasExecutions, HasRand, State},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -102,7 +102,7 @@ where
     pub current_corpus_idx: Option<usize>,
 
     /// The input we just ran
-    pub current_input: Option<<CS::State as HasCorpus>::Input>, // Todo: Get rid of copy
+    pub current_input: Option<<CS::State as State>::Input>, // Todo: Get rid of copy
 
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(CS, (), EM, OT, Z)>,
@@ -225,7 +225,7 @@ where
         _state: &mut CS::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-    ) -> Option<Result<<CS::State as HasCorpus>::Input, Error>>;
+    ) -> Option<Result<<CS::State as State>::Input, Error>>;
 
     /// Called after the execution of a testcase finished.
     #[inline]
@@ -235,7 +235,7 @@ where
         _state: &mut CS::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-        _input: <CS::State as HasCorpus>::Input,
+        _input: <CS::State as State>::Input,
         _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -254,7 +254,7 @@ where
     }
 
     /// This is the default implementation for `next` for this stage
-    fn next_std(&mut self) -> Option<Result<<CS::State as HasCorpus>::Input, Error>> {
+    fn next_std(&mut self) -> Option<Result<<CS::State as State>::Input, Error>> {
         let mut shared_state = {
             let shared_state_ref = &mut (*self.push_stage_helper_mut().shared_state).borrow_mut();
             shared_state_ref.take().unwrap()

@@ -12,13 +12,12 @@ use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
-    inputs::Input,
     mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand, State},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -38,8 +37,8 @@ pub struct StdMutationalPushStage<CS, EM, M, OT, Z>
 where
     CS: Scheduler,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
-    M: Mutator<<CS::State as HasCorpus>::Input, CS::State>,
-    OT: ObserversTuple<<CS::State as HasCorpus>::Input, CS::State>,
+    M: Mutator<CS::State>,
+    OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasRand,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
@@ -56,21 +55,20 @@ where
     psh: PushStageHelper<CS, EM, OT, Z>,
 }
 
-impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
+impl<CS, EM, M, OT, Z> StdMutationalPushStage<CS, EM, M, OT, Z>
 where
-    CS: Scheduler<Input = I, State = S>,
-    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
-    I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
-        + EvaluatorObservers<Input = I, State = S, Observers = OT>
-        + HasScheduler<CS, I, S>,
+    CS: Scheduler,
+    EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
+    M: Mutator<CS::State>,
+    OT: ObserversTuple<CS::State>,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor<Observers = OT, State = CS::State>
+        + EvaluatorObservers<Observers = OT, State = CS::State>
+        + HasScheduler<CS>,
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
-    fn iterations(&self, state: &mut S, _corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut CS::State, _corpus_idx: usize) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
     }
 
@@ -80,27 +78,35 @@ where
     }
 }
 
-impl<CS, EM, I, M, OT, S, Z> PushStage<CS, EM, I, OT, S, Z>
-    for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
+impl<CS, EM, M, OT, Z> PushStage<CS, EM, OT, Z> for StdMutationalPushStage<CS, EM, M, OT, Z>
 where
-    CS: Scheduler<Input = I, State = S>,
-    EM: EventFirer<Input = I, State = S>
+    CS: Scheduler,
+    EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId
-        + ProgressReporter<Input = I, State = S>,
-    I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
-        + EvaluatorObservers<Input = I, State = S, Observers = OT>
-        + HasScheduler<CS, I, S>,
+        + ProgressReporter<State = CS::State>,
+    M: Mutator<CS::State>,
+    OT: ObserversTuple<CS::State>,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
+    Z: ExecutionProcessor<Observers = OT, State = CS::State>
+        + EvaluatorObservers<Observers = OT, State = CS::State>
+        + HasScheduler<CS>,
 {
+    #[inline]
+    fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, OT, Z> {
+        &self.psh
+    }
+
+    #[inline]
+    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, OT, Z> {
+        &mut self.psh
+    }
+
     /// Creates a new default mutational stage
     fn init(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut CS::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
     ) -> Result<(), Error> {
@@ -116,25 +122,13 @@ where
         Ok(())
     }
 
-    #[inline]
-    fn deinit(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _event_mgr: &mut EM,
-        _observers: &mut OT,
-    ) -> Result<(), Error> {
-        self.current_corpus_idx = None;
-        Ok(())
-    }
-
     fn pre_exec(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut CS::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-    ) -> Option<Result<I, Error>> {
+    ) -> Option<Result<<CS::State as State>::Input, Error>> {
         if self.testcases_done >= self.testcases_to_do {
             // finished with this cicle.
             return None;
@@ -167,10 +161,10 @@ where
     fn post_exec(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut CS::State,
         event_mgr: &mut EM,
         observers: &mut OT,
-        last_input: I,
+        last_input: <CS::State as State>::Input,
         exit_kind: ExitKind,
     ) -> Result<(), Error> {
         // todo: isintersting, etc.
@@ -187,56 +181,56 @@ where
     }
 
     #[inline]
-    fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, I, OT, S, Z> {
-        &self.psh
-    }
-
-    #[inline]
-    fn push_stage_helper_mut(&mut self) -> &mut PushStageHelper<CS, EM, I, OT, S, Z> {
-        &mut self.psh
+    fn deinit(
+        &mut self,
+        _fuzzer: &mut Z,
+        _state: &mut CS::State,
+        _event_mgr: &mut EM,
+        _observers: &mut OT,
+    ) -> Result<(), Error> {
+        self.current_corpus_idx = None;
+        Ok(())
     }
 }
 
-impl<CS, EM, I, M, OT, S, Z> Iterator for StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
+impl<CS, EM, M, OT, Z> Iterator for StdMutationalPushStage<CS, EM, M, OT, Z>
 where
-    CS: Scheduler<Input = I, State = S>,
-    EM: EventFirer<Input = I, State = S>
+    CS: Scheduler,
+    EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId
-        + ProgressReporter<Input = I, State = S>,
-    I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand + HasExecutions,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
-        + EvaluatorObservers<Input = I, State = S, Observers = OT>
-        + HasScheduler<CS, I, S>,
+        + ProgressReporter<State = CS::State>,
+    M: Mutator<CS::State>,
+    OT: ObserversTuple<CS::State>,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions,
+    Z: ExecutionProcessor<Observers = OT, State = CS::State>
+        + EvaluatorObservers<Observers = OT, State = CS::State>
+        + HasScheduler<CS>,
 {
-    type Item = Result<I, Error>;
+    type Item = Result<<CS::State as State>::Input, Error>;
 
-    fn next(&mut self) -> Option<Result<I, Error>> {
+    fn next(&mut self) -> Option<Result<<CS::State as State>::Input, Error>> {
         self.next_std()
     }
 }
 
-impl<CS, EM, I, M, OT, S, Z> StdMutationalPushStage<CS, EM, I, M, OT, S, Z>
+impl<CS, EM, M, OT, Z> StdMutationalPushStage<CS, EM, M, OT, Z>
 where
-    CS: Scheduler<Input = I, State = S>,
-    EM: EventFirer<Input = I, State = S> + EventRestarter + HasEventManagerId,
-    I: Input,
-    M: Mutator<I, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<Input = I> + HasRand,
-    Z: ExecutionProcessor<Input = I, Observers = OT, State = S>
-        + EvaluatorObservers<Input = I, State = S, Observers = OT>
-        + HasScheduler<CS, I, S>,
+    CS: Scheduler,
+    EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
+    M: Mutator<CS::State>,
+    OT: ObserversTuple<CS::State>,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasRand,
+    Z: ExecutionProcessor<Observers = OT, State = CS::State>
+        + EvaluatorObservers<Observers = OT, State = CS::State>
+        + HasScheduler<CS>,
 {
     /// Creates a new default mutational stage
     #[must_use]
     #[allow(clippy::type_complexity)]
     pub fn new(
         mutator: M,
-        shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, I, OT, S, Z>>>>,
+        shared_state: Rc<RefCell<Option<PushStageSharedState<CS, EM, OT, Z>>>>,
         exit_kind: Rc<Cell<Option<ExitKind>>>,
         stage_idx: i32,
     ) -> Self {

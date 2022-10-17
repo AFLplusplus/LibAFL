@@ -13,7 +13,7 @@ use crate::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, State},
     Error,
 };
 
@@ -95,7 +95,7 @@ impl TopAccountingMetadata {
 pub struct CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
-    <CS::State as HasCorpus>::Input: HasLen,
+    <CS::State as State>::Input: HasLen,
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
@@ -105,7 +105,7 @@ where
 impl<'a, CS> Scheduler for CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
-    <CS::State as HasCorpus>::Input: HasLen,
+    <CS::State as State>::Input: HasLen,
 {
     type State = CS::State;
 
@@ -118,7 +118,7 @@ where
         &self,
         state: &mut Self::State,
         idx: usize,
-        testcase: &Testcase<<Self::State as HasCorpus>::Input>,
+        testcase: &Testcase<<Self::State as State>::Input>,
     ) -> Result<(), Error> {
         self.inner.on_replace(state, idx, testcase)
     }
@@ -127,7 +127,7 @@ where
         &self,
         state: &mut Self::State,
         idx: usize,
-        testcase: &Option<Testcase<<Self::State as HasCorpus>::Input>>,
+        testcase: &Option<Testcase<<Self::State as State>::Input>>,
     ) -> Result<(), Error> {
         self.inner.on_remove(state, idx, testcase)
     }
@@ -161,7 +161,7 @@ where
 impl<'a, CS> CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
-    <CS::State as HasCorpus>::Input: HasLen,
+    <CS::State as State>::Input: HasLen,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]

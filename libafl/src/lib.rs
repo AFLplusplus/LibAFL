@@ -10,6 +10,7 @@ Welcome to `LibAFL`
 #![cfg_attr(unstable_feature, feature(intrinsics))]
 // For `std::simd`
 #![cfg_attr(unstable_feature, feature(portable_simd))]
+#![cfg_attr(unstable_feature, feature(associated_type_bounds))]
 #![warn(clippy::cargo)]
 #![deny(clippy::cargo_common_metadata)]
 #![deny(rustdoc::broken_intra_doc_links)]
