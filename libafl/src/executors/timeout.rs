@@ -264,10 +264,10 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasInProcessHandlers,
-    I: Input,
+    E: Executor<EM, S, Z> + HasInProcessHandlers,
+    S: HasInput,
 {
     #[allow(clippy::cast_sign_loss)]
     fn run_target(
@@ -275,7 +275,7 @@ where
         fuzzer: &mut Z,
         state: &mut S,
         mgr: &mut EM,
-        input: &I,
+        input: &S::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             let data = &mut GLOBAL_STATE;
