@@ -562,7 +562,7 @@ where
 }
 
 #[cfg(feature = "introspection")]
-impl<C, R, SC> HasClientPerfMonitor for StdState<C, R, SC> {
+impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
     fn introspection_monitor(&self) -> &ClientPerfMonitor {
         &self.introspection_monitor
     }

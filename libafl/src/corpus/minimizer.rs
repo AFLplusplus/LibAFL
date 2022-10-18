@@ -12,26 +12,24 @@ use num_traits::ToPrimitive;
 use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
-    bolts::AsIter,
+    bolts::{tuples::MatchName, AsIter},
     corpus::Corpus,
     events::EventManager,
     executors::{Executor, HasObservers},
-    inputs::Input,
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, State},
+    state::{HasCorpus, HasMetadata},
     Error, Evaluator, HasScheduler,
 };
 
 /// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for
 /// details.
-pub trait CorpusMinimizer<E, I, S>
+pub trait CorpusMinimizer<E, S>
 where
-    I: Input,
-    S: HasCorpus<Input = I>,
+    S: HasCorpus,
 {
     /// Minimize the corpus of the provided state.
-    fn minimize<CS, EM, OT, Z>(
+    fn minimize<CS, EM, Z>(
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
@@ -39,42 +37,36 @@ where
         state: &mut S,
     ) -> Result<(), Error>
     where
-        CS: Scheduler<Input = I, State = S>,
-        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventManager<E, I, S, Z>,
-        I: Input,
-        OT: ObserversTuple<I, S>,
-        S: State<Input = I>,
-        Z: Evaluator<E, EM, State = S, Input = I> + HasScheduler<CS, I, S>;
+        CS: Scheduler<State = S>,
+        E: Executor<EM, S, Z> + HasObservers<State = S>,
+        EM: EventManager<E, S, Z>,
+        Z: Evaluator<E, EM, State = S> + HasScheduler<CS>;
 }
 
 /// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
 ///
 /// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
 #[derive(Debug)]
-pub struct MapCorpusMinimizer<E, I, O, S, TS>
+pub struct MapCorpusMinimizer<E, O, S, TS>
 where
     E: Copy + Hash + Eq,
-    I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
-    S: HasMetadata + HasCorpus<Input = I>,
-    TS: TestcaseScore<I, S>,
+    S: HasMetadata + HasCorpus,
+    TS: TestcaseScore<S>,
 {
     obs_name: String,
-    phantom: PhantomData<(E, I, O, S, TS)>,
+    phantom: PhantomData<(E, O, S, TS)>,
 }
 
 /// Standard corpus minimizer, which weights inputs by length and time.
-pub type StdCorpusMinimizer<E, I, O, S> =
-    MapCorpusMinimizer<E, I, O, S, LenTimeMulTestcaseScore<I, S>>;
+pub type StdCorpusMinimizer<E, O, S> = MapCorpusMinimizer<E, O, S, LenTimeMulTestcaseScore<S>>;
 
-impl<E, I, O, S, TS> MapCorpusMinimizer<E, I, O, S, TS>
+impl<E, O, S, TS> MapCorpusMinimizer<E, O, S, TS>
 where
     E: Copy + Hash + Eq,
-    I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
-    S: HasMetadata + HasCorpus<Input = I>,
-    TS: TestcaseScore<I, S>,
+    S: HasMetadata + HasCorpus,
+    TS: TestcaseScore<S>,
 {
     /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
     /// in the future to get observed maps from an executed input.
@@ -86,15 +78,14 @@ where
     }
 }
 
-impl<E, I, O, S, TS> CorpusMinimizer<E, I, S> for MapCorpusMinimizer<E, I, O, S, TS>
+impl<E, O, S, TS> CorpusMinimizer<E, S> for MapCorpusMinimizer<E, O, S, TS>
 where
     E: Copy + Hash + Eq,
-    I: Input,
     for<'a> O: MapObserver<Entry = E> + AsIter<'a, Item = E>,
-    S: HasMetadata + HasCorpus<Input = I>,
-    TS: TestcaseScore<I, S>,
+    S: HasMetadata + HasCorpus,
+    TS: TestcaseScore<S>,
 {
-    fn minimize<CS, EM, OT, Z>(
+    fn minimize<CS, EM, Z>(
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
@@ -102,13 +93,10 @@ where
         state: &mut S,
     ) -> Result<(), Error>
     where
-        CS: Scheduler<Input = I, State = S>,
-        E: Executor<EM, I, S, Z> + HasObservers<Observers = OT, Input = I, State = S>,
-        EM: EventManager<E, I, S, Z>,
-        I: Input,
-        OT: ObserversTuple<I, S>,
-        S: State<Input = I>,
-        Z: Evaluator<E, EM, Input = I, State = S> + HasScheduler<CS, I, S>,
+        CS: Scheduler<State = S>,
+        E: Executor<EM, S, Z> + HasObservers<State = S>,
+        EM: EventManager<E, S, Z>,
+        Z: Evaluator<E, EM, State = S> + HasScheduler<CS>,
     {
         let cfg = Config::default();
         let ctx = Context::new(&cfg);

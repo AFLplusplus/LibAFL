@@ -50,7 +50,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasSolutions},
+    state::{HasClientPerfMonitor, HasInput, HasSolutions},
     Error,
 };
 
@@ -148,7 +148,7 @@ where
     H: FnMut(&<S as HasInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus + HasSolutions,
+    S: HasSolutions + HasClientPerfMonitor,
 {
     /// Create a new in mem executor.
     /// Caution: crash and restart in one of them will lead to odd behavior if multiple are used,
@@ -324,7 +324,7 @@ impl InProcessHandlers {
         E: Executor<EM, E::State, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor + HasInput,
+        E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<OF, E::State>,
         H: FnMut(&<E::State as HasInput>::Input) -> ExitKind + ?Sized,
     {

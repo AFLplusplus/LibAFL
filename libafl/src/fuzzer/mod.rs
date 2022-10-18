@@ -43,7 +43,7 @@ where
 pub trait HasFeedback<F, S>
 where
     F: Feedback<S>,
-    S: HasInput,
+    S: HasInput + HasClientPerfMonitor,
 {
     /// The feedback
     fn feedback(&self) -> &F;
@@ -56,7 +56,7 @@ where
 pub trait HasObjective<OF, S>
 where
     OF: Feedback<S>,
-    S: HasInput,
+    S: HasInput + HasClientPerfMonitor,
 {
     /// The objective feedback
     fn objective(&self) -> &OF;

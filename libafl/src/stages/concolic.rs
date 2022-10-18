@@ -11,7 +11,6 @@ use super::{Stage, TracingStage};
 use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
-    inputs::Input,
     observers::concolic::ConcolicObserver,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
     Error,
@@ -335,20 +334,19 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
 #[derive(Clone, Debug)]
-pub struct SimpleConcolicMutationalStage<EM, I, S, Z>
+pub struct SimpleConcolicMutationalStage<EM, S, Z>
 where
-    I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
-    _phantom: PhantomData<(EM, I, S, Z)>,
+    _phantom: PhantomData<(EM, S, Z)>,
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<EM, I, S, Z>
+impl<E, EM, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<EM, S, Z>
 where
-    I: Input + HasBytesVec,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
-    Z: Evaluator<E, EM, Input = I, State = S>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    S::Input: HasBytesVec,
+    Z: Evaluator<E, EM, State = S>,
 {
     #[inline]
     fn perform(
@@ -387,10 +385,9 @@ where
     }
 }
 
-impl<EM, I, S, Z> Default for SimpleConcolicMutationalStage<EM, I, S, Z>
+impl<EM, S, Z> Default for SimpleConcolicMutationalStage<EM, S, Z>
 where
-    I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<Input = I>,
+    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     fn default() -> Self {
         Self {

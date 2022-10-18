@@ -34,7 +34,7 @@ pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
     Stage<E, EM, CS::State, Z> + FeedbackFactory<F2, CS::State, OT>
 where
     CS: Scheduler,
-    CS::State: HasExecutions + HasMaxSize,
+    CS::State: HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <CS::State as HasInput>::Input: HasLen + Hash,
     E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
@@ -216,6 +216,7 @@ impl<CS, E, EM, F1, F2, FF, M, T, Z> FeedbackFactory<F2, CS::State, T>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, T, Z>
 where
     CS: Scheduler,
+    CS::State: HasClientPerfMonitor,
     F2: Feedback<CS::State>,
     FF: FeedbackFactory<F2, CS::State, T>,
     M: Mutator<CS::State>,
