@@ -25,7 +25,7 @@ use crate::{
     observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
     std::borrow::ToOwned,
 };
-use alloc::string::String; 
+use alloc::string::String;
 use alloc::vec::Vec;
 
 #[cfg(feature = "std")]
@@ -630,7 +630,12 @@ impl CommandExecutorBuilder {
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator.into_executor::<EM,I,OT,S,Z> (observers, self.has_stdout_observer.clone(), self.has_stderr_observer.clone(), self. has_asan_observer.clone()))
+        Ok(configurator.into_executor::<EM, I, OT, S, Z>(
+            observers,
+            self.has_stdout_observer.clone(),
+            self.has_stderr_observer.clone(),
+            self.has_asan_observer.clone(),
+        ))
     }
 }
 

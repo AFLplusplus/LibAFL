@@ -31,7 +31,7 @@ where
     A: Debug,
     B: Debug,
     OTA: Debug,
-    OTB: Debug
+    OTB: Debug,
 {
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
     pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
@@ -40,13 +40,14 @@ where
         B: Executor<EM, I, S, Z>,
         I: Input,
     {
-        Self { primary, secondary,
-               observers: UnsafeCell::new(
-                    ProxyObserversTuple {
-                            primary: OwnedPtrMut::Ptr(core::ptr::null_mut()),
-                            secondary: OwnedPtrMut::Ptr(core::ptr::null_mut()),
-                    }
-                   )}
+        Self {
+            primary,
+            secondary,
+            observers: UnsafeCell::new(ProxyObserversTuple {
+                primary: OwnedPtrMut::Ptr(core::ptr::null_mut()),
+                secondary: OwnedPtrMut::Ptr(core::ptr::null_mut()),
+            }),
+        }
     }
 
     /// Retrieve the primary `Executor` that is wrapped by this `DiffExecutor`.
