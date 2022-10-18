@@ -1159,7 +1159,7 @@ pub mod win32_shmem {
     use core::{
         ffi::c_void,
         fmt::{self, Debug, Formatter},
-        ptr, slice,
+        slice,
     };
 
     use uuid::Uuid;

@@ -1,12 +1,10 @@
 # How to use python bindings
 ## First time setup
 ```bash
-# Create virtual environment
-python3 -m venv .env 
-# Enable environment
-. ./.env/bin/activate
 # Install maturin
 pip install maturin
+# Create virtual environment
+python3 -m venv .env
 ```
 ## Build bindings
 ```
