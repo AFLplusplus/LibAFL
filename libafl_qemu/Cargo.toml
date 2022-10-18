@@ -49,7 +49,7 @@ pyo3 = { version = "0.17", optional = true }
 [build-dependencies]
 cc = { version = "1.0" }
 which = "4.2"
-pyo3-build-config = { version = "0.16", optional = true }
+pyo3-build-config = { version = "0.15", optional = true }
 
 [lib]
 name = "libafl_qemu"
