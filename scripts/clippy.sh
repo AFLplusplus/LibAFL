@@ -22,3 +22,4 @@ RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --release --tests
    -A clippy::unseparated-literal-suffix \
    -A clippy::module-name-repetitions \
    -A clippy::unreadable-literal \
+   -A clippy::unsafe-derive-deserialize \
