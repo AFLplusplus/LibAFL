@@ -20,7 +20,7 @@ use serde_json::Value;
 )]
 struct Opt {
     #[clap(
-        parse(try_from_str),
+        value_parser,
         short,
         long = "grammar-file",
         name = "GRAMMAR",
@@ -29,7 +29,7 @@ struct Opt {
     grammar: PathBuf,
 
     #[clap(
-        parse(try_from_str),
+        value_parser,
         short,
         long,
         name = "LIMIT",
@@ -39,7 +39,7 @@ struct Opt {
     limit: usize,
 
     #[clap(
-        parse(try_from_str),
+        value_parser,
         short,
         long,
         help = "Set the output file",

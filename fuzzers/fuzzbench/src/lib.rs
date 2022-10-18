@@ -133,7 +133,7 @@ pub fn libafl_main() {
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
     let mut out_dir = PathBuf::from(
-        res.value_of("out")
+        res.get_one::<String>("out")
             .expect("The --output parameter is missing")
             .to_string(),
     );
@@ -149,7 +149,7 @@ pub fn libafl_main() {
     out_dir.push("queue");
 
     let in_dir = PathBuf::from(
-        res.value_of("in")
+        res.get_one::<String>("in")
             .expect("The --input parameter is missing")
             .to_string(),
     );
@@ -158,14 +158,13 @@ pub fn libafl_main() {
         return;
     }
 
-    let tokens = res.value_of("tokens").map(PathBuf::from);
+    let tokens = res.get_one::<String>("tokens").map(PathBuf::from);
 
-    let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
+    let logfile = PathBuf::from(res.get_one::<String>("logfile").unwrap());
 
     let timeout = Duration::from_millis(
-        res.value_of("timeout")
+        res.get_one::<String>("timeout")
             .unwrap()
-            .to_string()
             .parse()
             .expect("Could not parse timeout in milliseconds"),
     );

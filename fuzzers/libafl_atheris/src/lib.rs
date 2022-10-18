@@ -180,21 +180,24 @@ pub fn LLVMFuzzerRunDriver(
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let cores = Cores::from_cmdline(matches.value_of("cores").unwrap())
+    let cores = Cores::from_cmdline(matches.res.get_one::<String>("cores").unwrap())
         .expect("No valid core count given!");
     let broker_port = matches
-        .value_of("broker_port")
+        .res
+        .get_one::<String>("broker_port")
         .map(|s| s.parse().expect("Invalid broker port"))
         .unwrap_or(1337);
     let remote_broker_addr = matches
-        .value_of("remote_broker_addr")
+        .res
+        .get_one::<String>("remote_broker_addr")
         .map(|s| s.parse().expect("Invalid broker address"));
     let input_dirs: Vec<PathBuf> = matches
         .values_of("input")
         .map(|v| v.map(PathBuf::from).collect())
         .unwrap_or_default();
     let output_dir = matches
-        .value_of("output")
+        .res
+        .get_one::<String>("output")
         .map(PathBuf::from)
         .unwrap_or_else(|| workdir.clone());
     let token_files: Vec<&str> = matches
@@ -202,7 +205,8 @@ pub fn LLVMFuzzerRunDriver(
         .map(|v| v.collect())
         .unwrap_or_default();
     let timeout_ms = matches
-        .value_of("timeout")
+        .res
+        .get_one::<String>("timeout")
         .map(|s| s.parse().expect("Invalid timeout"))
         .unwrap_or(10000);
     // let cmplog_enabled = matches.is_present("cmplog");

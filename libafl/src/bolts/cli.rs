@@ -114,7 +114,7 @@ fn parse_instrumentation_location(
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
     /// timeout for each target execution (milliseconds)
-    #[clap(short, long, default_value = "1000", parse(try_from_str = parse_timeout), help_heading = "Fuzz Options")]
+    #[clap(short, long, default_value = "1000", value_parser = parse_timeout, help_heading = "Fuzz Options")]
     pub timeout: Duration,
 
     /// whether or not to print debug info
@@ -137,7 +137,7 @@ pub struct FuzzerOptions {
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
     #[cfg(feature = "frida_cli")]
-    #[clap(long, default_value = "0", parse(try_from_str = Cores::from_cmdline), help_heading = "ASAN Options")]
+    #[clap(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "ASAN Options")]
     pub asan_cores: Cores,
 
     /// number of fuzz iterations to perform
@@ -145,7 +145,7 @@ pub struct FuzzerOptions {
     pub iterations: usize,
 
     /// path to the harness
-    #[clap(short = 'H', long, parse(from_os_str), help_heading = "Fuzz Options")]
+    #[clap(short = 'H', long, value_parser, help_heading = "Fuzz Options")]
     pub harness: Option<PathBuf>,
 
     /// trailing arguments (after "--"); can be passed directly to the harness
@@ -183,7 +183,7 @@ pub struct FuzzerOptions {
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
     #[cfg(feature = "frida_cli")]
-    #[clap(long, default_value = "0", parse(try_from_str = Cores::from_cmdline), help_heading = "Frida Options")]
+    #[clap(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "Frida Options")]
     pub cmplog_cores: Cores,
 
     /// enable ASAN leak detection
@@ -251,7 +251,7 @@ pub struct FuzzerOptions {
         short = 'x',
         long,
         multiple_values = true,
-        parse(from_os_str),
+        value_parser,
         help_heading = "Fuzz Options"
     )]
     pub tokens: Vec<PathBuf>,
@@ -262,7 +262,7 @@ pub struct FuzzerOptions {
         long,
         default_values = &["corpus/"],
         multiple_values = true,
-        parse(from_os_str),
+        value_parser,
         help_heading = "Corpus Options"
     )]
     pub input: Vec<PathBuf>,
@@ -272,7 +272,7 @@ pub struct FuzzerOptions {
         short,
         long,
         default_value = "solutions/",
-        parse(from_os_str),
+        value_parser,
         help_heading = "Corpus Options"
     )]
     pub output: PathBuf,
@@ -280,7 +280,7 @@ pub struct FuzzerOptions {
     /// Spawn a client in each of the provided cores. Use 'all' to select all available
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
-    #[clap(short = 'c', long, default_value = "0", parse(try_from_str = Cores::from_cmdline))]
+    #[clap(short = 'c', long, default_value = "0", value_parser = Cores::from_cmdline)]
     pub cores: Cores,
 
     /// port on which the broker should listen
@@ -288,11 +288,11 @@ pub struct FuzzerOptions {
     pub broker_port: u16,
 
     /// ip:port where a remote broker is already listening
-    #[clap(short = 'a', long, parse(try_from_str), name = "REMOTE")]
+    #[clap(short = 'a', long, value_parser, name = "REMOTE")]
     pub remote_broker_addr: Option<SocketAddr>,
 
     /// path to file that should be sent to the harness for crash reproduction
-    #[clap(short, long, parse(from_os_str), help_heading = "Replay Options")]
+    #[clap(short, long, value_parser, help_heading = "Replay Options")]
     pub replay: Option<PathBuf>,
 
     /// Run the same replay input multiple times
@@ -342,7 +342,7 @@ impl FuzzerOptions {
     ///
     ///     // process the results
     ///     if let Some(("custom", sub_matches)) = matches.subcommand() {
-    ///         custom_func(sub_matches.value_of("bar").unwrap())
+    ///         custom_func(sub_matches.res.get_one::<String>("bar").unwrap())
     ///     }
     ///
     ///     println!("{:?}", matches);

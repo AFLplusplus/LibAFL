@@ -54,7 +54,7 @@ struct Opt {
     #[clap(
         short,
         long,
-        parse(try_from_str = Cores::from_cmdline),
+        value_parser = Cores::from_cmdline,
         help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
         name = "CORES"
     )]
@@ -70,7 +70,7 @@ struct Opt {
     broker_port: u16,
 
     #[clap(
-        parse(try_from_str),
+        value_parser,
         short = 'a',
         long,
         help = "Specify a remote broker",
@@ -79,7 +79,7 @@ struct Opt {
     remote_broker_addr: Option<SocketAddr>,
 
     #[clap(
-        parse(try_from_str),
+        value_parser,
         short,
         long,
         help = "Set an initial corpus directory",
@@ -90,7 +90,7 @@ struct Opt {
     #[clap(
         short,
         long,
-        parse(try_from_str),
+        value_parser,
         help = "Set the output directory, default is ./out",
         name = "OUTPUT",
         default_value = "./out"
@@ -109,7 +109,7 @@ struct Opt {
     /*
         // The tokens are hardcoded in this example.
         #[clap(
-        parse(from_os_str),
+        value_parser,
         short = "x",
         long,
         help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",

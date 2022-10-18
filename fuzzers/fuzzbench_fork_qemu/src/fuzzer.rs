@@ -113,7 +113,7 @@ pub fn main() {
     );
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
-    let mut out_dir = PathBuf::from(res.value_of("out").unwrap().to_string());
+    let mut out_dir = PathBuf::from(res.res.get_one::<String>("out").unwrap().to_string());
     if fs::create_dir(&out_dir).is_err() {
         println!("Out dir at {:?} already exists.", &out_dir);
         if !out_dir.is_dir() {
@@ -125,15 +125,15 @@ pub fn main() {
     crashes.push("crashes");
     out_dir.push("queue");
 
-    let in_dir = PathBuf::from(res.value_of("in").unwrap().to_string());
+    let in_dir = PathBuf::from(res.res.get_one::<String>("in").unwrap().to_string());
     if !in_dir.is_dir() {
         println!("In dir at {:?} is not a valid directory!", &in_dir);
         return;
     }
 
-    let tokens = res.value_of("tokens").map(PathBuf::from);
+    let tokens = res.res.get_one::<String>("tokens").map(PathBuf::from);
 
-    let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
+    let logfile = PathBuf::from(res.res.get_one::<String>("logfile").unwrap().to_string());
 
     fuzz(out_dir, crashes, in_dir, tokens, logfile).expect("An error occurred while fuzzing");
 }
