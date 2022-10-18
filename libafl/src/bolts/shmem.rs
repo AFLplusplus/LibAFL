@@ -1214,7 +1214,7 @@ pub mod win32_shmem {
                 map_str_bytes[19] = 0; // Trucate to size 20
                 let handle = CreateFileMappingA(
                     HANDLE(INVALID_HANDLE_VALUE),
-                    ptr::null_mut(),
+                    None,
                     PAGE_READWRITE,
                     0,
                     map_size as u32,
