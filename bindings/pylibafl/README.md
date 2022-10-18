@@ -1,8 +1,10 @@
 # How to use python bindings
 ## First time setup
-```
-# Create environment variable
-python -m venv .env 
+```bash
+# Create virtual environment
+python3 -m venv .env 
+# Enable environment
+. ./.env/bin/activate
 # Install maturin
 pip install maturin
 ```
@@ -13,7 +15,7 @@ source .env/bin/activate
 # Build python module
 maturin develop
 ```
-This is going to install `pylibafl` python module. 
+This is going to install `pylibafl` python module into this venv. 
 
 ## Use bindings
 ### Example: Running baby_fuzzer in fuzzers/baby_fuzzer/baby_fuzzer.py
@@ -28,4 +30,4 @@ Then simply run
 ```
 python PATH_TO_BABY_FUZZER/baby_fuzzer.py
 ```
-The crashes' directory will be created in the directory from which you ran the command.
+The crashes directory will be created in the directory from which you ran the command.
