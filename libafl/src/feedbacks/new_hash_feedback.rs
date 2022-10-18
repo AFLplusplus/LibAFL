@@ -73,14 +73,12 @@ pub struct NewHashFeedback<O, S> {
     o_type: PhantomData<(O, S)>,
 }
 
-impl<O, S> Feedback for NewHashFeedback<O, S>
+impl<O, S> Feedback<S> for NewHashFeedback<O, S>
 where
     O: ObserverWithHashField + Named + Debug,
     S: HasInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
 {
-    type State = S;
-
-    fn init_state(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata(NewHashFeedbackMetadata::default(), &self.name);
         Ok(())
     }
@@ -88,9 +86,9 @@ where
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         _manager: &mut EM,
-        _input: &<Self::State as HasInput>::Input,
+        _input: &<S as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>

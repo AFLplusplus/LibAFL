@@ -166,8 +166,8 @@ where
     where
         Self: Executor<EM, S, Z>,
         EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<State = S>,
-        Z: HasObjective<OF>,
+        OF: Feedback<S>,
+        Z: HasObjective<OF, S>,
     {
         let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
         #[cfg(windows)]
@@ -323,9 +323,9 @@ impl InProcessHandlers {
     where
         E: Executor<EM, E::State, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<State = E::State>,
+        OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor + HasInput,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, E::State>,
         H: FnMut(&<E::State as HasInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
@@ -594,9 +594,9 @@ mod unix_signal_handler {
     where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<State = E::State>,
+        OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -667,9 +667,9 @@ mod unix_signal_handler {
     ) where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<State = E::State>,
+        OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, E::State>,
     {
         if !data.is_valid() {
             #[cfg(feature = "std")]
@@ -745,9 +745,9 @@ mod unix_signal_handler {
     ) where
         E: Executor<EM, E::State, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<State = E::State>,
+        OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
@@ -928,9 +928,9 @@ mod windows_exception_handler {
     where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<State = E::State>,
+        OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -1018,9 +1018,9 @@ mod windows_exception_handler {
     ) where
         E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<State = E::State>,
+        OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, E::State>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -1114,9 +1114,9 @@ mod windows_exception_handler {
     ) where
         E: Executor<EM, E::State, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<State = E::State>,
+        OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, E::State>,
     {
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
@@ -1655,9 +1655,9 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<State = S>,
+        OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, S>,
     {
         let handlers = InChildProcessHandlers::new::<Self>()?;
         Ok(Self {
@@ -1702,9 +1702,9 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<State = S>,
+        OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, S>,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();

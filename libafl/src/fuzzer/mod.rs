@@ -40,9 +40,10 @@ where
 }
 
 /// Holds an feedback
-pub trait HasFeedback<F>
+pub trait HasFeedback<F, S>
 where
-    F: Feedback,
+    F: Feedback<S>,
+    S: HasInput,
 {
     /// The feedback
     fn feedback(&self) -> &F;
@@ -52,10 +53,10 @@ where
 }
 
 /// Holds an objective feedback
-pub trait HasObjective<OF>
+pub trait HasObjective<OF, S>
 where
-    OF: Feedback,
-    OF::State: HasClientPerfMonitor,
+    OF: Feedback<S>,
+    S: HasInput,
 {
     /// The objective feedback
     fn objective(&self) -> &OF;
@@ -247,8 +248,8 @@ pub enum ExecuteInputResult {
 pub struct StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor,
 {
     scheduler: CS,
@@ -260,8 +261,8 @@ where
 impl<CS, F, OF, OT> HasScheduler<CS> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor,
 {
     fn scheduler(&self) -> &CS {
@@ -273,11 +274,11 @@ where
     }
 }
 
-impl<CS, F, OF, OT> HasFeedback<F> for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF, OT> HasFeedback<F, CS::State> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor,
 {
     fn feedback(&self) -> &F {
@@ -289,11 +290,11 @@ where
     }
 }
 
-impl<CS, F, OF, OT> HasObjective<OF> for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF, OT> HasObjective<OF, CS::State> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor,
 {
     fn objective(&self) -> &OF {
@@ -308,8 +309,8 @@ where
 impl<CS, F, OF, OT> ExecutionProcessor for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
@@ -425,8 +426,8 @@ impl<CS, F, OF, OT> EvaluatorObservers for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
     type State = CS::State;
@@ -457,8 +458,8 @@ where
     CS: Scheduler,
     E: HasObservers<State = CS::State, Observers = OT> + Executor<EM, CS::State, Self>,
     EM: EventFirer<State = CS::State>,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
     CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
 {
@@ -524,8 +525,8 @@ where
     CS: Scheduler,
     EM: ProgressReporter<State = CS::State>
         + EventProcessor<E, Self, State = CS::State, Observers = OT>,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor + HasExecutions,
     ST: StagesTuple<E, EM, CS::State, Self>,
 {
@@ -572,8 +573,8 @@ where
 impl<CS, F, OF, OT> StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     CS::State: HasInput + HasExecutions + HasClientPerfMonitor,
 {
     /// Create a new `StdFuzzer` with standard behavior.
@@ -636,8 +637,8 @@ pub trait ExecutesInput<E, EM> {
 impl<CS, E, EM, F, OF> ExecutesInput<E, EM> for StdFuzzer<CS, F, OF, E::Observers>
 where
     CS: Scheduler,
-    F: Feedback<State = CS::State>,
-    OF: Feedback<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
     E: Executor<EM, CS::State, Self> + HasObservers<State = CS::State>,
     CS::State: HasInput + HasExecutions + HasClientPerfMonitor,
 {

@@ -346,7 +346,7 @@ pub struct MapFeedback<N, O, R, S, T> {
     phantom: PhantomData<(N, O, R, S, T)>,
 }
 
-impl<N, O, R, S, T> Feedback for MapFeedback<N, O, R, S, T>
+impl<N, O, R, S, T> Feedback<S> for MapFeedback<N, O, R, S, T>
 where
     N: IsNovel<T> + Debug,
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T> + Debug,
@@ -354,9 +354,7 @@ where
     S: HasInput + HasClientPerfMonitor + HasNamedMetadata + Debug,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
 {
-    type State = S;
-
-    fn init_state(&mut self, state: &mut Self::State) -> Result<(), Error> {
+    fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         // Initialize `MapFeedbackMetadata` with an empty vector and add it to the state.
         // The `MapFeedbackMetadata` would be resized on-demand in `is_interesting`
         state.add_named_metadata(MapFeedbackMetadata::<T>::default(), &self.name);
@@ -366,15 +364,15 @@ where
     #[rustversion::nightly]
     default fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
-        input: &<Self::State as HasInput>::Input,
+        input: &<S as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
@@ -382,23 +380,23 @@ where
     #[rustversion::not(nightly)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
-        input: &<Self::State as HasInput>::Input,
+        input: &<S as HasInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         self.is_interesting_default(state, manager, input, observers, exit_kind)
     }
 
     fn append_metadata(
         &mut self,
-        _state: &mut Self::State,
-        testcase: &mut Testcase<<Self::State as HasInput>::Input>,
+        _state: &mut S,
+        testcase: &mut Testcase<<S as HasInput>::Input>,
     ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             let meta = MapIndexesMetadata::new(core::mem::take(v));
@@ -414,8 +412,8 @@ where
     /// Discard the stored metadata in case that the testcase is not added to the corpus
     fn discard_metadata(
         &mut self,
-        _state: &mut Self::State,
-        _input: &<Self::State as HasInput>::Input,
+        _state: &mut S,
+        _input: &<S as HasInput>::Input,
     ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
@@ -429,7 +427,7 @@ where
 
 /// Specialize for the common coverage map size, maximization of u8s
 #[rustversion::nightly]
-impl<O, S> Feedback for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
+impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
     for<'it> O: AsIter<'it, Item = u8>,
@@ -439,15 +437,15 @@ where
     #[allow(clippy::needless_range_loop)]
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut Self::State,
+        state: &mut S,
         manager: &mut EM,
-        _input: &<Self::State as HasInput>::Input,
+        _input: &<S as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         // 128 bits vectors
         type VectorType = core::simd::u8x16;
@@ -755,20 +753,18 @@ where
     }
 }
 
-impl<O, S> Feedback for ReachabilityFeedback<O, S>
+impl<O, S> Feedback<S> for ReachabilityFeedback<O, S>
 where
     S: HasInput + Debug + HasClientPerfMonitor,
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {
-    type State = S;
-
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _manager: &mut EM,
-        _input: &<Self::State as HasInput>::Input,
+        _input: &<S as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -795,8 +791,8 @@ where
 
     fn append_metadata(
         &mut self,
-        _state: &mut Self::State,
-        testcase: &mut Testcase<<Self::State as HasInput>::Input>,
+        _state: &mut S,
+        testcase: &mut Testcase<<S as HasInput>::Input>,
     ) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
@@ -807,8 +803,8 @@ where
 
     fn discard_metadata(
         &mut self,
-        _state: &mut Self::State,
-        _input: &<Self::State as HasInput>::Input,
+        _state: &mut S,
+        _input: &<S as HasInput>::Input,
     ) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())

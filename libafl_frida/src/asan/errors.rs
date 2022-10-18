@@ -617,13 +617,11 @@ pub struct AsanErrorsFeedback<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> Feedback for AsanErrorsFeedback<S>
+impl<S> Feedback<S> for AsanErrorsFeedback<S>
 where
     S: HasInput + Debug + HasClientPerfMonitor,
     S::Input: HasTargetBytes,
 {
-    type State = S;
-
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,

@@ -50,18 +50,16 @@ impl<S> Named for ConcolicFeedback<S> {
     }
 }
 
-impl<S> Feedback for ConcolicFeedback<S>
+impl<S> Feedback<S> for ConcolicFeedback<S>
 where
     S: HasInput + Debug + HasClientPerfMonitor,
 {
-    type State = S;
-
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _manager: &mut EM,
-        _input: &<Self::State as HasInput>::Input,
+        _input: &<S as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -77,8 +75,8 @@ where
 
     fn append_metadata(
         &mut self,
-        _state: &mut Self::State,
-        _testcase: &mut Testcase<<Self::State as HasInput>::Input>,
+        _state: &mut S,
+        _testcase: &mut Testcase<<S as HasInput>::Input>,
     ) -> Result<(), Error> {
         if let Some(metadata) = self.metadata.take() {
             _testcase.metadata_mut().insert(metadata);
@@ -88,8 +86,8 @@ where
 
     fn discard_metadata(
         &mut self,
-        _state: &mut Self::State,
-        _input: &<Self::State as HasInput>::Input,
+        _state: &mut S,
+        _input: &<S as HasInput>::Input,
     ) -> Result<(), Error> {
         Ok(())
     }

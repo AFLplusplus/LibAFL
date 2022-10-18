@@ -116,7 +116,7 @@ where
     }
 }
 
-impl<F, I, O1, O2, S> Feedback for DiffFeedback<F, I, O1, O2, S>
+impl<F, I, O1, O2, S> Feedback<S> for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
@@ -124,8 +124,6 @@ where
     O1: Observer<S> + PartialEq<O2>,
     O2: Observer<S>,
 {
-    type State = S;
-
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,

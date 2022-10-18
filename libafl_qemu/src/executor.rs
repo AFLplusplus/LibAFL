@@ -60,9 +60,9 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
-        OF: Feedback<State = S>,
+        OF: Feedback<S>,
         S: State + HasExecutions + HasCorpus + HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, S>,
     {
         Ok(Self {
             hooks,
@@ -185,9 +185,9 @@ where
     ) -> Result<Self, Error>
     where
         EM: EventFirer<State = S> + EventRestarter,
-        OF: Feedback<State = S>,
+        OF: Feedback<S>,
         S: State + HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF>,
+        Z: HasObjective<OF, S>,
     {
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
 

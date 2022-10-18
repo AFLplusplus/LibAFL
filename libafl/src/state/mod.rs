@@ -539,8 +539,8 @@ where
         objective: &mut O,
     ) -> Result<Self, Error>
     where
-        F: Feedback<State = Self>,
-        O: Feedback<State = Self>,
+        F: Feedback<Self>,
+        O: Feedback<Self>,
     {
         let mut state = Self {
             rand,

@@ -31,20 +31,20 @@ use crate::{
 ///
 /// You must provide at least one mutator that actually reduces size.
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
-    Stage<E, EM, CS::State, Z> + FeedbackFactory<F2, OT>
+    Stage<E, EM, CS::State, Z> + FeedbackFactory<F2, CS::State, OT>
 where
     CS: Scheduler,
     CS::State: HasExecutions + HasMaxSize,
     <CS::State as HasInput>::Input: HasLen + Hash,
     E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
-    F1: Feedback<State = CS::State>,
-    F2: Feedback<State = CS::State>,
+    F1: Feedback<CS::State>,
+    F2: Feedback<CS::State>,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + ExecutesInput<E, EM, State = CS::State>
-        + HasFeedback<F1>
+        + HasFeedback<F1, CS::State>
         + HasScheduler<CS>,
 {
     /// The mutator registered for this stage
@@ -185,14 +185,14 @@ where
     <CS::State as HasInput>::Input: HasLen + Hash,
     E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
-    F1: Feedback<State = CS::State>,
-    F2: Feedback<State = CS::State>,
-    FF: FeedbackFactory<F2, OT>,
+    F1: Feedback<CS::State>,
+    F2: Feedback<CS::State>,
+    FF: FeedbackFactory<F2, CS::State, OT>,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + ExecutesInput<E, EM, State = CS::State>
-        + HasFeedback<F1>
+        + HasFeedback<F1, CS::State>
         + HasScheduler<CS>,
 {
     fn perform(
@@ -212,12 +212,12 @@ where
     }
 }
 
-impl<CS, E, EM, F1, F2, FF, M, T, Z> FeedbackFactory<F2, T>
+impl<CS, E, EM, F1, F2, FF, M, T, Z> FeedbackFactory<F2, CS::State, T>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, T, Z>
 where
     CS: Scheduler,
-    F2: Feedback<State = CS::State>,
-    FF: FeedbackFactory<F2, T>,
+    F2: Feedback<CS::State>,
+    FF: FeedbackFactory<F2, CS::State, T>,
     M: Mutator<CS::State>,
     Z: ExecutionProcessor<State = CS::State>,
 {
@@ -232,16 +232,16 @@ where
     CS: Scheduler,
     E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, CS::State, Z>,
     EM: EventFirer<State = CS::State>,
-    F1: Feedback<State = CS::State>,
-    F2: Feedback<State = CS::State>,
-    FF: FeedbackFactory<F2, OT>,
+    F1: Feedback<CS::State>,
+    F2: Feedback<CS::State>,
+    FF: FeedbackFactory<F2, CS::State, OT>,
     <CS::State as HasInput>::Input: HasLen + Hash,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + ExecutesInput<E, EM, State = CS::State>
-        + HasFeedback<F1>
+        + HasFeedback<F1, E::State>
         + HasScheduler<CS>,
 {
     /// The mutator, added to this stage
@@ -314,24 +314,22 @@ impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
     }
 }
 
-impl<M, S> Feedback for MapEqualityFeedback<M, S>
+impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
 where
     M: MapObserver + Debug,
     S: HasInput + HasClientPerfMonitor + Debug,
 {
-    type State = S;
-
     fn is_interesting<EM, OT>(
         &mut self,
-        _state: &mut Self::State,
+        _state: &mut S,
         _manager: &mut EM,
-        _input: &<Self::State as HasInput>::Input,
+        _input: &<S as HasInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<State = Self::State>,
-        OT: ObserversTuple<Self::State>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         let obs = observers
             .match_name::<M>(self.observer_name())
@@ -366,7 +364,7 @@ impl<M, S> HasObserverName for MapEqualityFactory<M, S> {
     }
 }
 
-impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, OT> for MapEqualityFactory<M, S>
+impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, S, OT> for MapEqualityFactory<M, S>
 where
     M: MapObserver,
     OT: ObserversTuple<S>,
