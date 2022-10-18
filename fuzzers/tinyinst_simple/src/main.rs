@@ -21,7 +21,8 @@ use libafl::{
 use libafl_tinyinst::executor::TinyInstExecutor;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
-static mut SIGNALS: [u8; 16] = [0; 16];
+static mut SIGNALS: [u8; 86016] = [0; 86016];
+
 fn main() {
     // Tinyinst things
     let tinyinst_args = vec![
@@ -31,7 +32,7 @@ fn main() {
         "coverage.txt".to_string(),
     ];
 
-    let args = vec![".\\test\\test.exe".to_string(), "bad12".to_string()];
+    let args = vec![".\\test\\test.exe".to_string(), "bad1".to_string()];
 
     let observer =
         unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };

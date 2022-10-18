@@ -10,8 +10,9 @@ use libafl::{
     state::State,
     Error,
 };
+use std::str;
 
-use crate::tinyinst::litecov::{self, Coverage, DebuggerStatus, LiteCov};
+use crate::tinyinst::litecov::{self, get_coverage_map, Coverage, DebuggerStatus, LiteCov};
 
 pub struct TinyInstExecutor<I, OT, S>
 where
@@ -60,15 +61,6 @@ where
     ) -> Result<ExitKind, Error> {
         let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
         self.observers.pre_exec_all(_state, _input)?;
-        unsafe {
-            if self.signals_len != 0 {
-                *(self.signals.add(self.signals_len)) = 1;
-
-                self.signals_len = self.signals_len - 1;
-            } else {
-                return Ok(ExitKind::Crash);
-            }
-        }
 
         let mut argv: Vec<*mut c_char> = Vec::with_capacity(self.argc + 1);
         for arg in &self.argv {
@@ -87,6 +79,15 @@ where
             self.instrumentation_ptr
                 .pin_mut()
                 .GetCoverage(self.coverage_ptr.pin_mut(), true);
+            let mut test = Vec::<u8>::new();
+            get_coverage_map(&mut test, self.coverage_ptr.pin_mut());
+            for i in test {
+                if self.signals_len < i as usize {
+                    panic!("Signal length is too small");
+                } else {
+                    *(self.signals.add(i as usize)) = 1;
+                }
+            }
         }
 
         match status {
