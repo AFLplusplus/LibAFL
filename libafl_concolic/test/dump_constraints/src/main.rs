@@ -11,7 +11,7 @@ use std::{
     string::ToString,
 };
 
-use clap::{self, StructOpt};
+use clap::{self, Parser};
 use libafl::{
     bolts::{
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
@@ -23,7 +23,7 @@ use libafl::{
     },
 };
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 #[clap(
     name = "dump_constraints",
     about = "Dump tool for concolic constraints."

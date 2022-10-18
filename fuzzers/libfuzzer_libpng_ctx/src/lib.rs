@@ -9,7 +9,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
-use clap::{self, StructOpt};
+use clap::{self, Parser};
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -44,7 +44,7 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(time.parse()?))
 }
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 #[clap(
     name = "libfuzzer_libpng_ctx",
     about = "A clone of libfuzzer using LibAFL for a libpng harness",
@@ -100,7 +100,7 @@ struct Opt {
     #[clap(
         short,
         long,
-        parse(try_from_str = timeout_from_millis_str),
+        value_parser = timeout_from_millis_str,
         help = "Set the exeucution timeout in milliseconds, default is 10000",
         name = "TIMEOUT",
         default_value = "10000",

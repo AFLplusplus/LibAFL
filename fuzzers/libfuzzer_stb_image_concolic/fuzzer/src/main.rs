@@ -4,7 +4,7 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use clap::{self, StructOpt};
+use clap::{self, Parser};
 use std::{
     env,
     path::PathBuf,
@@ -54,7 +54,7 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct Opt {
     /// This node should do concolic tracing + solving instead of traditional fuzzing
     #[clap(short, long)]

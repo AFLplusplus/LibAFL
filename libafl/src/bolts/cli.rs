@@ -106,7 +106,7 @@ fn parse_instrumentation_location(
 
 /// Top-level container for cli options/arguments/subcommands
 #[derive(Parser, Clone, Debug, Serialize, Deserialize)]
-#[clap(
+#[command(
     arg_required_else_help(true),
     subcommand_precedence_over_arg(true),
     args_conflicts_with_subcommands(true)
@@ -114,48 +114,48 @@ fn parse_instrumentation_location(
 #[allow(clippy::struct_excessive_bools)]
 pub struct FuzzerOptions {
     /// timeout for each target execution (milliseconds)
-    #[clap(short, long, default_value = "1000", value_parser = parse_timeout, help_heading = "Fuzz Options")]
+    #[arg(short, long, default_value = "1000", value_parser = parse_timeout, help_heading = "Fuzz Options")]
     pub timeout: Duration,
 
     /// whether or not to print debug info
-    #[clap(short, long)]
+    #[arg(short, long)]
     pub verbose: bool,
 
     /// file to which all client output should be written
-    #[clap(short, long, default_value = "/dev/null")]
+    #[arg(short, long, default_value = "/dev/null")]
     pub stdout: String,
 
     /// the name of the configuration to use
-    #[clap(long, default_value = "default configuration")]
+    #[arg(long, default_value = "default configuration")]
     pub configuration: String,
 
     /// enable Address Sanitizer (ASAN)
-    #[clap(short = 'A', long, help_heading = "Fuzz Options")]
+    #[arg(short = 'A', long, help_heading = "Fuzz Options")]
     pub asan: bool,
 
     /// Enable ASAN on each of the provided cores. Use 'all' to select all available
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
     #[cfg(feature = "frida_cli")]
-    #[clap(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "ASAN Options")]
+    #[arg(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "ASAN Options")]
     pub asan_cores: Cores,
 
     /// number of fuzz iterations to perform
-    #[clap(short = 'I', long, help_heading = "Fuzz Options", default_value = "0")]
+    #[arg(short = 'I', long, help_heading = "Fuzz Options", default_value = "0")]
     pub iterations: usize,
 
     /// path to the harness
-    #[clap(short = 'H', long, value_parser, help_heading = "Fuzz Options")]
+    #[arg(short = 'H', long, help_heading = "Fuzz Options")]
     pub harness: Option<PathBuf>,
 
     /// trailing arguments (after "--"); can be passed directly to the harness
     #[cfg(not(feature = "qemu_cli"))]
-    #[clap(last = true, name = "HARNESS_ARGS")]
+    #[arg(last = true, value_name = "HARNESS_ARGS")]
     pub harness_args: Vec<String>,
 
     /// harness function to call
     #[cfg(feature = "frida_cli")]
-    #[clap(
+    #[arg(
         short = 'F',
         long,
         default_value = "LLVMFuzzerTestOneInput",
@@ -165,17 +165,17 @@ pub struct FuzzerOptions {
 
     /// additional libraries to instrument
     #[cfg(feature = "frida_cli")]
-    #[clap(short, long, help_heading = "Frida Options")]
+    #[arg(short, long, help_heading = "Frida Options")]
     pub libs_to_instrument: Vec<String>,
 
     /// enable CmpLog instrumentation
     #[cfg_attr(
         feature = "frida_cli",
-        clap(short = 'C', long, help_heading = "Frida Options")
+        arg(short = 'C', long, help_heading = "Frida Options")
     )]
     #[cfg_attr(
         not(feature = "frida_cli"),
-        clap(short = 'C', long, help_heading = "Fuzz Options")
+        arg(short = 'C', long, help_heading = "Fuzz Options")
     )]
     pub cmplog: bool,
 
@@ -183,27 +183,27 @@ pub struct FuzzerOptions {
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
     #[cfg(feature = "frida_cli")]
-    #[clap(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "Frida Options")]
+    #[arg(long, default_value = "0", value_parser = Cores::from_cmdline, help_heading = "Frida Options")]
     pub cmplog_cores: Cores,
 
     /// enable ASAN leak detection
     #[cfg(feature = "frida_cli")]
-    #[clap(short, long, help_heading = "ASAN Options")]
+    #[arg(short, long, help_heading = "ASAN Options")]
     pub detect_leaks: bool,
 
     /// instruct ASAN to continue after a memory error is detected
     #[cfg(feature = "frida_cli")]
-    #[clap(long, help_heading = "ASAN Options")]
+    #[arg(long, help_heading = "ASAN Options")]
     pub continue_on_error: bool,
 
     /// instruct ASAN to gather (and report) allocation-/free-site backtraces
     #[cfg(feature = "frida_cli")]
-    #[clap(long, help_heading = "ASAN Options")]
+    #[arg(long, help_heading = "ASAN Options")]
     pub allocation_backtraces: bool,
 
     /// the maximum size that the ASAN allocator should allocate
     #[cfg(feature = "frida_cli")]
-    #[clap(
+    #[arg(
         short,
         long,
         default_value = "1073741824",  // 1_usize << 30
@@ -213,7 +213,7 @@ pub struct FuzzerOptions {
 
     /// the maximum total allocation size that the ASAN allocator should allocate
     #[cfg(feature = "frida_cli")]
-    #[clap(
+    #[arg(
         short = 'M',
         long,
         default_value = "4294967296",  // 1_usize << 32
@@ -223,56 +223,47 @@ pub struct FuzzerOptions {
 
     /// instruct ASAN to panic if the max ASAN allocation size is exceeded
     #[cfg(feature = "frida_cli")]
-    #[clap(long, help_heading = "ASAN Options")]
+    #[arg(long, help_heading = "ASAN Options")]
     pub max_allocation_panics: bool,
 
     /// disable coverage
     #[cfg(feature = "frida_cli")]
-    #[clap(long, help_heading = "Frida Options")]
+    #[arg(long, help_heading = "Frida Options")]
     pub disable_coverage: bool,
 
     /// enable DrCov (aarch64 only)
     #[cfg(feature = "frida_cli")]
-    #[clap(long, help_heading = "Frida Options")]
+    #[arg(long, help_heading = "Frida Options")]
     pub drcov: bool,
 
     /// locations which will not be instrumented for ASAN or coverage purposes (ex: mod_name@0x12345)
     #[cfg(feature = "frida_cli")]
-    #[clap(short = 'D', long, help_heading = "Frida Options", parse(try_from_str = parse_instrumentation_location), multiple_occurrences = true)]
+    #[arg(short = 'D', long, help_heading = "Frida Options", value_parser = parse_instrumentation_location)]
     pub dont_instrument: Vec<(String, usize)>,
 
     /// trailing arguments (after "--"); can be passed directly to QEMU
     #[cfg(feature = "qemu_cli")]
-    #[clap(last = true)]
+    #[arg(last = true)]
     pub qemu_args: Vec<String>,
 
     /// paths to fuzzer token files (aka 'dictionaries')
-    #[clap(
-        short = 'x',
-        long,
-        multiple_values = true,
-        value_parser,
-        help_heading = "Fuzz Options"
-    )]
+    #[arg(short = 'x', long, help_heading = "Fuzz Options")]
     pub tokens: Vec<PathBuf>,
 
     /// input corpus directories
-    #[clap(
+    #[arg(
         short,
         long,
         default_values = &["corpus/"],
-        multiple_values = true,
-        value_parser,
         help_heading = "Corpus Options"
     )]
     pub input: Vec<PathBuf>,
 
     /// output solutions directory
-    #[clap(
+    #[arg(
         short,
         long,
         default_value = "solutions/",
-        value_parser,
         help_heading = "Corpus Options"
     )]
     pub output: PathBuf,
@@ -280,27 +271,26 @@ pub struct FuzzerOptions {
     /// Spawn a client in each of the provided cores. Use 'all' to select all available
     /// cores. 'none' to run a client without binding to any core.
     /// ex: '1,2-4,6' selects the cores 1, 2, 3, 4, and 6.
-    #[clap(short = 'c', long, default_value = "0", value_parser = Cores::from_cmdline)]
+    #[arg(short = 'c', long, default_value = "0", value_parser = Cores::from_cmdline)]
     pub cores: Cores,
 
     /// port on which the broker should listen
-    #[clap(short = 'p', long, default_value = "1337", name = "PORT")]
+    #[arg(short = 'p', long, default_value = "1337", value_name = "PORT")]
     pub broker_port: u16,
 
     /// ip:port where a remote broker is already listening
-    #[clap(short = 'a', long, value_parser, name = "REMOTE")]
+    #[arg(short = 'a', long, value_name = "REMOTE")]
     pub remote_broker_addr: Option<SocketAddr>,
 
     /// path to file that should be sent to the harness for crash reproduction
-    #[clap(short, long, value_parser, help_heading = "Replay Options")]
+    #[arg(short, long, help_heading = "Replay Options")]
     pub replay: Option<PathBuf>,
 
     /// Run the same replay input multiple times
-    #[clap(
+    #[arg(
         short = 'R',
         long,
         default_missing_value = "1",
-        min_values = 0,
         help_heading = "Replay Options",
         requires = "replay"
     )]
@@ -319,10 +309,10 @@ impl FuzzerOptions {
     /// fn custom_func(_: &str) {}  // not relevant; just for illustrative purposes
     ///
     /// #[derive(Parser, Debug)]
-    /// #[clap(name = "custom")]  // the name of the new subcommand
+    /// #[arg(name = "custom")]  // the name of the new subcommand
     /// struct CustomFooParser {
     ///     /// a very cromulent option
-    ///     #[clap(short, long)]
+    ///     #[arg(short, long)]
     ///     bar: String,
     /// }
     ///

@@ -9,7 +9,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
-use clap::{self, StructOpt};
+use clap::{Command, CommandFactory, Parser};
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -48,7 +48,7 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 }
 
 /// The commandline args this fuzzer accepts
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 #[clap(
     name = "libfuzzer_libpng_launcher",
     about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
@@ -102,7 +102,7 @@ struct Opt {
     output: PathBuf,
 
     #[clap(
-        parse(try_from_str = timeout_from_millis_str),
+        value_parser = timeout_from_millis_str),
         short,
         long,
         help = "Set the exeucution timeout in milliseconds, default is 10000",
