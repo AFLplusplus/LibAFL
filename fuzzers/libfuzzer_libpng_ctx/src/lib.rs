@@ -69,28 +69,15 @@ struct Opt {
     )]
     broker_port: u16,
 
-    #[arg(
-        value_parser,
-        short = 'a',
-        long,
-        help = "Specify a remote broker",
-        name = "REMOTE"
-    )]
+    #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[arg(
-        value_parser,
-        short,
-        long,
-        help = "Set an initial corpus directory",
-        name = "INPUT"
-    )]
+    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
     input: Vec<PathBuf>,
 
     #[arg(
         short,
         long,
-        value_parser,
         help = "Set the output directory, default is ./out",
         name = "OUTPUT",
         default_value = "./out"
@@ -109,7 +96,7 @@ struct Opt {
     /*
         // The tokens are hardcoded in this example.
         #[arg(
-        value_parser,
+
         short = "x",
         long,
         help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",

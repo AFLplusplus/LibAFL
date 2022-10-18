@@ -50,7 +50,7 @@ struct Opt {
     prune: bool,
 
     /// Trace file path, "trace" by default.
-    #[arg(value_parser, short, long)]
+    #[arg(short, long)]
     output: Option<PathBuf>,
 
     /// Target program and arguments

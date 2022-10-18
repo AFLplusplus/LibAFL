@@ -20,7 +20,6 @@ use serde_json::Value;
 )]
 struct Opt {
     #[arg(
-        value_parser,
         short,
         long = "grammar-file",
         name = "GRAMMAR",
@@ -29,7 +28,6 @@ struct Opt {
     grammar: PathBuf,
 
     #[arg(
-        value_parser,
         short,
         long,
         name = "LIMIT",
@@ -38,13 +36,7 @@ struct Opt {
     )]
     limit: usize,
 
-    #[arg(
-        value_parser,
-        short,
-        long,
-        help = "Set the output file",
-        name = "OUTPUT"
-    )]
+    #[arg(short, long, help = "Set the output file", name = "OUTPUT")]
     output: PathBuf,
 }
 
