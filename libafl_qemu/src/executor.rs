@@ -3,10 +3,8 @@ use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
     bolts::shmem::ShMemProvider,
-    events::EventManager,
-    events::{EventFirer, EventRestarter},
-    executors::InProcessForkExecutor,
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    events::{EventFirer, EventManager, EventRestarter},
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor, InProcessForkExecutor},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     observers::ObserversTuple,

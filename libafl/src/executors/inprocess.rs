@@ -511,8 +511,6 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
 
 #[cfg(unix)]
 mod unix_signal_handler {
-    #[cfg(feature = "std")]
-    use crate::inputs::Input;
     use alloc::vec::Vec;
     #[cfg(feature = "std")]
     use alloc::{boxed::Box, string::String};
@@ -525,6 +523,8 @@ mod unix_signal_handler {
 
     use libc::siginfo_t;
 
+    #[cfg(feature = "std")]
+    use crate::inputs::Input;
     use crate::{
         bolts::os::unix_signals::{ucontext_t, Handler, Signal},
         corpus::{Corpus, Testcase},
@@ -917,10 +917,11 @@ mod windows_exception_handler {
         }
     }
 
-    use crate::state::HasInput;
     use windows::Win32::System::Threading::{
         EnterCriticalSection, LeaveCriticalSection, RTL_CRITICAL_SECTION,
     };
+
+    use crate::state::HasInput;
 
     /// invokes the `post_exec` hook on all observer in case of panic
     #[cfg(feature = "std")]

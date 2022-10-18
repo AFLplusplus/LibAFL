@@ -1,11 +1,11 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use libafl::bolts::AsSlice;
-use libafl::state::{HasInput, State};
 use libafl::{
+    bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
     inputs::HasTargetBytes,
     observers::ObserversTuple,
+    state::{HasInput, State},
     Error,
 };
 use libnyx::NyxReturnValue;

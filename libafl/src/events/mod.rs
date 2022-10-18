@@ -642,7 +642,6 @@ mod tests {
 pub mod pybind {
     use pyo3::prelude::*;
 
-    use crate::inputs::BytesInput;
     use crate::{
         events::{
             simple::pybind::PythonSimpleEventManager, Event, EventFirer, EventManager,
@@ -650,6 +649,7 @@ pub mod pybind {
         },
         executors::pybind::PythonExecutor,
         fuzzer::pybind::PythonStdFuzzer,
+        inputs::BytesInput,
         observers::pybind::PythonObserversTuple,
         state::pybind::PythonStdState,
         Error,

@@ -1,7 +1,5 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
-use std::fmt::Debug;
-use std::io::Write;
-use std::marker::PhantomData;
+use std::{fmt::Debug, io::Write, marker::PhantomData};
 
 use backtrace::Backtrace;
 use capstone::{arch::BuildsCapstone, Capstone};

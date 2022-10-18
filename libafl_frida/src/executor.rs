@@ -5,6 +5,8 @@ use frida_gum::{
     stalker::{NoneEventSink, Stalker},
     Gum, MemoryRange, NativePointer,
 };
+#[cfg(windows)]
+use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::HasTargetBytes,
@@ -18,8 +20,6 @@ use crate::asan::errors::ASAN_ERRORS;
 use crate::helper::{FridaInstrumentationHelper, FridaRuntimeTuple};
 #[cfg(windows)]
 use crate::windows_hooks::initialize;
-#[cfg(windows)]
-use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 
 /// The [`FridaInProcessExecutor`] is an [`Executor`] that executes the target in the same process, usinig [`frida`](https://frida.re/) for binary-only instrumentation.
 pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>

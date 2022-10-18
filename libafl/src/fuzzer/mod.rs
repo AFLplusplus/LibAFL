@@ -707,7 +707,6 @@ pub mod pybind {
 
     use pyo3::prelude::*;
 
-    use crate::observers::pybind::PythonObserversTuple;
     use crate::{
         bolts::ownedref::OwnedPtrMut,
         events::pybind::PythonEventManager,
@@ -715,6 +714,7 @@ pub mod pybind {
         feedbacks::pybind::PythonFeedback,
         fuzzer::{Evaluator, Fuzzer, StdFuzzer},
         inputs::BytesInput,
+        observers::pybind::PythonObserversTuple,
         schedulers::QueueScheduler,
         stages::pybind::PythonStagesTuple,
         state::pybind::{PythonStdState, PythonStdStateWrapper},

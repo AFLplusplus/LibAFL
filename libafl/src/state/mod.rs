@@ -653,7 +653,6 @@ pub mod pybind {
 
     use pyo3::{prelude::*, types::PyDict};
 
-    use crate::prelude::BytesInput;
     use crate::{
         bolts::{ownedref::OwnedPtrMut, rands::pybind::PythonRand},
         corpus::pybind::PythonCorpus,
@@ -662,6 +661,7 @@ pub mod pybind {
         feedbacks::pybind::PythonFeedback,
         fuzzer::pybind::PythonStdFuzzerWrapper,
         generators::pybind::PythonGenerator,
+        prelude::BytesInput,
         pybind::PythonMetadata,
         state::{
             HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,

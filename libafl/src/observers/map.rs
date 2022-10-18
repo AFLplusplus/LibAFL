@@ -1922,8 +1922,7 @@ pub mod pybind {
         AsIter, AsIterMut, AsMutSlice, AsSlice, Debug, Error, HasLen, Iter, IterMut, MapObserver,
         Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
-    use crate::observers::pybind::PythonObserver;
-    use crate::state::HasInput;
+    use crate::{observers::pybind::PythonObserver, state::HasInput};
 
     #[macro_export]
     macro_rules! mapob_unwrap_me {

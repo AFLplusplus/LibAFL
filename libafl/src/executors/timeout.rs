@@ -19,7 +19,6 @@ use core::{
 
 #[cfg(all(unix, not(target_os = "linux")))]
 use libc::c_int;
-
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,

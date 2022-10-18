@@ -9,8 +9,7 @@ use core::{
     ptr::{self, addr_of},
 };
 
-use libafl::executors::inprocess::inprocess_get_state;
-use libafl::state::HasInput;
+use libafl::{executors::inprocess::inprocess_get_state, state::HasInput};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{

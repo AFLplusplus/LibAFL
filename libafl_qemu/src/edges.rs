@@ -1,8 +1,7 @@
 use std::{cell::UnsafeCell, cmp::max};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::state::HasInput;
-use libafl::state::HasMetadata;
+use libafl::state::{HasInput, HasMetadata};
 pub use libafl_targets::{
     edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
