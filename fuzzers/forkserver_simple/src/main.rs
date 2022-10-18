@@ -75,7 +75,7 @@ pub fn main() {
         .get_matches();
 
     let corpus_dirs = vec![PathBuf::from(
-        res.res.get_one::<String>("in").unwrap().to_string(),
+        res.get_one::<String>("in").unwrap().to_string(),
     )];
 
     const MAP_SIZE: usize = 65536;
@@ -161,7 +161,7 @@ pub fn main() {
 
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
-        .program(res.res.get_one::<String>("executable").unwrap())
+        .program(res.get_one::<String>("executable").unwrap())
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
@@ -172,15 +172,13 @@ pub fn main() {
     let mut executor = TimeoutForkserverExecutor::with_signal(
         forkserver,
         Duration::from_millis(
-            res.res
-                .get_one::<String>("timeout")
+            res.get_one::<String>("timeout")
                 .unwrap()
                 .to_string()
                 .parse()
                 .expect("Could not parse timeout in milliseconds"),
         ),
-        res.res
-            .get_one::<String>("signal")
+        res.get_one::<String>("signal")
             .unwrap()
             .parse::<Signal>()
             .unwrap(),
