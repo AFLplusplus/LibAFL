@@ -9,7 +9,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
-use clap::{Command, CommandFactory, Parser};
+use clap::Parser;
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -73,28 +73,15 @@ struct Opt {
     )]
     broker_port: u16,
 
-    #[arg(
-        
-        short = 'a',
-        long,
-        help = "Specify a remote broker",
-        name = "REMOTE"
-    )]
+    #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[arg(
-        
-        short,
-        long,
-        help = "Set an initial corpus directory",
-        name = "INPUT"
-    )]
+    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
     input: Vec<PathBuf>,
 
     #[arg(
         short,
         long,
-        
         help = "Set the output directory, default is ./out",
         name = "OUTPUT",
         default_value = "./out"
@@ -102,10 +89,10 @@ struct Opt {
     output: PathBuf,
 
     #[arg(
-        value_parser = timeout_from_millis_str),
+        value_parser = timeout_from_millis_str,
         short,
         long,
-        help = "Set the exeucution timeout in milliseconds, default is 10000",
+        help = "Set the execution timeout in milliseconds, default is 10000",
         name = "TIMEOUT",
         default_value = "10000"
     )]
@@ -113,7 +100,7 @@ struct Opt {
     /*
     /// This fuzzer has hard-coded tokens
     #[arg(
-        
+
         short = "x",
         long,
         help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",

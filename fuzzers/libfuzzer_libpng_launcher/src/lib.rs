@@ -100,7 +100,7 @@ struct Opt {
     output: PathBuf,
 
     #[arg(
-        value_parser = timeout_from_millis_str),
+        value_parser = timeout_from_millis_str,
         short,
         long,
         help = "Set the exeucution timeout in milliseconds, default is 10000",
