@@ -57,7 +57,7 @@ use libafl_targets::{
 #[derive(Debug, Parser)]
 struct Opt {
     /// This node should do concolic tracing + solving instead of traditional fuzzing
-    #[clap(short, long)]
+    #[arg(short, long)]
     concolic: bool,
 }
 

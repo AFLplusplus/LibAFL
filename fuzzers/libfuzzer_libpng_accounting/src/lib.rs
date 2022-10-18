@@ -49,13 +49,13 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 
 /// The commandline args this fuzzer accepts
 #[derive(Debug, Parser)]
-#[clap(
+#[command(
     name = "libfuzzer_libpng_launcher",
     about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
     author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
 )]
 struct Opt {
-    #[clap(
+    #[arg(
         short,
         long,
         value_parser = Cores::from_cmdline,
@@ -64,7 +64,7 @@ struct Opt {
     )]
     cores: Cores,
 
-    #[clap(
+    #[arg(
         short = 'p',
         long,
         help = "Choose the broker TCP port, default is 1337",
@@ -73,7 +73,7 @@ struct Opt {
     )]
     broker_port: u16,
 
-    #[clap(
+    #[arg(
         value_parser,
         short = 'a',
         long,
@@ -82,7 +82,7 @@ struct Opt {
     )]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[clap(
+    #[arg(
         value_parser,
         short,
         long,
@@ -91,7 +91,7 @@ struct Opt {
     )]
     input: Vec<PathBuf>,
 
-    #[clap(
+    #[arg(
         short,
         long,
         value_parser,
@@ -101,7 +101,7 @@ struct Opt {
     )]
     output: PathBuf,
 
-    #[clap(
+    #[arg(
         value_parser = timeout_from_millis_str),
         short,
         long,
@@ -112,7 +112,7 @@ struct Opt {
     timeout: Duration,
     /*
     /// This fuzzer has hard-coded tokens
-    #[clap(
+    #[arg(
         value_parser,
         short = "x",
         long,

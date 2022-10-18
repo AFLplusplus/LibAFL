@@ -13,13 +13,13 @@ use regex::Regex;
 use serde_json::Value;
 
 #[derive(Debug, Parser)]
-#[clap(
+#[command(
     name = "construct_automata",
     about = "Generate a serialized Automaton using a json GNF grammar",
     author = "Andrea Fioraldi <andreafioraldi@gmail.com>"
 )]
 struct Opt {
-    #[clap(
+    #[arg(
         value_parser,
         short,
         long = "grammar-file",
@@ -28,7 +28,7 @@ struct Opt {
     )]
     grammar: PathBuf,
 
-    #[clap(
+    #[arg(
         value_parser,
         short,
         long,
@@ -38,7 +38,7 @@ struct Opt {
     )]
     limit: usize,
 
-    #[clap(
+    #[arg(
         value_parser,
         short,
         long,

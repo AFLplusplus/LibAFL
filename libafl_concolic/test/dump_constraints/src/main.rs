@@ -24,37 +24,37 @@ use libafl::{
 };
 
 #[derive(Debug, Parser)]
-#[clap(
+#[command(
     name = "dump_constraints",
     about = "Dump tool for concolic constraints."
 )]
 struct Opt {
     /// Outputs plain text instead of binary
-    #[clap(short, long)]
+    #[arg(short, long)]
     plain_text: bool,
 
     /// Outputs coverage information to the given file
-    #[clap(short, long)]
+    #[arg(short, long)]
     coverage_file: Option<PathBuf>,
 
     /// Symbolizes only the given input file offsets.
-    #[clap(short, long)]
+    #[arg(short, long)]
     symbolize_offsets: Option<Vec<usize>>,
 
     /// Concretize all floating point operations.
-    #[clap(long)]
+    #[arg(long)]
     no_float: bool,
 
     /// Prune expressions from high-frequency code locations.
-    #[clap(long)]
+    #[arg(long)]
     prune: bool,
 
     /// Trace file path, "trace" by default.
-    #[clap(value_parser, short, long)]
+    #[arg(value_parser, short, long)]
     output: Option<PathBuf>,
 
     /// Target program and arguments
-    #[clap(last = true)]
+    #[arg(last = true)]
     program: Vec<OsString>,
 }
 
