@@ -205,6 +205,7 @@ pub mod pybind {
     };
 
     #[pyclass(unsendable, name = "ExitKind")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct PythonExitKind {
         pub inner: ExitKind,

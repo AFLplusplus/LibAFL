@@ -2009,6 +2009,7 @@ pub mod pybind {
             }
 
             #[pyclass(unsendable, name = $py_name2)]
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Serialize, Deserialize, Debug, Clone)]
             /// Python class for OwnedMapObserver (i.e. StdMapObserver with owned map)
             pub struct $struct_name2 {
@@ -2079,6 +2080,7 @@ pub mod pybind {
 
             // Should not be exposed to user
             #[pyclass(unsendable, name = $py_name_trait)]
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Serialize, Deserialize, Debug, Clone)]
             /// MapObserver + Observer Trait binding
             pub struct $struct_name_trait {
