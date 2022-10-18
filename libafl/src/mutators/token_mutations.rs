@@ -567,6 +567,7 @@ where
                     while size != 0 {
                         if v.0[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.1, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -575,6 +576,7 @@ where
                     while size != 0 {
                         if v.1[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.0, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -582,8 +584,6 @@ where
                 }
             }
         }
-
-        //println!("{:?}", result);
 
         Ok(result)
     }
