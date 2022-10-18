@@ -332,7 +332,7 @@ impl FuzzerOptions {
     ///
     ///     // process the results
     ///     if let Some(("custom", sub_matches)) = matches.subcommand() {
-    ///         custom_func(sub_matches.res.get_one::<String>("bar").unwrap())
+    ///         custom_func(sub_matches.get_one::<String>("bar").unwrap())
     ///     }
     ///
     ///     println!("{:?}", matches);
