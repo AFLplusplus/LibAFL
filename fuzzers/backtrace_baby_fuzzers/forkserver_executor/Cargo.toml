@@ -15,4 +15,4 @@ opt-level = 3
 
 [dependencies]
 libafl = { path = "../../../libafl/" }
-clap = { version = "4.0", features = ["default"] }
+clap = { version = "3.2", features = ["default"] }

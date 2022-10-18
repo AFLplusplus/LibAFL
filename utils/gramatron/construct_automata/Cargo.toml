@@ -20,4 +20,4 @@ regex = "1"
 postcard = "1.0"
 lazy_static = "1.4.0"
 libafl = { path = "../../../libafl" }
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "3.2", features = ["derive"] }
