@@ -15,6 +15,19 @@ using namespace Gdiplus;
 GdiplusStartupInput gdiplusStartupInput;
 ULONG_PTR           gdiplusToken;
 
+// Some DLLs are lazily loaded during image loading
+// FridaInstrumentationHelper doesn't instrument DLLs that are loaded after
+// init, so they're manually loaded here
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+  switch (fdwReason) {
+    case DLL_PROCESS_ATTACH:
+      LoadLibraryA("gdi32full.dll");
+      LoadLibraryA("WindowsCodecs.dll");
+      break;
+  }
+  return TRUE;
+}
+
 extern "C" __declspec(dllexport) int LLVMFuzzerTestOneInput(const uint8_t *data,
                                                             size_t size) {
   static DWORD init = 0;
@@ -34,8 +47,6 @@ extern "C" __declspec(dllexport) int LLVMFuzzerTestOneInput(const uint8_t *data,
         Gdiplus::Bitmap *m_pBitmap = Gdiplus::Bitmap::FromStream(pStream);
         pStream->Release();
         if (m_pBitmap) {
-          if (m_pBitmap->GetLastStatus() == Gdiplus::Ok) return true;
-
           delete m_pBitmap;
           m_pBitmap = NULL;
         }
