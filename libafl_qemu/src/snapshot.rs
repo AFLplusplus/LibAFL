@@ -23,7 +23,7 @@ use crate::{SYS_mmap, SYS_newfstatat};
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
-pub type StopExecutionCallback = Box<dyn FnMut(&mut Self, &Emulator)>;
+pub type StopExecutionCallback = Box<dyn FnMut(&mut QemuSnapshotHelper, &Emulator)>;
 
 #[derive(Debug)]
 pub struct SnapshotPageInfo {
@@ -105,10 +105,7 @@ impl QemuSnapshotHelper {
     }
 
     #[must_use]
-    pub fn with_mmap_limit(
-        mmap_limit: usize,
-        stop_execution: Box<StopExecutionCallback>,
-    ) -> Self {
+    pub fn with_mmap_limit(mmap_limit: usize, stop_execution: Box<StopExecutionCallback>) -> Self {
         Self {
             accesses: ThreadLocal::new(),
             maps: MappingInfo::default(),
@@ -333,7 +330,7 @@ impl QemuSnapshotHelper {
         let interval = Interval::new(start, start + (size as GuestAddr));
         let mut found = vec![]; //  TODO optimize
         for entry in mapping.tree.query(interval) {
-            found.push((entry.interval.clone(), entry.value.perms.clone()));
+            found.push((*entry.interval, entry.value.perms));
         }
 
         for (i, perms) in found {
@@ -380,7 +377,7 @@ impl QemuSnapshotHelper {
         let interval = Interval::new(start, start + (size as GuestAddr));
         let mut found = vec![]; //  TODO optimize
         for entry in mapping.tree.query(interval) {
-            found.push((entry.interval.clone(), entry.value.perms.clone()));
+            found.push((*entry.interval, entry.value.perms));
         }
 
         for (i, perms) in found {
@@ -419,7 +416,7 @@ impl QemuSnapshotHelper {
             let mut found = vec![]; //  TODO optimize
             for overlap in new_maps.tree.query(*entry.interval) {
                 found.push((
-                    overlap.interval.clone(),
+                    *overlap.interval,
                     overlap.value.changed,
                     overlap.value.perms,
                 ));
