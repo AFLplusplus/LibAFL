@@ -25,6 +25,9 @@ cargo run -Zbuild-std=core,alloc --target x86_64-unknown-linux-gnu || true
 '''
 dependencies = ["build"]
 
+[tasks.build_aarch]
+script = "cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release"
+
 # Clean
 [tasks.clean]
 command = "cargo"

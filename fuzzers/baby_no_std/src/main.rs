@@ -52,7 +52,7 @@ fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
 
-/// Provide custom time in no_std environment
+/// Provide custom time in `no_std` environment
 /// Use a time provider of your choice
 #[no_mangle]
 pub extern "C" fn external_current_millis() -> u64 {
@@ -60,6 +60,9 @@ pub extern "C" fn external_current_millis() -> u64 {
     1000
 }
 
+/// The main of this program.
+/// # Panics
+/// Will panic once the fuzzer finds the correct conditions.
 #[allow(clippy::similar_names)]
 #[no_mangle]
 pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
@@ -72,6 +75,7 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
             signals_set(1);
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
+                #[allow(clippy::manual_assert)]
                 if buf.len() > 2 && buf[2] == b'c' {
                     panic!("=)");
                 }
@@ -107,11 +111,11 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|_s| {
-        // TODO: Print `_s` here, if your target permits it.
+    let monitor = SimpleMonitor::new(|s| {
+        // TODO: Print `s` here, if your target permits it.
         #[cfg(any(windows, unix))]
         unsafe {
-            printf(b"%s\n\0".as_ptr() as _, CString::new(_s).unwrap().as_ptr());
+            printf(b"%s\n\0".as_ptr().cast(), CString::new(s).unwrap().as_ptr());
         }
     });
 
