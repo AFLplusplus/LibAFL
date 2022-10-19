@@ -452,7 +452,7 @@ impl InProcessExecutorHandlerData {
         self.in_target == 1
     }
 
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     fn is_valid(&self) -> bool {
         !self.current_input_ptr.is_null()
     }
