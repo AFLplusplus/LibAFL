@@ -147,8 +147,6 @@ where
             .match_name(&self.o2_name)
             .ok_or_else(|| err(&self.o2_name))?;
 
-        //Ok(o1 != o2)
-        eprintln!("Invoking the compare_fn");
         Ok((self.compare_fn)(o1, o2) == DiffResult::Diff)
     }
 }

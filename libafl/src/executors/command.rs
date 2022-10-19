@@ -669,7 +669,8 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(all(feature = "std", unix))]
+
+#[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator: Sized + Debug {
     /// Spawns a new process with the given configuration.
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
@@ -708,17 +709,12 @@ mod tests {
         },
         inputs::BytesInput,
         monitors::SimpleMonitor,
-        Error, Evaluator, ExecuteInputResult,
     };
 
     #[test]
     #[cfg(unix)]
     fn test_builder() {
-        use std::marker::PhantomData;
-
-        use crate::NopEvaluator;
-
-        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+        let mut mgr = SimpleEventManager::<BytesInput, _, ()>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
 
@@ -729,13 +725,9 @@ mod tests {
         let executor = executor.build(());
         let mut executor = executor.unwrap();
 
-        let mut fuzzer = NopEvaluator {
-            phantom: PhantomData,
-        };
-
         executor
             .run_target(
-                &mut fuzzer,
+                &mut (),
                 &mut (),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
@@ -746,13 +738,20 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_parse_afl_cmdline() {
-        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
+        use alloc::string::ToString;
+        let mut mgr = SimpleEventManager::<BytesInput, _, ()>::new(SimpleMonitor::new(|status| {
             println!("{}", status);
         }));
 
-        let mut executor =
-            CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], (), true)
-                .unwrap();
+        let mut executor = CommandExecutor::parse_afl_cmdline(
+            &["file".to_string(), "@@".to_string()],
+            (),
+            true,
+            Some("StdOut".to_string()),
+            Some("StdErr".to_string()),
+            Some("Asan".to_string()),
+        )
+        .unwrap();
         executor
             .run_target(
                 &mut (),
