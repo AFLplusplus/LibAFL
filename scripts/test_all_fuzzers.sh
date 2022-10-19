@@ -67,7 +67,7 @@ do
 	    echo "[+] Done testing $fuzzer"
     else
         echo "[*] Building $fuzzer"
-        cargo build --target-dir ./target || exit 1
+        cargo build || exit 1
         echo "[+] Done building $fuzzer"
     fi
     end=$(date +%s)

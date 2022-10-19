@@ -26,6 +26,7 @@ where
     E: KnowsState,
 {
     /// The named trait objects map
+    #[allow(clippy::type_complexity)]
     pub list: Vec<Box<dyn AnyStage<E, EM, Z, State = E::State, Input = E::Input>>>,
 }
 
@@ -56,6 +57,7 @@ where
 {
     /// Create a new instance
     #[must_use]
+    #[allow(clippy::type_complexity)]
     pub fn new(list: Vec<Box<dyn AnyStage<E, EM, Z, Input = E::Input, State = E::State>>>) -> Self {
         Self { list }
     }
