@@ -949,7 +949,7 @@ mod windows_exception_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, E::State>,
+        Z: HasObjective<OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -1039,7 +1039,7 @@ mod windows_exception_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, E::State>,
+        Z: HasObjective<OF, State = E::State>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -1131,7 +1131,7 @@ mod windows_exception_handler {
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, E::State, Z> + HasObservers,
+        E: HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
@@ -1502,7 +1502,7 @@ where
     }
 }
 
-#[cfg(all(feature = "std", target_os = "linux"))]
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> KnowsState for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,

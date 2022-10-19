@@ -368,6 +368,8 @@ where
 impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, Z>,
+    EM: KnowsState<State = E::State>,
+    Z: KnowsState<State = E::State>,
 {
     fn run_target(
         &mut self,
