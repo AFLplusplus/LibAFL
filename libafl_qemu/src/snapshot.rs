@@ -23,6 +23,8 @@ use crate::{SYS_mmap, SYS_newfstatat};
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 
+pub type StopExecutionCallback = Box<dyn FnMut(&mut Self, &Emulator)>;
+
 #[derive(Debug)]
 pub struct SnapshotPageInfo {
     pub addr: GuestAddr,
@@ -66,7 +68,7 @@ pub struct QemuSnapshotHelper {
     pub brk: GuestAddr,
     pub mmap_start: GuestAddr,
     pub mmap_limit: usize,
-    pub stop_execution: Option<Box<dyn FnMut(&mut Self, &Emulator)>>,
+    pub stop_execution: Option<StopExecutionCallback>,
     pub empty: bool,
     pub accurate_unmap: bool,
 }
@@ -105,7 +107,7 @@ impl QemuSnapshotHelper {
     #[must_use]
     pub fn with_mmap_limit(
         mmap_limit: usize,
-        stop_execution: Box<dyn FnMut(&mut Self, &Emulator)>,
+        stop_execution: Box<StopExecutionCallback>,
     ) -> Self {
         Self {
             accesses: ThreadLocal::new(),
