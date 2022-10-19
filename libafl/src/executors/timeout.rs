@@ -285,7 +285,7 @@ where
             );
             write_volatile(
                 &mut data.timeout_input_ptr,
-                data.current_input_ptr as *mut c_void,
+                addr_of_mut!(data.current_input_ptr) as *mut c_void,
             );
             let tm: i64 = -self.milli_sec * 10 * 1000;
             let ft = FILETIME {
