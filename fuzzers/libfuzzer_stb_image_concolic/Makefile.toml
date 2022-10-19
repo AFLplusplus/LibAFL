@@ -1,5 +1,6 @@
 # Variables
 [env]
+CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 FUZZER_NAME='libfuzzer_stb_image_concolic'
 
 # Compilers
@@ -9,7 +10,7 @@ mac_alias = "unsupported"
 windows_alias = "unsupported"
 
 [tasks.runtime_unix]
-condition = { files_not_exist = ["runtime/target/libSymRuntime.so"] }
+condition = { files_not_exist = ["${CARGO_TARGET_DIR}/libSymRuntime.so"] }
 script_runner = "@shell"
 script = '''
 cd runtime
