@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::tuples::Named,
+    inputs::HasInput,
     observers::{
         concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
         Observer,
     },
-    state::HasInput,
 };
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.

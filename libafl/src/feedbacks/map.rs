@@ -21,9 +21,10 @@ use crate::{
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
+    inputs::HasInput,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
-    state::{HasClientPerfMonitor, HasInput, HasMetadata, HasNamedMetadata},
+    state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
     Error,
 };
 

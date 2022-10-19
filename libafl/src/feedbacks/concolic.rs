@@ -12,11 +12,12 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
+    inputs::HasInput,
     observers::{
         concolic::{ConcolicMetadata, ConcolicObserver},
         ObserversTuple,
     },
-    state::{HasClientPerfMonitor, HasInput, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
 

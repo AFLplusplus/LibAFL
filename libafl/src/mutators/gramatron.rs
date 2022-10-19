@@ -10,9 +10,9 @@ use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
     generators::GramatronGenerator,
-    inputs::{GramatronInput, Terminal},
+    inputs::{GramatronInput, HasInput, Terminal},
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasInput, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
 

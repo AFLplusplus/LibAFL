@@ -144,9 +144,9 @@ mod tests {
         bolts::rands::StdRand,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
-        inputs::{bytes::BytesInput, Input},
+        inputs::{bytes::BytesInput, HasInput, Input},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
-        state::{HasCorpus, HasInput, HasMetadata, StdState},
+        state::{HasCorpus, HasMetadata, StdState},
         Error,
     };
 

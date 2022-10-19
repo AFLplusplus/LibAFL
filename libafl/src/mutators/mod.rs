@@ -22,7 +22,7 @@ pub use nautilus::*;
 
 use crate::{
     bolts::tuples::{HasConstLen, Named},
-    state::HasInput,
+    inputs::HasInput,
     Error,
 };
 

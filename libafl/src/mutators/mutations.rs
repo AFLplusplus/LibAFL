@@ -9,9 +9,9 @@ use core::{
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::HasBytesVec,
+    inputs::{HasBytesVec, HasInput},
     mutators::{MutationResult, Mutator},
-    state::{HasCorpus, HasInput, HasMaxSize, HasRand},
+    state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
 

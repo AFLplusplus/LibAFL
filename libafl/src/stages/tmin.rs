@@ -17,13 +17,14 @@ use crate::{
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},
+    inputs::HasInput,
     mark_feature_time,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     schedulers::Scheduler,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasMaxSize},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 

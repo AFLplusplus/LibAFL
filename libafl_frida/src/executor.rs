@@ -9,9 +9,8 @@ use frida_gum::{
 use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::HasTargetBytes,
+    inputs::{HasInput, HasTargetBytes},
     observers::ObserversTuple,
-    state::HasInput,
     Error,
 };
 

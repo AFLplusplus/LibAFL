@@ -4,8 +4,8 @@ use core::fmt::{self, Debug, Formatter};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
+    inputs::HasInput,
     observers::ObserversTuple,
-    state::HasInput,
     Error,
 };
 

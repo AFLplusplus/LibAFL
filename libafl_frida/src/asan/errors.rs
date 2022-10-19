@@ -13,9 +13,9 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::HasTargetBytes,
+    inputs::{HasInput, HasTargetBytes},
     observers::{Observer, ObserversTuple},
-    state::{HasClientPerfMonitor, HasInput, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
 };
 use serde::{Deserialize, Serialize};

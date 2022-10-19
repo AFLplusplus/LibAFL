@@ -10,8 +10,9 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named, AsMutSlice, AsSlice},
+    inputs::HasInput,
     observers::Observer,
-    state::{HasInput, HasMetadata},
+    state::HasMetadata,
     Error,
 };
 

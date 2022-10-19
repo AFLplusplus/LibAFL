@@ -12,9 +12,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     fuzzer::Evaluator,
-    inputs::Input,
+    inputs::{HasInput, Input},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasInput, HasMetadata, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
     Error,
 };
 

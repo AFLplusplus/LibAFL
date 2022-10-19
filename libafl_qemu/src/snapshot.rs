@@ -5,7 +5,7 @@ use std::{
 };
 
 use bio::data_structures::interval_tree::IntervalTree;
-use libafl::state::{HasInput, HasMetadata};
+use libafl::{inputs::HasInput, state::HasMetadata};
 use thread_local::ThreadLocal;
 
 use crate::{

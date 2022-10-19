@@ -19,7 +19,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
-    inputs::Input,
+    inputs::{HasInput, Input},
     monitors::ClientPerfMonitor,
     Error,
 };
@@ -31,13 +31,6 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
 pub trait State: HasInput + Serialize + DeserializeOwned {}
-
-/// Defines the input type shared across traits of the type.
-/// Needed for consistency across HasCorpus/HasSolutions and friends.
-pub trait HasInput {
-    /// Type which will be used throughout this [`State`].
-    type Input: Input;
-}
 
 /// Trait for elements offering a corpus
 pub trait HasCorpus: HasInput {
@@ -661,7 +654,7 @@ pub mod pybind {
         feedbacks::pybind::PythonFeedback,
         fuzzer::pybind::PythonStdFuzzerWrapper,
         generators::pybind::PythonGenerator,
-        prelude::BytesInput,
+        inputs::BytesInput,
         pybind::PythonMetadata,
         state::{
             HasCorpus, HasExecutions, HasMaxSize, HasMetadata, HasRand, HasSolutions, StdState,

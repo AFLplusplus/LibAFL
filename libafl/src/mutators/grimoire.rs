@@ -7,10 +7,10 @@ use core::cmp::{max, min};
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{GeneralizedInput, GeneralizedItem},
+    inputs::{GeneralizedInput, GeneralizedItem, HasInput},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     stages::generalization::GeneralizedIndexesMetadata,
-    state::{HasCorpus, HasInput, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
 

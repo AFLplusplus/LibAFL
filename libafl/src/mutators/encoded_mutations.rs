@@ -9,12 +9,12 @@ use crate::{
         tuples::{tuple_list, tuple_list_type},
     },
     corpus::Corpus,
-    inputs::EncodedInput,
+    inputs::{EncodedInput, HasInput},
     mutators::{
         mutations::{buffer_copy, buffer_self_copy, ARITH_MAX},
         MutationResult, Mutator, Named,
     },
-    state::{HasCorpus, HasInput, HasMaxSize, HasRand},
+    state::{HasCorpus, HasMaxSize, HasRand},
     Error,
 };
 

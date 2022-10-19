@@ -35,9 +35,9 @@ pub struct EventManagerId {
     pub id: usize,
 }
 
+use crate::inputs::HasInput;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::state::HasInput;
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]

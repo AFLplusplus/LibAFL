@@ -5,7 +5,8 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    state::{HasInput, State},
+    inputs::HasInput,
+    state::State,
     Error,
 };
 

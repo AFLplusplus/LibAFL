@@ -17,8 +17,8 @@ use super::ObserverWithHashField;
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
+    inputs::HasInput,
     observers::Observer,
-    state::HasInput,
     Error,
 };
 

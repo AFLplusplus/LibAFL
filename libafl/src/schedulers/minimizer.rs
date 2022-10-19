@@ -11,8 +11,9 @@ use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
+    inputs::HasInput,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasInput, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
 

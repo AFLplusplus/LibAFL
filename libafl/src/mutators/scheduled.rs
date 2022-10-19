@@ -16,8 +16,9 @@ use crate::{
         AsMutSlice, AsSlice,
     },
     corpus::Corpus,
+    inputs::HasInput,
     mutators::{MutationResult, Mutator, MutatorsTuple},
-    state::{HasCorpus, HasInput, HasMetadata, HasRand, State},
+    state::{HasCorpus, HasMetadata, HasRand, State},
     Error,
 };
 

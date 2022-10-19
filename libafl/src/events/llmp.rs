@@ -42,10 +42,10 @@ use crate::{
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
-    inputs::Input,
+    inputs::{HasInput, Input},
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasInput, HasMetadata},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
 

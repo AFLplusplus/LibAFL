@@ -49,8 +49,9 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
+    inputs::HasInput,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasInput, HasSolutions},
+    state::{HasClientPerfMonitor, HasSolutions},
     Error,
 };
 
@@ -535,8 +536,9 @@ mod unix_signal_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
+        inputs::HasInput,
         observers::ObserversTuple,
-        state::{HasClientPerfMonitor, HasInput, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
@@ -921,7 +923,7 @@ mod windows_exception_handler {
         EnterCriticalSection, LeaveCriticalSection, RTL_CRITICAL_SECTION,
     };
 
-    use crate::state::HasInput;
+    use crate::inputs::HasInput;
 
     /// invokes the `post_exec` hook on all observer in case of panic
     #[cfg(feature = "std")]
@@ -1801,8 +1803,8 @@ pub mod child_signal_handlers {
     use crate::{
         bolts::os::unix_signals::{ucontext_t, Signal},
         executors::{ExitKind, HasObservers},
+        inputs::HasInput,
         observers::ObserversTuple,
-        state::HasInput,
     };
 
     /// invokes the `post_exec_child` hook on all observer in case the child process panics
@@ -1889,8 +1891,7 @@ mod tests {
     use crate::{
         bolts::tuples::tuple_list,
         executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
-        inputs::NopInput,
-        state::HasInput,
+        inputs::{HasInput, NopInput},
     };
 
     impl HasInput for () {

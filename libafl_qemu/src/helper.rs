@@ -1,6 +1,6 @@
 use core::{fmt::Debug, ops::Range};
 
-use libafl::{bolts::tuples::MatchFirstType, state::HasInput};
+use libafl::{bolts::tuples::MatchFirstType, inputs::HasInput};
 
 use crate::{emu::Emulator, hooks::QemuHooks};
 

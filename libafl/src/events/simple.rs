@@ -29,9 +29,10 @@ use crate::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
     },
+    inputs::HasInput,
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasInput, HasMetadata},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
 

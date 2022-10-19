@@ -39,9 +39,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::AsSlice,
-    inputs::HasTargetBytes,
+    inputs::{HasInput, HasTargetBytes},
     observers::ObserversTuple,
-    state::{HasInput, State},
+    state::State,
     Error,
 };
 

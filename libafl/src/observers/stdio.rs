@@ -4,7 +4,7 @@
 
 use alloc::string::String;
 
-use crate::{bolts::tuples::Named, observers::Observer, state::HasInput};
+use crate::{bolts::tuples::Named, inputs::HasInput, observers::Observer};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.

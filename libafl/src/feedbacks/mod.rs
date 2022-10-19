@@ -38,8 +38,9 @@ use crate::{
     corpus::Testcase,
     events::EventFirer,
     executors::ExitKind,
+    inputs::HasInput,
     observers::{ListObserver, ObserversTuple, TimeObserver},
-    state::{HasClientPerfMonitor, HasInput},
+    state::HasClientPerfMonitor,
     Error,
 };
 

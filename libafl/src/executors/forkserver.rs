@@ -32,10 +32,9 @@ use crate::{
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input},
+    inputs::{HasInput, HasTargetBytes, Input},
     mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
-    state::HasInput,
     Error,
 };
 

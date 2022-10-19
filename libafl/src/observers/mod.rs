@@ -39,7 +39,7 @@ use crate::{
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
-    state::HasInput,
+    inputs::HasInput,
     Error,
 };
 

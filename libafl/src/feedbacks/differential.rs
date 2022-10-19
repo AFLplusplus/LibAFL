@@ -162,9 +162,9 @@ mod tests {
         events::EventFirer,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
-        inputs::BytesInput,
+        inputs::{BytesInput, HasInput},
         observers::Observer,
-        state::{HasInput, NopState, State},
+        state::{NopState, State},
     };
 
     #[derive(Debug)]

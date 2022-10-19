@@ -3,9 +3,9 @@ use std::{fmt::Debug, marker::PhantomData};
 use libafl::{
     bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::HasTargetBytes,
+    inputs::{HasInput, HasTargetBytes},
     observers::ObserversTuple,
-    state::{HasInput, State},
+    state::State,
     Error,
 };
 use libnyx::NyxReturnValue;

@@ -30,7 +30,8 @@ pub use powersched::PowerQueueScheduler;
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, Testcase},
-    state::{HasCorpus, HasInput, HasRand, State},
+    inputs::HasInput,
+    state::{HasCorpus, HasRand, State},
     Error,
 };
 

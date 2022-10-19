@@ -1,5 +1,5 @@
 use capstone::prelude::*;
-use libafl::state::HasInput;
+use libafl::inputs::HasInput;
 
 use crate::{
     capstone,

@@ -22,10 +22,10 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     bolts::{rands::Rand, AsSlice},
-    inputs::HasBytesVec,
+    inputs::{HasBytesVec, HasInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{CmpValues, CmpValuesMetadata},
-    state::{HasInput, HasMaxSize, HasMetadata, HasRand},
+    state::{HasMaxSize, HasMetadata, HasRand},
     Error,
 };
 

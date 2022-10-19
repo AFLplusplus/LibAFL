@@ -1,6 +1,6 @@
 use std::{env, fs, ptr};
 
-use libafl::state::{HasInput, HasMetadata};
+use libafl::{inputs::HasInput, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{

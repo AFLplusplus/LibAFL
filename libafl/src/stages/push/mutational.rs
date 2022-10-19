@@ -15,12 +15,13 @@ use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
+    inputs::HasInput,
     mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 

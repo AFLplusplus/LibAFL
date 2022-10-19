@@ -9,11 +9,12 @@ use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
+    inputs::HasInput,
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasInput, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
 

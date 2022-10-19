@@ -16,12 +16,12 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec},
+    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, HasInput},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
 

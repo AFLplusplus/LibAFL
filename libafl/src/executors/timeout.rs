@@ -33,7 +33,7 @@ use windows::Win32::{
 use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    state::HasInput,
+    inputs::HasInput,
     Error,
 };
 

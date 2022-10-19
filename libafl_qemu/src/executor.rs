@@ -7,8 +7,9 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor, InProcessForkExecutor},
     feedbacks::Feedback,
     fuzzer::HasObjective,
+    inputs::HasInput,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasInput, HasSolutions, State},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State},
     Error,
 };
 

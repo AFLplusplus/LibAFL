@@ -27,9 +27,8 @@ use crate::{
         tuples::MatchName,
         AsSlice,
     },
-    inputs::HasTargetBytes,
+    inputs::{HasInput, HasTargetBytes},
     observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
-    state::HasInput,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};

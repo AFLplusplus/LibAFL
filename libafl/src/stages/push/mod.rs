@@ -19,9 +19,10 @@ use crate::{
     bolts::current_time,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
+    inputs::HasInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasExecutions, HasInput, HasRand},
+    state::{HasClientPerfMonitor, HasExecutions, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 

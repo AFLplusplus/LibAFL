@@ -8,8 +8,9 @@ use core::fmt::{self, Debug, Formatter};
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
+    inputs::HasInput,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
-    state::{HasInput, HasMetadata},
+    state::HasMetadata,
     Error,
 };
 
