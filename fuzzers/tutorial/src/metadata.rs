@@ -4,6 +4,7 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata},
+    inputs::KnowsInput,
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
@@ -20,11 +21,11 @@ pub struct PacketLenMetadata {
 
 pub struct PacketLenTestcaseScore {}
 
-impl<S> TestcaseScore<PacketData, S> for PacketLenTestcaseScore
+impl<S> TestcaseScore<S> for PacketLenTestcaseScore
 where
     S: HasCorpus<Input = PacketData> + HasMetadata,
 {
-    fn compute<I, S>(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
+    fn compute(entry: &mut Testcase<PacketData>, _state: &S) -> Result<f64, Error> {
         Ok(entry
             .metadata()
             .get::<PacketLenMetadata>()
@@ -32,17 +33,17 @@ where
     }
 }
 
-pub type PacketLenMinimizerScheduler<CS, S> =
-    MinimizerScheduler<CS, PacketLenTestcaseScore, PacketData, MapIndexesMetadata, S>;
+pub type PacketLenMinimizerScheduler<CS> =
+    MinimizerScheduler<CS, PacketLenTestcaseScore, MapIndexesMetadata>;
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct PacketLenFeedback {
     len: u64,
 }
 
-impl<S> Feedback<PacketData, S> for PacketLenFeedback
+impl<S> Feedback<S> for PacketLenFeedback
 where
-    S: HasClientPerfMonitor,
+    S: KnowsInput<Input = PacketData> + HasClientPerfMonitor,
 {
     #[inline]
     fn is_interesting<EM, OT>(
@@ -54,8 +55,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<PacketData>,
-        OT: ObserversTuple<Input = PacketData, State = S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         self.len = input.length;
         Ok(false)

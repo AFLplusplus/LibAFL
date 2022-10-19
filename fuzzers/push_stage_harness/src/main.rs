@@ -37,7 +37,7 @@ pub fn main() {
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
     // Feedback to rate the interestingness of an input
-    let mut feedback = MaxMapFeedback::<BytesInput, _, _, _>::new(&observer);
+    let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
     let mut objective = CrashFeedback::new();
@@ -47,7 +47,7 @@ pub fn main() {
         // RNG
         StdRand::with_seed(current_nanos()),
         // Corpus that will be evolved, we keep it in memory for performance
-        InMemoryCorpus::new(),
+        InMemoryCorpus::<BytesInput>::new(),
         // Corpus in which we store solutions (crashes in this example),
         // on disk so the user can get them after stopping the fuzzer
         OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap(),
@@ -64,7 +64,7 @@ pub fn main() {
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
-    let mgr = SimpleEventManager::new(monitor);
+    let mgr = SimpleEventManager::<_, (), _>::new(monitor);
 
     // A queue policy to get testcasess from the corpus
     let scheduler = QueueScheduler::new();

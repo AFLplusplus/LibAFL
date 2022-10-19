@@ -4,6 +4,7 @@ use libafl::{
         rands::{Rand, StdRand},
         tuples::Named,
     },
+    inputs::KnowsInput,
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
@@ -15,7 +16,10 @@ pub struct LainMutator {
     inner: lain::mutator::Mutator<StdRand>,
 }
 
-impl<S: HasRand> Mutator<PacketData, S> for LainMutator {
+impl<S> Mutator<S> for LainMutator
+where
+    S: KnowsInput<Input = PacketData> + HasRand,
+{
     fn mutate(
         &mut self,
         state: &mut S,

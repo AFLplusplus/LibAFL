@@ -118,7 +118,7 @@ pub fn main() -> Result<(), Error> {
     // The Monitor trait define how the fuzzer stats are displayed to the user
     let mon = SimpleMonitor::new(|s| println!("{}", s));
 
-    let mut mgr = SimpleEventManager::new(mon);
+    let mut mgr = SimpleEventManager::<_, (), _>::new(mon);
 
     let minimizer = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdTMinMutationalStage::new(

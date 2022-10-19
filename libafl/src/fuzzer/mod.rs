@@ -33,9 +33,9 @@ use crate::{
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
-pub trait HasScheduler<CS>
+pub trait HasScheduler<CS>: KnowsState
 where
-    CS: Scheduler,
+    CS: Scheduler<State = Self::State>,
 {
     /// The scheduler
     fn scheduler(&self) -> &CS;
