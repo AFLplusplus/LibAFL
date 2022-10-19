@@ -234,8 +234,8 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         let tp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),
-                addr_of_mut!(GLOBAL_STATE) as *mut c_void,
-                &TP_CALLBACK_ENVIRON_V3::default(),
+                Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
+                Some(&TP_CALLBACK_ENVIRON_V3::default()),
             )
         };
         let mut critical = RTL_CRITICAL_SECTION::default();
@@ -303,7 +303,7 @@ where
             LeaveCriticalSection(&mut self.critical);
             compiler_fence(Ordering::SeqCst);
 
-            SetThreadpoolTimer(self.tp_timer, &ft, 0, 0);
+            SetThreadpoolTimer(self.tp_timer, Some(&ft), 0, 0);
 
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
 
@@ -328,7 +328,7 @@ where
     /// Will dereference the given `tp_timer` pointer, unchecked.
     fn post_run_reset(&mut self) {
         unsafe {
-            SetThreadpoolTimer(self.tp_timer, core::ptr::null(), 0, 0);
+            SetThreadpoolTimer(self.tp_timer, None, 0, 0);
         }
         self.executor.post_run_reset();
     }

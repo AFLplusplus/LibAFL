@@ -481,6 +481,7 @@ pub mod pybind {
     }
 
     #[pyclass(unsendable, name = "Observer")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Clone, Debug)]
     /// Observer Trait binding
     pub struct PythonObserver {
@@ -818,6 +819,7 @@ pub mod pybind {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[pyclass(unsendable, name = "ObserversTuple")]
     pub struct PythonObserversTuple {
         list: Vec<PythonObserver>,

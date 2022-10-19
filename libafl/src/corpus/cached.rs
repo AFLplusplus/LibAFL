@@ -152,6 +152,7 @@ pub mod pybind {
     };
 
     #[pyclass(unsendable, name = "CachedOnDiskCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for CachedOnDiskCorpus
     pub struct PythonCachedOnDiskCorpus {

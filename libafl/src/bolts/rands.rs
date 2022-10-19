@@ -443,6 +443,7 @@ pub mod pybind {
     use crate::bolts::{current_nanos, rands::StdRand};
 
     #[pyclass(unsendable, name = "StdRand")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for StdRand
     pub struct PythonStdRand {
@@ -478,6 +479,7 @@ pub mod pybind {
 
     /// Rand Trait binding
     #[pyclass(unsendable, name = "Rand")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct PythonRand {
         wrapper: PythonRandWrapper,

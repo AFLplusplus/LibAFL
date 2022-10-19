@@ -249,6 +249,7 @@ pub mod pybind {
     };
 
     #[pyclass(unsendable, name = "OnDiskCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for OnDiskCorpus
     pub struct PythonOnDiskCorpus {

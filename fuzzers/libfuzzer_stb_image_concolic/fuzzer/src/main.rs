@@ -10,7 +10,7 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
-use clap::{self, StructOpt};
+use clap::{self, Parser, StructOpt};
 use libafl::{
     bolts::{
         current_nanos,
@@ -53,10 +53,10 @@ use libafl_targets::{
     MAX_EDGES_NUM,
 };
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct Opt {
     /// This node should do concolic tracing + solving instead of traditional fuzzing
-    #[clap(short, long)]
+    #[arg(short, long)]
     concolic: bool,
 }
 
