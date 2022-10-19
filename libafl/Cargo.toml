@@ -13,7 +13,7 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 
 [features]
 default = ["std", "derive", "llmp_compression", "rand_trait", "fork", "prelude"]
-std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "bincode", "wait-timeout", "regex", "byteorder", "once_cell", "uuid", "tui_monitor", "ctor", "backtrace"] # print, env, launcher ... support
+std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "bincode", "wait-timeout", "regex", "byteorder", "once_cell", "uuid", "tui_monitor", "ctor", "backtrace", "uds"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
 rand_trait = ["rand_core"] # If set, libafl's rand implementations will implement `rand::Rng`
@@ -94,7 +94,7 @@ grammartec = { version = "0.2", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2" # For (*nix) libc
-uds = "0.2.6"
+uds = { version = "0.2.6", optional = true }
 lock_api = "0.4.7"
 
 [target.'cfg(windows)'.dependencies]

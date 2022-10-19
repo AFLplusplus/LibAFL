@@ -1,10 +1,10 @@
 #![no_std]
 // Embedded targets: build with no_main
-#![cfg_attr(not(any(windows, unix)), no_main)]
+#![cfg_attr(not(any(windows)), no_main)]
 // Embedded needs alloc error handlers which only work on nightly right now...
-#![cfg_attr(not(any(windows, unix)), feature(default_alloc_error_handler))]
+#![cfg_attr(not(any(windows)), feature(default_alloc_error_handler))]
 
-#[cfg(not(any(windows, unix)))]
+#[cfg(not(any(windows)))]
 use core::panic::PanicInfo;
 
 #[cfg(any(windows, unix))]
@@ -26,16 +26,22 @@ use libafl::{
     state::StdState,
 };
 #[cfg(any(windows, unix))]
-use libc::{c_char, printf};
+use libc::{abort, c_char, printf};
 use static_alloc::Bump;
 
 #[global_allocator]
 static A: Bump<[u8; 512 * 1024 * 1024]> = Bump::uninit();
 
-#[cfg(not(any(windows, unix)))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+    #[cfg(unix)]
+    unsafe {
+        abort();
+    }
+    #[cfg(not(unix))]
+    loop {
+        // On embedded, there's not much left to do.
+    }
 }
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -55,7 +61,8 @@ pub extern "C" fn external_current_millis() -> u64 {
 }
 
 #[allow(clippy::similar_names)]
-pub fn main() {
+#[no_mangle]
+pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -146,4 +153,6 @@ pub fn main() {
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
+
+    0
 }
