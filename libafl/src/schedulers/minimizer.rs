@@ -11,7 +11,7 @@ use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
-    inputs::HasInput,
+    inputs::KnowsInput,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
@@ -93,7 +93,7 @@ where
         &self,
         state: &mut CS::State,
         idx: usize,
-        testcase: &Testcase<<CS::State as HasInput>::Input>,
+        testcase: &Testcase<<CS::State as KnowsInput>::Input>,
     ) -> Result<(), Error> {
         self.base.on_replace(state, idx, testcase)
     }
@@ -103,7 +103,7 @@ where
         &self,
         state: &mut CS::State,
         idx: usize,
-        testcase: &Option<Testcase<<CS::State as HasInput>::Input>>,
+        testcase: &Option<Testcase<<CS::State as KnowsInput>::Input>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, idx, testcase)?;
         let mut entries = if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {

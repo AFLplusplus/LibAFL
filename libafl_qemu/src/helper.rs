@@ -1,6 +1,6 @@
 use core::{fmt::Debug, ops::Range};
 
-use libafl::{bolts::tuples::MatchFirstType, inputs::HasInput};
+use libafl::{bolts::tuples::MatchFirstType, inputs::KnowsInput};
 
 use crate::{emu::Emulator, hooks::QemuHooks};
 
@@ -8,7 +8,7 @@ use crate::{emu::Emulator, hooks::QemuHooks};
 // TODO remove 'static when specialization will be stable
 pub trait QemuHelper<S>: 'static + Debug
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = true;
 
@@ -25,7 +25,7 @@ where
 
 pub trait QemuHelperTuple<S>: MatchFirstType + Debug
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool;
 
@@ -40,7 +40,7 @@ where
 
 impl<S> QemuHelperTuple<S> for ()
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
@@ -59,7 +59,7 @@ impl<Head, Tail, S> QemuHelperTuple<S> for (Head, Tail)
 where
     Head: QemuHelper<S>,
     Tail: QemuHelperTuple<S>,
-    S: HasInput,
+    S: KnowsInput,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = Head::HOOKS_DO_SIDE_EFFECTS || Tail::HOOKS_DO_SIDE_EFFECTS;
 

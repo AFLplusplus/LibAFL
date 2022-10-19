@@ -5,7 +5,7 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::HasInput,
+    inputs::KnowsInput,
     state::State,
     Error,
 };
@@ -23,7 +23,7 @@ impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
     where
         A: Executor<EM, S, Z>,
         B: Executor<EM, S, Z>,
-        S: HasInput,
+        S: KnowsInput,
     {
         Self { primary, secondary }
     }

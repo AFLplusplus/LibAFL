@@ -12,7 +12,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::HasInput,
+    inputs::KnowsInput,
     observers::{
         concolic::{ConcolicMetadata, ConcolicObserver},
         ObserversTuple,
@@ -53,14 +53,14 @@ impl<S> Named for ConcolicFeedback<S> {
 
 impl<S> Feedback<S> for ConcolicFeedback<S>
 where
-    S: HasInput + Debug + HasClientPerfMonitor,
+    S: KnowsInput + Debug + HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S as HasInput>::Input,
+        _input: &<S as KnowsInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -77,7 +77,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut S,
-        _testcase: &mut Testcase<<S as HasInput>::Input>,
+        _testcase: &mut Testcase<<S as KnowsInput>::Input>,
     ) -> Result<(), Error> {
         if let Some(metadata) = self.metadata.take() {
             _testcase.metadata_mut().insert(metadata);
@@ -88,7 +88,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut S,
-        _input: &<S as HasInput>::Input,
+        _input: &<S as KnowsInput>::Input,
     ) -> Result<(), Error> {
         Ok(())
     }

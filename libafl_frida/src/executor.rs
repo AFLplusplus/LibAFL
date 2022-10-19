@@ -9,7 +9,7 @@ use frida_gum::{
 use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{HasInput, HasTargetBytes},
+    inputs::{HasTargetBytes, KnowsInput},
     observers::ObserversTuple,
     Error,
 };
@@ -25,7 +25,7 @@ pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
 {
     base: InProcessExecutor<'a, H, OT, S>,
@@ -40,7 +40,7 @@ where
 impl<'a, 'b, 'c, H, OT, RT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
 {
@@ -57,7 +57,7 @@ impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, S, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
@@ -101,7 +101,7 @@ impl<'a, 'b, 'c, H, OT, RT, S> HasObservers for FridaInProcessExecutor<'a, 'b, '
 where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
 {
     type State = S;
@@ -121,7 +121,7 @@ where
 impl<'a, 'b, 'c, H, OT, S, RT> FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,

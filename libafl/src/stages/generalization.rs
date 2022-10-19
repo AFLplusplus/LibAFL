@@ -16,7 +16,7 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, HasInput},
+    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, KnowsInput},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
@@ -64,7 +64,7 @@ pub struct GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
     OT: ObserversTuple<S>,
-    S: HasInput<Input = GeneralizedInput>
+    S: KnowsInput<Input = GeneralizedInput>
         + HasClientPerfMonitor
         + HasExecutions
         + HasMetadata
@@ -81,7 +81,7 @@ where
     O: MapObserver,
     E: Executor<EM, E::State, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
-    E::State: HasInput<Input = GeneralizedInput>
+    E::State: KnowsInput<Input = GeneralizedInput>
         + HasClientPerfMonitor
         + HasExecutions
         + HasMetadata
@@ -360,7 +360,7 @@ impl<EM, O, OT, S, Z> GeneralizationStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
     OT: ObserversTuple<S>,
-    S: HasInput<Input = GeneralizedInput>
+    S: KnowsInput<Input = GeneralizedInput>
         + HasClientPerfMonitor
         + HasExecutions
         + HasMetadata

@@ -32,7 +32,7 @@ use crate::{
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasInput, HasTargetBytes, Input},
+    inputs::{HasTargetBytes, Input, KnowsInput},
     mutators::Tokens,
     observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
     Error,
@@ -381,7 +381,7 @@ impl<E: Debug> TimeoutForkserverExecutor<E> {
 impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutForkserverExecutor<E>
 where
     E: Executor<EM, S, Z> + HasForkserver + Debug,
-    S: HasInput,
+    S: KnowsInput,
     S::Input: HasTargetBytes,
 {
     #[inline]
@@ -519,7 +519,7 @@ impl ForkserverExecutor<(), (), StdShMemProvider> {
 impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: HasInput,
+    S: KnowsInput,
     S::Input: HasTargetBytes,
     SP: ShMemProvider,
 {
@@ -563,7 +563,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     pub fn build<OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<OT, S, SP>, Error>
     where
         OT: ObserversTuple<S>,
-        S: HasInput,
+        S: KnowsInput,
         S::Input: Input + HasTargetBytes,
         SP: ShMemProvider,
     {
@@ -859,7 +859,7 @@ impl<EM, OT, S, SP, Z> Executor<EM, S, Z> for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    S: HasInput,
+    S: KnowsInput,
     S::Input: HasTargetBytes,
     Self: HasObservers,
 {
@@ -949,7 +949,7 @@ where
 impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: HasInput,
+    S: KnowsInput,
     S::Input: HasTargetBytes,
     SP: ShMemProvider,
 {
@@ -970,7 +970,7 @@ where
 impl<OT, S, SP> HasForkserver for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: HasInput,
+    S: KnowsInput,
     S::Input: Input + HasTargetBytes,
     SP: ShMemProvider,
 {

@@ -1,6 +1,6 @@
 use std::{env, fs, ptr};
 
-use libafl::{inputs::HasInput, state::HasMetadata};
+use libafl::{inputs::KnowsInput, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
@@ -409,7 +409,7 @@ impl Default for QemuAsanHelper {
 
 impl<S> QemuHelper<S> for QemuAsanHelper
 where
-    S: HasInput + HasMetadata,
+    S: KnowsInput + HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
@@ -450,7 +450,7 @@ pub fn gen_readwrite_asan<QT, S>(
     _size: usize,
 ) -> Option<u64>
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuAsanHelper>().unwrap();
@@ -466,7 +466,7 @@ pub fn trace_read1_asan<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -480,7 +480,7 @@ pub fn trace_read2_asan<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -494,7 +494,7 @@ pub fn trace_read4_asan<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -508,7 +508,7 @@ pub fn trace_read8_asan<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -523,7 +523,7 @@ pub fn trace_read_n_asan<QT, S>(
     addr: GuestAddr,
     size: usize,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -537,7 +537,7 @@ pub fn trace_write1_asan<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -551,7 +551,7 @@ pub fn trace_write2_asan<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -565,7 +565,7 @@ pub fn trace_write4_asan<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -579,7 +579,7 @@ pub fn trace_write8_asan<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -594,7 +594,7 @@ pub fn trace_write_n_asan<QT, S>(
     addr: GuestAddr,
     size: usize,
 ) where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     let emulator = hooks.emulator().clone();
@@ -617,7 +617,7 @@ pub fn qasan_fake_syscall<QT, S>(
     _a7: u64,
 ) -> SyscallHookResult
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     if sys_num == QASAN_FAKESYS_NR {

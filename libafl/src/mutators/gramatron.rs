@@ -10,7 +10,7 @@ use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
     generators::GramatronGenerator,
-    inputs::{GramatronInput, HasInput, Terminal},
+    inputs::{GramatronInput, KnowsInput, Terminal},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
@@ -29,7 +29,7 @@ where
 
 impl<'a, S> Mutator<S> for GramatronRandomMutator<'a, S>
 where
-    S: HasInput<Input = GramatronInput> + HasRand + HasMetadata,
+    S: KnowsInput<Input = GramatronInput> + HasRand + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -98,7 +98,7 @@ pub struct GramatronSpliceMutator;
 
 impl<S> Mutator<S> for GramatronSpliceMutator
 where
-    S: HasInput<Input = GramatronInput> + HasRand + HasCorpus + HasMetadata,
+    S: KnowsInput<Input = GramatronInput> + HasRand + HasCorpus + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -171,7 +171,7 @@ pub struct GramatronRecursionMutator {
 
 impl<S> Mutator<S> for GramatronRecursionMutator
 where
-    S: HasInput<Input = GramatronInput> + HasRand + HasMetadata,
+    S: KnowsInput<Input = GramatronInput> + HasRand + HasMetadata,
 {
     fn mutate(
         &mut self,

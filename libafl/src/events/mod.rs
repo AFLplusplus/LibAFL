@@ -35,7 +35,7 @@ pub struct EventManagerId {
     pub id: usize,
 }
 
-use crate::inputs::HasInput;
+use crate::inputs::KnowsInput;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
 
@@ -303,7 +303,7 @@ where
 /// [`EventFirer`] fire an event.
 pub trait EventFirer {
     /// State for this fuzzing campaign
-    type State: HasInput;
+    type State: KnowsInput;
 
     /// Send off an [`Event`] to the broker
     ///
@@ -316,7 +316,7 @@ pub trait EventFirer {
     fn fire(
         &mut self,
         state: &mut Self::State,
-        event: Event<<Self::State as HasInput>::Input>,
+        event: Event<<Self::State as KnowsInput>::Input>,
     ) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
@@ -354,7 +354,7 @@ pub trait EventFirer {
 /// [`ProgressReporter`] report progress to the broker.
 pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State> {
     /// State for this fuzzing campaign
-    type State: HasInput + HasClientPerfMonitor + HasMetadata + HasExecutions;
+    type State: KnowsInput + HasClientPerfMonitor + HasMetadata + HasExecutions;
 
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
@@ -425,7 +425,7 @@ pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State
 /// Restartable trait
 pub trait EventRestarter {
     /// State for this fuzzing campaign
-    type State: HasInput;
+    type State: KnowsInput;
 
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
@@ -441,7 +441,7 @@ pub trait EventRestarter {
 /// [`EventProcessor`] process all the incoming messages
 pub trait EventProcessor<E, Z> {
     /// The state for this fuzzing campaign
-    type State: HasInput;
+    type State: KnowsInput;
     /// The observers for this fuzzing campaign
     type Observers: ObserversTuple<Self::State>;
 
@@ -480,7 +480,7 @@ pub trait EventManager<E, S, Z>:
     + HasEventManagerId
     + ProgressReporter<State = S>
 where
-    S: HasInput,
+    S: KnowsInput,
 {
 }
 
@@ -512,14 +512,14 @@ impl<OT, S> NopEventManager<OT, S> {
 
 impl<OT, S> EventFirer for NopEventManager<OT, S>
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     type State = S;
 
     fn fire(
         &mut self,
         _state: &mut Self::State,
-        _event: Event<<Self::State as HasInput>::Input>,
+        _event: Event<<Self::State as KnowsInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -527,14 +527,14 @@ where
 
 impl<OT, S> EventRestarter for NopEventManager<OT, S>
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     type State = S;
 }
 
 impl<E, OT, S, Z> EventProcessor<E, Z> for NopEventManager<OT, S>
 where
-    S: HasInput + HasClientPerfMonitor + HasExecutions,
+    S: KnowsInput + HasClientPerfMonitor + HasExecutions,
     OT: ObserversTuple<S>,
 {
     type State = S;
@@ -554,7 +554,7 @@ where
 impl<E, OT, S, Z> EventManager<E, S, Z> for NopEventManager<OT, S>
 where
     OT: ObserversTuple<S>,
-    S: HasInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
 }
 
@@ -568,7 +568,7 @@ impl<OT, S> HasCustomBufHandlers<S> for NopEventManager<OT, S> {
 
 impl<OT, S> ProgressReporter for NopEventManager<OT, S>
 where
-    S: HasInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
     type State = S;
 }

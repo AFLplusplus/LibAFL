@@ -6,7 +6,7 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::HasInput,
+    inputs::KnowsInput,
     state::State,
     Error,
 };
@@ -32,7 +32,7 @@ where
     where
         A: Executor<EM, S, Z>,
         B: Executor<EM, S, Z>,
-        S: HasInput,
+        S: KnowsInput,
         Z: Sized,
     {
         Self { primary, secondary }

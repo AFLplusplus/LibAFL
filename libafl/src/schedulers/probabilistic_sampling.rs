@@ -144,7 +144,7 @@ mod tests {
         bolts::rands::StdRand,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
-        inputs::{bytes::BytesInput, HasInput, Input},
+        inputs::{bytes::BytesInput, Input, KnowsInput},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::{HasCorpus, HasMetadata, StdState},
         Error,
@@ -170,7 +170,7 @@ mod tests {
     }
 
     pub type UniformProbabilitySamplingScheduler<S> =
-        ProbabilitySamplingScheduler<UniformDistribution<<S as HasInput>::Input>, S>;
+        ProbabilitySamplingScheduler<UniformDistribution<<S as KnowsInput>::Input>, S>;
 
     #[test]
     fn test_prob_sampling() {

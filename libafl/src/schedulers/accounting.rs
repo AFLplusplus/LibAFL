@@ -9,7 +9,7 @@ use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
-    inputs::HasInput,
+    inputs::KnowsInput,
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
@@ -97,7 +97,7 @@ pub struct CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
     CS::State: HasMetadata,
-    <CS::State as HasInput>::Input: HasLen,
+    <CS::State as KnowsInput>::Input: HasLen,
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
@@ -108,7 +108,7 @@ impl<'a, CS> Scheduler for CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand,
-    <CS::State as HasInput>::Input: HasLen,
+    <CS::State as KnowsInput>::Input: HasLen,
 {
     type State = CS::State;
 
@@ -121,7 +121,7 @@ where
         &self,
         state: &mut Self::State,
         idx: usize,
-        testcase: &Testcase<<Self::State as HasInput>::Input>,
+        testcase: &Testcase<<Self::State as KnowsInput>::Input>,
     ) -> Result<(), Error> {
         self.inner.on_replace(state, idx, testcase)
     }
@@ -130,7 +130,7 @@ where
         &self,
         state: &mut Self::State,
         idx: usize,
-        testcase: &Option<Testcase<<Self::State as HasInput>::Input>>,
+        testcase: &Option<Testcase<<Self::State as KnowsInput>::Input>>,
     ) -> Result<(), Error> {
         self.inner.on_remove(state, idx, testcase)
     }
@@ -165,7 +165,7 @@ impl<'a, CS> CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand,
-    <CS::State as HasInput>::Input: HasLen,
+    <CS::State as KnowsInput>::Input: HasLen,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]

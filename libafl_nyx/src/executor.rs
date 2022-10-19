@@ -3,7 +3,7 @@ use std::{fmt::Debug, marker::PhantomData};
 use libafl::{
     bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasInput, HasTargetBytes},
+    inputs::{HasTargetBytes, KnowsInput},
     observers::ObserversTuple,
     state::State,
     Error,
@@ -33,7 +33,7 @@ impl<'a, S, OT> Debug for NyxExecutor<'a, S, OT> {
 impl<'a, EM, S, Z, OT> Executor<EM, S, Z> for NyxExecutor<'a, S, OT>
 where
     S::Input: HasTargetBytes,
-    S: HasInput,
+    S: KnowsInput,
 {
     fn run_target(
         &mut self,

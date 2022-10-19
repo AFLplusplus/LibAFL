@@ -33,7 +33,7 @@ use crate::bolts::core_affinity::CoreId;
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::bolts::os::{dup2, fork, ForkResult};
-use crate::inputs::HasInput;
+use crate::inputs::KnowsInput;
 #[cfg(feature = "std")]
 use crate::{
     bolts::{core_affinity::Cores, shmem::ShMemProvider},
@@ -57,7 +57,7 @@ where
     MT: Monitor,
     SP: ShMemProvider + 'static,
     OT: ObserversTuple<S> + 'a,
-    S: DeserializeOwned + HasInput + 'a,
+    S: DeserializeOwned + KnowsInput + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -96,7 +96,7 @@ where
     OT: ObserversTuple<S> + DeserializeOwned,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned + HasInput,
+    S: DeserializeOwned + KnowsInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -116,7 +116,7 @@ where
     CF: FnOnce(Option<S>, LlmpRestartingEventManager<OT, S, SP>, usize) -> Result<(), Error>,
     OT: ObserversTuple<S> + DeserializeOwned,
     MT: Monitor + Clone,
-    S: DeserializeOwned + HasInput + HasExecutions + HasClientPerfMonitor,
+    S: DeserializeOwned + KnowsInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
 {
     /// Launch the broker and the clients and fuzz

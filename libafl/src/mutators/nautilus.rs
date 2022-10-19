@@ -14,7 +14,7 @@ use crate::{
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
-    prelude::HasInput,
+    prelude::KnowsInput,
     state::{HasCorpus, HasMetadata},
     Error,
 };
@@ -33,7 +33,7 @@ impl Debug for NautilusRandomMutator<'_> {
 
 impl<S> Mutator<S> for NautilusRandomMutator<'_>
 where
-    S: HasInput<Input = NautilusInput>,
+    S: KnowsInput<Input = NautilusInput>,
 {
     fn mutate(
         &mut self,
@@ -97,7 +97,7 @@ impl Debug for NautilusRecursionMutator<'_> {
 
 impl<S> Mutator<S> for NautilusRecursionMutator<'_>
 where
-    S: HasInput<Input = NautilusInput>,
+    S: KnowsInput<Input = NautilusInput>,
 {
     fn mutate(
         &mut self,
@@ -163,7 +163,7 @@ impl Debug for NautilusSpliceMutator<'_> {
 
 impl<S> Mutator<S> for NautilusSpliceMutator<'_>
 where
-    S: HasCorpus + HasMetadata + HasInput<Input = NautilusInput>,
+    S: HasCorpus + HasMetadata + KnowsInput<Input = NautilusInput>,
 {
     fn mutate(
         &mut self,

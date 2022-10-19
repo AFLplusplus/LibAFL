@@ -21,7 +21,7 @@ use crate::{
     events::{Event, EventFirer},
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
-    inputs::HasInput,
+    inputs::KnowsInput,
     monitors::UserStats,
     observers::{MapObserver, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
@@ -352,7 +352,7 @@ where
     N: IsNovel<T> + Debug,
     O: MapObserver<Entry = T> + for<'it> AsIter<'it, Item = T> + Debug,
     R: Reducer<T> + Debug,
-    S: HasInput + HasClientPerfMonitor + HasNamedMetadata + Debug,
+    S: KnowsInput + HasClientPerfMonitor + HasNamedMetadata + Debug,
     T: Default + Copy + Serialize + for<'de> Deserialize<'de> + PartialEq + Debug + 'static,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
@@ -367,7 +367,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &<S as HasInput>::Input,
+        input: &<S as KnowsInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -383,7 +383,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        input: &<S as HasInput>::Input,
+        input: &<S as KnowsInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -397,7 +397,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut S,
-        testcase: &mut Testcase<<S as HasInput>::Input>,
+        testcase: &mut Testcase<<S as KnowsInput>::Input>,
     ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             let meta = MapIndexesMetadata::new(core::mem::take(v));
@@ -414,7 +414,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut S,
-        _input: &<S as HasInput>::Input,
+        _input: &<S as KnowsInput>::Input,
     ) -> Result<(), Error> {
         if let Some(v) = self.indexes.as_mut() {
             v.clear();
@@ -432,7 +432,7 @@ impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
     O: MapObserver<Entry = u8> + AsSlice<u8>,
     for<'it> O: AsIter<'it, Item = u8>,
-    S: HasInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
+    S: KnowsInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     #[allow(clippy::wrong_self_convention)]
     #[allow(clippy::needless_range_loop)]
@@ -440,7 +440,7 @@ where
         &mut self,
         state: &mut S,
         manager: &mut EM,
-        _input: &<S as HasInput>::Input,
+        _input: &<S as KnowsInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -579,7 +579,7 @@ where
     O: MapObserver<Entry = T>,
     for<'it> O: AsIter<'it, Item = T>,
     N: IsNovel<T>,
-    S: HasInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
+    S: KnowsInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {
     /// Create new `MapFeedback`
     #[must_use]
@@ -756,7 +756,7 @@ where
 
 impl<O, S> Feedback<S> for ReachabilityFeedback<O, S>
 where
-    S: HasInput + Debug + HasClientPerfMonitor,
+    S: KnowsInput + Debug + HasClientPerfMonitor,
     O: MapObserver<Entry = usize>,
     for<'it> O: AsIter<'it, Item = usize>,
 {
@@ -765,7 +765,7 @@ where
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S as HasInput>::Input,
+        _input: &<S as KnowsInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -793,7 +793,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut S,
-        testcase: &mut Testcase<<S as HasInput>::Input>,
+        testcase: &mut Testcase<<S as KnowsInput>::Input>,
     ) -> Result<(), Error> {
         if !self.target_idx.is_empty() {
             let meta = MapIndexesMetadata::new(core::mem::take(self.target_idx.as_mut()));
@@ -805,7 +805,7 @@ where
     fn discard_metadata(
         &mut self,
         _state: &mut S,
-        _input: &<S as HasInput>::Input,
+        _input: &<S as KnowsInput>::Input,
     ) -> Result<(), Error> {
         self.target_idx.clear();
         Ok(())

@@ -4,7 +4,7 @@
 
 use alloc::string::String;
 
-use crate::{bolts::tuples::Named, inputs::HasInput, observers::Observer};
+use crate::{bolts::tuples::Named, inputs::KnowsInput, observers::Observer};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
@@ -25,7 +25,7 @@ impl StdOutObserver {
     }
 }
 
-impl<S> Observer<S> for StdOutObserver where S: HasInput {}
+impl<S> Observer<S> for StdOutObserver where S: KnowsInput {}
 
 impl Named for StdOutObserver {
     fn name(&self) -> &str {
@@ -52,7 +52,7 @@ impl StdErrObserver {
     }
 }
 
-impl<S> Observer<S> for StdErrObserver where S: HasInput {}
+impl<S> Observer<S> for StdErrObserver where S: KnowsInput {}
 
 impl Named for StdErrObserver {
     fn name(&self) -> &str {

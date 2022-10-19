@@ -7,7 +7,7 @@ use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor, InProcessForkExecutor},
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::HasInput,
+    inputs::KnowsInput,
     observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State},
     Error,
@@ -19,7 +19,7 @@ use crate::{emu::Emulator, helper::QemuHelperTuple, hooks::QemuHooks};
 pub struct QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
 {
@@ -30,7 +30,7 @@ where
 impl<'a, H, OT, QT, S> Debug for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
 {
@@ -45,7 +45,7 @@ where
 impl<'a, H, OT, QT, S> QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
 {
@@ -93,7 +93,7 @@ where
 impl<'a, EM, H, OT, QT, S, Z> Executor<EM, S, Z> for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
 {
@@ -115,7 +115,7 @@ where
 impl<'a, H, OT, QT, S> HasObservers for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     S: State,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
@@ -138,7 +138,7 @@ where
 pub struct QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,
@@ -151,7 +151,7 @@ where
 impl<'a, H, OT, QT, S, SP> Debug for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,
@@ -168,7 +168,7 @@ where
 impl<'a, H, OT, QT, S, SP> QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,
@@ -229,7 +229,7 @@ impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, S, Z> for QemuForkExecutor<'a, H,
 where
     EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, S, Z>,
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     S: State,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
@@ -254,7 +254,7 @@ where
 impl<'a, H, OT, QT, S, SP> HasObservers for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: HasInput,
+    S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,

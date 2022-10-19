@@ -17,7 +17,7 @@ use crate::{
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},
-    inputs::HasInput,
+    inputs::KnowsInput,
     mark_feature_time,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
@@ -36,7 +36,7 @@ pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
 where
     CS: Scheduler,
     CS::State: HasExecutions + HasMaxSize + HasClientPerfMonitor,
-    <CS::State as HasInput>::Input: HasLen + Hash,
+    <CS::State as KnowsInput>::Input: HasLen + Hash,
     E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
@@ -183,7 +183,7 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, CS::State, Z>
 where
     CS: Scheduler,
     CS::State: HasClientPerfMonitor + HasExecutions + HasMaxSize,
-    <CS::State as HasInput>::Input: HasLen + Hash,
+    <CS::State as KnowsInput>::Input: HasLen + Hash,
     E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
@@ -237,7 +237,7 @@ where
     F1: Feedback<CS::State>,
     F2: Feedback<CS::State>,
     FF: FeedbackFactory<F2, CS::State, OT>,
-    <CS::State as HasInput>::Input: HasLen + Hash,
+    <CS::State as KnowsInput>::Input: HasLen + Hash,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
@@ -319,13 +319,13 @@ impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
 impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
 where
     M: MapObserver + Debug,
-    S: HasInput + HasClientPerfMonitor + Debug,
+    S: KnowsInput + HasClientPerfMonitor + Debug,
 {
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S as HasInput>::Input,
+        _input: &<S as KnowsInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -370,7 +370,7 @@ impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, S, OT> for MapEquality
 where
     M: MapObserver,
     OT: ObserversTuple<S>,
-    S: HasInput + HasClientPerfMonitor + Debug,
+    S: KnowsInput + HasClientPerfMonitor + Debug,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M, S> {
         let obs = observers

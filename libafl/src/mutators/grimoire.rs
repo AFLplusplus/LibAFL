@@ -7,7 +7,7 @@ use core::cmp::{max, min};
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{GeneralizedInput, GeneralizedItem, HasInput},
+    inputs::{GeneralizedInput, GeneralizedItem, KnowsInput},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     stages::generalization::GeneralizedIndexesMetadata,
     state::{HasCorpus, HasMetadata, HasRand},
@@ -130,7 +130,7 @@ pub struct GrimoireExtensionMutator {
 
 impl<S> Mutator<S> for GrimoireExtensionMutator
 where
-    S: HasInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
+    S: KnowsInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
@@ -178,7 +178,7 @@ pub struct GrimoireRecursiveReplacementMutator {
 
 impl<S> Mutator<S> for GrimoireRecursiveReplacementMutator
 where
-    S: HasInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
+    S: KnowsInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
@@ -249,7 +249,7 @@ pub struct GrimoireStringReplacementMutator {}
 
 impl<S> Mutator<S> for GrimoireStringReplacementMutator
 where
-    S: HasInput<Input = GeneralizedInput> + HasMetadata + HasRand,
+    S: KnowsInput<Input = GeneralizedInput> + HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,
@@ -357,7 +357,7 @@ pub struct GrimoireRandomDeleteMutator {
 
 impl<S> Mutator<S> for GrimoireRandomDeleteMutator
 where
-    S: HasInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
+    S: KnowsInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,

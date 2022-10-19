@@ -10,7 +10,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named, AsMutSlice, AsSlice},
-    inputs::HasInput,
+    inputs::KnowsInput,
     observers::Observer,
     state::HasMetadata,
     Error,
@@ -115,7 +115,7 @@ pub trait CmpMap: Debug {
 pub trait CmpObserver<CM, S>: Observer<S>
 where
     CM: CmpMap,
-    S: HasInput,
+    S: KnowsInput,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize;
@@ -199,7 +199,7 @@ where
 pub struct StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize,
-    S: HasInput,
+    S: KnowsInput,
 {
     cmp_map: OwnedRefMut<'a, CM>,
     size: Option<OwnedRefMut<'a, usize>>,
@@ -210,7 +210,7 @@ where
 impl<'a, CM, S> CmpObserver<CM, S> for StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
-    S: HasInput + Debug,
+    S: KnowsInput + Debug,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -232,7 +232,7 @@ where
 impl<'a, CM, S> Observer<S> for StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
-    S: HasInput + Debug,
+    S: KnowsInput + Debug,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.cmp_map.as_mut().reset()?;
@@ -243,7 +243,7 @@ where
 impl<'a, CM, S> Named for StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
-    S: HasInput,
+    S: KnowsInput,
 {
     fn name(&self) -> &str {
         &self.name
@@ -253,7 +253,7 @@ where
 impl<'a, CM, S> StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
-    S: HasInput,
+    S: KnowsInput,
 {
     /// Creates a new [`StdCmpObserver`] with the given name and map.
     #[must_use]

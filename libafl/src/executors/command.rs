@@ -27,7 +27,7 @@ use crate::{
         tuples::MatchName,
         AsSlice,
     },
-    inputs::{HasInput, HasTargetBytes},
+    inputs::{HasTargetBytes, KnowsInput},
     observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
 };
 #[cfg(feature = "std")]
@@ -303,7 +303,7 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<EM, OT, S, T, Z> Executor<EM, S, Z> for CommandExecutor<EM, OT, S, T, Z>
 where
-    S: HasInput,
+    S: KnowsInput,
     S::Input: HasTargetBytes,
     T: CommandConfigurator + Debug,
     OT: Debug + MatchName,
@@ -379,7 +379,7 @@ where
 
 impl<EM, OT, S, T, Z> HasObservers for CommandExecutor<EM, OT, S, T, Z>
 where
-    S: HasInput,
+    S: KnowsInput,
     T: Debug,
     OT: ObserversTuple<S>,
 {
@@ -602,7 +602,7 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}};
-/// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}, state::HasInput};
+/// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}, state::KnowsInput};
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
@@ -624,7 +624,7 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, S, Z>() -> impl Executor<EM, S, Z> where S: HasInput, S::Input: HasTargetBytes {
+/// fn make_executor<EM, S, Z>() -> impl Executor<EM, S, Z> where S: KnowsInput, S::Input: HasTargetBytes {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```

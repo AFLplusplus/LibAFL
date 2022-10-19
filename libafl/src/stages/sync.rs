@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     fuzzer::Evaluator,
-    inputs::{HasInput, Input},
+    inputs::{Input, KnowsInput},
     stages::Stage,
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
     Error,
@@ -39,7 +39,7 @@ impl SyncFromDiskMetadata {
 #[derive(Debug)]
 pub struct SyncFromDiskStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as HasInput>::Input, Error>,
+    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as KnowsInput>::Input, Error>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
@@ -50,7 +50,7 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z::State, Z> for SyncFromDiskStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as HasInput>::Input, Error>,
+    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as KnowsInput>::Input, Error>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
@@ -93,7 +93,7 @@ where
 
 impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as HasInput>::Input, Error>,
+    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as KnowsInput>::Input, Error>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
@@ -154,7 +154,7 @@ where
 
 /// Function type when the callback in `SyncFromDiskStage` is not a lambda
 pub type SyncFromDiskFunction<S, Z> =
-    fn(&mut Z, &mut S, &Path) -> Result<<S as HasInput>::Input, Error>;
+    fn(&mut Z, &mut S, &Path) -> Result<<S as KnowsInput>::Input, Error>;
 
 impl<E, EM, Z> SyncFromDiskStage<SyncFromDiskFunction<Z::State, Z>, E, EM, Z>
 where
@@ -164,7 +164,7 @@ where
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
     pub fn with_from_file(sync_dir: PathBuf) -> Self {
-        fn load_callback<S: HasInput, Z>(
+        fn load_callback<S: KnowsInput, Z>(
             _: &mut Z,
             _: &mut S,
             p: &Path,

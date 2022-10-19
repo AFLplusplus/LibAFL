@@ -1,7 +1,7 @@
 use std::{cell::UnsafeCell, cmp::max};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{inputs::HasInput, state::HasMetadata};
+use libafl::{inputs::KnowsInput, state::HasMetadata};
 pub use libafl_targets::{
     edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
@@ -68,7 +68,7 @@ impl Default for QemuEdgeCoverageHelper {
 
 impl<S> QemuHelper<S> for QemuEdgeCoverageHelper
 where
-    S: HasInput + HasMetadata,
+    S: KnowsInput + HasMetadata,
 {
     fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
@@ -124,7 +124,7 @@ impl Default for QemuEdgeCoverageChildHelper {
 
 impl<S> QemuHelper<S> for QemuEdgeCoverageChildHelper
 where
-    S: HasInput,
+    S: KnowsInput,
     S: HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
@@ -157,7 +157,7 @@ pub fn gen_unique_edge_ids<QT, S>(
 ) -> Option<u64>
 where
     S: HasMetadata,
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.helpers().match_first_type::<QemuEdgeCoverageHelper>() {
@@ -216,7 +216,7 @@ pub fn gen_hashed_edge_ids<QT, S>(
     dest: GuestAddr,
 ) -> Option<u64>
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks
@@ -252,7 +252,7 @@ pub fn gen_addr_block_ids<QT, S>(
     pc: GuestAddr,
 ) -> Option<u64>
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     // GuestAddress is u32 for 32 bit guests
@@ -266,7 +266,7 @@ pub fn gen_hashed_block_ids<QT, S>(
     pc: GuestAddr,
 ) -> Option<u64>
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     // GuestAddress is u32 for 32 bit guests

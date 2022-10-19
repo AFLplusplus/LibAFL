@@ -39,7 +39,7 @@ use crate::{
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
-    inputs::HasInput,
+    inputs::KnowsInput,
     Error,
 };
 
@@ -47,7 +47,7 @@ use crate::{
 /// They can then be used by various sorts of feedback.
 pub trait Observer<S>: Named + Debug
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
@@ -94,7 +94,7 @@ where
 /// A haskell-style tuple of observers
 pub trait ObserversTuple<S>: MatchName + Debug
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     /// This is called right before the next execution.
     fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
@@ -121,7 +121,7 @@ where
 
 impl<S> ObserversTuple<S> for ()
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     fn pre_exec_all(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
@@ -154,7 +154,7 @@ impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
 where
     Head: Observer<S>,
     Tail: ObserversTuple<S>,
-    S: HasInput,
+    S: KnowsInput,
 {
     fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.0.pre_exec(state, input)?;
@@ -225,7 +225,7 @@ impl TimeObserver {
 
 impl<S> Observer<S> for TimeObserver
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
@@ -290,7 +290,7 @@ where
 
 impl<'a, S, T> Observer<S> for ListObserver<'a, T>
 where
-    S: HasInput,
+    S: KnowsInput,
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {

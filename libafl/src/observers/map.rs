@@ -24,7 +24,7 @@ use crate::{
         AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen,
     },
     executors::ExitKind,
-    inputs::HasInput,
+    inputs::KnowsInput,
     observers::Observer,
     Error,
 };
@@ -201,7 +201,7 @@ where
 
 impl<'a, S, T> Observer<S> for StdMapObserver<'a, T>
 where
-    S: HasInput,
+    S: KnowsInput,
     T: Bounded
         + PartialEq
         + Default
@@ -503,7 +503,7 @@ where
 
 impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
 where
-    S: HasInput,
+    S: KnowsInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
@@ -775,7 +775,7 @@ where
 
 impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
 where
-    S: HasInput,
+    S: KnowsInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
@@ -1045,7 +1045,7 @@ where
 impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<u8>,
-    S: HasInput,
+    S: KnowsInput,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
@@ -1251,7 +1251,7 @@ impl<S, M> Observer<S> for HitcountsIterableMapObserver<M>
 where
     M: MapObserver<Entry = u8> + Observer<S>,
     for<'it> M: AsIterMut<'it, Item = u8>,
-    S: HasInput,
+    S: KnowsInput,
 {
     #[inline]
     fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
@@ -1447,7 +1447,7 @@ where
 
 impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T>
 where
-    S: HasInput,
+    S: KnowsInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
@@ -1704,7 +1704,7 @@ where
 
 impl<S, T> Observer<S> for OwnedMapObserver<T>
 where
-    S: HasInput,
+    S: KnowsInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
@@ -1922,7 +1922,7 @@ pub mod pybind {
         AsIter, AsIterMut, AsMutSlice, AsSlice, Debug, Error, HasLen, Iter, IterMut, MapObserver,
         Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
-    use crate::{inputs::HasInput, observers::pybind::PythonObserver};
+    use crate::{inputs::KnowsInput, observers::pybind::PythonObserver};
 
     #[macro_export]
     macro_rules! mapob_unwrap_me {
@@ -2259,7 +2259,7 @@ pub mod pybind {
             impl<S> Observer<S> for $struct_name_trait
             where
                 Self: MapObserver,
-                S: HasInput,
+                S: KnowsInput,
             {
                 #[inline]
                 fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {

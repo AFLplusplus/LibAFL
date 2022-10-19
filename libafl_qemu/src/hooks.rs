@@ -9,7 +9,7 @@ use core::{
     ptr::{self, addr_of},
 };
 
-use libafl::{executors::inprocess::inprocess_get_state, inputs::HasInput};
+use libafl::{executors::inprocess::inprocess_get_state, inputs::KnowsInput};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -42,7 +42,7 @@ type DynamicLenHookCl<QT, S> =
 static mut QEMU_HOOKS_PTR: *const c_void = ptr::null();
 unsafe fn get_qemu_hooks<'a, QT, S>() -> &'a mut QemuHooks<'a, QT, S>
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     (QEMU_HOOKS_PTR as *mut QemuHooks<'a, QT, S>)
@@ -54,7 +54,7 @@ static mut GENERIC_HOOKS: Vec<Hook> = vec![];
 
 extern "C" fn generic_hook_wrapper<QT, S>(pc: GuestAddr, index: u64)
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -81,7 +81,7 @@ static mut EDGE_HOOKS: Vec<(Hook, Hook)> = vec![];
 
 extern "C" fn gen_edge_hook_wrapper<QT, S>(src: GuestAddr, dst: GuestAddr, index: u64) -> u64
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -115,7 +115,7 @@ where
 
 extern "C" fn exec_edge_hook_wrapper<QT, S>(id: u64, index: u64)
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -140,7 +140,7 @@ static mut BLOCK_HOOKS: Vec<(Hook, Hook)> = vec![];
 
 extern "C" fn gen_block_hook_wrapper<QT, S>(pc: GuestAddr, index: u64) -> u64
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -165,7 +165,7 @@ where
 
 extern "C" fn exec_block_hook_wrapper<QT, S>(id: u64, index: u64)
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -191,7 +191,7 @@ static mut WRITE_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook, Hook)> = vec![];
 
 extern "C" fn gen_read_hook_wrapper<QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -225,7 +225,7 @@ where
 
 extern "C" fn gen_write_hook_wrapper<QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -261,7 +261,7 @@ macro_rules! define_rw_exec_hook {
     ($name:ident, $field:tt, $global:ident) => {
         extern "C" fn $name<QT, S>(id: u64, addr: GuestAddr, index: u64)
         where
-            S: HasInput,
+            S: KnowsInput,
             QT: QemuHelperTuple<S>,
         {
             unsafe {
@@ -290,7 +290,7 @@ macro_rules! define_rw_exec_hook_n {
     ($name:ident, $field:tt, $global:ident) => {
         extern "C" fn $name<QT, S>(id: u64, addr: GuestAddr, size: usize, index: u64)
         where
-            S: HasInput,
+            S: KnowsInput,
             QT: QemuHelperTuple<S>,
         {
             unsafe {
@@ -342,7 +342,7 @@ static mut CMP_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook)> = vec![];
 
 extern "C" fn gen_cmp_hook_wrapper<QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -378,7 +378,7 @@ macro_rules! define_cmp_exec_hook {
     ($name:ident, $field:tt, $itype:ty) => {
         extern "C" fn $name<QT, S>(id: u64, v0: $itype, v1: $itype, index: u64)
         where
-            S: HasInput,
+            S: KnowsInput,
             QT: QemuHelperTuple<S>,
         {
             unsafe {
@@ -424,7 +424,7 @@ static mut ON_THREAD_HOOKS: Vec<Hook> = vec![];
 #[cfg(feature = "usermode")]
 extern "C" fn on_thread_hooks_wrapper<QT, S>(tid: u32)
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -470,7 +470,7 @@ extern "C" fn syscall_hooks_wrapper<QT, S>(
     a7: u64,
 ) -> SyscallHookResult
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -573,7 +573,7 @@ extern "C" fn syscall_after_hooks_wrapper<QT, S>(
     a7: u64,
 ) -> u64
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     unsafe {
@@ -660,7 +660,7 @@ static mut HOOKS_IS_INITIALIZED: bool = false;
 pub struct QemuHooks<'a, QT, S>
 where
     QT: QemuHelperTuple<S>,
-    S: HasInput,
+    S: KnowsInput,
 {
     helpers: QT,
     emulator: &'a Emulator,
@@ -669,7 +669,7 @@ where
 
 impl<'a, QT, S> Debug for QemuHooks<'a, QT, S>
 where
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -683,7 +683,7 @@ where
 impl<'a, QT, S> QemuHooks<'a, QT, S>
 where
     QT: QemuHelperTuple<S>,
-    S: HasInput,
+    S: KnowsInput,
 {
     pub fn new(emulator: &'a Emulator, helpers: QT) -> Box<Self> {
         unsafe {

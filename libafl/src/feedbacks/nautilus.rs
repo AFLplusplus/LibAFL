@@ -16,7 +16,7 @@ use crate::{
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,
-    prelude::HasInput,
+    prelude::KnowsInput,
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
@@ -83,7 +83,7 @@ impl<'a, S> Named for NautilusFeedback<'a, S> {
 
 impl<'a, S> Feedback<S> for NautilusFeedback<'a, S>
 where
-    S: HasMetadata + HasClientPerfMonitor + HasInput<Input = NautilusInput>,
+    S: HasMetadata + HasClientPerfMonitor + KnowsInput<Input = NautilusInput>,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(

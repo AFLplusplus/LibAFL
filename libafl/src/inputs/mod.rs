@@ -112,7 +112,7 @@ pub trait HasBytesVec {
 
 /// Defines the input type shared across traits of the type.
 /// Needed for consistency across HasCorpus/HasSolutions and friends.
-pub trait HasInput {
+pub trait KnowsInput {
     /// Type which will be used throughout this [`State`].
     type Input: Input;
 }

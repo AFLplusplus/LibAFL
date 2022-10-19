@@ -30,7 +30,7 @@ pub use powersched::PowerQueueScheduler;
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, Testcase},
-    inputs::HasInput,
+    inputs::KnowsInput,
     state::{HasCorpus, HasRand, State},
     Error,
 };
@@ -51,7 +51,7 @@ pub trait Scheduler {
         &self,
         _state: &mut Self::State,
         _idx: usize,
-        _prev: &Testcase<<Self::State as HasInput>::Input>,
+        _prev: &Testcase<<Self::State as KnowsInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -61,7 +61,7 @@ pub trait Scheduler {
         &self,
         _state: &mut Self::State,
         _idx: usize,
-        _testcase: &Option<Testcase<<Self::State as HasInput>::Input>>,
+        _testcase: &Option<Testcase<<Self::State as KnowsInput>::Input>>,
     ) -> Result<(), Error> {
         Ok(())
     }

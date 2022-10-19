@@ -17,7 +17,7 @@ use super::ObserverWithHashField;
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
-    inputs::HasInput,
+    inputs::KnowsInput,
     observers::Observer,
     Error,
 };
@@ -99,7 +99,7 @@ impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
 
 impl<'a, S> Observer<S> for BacktraceObserver<'a>
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     fn post_exec(
         &mut self,
@@ -247,7 +247,7 @@ impl Default for ASANBacktraceObserver {
 
 impl<S> Observer<S> for ASANBacktraceObserver
 where
-    S: HasInput,
+    S: KnowsInput,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())

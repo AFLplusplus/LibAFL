@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::AsSlice,
-    inputs::{HasInput, HasTargetBytes},
+    inputs::{HasTargetBytes, KnowsInput},
     observers::ObserversTuple,
     state::State,
     Error,
@@ -103,7 +103,7 @@ crate::impl_serdeany!(DiffExitKind);
 /// Holds a tuple of Observers
 pub trait HasObservers: Debug {
     /// The [`State`]
-    type State: HasInput;
+    type State: KnowsInput;
     /// The observers type
     type Observers: ObserversTuple<Self::State>;
 
@@ -117,7 +117,7 @@ pub trait HasObservers: Debug {
 /// An executor takes the given inputs, and runs the harness/target.
 pub trait Executor<EM, S, Z>: Debug
 where
-    S: HasInput,
+    S: KnowsInput,
     Z: Sized,
 {
     /// Instruct the target about the input and run

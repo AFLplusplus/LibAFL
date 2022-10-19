@@ -1,5 +1,5 @@
 use hashbrown::HashMap;
-use libafl::{inputs::HasInput, state::HasMetadata};
+use libafl::{inputs::KnowsInput, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogMap, CmpLogObserver, CMPLOG_MAP,
     CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W,
@@ -55,7 +55,7 @@ impl Default for QemuCmpLogHelper {
 
 impl<S> QemuHelper<S> for QemuCmpLogHelper
 where
-    S: HasInput + HasMetadata,
+    S: KnowsInput + HasMetadata,
 {
     fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
@@ -96,7 +96,7 @@ impl Default for QemuCmpLogChildHelper {
 
 impl<S> QemuHelper<S> for QemuCmpLogChildHelper
 where
-    S: HasInput,
+    S: KnowsInput,
     S: HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
@@ -123,7 +123,7 @@ pub fn gen_unique_cmp_ids<QT, S>(
 ) -> Option<u64>
 where
     S: HasMetadata,
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
@@ -155,7 +155,7 @@ pub fn gen_hashed_cmp_ids<QT, S>(
 ) -> Option<u64>
 where
     S: HasMetadata,
-    S: HasInput,
+    S: KnowsInput,
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {

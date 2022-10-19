@@ -11,7 +11,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
-    inputs::HasInput,
+    inputs::KnowsInput,
     observers::{ObserverWithHashField, ObserversTuple},
     state::{HasClientPerfMonitor, HasNamedMetadata},
     Error,
@@ -77,7 +77,7 @@ pub struct NewHashFeedback<O, S> {
 impl<O, S> Feedback<S> for NewHashFeedback<O, S>
 where
     O: ObserverWithHashField + Named + Debug,
-    S: HasInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
+    S: KnowsInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata(NewHashFeedbackMetadata::default(), &self.name);
@@ -89,7 +89,7 @@ where
         &mut self,
         state: &mut S,
         _manager: &mut EM,
-        _input: &<S as HasInput>::Input,
+        _input: &<S as KnowsInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>

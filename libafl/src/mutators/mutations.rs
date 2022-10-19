@@ -9,7 +9,7 @@ use core::{
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{HasBytesVec, HasInput},
+    inputs::{HasBytesVec, KnowsInput},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
@@ -102,13 +102,13 @@ pub struct BitFlipMutator;
 
 impl<S> Mutator<S> for BitFlipMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut <S as HasInput>::Input,
+        input: &mut <S as KnowsInput>::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if input.bytes().is_empty() {
@@ -142,7 +142,7 @@ pub struct ByteFlipMutator;
 
 impl<S> Mutator<S> for ByteFlipMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -180,7 +180,7 @@ pub struct ByteIncMutator;
 
 impl<S> Mutator<S> for ByteIncMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -219,7 +219,7 @@ pub struct ByteDecMutator;
 
 impl<S> Mutator<S> for ByteDecMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -258,7 +258,7 @@ pub struct ByteNegMutator;
 
 impl<S> Mutator<S> for ByteNegMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -297,7 +297,7 @@ pub struct ByteRandMutator;
 
 impl<S> Mutator<S> for ByteRandMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -341,7 +341,7 @@ macro_rules! add_mutator_impl {
         #[allow(trivial_numeric_casts)]
         impl<S> Mutator<S> for $name
         where
-            S: HasInput + HasRand,
+            S: KnowsInput + HasRand,
             S::Input: HasBytesVec,
         {
             fn mutate(
@@ -407,7 +407,7 @@ macro_rules! interesting_mutator_impl {
 
         impl<S> Mutator<S> for $name
         where
-            S: HasInput + HasRand,
+            S: KnowsInput + HasRand,
             S::Input: HasBytesVec,
         {
             #[allow(clippy::cast_sign_loss)]
@@ -460,7 +460,7 @@ pub struct BytesDeleteMutator;
 
 impl<S> Mutator<S> for BytesDeleteMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -502,7 +502,7 @@ pub struct BytesExpandMutator;
 
 impl<S> Mutator<S> for BytesExpandMutator
 where
-    S: HasInput + HasRand + HasMaxSize,
+    S: KnowsInput + HasRand + HasMaxSize,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -551,7 +551,7 @@ pub struct BytesInsertMutator;
 
 impl<S> Mutator<S> for BytesInsertMutator
 where
-    S: HasInput + HasRand + HasMaxSize,
+    S: KnowsInput + HasRand + HasMaxSize,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -606,7 +606,7 @@ pub struct BytesRandInsertMutator;
 
 impl<S> Mutator<S> for BytesRandInsertMutator
 where
-    S: HasInput + HasRand + HasMaxSize,
+    S: KnowsInput + HasRand + HasMaxSize,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -658,7 +658,7 @@ pub struct BytesSetMutator;
 
 impl<S> Mutator<S> for BytesSetMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -702,7 +702,7 @@ pub struct BytesRandSetMutator;
 
 impl<S> Mutator<S> for BytesRandSetMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -746,7 +746,7 @@ pub struct BytesCopyMutator;
 
 impl<S> Mutator<S> for BytesCopyMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -792,7 +792,7 @@ pub struct BytesInsertCopyMutator {
 
 impl<S> Mutator<S> for BytesInsertCopyMutator
 where
-    S: HasInput + HasRand + HasMaxSize,
+    S: KnowsInput + HasRand + HasMaxSize,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -854,7 +854,7 @@ pub struct BytesSwapMutator;
 
 impl<S> Mutator<S> for BytesSwapMutator
 where
-    S: HasInput + HasRand,
+    S: KnowsInput + HasRand,
     S::Input: HasBytesVec,
 {
     fn mutate(
