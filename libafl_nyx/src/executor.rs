@@ -4,8 +4,8 @@ use libafl::{
     bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, KnowsInput},
-    observers::ObserversTuple,
-    state::State,
+    observers::{KnowsObservers, ObserversTuple},
+    state::{KnowsState, State},
     Error,
 };
 use libnyx::NyxReturnValue;
@@ -30,17 +30,32 @@ impl<'a, S, OT> Debug for NyxExecutor<'a, S, OT> {
     }
 }
 
-impl<'a, EM, S, Z, OT> Executor<EM, S, Z> for NyxExecutor<'a, S, OT>
+impl<'a, S, OT> KnowsState for NyxExecutor<'a, S, OT>
+where
+    S: KnowsInput,
+{
+    type State = S;
+}
+
+impl<'a, S, OT> KnowsObservers for NyxExecutor<'a, S, OT>
+where
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+{
+    type Observers = OT;
+}
+
+impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
 where
     S::Input: HasTargetBytes,
     S: KnowsInput,
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        input: &S::Input,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let input_owned = input.target_bytes();
         let input = input_owned.as_slice();
@@ -90,9 +105,6 @@ where
     S: State,
     OT: ObserversTuple<S>,
 {
-    type State = S;
-    type Observers = OT;
-
     fn observers(&self) -> &OT {
         &self.observers
     }

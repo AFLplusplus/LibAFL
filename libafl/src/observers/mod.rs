@@ -40,6 +40,7 @@ use crate::{
     },
     executors::ExitKind,
     inputs::KnowsInput,
+    state::KnowsState,
     Error,
 };
 
@@ -89,6 +90,13 @@ where
     ) -> Result<(), Error> {
         Ok(())
     }
+}
+
+/// Defines the observer type shared across traits of the type.
+/// Needed for consistency across HasCorpus/HasSolutions and friends.
+pub trait KnowsObservers: KnowsState {
+    /// The observers type
+    type Observers: ObserversTuple<Self::State>;
 }
 
 /// A haskell-style tuple of observers

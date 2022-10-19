@@ -218,7 +218,7 @@ impl<CS, E, EM, OT, PS, Z> Stage<E, EM, CS::State, Z> for PushStageAdapter<CS, E
 where
     CS: Scheduler,
     CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasRand,
-    E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>
         + EventRestarter
         + HasEventManagerId

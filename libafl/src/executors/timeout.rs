@@ -34,6 +34,8 @@ use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::KnowsInput,
+    observers::KnowsObservers,
+    state::KnowsState,
     Error,
 };
 
@@ -272,9 +274,9 @@ where
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -333,17 +335,16 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, S, Z>,
-    S: KnowsInput,
+    E: Executor<EM, Z>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
@@ -372,9 +373,9 @@ where
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
@@ -393,13 +394,24 @@ where
     }
 }
 
+impl<E> KnowsState for TimeoutExecutor<E>
+where
+    E: KnowsState,
+{
+    type State = E::State;
+}
+
+impl<E> KnowsObservers for TimeoutExecutor<E>
+where
+    E: KnowsObservers,
+{
+    type Observers = E::Observers;
+}
+
 impl<E> HasObservers for TimeoutExecutor<E>
 where
     E: HasObservers,
 {
-    type State = E::State;
-    type Observers = E::Observers;
-
     #[inline]
     fn observers(&self) -> &Self::Observers {
         self.executor.observers()

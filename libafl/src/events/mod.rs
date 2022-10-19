@@ -35,9 +35,9 @@ pub struct EventManagerId {
     pub id: usize,
 }
 
-use crate::inputs::KnowsInput;
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
+use crate::{inputs::KnowsInput, observers::KnowsObservers, state::KnowsState};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -301,10 +301,7 @@ where
 }
 
 /// [`EventFirer`] fire an event.
-pub trait EventFirer {
-    /// State for this fuzzing campaign
-    type State: KnowsInput;
-
+pub trait EventFirer: KnowsState {
     /// Send off an [`Event`] to the broker
     ///
     /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
@@ -352,16 +349,16 @@ pub trait EventFirer {
 }
 
 /// [`ProgressReporter`] report progress to the broker.
-pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State> {
-    /// State for this fuzzing campaign
-    type State: KnowsInput + HasClientPerfMonitor + HasMetadata + HasExecutions;
-
+pub trait ProgressReporter: EventFirer
+where
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+{
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
     /// Will return an [`crate::Error`], if the stats could not be sent.
     fn maybe_report_progress(
         &mut self,
-        state: &mut <Self as ProgressReporter>::State,
+        state: &mut Self::State,
         last_report_time: Duration,
         monitor_timeout: Duration,
     ) -> Result<Duration, Error> {
@@ -423,10 +420,7 @@ pub trait ProgressReporter: EventFirer<State = <Self as ProgressReporter>::State
 }
 
 /// Restartable trait
-pub trait EventRestarter {
-    /// State for this fuzzing campaign
-    type State: KnowsInput;
-
+pub trait EventRestarter: KnowsState {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
     fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
@@ -439,12 +433,7 @@ pub trait EventRestarter {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, Z> {
-    /// The state for this fuzzing campaign
-    type State: KnowsInput;
-    /// The observers for this fuzzing campaign
-    type Observers: ObserversTuple<Self::State>;
-
+pub trait EventProcessor<E, Z>: KnowsObservers {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
     fn process(
@@ -473,14 +462,10 @@ pub trait HasEventManagerId {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager<E, S, Z>:
-    EventFirer<State = S>
-    + EventProcessor<E, Z, State = S>
-    + EventRestarter<State = S>
-    + HasEventManagerId
-    + ProgressReporter<State = S>
+pub trait EventManager<E, Z>:
+    EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
-    S: KnowsInput,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
 {
 }
 
@@ -510,12 +495,25 @@ impl<OT, S> NopEventManager<OT, S> {
     }
 }
 
-impl<OT, S> EventFirer for NopEventManager<OT, S>
+impl<OT, S> KnowsState for NopEventManager<OT, S>
 where
     S: KnowsInput,
 {
     type State = S;
+}
 
+impl<OT, S> KnowsObservers for NopEventManager<OT, S>
+where
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+{
+    type Observers = OT;
+}
+
+impl<OT, S> EventFirer for NopEventManager<OT, S>
+where
+    S: KnowsInput,
+{
     fn fire(
         &mut self,
         _state: &mut Self::State,
@@ -525,22 +523,13 @@ where
     }
 }
 
-impl<OT, S> EventRestarter for NopEventManager<OT, S>
-where
-    S: KnowsInput,
-{
-    type State = S;
-}
+impl<OT, S> EventRestarter for NopEventManager<OT, S> where S: KnowsInput {}
 
 impl<E, OT, S, Z> EventProcessor<E, Z> for NopEventManager<OT, S>
 where
     S: KnowsInput + HasClientPerfMonitor + HasExecutions,
     OT: ObserversTuple<S>,
 {
-    type State = S;
-
-    type Observers = OT;
-
     fn process(
         &mut self,
         _fuzzer: &mut Z,
@@ -551,7 +540,7 @@ where
     }
 }
 
-impl<E, OT, S, Z> EventManager<E, S, Z> for NopEventManager<OT, S>
+impl<E, OT, S, Z> EventManager<E, Z> for NopEventManager<OT, S>
 where
     OT: ObserversTuple<S>,
     S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
@@ -566,11 +555,9 @@ impl<OT, S> HasCustomBufHandlers<S> for NopEventManager<OT, S> {
     }
 }
 
-impl<OT, S> ProgressReporter for NopEventManager<OT, S>
-where
-    S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+impl<OT, S> ProgressReporter for NopEventManager<OT, S> where
+    S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata
 {
-    type State = S;
 }
 
 impl<OT, S> HasEventManagerId for NopEventManager<OT, S> {
@@ -650,8 +637,8 @@ pub mod pybind {
         executors::pybind::PythonExecutor,
         fuzzer::pybind::PythonStdFuzzer,
         inputs::BytesInput,
-        observers::pybind::PythonObserversTuple,
-        state::pybind::PythonStdState,
+        observers::{pybind::PythonObserversTuple, KnowsObservers},
+        state::{pybind::PythonStdState, KnowsState},
         Error,
     };
 
@@ -694,22 +681,23 @@ pub mod pybind {
         }
     }
 
-    impl EventFirer for PythonEventManager {
+    impl KnowsState for PythonEventManager {
         type State = PythonStdState;
+    }
 
+    impl KnowsObservers for PythonEventManager {
+        type Observers = PythonObserversTuple;
+    }
+
+    impl EventFirer for PythonEventManager {
         fn fire(&mut self, state: &mut Self::State, event: Event<BytesInput>) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
         }
     }
 
-    impl EventRestarter for PythonEventManager {
-        type State = PythonStdState;
-    }
+    impl EventRestarter for PythonEventManager {}
 
     impl EventProcessor<PythonExecutor, PythonStdFuzzer> for PythonEventManager {
-        type State = PythonStdState;
-        type Observers = PythonObserversTuple;
-
         fn process(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
@@ -720,9 +708,7 @@ pub mod pybind {
         }
     }
 
-    impl ProgressReporter for PythonEventManager {
-        type State = PythonStdState;
-    }
+    impl ProgressReporter for PythonEventManager {}
 
     impl HasEventManagerId for PythonEventManager {
         fn mgr_id(&self) -> EventManagerId {
@@ -730,7 +716,7 @@ pub mod pybind {
         }
     }
 
-    impl EventManager<PythonExecutor, PythonStdState, PythonStdFuzzer> for PythonEventManager {}
+    impl EventManager<PythonExecutor, PythonStdFuzzer> for PythonEventManager {}
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

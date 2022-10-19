@@ -21,7 +21,7 @@ use crate::{
     observers::ObserversTuple,
     schedulers::Scheduler,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -91,7 +91,8 @@ where
         + ProgressReporter<State = CS::State>,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + Clone + Debug,
+    CS::State:
+        HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
         + HasScheduler<CS>,
@@ -200,13 +201,11 @@ where
 impl<CS, EM, M, OT, Z> Iterator for StdMutationalPushStage<CS, EM, M, OT, Z>
 where
     CS: Scheduler,
-    EM: EventFirer<State = CS::State>
-        + EventRestarter
-        + HasEventManagerId
-        + ProgressReporter<State = CS::State>,
+    EM: EventFirer + EventRestarter + HasEventManagerId + ProgressReporter<State = CS::State>,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + Clone + Debug,
+    CS::State:
+        HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
         + HasScheduler<CS>,

@@ -4,34 +4,48 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::ObserversTuple,
-    state::State,
+    observers::{KnowsObservers, ObserversTuple},
+    state::KnowsState,
     Error,
 };
 
 /// A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
 #[derive(Debug)]
-pub struct WithObservers<E: Debug, OT: Debug> {
+pub struct WithObservers<E, OT> {
     executor: E,
     observers: OT,
 }
 
-impl<E, EM, OT, S, Z> Executor<EM, S, Z> for WithObservers<E, OT>
+impl<E, EM, OT, Z> Executor<EM, Z> for WithObservers<E, OT>
 where
-    E: Executor<EM, S, Z> + Debug,
+    E: Executor<EM, Z> + Debug,
     OT: Debug,
-    S: State,
     Z: Sized,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
+}
+
+impl<E, OT> KnowsState for WithObservers<E, OT>
+where
+    E: KnowsState,
+{
+    type State = E::State;
+}
+
+impl<E, OT> KnowsObservers for WithObservers<E, OT>
+where
+    E: KnowsState,
+    OT: ObserversTuple<E::State>,
+{
+    type Observers = OT;
 }
 
 impl<E, OT> HasObservers for WithObservers<E, OT>
@@ -39,9 +53,6 @@ where
     E: HasObservers + Debug,
     OT: ObserversTuple<E::State> + Debug,
 {
-    type State = E::State;
-    type Observers = OT;
-
     fn observers(&self) -> &OT {
         &self.observers
     }

@@ -19,7 +19,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct TracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     tracer_executor: TE,
@@ -29,7 +29,7 @@ where
 
 impl<E, EM, TE, Z> Stage<E, EM, TE::State, Z> for TracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
@@ -76,7 +76,7 @@ where
 
 impl<EM, TE, Z> TracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default stage
@@ -103,7 +103,7 @@ pub struct ShadowTracingStage<E, EM, OT, SOT, Z> {
 impl<E, EM, OT, SOT, Z> Stage<ShadowExecutor<E, SOT>, EM, E::State, Z>
     for ShadowTracingStage<E, EM, OT, SOT, Z>
 where
-    E: Executor<EM, E::State, Z> + HasObservers<Observers = OT>,
+    E: Executor<EM, Z> + HasObservers<Observers = OT>,
     OT: ObserversTuple<E::State>,
     SOT: ObserversTuple<E::State>,
     E::State: State + HasClientPerfMonitor + HasExecutions + HasCorpus + Debug,
@@ -154,7 +154,7 @@ where
 
 impl<E, EM, OT, SOT, Z> ShadowTracingStage<E, EM, OT, SOT, Z>
 where
-    E: Executor<EM, E::State, Z> + HasObservers<Observers = OT>,
+    E: Executor<EM, Z> + HasObservers<Observers = OT>,
     OT: ObserversTuple<E::State>,
     E::State: State + HasClientPerfMonitor + HasExecutions + HasCorpus,
     SOT: ObserversTuple<E::State>,

@@ -10,7 +10,8 @@ use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{HasTargetBytes, KnowsInput},
-    observers::ObserversTuple,
+    observers::{KnowsObservers, ObserversTuple},
+    state::KnowsState,
     Error,
 };
 
@@ -53,7 +54,7 @@ where
     }
 }
 
-impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, S, Z>
+impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -67,9 +68,9 @@ where
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.helper.pre_exec(input)?;
         if self.helper.stalker_enabled() {
@@ -97,6 +98,26 @@ where
     }
 }
 
+impl<'a, 'b, 'c, H, OT, RT, S> KnowsObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+where
+    H: FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+    S::Input: HasTargetBytes,
+{
+    type Observers = OT;
+}
+
+impl<'a, 'b, 'c, H, OT, RT, S> KnowsState for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+where
+    H: FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+    S::Input: HasTargetBytes,
+{
+    type State = S;
+}
+
 impl<'a, 'b, 'c, H, OT, RT, S> HasObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
@@ -104,9 +125,6 @@ where
     S: KnowsInput,
     OT: ObserversTuple<S>,
 {
-    type State = S;
-    type Observers = OT;
-
     #[inline]
     fn observers(&self) -> &OT {
         self.base.observers()

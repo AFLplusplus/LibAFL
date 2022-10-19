@@ -14,7 +14,7 @@ use crate::{
         powersched::SchedulerMetadata, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
     },
     stages::{MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, KnowsState},
     Error,
 };
 
@@ -22,7 +22,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct PowerMutationalStage<E, F, EM, M, O, Z>
 where
-    E: Executor<EM, E::State, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -37,7 +37,7 @@ where
 
 impl<E, F, EM, M, O, Z> MutationalStage<E, EM, M, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
 where
-    E: Executor<EM, E::State, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -127,7 +127,7 @@ where
 
 impl<E, F, EM, M, O, Z> Stage<E, EM, E::State, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
 where
-    E: Executor<EM, E::State, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -151,7 +151,7 @@ where
 
 impl<E, F, EM, M, O, Z> PowerMutationalStage<E, F, EM, M, O, Z>
 where
-    E: Executor<EM, E::State, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -170,4 +170,4 @@ where
 
 /// The standard powerscheduling stage
 pub type StdPowerMutationalStage<E, EM, M, O, Z> =
-    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as HasObservers>::State>, EM, M, O, Z>;
+    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as KnowsState>::State>, EM, M, O, Z>;

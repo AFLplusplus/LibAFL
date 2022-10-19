@@ -22,7 +22,7 @@ use crate::{
     inputs::KnowsInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasExecutions, HasRand},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand},
     Error, EvaluatorObservers, ExecutionProcessor, HasScheduler,
 };
 
@@ -188,7 +188,7 @@ where
         + HasEventManagerId
         + ProgressReporter<State = CS::State>,
     OT: ObserversTuple<CS::State>,
-    CS::State: HasClientPerfMonitor + HasRand + HasExecutions,
+    CS::State: HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata,
     Z: ExecutionProcessor<Observers = OT, State = CS::State>
         + EvaluatorObservers<Observers = OT, State = CS::State>
         + HasScheduler<CS>,

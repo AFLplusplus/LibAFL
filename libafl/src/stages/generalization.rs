@@ -79,7 +79,7 @@ impl<E, EM, O, Z> Stage<E, EM, E::State, Z>
     for GeneralizationStage<EM, O, E::Observers, E::State, Z>
 where
     O: MapObserver,
-    E: Executor<EM, E::State, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
     E::State: KnowsInput<Input = GeneralizedInput>
         + HasClientPerfMonitor
@@ -394,7 +394,7 @@ where
         input: &GeneralizedInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, S, Z> + HasObservers<Observers = OT, State = S>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = S>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -439,7 +439,7 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, S, Z> + HasObservers<Observers = OT, State = S>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = S>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -481,7 +481,7 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, S, Z> + HasObservers<Observers = OT, State = S>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = S>,
     {
         let mut index = 0;
         while index < payload.len() {

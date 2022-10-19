@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
+    inputs::KnowsInput,
     schedulers::{Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, KnowsState},
     Error,
 };
 
@@ -19,8 +20,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct ProbabilitySamplingScheduler<F, S>
 where
-    F: TestcaseScore<S>,
-    S: HasCorpus + HasMetadata + HasRand,
+    S: KnowsInput,
 {
     phantom: PhantomData<(F, S)>,
 }
@@ -87,13 +87,18 @@ where
     }
 }
 
+impl<F, S> KnowsState for ProbabilitySamplingScheduler<F, S>
+where
+    S: KnowsInput,
+{
+    type State = S;
+}
+
 impl<F, S> Scheduler for ProbabilitySamplingScheduler<F, S>
 where
     F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand,
 {
-    type State = S;
-
     fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if state.metadata().get::<ProbabilityMetadata>().is_none() {
             state.add_metadata(ProbabilityMetadata::new());

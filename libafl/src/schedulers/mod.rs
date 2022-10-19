@@ -31,16 +31,13 @@ use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, Testcase},
     inputs::KnowsInput,
-    state::{HasCorpus, HasRand, State},
+    state::{HasCorpus, HasRand, KnowsState},
     Error,
 };
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait Scheduler {
-    /// The [`State`]
-    type State: HasCorpus;
-
+pub trait Scheduler: KnowsState {
     /// Added an entry to the corpus at the given index
     fn on_add(&self, _state: &mut Self::State, _idx: usize) -> Result<(), Error> {
         Ok(())
@@ -76,12 +73,17 @@ pub struct RandScheduler<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> Scheduler for RandScheduler<S>
+impl<S> KnowsState for RandScheduler<S>
 where
-    S: State + HasCorpus + HasRand,
+    S: KnowsInput,
 {
     type State = S;
+}
 
+impl<S> Scheduler for RandScheduler<S>
+where
+    S: HasCorpus + HasRand,
+{
     /// Gets the next entry at random
     fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {

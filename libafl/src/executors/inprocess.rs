@@ -35,23 +35,20 @@ use windows::Win32::System::Threading::SetThreadStackGuarantee;
 
 #[cfg(unix)]
 use crate::bolts::os::unix_signals::setup_signal_handler;
+#[cfg(all(feature = "std", unix))]
+use crate::bolts::os::unix_signals::{ucontext_t, Handler, Signal};
 #[cfg(all(windows, feature = "std"))]
 use crate::bolts::os::windows_exceptions::setup_exception_handler;
 #[cfg(all(feature = "std", unix))]
 use crate::bolts::shmem::ShMemProvider;
-#[cfg(all(feature = "std", unix))]
-use crate::{
-    bolts::os::unix_signals::{ucontext_t, Handler, Signal},
-    events::EventManager,
-};
 use crate::{
     events::{EventFirer, EventRestarter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::KnowsInput,
-    observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasSolutions},
+    observers::{KnowsObservers, ObserversTuple},
+    state::{HasClientPerfMonitor, HasSolutions, KnowsState},
     Error,
 };
 
@@ -99,7 +96,27 @@ where
     }
 }
 
-impl<EM, H, HB, OT, S, Z> Executor<EM, S, Z> for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, OT, S> KnowsState for GenericInProcessExecutor<H, HB, OT, S>
+where
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+{
+    type State = S;
+}
+
+impl<H, HB, OT, S> KnowsObservers for GenericInProcessExecutor<H, HB, OT, S>
+where
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    HB: BorrowMut<H>,
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+{
+    type Observers = OT;
+}
+
+impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
@@ -109,9 +126,9 @@ where
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
@@ -130,9 +147,6 @@ where
     OT: ObserversTuple<S>,
     S: KnowsInput,
 {
-    type State = S;
-    type Observers = OT;
-
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers
@@ -165,8 +179,8 @@ where
         _event_mgr: &mut EM,
     ) -> Result<Self, Error>
     where
-        Self: Executor<EM, S, Z>,
-        EM: EventFirer<State = S> + EventRestarter<State = S>,
+        Self: Executor<EM, Z, State = S>,
+        EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         Z: HasObjective<OF, S>,
     {
@@ -322,7 +336,7 @@ impl InProcessHandlers {
     /// Create new [`InProcessHandlers`].
     pub fn new<E, EM, OF, Z, H>() -> Result<Self, Error>
     where
-        E: Executor<EM, E::State, Z> + HasObservers,
+        E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
@@ -745,7 +759,7 @@ mod unix_signal_handler {
         _context: &mut ucontext_t,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: Executor<EM, E::State, Z> + HasObservers,
+        E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
@@ -1486,10 +1500,31 @@ where
     }
 }
 
-#[cfg(all(feature = "std", unix))]
-impl<'a, EM, H, OT, S, SP, Z> Executor<EM, S, Z> for InProcessForkExecutor<'a, H, OT, S, SP>
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<'a, H, OT, S, SP> KnowsState for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    EM: EventManager<Self, S, Z>,
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type State = S;
+}
+
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<'a, H, OT, S, SP> KnowsState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
+where
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type State = S;
+}
+
+#[cfg(all(feature = "std", unix))]
+impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for InProcessForkExecutor<'a, H, OT, S, SP>
+where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: KnowsInput,
@@ -1500,9 +1535,9 @@ where
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         _mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -1554,7 +1589,7 @@ where
 }
 
 #[cfg(all(feature = "std", target_os = "linux"))]
-impl<'a, EM, H, OT, S, SP, Z> Executor<EM, S, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
+impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
@@ -1565,10 +1600,10 @@ where
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
-        state: &mut S,
-        _mgr: &mut EM,
-        input: &S::Input,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             self.shmem_provider.pre_fork()?;
@@ -1748,6 +1783,28 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
+impl<'a, H, OT, S, SP> KnowsObservers for InProcessForkExecutor<'a, H, OT, S, SP>
+where
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type Observers = OT;
+}
+
+#[cfg(all(feature = "std", target_os = "linux"))]
+impl<'a, H, OT, S, SP> KnowsObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
+where
+    H: ?Sized + FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type Observers = OT;
+}
+
+#[cfg(all(feature = "std", unix))]
 impl<'a, H, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
@@ -1755,9 +1812,6 @@ where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
-    type State = S;
-    type Observers = OT;
-
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers
@@ -1777,9 +1831,6 @@ where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
-    type State = S;
-    type Observers = OT;
-
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers

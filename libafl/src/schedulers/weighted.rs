@@ -12,12 +12,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
+    inputs::KnowsInput,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, KnowsState},
     Error,
 };
 
@@ -216,13 +217,18 @@ where
     }
 }
 
+impl<F, S> KnowsState for WeightedScheduler<F, S>
+where
+    S: KnowsInput,
+{
+    type State = S;
+}
+
 impl<F, S> Scheduler for WeightedScheduler<F, S>
 where
     F: TestcaseScore<S>,
     S: HasCorpus + HasMetadata + HasRand,
 {
-    type State = S;
-
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {

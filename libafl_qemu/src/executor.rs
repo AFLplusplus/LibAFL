@@ -8,8 +8,11 @@ use libafl::{
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::KnowsInput,
-    observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State},
+    observers::{KnowsObservers, ObserversTuple},
+    state::{
+        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, KnowsState,
+        State,
+    },
     Error,
 };
 
@@ -90,7 +93,7 @@ where
     }
 }
 
-impl<'a, EM, H, OT, QT, S, Z> Executor<EM, S, Z> for QemuExecutor<'a, H, OT, QT, S>
+impl<'a, EM, H, OT, QT, S, Z> Executor<EM, Z> for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S: KnowsInput,
@@ -100,9 +103,9 @@ where
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
         self.hooks.helpers_mut().pre_exec_all(&emu, input);
@@ -112,17 +115,33 @@ where
     }
 }
 
+impl<'a, H, OT, QT, S> KnowsState for QemuExecutor<'a, H, OT, QT, S>
+where
+    H: FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    S: KnowsInput,
+{
+    type State = S;
+}
+
+impl<'a, H, OT, QT, S> KnowsObservers for QemuExecutor<'a, H, OT, QT, S>
+where
+    H: FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    S: KnowsInput,
+{
+    type Observers = OT;
+}
+
 impl<'a, H, OT, QT, S> HasObservers for QemuExecutor<'a, H, OT, QT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S: KnowsInput,
-    S: State,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
 {
-    type State = S;
-    type Observers = OT;
-
     #[inline]
     fn observers(&self) -> &OT {
         self.inner.observers()
@@ -185,7 +204,7 @@ where
     where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
-        S: State + HasSolutions + HasClientPerfMonitor,
+        S: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<OF, S>,
     {
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
@@ -225,12 +244,11 @@ where
 }
 
 #[cfg(feature = "fork")]
-impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, S, Z> for QemuForkExecutor<'a, H, OT, QT, S, SP>
+impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, Z> for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
-    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, S, Z>,
+    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, Z, State = S>,
     H: FnMut(&S::Input) -> ExitKind,
-    S: KnowsInput,
-    S: State,
+    S: KnowsInput + HasClientPerfMonitor + HasMetadata + HasExecutions,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,
@@ -238,9 +256,9 @@ where
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
         self.hooks.helpers_mut().pre_exec_all(&emu, input);
@@ -248,6 +266,30 @@ where
         self.hooks.helpers_mut().post_exec_all(&emu, input);
         r
     }
+}
+
+#[cfg(feature = "fork")]
+impl<'a, H, OT, QT, S, SP> KnowsObservers for QemuForkExecutor<'a, H, OT, QT, S, SP>
+where
+    H: FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type Observers = OT;
+}
+
+#[cfg(feature = "fork")]
+impl<'a, H, OT, QT, S, SP> KnowsState for QemuForkExecutor<'a, H, OT, QT, S, SP>
+where
+    H: FnMut(&S::Input) -> ExitKind,
+    OT: ObserversTuple<S>,
+    QT: QemuHelperTuple<S>,
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type State = S;
 }
 
 #[cfg(feature = "fork")]
@@ -259,9 +301,6 @@ where
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,
 {
-    type State = S;
-    type Observers = OT;
-
     #[inline]
     fn observers(&self) -> &OT {
         self.inner.observers()

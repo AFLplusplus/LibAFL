@@ -35,9 +35,9 @@ pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
     Stage<E, EM, CS::State, Z> + FeedbackFactory<F2, CS::State, OT>
 where
     CS: Scheduler,
-    CS::State: HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    CS::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <CS::State as KnowsInput>::Input: HasLen + Hash,
-    E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
     F2: Feedback<CS::State>,
@@ -182,9 +182,9 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, CS::State, Z>
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
-    CS::State: HasClientPerfMonitor + HasExecutions + HasMaxSize,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
     <CS::State as KnowsInput>::Input: HasLen + Hash,
-    E: Executor<EM, CS::State, Z> + HasObservers<Observers = OT, State = CS::State>,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
     F2: Feedback<CS::State>,
@@ -232,7 +232,7 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> TMinMutationalStage<CS, E, EM, F1, F2, M, 
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
-    E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, CS::State, Z>,
+    E: HasObservers<Observers = OT, State = CS::State> + Executor<EM, Z>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
     F2: Feedback<CS::State>,

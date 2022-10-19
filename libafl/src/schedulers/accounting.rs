@@ -1,6 +1,7 @@
 //! Coverage accounting corpus scheduler, more details at <https://www.ndss-symposium.org/wp-content/uploads/2020/02/24422-paper.pdf>
 
 use alloc::vec::Vec;
+use core::fmt::Debug;
 
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,7 @@ use crate::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, KnowsState},
     Error,
 };
 
@@ -95,23 +96,32 @@ impl TopAccountingMetadata {
 #[derive(Debug)]
 pub struct CoverageAccountingScheduler<'a, CS>
 where
-    CS: Scheduler,
-    CS::State: HasMetadata,
-    <CS::State as KnowsInput>::Input: HasLen,
+    CS: KnowsState,
+    CS::State: Debug,
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
-    inner: MinimizerScheduler<CS, LenTimeMulTestcaseScore<CS::State>, MapIndexesMetadata>,
+    inner: MinimizerScheduler<
+        CS,
+        LenTimeMulTestcaseScore<<CS as KnowsState>::State>,
+        MapIndexesMetadata,
+    >,
+}
+
+impl<'a, CS> KnowsState for CoverageAccountingScheduler<'a, CS>
+where
+    CS: KnowsState,
+    CS::State: Debug,
+{
+    type State = CS::State;
 }
 
 impl<'a, CS> Scheduler for CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
-    CS::State: HasCorpus + HasMetadata + HasRand,
+    CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as KnowsInput>::Input: HasLen,
 {
-    type State = CS::State;
-
     fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
         self.inner.on_add(state, idx)
@@ -164,7 +174,7 @@ where
 impl<'a, CS> CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
-    CS::State: HasCorpus + HasMetadata + HasRand,
+    CS::State: HasCorpus + HasMetadata + HasRand + Debug,
     <CS::State as KnowsInput>::Input: HasLen,
 {
     /// Update the `Corpus` score

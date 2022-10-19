@@ -3,7 +3,13 @@
 use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
-use crate::{corpus::Corpus, schedulers::Scheduler, state::HasCorpus, Error};
+use crate::{
+    corpus::Corpus,
+    inputs::KnowsInput,
+    schedulers::Scheduler,
+    state::{HasCorpus, KnowsState},
+    Error,
+};
 
 /// Walk the corpus in a queue-like fashion
 #[derive(Debug, Clone)]
@@ -11,12 +17,17 @@ pub struct QueueScheduler<S> {
     phantom: PhantomData<S>,
 }
 
+impl<S> KnowsState for QueueScheduler<S>
+where
+    S: KnowsInput,
+{
+    type State = S;
+}
+
 impl<S> Scheduler for QueueScheduler<S>
 where
     S: HasCorpus,
 {
-    type State = S;
-
     /// Gets the next entry in the queue
     fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {

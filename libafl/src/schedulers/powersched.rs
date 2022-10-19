@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
+    inputs::KnowsInput,
     schedulers::Scheduler,
-    state::{HasCorpus, HasMetadata},
+    state::{HasCorpus, HasMetadata, KnowsState},
     Error,
 };
 
@@ -153,12 +154,17 @@ pub struct PowerQueueScheduler<S> {
     phantom: PhantomData<S>,
 }
 
+impl<S> KnowsState for PowerQueueScheduler<S>
+where
+    S: KnowsInput,
+{
+    type State = S;
+}
+
 impl<S> Scheduler for PowerQueueScheduler<S>
 where
     S: HasCorpus + HasMetadata,
 {
-    type State = S;
-
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {

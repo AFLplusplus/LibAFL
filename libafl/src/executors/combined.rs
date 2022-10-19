@@ -6,23 +6,24 @@ use core::fmt::Debug;
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::KnowsInput,
-    state::State,
+    observers::KnowsObservers,
+    state::KnowsState,
     Error,
 };
 
 /// A [`CombinedExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
 #[derive(Debug)]
-pub struct CombinedExecutor<A: Debug, B: Debug> {
+pub struct CombinedExecutor<A, B> {
     primary: A,
     secondary: B,
 }
 
-impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
+impl<A, B> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
     pub fn new<EM, S, Z>(primary: A, secondary: B) -> Self
     where
-        A: Executor<EM, S, Z>,
-        B: Executor<EM, S, Z>,
+        A: Executor<EM, Z>,
+        B: Executor<EM, Z, State = A::State>,
         S: KnowsInput,
     {
         Self { primary, secondary }
@@ -39,19 +40,18 @@ impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
     }
 }
 
-impl<A, B, EM, S, Z> Executor<EM, S, Z> for CombinedExecutor<A, B>
+impl<A, B, EM, Z> Executor<EM, Z> for CombinedExecutor<A, B>
 where
-    A: Executor<EM, S, Z>,
-    B: Executor<EM, S, Z>,
-    S: State,
+    A: Executor<EM, Z>,
+    B: Executor<EM, Z, State = A::State>,
     Z: Sized,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let ret = self.primary.run_target(fuzzer, state, mgr, input);
         self.primary.post_run_reset();
@@ -60,14 +60,25 @@ where
     }
 }
 
+impl<A, B> KnowsState for CombinedExecutor<A, B>
+where
+    A: KnowsState,
+{
+    type State = A::State;
+}
+
+impl<A, B> KnowsObservers for CombinedExecutor<A, B>
+where
+    A: KnowsObservers,
+{
+    type Observers = A::Observers;
+}
+
 impl<A, B> HasObservers for CombinedExecutor<A, B>
 where
     A: HasObservers,
     B: Debug,
 {
-    type State = A::State;
-    type Observers = A::Observers;
-
     #[inline]
     fn observers(&self) -> &Self::Observers {
         self.primary.observers()

@@ -34,7 +34,10 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, KnowsInput},
     mutators::Tokens,
-    observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
+    observers::{
+        get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, KnowsObservers, ObserversTuple,
+    },
+    state::KnowsState,
     Error,
 };
 
@@ -353,13 +356,13 @@ pub trait HasForkserver {
 
 /// The timeout forkserver executor that wraps around the standard forkserver executor and sets a timeout before each run.
 #[derive(Debug)]
-pub struct TimeoutForkserverExecutor<E: Debug> {
+pub struct TimeoutForkserverExecutor<E> {
     executor: E,
     timeout: TimeSpec,
     signal: Signal,
 }
 
-impl<E: Debug> TimeoutForkserverExecutor<E> {
+impl<E> TimeoutForkserverExecutor<E> {
     /// Create a new [`TimeoutForkserverExecutor`]
     pub fn new(executor: E, exec_tmout: Duration) -> Result<Self, Error> {
         let signal = Signal::SIGKILL;
@@ -378,19 +381,18 @@ impl<E: Debug> TimeoutForkserverExecutor<E> {
     }
 }
 
-impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutForkserverExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutForkserverExecutor<E>
 where
-    E: Executor<EM, S, Z> + HasForkserver + Debug,
-    S: KnowsInput,
-    S::Input: HasTargetBytes,
+    E: Executor<EM, Z> + HasForkserver + Debug,
+    Self::Input: HasTargetBytes,
 {
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        input: &S::Input,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
@@ -477,7 +479,6 @@ where
 /// Please refer to AFL++'s docs. <https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md>
 pub struct ForkserverExecutor<OT, S, SP>
 where
-    OT: Debug,
     SP: ShMemProvider,
 {
     target: OsString,
@@ -855,21 +856,20 @@ impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 }
 
-impl<EM, OT, S, SP, Z> Executor<EM, S, Z> for ForkserverExecutor<OT, S, SP>
+impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
     S: KnowsInput,
     S::Input: HasTargetBytes,
-    Self: HasObservers,
 {
     #[inline]
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        input: &S::Input,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
 
@@ -946,6 +946,23 @@ where
     }
 }
 
+impl<OT, S, SP> KnowsObservers for ForkserverExecutor<OT, S, SP>
+where
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type Observers = OT;
+}
+
+impl<OT, S, SP> KnowsState for ForkserverExecutor<OT, S, SP>
+where
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type State = S;
+}
+
 impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
@@ -953,9 +970,6 @@ where
     S::Input: HasTargetBytes,
     SP: ShMemProvider,
 {
-    type State = S;
-    type Observers = OT;
-
     #[inline]
     fn observers(&self) -> &OT {
         &self.observers
@@ -1007,14 +1021,24 @@ where
     }
 }
 
+impl<E> KnowsState for TimeoutForkserverExecutor<E>
+where
+    E: KnowsState,
+{
+    type State = E::State;
+}
+
+impl<E> KnowsObservers for TimeoutForkserverExecutor<E>
+where
+    E: KnowsObservers,
+{
+    type Observers = E::Observers;
+}
+
 impl<E> HasObservers for TimeoutForkserverExecutor<E>
 where
     E: HasObservers,
-    E::State: Debug,
 {
-    type State = E::State;
-    type Observers = E::Observers;
-
     #[inline]
     fn observers(&self) -> &Self::Observers {
         self.executor.observers()

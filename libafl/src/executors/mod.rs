@@ -40,8 +40,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::AsSlice,
     inputs::{HasTargetBytes, KnowsInput},
-    observers::ObserversTuple,
-    state::State,
+    observers::{KnowsObservers, ObserversTuple},
+    state::KnowsState,
     Error,
 };
 
@@ -101,12 +101,7 @@ impl From<ExitKind> for DiffExitKind {
 crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers: Debug {
-    /// The [`State`]
-    type State: KnowsInput;
-    /// The observers type
-    type Observers: ObserversTuple<Self::State>;
-
+pub trait HasObservers: KnowsObservers + Debug {
     /// Get the linked observers
     fn observers(&self) -> &Self::Observers;
 
@@ -115,18 +110,14 @@ pub trait HasObservers: Debug {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, S, Z>: Debug
-where
-    S: KnowsInput,
-    Z: Sized,
-{
+pub trait Executor<EM, Z>: KnowsState + Debug {
     /// Instruct the target about the input and run
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error>;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
@@ -136,7 +127,7 @@ where
     fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
     where
         Self: Sized,
-        OT: ObserversTuple<S>,
+        OT: ObserversTuple<Self::State>,
     {
         WithObservers::new(self, observers)
     }
@@ -153,17 +144,24 @@ struct NopExecutor<S> {
     phantom: PhantomData<S>,
 }
 
-impl<EM, S, Z> Executor<EM, S, Z> for NopExecutor<S>
+impl<S> KnowsState for NopExecutor<S>
 where
-    S: State + Debug,
+    S: KnowsInput,
+{
+    type State = S;
+}
+
+impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
+where
+    S: KnowsInput + Debug,
     S::Input: HasTargetBytes,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &S::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::empty("Input Empty"))
@@ -213,9 +211,12 @@ pub mod pybind {
             inprocess::pybind::PythonOwnedInProcessExecutor, Executor, ExitKind, HasObservers,
         },
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
-        inputs::{BytesInput, HasBytesVec},
-        observers::pybind::PythonObserversTuple,
-        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        inputs::{HasBytesVec, KnowsInput},
+        observers::{pybind::PythonObserversTuple, KnowsObservers},
+        state::{
+            pybind::{PythonStdState, PythonStdStateWrapper},
+            KnowsState,
+        },
         Error,
     };
 
@@ -307,10 +308,15 @@ pub mod pybind {
         }
     }
 
-    impl HasObservers for PyObjectExecutor {
-        type Observers = PythonObserversTuple;
+    impl KnowsState for PyObjectExecutor {
         type State = PythonStdState;
+    }
 
+    impl KnowsObservers for PyObjectExecutor {
+        type Observers = PythonObserversTuple;
+    }
+
+    impl HasObservers for PyObjectExecutor {
         #[inline]
         fn observers(&self) -> &PythonObserversTuple {
             &self.tuple
@@ -322,14 +328,14 @@ pub mod pybind {
         }
     }
 
-    impl Executor<PythonEventManager, PythonStdState, PythonStdFuzzer> for PyObjectExecutor {
+    impl Executor<PythonEventManager, PythonStdFuzzer> for PyObjectExecutor {
         #[inline]
         fn run_target(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
-            state: &mut PythonStdState,
+            state: &mut Self::State,
             mgr: &mut PythonEventManager,
-            input: &BytesInput,
+            input: &Self::Input,
         ) -> Result<ExitKind, Error> {
             let ek = Python::with_gil(|py| -> PyResult<_> {
                 let ek: PythonExitKind = self
@@ -419,10 +425,15 @@ pub mod pybind {
         }
     }
 
-    impl HasObservers for PythonExecutor {
-        type Observers = PythonObserversTuple;
+    impl KnowsState for PythonExecutor {
         type State = PythonStdState;
+    }
 
+    impl KnowsObservers for PythonExecutor {
+        type Observers = PythonObserversTuple;
+    }
+
+    impl HasObservers for PythonExecutor {
         #[inline]
         fn observers(&self) -> &PythonObserversTuple {
             let ptr = unwrap_me!(self.wrapper, e, {
@@ -440,14 +451,14 @@ pub mod pybind {
         }
     }
 
-    impl Executor<PythonEventManager, PythonStdState, PythonStdFuzzer> for PythonExecutor {
+    impl Executor<PythonEventManager, PythonStdFuzzer> for PythonExecutor {
         #[inline]
         fn run_target(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
-            state: &mut PythonStdState,
+            state: &mut Self::State,
             mgr: &mut PythonEventManager,
-            input: &BytesInput,
+            input: &Self::Input,
         ) -> Result<ExitKind, Error> {
             unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })
         }

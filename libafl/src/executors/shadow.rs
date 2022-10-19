@@ -4,17 +4,13 @@ use core::fmt::{self, Debug, Formatter};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::KnowsInput,
-    observers::ObserversTuple,
+    observers::{KnowsObservers, ObserversTuple},
+    state::KnowsState,
     Error,
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
-pub struct ShadowExecutor<E, SOT>
-where
-    E: HasObservers + Debug,
-    SOT: ObserversTuple<E::State> + Debug,
-{
+pub struct ShadowExecutor<E, SOT> {
     /// The wrapped executor
     executor: E,
     /// The shadow observers
@@ -23,7 +19,7 @@ where
 
 impl<E, SOT> Debug for ShadowExecutor<E, SOT>
 where
-    E: HasObservers + Debug,
+    E: KnowsState + Debug,
     SOT: ObserversTuple<E::State> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -60,20 +56,34 @@ where
     }
 }
 
-impl<E, EM, SOT, Z> Executor<EM, E::State, Z> for ShadowExecutor<E, SOT>
+impl<E, EM, SOT, Z> Executor<EM, Z> for ShadowExecutor<E, SOT>
 where
-    E: Executor<EM, E::State, Z> + HasObservers,
+    E: Executor<EM, Z> + HasObservers,
     SOT: ObserversTuple<E::State>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut E::State,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &<E::State as KnowsInput>::Input,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
+}
+
+impl<E, SOT> KnowsState for ShadowExecutor<E, SOT>
+where
+    E: KnowsState,
+{
+    type State = E::State;
+}
+
+impl<E, SOT> KnowsObservers for ShadowExecutor<E, SOT>
+where
+    E: KnowsObservers,
+{
+    type Observers = E::Observers;
 }
 
 impl<E, SOT> HasObservers for ShadowExecutor<E, SOT>
@@ -81,9 +91,6 @@ where
     E: HasObservers,
     SOT: ObserversTuple<E::State>,
 {
-    type State = E::State;
-    type Observers = E::Observers;
-
     #[inline]
     fn observers(&self) -> &Self::Observers {
         self.executor.observers()

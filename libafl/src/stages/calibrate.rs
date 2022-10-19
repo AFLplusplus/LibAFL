@@ -80,7 +80,7 @@ const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
 impl<E, EM, O, OT, Z> Stage<E, EM, E::State, Z> for CalibrationStage<O, OT, E::State>
 where
-    E: Executor<EM, E::State, Z> + HasObservers<Observers = OT>,
+    E: Executor<EM, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<State = E::State>,
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,

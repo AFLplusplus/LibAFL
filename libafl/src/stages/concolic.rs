@@ -20,7 +20,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct ConcolicTracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     inner: TracingStage<EM, TE, Z>,
@@ -29,7 +29,7 @@ where
 
 impl<E, EM, TE, Z> Stage<E, EM, TE::State, Z> for ConcolicTracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
@@ -64,7 +64,7 @@ where
 
 impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z>
 where
-    TE: Executor<EM, TE::State, Z> + HasObservers,
+    TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.

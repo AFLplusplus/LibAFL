@@ -28,7 +28,10 @@ use crate::{
         AsSlice,
     },
     inputs::{HasTargetBytes, KnowsInput},
-    observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
+    observers::{
+        ASANBacktraceObserver, KnowsObservers, ObserversTuple, StdErrObserver, StdOutObserver,
+    },
+    state::KnowsState,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
@@ -140,11 +143,7 @@ impl CommandConfigurator for StdCommandConfigurator {
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<EM, OT, S, T, Z>
-where
-    T: Debug,
-    OT: Debug,
-{
+pub struct CommandExecutor<EM, OT, S, T, Z> {
     /// The wrapped comand configurer
     configurer: T,
     observers: OT,
@@ -301,7 +300,7 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, OT, S, T, Z> Executor<EM, S, Z> for CommandExecutor<EM, OT, S, T, Z>
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<EM, OT, S, T, Z>
 where
     S: KnowsInput,
     S::Input: HasTargetBytes,
@@ -310,10 +309,10 @@ where
 {
     fn run_target(
         &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        input: &S::Input,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
@@ -377,15 +376,27 @@ where
     }
 }
 
+impl<EM, OT, S, T, Z> KnowsState for CommandExecutor<EM, OT, S, T, Z>
+where
+    S: KnowsInput,
+{
+    type State = S;
+}
+
+impl<EM, OT, S, T, Z> KnowsObservers for CommandExecutor<EM, OT, S, T, Z>
+where
+    OT: ObserversTuple<S>,
+    S: KnowsInput,
+{
+    type Observers = OT;
+}
+
 impl<EM, OT, S, T, Z> HasObservers for CommandExecutor<EM, OT, S, T, Z>
 where
     S: KnowsInput,
     T: Debug,
     OT: ObserversTuple<S>,
 {
-    type State = S;
-    type Observers = OT;
-
     fn observers(&self) -> &OT {
         &self.observers
     }
