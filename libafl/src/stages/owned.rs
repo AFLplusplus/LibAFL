@@ -5,26 +5,41 @@ use alloc::{boxed::Box, vec::Vec};
 use crate::{
     bolts::anymap::AsAny,
     stages::{Stage, StagesTuple},
+    state::KnowsState,
     Error,
 };
 
 /// Combine `Stage` and `AsAny`
-pub trait AnyStage<E, EM, S, Z>: Stage<E, EM, S, Z> + AsAny {}
+pub trait AnyStage<E, EM, Z>: Stage<E, EM, Z> + AsAny
+where
+    E: KnowsState<State = Self::State>,
+    EM: KnowsState<State = Self::State>,
+    Z: KnowsState<State = Self::State>,
+{
+}
 
 /// An owned list of `Observer` trait objects
 #[derive(Default)]
 #[allow(missing_debug_implementations)]
-pub struct StagesOwnedList<E, EM, S, Z> {
+pub struct StagesOwnedList<E, EM, Z>
+where
+    E: KnowsState,
+{
     /// The named trait objects map
-    pub list: Vec<Box<dyn AnyStage<E, EM, S, Z>>>,
+    pub list: Vec<Box<dyn AnyStage<E, EM, Z, State = E::State, Input = E::Input>>>,
 }
 
-impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for StagesOwnedList<E, EM, S, Z> {
+impl<E, EM, Z> StagesTuple<E, EM, E::State, Z> for StagesOwnedList<E, EM, Z>
+where
+    E: KnowsState,
+    EM: KnowsState<State = E::State>,
+    Z: KnowsState<State = E::State>,
+{
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -35,10 +50,13 @@ impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for StagesOwnedList<E, EM, S, Z> {
     }
 }
 
-impl<E, EM, S, Z> StagesOwnedList<E, EM, S, Z> {
+impl<E, EM, Z> StagesOwnedList<E, EM, Z>
+where
+    E: KnowsState,
+{
     /// Create a new instance
     #[must_use]
-    pub fn new(list: Vec<Box<dyn AnyStage<E, EM, S, Z>>>) -> Self {
+    pub fn new(list: Vec<Box<dyn AnyStage<E, EM, Z, Input = E::Input, State = E::State>>>) -> Self {
         Self { list }
     }
 }

@@ -5,7 +5,6 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::KnowsInput,
     observers::KnowsObservers,
     state::KnowsState,
     Error,
@@ -20,11 +19,12 @@ pub struct CombinedExecutor<A, B> {
 
 impl<A, B> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, S, Z>(primary: A, secondary: B) -> Self
+    pub fn new<EM, Z>(primary: A, secondary: B) -> Self
     where
         A: Executor<EM, Z>,
         B: Executor<EM, Z, State = A::State>,
-        S: KnowsInput,
+        EM: KnowsState<State = A::State>,
+        Z: KnowsState<State = A::State>,
     {
         Self { primary, secondary }
     }
@@ -44,7 +44,8 @@ impl<A, B, EM, Z> Executor<EM, Z> for CombinedExecutor<A, B>
 where
     A: Executor<EM, Z>,
     B: Executor<EM, Z, State = A::State>,
-    Z: Sized,
+    EM: KnowsState<State = A::State>,
+    Z: KnowsState<State = A::State>,
 {
     fn run_target(
         &mut self,
@@ -77,7 +78,6 @@ where
 impl<A, B> HasObservers for CombinedExecutor<A, B>
 where
     A: HasObservers,
-    B: Debug,
 {
     #[inline]
     fn observers(&self) -> &Self::Observers {

@@ -20,10 +20,11 @@ use crate::{
         HasObserverName,
     },
     fuzzer::Evaluator,
+    inputs::KnowsInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, KnowsState},
     Error,
 };
 
@@ -62,12 +63,7 @@ impl UnstableEntriesMetadata {
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<O, OT, S>
-where
-    O: MapObserver,
-    OT: ObserversTuple<S>,
-    S: HasCorpus + HasMetadata + HasNamedMetadata,
-{
+pub struct CalibrationStage<O, OT, S> {
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
@@ -78,7 +74,14 @@ where
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
 const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<E, EM, O, OT, Z> Stage<E, EM, E::State, Z> for CalibrationStage<O, OT, E::State>
+impl<O, OT, S> KnowsState for CalibrationStage<O, OT, S>
+where
+    S: KnowsInput,
+{
+    type State = S;
+}
+
+impl<E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<O, OT, E::State>
 where
     E: Executor<EM, Z> + HasObservers<Observers = OT>,
     EM: EventFirer<State = E::State>,

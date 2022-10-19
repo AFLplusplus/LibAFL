@@ -20,7 +20,8 @@ impl<E, EM, OT, Z> Executor<EM, Z> for WithObservers<E, OT>
 where
     E: Executor<EM, Z> + Debug,
     OT: Debug,
-    Z: Sized,
+    EM: KnowsState<State = E::State>,
+    Z: KnowsState<State = E::State>,
 {
     fn run_target(
         &mut self,

@@ -47,14 +47,16 @@ where
 
 impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
 where
-    S::Input: HasTargetBytes,
+    EM: KnowsState<State = S>,
     S: KnowsInput,
+    S::Input: HasTargetBytes,
+    Z: KnowsState<State = S>,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let input_owned = input.target_bytes();

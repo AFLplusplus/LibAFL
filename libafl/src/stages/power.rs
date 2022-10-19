@@ -20,24 +20,24 @@ use crate::{
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<E, F, EM, M, O, Z>
-where
-    E: Executor<EM, Z> + HasObservers,
-    F: TestcaseScore<E::State>,
-    M: Mutator<E::State>,
-    O: MapObserver,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata,
-    Z: Evaluator<E, EM, State = E::State>,
-{
+pub struct PowerMutationalStage<E, F, EM, M, O, Z> {
     map_observer_name: String,
     mutator: M,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, F, EM, O, Z)>,
 }
 
+impl<E, F, EM, M, O, Z> KnowsState for PowerMutationalStage<E, F, EM, M, O, Z>
+where
+    E: KnowsState,
+{
+    type State = E::State;
+}
+
 impl<E, F, EM, M, O, Z> MutationalStage<E, EM, M, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
+    EM: KnowsState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -125,9 +125,10 @@ where
     }
 }
 
-impl<E, F, EM, M, O, Z> Stage<E, EM, E::State, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
+impl<E, F, EM, M, O, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
+    EM: KnowsState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -152,6 +153,7 @@ where
 impl<E, F, EM, M, O, Z> PowerMutationalStage<E, F, EM, M, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
+    EM: KnowsState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,

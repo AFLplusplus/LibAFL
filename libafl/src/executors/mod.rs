@@ -101,7 +101,7 @@ impl From<ExitKind> for DiffExitKind {
 crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers: KnowsObservers + Debug {
+pub trait HasObservers: KnowsObservers {
     /// Get the linked observers
     fn observers(&self) -> &Self::Observers;
 
@@ -110,7 +110,11 @@ pub trait HasObservers: KnowsObservers + Debug {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, Z>: KnowsState + Debug {
+pub trait Executor<EM, Z>: KnowsState + Debug
+where
+    EM: KnowsState<State = Self::State>,
+    Z: KnowsState<State = Self::State>,
+{
     /// Instruct the target about the input and run
     fn run_target(
         &mut self,
@@ -153,8 +157,10 @@ where
 
 impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
 where
+    EM: KnowsState<State = S>,
     S: KnowsInput + Debug,
     S::Input: HasTargetBytes,
+    Z: KnowsState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -176,7 +182,7 @@ mod test {
     use core::marker::PhantomData;
 
     use super::{Executor, NopExecutor};
-    use crate::{inputs::BytesInput, state::NopState, NopFuzzer};
+    use crate::{events::NopEventManager, inputs::BytesInput, state::NopState, NopFuzzer};
 
     #[test]
     fn nop_executor() {
@@ -190,10 +196,20 @@ mod test {
         let mut state = NopState::new();
 
         executor
-            .run_target(&mut fuzzer, &mut state, &mut (), &empty_input)
+            .run_target(
+                &mut fuzzer,
+                &mut state,
+                &mut NopEventManager::<(), _>::new(),
+                &empty_input,
+            )
             .unwrap_err();
         executor
-            .run_target(&mut fuzzer, &mut state, &mut (), &nonempty_input)
+            .run_target(
+                &mut fuzzer,
+                &mut state,
+                &mut NopEventManager::<(), _>::new(),
+                &nonempty_input,
+            )
             .unwrap();
     }
 }
@@ -211,7 +227,7 @@ pub mod pybind {
             inprocess::pybind::PythonOwnedInProcessExecutor, Executor, ExitKind, HasObservers,
         },
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
-        inputs::{HasBytesVec, KnowsInput},
+        inputs::HasBytesVec,
         observers::{pybind::PythonObserversTuple, KnowsObservers},
         state::{
             pybind::{PythonStdState, PythonStdStateWrapper},

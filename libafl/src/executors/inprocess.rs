@@ -120,8 +120,10 @@ impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, OT
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
+    EM: KnowsState<State = S>,
     OT: ObserversTuple<S>,
     S: KnowsInput,
+    Z: KnowsState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -182,7 +184,7 @@ where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
-        Z: HasObjective<OF, S>,
+        Z: HasObjective<OF, State = S>,
     {
         let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
         #[cfg(windows)]
@@ -340,7 +342,7 @@ impl InProcessHandlers {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, E::State>,
+        Z: HasObjective<OF, State = E::State>,
         H: FnMut(&<E::State as KnowsInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
@@ -612,7 +614,7 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, E::State>,
+        Z: HasObjective<OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -685,7 +687,7 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, E::State>,
+        Z: HasObjective<OF, State = E::State>,
     {
         if !data.is_valid() {
             #[cfg(feature = "std")]
@@ -763,7 +765,7 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, E::State>,
+        Z: HasObjective<OF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
@@ -1525,10 +1527,12 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for InProcessForkExecutor<'a, H, OT, S, SP>
 where
+    EM: KnowsState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: KnowsInput,
     SP: ShMemProvider,
+    Z: KnowsState<State = S>,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -1591,18 +1595,20 @@ where
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
+    EM: KnowsState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
     S: KnowsInput,
     SP: ShMemProvider,
+    Z: KnowsState<State = S>,
 {
     #[allow(unreachable_code)]
     #[inline]
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
+        _fuzzer: &mut Z,
         state: &mut Self::State,
-        mgr: &mut EM,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
@@ -1695,7 +1701,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, S>,
+        Z: HasObjective<OF, State = S>,
     {
         let handlers = InChildProcessHandlers::new::<Self>()?;
         Ok(Self {
@@ -1742,7 +1748,7 @@ where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, S>,
+        Z: HasObjective<OF, State = S>,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();
@@ -1941,8 +1947,11 @@ mod tests {
 
     use crate::{
         bolts::tuples::tuple_list,
+        events::NopEventManager,
         executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
         inputs::{KnowsInput, NopInput},
+        state::NopState,
+        NopFuzzer,
     };
 
     impl KnowsInput for () {
@@ -1953,7 +1962,7 @@ mod tests {
     fn test_inmem_exec() {
         let mut harness = |_buf: &NopInput| ExitKind::Ok;
 
-        let mut in_process_executor = InProcessExecutor::<_, (), ()> {
+        let mut in_process_executor = InProcessExecutor::<_, _, _> {
             harness_fn: &mut harness,
             observers: tuple_list!(),
             handlers: InProcessHandlers::nop(),
@@ -1961,7 +1970,12 @@ mod tests {
         };
         let input = NopInput {};
         in_process_executor
-            .run_target(&mut (), &mut (), &mut (), &input)
+            .run_target(
+                &mut NopFuzzer::new(),
+                &mut NopState::new(),
+                &mut NopEventManager::<(), _>::new(),
+                &input,
+            )
             .unwrap();
     }
 

@@ -44,7 +44,7 @@ use crate::{
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
     inputs::{Input, KnowsInput},
     monitors::Monitor,
-    observers::{KnowsObservers, ObserversTuple},
+    observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, KnowsState},
     Error,
 };
@@ -385,7 +385,7 @@ where
     where
         OT: ObserversTuple<S> + DeserializeOwned,
         E: Executor<Self, Z> + HasObservers<State = S, Observers = OT>,
-        Z: ExecutionProcessor<State = S, Observers = OT> + EvaluatorObservers,
+        Z: ExecutionProcessor<OT, State = S> + EvaluatorObservers<OT>,
     {
         match event {
             Event::NewTestcase {
@@ -442,15 +442,6 @@ where
     SP: ShMemProvider,
 {
     type State = S;
-}
-
-impl<OT, S, SP> KnowsObservers for LlmpEventManager<OT, S, SP>
-where
-    OT: ObserversTuple<S>,
-    S: KnowsInput,
-    SP: ShMemProvider,
-{
-    type Observers = OT;
 }
 
 impl<OT, S, SP> EventFirer for LlmpEventManager<OT, S, SP>
@@ -513,14 +504,13 @@ where
     }
 }
 
-impl<E, OT, S, SP, Z> EventProcessor<E, Z> for LlmpEventManager<OT, S, SP>
+impl<E, OT, S, SP, Z> EventProcessor<E, OT, Z> for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S> + DeserializeOwned,
     S: KnowsInput + HasClientPerfMonitor + HasExecutions,
     SP: ShMemProvider,
     E: HasObservers<State = S, Observers = OT> + Executor<Self, Z>,
-    Z: EvaluatorObservers<State = S, Observers = OT>
-        + ExecutionProcessor<State = S, Observers = OT>,
+    Z: EvaluatorObservers<OT, State = S> + ExecutionProcessor<OT, State = S>,
 {
     fn process(
         &mut self,
@@ -559,14 +549,13 @@ where
     }
 }
 
-impl<E, OT, S, SP, Z> EventManager<E, Z> for LlmpEventManager<OT, S, SP>
+impl<E, OT, S, SP, Z> EventManager<E, OT, Z> for LlmpEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S> + DeserializeOwned,
     S: KnowsInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
     E: HasObservers<State = S, Observers = OT> + Executor<Self, Z>,
-    Z: EvaluatorObservers<State = S, Observers = OT>
-        + ExecutionProcessor<State = S, Observers = OT>,
+    Z: EvaluatorObservers<OT, State = S> + ExecutionProcessor<OT, State = S>,
 {
 }
 
@@ -633,16 +622,6 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<OT, S, SP> KnowsObservers for LlmpRestartingEventManager<OT, S, SP>
-where
-    OT: ObserversTuple<S>,
-    S: KnowsInput,
-    SP: ShMemProvider + 'static,
-{
-    type Observers = OT;
-}
-
-#[cfg(feature = "std")]
 impl<OT, S, SP> ProgressReporter for LlmpRestartingEventManager<OT, S, SP>
 where
     OT: ObserversTuple<S>,
@@ -698,13 +677,13 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<Z::Observers, Z::State, SP>
+impl<E, OT, SP, Z> EventProcessor<E, OT, Z> for LlmpRestartingEventManager<OT, Z::State, SP>
 where
     SP: ShMemProvider + 'static,
-    E: HasObservers<State = Z::State, Observers = Z::Observers>
-        + Executor<LlmpEventManager<Z::Observers, Z::State, SP>, Z>,
-    Z: EvaluatorObservers + ExecutionProcessor,
-    Z::Observers: DeserializeOwned,
+    E: HasObservers<State = Z::State, Observers = OT>
+        + Executor<LlmpEventManager<OT, Z::State, SP>, Z>,
+    OT: ObserversTuple<Z::State> + DeserializeOwned,
+    Z: EvaluatorObservers<OT> + ExecutionProcessor<OT>,
     Z::State: KnowsInput + HasExecutions + HasClientPerfMonitor, //CE: CustomEvent<I>,
 {
     fn process(
@@ -718,13 +697,13 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<Z::Observers, Z::State, SP>
+impl<E, OT, SP, Z> EventManager<E, OT, Z> for LlmpRestartingEventManager<OT, Z::State, SP>
 where
     SP: ShMemProvider + 'static,
-    E: HasObservers<Observers = Z::Observers, State = Z::State>
-        + Executor<LlmpEventManager<Z::Observers, Z::State, SP>, Z>,
-    Z: EvaluatorObservers + ExecutionProcessor,
-    Z::Observers: ObserversTuple<Z::State> + DeserializeOwned,
+    E: HasObservers<Observers = OT, State = Z::State>
+        + Executor<LlmpEventManager<OT, Z::State, SP>, Z>,
+    OT: ObserversTuple<Z::State> + DeserializeOwned,
+    Z: EvaluatorObservers<OT> + ExecutionProcessor<OT>,
     Z::State: KnowsInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize, //CE: CustomEvent<I>,
 {
 }

@@ -25,7 +25,6 @@ use nix::{
 
 use crate::{
     bolts::{
-        bolts_prelude::MatchName,
         fs::{InputFile, INPUTFILE_STD},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
@@ -384,14 +383,16 @@ impl<E> TimeoutForkserverExecutor<E> {
 impl<E, EM, Z> Executor<EM, Z> for TimeoutForkserverExecutor<E>
 where
     E: Executor<EM, Z> + HasForkserver + Debug,
-    Self::Input: HasTargetBytes,
+    E::Input: HasTargetBytes,
+    EM: KnowsState<State = E::State>,
+    Z: KnowsState<State = E::State>,
 {
     #[inline]
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
@@ -520,8 +521,7 @@ impl ForkserverExecutor<(), (), StdShMemProvider> {
 impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: KnowsInput,
-    S::Input: HasTargetBytes,
+    S: KnowsState,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -862,13 +862,15 @@ where
     SP: ShMemProvider,
     S: KnowsInput,
     S::Input: HasTargetBytes,
+    EM: KnowsState<State = S>,
+    Z: KnowsState<State = S>,
 {
     #[inline]
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let mut exit_kind = ExitKind::Ok;
@@ -946,6 +948,14 @@ where
     }
 }
 
+impl<OT, S, SP> KnowsState for ForkserverExecutor<OT, S, SP>
+where
+    S: KnowsInput,
+    SP: ShMemProvider,
+{
+    type State = S;
+}
+
 impl<OT, S, SP> KnowsObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
@@ -955,19 +965,10 @@ where
     type Observers = OT;
 }
 
-impl<OT, S, SP> KnowsState for ForkserverExecutor<OT, S, SP>
-where
-    S: KnowsInput,
-    SP: ShMemProvider,
-{
-    type State = S;
-}
-
 impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     S: KnowsInput,
-    S::Input: HasTargetBytes,
     SP: ShMemProvider,
 {
     #[inline]

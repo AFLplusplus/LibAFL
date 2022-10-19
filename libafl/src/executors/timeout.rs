@@ -33,7 +33,6 @@ use windows::Win32::{
 use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::KnowsInput,
     observers::KnowsObservers,
     state::KnowsState,
     Error,
@@ -265,10 +264,9 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, S, Z> + HasInProcessHandlers,
-    S: KnowsInput,
+    E: Executor<EM, Z> + HasInProcessHandlers,
 {
     #[allow(clippy::cast_sign_loss)]
     fn run_target(
@@ -338,6 +336,8 @@ where
 impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, Z>,
+    EM: KnowsState<State = E::State>,
+    Z: KnowsState<State = E::State>,
 {
     fn run_target(
         &mut self,
@@ -365,10 +365,9 @@ where
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E, EM, S, Z> Executor<EM, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, S, Z>,
-    S: KnowsInput,
+    E: Executor<EM, Z>,
 {
     fn run_target(
         &mut self,

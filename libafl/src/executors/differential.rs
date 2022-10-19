@@ -6,7 +6,6 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::KnowsInput,
     observers::KnowsObservers,
     state::KnowsState,
     Error,
@@ -21,12 +20,12 @@ pub struct DiffExecutor<A, B> {
 
 impl<A, B> DiffExecutor<A, B> {
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, S, Z>(primary: A, secondary: B) -> Self
+    pub fn new<EM, Z>(primary: A, secondary: B) -> Self
     where
         A: Executor<EM, Z>,
         B: Executor<EM, Z, State = A::State>,
-        S: KnowsInput,
-        Z: Sized,
+        EM: KnowsState<State = A::State>,
+        Z: KnowsState<State = A::State>,
     {
         Self { primary, secondary }
     }
@@ -46,7 +45,8 @@ impl<A, B, EM, Z> Executor<EM, Z> for DiffExecutor<A, B>
 where
     A: Executor<EM, Z>,
     B: Executor<EM, Z, State = A::State>,
-    Z: Sized,
+    EM: KnowsState<State = A::State>,
+    Z: KnowsState<State = A::State>,
 {
     fn run_target(
         &mut self,
@@ -80,7 +80,7 @@ where
 
 impl<A, B> KnowsObservers for DiffExecutor<A, B>
 where
-    A: KnowsObservers,
+    A: HasObservers,
 {
     type Observers = A::Observers;
 }
@@ -88,7 +88,6 @@ where
 impl<A, B> HasObservers for DiffExecutor<A, B>
 where
     A: HasObservers,
-    B: Debug,
 {
     #[inline]
     fn observers(&self) -> &Self::Observers {

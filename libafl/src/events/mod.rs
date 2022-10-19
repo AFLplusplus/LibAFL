@@ -37,7 +37,7 @@ pub struct EventManagerId {
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::{inputs::KnowsInput, observers::KnowsObservers, state::KnowsState};
+use crate::{inputs::KnowsInput, state::KnowsState};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -433,7 +433,7 @@ pub trait EventRestarter: KnowsState {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, Z>: KnowsObservers {
+pub trait EventProcessor<E, OT, Z>: KnowsState {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
     fn process(
@@ -444,9 +444,9 @@ pub trait EventProcessor<E, Z>: KnowsObservers {
     ) -> Result<usize, Error>;
 
     /// Deserialize all observers for this type and manager
-    fn deserialize_observers(&mut self, observers_buf: &[u8]) -> Result<Self::Observers, Error>
+    fn deserialize_observers(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
     where
-        Self::Observers: serde::de::DeserializeOwned,
+        OT: serde::de::DeserializeOwned,
     {
         Ok(postcard::from_bytes(observers_buf)?)
     }
@@ -462,8 +462,8 @@ pub trait HasEventManagerId {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager<E, Z>:
-    EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
+pub trait EventManager<E, OT, Z>:
+    EventFirer + EventProcessor<E, OT, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
     Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
 {
@@ -502,14 +502,6 @@ where
     type State = S;
 }
 
-impl<OT, S> KnowsObservers for NopEventManager<OT, S>
-where
-    OT: ObserversTuple<S>,
-    S: KnowsInput,
-{
-    type Observers = OT;
-}
-
 impl<OT, S> EventFirer for NopEventManager<OT, S>
 where
     S: KnowsInput,
@@ -525,7 +517,7 @@ where
 
 impl<OT, S> EventRestarter for NopEventManager<OT, S> where S: KnowsInput {}
 
-impl<E, OT, S, Z> EventProcessor<E, Z> for NopEventManager<OT, S>
+impl<E, OT, S, Z> EventProcessor<E, OT, Z> for NopEventManager<OT, S>
 where
     S: KnowsInput + HasClientPerfMonitor + HasExecutions,
     OT: ObserversTuple<S>,
@@ -540,7 +532,7 @@ where
     }
 }
 
-impl<E, OT, S, Z> EventManager<E, Z> for NopEventManager<OT, S>
+impl<E, OT, S, Z> EventManager<E, OT, Z> for NopEventManager<OT, S>
 where
     OT: ObserversTuple<S>,
     S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
@@ -697,7 +689,7 @@ pub mod pybind {
 
     impl EventRestarter for PythonEventManager {}
 
-    impl EventProcessor<PythonExecutor, PythonStdFuzzer> for PythonEventManager {
+    impl EventProcessor<PythonExecutor, PythonObserversTuple, PythonStdFuzzer> for PythonEventManager {
         fn process(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
@@ -716,7 +708,7 @@ pub mod pybind {
         }
     }
 
-    impl EventManager<PythonExecutor, PythonStdFuzzer> for PythonEventManager {}
+    impl EventManager<PythonExecutor, PythonObserversTuple, PythonStdFuzzer> for PythonEventManager {}
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

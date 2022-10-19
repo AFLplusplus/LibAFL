@@ -14,7 +14,7 @@ use crate::{
     fuzzer::Evaluator,
     inputs::{Input, KnowsInput},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, KnowsState},
     Error,
 };
 
@@ -37,20 +37,24 @@ impl SyncFromDiskMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromDiskStage<CB, E, EM, Z>
-where
-    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as KnowsInput>::Input, Error>,
-    Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
-{
+pub struct SyncFromDiskStage<CB, E, EM, Z> {
     sync_dir: PathBuf,
     load_callback: CB,
     phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CB, E, EM, Z> Stage<E, EM, Z::State, Z> for SyncFromDiskStage<CB, E, EM, Z>
+impl<CB, E, EM, Z> KnowsState for SyncFromDiskStage<CB, E, EM, Z>
+where
+    E: KnowsState,
+{
+    type State = E::State;
+}
+
+impl<CB, E, EM, Z> Stage<E, EM, Z> for SyncFromDiskStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as KnowsInput>::Input, Error>,
+    E: KnowsState<State = Z::State>,
+    EM: KnowsState<State = Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
@@ -94,6 +98,8 @@ where
 impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as KnowsInput>::Input, Error>,
+    E: KnowsState<State = Z::State>,
+    EM: KnowsState<State = Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
@@ -158,6 +164,8 @@ pub type SyncFromDiskFunction<S, Z> =
 
 impl<E, EM, Z> SyncFromDiskStage<SyncFromDiskFunction<Z::State, Z>, E, EM, Z>
 where
+    E: KnowsState<State = Z::State>,
+    EM: KnowsState<State = Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {

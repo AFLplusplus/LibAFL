@@ -13,7 +13,7 @@ use crate::{
     mutators::Mutator,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasRand, KnowsState},
     Error,
 };
 
@@ -22,11 +22,13 @@ use crate::{
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<E, EM, M, Z>: Stage<E, EM, Z::State, Z>
+pub trait MutationalStage<E, EM, M, Z>: Stage<E, EM, Z>
 where
-    M: Mutator<Z::State>,
-    Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus,
+    E: KnowsState<State = Self::State>,
+    M: Mutator<Self::State>,
+    EM: KnowsState<State = Self::State>,
+    Z: Evaluator<E, EM, State = Self::State>,
+    Self::State: HasClientPerfMonitor + HasCorpus,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -80,12 +82,7 @@ pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<E, EM, M, Z>
-where
-    M: Mutator<Z::State>,
-    Z: Evaluator<E, EM>,
-    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
-{
+pub struct StdMutationalStage<E, EM, M, Z> {
     mutator: M,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(E, EM, Z)>,
@@ -93,6 +90,8 @@ where
 
 impl<E, EM, M, Z> MutationalStage<E, EM, M, Z> for StdMutationalStage<E, EM, M, Z>
 where
+    E: KnowsState<State = Z::State>,
+    EM: KnowsState<State = Z::State>,
     M: Mutator<Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
@@ -115,8 +114,21 @@ where
     }
 }
 
-impl<E, EM, M, Z> Stage<E, EM, Z::State, Z> for StdMutationalStage<E, EM, M, Z>
+impl<E, EM, M, Z> KnowsState for StdMutationalStage<E, EM, M, Z>
 where
+    E: KnowsState<State = Z::State>,
+    EM: KnowsState<State = Z::State>,
+    M: Mutator<Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    type State = Z::State;
+}
+
+impl<E, EM, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, M, Z>
+where
+    E: KnowsState<State = Z::State>,
+    EM: KnowsState<State = Z::State>,
     M: Mutator<Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
@@ -142,6 +154,8 @@ where
 
 impl<E, EM, M, Z> StdMutationalStage<E, EM, M, Z>
 where
+    E: KnowsState<State = Z::State>,
+    EM: KnowsState<State = Z::State>,
     M: Mutator<Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,

@@ -60,6 +60,8 @@ impl<E, EM, SOT, Z> Executor<EM, Z> for ShadowExecutor<E, SOT>
 where
     E: Executor<EM, Z> + HasObservers,
     SOT: ObserversTuple<E::State>,
+    EM: KnowsState<State = E::State>,
+    Z: KnowsState<State = E::State>,
 {
     fn run_target(
         &mut self,

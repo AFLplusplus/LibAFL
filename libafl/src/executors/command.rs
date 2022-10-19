@@ -302,16 +302,18 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<EM, OT, S, T, Z>
 where
+    EM: KnowsState<State = S>,
     S: KnowsInput,
     S::Input: HasTargetBytes,
     T: CommandConfigurator + Debug,
     OT: Debug + MatchName,
+    Z: KnowsState<State = S>,
 {
     fn run_target(
         &mut self,
-        fuzzer: &mut Z,
-        state: &mut Self::State,
-        mgr: &mut EM,
+        _fuzzer: &mut Z,
+        _state: &mut Self::State,
+        _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
@@ -613,7 +615,7 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}};
-/// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}, state::KnowsInput};
+/// use libafl::{Error, bolts::AsSlice, inputs::{HasTargetBytes, Input, KnowsInput}, executors::{Executor, command::CommandConfigurator}, state::KnowsState};
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
@@ -635,7 +637,13 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, S, Z>() -> impl Executor<EM, S, Z> where S: KnowsInput, S::Input: HasTargetBytes {
+/// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
+/// where
+///     EM: KnowsState,
+///     Z: KnowsState<State = EM::State>,
+///     EM::State: KnowsInput,
+///     EM::Input: HasTargetBytes
+/// {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
@@ -685,6 +693,7 @@ mod tests {
         inputs::BytesInput,
         monitors::SimpleMonitor,
         state::NopState,
+        NopFuzzer,
     };
 
     #[test]
@@ -704,8 +713,8 @@ mod tests {
 
         executor
             .run_target(
-                &mut (),
-                &mut NopState::default(),
+                &mut NopFuzzer::new(),
+                &mut NopState::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )
@@ -727,8 +736,8 @@ mod tests {
                 .unwrap();
         executor
             .run_target(
-                &mut (),
-                &mut NopState::default(),
+                &mut NopFuzzer::new(),
+                &mut NopState::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )

@@ -164,7 +164,7 @@ mod tests {
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
         inputs::{BytesInput, KnowsInput},
         observers::Observer,
-        state::{NopState, State},
+        state::{KnowsState, NopState},
     };
 
     #[derive(Debug)]
@@ -195,12 +195,16 @@ mod tests {
     struct NopEventFirer<S> {
         phantom: PhantomData<S>,
     }
-    impl<S> EventFirer for NopEventFirer<S>
+    impl<S> KnowsState for NopEventFirer<S>
     where
-        S: State,
+        S: KnowsInput,
     {
         type State = S;
-
+    }
+    impl<S> EventFirer for NopEventFirer<S>
+    where
+        S: KnowsInput,
+    {
         fn fire(
             &mut self,
             _state: &mut S,

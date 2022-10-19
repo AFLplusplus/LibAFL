@@ -358,6 +358,8 @@ where
         loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
+        E: KnowsState<State = Self>,
+        EM: KnowsState<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
         for entry in fs::read_dir(in_dir)? {
@@ -401,8 +403,9 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, State = Self>,
+        E: KnowsState<State = Self>,
         EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
     {
         for in_dir in in_dirs {
             self.load_from_directory(
@@ -436,8 +439,9 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, State = Self>,
+        E: KnowsState<State = Self>,
         EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, true)
     }
@@ -451,8 +455,9 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        Z: Evaluator<E, EM, State = Self>,
+        E: KnowsState<State = Self>,
         EM: EventFirer<State = Self>,
+        Z: Evaluator<E, EM, State = Self>,
     {
         self.load_initial_inputs_internal(fuzzer, executor, manager, in_dirs, false)
     }
@@ -475,9 +480,10 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
+        E: KnowsState<State = Self>,
+        EM: EventFirer<State = Self>,
         G: Generator<<Self as KnowsInput>::Input, Self>,
         Z: Evaluator<E, EM, State = Self>,
-        EM: EventFirer<State = Self>,
     {
         let mut added = 0;
         for _ in 0..num {
@@ -513,9 +519,10 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
+        E: KnowsState<State = Self>,
+        EM: EventFirer<State = Self>,
         G: Generator<<Self as KnowsInput>::Input, Self>,
         Z: Evaluator<E, EM, State = Self>,
-        EM: EventFirer<State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
     }
@@ -530,9 +537,10 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
+        E: KnowsState<State = Self>,
+        EM: EventFirer<State = Self>,
         G: Generator<<Self as KnowsInput>::Input, Self>,
         Z: Evaluator<E, EM, State = Self>,
-        EM: EventFirer<State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
@@ -608,6 +616,14 @@ impl<I> NopState<I> {
 }
 
 #[cfg(test)]
+impl<I> KnowsInput for NopState<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+#[cfg(test)]
 impl<I> HasExecutions for NopState<I> {
     fn executions(&self) -> &usize {
         unimplemented!()
@@ -642,14 +658,6 @@ impl<I> HasClientPerfMonitor for NopState<I> {
 
 #[cfg(test)]
 impl<I> State for NopState<I> where I: Input {}
-
-#[cfg(test)]
-impl<I> KnowsInput for NopState<I>
-where
-    I: Input,
-{
-    type Input = I;
-}
 
 #[cfg(feature = "python")]
 #[allow(missing_docs)]

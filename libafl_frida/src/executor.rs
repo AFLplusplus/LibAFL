@@ -57,11 +57,13 @@ where
 impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
+    EM: KnowsState<State = S>,
     H: FnMut(&S::Input) -> ExitKind,
     S: KnowsInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
+    Z: KnowsState<State = S>,
 {
     /// Instruct the target about the input and run
     #[inline]

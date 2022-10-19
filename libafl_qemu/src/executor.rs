@@ -64,7 +64,7 @@ where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<S>,
         S: State + HasExecutions + HasCorpus + HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, S>,
+        Z: HasObjective<OF, State = S>,
     {
         Ok(Self {
             hooks,
@@ -95,10 +95,12 @@ where
 
 impl<'a, EM, H, OT, QT, S, Z> Executor<EM, Z> for QemuExecutor<'a, H, OT, QT, S>
 where
+    EM: KnowsState<State = S>,
     H: FnMut(&S::Input) -> ExitKind,
     S: KnowsInput,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
+    Z: KnowsState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -205,7 +207,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, S>,
+        Z: HasObjective<OF, State = S>,
     {
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
 
@@ -246,12 +248,13 @@ where
 #[cfg(feature = "fork")]
 impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, Z> for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
-    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, Z, State = S>,
+    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, OT, Z, State = S>,
     H: FnMut(&S::Input) -> ExitKind,
     S: KnowsInput + HasClientPerfMonitor + HasMetadata + HasExecutions,
     OT: ObserversTuple<S>,
     QT: QemuHelperTuple<S>,
     SP: ShMemProvider,
+    Z: KnowsState<State = S>,
 {
     fn run_target(
         &mut self,

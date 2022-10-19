@@ -24,7 +24,7 @@ use crate::{
     schedulers::Scheduler,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, KnowsState},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 
@@ -32,20 +32,20 @@ use crate::{
 ///
 /// You must provide at least one mutator that actually reduces size.
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
-    Stage<E, EM, CS::State, Z> + FeedbackFactory<F2, CS::State, OT>
+    Stage<E, EM, Z> + FeedbackFactory<F2, CS::State, OT>
 where
-    CS: Scheduler,
-    CS::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
-    <CS::State as KnowsInput>::Input: HasLen + Hash,
-    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
-    EM: EventFirer<State = CS::State>,
-    F1: Feedback<CS::State>,
-    F2: Feedback<CS::State>,
-    M: Mutator<CS::State>,
+    Self::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    <Self::State as KnowsInput>::Input: HasLen + Hash,
+    CS: Scheduler<State = Self::State>,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
+    EM: EventFirer<State = Self::State>,
+    F1: Feedback<Self::State>,
+    F2: Feedback<Self::State>,
+    M: Mutator<Self::State>,
     OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<Observers = OT, State = CS::State>
-        + ExecutesInput<E, EM, State = CS::State>
-        + HasFeedback<F1, CS::State>
+    Z: ExecutionProcessor<OT, State = Self::State>
+        + ExecutesInput<E, EM>
+        + HasFeedback<F1>
         + HasScheduler<CS>,
 {
     /// The mutator registered for this stage
@@ -165,24 +165,29 @@ where
 
 /// The default corpus entry minimising mutational stage
 #[derive(Clone, Debug)]
-pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, T, Z>
-where
-    CS: Scheduler,
-    M: Mutator<CS::State>,
-    Z: ExecutionProcessor<State = CS::State>,
-{
+pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z> {
     mutator: M,
     factory: FF,
     runs: usize,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(CS, E, EM, F1, F2, T, Z)>,
+    phantom: PhantomData<(CS, E, EM, F1, F2, OT, Z)>,
 }
 
-impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, CS::State, Z>
+impl<CS, E, EM, F1, F2, FF, M, OT, Z> KnowsState
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
-    CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
+    M: Mutator<CS::State>,
+    Z: ExecutionProcessor<OT, State = CS::State>,
+{
+    type State = CS::State;
+}
+
+impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
+    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
+where
+    CS: Scheduler,
+    CS::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
     <CS::State as KnowsInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
@@ -191,9 +196,9 @@ where
     FF: FeedbackFactory<F2, CS::State, OT>,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<Observers = OT, State = CS::State>
-        + ExecutesInput<E, EM, State = CS::State>
-        + HasFeedback<F1, CS::State>
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + ExecutesInput<E, EM>
+        + HasFeedback<F1>
         + HasScheduler<CS>,
 {
     fn perform(
@@ -213,17 +218,15 @@ where
     }
 }
 
-impl<CS, E, EM, F1, F2, FF, M, T, Z> FeedbackFactory<F2, CS::State, T>
-    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, T, Z>
+impl<CS, E, EM, F1, F2, FF, M, OT, Z> FeedbackFactory<F2, Z::State, OT>
+    for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
-    CS: Scheduler,
-    CS::State: HasClientPerfMonitor,
-    F2: Feedback<CS::State>,
-    FF: FeedbackFactory<F2, CS::State, T>,
-    M: Mutator<CS::State>,
-    Z: ExecutionProcessor<State = CS::State>,
+    F2: Feedback<Z::State>,
+    FF: FeedbackFactory<F2, Z::State, OT>,
+    Z: KnowsState,
+    Z::State: HasClientPerfMonitor,
 {
-    fn create_feedback(&self, ctx: &T) -> F2 {
+    fn create_feedback(&self, ctx: &OT) -> F2 {
         self.factory.create_feedback(ctx)
     }
 }
@@ -241,9 +244,9 @@ where
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
-    Z: ExecutionProcessor<Observers = OT, State = CS::State>
-        + ExecutesInput<E, EM, State = CS::State>
-        + HasFeedback<F1, E::State>
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + ExecutesInput<E, EM>
+        + HasFeedback<F1>
         + HasScheduler<CS>,
 {
     /// The mutator, added to this stage
@@ -264,11 +267,11 @@ where
     }
 }
 
-impl<CS, E, EM, F1, F2, FF, M, T, Z> StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, T, Z>
+impl<CS, E, EM, F1, F2, FF, M, OT, Z> StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
     M: Mutator<CS::State>,
-    Z: ExecutionProcessor<State = CS::State>,
+    Z: ExecutionProcessor<OT, State = CS::State>,
 {
     /// Creates a new minimising mutational stage that will minimize provided corpus entries
     pub fn new(mutator: M, factory: FF, runs: usize) -> Self {

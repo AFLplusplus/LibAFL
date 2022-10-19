@@ -31,7 +31,7 @@ use crate::{
     },
     inputs::KnowsInput,
     monitors::Monitor,
-    observers::{KnowsObservers, ObserversTuple},
+    observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, KnowsState},
     Error,
 };
@@ -77,14 +77,6 @@ where
     type State = S;
 }
 
-impl<MT, OT, S> KnowsObservers for SimpleEventManager<MT, OT, S>
-where
-    OT: ObserversTuple<S>,
-    S: KnowsInput,
-{
-    type Observers = OT;
-}
-
 impl<MT, OT, S> EventFirer for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
@@ -110,7 +102,7 @@ where
 {
 }
 
-impl<E, MT, OT, S, Z> EventProcessor<E, Z> for SimpleEventManager<MT, OT, S>
+impl<E, MT, OT, S, Z> EventProcessor<E, OT, Z> for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
     OT: ObserversTuple<S>,
@@ -131,7 +123,7 @@ where
     }
 }
 
-impl<E, MT, OT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, OT, S>
+impl<E, MT, OT, S, Z> EventManager<E, OT, Z> for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
     OT: ObserversTuple<S>,
@@ -326,16 +318,6 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<MT, OT, S, SP> KnowsObservers for SimpleRestartingEventManager<MT, OT, S, SP>
-where
-    OT: ObserversTuple<S>,
-    S: KnowsInput,
-    SP: ShMemProvider,
-{
-    type Observers = OT;
-}
-
-#[cfg(feature = "std")]
 impl<MT, OT, S, SP> EventFirer for SimpleRestartingEventManager<MT, OT, S, SP>
 where
     MT: Monitor,
@@ -366,7 +348,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, MT, OT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<E, MT, OT, S, SP, Z> EventProcessor<E, OT, Z> for SimpleRestartingEventManager<MT, OT, S, SP>
 where
     MT: Monitor,
     OT: ObserversTuple<S>,
@@ -384,7 +366,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, MT, OT, S, SP, Z> EventManager<E, Z> for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<E, MT, OT, S, SP, Z> EventManager<E, OT, Z> for SimpleRestartingEventManager<MT, OT, S, SP>
 where
     MT: Monitor,
     OT: ObserversTuple<S>,

@@ -18,19 +18,25 @@ use crate::{
 
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
-pub struct ConcolicTracingStage<EM, TE, Z>
-where
-    TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
-{
+pub struct ConcolicTracingStage<EM, TE, Z> {
     inner: TracingStage<EM, TE, Z>,
     observer_name: String,
 }
 
-impl<E, EM, TE, Z> Stage<E, EM, TE::State, Z> for ConcolicTracingStage<EM, TE, Z>
+impl<EM, TE, Z> KnowsState for ConcolicTracingStage<EM, TE, Z>
 where
+    TE: KnowsState,
+{
+    type State = TE::State;
+}
+
+impl<E, EM, TE, Z> Stage<E, EM, Z> for ConcolicTracingStage<EM, TE, Z>
+where
+    E: KnowsState<State = TE::State>,
+    EM: KnowsState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Z: KnowsState<State = TE::State>,
 {
     #[inline]
     fn perform(
@@ -62,11 +68,7 @@ where
     }
 }
 
-impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z>
-where
-    TE: Executor<EM, Z> + HasObservers,
-    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
-{
+impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
     pub fn new(inner: TracingStage<EM, TE, Z>, observer_name: String) -> Self {
         Self {
@@ -76,9 +78,9 @@ where
     }
 }
 
-use crate::bolts::tuples::MatchName;
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
+use crate::{bolts::tuples::MatchName, state::KnowsState};
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,
