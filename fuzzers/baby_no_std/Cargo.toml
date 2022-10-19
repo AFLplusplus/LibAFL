@@ -20,5 +20,4 @@ static-alloc = "0.2.3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-cstr_core = "0.2.3"
 

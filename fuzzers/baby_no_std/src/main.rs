@@ -4,11 +4,13 @@
 // Embedded needs alloc error handlers which only work on nightly right now...
 #![cfg_attr(not(any(windows)), feature(default_alloc_error_handler))]
 
+#[cfg(any(windows, unix))]
+extern crate alloc;
+#[cfg(any(windows, unix))]
+use alloc::ffi::CString;
 #[cfg(not(any(windows)))]
 use core::panic::PanicInfo;
 
-#[cfg(any(windows, unix))]
-use cstr_core::CString;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::InMemoryCorpus,
@@ -115,7 +117,8 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
         // TODO: Print `s` here, if your target permits it.
         #[cfg(any(windows, unix))]
         unsafe {
-            printf(b"%s\n\0".as_ptr().cast(), CString::new(s).unwrap().as_ptr());
+            let s = CString::new(s).unwrap();
+            printf(b"%s\n\0".as_ptr().cast(), s.as_ptr());
         }
     });
 
