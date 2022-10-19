@@ -1,7 +1,8 @@
 # Variables
 [env]
+CARGO_TARGET_DIR = { source = "${CARGO_TARGET_DIR}", default_value = "./target" }
 FUZZER_NAME={ source = "${CARGO_MAKE_RUST_TARGET_OS}", default_value = "frida_fuzzer", mapping = {"linux" = "frida_fuzzer", "macos" = "frida_fuzzer", "windows" = "frida_fuzzer.exe"} }
-FUZZER = './target/release/${FUZZER_NAME}'
+FUZZER = '${CARGO_TARGET_DIR}/release/${FUZZER_NAME}'
 
 [tasks.unsupported]
 script_runner="@shell"
@@ -63,7 +64,7 @@ cl /c harness_win.cpp && link harness_win.obj /dll
 script_runner="@shell"
 script='''
 cargo build --release
-cp ./target/release/${FUZZER_NAME} .
+cp ${CARGO_TARGET_DIR}/release/${FUZZER_NAME} .
 '''
 
 # Run the fuzzer
