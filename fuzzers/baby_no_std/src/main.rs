@@ -26,7 +26,7 @@ use libafl::{
     state::StdState,
 };
 #[cfg(any(windows, unix))]
-use libc::{abort, c_char, printf};
+use libc::{abort, printf};
 use static_alloc::Bump;
 
 #[global_allocator]
@@ -107,14 +107,11 @@ pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are reported to the user
-    let monitor = SimpleMonitor::new(|s| {
-        // TODO: Print `s` here, if your target permits it.
+    let monitor = SimpleMonitor::new(|_s| {
+        // TODO: Print `_s` here, if your target permits it.
         #[cfg(any(windows, unix))]
         unsafe {
-            printf(
-                b"%s\n\0".as_ptr() as *const c_char,
-                CString::new(s).unwrap().as_ptr() as *const c_char,
-            );
+            printf(b"%s\n\0".as_ptr() as _, CString::new(_s).unwrap().as_ptr());
         }
     });
 
