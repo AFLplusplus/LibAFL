@@ -10,12 +10,12 @@ use crate::{
     bolts::{rands::Rand, AsMutSlice, AsSlice, HasLen, HasRefCnt},
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     schedulers::{
         minimizer::{IsFavoredMetadata, MinimizerScheduler, DEFAULT_SKIP_NON_FAVORED_PROB},
         LenTimeMulTestcaseScore, Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, KnowsState},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -96,21 +96,21 @@ impl TopAccountingMetadata {
 #[derive(Debug)]
 pub struct CoverageAccountingScheduler<'a, CS>
 where
-    CS: KnowsState,
+    CS: UsesState,
     CS::State: Debug,
 {
     accounting_map: &'a [u32],
     skip_non_favored_prob: u64,
     inner: MinimizerScheduler<
         CS,
-        LenTimeMulTestcaseScore<<CS as KnowsState>::State>,
+        LenTimeMulTestcaseScore<<CS as UsesState>::State>,
         MapIndexesMetadata,
     >,
 }
 
-impl<'a, CS> KnowsState for CoverageAccountingScheduler<'a, CS>
+impl<'a, CS> UsesState for CoverageAccountingScheduler<'a, CS>
 where
-    CS: KnowsState,
+    CS: UsesState,
     CS::State: Debug,
 {
     type State = CS::State;
@@ -120,7 +120,7 @@ impl<'a, CS> Scheduler for CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
-    <CS::State as KnowsInput>::Input: HasLen,
+    <CS::State as UsesInput>::Input: HasLen,
 {
     fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         self.update_accounting_score(state, idx)?;
@@ -131,7 +131,7 @@ where
         &self,
         state: &mut Self::State,
         idx: usize,
-        testcase: &Testcase<<Self::State as KnowsInput>::Input>,
+        testcase: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.inner.on_replace(state, idx, testcase)
     }
@@ -140,7 +140,7 @@ where
         &self,
         state: &mut Self::State,
         idx: usize,
-        testcase: &Option<Testcase<<Self::State as KnowsInput>::Input>>,
+        testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.inner.on_remove(state, idx, testcase)
     }
@@ -175,7 +175,7 @@ impl<'a, CS> CoverageAccountingScheduler<'a, CS>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasMetadata + HasRand + Debug,
-    <CS::State as KnowsInput>::Input: HasLen,
+    <CS::State as UsesInput>::Input: HasLen,
 {
     /// Update the `Corpus` score
     #[allow(clippy::unused_self)]

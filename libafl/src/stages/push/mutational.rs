@@ -15,7 +15,7 @@ use crate::{
     corpus::Corpus,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     mark_feature_time,
     mutators::Mutator,
     observers::ObserversTuple,
@@ -124,7 +124,7 @@ where
         state: &mut CS::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-    ) -> Option<Result<<CS::State as KnowsInput>::Input, Error>> {
+    ) -> Option<Result<<CS::State as UsesInput>::Input, Error>> {
         if self.testcases_done >= self.testcases_to_do {
             // finished with this cicle.
             return None;
@@ -160,7 +160,7 @@ where
         state: &mut CS::State,
         event_mgr: &mut EM,
         observers: &mut OT,
-        last_input: <CS::State as KnowsInput>::Input,
+        last_input: <CS::State as UsesInput>::Input,
         exit_kind: ExitKind,
     ) -> Result<(), Error> {
         // todo: isintersting, etc.
@@ -199,9 +199,9 @@ where
         HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
     Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
 {
-    type Item = Result<<CS::State as KnowsInput>::Input, Error>;
+    type Item = Result<<CS::State as UsesInput>::Input, Error>;
 
-    fn next(&mut self) -> Option<Result<<CS::State as KnowsInput>::Input, Error>> {
+    fn next(&mut self) -> Option<Result<<CS::State as UsesInput>::Input, Error>> {
         self.next_std()
     }
 }

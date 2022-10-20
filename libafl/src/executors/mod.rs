@@ -39,9 +39,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::AsSlice,
-    inputs::{HasTargetBytes, KnowsInput},
-    observers::{KnowsObservers, ObserversTuple},
-    state::KnowsState,
+    inputs::{HasTargetBytes, UsesInput},
+    observers::{ObserversTuple, UsesObservers},
+    state::UsesState,
     Error,
 };
 
@@ -101,7 +101,7 @@ impl From<ExitKind> for DiffExitKind {
 crate::impl_serdeany!(DiffExitKind);
 
 /// Holds a tuple of Observers
-pub trait HasObservers: KnowsObservers {
+pub trait HasObservers: UsesObservers {
     /// Get the linked observers
     fn observers(&self) -> &Self::Observers;
 
@@ -110,10 +110,10 @@ pub trait HasObservers: KnowsObservers {
 }
 
 /// An executor takes the given inputs, and runs the harness/target.
-pub trait Executor<EM, Z>: KnowsState + Debug
+pub trait Executor<EM, Z>: UsesState + Debug
 where
-    EM: KnowsState<State = Self::State>,
-    Z: KnowsState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
 {
     /// Instruct the target about the input and run
     fn run_target(
@@ -148,19 +148,19 @@ struct NopExecutor<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> KnowsState for NopExecutor<S>
+impl<S> UsesState for NopExecutor<S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }
 
 impl<EM, S, Z> Executor<EM, Z> for NopExecutor<S>
 where
-    EM: KnowsState<State = S>,
-    S: KnowsInput + Debug,
+    EM: UsesState<State = S>,
+    S: UsesInput + Debug,
     S::Input: HasTargetBytes,
-    Z: KnowsState<State = S>,
+    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -228,10 +228,10 @@ pub mod pybind {
         },
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
         inputs::HasBytesVec,
-        observers::{pybind::PythonObserversTuple, KnowsObservers},
+        observers::{pybind::PythonObserversTuple, UsesObservers},
         state::{
             pybind::{PythonStdState, PythonStdStateWrapper},
-            KnowsState,
+            UsesState,
         },
         Error,
     };
@@ -325,11 +325,11 @@ pub mod pybind {
         }
     }
 
-    impl KnowsState for PyObjectExecutor {
+    impl UsesState for PyObjectExecutor {
         type State = PythonStdState;
     }
 
-    impl KnowsObservers for PyObjectExecutor {
+    impl UsesObservers for PyObjectExecutor {
         type Observers = PythonObserversTuple;
     }
 
@@ -442,11 +442,11 @@ pub mod pybind {
         }
     }
 
-    impl KnowsState for PythonExecutor {
+    impl UsesState for PythonExecutor {
         type State = PythonStdState;
     }
 
-    impl KnowsObservers for PythonExecutor {
+    impl UsesObservers for PythonExecutor {
         type Observers = PythonObserversTuple;
     }
 

@@ -8,7 +8,7 @@ use core::fmt::{self, Debug, Formatter};
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
@@ -187,7 +187,7 @@ pub struct CmpLogObserver<'a> {
 
 impl<'a, S> CmpObserver<CmpLogMap, S> for CmpLogObserver<'a>
 where
-    S: KnowsInput + HasMetadata,
+    S: UsesInput + HasMetadata,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -208,7 +208,7 @@ where
 
 impl<'a, S> Observer<S> for CmpLogObserver<'a>
 where
-    S: KnowsInput + HasMetadata,
+    S: UsesInput + HasMetadata,
     Self: CmpObserver<CmpLogMap, S>,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {

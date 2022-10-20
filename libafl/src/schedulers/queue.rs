@@ -5,9 +5,9 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::Corpus,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     schedulers::Scheduler,
-    state::{HasCorpus, KnowsState},
+    state::{HasCorpus, UsesState},
     Error,
 };
 
@@ -17,9 +17,9 @@ pub struct QueueScheduler<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> KnowsState for QueueScheduler<S>
+impl<S> UsesState for QueueScheduler<S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }

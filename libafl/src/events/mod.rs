@@ -37,7 +37,7 @@ pub struct EventManagerId {
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-use crate::{inputs::KnowsInput, state::KnowsState};
+use crate::{inputs::UsesInput, state::UsesState};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -301,7 +301,7 @@ where
 }
 
 /// [`EventFirer`] fire an event.
-pub trait EventFirer: KnowsState {
+pub trait EventFirer: UsesState {
     /// Send off an [`Event`] to the broker
     ///
     /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
@@ -313,7 +313,7 @@ pub trait EventFirer: KnowsState {
     fn fire(
         &mut self,
         state: &mut Self::State,
-        event: Event<<Self::State as KnowsInput>::Input>,
+        event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
@@ -420,7 +420,7 @@ where
 }
 
 /// Restartable trait
-pub trait EventRestarter: KnowsState {
+pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
     fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
@@ -433,7 +433,7 @@ pub trait EventRestarter: KnowsState {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, OT, Z>: KnowsState {
+pub trait EventProcessor<E, OT, Z>: UsesState {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
     fn process(
@@ -495,31 +495,31 @@ impl<OT, S> NopEventManager<OT, S> {
     }
 }
 
-impl<OT, S> KnowsState for NopEventManager<OT, S>
+impl<OT, S> UsesState for NopEventManager<OT, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }
 
 impl<OT, S> EventFirer for NopEventManager<OT, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     fn fire(
         &mut self,
         _state: &mut Self::State,
-        _event: Event<<Self::State as KnowsInput>::Input>,
+        _event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<OT, S> EventRestarter for NopEventManager<OT, S> where S: KnowsInput {}
+impl<OT, S> EventRestarter for NopEventManager<OT, S> where S: UsesInput {}
 
 impl<E, OT, S, Z> EventProcessor<E, OT, Z> for NopEventManager<OT, S>
 where
-    S: KnowsInput + HasClientPerfMonitor + HasExecutions,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions,
     OT: ObserversTuple<S>,
 {
     fn process(
@@ -535,7 +535,7 @@ where
 impl<E, OT, S, Z> EventManager<E, OT, Z> for NopEventManager<OT, S>
 where
     OT: ObserversTuple<S>,
-    S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
 }
 
@@ -548,7 +548,7 @@ impl<OT, S> HasCustomBufHandlers<S> for NopEventManager<OT, S> {
 }
 
 impl<OT, S> ProgressReporter for NopEventManager<OT, S> where
-    S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
 {
 }
 
@@ -629,8 +629,8 @@ pub mod pybind {
         executors::pybind::PythonExecutor,
         fuzzer::pybind::PythonStdFuzzer,
         inputs::BytesInput,
-        observers::{pybind::PythonObserversTuple, KnowsObservers},
-        state::{pybind::PythonStdState, KnowsState},
+        observers::{pybind::PythonObserversTuple, UsesObservers},
+        state::{pybind::PythonStdState, UsesState},
         Error,
     };
 
@@ -673,11 +673,11 @@ pub mod pybind {
         }
     }
 
-    impl KnowsState for PythonEventManager {
+    impl UsesState for PythonEventManager {
         type State = PythonStdState;
     }
 
-    impl KnowsObservers for PythonEventManager {
+    impl UsesObservers for PythonEventManager {
         type Observers = PythonObserversTuple;
     }
 

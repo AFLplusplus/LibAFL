@@ -16,12 +16,12 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, KnowsInput},
+    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, UsesInput},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, KnowsState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, UsesState},
     Error,
 };
 
@@ -66,10 +66,10 @@ pub struct GeneralizationStage<EM, O, OT, Z> {
     phantom: PhantomData<(EM, O, OT, Z)>,
 }
 
-impl<EM, O, OT, Z> KnowsState for GeneralizationStage<EM, O, OT, Z>
+impl<EM, O, OT, Z> UsesState for GeneralizationStage<EM, O, OT, Z>
 where
-    EM: KnowsState,
-    EM::State: KnowsInput<Input = GeneralizedInput>,
+    EM: UsesState,
+    EM::State: UsesInput<Input = GeneralizedInput>,
 {
     type State = EM::State;
 }
@@ -79,13 +79,13 @@ where
     O: MapObserver,
     E: Executor<EM, Z> + HasObservers,
     E::Observers: ObserversTuple<E::State>,
-    E::State: KnowsInput<Input = GeneralizedInput>
+    E::State: UsesInput<Input = GeneralizedInput>
         + HasClientPerfMonitor
         + HasExecutions
         + HasMetadata
         + HasCorpus,
-    EM: KnowsState<State = E::State>,
-    Z: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     #[inline]
     #[allow(clippy::too_many_lines)]
@@ -358,10 +358,10 @@ where
 
 impl<EM, O, OT, Z> GeneralizationStage<EM, O, OT, Z>
 where
-    EM: KnowsState,
+    EM: UsesState,
     O: MapObserver,
     OT: ObserversTuple<EM::State>,
-    EM::State: KnowsInput<Input = GeneralizedInput>
+    EM::State: UsesInput<Input = GeneralizedInput>
         + HasClientPerfMonitor
         + HasExecutions
         + HasMetadata
@@ -396,7 +396,7 @@ where
     ) -> Result<bool, Error>
     where
         E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: KnowsState<State = EM::State>,
+        Z: UsesState<State = EM::State>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -442,7 +442,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: KnowsState<State = EM::State>,
+        Z: UsesState<State = EM::State>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -485,7 +485,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
-        Z: KnowsState<State = EM::State>,
+        Z: UsesState<State = EM::State>,
     {
         let mut index = 0;
         while index < payload.len() {

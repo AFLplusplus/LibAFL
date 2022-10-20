@@ -19,7 +19,7 @@ use crate::{
     bolts::current_time,
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand},
@@ -97,7 +97,7 @@ where
     pub current_corpus_idx: Option<usize>,
 
     /// The input we just ran
-    pub current_input: Option<<CS::State as KnowsInput>::Input>, // Todo: Get rid of copy
+    pub current_input: Option<<CS::State as UsesInput>::Input>, // Todo: Get rid of copy
 
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(CS, EM, OT, Z)>,
@@ -213,7 +213,7 @@ where
         _state: &mut CS::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-    ) -> Option<Result<<CS::State as KnowsInput>::Input, Error>>;
+    ) -> Option<Result<<CS::State as UsesInput>::Input, Error>>;
 
     /// Called after the execution of a testcase finished.
     #[inline]
@@ -223,7 +223,7 @@ where
         _state: &mut CS::State,
         _event_mgr: &mut EM,
         _observers: &mut OT,
-        _input: <CS::State as KnowsInput>::Input,
+        _input: <CS::State as UsesInput>::Input,
         _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -242,7 +242,7 @@ where
     }
 
     /// This is the default implementation for `next` for this stage
-    fn next_std(&mut self) -> Option<Result<<CS::State as KnowsInput>::Input, Error>> {
+    fn next_std(&mut self) -> Option<Result<<CS::State as UsesInput>::Input, Error>> {
         let mut shared_state = {
             let shared_state_ref = &mut (*self.push_stage_helper_mut().shared_state).borrow_mut();
             shared_state_ref.take().unwrap()

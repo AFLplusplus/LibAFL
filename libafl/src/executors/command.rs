@@ -27,11 +27,11 @@ use crate::{
         tuples::MatchName,
         AsSlice,
     },
-    inputs::{HasTargetBytes, KnowsInput},
+    inputs::{HasTargetBytes, UsesInput},
     observers::{
-        ASANBacktraceObserver, KnowsObservers, ObserversTuple, StdErrObserver, StdOutObserver,
+        ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver, UsesObservers,
     },
-    state::KnowsState,
+    state::UsesState,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
@@ -302,12 +302,12 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<EM, OT, S, T, Z>
 where
-    EM: KnowsState<State = S>,
-    S: KnowsInput,
+    EM: UsesState<State = S>,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     T: CommandConfigurator + Debug,
     OT: Debug + MatchName,
-    Z: KnowsState<State = S>,
+    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -378,24 +378,24 @@ where
     }
 }
 
-impl<EM, OT, S, T, Z> KnowsState for CommandExecutor<EM, OT, S, T, Z>
+impl<EM, OT, S, T, Z> UsesState for CommandExecutor<EM, OT, S, T, Z>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }
 
-impl<EM, OT, S, T, Z> KnowsObservers for CommandExecutor<EM, OT, S, T, Z>
+impl<EM, OT, S, T, Z> UsesObservers for CommandExecutor<EM, OT, S, T, Z>
 where
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     type Observers = OT;
 }
 
 impl<EM, OT, S, T, Z> HasObservers for CommandExecutor<EM, OT, S, T, Z>
 where
-    S: KnowsInput,
+    S: UsesInput,
     T: Debug,
     OT: ObserversTuple<S>,
 {
@@ -615,7 +615,7 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}};
-/// use libafl::{Error, bolts::AsSlice, inputs::{HasTargetBytes, Input, KnowsInput}, executors::{Executor, command::CommandConfigurator}, state::KnowsState};
+/// use libafl::{Error, bolts::AsSlice, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::UsesState};
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
@@ -639,9 +639,9 @@ impl CommandExecutorBuilder {
 ///
 /// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
 /// where
-///     EM: KnowsState,
-///     Z: KnowsState<State = EM::State>,
-///     EM::State: KnowsInput,
+///     EM: UsesState,
+///     Z: UsesState<State = EM::State>,
+///     EM::State: UsesInput,
 ///     EM::Input: HasTargetBytes
 /// {
 ///     MyExecutor.into_executor(())

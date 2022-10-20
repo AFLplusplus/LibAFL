@@ -48,20 +48,20 @@ use self::push::PushStage;
 use crate::{
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
-    inputs::KnowsInput,
+    inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand, KnowsState},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand, UsesState},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<E, EM, Z>: KnowsState
+pub trait Stage<E, EM, Z>: UsesState
 where
-    E: KnowsState<State = Self::State>,
-    EM: KnowsState<State = Self::State>,
-    Z: KnowsState<State = Self::State>,
+    E: UsesState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
 {
     /// Run the stage
     fn perform(
@@ -77,10 +77,10 @@ where
 /// A tuple holding all `Stages` used for fuzzing.
 pub trait StagesTuple<E, EM, S, Z>
 where
-    E: KnowsState<State = S>,
-    EM: KnowsState<State = S>,
-    Z: KnowsState<State = S>,
-    S: KnowsInput,
+    E: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+    S: UsesInput,
 {
     /// Performs all `Stages` in this tuple
     fn perform_all(
@@ -95,10 +95,10 @@ where
 
 impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for ()
 where
-    E: KnowsState<State = S>,
-    EM: KnowsState<State = S>,
-    Z: KnowsState<State = S>,
-    S: KnowsInput,
+    E: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+    S: UsesInput,
 {
     fn perform_all(
         &mut self,
@@ -116,9 +116,9 @@ impl<Head, Tail, E, EM, Z> StagesTuple<E, EM, Head::State, Z> for (Head, Tail)
 where
     Head: Stage<E, EM, Z>,
     Tail: StagesTuple<E, EM, Head::State, Z>,
-    E: KnowsState<State = Head::State>,
-    EM: KnowsState<State = Head::State>,
-    Z: KnowsState<State = Head::State>,
+    E: UsesState<State = Head::State>,
+    EM: UsesState<State = Head::State>,
+    Z: UsesState<State = Head::State>,
 {
     fn perform_all(
         &mut self,
@@ -143,16 +143,16 @@ where
 pub struct ClosureStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
-    E: KnowsState,
+    E: UsesState,
 {
     closure: CB,
     phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CB, E, EM, Z> KnowsState for ClosureStage<CB, E, EM, Z>
+impl<CB, E, EM, Z> UsesState for ClosureStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
-    E: KnowsState,
+    E: UsesState,
 {
     type State = E::State;
 }
@@ -160,9 +160,9 @@ where
 impl<CB, E, EM, Z> Stage<E, EM, Z> for ClosureStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
-    E: KnowsState,
-    EM: KnowsState<State = E::State>,
-    Z: KnowsState<State = E::State>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn perform(
         &mut self,
@@ -180,7 +180,7 @@ where
 impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
-    E: KnowsState,
+    E: UsesState,
 {
     /// Create a new [`ClosureStage`]
     #[must_use]
@@ -195,7 +195,7 @@ where
 impl<CB, E, EM, Z> From<CB> for ClosureStage<CB, E, EM, Z>
 where
     CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
-    E: KnowsState,
+    E: UsesState,
 {
     #[must_use]
     fn from(closure: CB) -> Self {
@@ -223,9 +223,9 @@ impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z> {
     }
 }
 
-impl<CS, EM, OT, PS, Z> KnowsState for PushStageAdapter<CS, EM, OT, PS, Z>
+impl<CS, EM, OT, PS, Z> UsesState for PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: KnowsState,
+    CS: UsesState,
 {
     type State = CS::State;
 }
@@ -316,9 +316,9 @@ impl<CD, E, EM, ST, Z> SkippableStage<CD, E, EM, ST, Z>
 where
     CD: FnMut(&mut ST::State) -> SkippableStageDecision,
     ST: Stage<E, EM, Z>,
-    E: KnowsState<State = ST::State>,
-    EM: KnowsState<State = ST::State>,
-    Z: KnowsState<State = ST::State>,
+    E: UsesState<State = ST::State>,
+    EM: UsesState<State = ST::State>,
+    Z: UsesState<State = ST::State>,
 {
     /// Create a new [`SkippableStage`]
     pub fn new(wrapped_stage: ST, condition: CD) -> Self {
@@ -330,13 +330,13 @@ where
     }
 }
 
-impl<CD, E, EM, ST, Z> KnowsState for SkippableStage<CD, E, EM, ST, Z>
+impl<CD, E, EM, ST, Z> UsesState for SkippableStage<CD, E, EM, ST, Z>
 where
     CD: FnMut(&mut ST::State) -> SkippableStageDecision,
     ST: Stage<E, EM, Z>,
-    E: KnowsState<State = ST::State>,
-    EM: KnowsState<State = ST::State>,
-    Z: KnowsState<State = ST::State>,
+    E: UsesState<State = ST::State>,
+    EM: UsesState<State = ST::State>,
+    Z: UsesState<State = ST::State>,
 {
     type State = ST::State;
 }
@@ -345,9 +345,9 @@ impl<CD, E, EM, ST, Z> Stage<E, EM, Z> for SkippableStage<CD, E, EM, ST, Z>
 where
     CD: FnMut(&mut ST::State) -> SkippableStageDecision,
     ST: Stage<E, EM, Z>,
-    E: KnowsState<State = ST::State>,
-    EM: KnowsState<State = ST::State>,
-    Z: KnowsState<State = ST::State>,
+    E: UsesState<State = ST::State>,
+    EM: UsesState<State = ST::State>,
+    Z: UsesState<State = ST::State>,
 {
     /// Run the stage
     #[inline]
@@ -384,7 +384,7 @@ pub mod pybind {
         stages::{mutational::pybind::PythonStdMutationalStage, Stage, StagesTuple},
         state::{
             pybind::{PythonStdState, PythonStdStateWrapper},
-            KnowsState,
+            UsesState,
         },
         Error,
     };
@@ -401,7 +401,7 @@ pub mod pybind {
         }
     }
 
-    impl KnowsState for PyObjectStage {
+    impl UsesState for PyObjectStage {
         type State = PythonStdState;
     }
 
@@ -489,7 +489,7 @@ pub mod pybind {
         }
     }
 
-    impl KnowsState for PythonStage {
+    impl UsesState for PythonStage {
         type State = PythonStdState;
     }
 

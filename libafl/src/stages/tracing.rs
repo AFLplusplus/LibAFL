@@ -11,7 +11,7 @@ use crate::{
     observers::ObserversTuple,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, KnowsState, State},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, State, UsesState},
     Error,
 };
 
@@ -23,20 +23,20 @@ pub struct TracingStage<EM, TE, Z> {
     phantom: PhantomData<(EM, TE, Z)>,
 }
 
-impl<EM, TE, Z> KnowsState for TracingStage<EM, TE, Z>
+impl<EM, TE, Z> UsesState for TracingStage<EM, TE, Z>
 where
-    TE: KnowsState,
+    TE: UsesState,
 {
     type State = TE::State;
 }
 
 impl<E, EM, TE, Z> Stage<E, EM, Z> for TracingStage<EM, TE, Z>
 where
-    E: KnowsState<State = TE::State>,
+    E: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
-    EM: KnowsState<State = TE::State>,
-    Z: KnowsState<State = TE::State>,
+    EM: UsesState<State = TE::State>,
+    Z: UsesState<State = TE::State>,
 {
     #[inline]
     fn perform(
@@ -102,9 +102,9 @@ pub struct ShadowTracingStage<E, EM, SOT, Z> {
     phantom: PhantomData<(E, EM, SOT, Z)>,
 }
 
-impl<E, EM, SOT, Z> KnowsState for ShadowTracingStage<E, EM, SOT, Z>
+impl<E, EM, SOT, Z> UsesState for ShadowTracingStage<E, EM, SOT, Z>
 where
-    E: KnowsState,
+    E: UsesState,
 {
     type State = E::State;
 }
@@ -112,9 +112,9 @@ where
 impl<E, EM, SOT, Z> Stage<ShadowExecutor<E, SOT>, EM, Z> for ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
     SOT: ObserversTuple<E::State>,
-    Z: KnowsState<State = E::State>,
+    Z: UsesState<State = E::State>,
     E::State: State + HasClientPerfMonitor + HasExecutions + HasCorpus + Debug,
 {
     #[inline]
@@ -165,9 +165,9 @@ impl<E, EM, SOT, Z> ShadowTracingStage<E, EM, SOT, Z>
 where
     E: Executor<EM, Z> + HasObservers,
     E::State: State + HasClientPerfMonitor + HasExecutions + HasCorpus,
-    EM: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
     SOT: ObserversTuple<E::State>,
-    Z: KnowsState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     /// Creates a new default stage
     pub fn new(_executor: &mut ShadowExecutor<E, SOT>) -> Self {

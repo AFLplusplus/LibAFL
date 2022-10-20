@@ -5,16 +5,16 @@ use alloc::{boxed::Box, vec::Vec};
 use crate::{
     bolts::anymap::AsAny,
     stages::{Stage, StagesTuple},
-    state::KnowsState,
+    state::UsesState,
     Error,
 };
 
 /// Combine `Stage` and `AsAny`
 pub trait AnyStage<E, EM, Z>: Stage<E, EM, Z> + AsAny
 where
-    E: KnowsState<State = Self::State>,
-    EM: KnowsState<State = Self::State>,
-    Z: KnowsState<State = Self::State>,
+    E: UsesState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
 {
 }
 
@@ -23,7 +23,7 @@ where
 #[allow(missing_debug_implementations)]
 pub struct StagesOwnedList<E, EM, Z>
 where
-    E: KnowsState,
+    E: UsesState,
 {
     /// The named trait objects map
     #[allow(clippy::type_complexity)]
@@ -32,9 +32,9 @@ where
 
 impl<E, EM, Z> StagesTuple<E, EM, E::State, Z> for StagesOwnedList<E, EM, Z>
 where
-    E: KnowsState,
-    EM: KnowsState<State = E::State>,
-    Z: KnowsState<State = E::State>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn perform_all(
         &mut self,
@@ -53,7 +53,7 @@ where
 
 impl<E, EM, Z> StagesOwnedList<E, EM, Z>
 where
-    E: KnowsState,
+    E: UsesState,
 {
     /// Create a new instance
     #[must_use]

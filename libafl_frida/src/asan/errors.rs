@@ -13,7 +13,7 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::{HasTargetBytes, KnowsInput},
+    inputs::{HasTargetBytes, UsesInput},
     observers::{Observer, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
@@ -553,7 +553,7 @@ pub struct AsanErrorsObserver {
 
 impl<S> Observer<S> for AsanErrorsObserver
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         unsafe {
@@ -617,7 +617,7 @@ pub struct AsanErrorsFeedback<S> {
 
 impl<S> Feedback<S> for AsanErrorsFeedback<S>
 where
-    S: KnowsInput + Debug + HasClientPerfMonitor,
+    S: UsesInput + Debug + HasClientPerfMonitor,
     S::Input: HasTargetBytes,
 {
     #[allow(clippy::wrong_self_convention)]

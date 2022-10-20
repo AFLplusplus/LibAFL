@@ -20,7 +20,7 @@ use crate::{
     executors::{Executor, HasObservers},
     observers::{MapObserver, ObserversTuple},
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, KnowsState},
+    state::{HasCorpus, HasMetadata, UsesState},
     Error, HasScheduler,
 };
 
@@ -28,7 +28,7 @@ use crate::{
 /// details.
 pub trait CorpusMinimizer<E>
 where
-    E: KnowsState,
+    E: UsesState,
     E::State: HasCorpus,
 {
     /// Minimize the corpus of the provided state.
@@ -42,7 +42,7 @@ where
     where
         E: Executor<EM, Z> + HasObservers,
         CS: Scheduler<State = E::State>,
-        EM: KnowsState<State = E::State>,
+        EM: UsesState<State = E::State>,
         Z: HasScheduler<CS, State = E::State>;
 }
 
@@ -52,7 +52,7 @@ where
 #[derive(Debug)]
 pub struct MapCorpusMinimizer<E, O, T, TS>
 where
-    E: KnowsState,
+    E: UsesState,
     E::State: HasCorpus + HasMetadata,
     TS: TestcaseScore<E::State>,
 {
@@ -62,11 +62,11 @@ where
 
 /// Standard corpus minimizer, which weights inputs by length and time.
 pub type StdCorpusMinimizer<E, O, T> =
-    MapCorpusMinimizer<E, O, T, LenTimeMulTestcaseScore<<E as KnowsState>::State>>;
+    MapCorpusMinimizer<E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
 
 impl<E, O, T, TS> MapCorpusMinimizer<E, O, T, TS>
 where
-    E: KnowsState,
+    E: UsesState,
     E::State: HasCorpus + HasMetadata,
     TS: TestcaseScore<E::State>,
 {
@@ -85,7 +85,7 @@ where
 
 impl<E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<E, O, T, TS>
 where
-    E: KnowsState,
+    E: UsesState,
     for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
     E::State: HasMetadata + HasCorpus,
     T: Copy + Hash + Eq,
@@ -101,7 +101,7 @@ where
     where
         E: Executor<EM, Z> + HasObservers,
         CS: Scheduler<State = E::State>,
-        EM: KnowsState<State = E::State>,
+        EM: UsesState<State = E::State>,
         Z: HasScheduler<CS, State = E::State>,
     {
         let cfg = Config::default();

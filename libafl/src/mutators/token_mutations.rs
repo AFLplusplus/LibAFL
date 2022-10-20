@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     bolts::{rands::Rand, AsSlice},
-    inputs::{HasBytesVec, KnowsInput},
+    inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{CmpValues, CmpValuesMetadata},
     state::{HasMaxSize, HasMetadata, HasRand},
@@ -297,7 +297,7 @@ pub struct TokenInsert;
 
 impl<S> Mutator<S> for TokenInsert
 where
-    S: KnowsInput + HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -363,7 +363,7 @@ pub struct TokenReplace;
 
 impl<S> Mutator<S> for TokenReplace
 where
-    S: KnowsInput + HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
     S::Input: HasBytesVec,
 {
     fn mutate(
@@ -425,7 +425,7 @@ pub struct I2SRandReplace;
 
 impl<S> Mutator<S> for I2SRandReplace
 where
-    S: KnowsInput + HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
     S::Input: HasBytesVec,
 {
     #[allow(clippy::too_many_lines)]

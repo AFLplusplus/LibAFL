@@ -19,7 +19,7 @@ use crate::{
     feedbacks::Feedback,
     fuzzer::{Evaluator, ExecuteInputResult},
     generators::Generator,
-    inputs::{Input, KnowsInput},
+    inputs::{Input, UsesInput},
     monitors::ClientPerfMonitor,
     Error,
 };
@@ -30,26 +30,26 @@ pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
 /// The [`State`] of the fuzzer.
 /// Contains all important information about the current run.
 /// Will be used to restart the fuzzing process at any time.
-pub trait State: KnowsInput + Serialize + DeserializeOwned {}
+pub trait State: UsesInput + Serialize + DeserializeOwned {}
 
 /// Structs which implement this trait are aware of the state. This is used for type enforcement.
-pub trait KnowsState: KnowsInput<Input = <Self::State as KnowsInput>::Input> {
+pub trait UsesState: UsesInput<Input = <Self::State as UsesInput>::Input> {
     /// The state known by this type.
-    type State: KnowsInput;
+    type State: UsesInput;
 }
 
-// blanket impl which automatically defines KnowsInput for anything that implements KnowsState
-impl<KS> KnowsInput for KS
+// blanket impl which automatically defines UsesInput for anything that implements UsesState
+impl<KS> UsesInput for KS
 where
-    KS: KnowsState,
+    KS: UsesState,
 {
-    type Input = <KS::State as KnowsInput>::Input;
+    type Input = <KS::State as UsesInput>::Input;
 }
 
 /// Trait for elements offering a corpus
-pub trait HasCorpus: KnowsInput {
+pub trait HasCorpus: UsesInput {
     /// The associated type implementing [`Corpus`].
-    type Corpus: Corpus<Input = <Self as KnowsInput>::Input>;
+    type Corpus: Corpus<Input = <Self as UsesInput>::Input>;
 
     /// The testcase corpus
     fn corpus(&self) -> &Self::Corpus;
@@ -66,9 +66,9 @@ pub trait HasMaxSize {
 }
 
 /// Trait for elements offering a corpus of solutions
-pub trait HasSolutions: KnowsInput {
+pub trait HasSolutions: UsesInput {
     /// The associated type implementing [`Corpus`] for solutions
-    type Solutions: Corpus<Input = <Self as KnowsInput>::Input>;
+    type Solutions: Corpus<Input = <Self as UsesInput>::Input>;
 
     /// The solutions corpus
     fn solutions(&self) -> &Self::Solutions;
@@ -195,7 +195,7 @@ pub struct StdState<I, C, R, SC> {
     phantom: PhantomData<I>,
 }
 
-impl<I, C, R, SC> KnowsInput for StdState<I, C, R, SC>
+impl<I, C, R, SC> UsesInput for StdState<I, C, R, SC>
 where
     I: Input,
 {
@@ -207,7 +207,7 @@ where
     C: Corpus<Input = Self::Input>,
     R: Rand,
     SC: Corpus<Input = Self::Input>,
-    Self: KnowsInput,
+    Self: UsesInput,
 {
 }
 
@@ -233,7 +233,7 @@ where
 impl<I, C, R, SC> HasCorpus for StdState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = <Self as KnowsInput>::Input>,
+    C: Corpus<Input = <Self as UsesInput>::Input>,
     R: Rand,
 {
     type Corpus = C;
@@ -254,7 +254,7 @@ where
 impl<I, C, R, SC> HasSolutions for StdState<I, C, R, SC>
 where
     I: Input,
-    SC: Corpus<Input = <Self as KnowsInput>::Input>,
+    SC: Corpus<Input = <Self as UsesInput>::Input>,
 {
     type Solutions = SC;
 
@@ -341,9 +341,9 @@ impl<I, C, R, SC> HasStartTime for StdState<I, C, R, SC> {
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = <Self as KnowsInput>::Input>,
+    C: Corpus<Input = <Self as UsesInput>::Input>,
     R: Rand,
-    SC: Corpus<Input = <Self as KnowsInput>::Input>,
+    SC: Corpus<Input = <Self as UsesInput>::Input>,
 {
     /// Loads inputs from a directory.
     /// If `forced` is `true`, the value will be loaded,
@@ -358,8 +358,8 @@ where
         loader: &mut dyn FnMut(&mut Z, &mut Self, &Path) -> Result<I, Error>,
     ) -> Result<(), Error>
     where
-        E: KnowsState<State = Self>,
-        EM: KnowsState<State = Self>,
+        E: UsesState<State = Self>,
+        EM: UsesState<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
         for entry in fs::read_dir(in_dir)? {
@@ -403,7 +403,7 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        E: KnowsState<State = Self>,
+        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
@@ -439,7 +439,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: KnowsState<State = Self>,
+        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
@@ -455,7 +455,7 @@ where
         in_dirs: &[PathBuf],
     ) -> Result<(), Error>
     where
-        E: KnowsState<State = Self>,
+        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
@@ -466,9 +466,9 @@ where
 impl<C, I, R, SC> StdState<I, C, R, SC>
 where
     I: Input,
-    C: Corpus<Input = <Self as KnowsInput>::Input>,
+    C: Corpus<Input = <Self as UsesInput>::Input>,
     R: Rand,
-    SC: Corpus<Input = <Self as KnowsInput>::Input>,
+    SC: Corpus<Input = <Self as UsesInput>::Input>,
 {
     fn generate_initial_internal<G, E, EM, Z>(
         &mut self,
@@ -480,9 +480,9 @@ where
         forced: bool,
     ) -> Result<(), Error>
     where
-        E: KnowsState<State = Self>,
+        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        G: Generator<<Self as KnowsInput>::Input, Self>,
+        G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
         let mut added = 0;
@@ -519,9 +519,9 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        E: KnowsState<State = Self>,
+        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        G: Generator<<Self as KnowsInput>::Input, Self>,
+        G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, true)
@@ -537,9 +537,9 @@ where
         num: usize,
     ) -> Result<(), Error>
     where
-        E: KnowsState<State = Self>,
+        E: UsesState<State = Self>,
         EM: EventFirer<State = Self>,
-        G: Generator<<Self as KnowsInput>::Input, Self>,
+        G: Generator<<Self as UsesInput>::Input, Self>,
         Z: Evaluator<E, EM, State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
@@ -616,7 +616,7 @@ impl<I> NopState<I> {
 }
 
 #[cfg(test)]
-impl<I> KnowsInput for NopState<I>
+impl<I> UsesInput for NopState<I>
 where
     I: Input,
 {

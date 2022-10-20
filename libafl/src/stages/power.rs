@@ -14,7 +14,7 @@ use crate::{
         powersched::SchedulerMetadata, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
     },
     stages::{MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, KnowsState},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -27,9 +27,9 @@ pub struct PowerMutationalStage<E, F, EM, M, O, Z> {
     phantom: PhantomData<(E, F, EM, O, Z)>,
 }
 
-impl<E, F, EM, M, O, Z> KnowsState for PowerMutationalStage<E, F, EM, M, O, Z>
+impl<E, F, EM, M, O, Z> UsesState for PowerMutationalStage<E, F, EM, M, O, Z>
 where
-    E: KnowsState,
+    E: UsesState,
 {
     type State = E::State;
 }
@@ -37,7 +37,7 @@ where
 impl<E, F, EM, M, O, Z> MutationalStage<E, EM, M, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -128,7 +128,7 @@ where
 impl<E, F, EM, M, O, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -153,7 +153,7 @@ where
 impl<E, F, EM, M, O, Z> PowerMutationalStage<E, F, EM, M, O, Z>
 where
     E: Executor<EM, Z> + HasObservers,
-    EM: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
     F: TestcaseScore<E::State>,
     M: Mutator<E::State>,
     O: MapObserver,
@@ -172,4 +172,4 @@ where
 
 /// The standard powerscheduling stage
 pub type StdPowerMutationalStage<E, EM, M, O, Z> =
-    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as KnowsState>::State>, EM, M, O, Z>;
+    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, M, O, Z>;

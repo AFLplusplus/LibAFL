@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::tuples::Named,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     observers::{
         concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
         Observer,
@@ -19,7 +19,7 @@ pub struct ConcolicObserver<'map> {
     name: String,
 }
 
-impl<'map, S> Observer<S> for ConcolicObserver<'map> where S: KnowsInput {}
+impl<'map, S> Observer<S> for ConcolicObserver<'map> where S: UsesInput {}
 
 impl<'map> ConcolicObserver<'map> {
     /// Create the concolic observer metadata for this run

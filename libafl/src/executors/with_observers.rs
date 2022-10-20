@@ -4,8 +4,8 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::{KnowsObservers, ObserversTuple},
-    state::KnowsState,
+    observers::{ObserversTuple, UsesObservers},
+    state::UsesState,
     Error,
 };
 
@@ -20,8 +20,8 @@ impl<E, EM, OT, Z> Executor<EM, Z> for WithObservers<E, OT>
 where
     E: Executor<EM, Z> + Debug,
     OT: Debug,
-    EM: KnowsState<State = E::State>,
-    Z: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
@@ -34,16 +34,16 @@ where
     }
 }
 
-impl<E, OT> KnowsState for WithObservers<E, OT>
+impl<E, OT> UsesState for WithObservers<E, OT>
 where
-    E: KnowsState,
+    E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, OT> KnowsObservers for WithObservers<E, OT>
+impl<E, OT> UsesObservers for WithObservers<E, OT>
 where
-    E: KnowsState,
+    E: UsesState,
     OT: ObserversTuple<E::State>,
 {
     type Observers = OT;

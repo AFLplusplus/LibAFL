@@ -1,5 +1,5 @@
 use capstone::prelude::*;
-use libafl::inputs::KnowsInput;
+use libafl::inputs::UsesInput;
 
 use crate::{
     capstone,
@@ -48,7 +48,7 @@ impl Default for QemuCallTracerHelper {
 
 impl<S> QemuHelper<S> for QemuCallTracerHelper
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'a, QT, S>)
     where
@@ -71,7 +71,7 @@ where
 
 pub fn on_ret<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, _state: Option<&mut S>, _pc: GuestAddr)
 where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     #[cfg(cpu_target = "x86_64")]
@@ -119,7 +119,7 @@ pub fn gen_blocks_calls<QT, S>(
     pc: GuestAddr,
 ) -> Option<u64>
 where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     let emu = hooks.emulator();

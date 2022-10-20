@@ -46,9 +46,9 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
-    inputs::KnowsInput,
-    observers::{KnowsObservers, ObserversTuple},
-    state::{HasClientPerfMonitor, HasSolutions, KnowsState},
+    inputs::UsesInput,
+    observers::{ObserversTuple, UsesObservers},
+    state::{HasClientPerfMonitor, HasSolutions, UsesState},
     Error,
 };
 
@@ -57,8 +57,8 @@ pub type InProcessExecutor<'a, H, OT, S> = GenericInProcessExecutor<H, &'a mut H
 
 /// The process executor simply calls a target function, as boxed `FnMut` trait object
 pub type OwnedInProcessExecutor<OT, S> = GenericInProcessExecutor<
-    dyn FnMut(&<S as KnowsInput>::Input) -> ExitKind,
-    Box<dyn FnMut(&<S as KnowsInput>::Input) -> ExitKind>,
+    dyn FnMut(&<S as UsesInput>::Input) -> ExitKind,
+    Box<dyn FnMut(&<S as UsesInput>::Input) -> ExitKind>,
     OT,
     S,
 >;
@@ -70,7 +70,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     /// The harness function, being executed for each fuzzing loop execution
     harness_fn: HB,
@@ -86,7 +86,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("GenericInProcessExecutor")
@@ -96,22 +96,22 @@ where
     }
 }
 
-impl<H, HB, OT, S> KnowsState for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, OT, S> UsesState for GenericInProcessExecutor<H, HB, OT, S>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }
 
-impl<H, HB, OT, S> KnowsObservers for GenericInProcessExecutor<H, HB, OT, S>
+impl<H, HB, OT, S> UsesObservers for GenericInProcessExecutor<H, HB, OT, S>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     type Observers = OT;
 }
@@ -120,10 +120,10 @@ impl<EM, H, HB, OT, S, Z> Executor<EM, Z> for GenericInProcessExecutor<H, HB, OT
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
-    EM: KnowsState<State = S>,
+    EM: UsesState<State = S>,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
-    Z: KnowsState<State = S>,
+    S: UsesInput,
+    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
@@ -147,7 +147,7 @@ where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     #[inline]
     fn observers(&self) -> &OT {
@@ -162,7 +162,7 @@ where
 
 impl<H, HB, OT, S> GenericInProcessExecutor<H, HB, OT, S>
 where
-    H: FnMut(&<S as KnowsInput>::Input) -> ExitKind + ?Sized,
+    H: FnMut(&<S as UsesInput>::Input) -> ExitKind + ?Sized,
     HB: BorrowMut<H>,
     OT: ObserversTuple<S>,
     S: HasSolutions + HasClientPerfMonitor,
@@ -247,7 +247,7 @@ impl<'a, H, OT, S> HasInProcessHandlers for InProcessExecutor<'a, H, OT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     /// the timeout handler
     #[inline]
@@ -343,7 +343,7 @@ impl InProcessHandlers {
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
         Z: HasObjective<OF, State = E::State>,
-        H: FnMut(&<E::State as KnowsInput>::Input) -> ExitKind + ?Sized,
+        H: FnMut(&<E::State as UsesInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
         unsafe {
@@ -552,7 +552,7 @@ mod unix_signal_handler {
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
-        inputs::KnowsInput,
+        inputs::UsesInput,
         observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
@@ -625,7 +625,7 @@ mod unix_signal_handler {
                 let executor = data.executor_mut::<E>();
                 let observers = executor.observers_mut();
                 let state = data.state_mut::<E::State>();
-                let input = data.current_input::<<E::State as KnowsInput>::Input>();
+                let input = data.current_input::<<E::State as UsesInput>::Input>();
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
@@ -701,7 +701,7 @@ mod unix_signal_handler {
         let fuzzer = data.fuzzer_mut::<Z>();
         let event_mgr = data.event_mgr_mut::<EM>();
 
-        let input = data.take_current_input::<<E::State as KnowsInput>::Input>();
+        let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
         #[cfg(feature = "std")]
         println!("Timeout in fuzz run.");
@@ -782,7 +782,7 @@ mod unix_signal_handler {
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
 
-            let input = data.take_current_input::<<E::State as KnowsInput>::Input>();
+            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
             observers
                 .post_exec_all(state, input, &ExitKind::Crash)
@@ -939,7 +939,7 @@ mod windows_exception_handler {
         EnterCriticalSection, LeaveCriticalSection, RTL_CRITICAL_SECTION,
     };
 
-    use crate::inputs::KnowsInput;
+    use crate::inputs::UsesInput;
 
     /// invokes the `post_exec` hook on all observer in case of panic
     #[cfg(feature = "std")]
@@ -980,7 +980,7 @@ mod windows_exception_handler {
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
-                let input = data.take_current_input::<<E::State as KnowsInput>::Input>();
+                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
                 observers
                     .post_exec_all(state, input, &ExitKind::Crash)
@@ -1067,7 +1067,7 @@ mod windows_exception_handler {
                 #[cfg(feature = "std")]
                 let _res = stdout().flush();
 
-                let input = (data.timeout_input_ptr as *const <E::State as KnowsInput>::Input)
+                let input = (data.timeout_input_ptr as *const <E::State as UsesInput>::Input)
                     .as_ref()
                     .unwrap();
                 data.timeout_input_ptr = ptr::null_mut();
@@ -1131,7 +1131,7 @@ mod windows_exception_handler {
         exception_pointers: *mut EXCEPTION_POINTERS,
         data: &mut InProcessExecutorHandlerData,
     ) where
-        E: HasObservers,
+        E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
@@ -1213,7 +1213,7 @@ mod windows_exception_handler {
             drop(stdout().flush());
 
             // Make sure we don't crash in the crash handler forever.
-            let input = data.take_current_input::<<E::State as KnowsInput>::Input>();
+            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
@@ -1442,7 +1442,7 @@ pub struct InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     harness_fn: &'a mut H,
@@ -1458,7 +1458,7 @@ pub struct TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     harness_fn: &'a mut H,
@@ -1474,7 +1474,7 @@ impl<'a, H, OT, S, SP> Debug for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1490,7 +1490,7 @@ impl<'a, H, OT, S, SP> Debug for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1503,22 +1503,22 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> KnowsState for InProcessForkExecutor<'a, H, OT, S, SP>
+impl<'a, H, OT, S, SP> UsesState for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     type State = S;
 }
 
 #[cfg(all(feature = "std", target_os = "linux"))]
-impl<'a, H, OT, S, SP> KnowsState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
+impl<'a, H, OT, S, SP> UsesState for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     type State = S;
@@ -1527,12 +1527,12 @@ where
 #[cfg(all(feature = "std", unix))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for InProcessForkExecutor<'a, H, OT, S, SP>
 where
-    EM: KnowsState<State = S>,
+    EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
-    Z: KnowsState<State = S>,
+    Z: UsesState<State = S>,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -1595,12 +1595,12 @@ where
 #[cfg(all(feature = "std", target_os = "linux"))]
 impl<'a, EM, H, OT, S, SP, Z> Executor<EM, Z> for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
-    EM: KnowsState<State = S>,
+    EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
-    Z: KnowsState<State = S>,
+    Z: UsesState<State = S>,
 {
     #[allow(unreachable_code)]
     #[inline]
@@ -1685,7 +1685,7 @@ impl<'a, H, OT, S, SP> InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     /// Creates a new [`InProcessForkExecutor`]
@@ -1730,7 +1730,7 @@ where
 impl<'a, H, OT, S, SP> TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: KnowsInput,
+    S: UsesInput,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
@@ -1789,22 +1789,22 @@ where
 }
 
 #[cfg(all(feature = "std", unix))]
-impl<'a, H, OT, S, SP> KnowsObservers for InProcessForkExecutor<'a, H, OT, S, SP>
+impl<'a, H, OT, S, SP> UsesObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     type Observers = OT;
 }
 
 #[cfg(all(feature = "std", target_os = "linux"))]
-impl<'a, H, OT, S, SP> KnowsObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
+impl<'a, H, OT, S, SP> UsesObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: ?Sized + FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     type Observers = OT;
@@ -1814,7 +1814,7 @@ where
 impl<'a, H, OT, S, SP> HasObservers for InProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: KnowsInput,
+    S: UsesInput,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
@@ -1833,7 +1833,7 @@ where
 impl<'a, H, OT, S, SP> HasObservers for TimeoutInProcessForkExecutor<'a, H, OT, S, SP>
 where
     H: FnMut(&S::Input) -> ExitKind + ?Sized,
-    S: KnowsInput,
+    S: UsesInput,
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
 {
@@ -1860,7 +1860,7 @@ pub mod child_signal_handlers {
     use crate::{
         bolts::os::unix_signals::{ucontext_t, Signal},
         executors::{ExitKind, HasObservers},
-        inputs::KnowsInput,
+        inputs::UsesInput,
         observers::ObserversTuple,
     };
 
@@ -1878,7 +1878,7 @@ pub mod child_signal_handlers {
                 let observers = executor.observers_mut();
                 let state = data.state_mut::<E::State>();
                 // Invalidate data to not execute again the observer hooks in the crash handler
-                let input = data.take_current_input::<<E::State as KnowsInput>::Input>();
+                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
                 observers
                     .post_exec_child_all(state, input, &ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
@@ -1907,7 +1907,7 @@ pub mod child_signal_handlers {
             let executor = data.executor_mut::<E>();
             let observers = executor.observers_mut();
             let state = data.state_mut::<E::State>();
-            let input = data.take_current_input::<<E::State as KnowsInput>::Input>();
+            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
             observers
                 .post_exec_child_all(state, input, &ExitKind::Crash)
                 .expect("Failed to run post_exec on observers");
@@ -1929,7 +1929,7 @@ pub mod child_signal_handlers {
             let executor = data.executor_mut::<E>();
             let observers = executor.observers_mut();
             let state = data.state_mut::<E::State>();
-            let input = data.take_current_input::<<E::State as KnowsInput>::Input>();
+            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
             observers
                 .post_exec_child_all(state, input, &ExitKind::Timeout)
                 .expect("Failed to run post_exec on observers");
@@ -1949,12 +1949,12 @@ mod tests {
         bolts::tuples::tuple_list,
         events::NopEventManager,
         executors::{inprocess::InProcessHandlers, Executor, ExitKind, InProcessExecutor},
-        inputs::{KnowsInput, NopInput},
+        inputs::{NopInput, UsesInput},
         state::NopState,
         NopFuzzer,
     };
 
-    impl KnowsInput for () {
+    impl UsesInput for () {
         type Input = NopInput;
     }
 

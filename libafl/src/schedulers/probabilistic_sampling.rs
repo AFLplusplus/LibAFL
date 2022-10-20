@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     schedulers::{Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, KnowsState},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -20,7 +20,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct ProbabilitySamplingScheduler<F, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     phantom: PhantomData<(F, S)>,
 }
@@ -87,9 +87,9 @@ where
     }
 }
 
-impl<F, S> KnowsState for ProbabilitySamplingScheduler<F, S>
+impl<F, S> UsesState for ProbabilitySamplingScheduler<F, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }
@@ -149,7 +149,7 @@ mod tests {
         bolts::rands::StdRand,
         corpus::{Corpus, InMemoryCorpus, Testcase},
         feedbacks::ConstFeedback,
-        inputs::{bytes::BytesInput, Input, KnowsInput},
+        inputs::{bytes::BytesInput, Input, UsesInput},
         schedulers::{ProbabilitySamplingScheduler, Scheduler, TestcaseScore},
         state::{HasCorpus, HasMetadata, StdState},
         Error,
@@ -175,7 +175,7 @@ mod tests {
     }
 
     pub type UniformProbabilitySamplingScheduler<S> =
-        ProbabilitySamplingScheduler<UniformDistribution<<S as KnowsInput>::Input>, S>;
+        ProbabilitySamplingScheduler<UniformDistribution<<S as UsesInput>::Input>, S>;
 
     #[test]
     fn test_prob_sampling() {

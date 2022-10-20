@@ -31,12 +31,12 @@ use crate::{
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input, KnowsInput},
+    inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{
-        get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, KnowsObservers, ObserversTuple,
+        get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple, UsesObservers,
     },
-    state::KnowsState,
+    state::UsesState,
     Error,
 };
 
@@ -384,8 +384,8 @@ impl<E, EM, Z> Executor<EM, Z> for TimeoutForkserverExecutor<E>
 where
     E: Executor<EM, Z> + HasForkserver + Debug,
     E::Input: HasTargetBytes,
-    EM: KnowsState<State = E::State>,
-    Z: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     #[inline]
     fn run_target(
@@ -521,7 +521,7 @@ impl ForkserverExecutor<(), (), StdShMemProvider> {
 impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: KnowsState,
+    S: UsesState,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -564,7 +564,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     pub fn build<OT, S>(&mut self, observers: OT) -> Result<ForkserverExecutor<OT, S, SP>, Error>
     where
         OT: ObserversTuple<S>,
-        S: KnowsInput,
+        S: UsesInput,
         S::Input: Input + HasTargetBytes,
         SP: ShMemProvider,
     {
@@ -860,10 +860,10 @@ impl<EM, OT, S, SP, Z> Executor<EM, Z> for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
     SP: ShMemProvider,
-    S: KnowsInput,
+    S: UsesInput,
     S::Input: HasTargetBytes,
-    EM: KnowsState<State = S>,
-    Z: KnowsState<State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
 {
     #[inline]
     fn run_target(
@@ -948,18 +948,18 @@ where
     }
 }
 
-impl<OT, S, SP> KnowsState for ForkserverExecutor<OT, S, SP>
+impl<OT, S, SP> UsesState for ForkserverExecutor<OT, S, SP>
 where
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     type State = S;
 }
 
-impl<OT, S, SP> KnowsObservers for ForkserverExecutor<OT, S, SP>
+impl<OT, S, SP> UsesObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     type Observers = OT;
@@ -968,7 +968,7 @@ where
 impl<OT, S, SP> HasObservers for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     #[inline]
@@ -985,7 +985,7 @@ where
 impl<OT, S, SP> HasForkserver for ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     S::Input: Input + HasTargetBytes,
     SP: ShMemProvider,
 {
@@ -1022,16 +1022,16 @@ where
     }
 }
 
-impl<E> KnowsState for TimeoutForkserverExecutor<E>
+impl<E> UsesState for TimeoutForkserverExecutor<E>
 where
-    E: KnowsState,
+    E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E> KnowsObservers for TimeoutForkserverExecutor<E>
+impl<E> UsesObservers for TimeoutForkserverExecutor<E>
 where
-    E: KnowsObservers,
+    E: UsesObservers,
 {
     type Observers = E::Observers;
 }

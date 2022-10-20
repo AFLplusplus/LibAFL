@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
-    inputs::KnowsInput,
+    inputs::UsesInput,
     schedulers::Scheduler,
-    state::{HasCorpus, HasMetadata, KnowsState},
+    state::{HasCorpus, HasMetadata, UsesState},
     Error,
 };
 
@@ -154,9 +154,9 @@ pub struct PowerQueueScheduler<S> {
     phantom: PhantomData<S>,
 }
 
-impl<S> KnowsState for PowerQueueScheduler<S>
+impl<S> UsesState for PowerQueueScheduler<S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }

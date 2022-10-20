@@ -162,9 +162,9 @@ mod tests {
         events::EventFirer,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
-        inputs::{BytesInput, KnowsInput},
+        inputs::{BytesInput, UsesInput},
         observers::Observer,
-        state::{KnowsState, NopState},
+        state::{NopState, UsesState},
     };
 
     #[derive(Debug)]
@@ -180,7 +180,7 @@ mod tests {
             }
         }
     }
-    impl<S> Observer<S> for NopObserver where S: KnowsInput {}
+    impl<S> Observer<S> for NopObserver where S: UsesInput {}
     impl PartialEq for NopObserver {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value
@@ -195,15 +195,15 @@ mod tests {
     struct NopEventFirer<S> {
         phantom: PhantomData<S>,
     }
-    impl<S> KnowsState for NopEventFirer<S>
+    impl<S> UsesState for NopEventFirer<S>
     where
-        S: KnowsInput,
+        S: UsesInput,
     {
         type State = S;
     }
     impl<S> EventFirer for NopEventFirer<S>
     where
-        S: KnowsInput,
+        S: UsesInput,
     {
         fn fire(
             &mut self,

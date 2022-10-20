@@ -9,9 +9,9 @@ use frida_gum::{
 use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
-    inputs::{HasTargetBytes, KnowsInput},
-    observers::{KnowsObservers, ObserversTuple},
-    state::KnowsState,
+    inputs::{HasTargetBytes, UsesInput},
+    observers::{ObserversTuple, UsesObservers},
+    state::UsesState,
     Error,
 };
 
@@ -26,7 +26,7 @@ pub struct FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
-    S: KnowsInput,
+    S: UsesInput,
     OT: ObserversTuple<S>,
 {
     base: InProcessExecutor<'a, H, OT, S>,
@@ -41,7 +41,7 @@ where
 impl<'a, 'b, 'c, H, OT, RT, S> Debug for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: KnowsInput,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
 {
@@ -57,13 +57,13 @@ where
 impl<'a, 'b, 'c, EM, H, OT, RT, S, Z> Executor<EM, Z>
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
-    EM: KnowsState<State = S>,
+    EM: UsesState<State = S>,
     H: FnMut(&S::Input) -> ExitKind,
-    S: KnowsInput,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,
-    Z: KnowsState<State = S>,
+    Z: UsesState<State = S>,
 {
     /// Instruct the target about the input and run
     #[inline]
@@ -100,21 +100,21 @@ where
     }
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> KnowsObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<'a, 'b, 'c, H, OT, RT, S> UsesObservers for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     S::Input: HasTargetBytes,
 {
     type Observers = OT;
 }
 
-impl<'a, 'b, 'c, H, OT, RT, S> KnowsState for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
+impl<'a, 'b, 'c, H, OT, RT, S> UsesState for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
     S::Input: HasTargetBytes,
 {
     type State = S;
@@ -124,7 +124,7 @@ impl<'a, 'b, 'c, H, OT, RT, S> HasObservers for FridaInProcessExecutor<'a, 'b, '
 where
     H: FnMut(&S::Input) -> ExitKind,
     S::Input: HasTargetBytes,
-    S: KnowsInput,
+    S: UsesInput,
     OT: ObserversTuple<S>,
 {
     #[inline]
@@ -141,7 +141,7 @@ where
 impl<'a, 'b, 'c, H, OT, S, RT> FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: KnowsInput,
+    S: UsesInput,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,

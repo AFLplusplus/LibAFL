@@ -12,13 +12,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
-    inputs::KnowsInput,
+    inputs::UsesInput,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand, KnowsState},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -217,9 +217,9 @@ where
     }
 }
 
-impl<F, S> KnowsState for WeightedScheduler<F, S>
+impl<F, S> UsesState for WeightedScheduler<F, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }

@@ -4,7 +4,7 @@ use std::{
     sync::Mutex,
 };
 
-use libafl::{inputs::KnowsInput, state::HasMetadata};
+use libafl::{inputs::UsesInput, state::HasMetadata};
 use meminterval::{Interval, IntervalTree};
 use thread_local::ThreadLocal;
 
@@ -470,7 +470,7 @@ impl Default for QemuSnapshotHelper {
 
 impl<S> QemuHelper<S> for QemuSnapshotHelper
 where
-    S: KnowsInput + HasMetadata,
+    S: UsesInput + HasMetadata,
 {
     fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
@@ -506,7 +506,7 @@ pub fn trace_write1_snapshot<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -519,7 +519,7 @@ pub fn trace_write2_snapshot<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -532,7 +532,7 @@ pub fn trace_write4_snapshot<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -545,7 +545,7 @@ pub fn trace_write8_snapshot<QT, S>(
     _id: u64,
     addr: GuestAddr,
 ) where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -559,7 +559,7 @@ pub fn trace_write_n_snapshot<QT, S>(
     addr: GuestAddr,
     size: usize,
 ) where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     let h = hooks.match_helper_mut::<QemuSnapshotHelper>().unwrap();
@@ -582,7 +582,7 @@ pub fn filter_mmap_snapshot<QT, S>(
     _a7: u64,
 ) -> SyscallHookResult
 where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     if i64::from(sys_num) == SYS_munmap {
@@ -611,7 +611,7 @@ pub fn trace_mmap_snapshot<QT, S>(
     _a7: u64,
 ) -> u64
 where
-    S: KnowsInput,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     // NOT A COMPLETE LIST OF MEMORY EFFECTS

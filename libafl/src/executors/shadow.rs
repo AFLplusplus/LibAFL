@@ -4,8 +4,8 @@ use core::fmt::{self, Debug, Formatter};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::{KnowsObservers, ObserversTuple},
-    state::KnowsState,
+    observers::{ObserversTuple, UsesObservers},
+    state::UsesState,
     Error,
 };
 
@@ -19,7 +19,7 @@ pub struct ShadowExecutor<E, SOT> {
 
 impl<E, SOT> Debug for ShadowExecutor<E, SOT>
 where
-    E: KnowsState + Debug,
+    E: UsesState + Debug,
     SOT: ObserversTuple<E::State> + Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -60,8 +60,8 @@ impl<E, EM, SOT, Z> Executor<EM, Z> for ShadowExecutor<E, SOT>
 where
     E: Executor<EM, Z> + HasObservers,
     SOT: ObserversTuple<E::State>,
-    EM: KnowsState<State = E::State>,
-    Z: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
@@ -74,16 +74,16 @@ where
     }
 }
 
-impl<E, SOT> KnowsState for ShadowExecutor<E, SOT>
+impl<E, SOT> UsesState for ShadowExecutor<E, SOT>
 where
-    E: KnowsState,
+    E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E, SOT> KnowsObservers for ShadowExecutor<E, SOT>
+impl<E, SOT> UsesObservers for ShadowExecutor<E, SOT>
 where
-    E: KnowsObservers,
+    E: UsesObservers,
 {
     type Observers = E::Observers;
 }

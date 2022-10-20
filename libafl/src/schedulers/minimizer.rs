@@ -11,9 +11,9 @@ use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand, KnowsState},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -67,9 +67,9 @@ pub struct MinimizerScheduler<CS, F, M> {
     phantom: PhantomData<(F, M)>,
 }
 
-impl<CS, F, M> KnowsState for MinimizerScheduler<CS, F, M>
+impl<CS, F, M> UsesState for MinimizerScheduler<CS, F, M>
 where
-    CS: KnowsState,
+    CS: UsesState,
 {
     type State = CS::State;
 }
@@ -92,7 +92,7 @@ where
         &self,
         state: &mut CS::State,
         idx: usize,
-        testcase: &Testcase<<CS::State as KnowsInput>::Input>,
+        testcase: &Testcase<<CS::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.base.on_replace(state, idx, testcase)
     }
@@ -102,7 +102,7 @@ where
         &self,
         state: &mut CS::State,
         idx: usize,
-        testcase: &Option<Testcase<<CS::State as KnowsInput>::Input>>,
+        testcase: &Option<Testcase<<CS::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, idx, testcase)?;
         let mut entries = if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {
@@ -328,9 +328,9 @@ where
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`.
 pub type LenTimeMinimizerScheduler<CS, M> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as KnowsState>::State>, M>;
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, M>;
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
 pub type IndexesLenTimeMinimizerScheduler<CS> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as KnowsState>::State>, MapIndexesMetadata>;
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, MapIndexesMetadata>;

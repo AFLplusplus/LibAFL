@@ -4,7 +4,7 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, MapIndexesMetadata},
-    inputs::KnowsInput,
+    inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::{MinimizerScheduler, TestcaseScore},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata},
@@ -43,7 +43,7 @@ pub struct PacketLenFeedback {
 
 impl<S> Feedback<S> for PacketLenFeedback
 where
-    S: KnowsInput<Input = PacketData> + HasClientPerfMonitor,
+    S: UsesInput<Input = PacketData> + HasClientPerfMonitor,
 {
     #[inline]
     fn is_interesting<EM, OT>(

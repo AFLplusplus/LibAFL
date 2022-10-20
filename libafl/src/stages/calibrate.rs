@@ -20,11 +20,11 @@ use crate::{
         HasObserverName,
     },
     fuzzer::Evaluator,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, KnowsState},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState},
     Error,
 };
 
@@ -74,9 +74,9 @@ pub struct CalibrationStage<O, OT, S> {
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
 const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<O, OT, S> KnowsState for CalibrationStage<O, OT, S>
+impl<O, OT, S> UsesState for CalibrationStage<O, OT, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }

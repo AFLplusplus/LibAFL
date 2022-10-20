@@ -29,10 +29,10 @@ use crate::{
         BrokerEventResult, Event, EventFirer, EventManager, EventManagerId, EventProcessor,
         EventRestarter, HasEventManagerId,
     },
-    inputs::KnowsInput,
+    inputs::UsesInput,
     monitors::Monitor,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, KnowsState},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
 };
 
@@ -45,7 +45,7 @@ const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 /// A simple, single-threaded event manager that just logs
 pub struct SimpleEventManager<MT, OT, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     /// The monitor
     monitor: MT,
@@ -59,7 +59,7 @@ where
 impl<MT, OT, S> Debug for SimpleEventManager<MT, OT, S>
 where
     MT: Debug,
-    S: KnowsInput,
+    S: UsesInput,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SimpleEventManager")
@@ -70,9 +70,9 @@ where
     }
 }
 
-impl<MT, OT, S> KnowsState for SimpleEventManager<MT, OT, S>
+impl<MT, OT, S> UsesState for SimpleEventManager<MT, OT, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }
@@ -80,12 +80,12 @@ where
 impl<MT, OT, S> EventFirer for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
-    S: KnowsInput,
+    S: UsesInput,
 {
     fn fire(
         &mut self,
         _state: &mut Self::State,
-        event: Event<<Self::State as KnowsInput>::Input>,
+        event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         match Self::handle_in_broker(&mut self.monitor, &event)? {
             BrokerEventResult::Forward => self.events.push(event),
@@ -98,7 +98,7 @@ where
 impl<MT, OT, S> EventRestarter for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
-    S: KnowsInput,
+    S: UsesInput,
 {
 }
 
@@ -106,7 +106,7 @@ impl<E, MT, OT, S, Z> EventProcessor<E, OT, Z> for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     fn process(
         &mut self,
@@ -127,14 +127,14 @@ impl<E, MT, OT, S, Z> EventManager<E, OT, Z> for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
     OT: ObserversTuple<S>,
-    S: KnowsInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
 }
 
 impl<MT, OT, S> HasCustomBufHandlers<S> for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor, //CE: CustomEvent<I, OT>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(
@@ -148,14 +148,14 @@ where
 impl<MT, OT, S> ProgressReporter for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
-    S: KnowsInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
 {
 }
 
 impl<MT, OT, S> HasEventManagerId for SimpleEventManager<MT, OT, S>
 where
     MT: Monitor,
-    S: KnowsInput,
+    S: UsesInput,
 {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId { id: 0 }
@@ -165,7 +165,7 @@ where
 #[cfg(feature = "std")]
 impl<OT, S> SimpleEventManager<SimplePrintingMonitor, OT, S>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     /// Creates a [`SimpleEventManager`] that just prints to `stdout`.
     #[must_use]
@@ -177,7 +177,7 @@ where
 impl<MT, OT, S> SimpleEventManager<MT, OT, S>
 where
     MT: Monitor, //TODO CE: CustomEvent,
-    S: KnowsInput,
+    S: UsesInput,
 {
     /// Creates a new [`SimpleEventManager`].
     pub fn new(monitor: MT) -> Self {
@@ -299,7 +299,7 @@ where
 #[derive(Debug)]
 pub struct SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider, //CE: CustomEvent<I, OT>,
 {
     /// The actual simple event mgr
@@ -309,9 +309,9 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<MT, OT, S, SP> KnowsState for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<MT, OT, S, SP> UsesState for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     type State = S;
@@ -321,13 +321,13 @@ where
 impl<MT, OT, S, SP> EventFirer for SimpleRestartingEventManager<MT, OT, S, SP>
 where
     MT: Monitor,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     fn fire(
         &mut self,
         _state: &mut Self::State,
-        event: Event<<Self::State as KnowsInput>::Input>,
+        event: Event<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.simple_event_mgr.fire(_state, event)
     }
@@ -336,7 +336,7 @@ where
 #[cfg(feature = "std")]
 impl<MT, OT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    S: KnowsInput + Serialize,
+    S: UsesInput + Serialize,
     SP: ShMemProvider,
 {
     /// Reset the single page (we reuse it over and over from pos 0), then send the current state to the next runner.
@@ -352,7 +352,7 @@ impl<E, MT, OT, S, SP, Z> EventProcessor<E, OT, Z> for SimpleRestartingEventMana
 where
     MT: Monitor,
     OT: ObserversTuple<S>,
-    S: KnowsInput + HasClientPerfMonitor + HasExecutions + Serialize,
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + Serialize,
     SP: ShMemProvider,
 {
     fn process(
@@ -370,7 +370,7 @@ impl<E, MT, OT, S, SP, Z> EventManager<E, OT, Z> for SimpleRestartingEventManage
 where
     MT: Monitor,
     OT: ObserversTuple<S>,
-    S: KnowsInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize,
     SP: ShMemProvider,
 {
 }
@@ -379,7 +379,7 @@ where
 impl<MT, OT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<MT, OT, S, SP>
 where
     MT: Monitor,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     fn add_custom_buf_handler(
@@ -394,7 +394,7 @@ where
 impl<MT, OT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, OT, S, SP>
 where
     MT: Monitor,
-    S: KnowsInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
+    S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
 {
 }
@@ -403,7 +403,7 @@ where
 impl<MT, OT, S, SP> HasEventManagerId for SimpleRestartingEventManager<MT, OT, S, SP>
 where
     MT: Monitor,
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     fn mgr_id(&self) -> EventManagerId {
@@ -415,7 +415,7 @@ where
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
 impl<MT, OT, S, SP> SimpleRestartingEventManager<MT, OT, S, SP>
 where
-    S: KnowsInput,
+    S: UsesInput,
     SP: ShMemProvider,
     MT: Monitor, //TODO CE: CustomEvent,
 {

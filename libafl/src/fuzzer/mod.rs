@@ -17,15 +17,13 @@ use crate::{
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
-    inputs::KnowsInput,
+    inputs::UsesInput,
     mark_feature_time,
     observers::ObserversTuple,
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, KnowsState,
-    },
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, UsesState},
     Error,
 };
 
@@ -33,7 +31,7 @@ use crate::{
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
-pub trait HasScheduler<CS>: KnowsState
+pub trait HasScheduler<CS>: UsesState
 where
     CS: Scheduler<State = Self::State>,
 {
@@ -45,7 +43,7 @@ where
 }
 
 /// Holds an feedback
-pub trait HasFeedback<F>: KnowsState
+pub trait HasFeedback<F>: UsesState
 where
     F: Feedback<Self::State>,
     Self::State: HasClientPerfMonitor,
@@ -58,7 +56,7 @@ where
 }
 
 /// Holds an objective feedback
-pub trait HasObjective<OF>: KnowsState
+pub trait HasObjective<OF>: UsesState
 where
     OF: Feedback<Self::State>,
     Self::State: HasClientPerfMonitor,
@@ -71,13 +69,13 @@ where
 }
 
 /// Evaluate if an input is interesting using the feedback
-pub trait ExecutionProcessor<OT>: KnowsState {
+pub trait ExecutionProcessor<OT>: UsesState {
     /// Evaluate if a set of observation channels has an interesting state
     fn process_execution<EM>(
         &mut self,
         state: &mut Self::State,
         manager: &mut EM,
-        input: <Self::State as KnowsInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
@@ -87,7 +85,7 @@ pub trait ExecutionProcessor<OT>: KnowsState {
 }
 
 /// Evaluate an input modifying the state of the fuzzer
-pub trait EvaluatorObservers<OT>: KnowsState + Sized {
+pub trait EvaluatorObservers<OT>: UsesState + Sized {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new
     /// [`crate::corpus::Testcase`] in the [`crate::corpus::Corpus`]
@@ -96,7 +94,7 @@ pub trait EvaluatorObservers<OT>: KnowsState + Sized {
         state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as KnowsInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
@@ -105,10 +103,10 @@ pub trait EvaluatorObservers<OT>: KnowsState + Sized {
 }
 
 /// Evaluate an input modifying the state of the fuzzer
-pub trait Evaluator<E, EM>: KnowsState
+pub trait Evaluator<E, EM>: UsesState
 where
-    E: KnowsState<State = Self::State>,
-    EM: KnowsState<State = Self::State>,
+    E: UsesState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
 {
     /// Runs the input and triggers observers and feedback,
     /// returns if is interesting an (option) the index of the new [`crate::corpus::Testcase`] in the corpus
@@ -117,7 +115,7 @@ where
         state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as KnowsInput>::Input,
+        input: <Self::State as UsesInput>::Input,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
         self.evaluate_input_events(state, executor, manager, input, true)
     }
@@ -130,7 +128,7 @@ where
         state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as KnowsInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>;
 
@@ -143,7 +141,7 @@ where
         state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as KnowsInput>::Input,
+        input: <Self::State as UsesInput>::Input,
     ) -> Result<usize, Error>;
 }
 
@@ -253,7 +251,7 @@ where
     phantom: PhantomData<OT>,
 }
 
-impl<CS, F, OF, OT> KnowsState for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF, OT> UsesState for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
     F: Feedback<CS::State>,
@@ -324,7 +322,7 @@ where
         &mut self,
         state: &mut CS::State,
         manager: &mut EM,
-        input: <CS::State as KnowsInput>::Input,
+        input: <CS::State as UsesInput>::Input,
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
@@ -439,7 +437,7 @@ where
         state: &mut Self::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <Self::State as KnowsInput>::Input,
+        input: <Self::State as UsesInput>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
@@ -469,7 +467,7 @@ where
         state: &mut CS::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as KnowsInput>::Input,
+        input: <CS::State as UsesInput>::Input,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
@@ -481,7 +479,7 @@ where
         state: &mut CS::State,
         executor: &mut E,
         manager: &mut EM,
-        input: <CS::State as KnowsInput>::Input,
+        input: <CS::State as UsesInput>::Input,
     ) -> Result<usize, Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
@@ -520,7 +518,7 @@ where
 impl<CS, E, EM, F, OF, OT, ST> Fuzzer<E, EM, ST> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    E: KnowsState<State = CS::State>,
+    E: UsesState<State = CS::State>,
     EM: ProgressReporter + EventProcessor<E, OT, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
@@ -572,7 +570,7 @@ where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
-    CS::State: KnowsInput + HasExecutions + HasClientPerfMonitor,
+    CS::State: UsesInput + HasExecutions + HasClientPerfMonitor,
 {
     /// Create a new `StdFuzzer` with standard behavior.
     pub fn new(scheduler: CS, feedback: F, objective: OF) -> Self {
@@ -590,11 +588,11 @@ where
         state: &mut CS::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &<CS::State as KnowsInput>::Input,
+        input: &<CS::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = CS::State>,
-        EM: KnowsState<State = CS::State>,
+        EM: UsesState<State = CS::State>,
         OT: ObserversTuple<CS::State>,
     {
         start_timer!(state);
@@ -618,10 +616,10 @@ where
 }
 
 /// Structs with this trait will execute an input
-pub trait ExecutesInput<E, EM>: KnowsState
+pub trait ExecutesInput<E, EM>: UsesState
 where
-    E: KnowsState<State = Self::State>,
-    EM: KnowsState<State = Self::State>,
+    E: UsesState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(
@@ -629,7 +627,7 @@ where
         state: &mut Self::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &<Self::State as KnowsInput>::Input,
+        input: &<Self::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error>;
 }
 
@@ -639,8 +637,8 @@ where
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     E: Executor<EM, Self> + HasObservers<State = CS::State>,
-    EM: KnowsState<State = CS::State>,
-    CS::State: KnowsInput + HasExecutions + HasClientPerfMonitor,
+    EM: UsesState<State = CS::State>,
+    CS::State: UsesInput + HasExecutions + HasClientPerfMonitor,
 {
     /// Runs the input and triggers observers and feedback
     fn execute_input(
@@ -648,7 +646,7 @@ where
         state: &mut CS::State,
         executor: &mut E,
         event_mgr: &mut EM,
-        input: &<CS::State as KnowsInput>::Input,
+        input: &<CS::State as UsesInput>::Input,
     ) -> Result<ExitKind, Error> {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -686,7 +684,7 @@ impl<I> NopFuzzer<I> {
 }
 
 #[cfg(test)]
-impl<I> KnowsState for NopFuzzer<I>
+impl<I> UsesState for NopFuzzer<I>
 where
     I: Input,
 {

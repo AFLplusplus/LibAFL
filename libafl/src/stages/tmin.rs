@@ -17,14 +17,14 @@ use crate::{
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},
-    inputs::KnowsInput,
+    inputs::UsesInput,
     mark_feature_time,
     mutators::Mutator,
     observers::{MapObserver, ObserversTuple},
     schedulers::Scheduler,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, KnowsState},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMaxSize, UsesState},
     Error, ExecutesInput, ExecutionProcessor, HasFeedback, HasScheduler,
 };
 
@@ -35,7 +35,7 @@ pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F2, CS::State, OT>
 where
     Self::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
-    <Self::State as KnowsInput>::Input: HasLen + Hash,
+    <Self::State as UsesInput>::Input: HasLen + Hash,
     CS: Scheduler<State = Self::State>,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
     EM: EventFirer<State = Self::State>,
@@ -173,7 +173,7 @@ pub struct StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z> {
     phantom: PhantomData<(CS, E, EM, F1, F2, OT, Z)>,
 }
 
-impl<CS, E, EM, F1, F2, FF, M, OT, Z> KnowsState
+impl<CS, E, EM, F1, F2, FF, M, OT, Z> UsesState
     for StdTMinMutationalStage<CS, E, EM, F1, F2, FF, M, OT, Z>
 where
     CS: Scheduler,
@@ -188,7 +188,7 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> Stage<E, EM, Z>
 where
     CS: Scheduler,
     CS::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
-    <CS::State as KnowsInput>::Input: HasLen + Hash,
+    <CS::State as UsesInput>::Input: HasLen + Hash,
     E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
     EM: EventFirer<State = CS::State>,
     F1: Feedback<CS::State>,
@@ -223,7 +223,7 @@ impl<CS, E, EM, F1, F2, FF, M, OT, Z> FeedbackFactory<F2, Z::State, OT>
 where
     F2: Feedback<Z::State>,
     FF: FeedbackFactory<F2, Z::State, OT>,
-    Z: KnowsState,
+    Z: UsesState,
     Z::State: HasClientPerfMonitor,
 {
     fn create_feedback(&self, ctx: &OT) -> F2 {
@@ -240,7 +240,7 @@ where
     F1: Feedback<CS::State>,
     F2: Feedback<CS::State>,
     FF: FeedbackFactory<F2, CS::State, OT>,
-    <CS::State as KnowsInput>::Input: HasLen + Hash,
+    <CS::State as UsesInput>::Input: HasLen + Hash,
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
@@ -322,13 +322,13 @@ impl<M, S> HasObserverName for MapEqualityFeedback<M, S> {
 impl<M, S> Feedback<S> for MapEqualityFeedback<M, S>
 where
     M: MapObserver + Debug,
-    S: KnowsInput + HasClientPerfMonitor + Debug,
+    S: UsesInput + HasClientPerfMonitor + Debug,
 {
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &<S as KnowsInput>::Input,
+        _input: &<S as UsesInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
@@ -373,7 +373,7 @@ impl<M, OT, S> FeedbackFactory<MapEqualityFeedback<M, S>, S, OT> for MapEquality
 where
     M: MapObserver,
     OT: ObserversTuple<S>,
-    S: KnowsInput + HasClientPerfMonitor + Debug,
+    S: UsesInput + HasClientPerfMonitor + Debug,
 {
     fn create_feedback(&self, observers: &OT) -> MapEqualityFeedback<M, S> {
         let obs = observers

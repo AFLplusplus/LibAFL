@@ -6,8 +6,8 @@ use core::fmt::Debug;
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::KnowsObservers,
-    state::KnowsState,
+    observers::UsesObservers,
+    state::UsesState,
     Error,
 };
 
@@ -24,8 +24,8 @@ impl<A, B> DiffExecutor<A, B> {
     where
         A: Executor<EM, Z>,
         B: Executor<EM, Z, State = A::State>,
-        EM: KnowsState<State = A::State>,
-        Z: KnowsState<State = A::State>,
+        EM: UsesState<State = A::State>,
+        Z: UsesState<State = A::State>,
     {
         Self { primary, secondary }
     }
@@ -45,8 +45,8 @@ impl<A, B, EM, Z> Executor<EM, Z> for DiffExecutor<A, B>
 where
     A: Executor<EM, Z>,
     B: Executor<EM, Z, State = A::State>,
-    EM: KnowsState<State = A::State>,
-    Z: KnowsState<State = A::State>,
+    EM: UsesState<State = A::State>,
+    Z: UsesState<State = A::State>,
 {
     fn run_target(
         &mut self,
@@ -71,14 +71,14 @@ where
     }
 }
 
-impl<A, B> KnowsState for DiffExecutor<A, B>
+impl<A, B> UsesState for DiffExecutor<A, B>
 where
-    A: KnowsState,
+    A: UsesState,
 {
     type State = A::State;
 }
 
-impl<A, B> KnowsObservers for DiffExecutor<A, B>
+impl<A, B> UsesObservers for DiffExecutor<A, B>
 where
     A: HasObservers,
 {

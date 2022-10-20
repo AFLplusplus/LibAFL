@@ -33,8 +33,8 @@ use windows::Win32::{
 use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    observers::KnowsObservers,
-    state::KnowsState,
+    observers::UsesObservers,
+    state::UsesState,
     Error,
 };
 
@@ -267,6 +267,8 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, Z> + HasInProcessHandlers,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     #[allow(clippy::cast_sign_loss)]
     fn run_target(
@@ -336,8 +338,8 @@ where
 impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, Z>,
-    EM: KnowsState<State = E::State>,
-    Z: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
@@ -368,8 +370,8 @@ where
 impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
     E: Executor<EM, Z>,
-    EM: KnowsState<State = E::State>,
-    Z: KnowsState<State = E::State>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
@@ -395,16 +397,16 @@ where
     }
 }
 
-impl<E> KnowsState for TimeoutExecutor<E>
+impl<E> UsesState for TimeoutExecutor<E>
 where
-    E: KnowsState,
+    E: UsesState,
 {
     type State = E::State;
 }
 
-impl<E> KnowsObservers for TimeoutExecutor<E>
+impl<E> UsesObservers for TimeoutExecutor<E>
 where
-    E: KnowsObservers,
+    E: UsesObservers,
 {
     type Observers = E::Observers;
 }

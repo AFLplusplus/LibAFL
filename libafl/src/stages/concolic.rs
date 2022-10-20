@@ -23,20 +23,20 @@ pub struct ConcolicTracingStage<EM, TE, Z> {
     observer_name: String,
 }
 
-impl<EM, TE, Z> KnowsState for ConcolicTracingStage<EM, TE, Z>
+impl<EM, TE, Z> UsesState for ConcolicTracingStage<EM, TE, Z>
 where
-    TE: KnowsState,
+    TE: UsesState,
 {
     type State = TE::State;
 }
 
 impl<E, EM, TE, Z> Stage<E, EM, Z> for ConcolicTracingStage<EM, TE, Z>
 where
-    E: KnowsState<State = TE::State>,
-    EM: KnowsState<State = TE::State>,
+    E: UsesState<State = TE::State>,
+    EM: UsesState<State = TE::State>,
     TE: Executor<EM, Z> + HasObservers,
     TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
-    Z: KnowsState<State = TE::State>,
+    Z: UsesState<State = TE::State>,
 {
     #[inline]
     fn perform(
@@ -80,7 +80,7 @@ impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
 
 #[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
 use crate::monitors::PerfFeature;
-use crate::{bolts::tuples::MatchName, state::KnowsState};
+use crate::{bolts::tuples::MatchName, state::UsesState};
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,

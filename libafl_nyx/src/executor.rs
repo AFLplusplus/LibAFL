@@ -3,9 +3,9 @@ use std::{fmt::Debug, marker::PhantomData};
 use libafl::{
     bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, KnowsInput},
-    observers::{KnowsObservers, ObserversTuple},
-    state::{KnowsState, State},
+    inputs::{HasTargetBytes, UsesInput},
+    observers::{ObserversTuple, UsesObservers},
+    state::{State, UsesState},
     Error,
 };
 use libnyx::NyxReturnValue;
@@ -30,27 +30,27 @@ impl<'a, S, OT> Debug for NyxExecutor<'a, S, OT> {
     }
 }
 
-impl<'a, S, OT> KnowsState for NyxExecutor<'a, S, OT>
+impl<'a, S, OT> UsesState for NyxExecutor<'a, S, OT>
 where
-    S: KnowsInput,
+    S: UsesInput,
 {
     type State = S;
 }
 
-impl<'a, S, OT> KnowsObservers for NyxExecutor<'a, S, OT>
+impl<'a, S, OT> UsesObservers for NyxExecutor<'a, S, OT>
 where
     OT: ObserversTuple<S>,
-    S: KnowsInput,
+    S: UsesInput,
 {
     type Observers = OT;
 }
 
 impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
 where
-    EM: KnowsState<State = S>,
-    S: KnowsInput,
+    EM: UsesState<State = S>,
+    S: UsesInput,
     S::Input: HasTargetBytes,
-    Z: KnowsState<State = S>,
+    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,

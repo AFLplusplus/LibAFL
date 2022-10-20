@@ -13,7 +13,7 @@ use crate::{
     mutators::Mutator,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasRand, KnowsState},
+    state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
     Error,
 };
 
@@ -24,9 +24,9 @@ use crate::{
 /// being applied to the input one by one, between executions.
 pub trait MutationalStage<E, EM, M, Z>: Stage<E, EM, Z>
 where
-    E: KnowsState<State = Self::State>,
+    E: UsesState<State = Self::State>,
     M: Mutator<Self::State>,
-    EM: KnowsState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
     Z: Evaluator<E, EM, State = Self::State>,
     Self::State: HasClientPerfMonitor + HasCorpus,
 {
@@ -90,8 +90,8 @@ pub struct StdMutationalStage<E, EM, M, Z> {
 
 impl<E, EM, M, Z> MutationalStage<E, EM, M, Z> for StdMutationalStage<E, EM, M, Z>
 where
-    E: KnowsState<State = Z::State>,
-    EM: KnowsState<State = Z::State>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
     M: Mutator<Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
@@ -114,10 +114,10 @@ where
     }
 }
 
-impl<E, EM, M, Z> KnowsState for StdMutationalStage<E, EM, M, Z>
+impl<E, EM, M, Z> UsesState for StdMutationalStage<E, EM, M, Z>
 where
-    E: KnowsState<State = Z::State>,
-    EM: KnowsState<State = Z::State>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
     M: Mutator<Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
@@ -127,8 +127,8 @@ where
 
 impl<E, EM, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, M, Z>
 where
-    E: KnowsState<State = Z::State>,
-    EM: KnowsState<State = Z::State>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
     M: Mutator<Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
@@ -154,8 +154,8 @@ where
 
 impl<E, EM, M, Z> StdMutationalStage<E, EM, M, Z>
 where
-    E: KnowsState<State = Z::State>,
-    EM: KnowsState<State = Z::State>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
     M: Mutator<Z::State>,
     Z: Evaluator<E, EM>,
     Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
