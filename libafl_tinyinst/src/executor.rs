@@ -1,12 +1,13 @@
 use core::marker::PhantomData;
 use core::pin::Pin;
-use std::{ffi::CString, os::raw::c_char};
+use std::{ffi::CString, fs::File, io::Write, os::raw::c_char};
 
 use cxx::UniquePtr;
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
+    prelude::AsSlice,
     state::State,
     Error,
 };
@@ -31,6 +32,7 @@ where
     phantom: PhantomData<(I, S, OT)>,
     bitmap: *mut u8,
     map_size: usize,
+    cur_file: File,
 }
 
 impl<I, OT, S> std::fmt::Debug for TinyInstExecutor<I, OT, S>
@@ -62,16 +64,16 @@ where
         let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
 
         let mut argv: Vec<*mut c_char> = Vec::with_capacity(self.argc + 1);
-        println!("argv: {:?}", input.target_bytes());
 
         for arg in &self.argv {
             argv.push(arg.as_ptr() as *mut c_char);
         }
         argv.push(core::ptr::null_mut());
 
+        self.cur_file.write_all(input.target_bytes().as_slice())?;
+
         unsafe {
             status = self.instrumentation_ptr.pin_mut().Run(
-                // self.tinyinst_argc as i32,
                 self.argc as i32,
                 argv.as_mut_ptr(),
                 self.timeout,
@@ -144,6 +146,8 @@ where
         let coverage_ptr = Coverage::new();
         let newcoverage_ptr = Coverage::new();
 
+        let mut cur_file = File::create("cur_file").expect("Unable to create file");
+
         Self {
             instrumentation_ptr,
             coverage_ptr,
@@ -157,6 +161,7 @@ where
             phantom: PhantomData,
             bitmap,
             map_size,
+            cur_file,
         }
     }
 }

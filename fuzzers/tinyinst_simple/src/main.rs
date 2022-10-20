@@ -32,7 +32,7 @@ fn main() {
         "coverage.txt".to_string(),
     ];
 
-    let args = vec![".\\test\\test.exe".to_string(), "bad1".to_string()];
+    let args = vec![".\\test\\test.exe".to_string(), "cur_file".to_string()];
 
     let observer =
         unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };

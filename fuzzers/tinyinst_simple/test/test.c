@@ -1,15 +1,14 @@
 #include <stdio.h>
-#include <signal.h>
 
-void pass1(char *gg) {
-  char buf[10];
-  if (gg[0] == 'b') {
-    if (gg[1] == 'a') {
-      if (gg[2] == 'd') {
-        if (gg[3] == '1') {
-          if (gg[4] == '2') {
+void pass1(char *buf, int buf_size) {
+  char target[0x100];
+  if (buf[0] == 'b') {
+    if (buf[1] == 'a') {
+      if (buf[2] == 'd') {
+        if (buf[3] == '1') {
+          if (buf[4] == '2') {
             printf("You got me\n");
-            memcpy(buf, gg, 100000);
+            memcpy(target, buf, buf_size);
           }
         }
       }
@@ -17,8 +16,18 @@ void pass1(char *gg) {
   }
 }
 int main(int argc, char *argv[]) {
+  FILE *fp;
+  char  buf[0x1000];
   if (argc == 2) {
-    pass1(argv[1]);
+    fp = fopen(argv[1], "r");
+    if (fp == NULL) {
+      printf("File not found");
+      return 1;
+    }
+    fscanf(fp, "%s", buf);
+
+    pass1(buf, sizeof(buf));
+
   } else {
     printf("there is nothing\n");
   }
