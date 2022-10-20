@@ -1,6 +1,11 @@
 use core::marker::PhantomData;
 use core::pin::Pin;
-use std::{ffi::CString, fs::File, io::Write, os::raw::c_char};
+use std::{
+    ffi::CString,
+    fs::{File, OpenOptions},
+    io::Write,
+    os::raw::c_char,
+};
 
 use cxx::UniquePtr;
 use libafl::{
@@ -32,7 +37,6 @@ where
     phantom: PhantomData<(I, S, OT)>,
     bitmap: *mut u8,
     map_size: usize,
-    cur_file: File,
 }
 
 impl<I, OT, S> std::fmt::Debug for TinyInstExecutor<I, OT, S>
@@ -70,7 +74,9 @@ where
         }
         argv.push(core::ptr::null_mut());
 
-        self.cur_file.write_all(input.target_bytes().as_slice())?;
+        let mut cur_file = File::create("cur_file").expect("Unable to create file");
+        cur_file.write_all(input.target_bytes().as_slice())?;
+        // cur_file.write_all(b"bad12")?;
 
         unsafe {
             status = self.instrumentation_ptr.pin_mut().Run(
@@ -146,8 +152,6 @@ where
         let coverage_ptr = Coverage::new();
         let newcoverage_ptr = Coverage::new();
 
-        let mut cur_file = File::create("cur_file").expect("Unable to create file");
-
         Self {
             instrumentation_ptr,
             coverage_ptr,
@@ -161,7 +165,6 @@ where
             phantom: PhantomData,
             bitmap,
             map_size,
-            cur_file,
         }
     }
 }
