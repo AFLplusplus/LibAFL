@@ -76,6 +76,7 @@ where
 
         let mut cur_file = File::create("cur_file").expect("Unable to create file");
         cur_file.write_all(input.target_bytes().as_slice())?;
+        cur_file.flush()?;
         // cur_file.write_all(b"bad12")?;
 
         unsafe {
