@@ -21,7 +21,7 @@ use libafl::{
 use libafl_tinyinst::executor::TinyInstExecutor;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
-static mut SIGNALS: [u8; 86016] = [0; 86016];
+static mut SIGNALS: [u8; 8 * 1024 * 1024] = [0; 8 * 1024 * 1024];
 
 fn main() {
     // Tinyinst things

@@ -72,7 +72,11 @@ pub mod litecov {
         pub fn IsTargetAlive(self: Pin<&mut LiteCov>) -> bool;
         pub fn IsTargetFunctionDefined(self: Pin<&mut LiteCov>) -> bool;
         pub fn GetTargetReturnValue(self: Pin<&mut LiteCov>) -> u64;
-        pub fn get_coverage_map(v: &mut Vec<u8>, coverage: Pin<&mut Coverage>);
+        pub unsafe fn get_coverage_map(
+            bitmap: *mut u8,
+            map_size: usize,
+            coverage: Pin<&mut Coverage>,
+        );
 
     }
 }

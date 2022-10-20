@@ -29,8 +29,8 @@ where
     timeout: u32,
     observers: OT,
     phantom: PhantomData<(I, S, OT)>,
-    signals: *mut u8,
-    signals_len: usize,
+    bitmap: *mut u8,
+    map_size: usize,
 }
 
 impl<I, OT, S> std::fmt::Debug for TinyInstExecutor<I, OT, S>
@@ -57,12 +57,13 @@ where
         _fuzzer: &mut Z,
         _state: &mut S,
         _mgr: &mut EM,
-        _input: &I,
+        input: &I,
     ) -> Result<ExitKind, Error> {
         let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
-        self.observers.pre_exec_all(_state, _input)?;
 
         let mut argv: Vec<*mut c_char> = Vec::with_capacity(self.argc + 1);
+        println!("argv: {:?}", input.target_bytes());
+
         for arg in &self.argv {
             argv.push(arg.as_ptr() as *mut c_char);
         }
@@ -79,20 +80,11 @@ where
             self.instrumentation_ptr
                 .pin_mut()
                 .GetCoverage(self.coverage_ptr.pin_mut(), true);
-            let mut test = Vec::<u8>::new();
-            get_coverage_map(&mut test, self.coverage_ptr.pin_mut());
-            for i in test {
-                if self.signals_len < i as usize {
-                    panic!("Signal length is too small");
-                } else {
-                    *(self.signals.add(i as usize)) = 1;
-                }
-            }
+            get_coverage_map(self.bitmap, self.map_size, self.coverage_ptr.pin_mut());
         }
 
         match status {
             DebuggerStatus::DEBUGGER_CRASHED | DebuggerStatus::DEBUGGER_HANGED => {
-                // set the observer here
                 Ok(ExitKind::Crash)
             }
             DebuggerStatus::DEBUGGER_NONE => {
@@ -113,8 +105,8 @@ where
         args: Vec<String>,
         timeout: u32,
         observers: OT,
-        signals: *mut u8,
-        signals_len: usize,
+        bitmap: *mut u8,
+        map_size: usize,
     ) -> Self {
         let mut instrumentation_ptr = LiteCov::new();
         let instrumentation = instrumentation_ptr.pin_mut();
@@ -163,8 +155,8 @@ where
             timeout,
             observers,
             phantom: PhantomData,
-            signals,
-            signals_len,
+            bitmap,
+            map_size,
         }
     }
 }
