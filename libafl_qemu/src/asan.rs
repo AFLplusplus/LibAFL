@@ -1,17 +1,17 @@
-use std::{env, fs, ptr, sync::Mutex};
+use std::{env, fs, sync::Mutex};
+
+use libafl::{inputs::Input, state::HasMetadata};
 use libc::{
     c_void, MAP_ANON, MAP_FAILED, MAP_FIXED, MAP_NORESERVE, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 use meminterval::{Interval, IntervalTree};
-
-use libafl::{inputs::Input, state::HasMetadata};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
     emu::{Emulator, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
-    GuestAddr, Regs,
+    GuestAddr,
 };
 
 // TODO at some point, merge parts with libafl_frida
@@ -45,7 +45,7 @@ pub enum QasanAction {
 }
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
-#[repr(u8)]
+#[repr(i8)]
 pub enum PoisonKind {
     Valid = 0,
     Partial1 = 1,
@@ -55,19 +55,19 @@ pub enum PoisonKind {
     Partial5 = 5,
     Partial6 = 6,
     Partial7 = 7,
-    ArrayCookie = 0xac,
-    StackRz = 0xf0,
-    StackLeftRz = 0xf1,
-    StackMidRz = 0xf2,
-    StackRightRz = 0xf3,
-    StacKFreed = 0xf5,
-    StackOOScope = 0xf8,
-    GlobalRz = 0xf9,
-    HeapRz = 0xe9,
-    User = 0xf7,
-    HeapLeftRz = 0xfa,
-    HeapRightRz = 0xfb,
-    HeapFreed = 0xfd,
+    ArrayCookie = -84,  // 0xac
+    StackRz = -16,      // 0xf0
+    StackLeftRz = -15,  // 0xf1
+    StackMidRz = -14,   // 0xf2
+    StackRightRz = -13, // 0xf3
+    StacKFreed = -11,   // 0xf5
+    StackOOScope = -8,  // 0xf8
+    GlobalRz = -7,      // 0xf9
+    HeapRz = -23,       // 0xe9
+    User = -9,          // 0xf7
+    HeapLeftRz = -6,    // 0xfa
+    HeapRightRz = -5,   // 0xfb
+    HeapFreed = -3,     // 0xfd
 }
 
 pub enum AsanError {
@@ -81,6 +81,14 @@ pub type AsanErrorCallback = Box<dyn FnMut(&Emulator, AsanError)>;
 pub struct AsanGiovese {
     pub alloc_tree: Mutex<IntervalTree<GuestAddr, ()>>,
     pub error_callback: Option<AsanErrorCallback>,
+}
+
+impl core::fmt::Debug for AsanGiovese {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AsanGiovese")
+            .field("alloc_tree", &self.alloc_tree)
+            .finish()
+    }
 }
 
 impl AsanGiovese {
@@ -117,41 +125,45 @@ impl AsanGiovese {
         );
     }
 
+    #[inline]
     pub fn is_invalid_access_1(emu: &Emulator, addr: GuestAddr) -> bool {
         unsafe {
-            let h: isize = emu.g2h(addr) as isize;
-            let shadow_addr: *mut i8 = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            let k: isize = *shadow_addr as isize;
+            let h = emu.g2h::<*const c_void>(addr) as isize;
+            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+            let k = *shadow_addr as isize;
             k != 0 && (h & 7).wrapping_add(1) > k
         }
     }
 
+    #[inline]
     pub fn is_invalid_access_2(emu: &Emulator, addr: GuestAddr) -> bool {
         unsafe {
-            let h: isize = emu.g2h(addr) as isize;
-            let shadow_addr: *mut i8 = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            let k: isize = *shadow_addr as isize;
+            let h = emu.g2h::<*const c_void>(addr) as isize;
+            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+            let k = *shadow_addr as isize;
             k != 0 && (h & 7).wrapping_add(2) > k
         }
     }
 
+    #[inline]
     pub fn is_invalid_access_4(emu: &Emulator, addr: GuestAddr) -> bool {
         unsafe {
-            let h: isize = emu.g2h(addr) as isize;
-            let shadow_addr: *mut i8 = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-            let k: isize = *shadow_addr as isize;
+            let h = emu.g2h::<*const c_void>(addr) as isize;
+            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+            let k = *shadow_addr as isize;
             k != 0 && (h & 7).wrapping_add(4) > k
         }
     }
 
     pub fn is_invalid_access_8(emu: &Emulator, addr: GuestAddr) -> bool {
         unsafe {
-            let h: isize = emu.g2h(addr) as isize;
-            let shadow_addr: *mut i8 = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+            let h = emu.g2h::<*const c_void>(addr) as isize;
+            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
             *shadow_addr != 0
         }
     }
 
+    #[inline]
     pub fn is_invalid_access(emu: &Emulator, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             if n == 0 {
@@ -159,42 +171,98 @@ impl AsanGiovese {
             }
 
             let n = n as isize;
-            let mut start: GuestAddr = addr;
-            let end: GuestAddr = start.wrapping_add(n as GuestAddr);
-            let last_8: GuestAddr = end & !7;
+            let mut start = addr;
+            let end = start.wrapping_add(n as GuestAddr);
+            let last_8 = end & !7;
+
             if start & 0x7 != 0 {
-                let next_8: GuestAddr = (start & !7).wrapping_add(8);
-                let first_size: isize = next_8.wrapping_sub(start) as isize;
+                let next_8 = (start & !7).wrapping_add(8);
+                let first_size = next_8.wrapping_sub(start) as isize;
                 if n <= first_size {
-                    let h: isize = emu.g2h(start) as isize;
-                    let shadow_addr: *mut i8 = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-                    let k: isize = *shadow_addr as isize;
+                    let h = emu.g2h::<*const c_void>(start) as isize;
+                    let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+                    let k = *shadow_addr as isize;
                     return k != 0 && (h & 7).wrapping_add(n) > k;
                 }
-                let h: isize = emu.g2h(start) as isize;
-                let shadow_addr: *mut i8 = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-                let k: isize = *shadow_addr as isize;
+                let h = emu.g2h::<*const c_void>(start) as isize;
+                let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+                let k = *shadow_addr as isize;
                 if k != 0 && (h & 7).wrapping_add(first_size) > k {
                     return true;
                 }
                 start = next_8;
             }
+
             while start < last_8 {
-                let h: isize = emu.g2h(start) as isize;
-                let shadow_addr: *mut i8 = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+                let h = emu.g2h::<*const c_void>(start) as isize;
+                let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
                 if *shadow_addr != 0 {
                     return true;
                 }
                 start = (start).wrapping_add(8);
             }
+
             if last_8 != end {
-                let h: isize = emu.g2h(start) as isize;
-                let last_size: isize = end.wrapping_sub(last_8) as isize;
-                let shadow_addr: *mut i8 = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
-                let k: isize = *shadow_addr as isize;
+                let h = emu.g2h::<*const c_void>(start) as isize;
+                let last_size = end.wrapping_sub(last_8) as isize;
+                let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+                let k = *shadow_addr as isize;
                 return k != 0 && (h & 7).wrapping_add(last_size) > k;
             }
+
             false
+        }
+    }
+
+    #[inline]
+    pub fn poison(emu: &Emulator, addr: GuestAddr, n: usize, mut poison_byte: i8) -> bool {
+        unsafe {
+            if n == 0 {
+                return false;
+            }
+
+            let n = n as isize;
+            let mut start = addr;
+            let end = start.wrapping_add(n as GuestAddr);
+            let last_8 = end & !7;
+
+            if start & 0x7 != 0 {
+                let mut next_8 = (start & !7).wrapping_add(8);
+                let first_size = next_8.wrapping_sub(start) as isize;
+                if n < first_size {
+                    return false;
+                }
+                let h = emu.g2h::<*const c_void>(start) as isize;
+                let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+                *shadow_addr = (8isize).wrapping_sub(first_size) as i8;
+                start = next_8;
+            }
+
+            while start < last_8 {
+                let h = emu.g2h::<*const c_void>(start) as isize;
+                let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+                *shadow_addr = poison_byte;
+                start = (start).wrapping_add(8);
+            }
+
+            true
+        }
+    }
+
+    #[inline]
+    pub fn unpoison(emu: &Emulator, addr: GuestAddr, n: usize) -> bool {
+        unsafe {
+            let n = n as isize;
+            let mut start = addr;
+            let end = start.wrapping_add(n as GuestAddr);
+
+            while start < end {
+                let h = emu.g2h::<*const c_void>(start) as isize;
+                let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+                *shadow_addr = 0;
+                start = (start).wrapping_add(8);
+            }
+            true
         }
     }
 
@@ -243,12 +311,10 @@ impl AsanGiovese {
             .next()
             .map(|entry| *entry.interval)
     }
-    
+
     pub fn alloc_clear(&mut self) {
-    // TODO query and unposion 
-    self.alloc_tree
-            .lock()
-            .unwrap().delete(0..GuestAddr::MAX);
+        // TODO query and unposion
+        self.alloc_tree.lock().unwrap().delete(0..GuestAddr::MAX);
     }
 }
 
@@ -324,7 +390,10 @@ impl QemuAsanHelper {
     }
 
     #[must_use]
-    pub fn with_error_callback(filter: QemuInstrumentationFilter, error_callback: AsanErrorCallback) -> Self {
+    pub fn with_error_callback(
+        filter: QemuInstrumentationFilter,
+        error_callback: AsanErrorCallback,
+    ) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
         Self {
             enabled: true,
@@ -349,87 +418,95 @@ impl QemuAsanHelper {
 
     #[allow(clippy::unused_self)]
     pub fn alloc(&mut self, _emulator: &Emulator, start: GuestAddr, end: GuestAddr) {
-        self.rt.alloc_insert(start..end);
+        self.rt.alloc_insert(start, end);
     }
 
     #[allow(clippy::unused_self)]
     pub fn dealloc(&mut self, emulator: &Emulator, addr: GuestAddr) {
         let chunk = self.rt.alloc_search(addr);
         if let Some(ck) = chunk {
-              if ck.start != addr {
-                  // Free not the start of the chunk
-                  self.rt.report_and_crash(emulator, AsanError::BadFree(addr, Some(ck)));
-              }
-          } else {
-              // Free of wild ptr
-              self.rt.report_and_crash(emulator, AsanError::BadFree(addr, None));
-          }
+            if ck.start != addr {
+                // Free not the start of the chunk
+                self.rt
+                    .report_and_crash(emulator, AsanError::BadFree(addr, Some(ck)));
+            }
+        } else {
+            // Free of wild ptr
+            self.rt
+                .report_and_crash(emulator, AsanError::BadFree(addr, None));
+        }
     }
 
     #[allow(clippy::unused_self)]
     #[must_use]
     pub fn is_poisoned(&self, emulator: &Emulator, addr: GuestAddr, size: usize) -> bool {
-        self.rt.is_invalid_access(emulator, addr, size)
+        AsanGiovese::is_invalid_access(emulator, addr, size)
     }
 
     pub fn read_1(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        if self.enabled() && self.rt.is_invalid_access_1(emulator, addr) {
+        if self.enabled() && AsanGiovese::is_invalid_access_1(emulator, addr) {
             self.rt.report_and_crash(emulator, AsanError::Read(addr, 1));
         }
     }
 
     pub fn read_2(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        if self.enabled() && self.rt.is_invalid_access_2(emulator, addr) {
+        if self.enabled() && AsanGiovese::is_invalid_access_2(emulator, addr) {
             self.rt.report_and_crash(emulator, AsanError::Read(addr, 2));
         }
     }
 
     pub fn read_4(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        if self.enabled() && self.rt.is_invalid_access_4(emulator, addr) {
+        if self.enabled() && AsanGiovese::is_invalid_access_4(emulator, addr) {
             self.rt.report_and_crash(emulator, AsanError::Read(addr, 4));
         }
     }
 
     pub fn read_8(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        if self.enabled() && self.rt.is_invalid_access_8(emulator, addr) {
+        if self.enabled() && AsanGiovese::is_invalid_access_8(emulator, addr) {
             self.rt.report_and_crash(emulator, AsanError::Read(addr, 8));
         }
     }
 
     pub fn read_n(&mut self, emulator: &Emulator, addr: GuestAddr, size: usize) {
-          if self.enabled() && self.rt.is_invalid_access(emulator, addr, size) {
-              self.rt.report_and_crash(emulator, AsanError::Read(addr, size));
-          }
+        if self.enabled() && AsanGiovese::is_invalid_access(emulator, addr, size) {
+            self.rt
+                .report_and_crash(emulator, AsanError::Read(addr, size));
+        }
     }
 
     pub fn write_1(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        if self.enabled() && self.rt.is_invalid_access_1(emulator, addr) {
-            self.rt.report_and_crash(emulator, AsanError::Write(addr, 1));
+        if self.enabled() && AsanGiovese::is_invalid_access_1(emulator, addr) {
+            self.rt
+                .report_and_crash(emulator, AsanError::Write(addr, 1));
         }
     }
 
     pub fn write_2(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        if self.enabled() && self.rt.is_invalid_access_2(emulator, addr) {
-            self.rt.report_and_crash(emulator, AsanError::Write(addr, 2));
+        if self.enabled() && AsanGiovese::is_invalid_access_2(emulator, addr) {
+            self.rt
+                .report_and_crash(emulator, AsanError::Write(addr, 2));
         }
     }
 
     pub fn write_4(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        if self.enabled() && self.rt.is_invalid_access_4(emulator, addr) {
-            self.rt.report_and_crash(emulator, AsanError::Write(addr, 4));
+        if self.enabled() && AsanGiovese::is_invalid_access_4(emulator, addr) {
+            self.rt
+                .report_and_crash(emulator, AsanError::Write(addr, 4));
         }
     }
 
     pub fn write_8(&mut self, emulator: &Emulator, addr: GuestAddr) {
-        if self.enabled() && self.rt.is_invalid_access_8(emulator, addr) {
-            self.rt.report_and_crash(emulator, AsanError::Write(addr, 8));
+        if self.enabled() && AsanGiovese::is_invalid_access_8(emulator, addr) {
+            self.rt
+                .report_and_crash(emulator, AsanError::Write(addr, 8));
         }
     }
 
     pub fn write_n(&mut self, emulator: &Emulator, addr: GuestAddr, size: usize) {
-          if self.enabled() && self.rt.is_invalid_access(emulator, addr, size) {
-              self.rt.report_and_crash(emulator, AsanError::Write(addr, size));
-          }
+        if self.enabled() && AsanGiovese::is_invalid_access(emulator, addr, size) {
+            self.rt
+                .report_and_crash(emulator, AsanError::Write(addr, size));
+        }
     }
 
     #[allow(clippy::unused_self)]
@@ -440,12 +517,12 @@ impl QemuAsanHelper {
         size: usize,
         poison: PoisonKind,
     ) {
-        unsafe { asan_giovese_poison_region(emulator.g2h(addr), size, poison.into()) };
+        AsanGiovese::poison(emulator, addr, size, poison.into());
     }
 
     #[allow(clippy::unused_self)]
     pub fn unpoison(&mut self, emulator: &Emulator, addr: GuestAddr, size: usize) {
-        unsafe { asan_giovese_unpoison_region(emulator.g2h(addr), size) };
+        AsanGiovese::unpoison(emulator, addr, size);
     }
 
     #[allow(clippy::unused_self)]
@@ -690,7 +767,7 @@ where
                     &emulator,
                     a1 as GuestAddr,
                     a2 as usize,
-                    PoisonKind::try_from(a3 as u8).unwrap(),
+                    PoisonKind::try_from(a3 as i8).unwrap(),
                 );
             }
             QasanAction::UserPoison => {

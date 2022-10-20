@@ -380,7 +380,6 @@ pub fn build() {
     {
         let qasan_dir = Path::new("libqasan");
         let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
-        let src_dir = Path::new("src");
 
         assert!(Command::new("make")
             .current_dir(out_dir_path)
