@@ -2,12 +2,6 @@
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 cd "$SCRIPT_DIR/.." || exit 1
 
-# Clippy checks
-if [ "$1" != "--no-clean" ]; then
-   # Usually, we want to clean, since clippy won't work otherwise.
-   echo "[+] Cleaning up previous builds..."
-   cargo clean -p libafl
-fi
 RUST_BACKTRACE=full cargo +nightly clippy --all --all-features --release --tests -- -Z macro-backtrace \
    -D clippy::all \
    -D clippy::pedantic \
