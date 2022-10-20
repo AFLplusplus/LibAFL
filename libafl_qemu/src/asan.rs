@@ -28,6 +28,8 @@ pub const SHADOW_OFFSET: isize = 0x7fff8000;
 
 pub const QASAN_FAKESYS_NR: i32 = 0xa2a4;
 
+pub const UNPOISON_PADDING: GuestAddr = 256; // To unpoison the redzone too, it may need to be increased
+
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
 #[repr(u64)]
 pub enum QasanAction {
@@ -74,6 +76,7 @@ pub enum AsanError {
     Read(GuestAddr, usize),
     Write(GuestAddr, usize),
     BadFree(GuestAddr, Option<Interval<GuestAddr>>),
+    MemLeak(Interval<GuestAddr>),
 }
 
 pub type AsanErrorCallback = Box<dyn FnMut(&Emulator, AsanError)>;
@@ -215,7 +218,7 @@ impl AsanGiovese {
     }
 
     #[inline]
-    pub fn poison(emu: &Emulator, addr: GuestAddr, n: usize, mut poison_byte: i8) -> bool {
+    pub fn poison(emu: &Emulator, addr: GuestAddr, n: usize, poison_byte: i8) -> bool {
         unsafe {
             if n == 0 {
                 return false;
@@ -227,7 +230,7 @@ impl AsanGiovese {
             let last_8 = end & !7;
 
             if start & 0x7 != 0 {
-                let mut next_8 = (start & !7).wrapping_add(8);
+                let next_8 = (start & !7).wrapping_add(8);
                 let first_size = next_8.wrapping_sub(start) as isize;
                 if n < first_size {
                     return false;
@@ -281,7 +284,7 @@ impl AsanGiovese {
     }
 
     pub fn report_and_crash(&mut self, emu: &Emulator, error: AsanError) {
-        if let Some(mut cb) = self.error_callback.as_mut() {
+        if let Some(cb) = self.error_callback.as_mut() {
             (cb)(emu, error);
         } else {
             std::process::abort();
@@ -312,9 +315,27 @@ impl AsanGiovese {
             .map(|entry| *entry.interval)
     }
 
-    pub fn alloc_clear(&mut self) {
-        // TODO query and unposion
-        self.alloc_tree.lock().unwrap().delete(0..GuestAddr::MAX);
+    pub fn alloc_clear(&mut self, emu: &Emulator, detect_leaks: bool) {
+        let mut leaks = vec![];
+
+        {
+            let mut tree = self.alloc_tree.lock().unwrap();
+            for entry in tree.query(0..GuestAddr::MAX) {
+                if detect_leaks {
+                    leaks.push(*entry.interval);
+                }
+                Self::unpoison(
+                    emu,
+                    entry.interval.start - UNPOISON_PADDING,
+                    (entry.interval.end - entry.interval.start + UNPOISON_PADDING) as usize,
+                );
+            }
+            tree.delete(0..GuestAddr::MAX);
+        }
+
+        for interval in leaks {
+            self.report_and_crash(emu, AsanError::MemLeak(interval));
+        }
     }
 }
 
@@ -374,6 +395,8 @@ pub type QemuAsanChildHelper = QemuAsanHelper;
 #[derive(Debug)]
 pub struct QemuAsanHelper {
     enabled: bool,
+    pub detect_leaks: bool,
+    pub rollback: bool,
     rt: AsanGiovese,
     filter: QemuInstrumentationFilter,
 }
@@ -384,6 +407,8 @@ impl QemuAsanHelper {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
         Self {
             enabled: true,
+            detect_leaks: false,
+            rollback: true,
             rt: AsanGiovese::new(),
             filter,
         }
@@ -397,6 +422,8 @@ impl QemuAsanHelper {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
         Self {
             enabled: true,
+            detect_leaks: false,
+            rollback: true,
             rt: AsanGiovese::with_error_callback(error_callback),
             filter,
         }
@@ -525,9 +552,10 @@ impl QemuAsanHelper {
         AsanGiovese::unpoison(emulator, addr, size);
     }
 
-    #[allow(clippy::unused_self)]
-    pub fn reset(&mut self) {
-        self.rt.alloc_clear();
+    pub fn reset(&mut self, emulator: &Emulator) {
+        if self.rollback || self.detect_leaks {
+            self.rt.alloc_clear(emulator, self.detect_leaks);
+        }
     }
 }
 
@@ -569,8 +597,8 @@ where
         hooks.syscalls(qasan_fake_syscall::<I, QT, S>);
     }
 
-    fn post_exec(&mut self, _emulator: &Emulator, _input: &I) {
-        self.reset();
+    fn post_exec(&mut self, emulator: &Emulator, _input: &I) {
+        self.reset(emulator);
     }
 }
 
