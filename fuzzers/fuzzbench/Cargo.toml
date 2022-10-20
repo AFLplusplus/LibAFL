@@ -23,8 +23,8 @@ libafl = { path = "../../libafl/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
-clap = { version = "3.2", features = ["default"] }
-nix = "0.24"
+clap = { version = "4.0", features = ["default"] }
+nix = "0.25"
 mimalloc = { version = "*", default-features = false }
 
 [lib]

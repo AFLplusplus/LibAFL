@@ -40,16 +40,16 @@ libc = "0.2"
 strum = "0.24"
 strum_macros = "0.24"
 syscall-numbers = "3.0"
-bio = "0.41"
+meminterval = "0.1"
 thread_local = "1.1.4"
 capstone = "0.11.0"
 #pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
-pyo3 = { version = "0.15", optional = true }
+pyo3 = { version = "0.17", features = ["pyproto"], optional = true }
 
 [build-dependencies]
 cc = { version = "1.0" }
 which = "4.2"
-pyo3-build-config = { version = "0.16", optional = true }
+pyo3-build-config = { version = "0.15", optional = true }
 
 [lib]
 name = "libafl_qemu"

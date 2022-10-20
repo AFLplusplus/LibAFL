@@ -104,6 +104,7 @@ pub mod pybind {
     };
 
     #[pyclass(unsendable, name = "InMemoryCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for InMemoryCorpus
     pub struct PythonInMemoryCorpus {
