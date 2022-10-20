@@ -77,6 +77,7 @@ fn clone_command(cmd: &Command) -> Command {
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file
 /// Use [`CommandExecutor::builder()`] to use this configurator.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
@@ -641,6 +642,8 @@ impl CommandExecutorBuilder {
 
 /// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
 /// # Example
+#[cfg_attr(all(feature = "std", unix), doc = " ```")]
+#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// ```
 /// use std::{io::Write, process::{Stdio, Command, Child}};
 /// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
