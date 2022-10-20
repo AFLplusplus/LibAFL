@@ -95,10 +95,10 @@ jobs:
     - name: Check each feature
       # Skipping `python` as it has to be built with the `maturin` tool
       # `agpl`, `nautilus` require nightly
-      # `sancov_pcguard_edges` are tested seperately
+      # `sancov_pcguard_edges` is tested seperately
       run: cargo hack check --each-feature --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386,be
     - name: Check nightly features
-      run: cargo +nightly hack check --each-feature --include-features=agpl,nautilus
+      run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
     - name: Build examples
       run: cargo build --examples --verbose
 
