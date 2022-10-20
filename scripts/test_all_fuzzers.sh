@@ -78,8 +78,16 @@ do
     fi
     end=$(date +%s)
     time_record[$fuzzer]=$((end-start))
+    du -sh "$CARGO_TARGET_DIR"
     # Save disk space
     cargo clean -p "$(basename "$fuzzer")"
+    cargo clean --release -p "$(basename "$fuzzer")" 2> /dev/null
+    # Leaving these in the cache results in lots of duplicate build artefacts
+    # (many different feature flag combinations, ...), so let's prune them.
+    for clean_pkgid in libafl libafl_targets libafl_sugar; do
+        cargo clean -p "$clean_pkgid" 2> /dev/null
+        cargo clean --release -p "$clean_pkgid" 2> /dev/null
+    done
     du -sh "$CARGO_TARGET_DIR"
     cd "$libafl" || exit 1
     echo ""
