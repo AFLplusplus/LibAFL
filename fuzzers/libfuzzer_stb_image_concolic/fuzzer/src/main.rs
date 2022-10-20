@@ -10,7 +10,7 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
-use clap::{self, Parser, StructOpt};
+use clap::{self, Parser};
 use libafl::{
     bolts::{
         current_nanos,

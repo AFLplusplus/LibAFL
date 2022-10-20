@@ -336,26 +336,33 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
 #[derive(Clone, Debug)]
-pub struct SimpleConcolicMutationalStage<EM, S, Z>
-where
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
-{
-    _phantom: PhantomData<(EM, S, Z)>,
+pub struct SimpleConcolicMutationalStage<Z> {
+    _phantom: PhantomData<Z>,
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<E, EM, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<EM, S, Z>
+impl<Z> UsesState for SimpleConcolicMutationalStage<Z>
 where
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
-    S::Input: HasBytesVec,
-    Z: Evaluator<E, EM, State = S>,
+    Z: UsesState,
+{
+    type State = Z::State;
+}
+
+#[cfg(feature = "concolic_mutation")]
+impl<E, EM, Z> Stage<E, EM, Z> for SimpleConcolicMutationalStage<Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::Input: HasBytesVec,
+    Z::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Z::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -387,10 +394,7 @@ where
     }
 }
 
-impl<EM, S, Z> Default for SimpleConcolicMutationalStage<EM, S, Z>
-where
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus,
-{
+impl<Z> Default for SimpleConcolicMutationalStage<Z> {
     fn default() -> Self {
         Self {
             _phantom: PhantomData,
