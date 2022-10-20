@@ -2,6 +2,10 @@
 //! It wraps two exeutors that will be run after each other with the same input.
 //! In comparison to the [`crate::executors::CombinedExecutor`] it also runs the secondary executor in `run_target`.
 //!
+use core::{cell::UnsafeCell, fmt::Debug};
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
     bolts::{ownedref::OwnedPtrMut, tuples::MatchName},
     executors::{Executor, ExitKind, HasObservers},
@@ -9,8 +13,6 @@ use crate::{
     observers::ObserversTuple,
     Error,
 };
-use core::{cell::UnsafeCell, fmt::Debug};
-use serde::{Deserialize, Serialize};
 
 /// A [`DiffExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
 #[derive(Debug)]
