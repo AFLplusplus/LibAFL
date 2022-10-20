@@ -401,10 +401,5 @@ pub fn build() {
             .status()
             .expect("make failed")
             .success());
-
-        cc::Build::new()
-            .warnings(false)
-            .file(src_dir.join("asan-giovese.c"))
-            .compile("asan_giovese");
     }
 }
