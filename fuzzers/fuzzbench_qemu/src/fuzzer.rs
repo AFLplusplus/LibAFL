@@ -62,6 +62,8 @@ use libafl_qemu::{
 #[cfg(unix)]
 use nix::{self, unistd::dup};
 
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+
 /// The fuzzer main
 pub fn main() {
     // Registry the metadata types used in this fuzzer
@@ -198,7 +200,9 @@ fn fuzz(
     emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = emu
+        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+        .unwrap();
     println!("Placing input at {:#x}", input_addr);
 
     let log = RefCell::new(
@@ -312,10 +316,11 @@ fn fuzz(
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
+        println!("{:?}", buf);
         let mut len = buf.len();
-        if len > 4096 {
-            buf = &buf[0..4096];
-            len = 4096;
+        if len > MAX_INPUT_SIZE {
+            buf = &buf[0..MAX_INPUT_SIZE];
+            len = MAX_INPUT_SIZE;
         }
 
         unsafe {
@@ -382,8 +387,8 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        dup2(null_fd, io::stdout().as_raw_fd())?;
-        dup2(null_fd, io::stderr().as_raw_fd())?;
+        //dup2(null_fd, io::stdout().as_raw_fd())?;
+        //dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
     log.replace(

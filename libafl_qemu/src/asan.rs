@@ -273,6 +273,7 @@ impl AsanGiovese {
     }
 
     #[inline]
+    #[clippy::must_use_candidate]
     pub fn unpoison(emu: &Emulator, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             let n = n as isize;
