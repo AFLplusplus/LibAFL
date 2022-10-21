@@ -1,11 +1,9 @@
 //! Architecture agnostic processor features
 
-/*
 #[cfg(target_arch = "aarch64")]
 use core::arch::asm;
-*/
 
-#[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+#[cfg(not(any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))]
 use crate::bolts::current_nanos;
 
 // TODO: Add more architectures, using C code, see
@@ -31,7 +29,6 @@ pub fn read_time_counter() -> u64 {
     }
 }
 
-/*
 /// Read a timestamp for measurements
 ///
 /// Fetches the counter-virtual count register
@@ -39,14 +36,13 @@ pub fn read_time_counter() -> u64 {
 #[cfg(target_arch = "aarch64")]
 #[must_use]
 pub fn read_time_counter() -> u64 {
-    let v: u64 = 0;
+    let mut v: u64 = 0;
     unsafe {
         // TODO pushing a change in core::arch::aarch64 ?
-        asm!("mrs {v}, cntvct_el0", v = out(reg) _);
+        asm!("mrs {v}, cntvct_el0", v = out(reg) v);
     }
     v
 }
-*/
 
 /// Read a timestamp for measurements.
 ///
@@ -54,7 +50,7 @@ pub fn read_time_counter() -> u64 {
 /// In this way, an experiment only has to
 /// change this implementation rather than every instead of [`read_time_counter`]
 /// On unsupported architectures, it's falling back to normal system time, in millis.
-#[cfg(not(any(target_arch = "x86_64", target_arch = "x86")))]
+#[cfg(not(any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))]
 #[must_use]
 pub fn read_time_counter() -> u64 {
     current_nanos()
