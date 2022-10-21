@@ -45,7 +45,7 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    //asan::QemuAsanHelper,
+    asan::{init_with_asan, QemuAsanHelper},
     cmplog,
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
     edges,
@@ -54,7 +54,7 @@ use libafl_qemu::{
     emu::Emulator,
     filter_qemu_args,
     hooks::QemuHooks,
-    //snapshot::QemuSnapshotHelper,
+    snapshot::QemuSnapshotHelper,
     MmapPerms,
     QemuExecutor,
     Regs,
@@ -70,8 +70,8 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match Command::new("libafl_qemu_fuzzbench")
-        .version("0.4.0")
+    let res = match Command::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
         .arg(
@@ -172,9 +172,10 @@ fn fuzz(
 ) -> Result<(), Error> {
     env::remove_var("LD_LIBRARY_PATH");
 
-    let args: Vec<String> = env::args().collect();
-    let env: Vec<(String, String)> = env::vars().collect();
-    let emu = Emulator::new(&args, &env);
+    let mut args: Vec<String> = env::args().collect();
+    let mut env: Vec<(String, String)> = env::vars().collect();
+    //let emu = Emulator::new(&args, &env);
+    let emu = init_with_asan(&mut args, &mut env);
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
@@ -316,7 +317,6 @@ fn fuzz(
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
-        println!("{:?}", buf);
         let mut len = buf.len();
         if len > MAX_INPUT_SIZE {
             buf = &buf[0..MAX_INPUT_SIZE];
@@ -336,14 +336,14 @@ fn fuzz(
 
         ExitKind::Ok
     };
-
+    
     let mut hooks = QemuHooks::new(
         &emu,
         tuple_list!(
             QemuEdgeCoverageHelper::default(),
             QemuCmpLogHelper::default(),
-            //QemuAsanHelper::new(),
-            //QemuSnapshotHelper::new()
+            QemuAsanHelper::default(),
+            QemuSnapshotHelper::new()
         ),
     );
 
@@ -387,8 +387,8 @@ fn fuzz(
     #[cfg(unix)]
     {
         let null_fd = file_null.as_raw_fd();
-        //dup2(null_fd, io::stdout().as_raw_fd())?;
-        //dup2(null_fd, io::stderr().as_raw_fd())?;
+        dup2(null_fd, io::stdout().as_raw_fd())?;
+        dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
     log.replace(

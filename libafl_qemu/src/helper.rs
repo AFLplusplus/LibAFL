@@ -18,6 +18,12 @@ where
     {
     }
 
+    fn first_exec<QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
+    where
+        QT: QemuHelperTuple<I, S>,
+    {
+    }
+
     fn pre_exec(&mut self, _emulator: &Emulator, _input: &I) {}
 
     fn post_exec(&mut self, _emulator: &Emulator, _input: &I) {}
@@ -33,6 +39,10 @@ where
     where
         QT: QemuHelperTuple<I, S>;
 
+    fn first_exec_all<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    where
+        QT: QemuHelperTuple<I, S>;
+
     fn pre_exec_all(&mut self, _emulator: &Emulator, input: &I);
 
     fn post_exec_all(&mut self, _emulator: &Emulator, input: &I);
@@ -45,6 +55,12 @@ where
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
     fn init_hooks_all<QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
+    where
+        QT: QemuHelperTuple<I, S>,
+    {
+    }
+
+    fn first_exec_all<QT>(&self, _hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -69,6 +85,14 @@ where
     {
         self.0.init_hooks(hooks);
         self.1.init_hooks_all(hooks);
+    }
+
+    fn first_exec_all<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    where
+        QT: QemuHelperTuple<I, S>,
+    {
+        self.0.first_exec(hooks);
+        self.1.first_exec_all(hooks);
     }
 
     fn pre_exec_all(&mut self, emulator: &Emulator, input: &I) {

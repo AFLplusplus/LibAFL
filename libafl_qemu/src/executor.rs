@@ -26,6 +26,7 @@ where
     OT: ObserversTuple<I, S>,
     QT: QemuHelperTuple<I, S>,
 {
+    first_exec: bool,
     hooks: &'a mut QemuHooks<'a, I, QT, S>,
     inner: InProcessExecutor<'a, H, I, OT, S>,
 }
@@ -67,6 +68,7 @@ where
         Z: HasObjective<I, OF, S>,
     {
         Ok(Self {
+            first_exec: true,
             hooks,
             inner: InProcessExecutor::new(harness_fn, observers, fuzzer, state, event_mgr)?,
         })
@@ -108,6 +110,10 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
+        if self.first_exec {
+            self.hooks.helpers().first_exec_all(&self.hooks);
+            self.first_exec = false;
+        }
         self.hooks.helpers_mut().pre_exec_all(&emu, input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
         self.hooks.helpers_mut().post_exec_all(&emu, input);
@@ -142,6 +148,7 @@ where
     QT: QemuHelperTuple<I, S>,
     SP: ShMemProvider,
 {
+    first_exec: bool,
     hooks: &'a mut QemuHooks<'a, I, QT, S>,
     inner: InProcessForkExecutor<'a, H, I, OT, S, SP>,
 }
@@ -190,6 +197,7 @@ where
         assert!(!QT::HOOKS_DO_SIDE_EFFECTS, "When using QemuForkExecutor, the hooks must not do any side effect as they will happen in the child process and then discarded");
 
         Ok(Self {
+            first_exec: true,
             hooks,
             inner: InProcessForkExecutor::new(
                 harness_fn,
@@ -241,6 +249,10 @@ where
         input: &I,
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
+        if self.first_exec {
+            self.hooks.helpers().first_exec_all(&self.hooks);
+            self.first_exec = false;
+        }
         self.hooks.helpers_mut().pre_exec_all(&emu, input);
         let r = self.inner.run_target(fuzzer, state, mgr, input);
         self.hooks.helpers_mut().post_exec_all(&emu, input);

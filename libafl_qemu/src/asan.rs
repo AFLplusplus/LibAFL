@@ -1,6 +1,10 @@
 #![allow(clippy::cast_possible_wrap)]
 
-use std::{collections::HashSet, env, fs, sync::Mutex};
+use std::{
+    collections::{HashMap, HashSet},
+    env, fs,
+    sync::Mutex,
+};
 
 use libafl::{inputs::Input, state::HasMetadata};
 use libc::{
@@ -22,9 +26,9 @@ pub const HIGH_SHADOW_ADDR: *mut c_void = 0x02008fff7000 as *mut c_void;
 pub const LOW_SHADOW_ADDR: *mut c_void = 0x00007fff8000 as *mut c_void;
 pub const GAP_SHADOW_ADDR: *mut c_void = 0x00008fff7000 as *mut c_void;
 
-pub const HIGH_SHADOW_SIZE: usize = 0x02008fff7000;
-pub const LOW_SHADOW_SIZE: usize = 0x00007fff8000;
-pub const GAP_SHADOW_SIZE: usize = 0x00008fff7000;
+pub const HIGH_SHADOW_SIZE: usize = 0xdfff0000fff;
+pub const LOW_SHADOW_SIZE: usize = 0xfffefff;
+pub const GAP_SHADOW_SIZE: usize = 0x1ffffffffff;
 
 pub const SHADOW_OFFSET: isize = 0x7fff8000;
 
@@ -86,8 +90,10 @@ pub type AsanErrorCallback = Box<dyn FnMut(&Emulator, AsanError)>;
 
 pub struct AsanGiovese {
     pub alloc_tree: Mutex<IntervalTree<GuestAddr, ()>>,
+    pub saved_tree: IntervalTree<GuestAddr, ()>,
     pub error_callback: Option<AsanErrorCallback>,
-    pub dirty_shadow: HashSet<GuestAddr>,
+    pub dirty_shadow: Mutex<HashSet<GuestAddr>>,
+    pub saved_shadow: HashMap<GuestAddr, Vec<i8>>,
     pub snapshot_shadow: bool,
 }
 
@@ -238,8 +244,9 @@ impl AsanGiovese {
 
             if self.snapshot_shadow {
                 let mut page = addr & SHADOW_PAGE_MASK;
+                let mut set = self.dirty_shadow.lock().unwrap();
                 while page < addr + n as GuestAddr {
-                    self.dirty_shadow.insert(page);
+                    set.insert(page);
                     page += SHADOW_PAGE_SIZE as GuestAddr;
                 }
             }
@@ -299,12 +306,23 @@ impl AsanGiovese {
         }
     }
 
+    #[inline]
+    fn get_shadow_page(emu: &Emulator, page: GuestAddr) -> &mut [i8] {
+        unsafe {
+            let h = emu.g2h::<*const c_void>(page) as isize;
+            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+            std::slice::from_raw_parts_mut(shadow_addr, SHADOW_PAGE_SIZE)
+        }
+    }
+
     #[must_use]
     pub fn new(snapshot_shadow: bool) -> Self {
         Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
+            saved_tree: IntervalTree::new(),
             error_callback: None,
-            dirty_shadow: HashSet::default(),
+            dirty_shadow: Mutex::new(HashSet::default()),
+            saved_shadow: HashMap::default(),
             snapshot_shadow,
         }
     }
@@ -313,8 +331,10 @@ impl AsanGiovese {
     pub fn with_error_callback(snapshot_shadow: bool, error_callback: AsanErrorCallback) -> Self {
         Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
+            saved_tree: IntervalTree::new(),
             error_callback: Some(error_callback),
-            dirty_shadow: HashSet::default(),
+            dirty_shadow: Mutex::new(HashSet::default()),
+            saved_shadow: HashMap::default(),
             snapshot_shadow,
         }
     }
@@ -347,9 +367,23 @@ impl AsanGiovese {
         self.alloc_tree
             .lock()
             .unwrap()
-            .query(query..query)
+            .query(query..query + 1)
             .next()
             .map(|entry| *entry.interval)
+    }
+
+    pub fn snapshot(&mut self, emu: &Emulator) {
+        if self.snapshot_shadow {
+            let set = self.dirty_shadow.lock().unwrap();
+
+            for &page in set.iter() {
+                let data = Self::get_shadow_page(emu, page).to_vec();
+                self.saved_shadow.insert(page, data);
+            }
+
+            let tree = self.alloc_tree.lock().unwrap();
+            self.saved_tree = tree.clone();
+        }
     }
 
     pub fn rollback(&mut self, emu: &Emulator, detect_leaks: bool) {
@@ -357,23 +391,32 @@ impl AsanGiovese {
 
         {
             let mut tree = self.alloc_tree.lock().unwrap();
-            for entry in tree.query(0..GuestAddr::MAX) {
-                if detect_leaks {
+
+            if detect_leaks {
+                for entry in tree.query(0..GuestAddr::MAX) {
                     leaks.push(*entry.interval);
                 }
             }
 
             if self.snapshot_shadow {
-                tree.delete(0..GuestAddr::MAX);
+                tree.clear();
             }
         }
 
         if self.snapshot_shadow {
-            for page in &self.dirty_shadow {
-                Self::unpoison_page(emu, *page);
+            let mut set = self.dirty_shadow.lock().unwrap();
+
+            for &page in set.iter() {
+                let original = self.saved_shadow.get(&page);
+                if let Some(data) = original {
+                    let cur = Self::get_shadow_page(emu, page);
+                    cur.copy_from_slice(data);
+                } else {
+                    Self::unpoison_page(emu, page);
+                }
             }
 
-            self.dirty_shadow.clear();
+            set.clear();
         }
 
         for interval in leaks {
@@ -433,26 +476,39 @@ pub fn init_with_asan(args: &mut Vec<String>, env: &mut [(String, String)]) -> E
     Emulator::new(args, env)
 }
 
+pub enum QemuAsanOptions {
+    None,
+    Snapshot,
+    DetectLeaks,
+    SnapshotDetectLeaks,
+}
+
 pub type QemuAsanChildHelper = QemuAsanHelper;
 
 #[derive(Debug)]
 pub struct QemuAsanHelper {
     enabled: bool,
-    pub detect_leaks: bool,
-    rollback: bool,
+    detect_leaks: bool,
+    empty: bool,
     rt: AsanGiovese,
     filter: QemuInstrumentationFilter,
 }
 
 impl QemuAsanHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter) -> Self {
+    pub fn new(filter: QemuInstrumentationFilter, options: QemuAsanOptions) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
+        let (snapshot, detect_leaks) = match options {
+            QemuAsanOptions::None => (false, false),
+            QemuAsanOptions::Snapshot => (true, false),
+            QemuAsanOptions::DetectLeaks => (false, true),
+            QemuAsanOptions::SnapshotDetectLeaks => (true, true),
+        };
         Self {
             enabled: true,
-            detect_leaks: false,
-            rollback: true,
-            rt: AsanGiovese::new(true),
+            detect_leaks,
+            empty: true,
+            rt: AsanGiovese::new(snapshot),
             filter,
         }
     }
@@ -461,13 +517,20 @@ impl QemuAsanHelper {
     pub fn with_error_callback(
         filter: QemuInstrumentationFilter,
         error_callback: AsanErrorCallback,
+        options: QemuAsanOptions,
     ) -> Self {
         assert!(unsafe { ASAN_INITED }, "The ASan runtime is not initialized, use init_with_asan(...) instead of just Emulator::new(...)");
+        let (snapshot, detect_leaks) = match options {
+            QemuAsanOptions::None => (false, false),
+            QemuAsanOptions::Snapshot => (true, false),
+            QemuAsanOptions::DetectLeaks => (false, true),
+            QemuAsanOptions::SnapshotDetectLeaks => (true, true),
+        };
         Self {
             enabled: true,
-            detect_leaks: false,
-            rollback: true,
-            rt: AsanGiovese::with_error_callback(true, error_callback),
+            detect_leaks,
+            empty: true,
+            rt: AsanGiovese::with_error_callback(snapshot, error_callback),
             filter,
         }
     }
@@ -596,15 +659,13 @@ impl QemuAsanHelper {
     }
 
     pub fn reset(&mut self, emulator: &Emulator) {
-        if self.rollback || self.detect_leaks {
-            self.rt.rollback(emulator, self.detect_leaks);
-        }
+        self.rt.rollback(emulator, self.detect_leaks);
     }
 }
 
 impl Default for QemuAsanHelper {
     fn default() -> Self {
-        Self::new(QemuInstrumentationFilter::None)
+        Self::new(QemuInstrumentationFilter::None, QemuAsanOptions::Snapshot)
     }
 }
 
@@ -616,6 +677,13 @@ where
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
     fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    where
+        QT: QemuHelperTuple<I, S>,
+    {
+        hooks.syscalls(qasan_fake_syscall::<I, QT, S>);
+    }
+
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
     where
         QT: QemuHelperTuple<I, S>,
     {
@@ -636,8 +704,13 @@ where
             Some(trace_write8_asan::<I, QT, S>),
             Some(trace_write_n_asan::<I, QT, S>),
         );
+    }
 
-        hooks.syscalls(qasan_fake_syscall::<I, QT, S>);
+    fn pre_exec(&mut self, emulator: &Emulator, _input: &I) {
+        if self.empty {
+            self.rt.snapshot(emulator);
+            self.empty = false;
+        }
     }
 
     fn post_exec(&mut self, emulator: &Emulator, _input: &I) {
