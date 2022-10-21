@@ -45,7 +45,7 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    asan::{init_with_asan, QemuAsanHelper},
+    //asan::{init_with_asan, QemuAsanHelper},
     cmplog,
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
     edges,
@@ -54,7 +54,7 @@ use libafl_qemu::{
     emu::Emulator,
     filter_qemu_args,
     hooks::QemuHooks,
-    snapshot::QemuSnapshotHelper,
+    //snapshot::QemuSnapshotHelper,
     MmapPerms,
     QemuExecutor,
     Regs,
@@ -172,10 +172,10 @@ fn fuzz(
 ) -> Result<(), Error> {
     env::remove_var("LD_LIBRARY_PATH");
 
-    let mut args: Vec<String> = env::args().collect();
-    let mut env: Vec<(String, String)> = env::vars().collect();
-    //let emu = Emulator::new(&args, &env);
-    let emu = init_with_asan(&mut args, &mut env);
+    let args: Vec<String> = env::args().collect();
+    let env: Vec<(String, String)> = env::vars().collect();
+    let emu = Emulator::new(&args, &env);
+    //let emu = init_with_asan(&mut args, &mut env);
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
@@ -342,8 +342,8 @@ fn fuzz(
         tuple_list!(
             QemuEdgeCoverageHelper::default(),
             QemuCmpLogHelper::default(),
-            QemuAsanHelper::default(),
-            QemuSnapshotHelper::new()
+            //QemuAsanHelper::default(),
+            //QemuSnapshotHelper::new()
         ),
     );
 
