@@ -31,7 +31,6 @@ pub fn read_time_counter() -> u64 {
     }
 }
 
-
 /*
 /// Read a timestamp for measurements
 ///
