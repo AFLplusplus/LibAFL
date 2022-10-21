@@ -16,8 +16,18 @@ If you did neither of these, congrats! You are likely unaffected by these change
 
 Migrating specific generics should be a quite simple process; you should review the API documentation for details on the
 order of generics and replace them accordingly. Generally speaking, it should no longer be necessary to specify these
-generics. 
-
-
+generics.
 
 See `fuzzers/` for examples of these changes.
+
+### Migrating component types
+
+If you implemented a Mutator, Executor, State, or another kind of component, you must update your implementation. The
+main changes to the API are in the use of "Uses*" for associated types.
+
+In many scenarios, Input, Observers, and State generics have been moved into traits with associated types (namely,
+"UsesInput", "UsesObservers", and "UsesState". These traits are required for many existing traits now and are very
+straightforward to implement. In a majority of cases, you will have generics on your custom implementation or a fixed
+type to implement this with.
+
+<!-- TODO explain implementation with example, explain tighter bounds -->
