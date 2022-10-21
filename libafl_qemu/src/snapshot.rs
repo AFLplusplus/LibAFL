@@ -105,7 +105,7 @@ impl QemuSnapshotHelper {
     }
 
     #[must_use]
-    pub fn with_mmap_limit(mmap_limit: usize, stop_execution: Box<StopExecutionCallback>) -> Self {
+    pub fn with_mmap_limit(mmap_limit: usize, stop_execution: StopExecutionCallback) -> Self {
         Self {
             accesses: ThreadLocal::new(),
             maps: MappingInfo::default(),
