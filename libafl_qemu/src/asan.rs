@@ -1,3 +1,5 @@
+#![allow(clippy::cast_possible_wrap)]
+
 use std::{collections::HashSet, env, fs, sync::Mutex};
 
 use libafl::{inputs::Input, state::HasMetadata};
@@ -27,8 +29,6 @@ pub const GAP_SHADOW_SIZE: usize = 0x00008fff7000;
 pub const SHADOW_OFFSET: isize = 0x7fff8000;
 
 pub const QASAN_FAKESYS_NR: i32 = 0xa2a4;
-
-pub const UNPOISON_PADDING: GuestAddr = 256; // To unpoison the redzone too, it may need to be increased
 
 pub const SHADOW_PAGE_SIZE: usize = 4096;
 pub const SHADOW_PAGE_MASK: GuestAddr = !(SHADOW_PAGE_SIZE as GuestAddr - 1);
@@ -135,6 +135,7 @@ impl AsanGiovese {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_invalid_access_1(emu: &Emulator, addr: GuestAddr) -> bool {
         unsafe {
             let h = emu.g2h::<*const c_void>(addr) as isize;
@@ -145,6 +146,7 @@ impl AsanGiovese {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_invalid_access_2(emu: &Emulator, addr: GuestAddr) -> bool {
         unsafe {
             let h = emu.g2h::<*const c_void>(addr) as isize;
@@ -155,6 +157,7 @@ impl AsanGiovese {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_invalid_access_4(emu: &Emulator, addr: GuestAddr) -> bool {
         unsafe {
             let h = emu.g2h::<*const c_void>(addr) as isize;
@@ -164,6 +167,8 @@ impl AsanGiovese {
         }
     }
 
+    #[inline]
+    #[must_use]
     pub fn is_invalid_access_8(emu: &Emulator, addr: GuestAddr) -> bool {
         unsafe {
             let h = emu.g2h::<*const c_void>(addr) as isize;
@@ -173,6 +178,7 @@ impl AsanGiovese {
     }
 
     #[inline]
+    #[must_use]
     pub fn is_invalid_access(emu: &Emulator, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             if n == 0 {
@@ -292,6 +298,7 @@ impl AsanGiovese {
         }
     }
 
+    #[must_use]
     pub fn new(snapshot_shadow: bool) -> Self {
         Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
@@ -301,6 +308,7 @@ impl AsanGiovese {
         }
     }
 
+    #[must_use]
     pub fn with_error_callback(snapshot_shadow: bool, error_callback: AsanErrorCallback) -> Self {
         Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
@@ -333,6 +341,7 @@ impl AsanGiovese {
         }
     }
 
+    #[must_use]
     pub fn alloc_search(&mut self, query: GuestAddr) -> Option<Interval<GuestAddr>> {
         self.alloc_tree
             .lock()
