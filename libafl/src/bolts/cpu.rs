@@ -36,10 +36,10 @@ pub fn read_time_counter() -> u64 {
 #[cfg(target_arch = "aarch64")]
 #[must_use]
 pub fn read_time_counter() -> u64 {
-    let v: u64 = 0;
+    let mut v: u64 = 0;
     unsafe {
         // TODO pushing a change in core::arch::aarch64 ?
-        asm!("mrs {v}, cntvct_el0", v = out(reg) _);
+        asm!("mrs {v}, cntvct_el0", v = out(reg) v);
     }
     v
 }

@@ -10,6 +10,9 @@ use std::{
 
 use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX};
 
+/// The `OUT_DIR` for `LLVM` compiler passes
+pub const OUT_DIR: &str = env!("OUT_DIR");
+
 fn dll_extension<'a>() -> &'a str {
     if cfg!(target_os = "windows") {
         "dll"
