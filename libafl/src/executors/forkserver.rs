@@ -179,6 +179,8 @@ impl Forkserver {
         input_filefd: RawFd,
         use_stdin: bool,
         memlimit: u64,
+        is_persistent: bool,
+        is_deferred_frksrv: bool,
         debug_output: bool,
     ) -> Result<Self, Error> {
         let mut st_pipe = Pipe::new().unwrap();
@@ -190,12 +192,26 @@ impl Forkserver {
             (Stdio::null(), Stdio::null())
         };
 
-        match Command::new(target)
+        let mut command = Command::new(target);
+
+        // Setup args, stdio
+        command
             .args(args)
             .stdin(Stdio::null())
             .stdout(stdout)
-            .stderr(stderr)
-            .env("LD_BIND_LAZY", "1")
+            .stderr(stderr);
+
+        // Persistent, deferred forkserver
+        if is_persistent {
+            command.env("__AFL_PERSISTENT", "1");
+        }
+
+        if is_deferred_frksrv {
+            command.env("__AFL_DEFER_FORKSRV", "1");
+        }
+
+        match command
+            .env("LD_BIND_NOW", "1")
             .env("ASAN_OPTIONS", get_asan_runtime_flags_with_log_path())
             .envs(envs)
             .setlimit(memlimit)
@@ -549,6 +565,8 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     envs: Vec<(OsString, OsString)>,
     debug_child: bool,
     use_stdin: bool,
+    is_persistent: bool,
+    is_deferred_frksrv: bool,
     autotokens: Option<&'a mut Tokens>,
     input_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
@@ -595,6 +613,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     input_file.as_raw_fd(),
                     self.use_stdin,
                     0,
+                    self.is_persistent,
+                    self.is_deferred_frksrv,
                     self.debug_child,
                 )?;
 
@@ -740,6 +760,8 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             envs: vec![],
             debug_child: false,
             use_stdin: true,
+            is_persistent: false,
+            is_deferred_frksrv: false,
             autotokens: None,
             input_filename: None,
             shmem_provider: None,
@@ -830,6 +852,20 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
+    #[must_use]
+    /// Call this if you want to run it under persistent mode; default is false
+    pub fn is_persistent(mut self, is_persistent: bool) -> Self {
+        self.is_persistent = is_persistent;
+        self
+    }
+
+    #[must_use]
+    /// Call this if the harness uses deferred forkserver mode; default is false
+    pub fn is_deferred_frksrv(mut self, is_deferred_frksrv: bool) -> Self {
+        self.is_deferred_frksrv = is_deferred_frksrv;
+        self
+    }
+
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
@@ -841,6 +877,8 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             envs: self.envs,
             debug_child: self.debug_child,
             use_stdin: self.use_stdin,
+            is_persistent: self.is_persistent,
+            is_deferred_frksrv: self.is_deferred_frksrv,
             autotokens: self.autotokens,
             input_filename: self.input_filename,
             shmem_provider: Some(shmem_provider),
