@@ -494,7 +494,7 @@ mod tests {
         let _monitor = SimpleMonitor::new(|s| {
             println!("{s}");
         });
-        let mut event_manager = NopEventManager::<(), _>::new();
+        let mut event_manager = NopEventManager::new();
 
         let feedback = ConstFeedback::new(false);
         let objective = ConstFeedback::new(false);

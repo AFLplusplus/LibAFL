@@ -519,7 +519,7 @@ impl<CS, E, EM, F, OF, OT, ST> Fuzzer<E, EM, ST> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
     E: UsesState<State = CS::State>,
-    EM: ProgressReporter + EventProcessor<E, OT, Self, State = CS::State>,
+    EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata,

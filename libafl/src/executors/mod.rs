@@ -199,7 +199,7 @@ mod test {
             .run_target(
                 &mut fuzzer,
                 &mut state,
-                &mut NopEventManager::<(), _>::new(),
+                &mut NopEventManager::new(),
                 &empty_input,
             )
             .unwrap_err();
@@ -207,7 +207,7 @@ mod test {
             .run_target(
                 &mut fuzzer,
                 &mut state,
-                &mut NopEventManager::<(), _>::new(),
+                &mut NopEventManager::new(),
                 &nonempty_input,
             )
             .unwrap();

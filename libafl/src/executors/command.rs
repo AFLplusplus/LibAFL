@@ -699,10 +699,9 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_builder() {
-        let mut mgr =
-            SimpleEventManager::<_, (), NopState<BytesInput>>::new(SimpleMonitor::new(|status| {
-                println!("{status}");
-            }));
+        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
+            println!("{status}");
+        }));
 
         let mut executor = CommandExecutor::builder();
         executor
@@ -726,10 +725,9 @@ mod tests {
     fn test_parse_afl_cmdline() {
         use alloc::string::ToString;
 
-        let mut mgr =
-            SimpleEventManager::<_, (), NopState<BytesInput>>::new(SimpleMonitor::new(|status| {
-                println!("{status}");
-            }));
+        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
+            println!("{status}");
+        }));
 
         let mut executor =
             CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], (), true)

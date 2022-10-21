@@ -1,17 +1,19 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
 use core::fmt::{self, Debug, Formatter};
 
+#[cfg(feature = "fork")]
 use libafl::{
-    bolts::shmem::ShMemProvider,
-    events::{EventFirer, EventManager, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor, InProcessForkExecutor},
+    bolts::shmem::ShMemProvider, events::EventManager, executors::InProcessForkExecutor,
+    state::HasMetadata,
+};
+use libafl::{
+    events::{EventFirer, EventRestarter},
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
     observers::{ObserversTuple, UsesObservers},
-    state::{
-        HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, State, UsesState,
-    },
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasSolutions, State, UsesState},
     Error,
 };
 
@@ -247,7 +249,7 @@ where
 #[cfg(feature = "fork")]
 impl<'a, EM, H, OT, QT, S, Z, SP> Executor<EM, Z> for QemuForkExecutor<'a, H, OT, QT, S, SP>
 where
-    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, OT, Z, State = S>,
+    EM: EventManager<InProcessForkExecutor<'a, H, OT, S, SP>, Z, State = S>,
     H: FnMut(&S::Input) -> ExitKind,
     S: UsesInput + HasClientPerfMonitor + HasMetadata + HasExecutions,
     OT: ObserversTuple<S>,

@@ -433,7 +433,7 @@ pub trait EventRestarter: UsesState {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, OT, Z>: UsesState {
+pub trait EventProcessor<E, Z>: UsesState {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
     fn process(
@@ -442,14 +442,6 @@ pub trait EventProcessor<E, OT, Z>: UsesState {
         state: &mut Self::State,
         executor: &mut E,
     ) -> Result<usize, Error>;
-
-    /// Deserialize all observers for this type and manager
-    fn deserialize_observers(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
-    where
-        OT: serde::de::DeserializeOwned,
-    {
-        Ok(postcard::from_bytes(observers_buf)?)
-    }
 }
 /// The id of this [`EventManager`].
 /// For multi processed [`EventManager`]s,
@@ -462,8 +454,8 @@ pub trait HasEventManagerId {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager<E, OT, Z>:
-    EventFirer + EventProcessor<E, OT, Z> + EventRestarter + HasEventManagerId + ProgressReporter
+pub trait EventManager<E, Z>:
+    EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
     Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
 {
@@ -481,11 +473,11 @@ pub trait HasCustomBufHandlers<S> {
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
 #[derive(Copy, Clone, Debug, Default)]
-pub struct NopEventManager<OT, S> {
-    phantom: PhantomData<(OT, S)>,
+pub struct NopEventManager<S> {
+    phantom: PhantomData<S>,
 }
 
-impl<OT, S> NopEventManager<OT, S> {
+impl<S> NopEventManager<S> {
     /// Creates a new [`NopEventManager`]
     #[must_use]
     pub fn new() -> Self {
@@ -495,14 +487,14 @@ impl<OT, S> NopEventManager<OT, S> {
     }
 }
 
-impl<OT, S> UsesState for NopEventManager<OT, S>
+impl<S> UsesState for NopEventManager<S>
 where
     S: UsesInput,
 {
     type State = S;
 }
 
-impl<OT, S> EventFirer for NopEventManager<OT, S>
+impl<S> EventFirer for NopEventManager<S>
 where
     S: UsesInput,
 {
@@ -515,12 +507,11 @@ where
     }
 }
 
-impl<OT, S> EventRestarter for NopEventManager<OT, S> where S: UsesInput {}
+impl<S> EventRestarter for NopEventManager<S> where S: UsesInput {}
 
-impl<E, OT, S, Z> EventProcessor<E, OT, Z> for NopEventManager<OT, S>
+impl<E, S, Z> EventProcessor<E, Z> for NopEventManager<S>
 where
     S: UsesInput + HasClientPerfMonitor + HasExecutions,
-    OT: ObserversTuple<S>,
 {
     fn process(
         &mut self,
@@ -532,14 +523,12 @@ where
     }
 }
 
-impl<E, OT, S, Z> EventManager<E, OT, Z> for NopEventManager<OT, S>
-where
-    OT: ObserversTuple<S>,
-    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
+impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
 {
 }
 
-impl<OT, S> HasCustomBufHandlers<S> for NopEventManager<OT, S> {
+impl<S> HasCustomBufHandlers<S> for NopEventManager<S> {
     fn add_custom_buf_handler(
         &mut self,
         _handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
@@ -547,12 +536,12 @@ impl<OT, S> HasCustomBufHandlers<S> for NopEventManager<OT, S> {
     }
 }
 
-impl<OT, S> ProgressReporter for NopEventManager<OT, S> where
+impl<S> ProgressReporter for NopEventManager<S> where
     S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
 {
 }
 
-impl<OT, S> HasEventManagerId for NopEventManager<OT, S> {
+impl<S> HasEventManagerId for NopEventManager<S> {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId { id: 0 }
     }
@@ -677,10 +666,6 @@ pub mod pybind {
         type State = PythonStdState;
     }
 
-    impl UsesObservers for PythonEventManager {
-        type Observers = PythonObserversTuple;
-    }
-
     impl EventFirer for PythonEventManager {
         fn fire(&mut self, state: &mut Self::State, event: Event<BytesInput>) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
@@ -689,7 +674,7 @@ pub mod pybind {
 
     impl EventRestarter for PythonEventManager {}
 
-    impl EventProcessor<PythonExecutor, PythonObserversTuple, PythonStdFuzzer> for PythonEventManager {
+    impl EventProcessor<PythonExecutor, PythonStdFuzzer> for PythonEventManager {
         fn process(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
@@ -708,7 +693,7 @@ pub mod pybind {
         }
     }
 
-    impl EventManager<PythonExecutor, PythonObserversTuple, PythonStdFuzzer> for PythonEventManager {}
+    impl EventManager<PythonExecutor, PythonStdFuzzer> for PythonEventManager {}
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

@@ -6,7 +6,10 @@ use frida_gum::{
     Gum, MemoryRange, NativePointer,
 };
 #[cfg(windows)]
-use libafl::executors::inprocess::{HasInProcessHandlers, InProcessHandlers};
+use libafl::{
+    executors::inprocess::{HasInProcessHandlers, InProcessHandlers},
+    state::{HasClientPerfMonitor, HasSolutions},
+};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{HasTargetBytes, UsesInput},
@@ -193,7 +196,7 @@ impl<'a, 'b, 'c, H, OT, RT, S> HasInProcessHandlers
     for FridaInProcessExecutor<'a, 'b, 'c, H, OT, RT, S>
 where
     H: FnMut(&S::Input) -> ExitKind,
-    S: UsesInput,
+    S: UsesInput + HasClientPerfMonitor + HasSolutions,
     S::Input: HasTargetBytes,
     OT: ObserversTuple<S>,
     RT: FridaRuntimeTuple,

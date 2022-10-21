@@ -31,7 +31,6 @@ use crate::{
     },
     inputs::UsesInput,
     monitors::Monitor,
-    observers::ObserversTuple,
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata, UsesState},
     Error,
 };
@@ -43,7 +42,7 @@ const _ENV_FUZZER_RECEIVER: &str = "_AFL_ENV_FUZZER_RECEIVER";
 const _ENV_FUZZER_BROKER_CLIENT_INITIAL: &str = "_AFL_ENV_FUZZER_BROKER_CLIENT";
 
 /// A simple, single-threaded event manager that just logs
-pub struct SimpleEventManager<MT, OT, S>
+pub struct SimpleEventManager<MT, S>
 where
     S: UsesInput,
 {
@@ -53,10 +52,10 @@ where
     events: Vec<Event<S::Input>>,
     /// The custom buf handler
     custom_buf_handlers: Vec<Box<CustomBufHandlerFn<S>>>,
-    phantom: PhantomData<(OT, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<MT, OT, S> Debug for SimpleEventManager<MT, OT, S>
+impl<MT, S> Debug for SimpleEventManager<MT, S>
 where
     MT: Debug,
     S: UsesInput,
@@ -70,14 +69,14 @@ where
     }
 }
 
-impl<MT, OT, S> UsesState for SimpleEventManager<MT, OT, S>
+impl<MT, S> UsesState for SimpleEventManager<MT, S>
 where
     S: UsesInput,
 {
     type State = S;
 }
 
-impl<MT, OT, S> EventFirer for SimpleEventManager<MT, OT, S>
+impl<MT, S> EventFirer for SimpleEventManager<MT, S>
 where
     MT: Monitor,
     S: UsesInput,
@@ -95,17 +94,16 @@ where
     }
 }
 
-impl<MT, OT, S> EventRestarter for SimpleEventManager<MT, OT, S>
+impl<MT, S> EventRestarter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
     S: UsesInput,
 {
 }
 
-impl<E, MT, OT, S, Z> EventProcessor<E, OT, Z> for SimpleEventManager<MT, OT, S>
+impl<E, MT, S, Z> EventProcessor<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    OT: ObserversTuple<S>,
     S: UsesInput,
 {
     fn process(
@@ -123,15 +121,14 @@ where
     }
 }
 
-impl<E, MT, OT, S, Z> EventManager<E, OT, Z> for SimpleEventManager<MT, OT, S>
+impl<E, MT, S, Z> EventManager<E, Z> for SimpleEventManager<MT, S>
 where
     MT: Monitor,
-    OT: ObserversTuple<S>,
     S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata,
 {
 }
 
-impl<MT, OT, S> HasCustomBufHandlers<S> for SimpleEventManager<MT, OT, S>
+impl<MT, S> HasCustomBufHandlers<S> for SimpleEventManager<MT, S>
 where
     MT: Monitor, //CE: CustomEvent<I, OT>,
     S: UsesInput,
@@ -145,14 +142,14 @@ where
     }
 }
 
-impl<MT, OT, S> ProgressReporter for SimpleEventManager<MT, OT, S>
+impl<MT, S> ProgressReporter for SimpleEventManager<MT, S>
 where
     MT: Monitor,
     S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
 {
 }
 
-impl<MT, OT, S> HasEventManagerId for SimpleEventManager<MT, OT, S>
+impl<MT, S> HasEventManagerId for SimpleEventManager<MT, S>
 where
     MT: Monitor,
     S: UsesInput,
@@ -163,7 +160,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<OT, S> SimpleEventManager<SimplePrintingMonitor, OT, S>
+impl<S> SimpleEventManager<SimplePrintingMonitor, S>
 where
     S: UsesInput,
 {
@@ -174,7 +171,7 @@ where
     }
 }
 
-impl<MT, OT, S> SimpleEventManager<MT, OT, S>
+impl<MT, S> SimpleEventManager<MT, S>
 where
     MT: Monitor, //TODO CE: CustomEvent,
     S: UsesInput,
@@ -297,19 +294,19 @@ where
 #[cfg(feature = "std")]
 #[allow(clippy::default_trait_access)]
 #[derive(Debug)]
-pub struct SimpleRestartingEventManager<MT, OT, S, SP>
+pub struct SimpleRestartingEventManager<MT, S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider, //CE: CustomEvent<I, OT>,
 {
     /// The actual simple event mgr
-    simple_event_mgr: SimpleEventManager<MT, OT, S>,
+    simple_event_mgr: SimpleEventManager<MT, S>,
     /// [`StateRestorer`] for restarts
     staterestorer: StateRestorer<SP>,
 }
 
 #[cfg(feature = "std")]
-impl<MT, OT, S, SP> UsesState for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<MT, S, SP> UsesState for SimpleRestartingEventManager<MT, S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider,
@@ -318,7 +315,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<MT, OT, S, SP> EventFirer for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<MT, S, SP> EventFirer for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
     S: UsesInput,
@@ -334,7 +331,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<MT, OT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<MT, S, SP> EventRestarter for SimpleRestartingEventManager<MT, S, SP>
 where
     S: UsesInput + Serialize,
     SP: ShMemProvider,
@@ -348,10 +345,9 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, MT, OT, S, SP, Z> EventProcessor<E, OT, Z> for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<E, MT, S, SP, Z> EventProcessor<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    OT: ObserversTuple<S>,
     S: UsesInput + HasClientPerfMonitor + HasExecutions + Serialize,
     SP: ShMemProvider,
 {
@@ -366,17 +362,16 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<E, MT, OT, S, SP, Z> EventManager<E, OT, Z> for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<E, MT, S, SP, Z> EventManager<E, Z> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
-    OT: ObserversTuple<S>,
     S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize,
     SP: ShMemProvider,
 {
 }
 
 #[cfg(feature = "std")]
-impl<MT, OT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<MT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
     S: UsesInput,
@@ -391,7 +386,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<MT, OT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<MT, S, SP> ProgressReporter for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
     S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
@@ -400,7 +395,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<MT, OT, S, SP> HasEventManagerId for SimpleRestartingEventManager<MT, OT, S, SP>
+impl<MT, S, SP> HasEventManagerId for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
     S: UsesInput,
@@ -413,7 +408,7 @@ where
 
 #[cfg(feature = "std")]
 #[allow(clippy::type_complexity, clippy::too_many_lines)]
-impl<MT, OT, S, SP> SimpleRestartingEventManager<MT, OT, S, SP>
+impl<MT, S, SP> SimpleRestartingEventManager<MT, S, SP>
 where
     S: UsesInput,
     SP: ShMemProvider,
@@ -551,7 +546,7 @@ pub mod pybind {
     /// Python class for SimpleEventManager
     pub struct PythonSimpleEventManager {
         /// Rust wrapped SimpleEventManager object
-        pub inner: SimpleEventManager<PythonMonitor, PythonObserversTuple, PythonStdState>,
+        pub inner: SimpleEventManager<PythonMonitor, PythonStdState>,
     }
 
     #[pymethods]
