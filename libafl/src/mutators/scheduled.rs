@@ -432,8 +432,12 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let mut rand = XkcdRand::with_seed(5);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
-        corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
+        corpus
+            .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
+            .unwrap();
+        corpus
+            .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
+            .unwrap();
 
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();
@@ -468,8 +472,12 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
-        corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
+        corpus
+            .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
+            .unwrap();
+        corpus
+            .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
+            .unwrap();
 
         let testcase = corpus.get(0).expect("Corpus did not contain entries");
         let mut input = testcase.borrow_mut().load_input().unwrap().clone();

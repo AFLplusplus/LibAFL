@@ -23,13 +23,10 @@ use core::cell::RefCell;
 #[cfg(feature = "cmin")]
 pub use minimizer::*;
 
-use crate::{inputs::Input, Error};
+use crate::{inputs::UsesInput, Error};
 
 /// Corpus with all current testcases
-pub trait Corpus: serde::Serialize + for<'de> serde::Deserialize<'de> {
-    /// The [`Input`] type used in this [`Corpus`]
-    type Input: Input;
-
+pub trait Corpus: UsesInput + serde::Serialize + for<'de> serde::Deserialize<'de> {
     /// Returns the number of elements
     fn count(&self) -> usize;
 

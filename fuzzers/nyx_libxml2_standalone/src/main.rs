@@ -31,8 +31,7 @@ fn main() {
 
     let input = BytesInput::new(b"22".to_vec());
     let rand = StdRand::new();
-    let mut corpus =
-        CachedOnDiskCorpus::<BytesInput>::new(PathBuf::from("./corpus_discovered"), 64).unwrap();
+    let mut corpus = CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap();
     corpus
         .add(Testcase::new(input))
         .expect("error in adding corpus");
@@ -49,7 +48,7 @@ fn main() {
     // let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
     let monitor = TuiMonitor::new("test_fuzz".to_string(), true);
 
-    let mut mgr: SimpleEventManager<_, _, _> = SimpleEventManager::new(monitor);
+    let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));

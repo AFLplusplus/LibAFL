@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, Testcase},
-    inputs::Input,
+    inputs::{Input, UsesInput},
     Error,
 };
 
@@ -22,11 +22,17 @@ where
     current: Option<usize>,
 }
 
-impl<I> Corpus for InMemoryCorpus<I>
+impl<I> UsesInput for InMemoryCorpus<I>
 where
     I: Input,
 {
     type Input = I;
+}
+
+impl<I> Corpus for InMemoryCorpus<I>
+where
+    I: Input,
+{
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {

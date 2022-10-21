@@ -146,10 +146,12 @@ where
 }
 
 /// The main fuzzer trait.
-pub trait Fuzzer<E, EM, ST>
+pub trait Fuzzer<E, EM, ST>: Sized + UsesState
 where
-    EM: ProgressReporter,
-    EM::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
+    E: UsesState<State = Self::State>,
+    EM: ProgressReporter<State = Self::State>,
+    ST: StagesTuple<E, EM, Self::State, Self>,
 {
     /// Fuzz for a single iteration.
     /// Returns the index of the last fuzzed corpus item.
@@ -694,8 +696,10 @@ where
 #[cfg(test)]
 impl<ST, E, I, EM> Fuzzer<E, EM, ST> for NopFuzzer<I>
 where
+    E: UsesState<State = NopState<I>>,
     EM: ProgressReporter<State = NopState<I>>,
     I: Input,
+    ST: StagesTuple<E, EM, NopState<I>, Self>,
 {
     fn fuzz_one(
         &mut self,

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, Testcase},
-    inputs::Input,
+    inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
 };
@@ -54,12 +54,17 @@ where
     meta_format: Option<OnDiskMetadataFormat>,
 }
 
-impl<I> Corpus for OnDiskCorpus<I>
+impl<I> UsesInput for OnDiskCorpus<I>
 where
     I: Input,
 {
     type Input = I;
+}
 
+impl<I> Corpus for OnDiskCorpus<I>
+where
+    I: Input,
+{
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {

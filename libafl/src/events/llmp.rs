@@ -11,9 +11,9 @@ use core::{marker::PhantomData, time::Duration};
 #[cfg(feature = "std")]
 use std::net::{SocketAddr, ToSocketAddrs};
 
-use serde::de::DeserializeOwned;
+use serde::Deserialize;
 #[cfg(feature = "std")]
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "std")]
 use typed_builder::TypedBuilder;
 
@@ -379,7 +379,7 @@ where
     ) -> Result<(), Error>
     where
         E: Executor<Self, Z> + HasObservers<State = S>,
-        E::Observers: Serialize + DeserializeOwned,
+        for<'a> E::Observers: Deserialize<'a>,
         Z: ExecutionProcessor<E::Observers, State = S> + EvaluatorObservers<E::Observers>,
     {
         match event {
@@ -502,7 +502,7 @@ where
     S: UsesInput + HasClientPerfMonitor + HasExecutions,
     SP: ShMemProvider,
     E: HasObservers<State = S> + Executor<Self, Z>,
-    E::Observers: Serialize + DeserializeOwned,
+    for<'a> E::Observers: Deserialize<'a>,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
 {
     fn process(
@@ -545,7 +545,7 @@ where
 impl<E, S, SP, Z> EventManager<E, Z> for LlmpEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<Self, Z>,
-    E::Observers: Serialize + DeserializeOwned,
+    for<'a> E::Observers: Deserialize<'a>,
     S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata,
     SP: ShMemProvider,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers, State = S>,
@@ -665,7 +665,7 @@ where
 impl<E, S, SP, Z> EventProcessor<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
-    E::Observers: Serialize + DeserializeOwned,
+    for<'a> E::Observers: Deserialize<'a>,
     S: UsesInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
@@ -679,7 +679,7 @@ where
 impl<E, S, SP, Z> EventManager<E, Z> for LlmpRestartingEventManager<S, SP>
 where
     E: HasObservers<State = S> + Executor<LlmpEventManager<S, SP>, Z>,
-    E::Observers: Serialize + DeserializeOwned,
+    for<'a> E::Observers: Deserialize<'a>,
     S: UsesInput + HasExecutions + HasClientPerfMonitor + HasMetadata + Serialize,
     SP: ShMemProvider + 'static,
     Z: EvaluatorObservers<E::Observers, State = S> + ExecutionProcessor<E::Observers>, //CE: CustomEvent<I>,
@@ -1021,7 +1021,7 @@ mod tests {
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4]);
+        let testcase = Testcase::new(vec![0; 4].into());
         corpus.add(testcase).unwrap();
 
         let solutions = InMemoryCorpus::<BytesInput>::new();
