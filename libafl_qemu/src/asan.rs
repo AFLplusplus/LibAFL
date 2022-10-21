@@ -1,4 +1,4 @@
-use std::{env, fs, sync::Mutex};
+use std::{collections::HashSet, env, fs, sync::Mutex};
 
 use libafl::{inputs::Input, state::HasMetadata};
 use libc::{
@@ -29,6 +29,9 @@ pub const SHADOW_OFFSET: isize = 0x7fff8000;
 pub const QASAN_FAKESYS_NR: i32 = 0xa2a4;
 
 pub const UNPOISON_PADDING: GuestAddr = 256; // To unpoison the redzone too, it may need to be increased
+
+pub const SHADOW_PAGE_SIZE: usize = 4096;
+pub const SHADOW_PAGE_MASK: GuestAddr = !(SHADOW_PAGE_SIZE as GuestAddr - 1);
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy)]
 #[repr(u64)]
@@ -84,12 +87,15 @@ pub type AsanErrorCallback = Box<dyn FnMut(&Emulator, AsanError)>;
 pub struct AsanGiovese {
     pub alloc_tree: Mutex<IntervalTree<GuestAddr, ()>>,
     pub error_callback: Option<AsanErrorCallback>,
+    pub dirty_shadow: HashSet<GuestAddr>,
+    pub snapshot_shadow: bool,
 }
 
 impl core::fmt::Debug for AsanGiovese {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AsanGiovese")
             .field("alloc_tree", &self.alloc_tree)
+            .field("dirty_shadow", &self.dirty_shadow)
             .finish()
     }
 }
@@ -218,10 +224,18 @@ impl AsanGiovese {
     }
 
     #[inline]
-    pub fn poison(emu: &Emulator, addr: GuestAddr, n: usize, poison_byte: i8) -> bool {
+    pub fn poison(&mut self, emu: &Emulator, addr: GuestAddr, n: usize, poison_byte: i8) -> bool {
         unsafe {
             if n == 0 {
                 return false;
+            }
+
+            if self.snapshot_shadow {
+                let mut page = addr & SHADOW_PAGE_MASK;
+                while page < addr + n as GuestAddr {
+                    self.dirty_shadow.insert(page);
+                    page += SHADOW_PAGE_SIZE as GuestAddr;
+                }
             }
 
             let n = n as isize;
@@ -269,17 +283,30 @@ impl AsanGiovese {
         }
     }
 
-    pub fn new() -> Self {
-        Self {
-            alloc_tree: Mutex::new(IntervalTree::new()),
-            error_callback: None,
+    #[inline]
+    fn unpoison_page(emu: &Emulator, page: GuestAddr) {
+        unsafe {
+            let h = emu.g2h::<*const c_void>(page) as isize;
+            let shadow_addr = ((h >> 3) as *mut i8).offset(SHADOW_OFFSET);
+            shadow_addr.write_bytes(0, SHADOW_PAGE_SIZE);
         }
     }
 
-    pub fn with_error_callback(error_callback: AsanErrorCallback) -> Self {
+    pub fn new(snapshot_shadow: bool) -> Self {
+        Self {
+            alloc_tree: Mutex::new(IntervalTree::new()),
+            error_callback: None,
+            dirty_shadow: HashSet::default(),
+            snapshot_shadow,
+        }
+    }
+
+    pub fn with_error_callback(snapshot_shadow: bool, error_callback: AsanErrorCallback) -> Self {
         Self {
             alloc_tree: Mutex::new(IntervalTree::new()),
             error_callback: Some(error_callback),
+            dirty_shadow: HashSet::default(),
+            snapshot_shadow,
         }
     }
 
@@ -315,7 +342,7 @@ impl AsanGiovese {
             .map(|entry| *entry.interval)
     }
 
-    pub fn alloc_clear(&mut self, emu: &Emulator, detect_leaks: bool) {
+    pub fn rollback(&mut self, emu: &Emulator, detect_leaks: bool) {
         let mut leaks = vec![];
 
         {
@@ -324,13 +351,19 @@ impl AsanGiovese {
                 if detect_leaks {
                     leaks.push(*entry.interval);
                 }
-                Self::unpoison(
-                    emu,
-                    entry.interval.start - UNPOISON_PADDING,
-                    (entry.interval.end - entry.interval.start + UNPOISON_PADDING) as usize,
-                );
             }
-            tree.delete(0..GuestAddr::MAX);
+
+            if self.snapshot_shadow {
+                tree.delete(0..GuestAddr::MAX);
+            }
+        }
+
+        if self.snapshot_shadow {
+            for page in &self.dirty_shadow {
+                Self::unpoison_page(emu, *page);
+            }
+
+            self.dirty_shadow.clear();
         }
 
         for interval in leaks {
@@ -396,7 +429,7 @@ pub type QemuAsanChildHelper = QemuAsanHelper;
 pub struct QemuAsanHelper {
     enabled: bool,
     pub detect_leaks: bool,
-    pub rollback: bool,
+    rollback: bool,
     rt: AsanGiovese,
     filter: QemuInstrumentationFilter,
 }
@@ -409,7 +442,7 @@ impl QemuAsanHelper {
             enabled: true,
             detect_leaks: false,
             rollback: true,
-            rt: AsanGiovese::new(),
+            rt: AsanGiovese::new(true),
             filter,
         }
     }
@@ -424,7 +457,7 @@ impl QemuAsanHelper {
             enabled: true,
             detect_leaks: false,
             rollback: true,
-            rt: AsanGiovese::with_error_callback(error_callback),
+            rt: AsanGiovese::with_error_callback(true, error_callback),
             filter,
         }
     }
@@ -544,7 +577,7 @@ impl QemuAsanHelper {
         size: usize,
         poison: PoisonKind,
     ) {
-        AsanGiovese::poison(emulator, addr, size, poison.into());
+        self.rt.poison(emulator, addr, size, poison.into());
     }
 
     #[allow(clippy::unused_self)]
@@ -554,7 +587,7 @@ impl QemuAsanHelper {
 
     pub fn reset(&mut self, emulator: &Emulator) {
         if self.rollback || self.detect_leaks {
-            self.rt.alloc_clear(emulator, self.detect_leaks);
+            self.rt.rollback(emulator, self.detect_leaks);
         }
     }
 }

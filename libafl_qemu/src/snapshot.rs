@@ -187,6 +187,7 @@ impl QemuSnapshotHelper {
     }
 
     pub fn access(&mut self, addr: GuestAddr, size: usize) {
+        // ASSUMPTION: the access can only cross 2 pages
         debug_assert!(size > 0);
         let page = addr & SNAPSHOT_PAGE_MASK;
         self.page_access(page);
