@@ -1,4 +1,4 @@
-use std::os::raw::c_char;
+
 
 #[cxx::bridge]
 pub mod common {
@@ -72,6 +72,11 @@ pub mod litecov {
         pub fn IsTargetAlive(self: Pin<&mut LiteCov>) -> bool;
         pub fn IsTargetFunctionDefined(self: Pin<&mut LiteCov>) -> bool;
         pub fn GetTargetReturnValue(self: Pin<&mut LiteCov>) -> u64;
+        pub unsafe fn get_coverage_map(
+            bitmap: *mut u8,
+            map_size: usize,
+            coverage: Pin<&mut Coverage>,
+        );
 
     }
 }

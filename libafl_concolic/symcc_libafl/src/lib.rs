@@ -27,11 +27,11 @@ mod clone {
         );
 
         let mut cmd = Command::new("git");
-        cmd.arg("clone").arg(url).arg(&path);
+        cmd.arg("clone").arg(url).arg(path);
         let output = cmd.output().expect("failed to execute git clone");
         if output.status.success() {
             let mut cmd = Command::new("git");
-            cmd.arg("checkout").arg(commit).current_dir(&path);
+            cmd.arg("checkout").arg(commit).current_dir(path);
             let output = cmd.output().expect("failed to execute git checkout");
             if !output.status.success() {
                 println!("failed to checkout symcc git repository commit:");

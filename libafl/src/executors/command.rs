@@ -593,7 +593,8 @@ impl CommandExecutorBuilder {
 
 /// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
 /// # Example
-/// ```
+#[cfg_attr(all(feature = "std", unix), doc = " ```")]
+#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}};
 /// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
 /// #[derive(Debug)]
@@ -621,7 +622,7 @@ impl CommandExecutorBuilder {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(all(feature = "std", unix))]
+#[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator: Sized + Debug {
     /// Spawns a new process with the given configuration.
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>

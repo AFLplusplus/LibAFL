@@ -1,7 +1,7 @@
 //! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 use alloc::vec::Vec;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use core::slice::from_raw_parts;
 use core::{
     mem::size_of,
@@ -105,7 +105,7 @@ impl Tokens {
     /// # Safety
     /// The caller must ensure that the region between `token_start` and `token_stop`
     /// is a valid region, containing autotokens in the exepcted format.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
         let mut ret = Self::default();
         if token_start.is_null() || token_stop.is_null() {
@@ -623,7 +623,7 @@ token1="A\x41A"
 token2="B"
         "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
-        let tokens = Tokens::from_file(&"test.tkns").unwrap();
+        let tokens = Tokens::from_file("test.tkns").unwrap();
         #[cfg(feature = "std")]
         println!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);

@@ -13,10 +13,15 @@ pub use ondisk::OnDiskCorpus;
 
 #[cfg(feature = "std")]
 pub mod cached;
-use core::cell::RefCell;
-
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
+
+#[cfg(feature = "cmin")]
+pub mod minimizer;
+use core::cell::RefCell;
+
+#[cfg(feature = "cmin")]
+pub use minimizer::*;
 
 use crate::{inputs::Input, Error};
 
@@ -36,8 +41,8 @@ where
     /// Add an entry to the corpus and return its index
     fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error>;
 
-    /// Replaces the testcase at the given idx
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error>;
+    /// Replaces the testcase at the given idx, returning the existing.
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
     fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error>;
@@ -177,7 +182,11 @@ pub mod pybind {
         }
 
         #[inline]
-        fn replace(&mut self, idx: usize, testcase: Testcase<BytesInput>) -> Result<(), Error> {
+        fn replace(
+            &mut self,
+            idx: usize,
+            testcase: Testcase<BytesInput>,
+        ) -> Result<Testcase<BytesInput>, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.replace(idx, testcase) })
         }
 

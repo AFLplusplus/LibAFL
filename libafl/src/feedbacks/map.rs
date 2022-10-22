@@ -4,6 +4,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[rustversion::nightly]
+use core::simd::SimdOrd;
 use core::{
     fmt::Debug,
     marker::PhantomData,
@@ -493,7 +495,7 @@ where
             let history = VectorType::from_slice(&history_map[i..]);
             let items = VectorType::from_slice(&map[i..]);
 
-            if items.max(history) != history {
+            if items.simd_max(history) != history {
                 interesting = true;
                 unsafe {
                     for j in i..(i + VectorType::LANES) {
@@ -626,6 +628,21 @@ where
             novelties: None,
             name: name.to_string(),
             observer_name: observer_name.to_string(),
+            stats_name: create_stats_name(name),
+            phantom: PhantomData,
+        }
+    }
+
+    /// Creating a new `MapFeedback` with a specific name. This is usefully whenever the same
+    /// feedback is needed twice, but with a different history. Using `new()` always results in the
+    /// same name and therefore also the same history.
+    #[must_use]
+    pub fn with_name(name: &'static str, map_observer: &O) -> Self {
+        Self {
+            indexes: None,
+            novelties: None,
+            name: name.to_string(),
+            observer_name: map_observer.name().to_string(),
             stats_name: create_stats_name(name),
             phantom: PhantomData,
         }

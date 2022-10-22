@@ -36,7 +36,12 @@ pub fn build() {
     // Else, we default to `x86_64` - having a default makes CI easier :)
     assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
 
-    let cpu_target = if cfg!(feature = "x86_64") {
+    // Make sure that we don't have BE set for any architecture other than arm
+    // Sure aarch64 may support BE, but its not in common usage and we don't
+    // need it yet and so haven't tested it
+    assert_unique_feature!("be", "aarch64", "i386", "i86_64");
+
+    let mut cpu_target = if cfg!(feature = "x86_64") {
         "x86_64".to_string()
     } else if cfg!(feature = "arm") {
         "arm".to_string()
@@ -63,6 +68,20 @@ pub fn build() {
 
     println!("cargo:rustc-cfg=cpu_target=\"{}\"", cpu_target);
 
+    // qemu-system-arm supports both big and little endian configurations and so
+    // therefore the "be" feature should ignored in this configuration. Also
+    // ignore the feature if we are running in clippy which enables all the
+    // features at once (disabling the check for mutually exclusive options)
+    // resulting in cpu_target being set to 'x86_64' above which obviously
+    // doesn't support BE.
+    if cfg!(feature = "be") && cfg!(feature = "arm") && cfg!(feature = "usermode") && !cfg!(feature = "clippy"){
+        // We have told rustc which CPU target to use above (it doesn't need
+        // to make any changes for endianness), however, we need QEMU to be
+        // built for the right endian-ness, so we update the cpu_target for
+        // here on down
+        cpu_target += "eb";
+    }
+
     if std::env::var("DOCS_RS").is_ok() {
         return; // only build when we're not generating docs
     }
@@ -85,9 +104,9 @@ pub fn build() {
     let qemu_path = if let Some(qemu_dir) = custum_qemu_dir.as_ref() {
         Path::new(&qemu_dir).to_path_buf()
     } else {
-        let qemu_path = out_dir_path.join(QEMU_DIRNAME);
+        let qemu_path = target_dir.join(QEMU_DIRNAME);
 
-        let qemu_rev = out_dir_path.join("QEMU_REVISION");
+        let qemu_rev = target_dir.join("QEMU_REVISION");
         if qemu_rev.exists()
             && fs::read_to_string(&qemu_rev).expect("Failed to read QEMU_REVISION") != QEMU_REVISION
         {
@@ -139,7 +158,11 @@ pub fn build() {
     #[cfg(not(feature = "usermode"))]
     let target_suffix = "softmmu";
 
-    let build_dir = qemu_path.join("build");
+    let build_dir = out_dir_path.join("build");
+    if !build_dir.is_dir() {
+        fs::create_dir_all(&build_dir).unwrap();
+    }
+
     #[cfg(feature = "usermode")]
     let output_lib = build_dir.join(&format!("libqemu-{}.so", cpu_target));
     #[cfg(not(feature = "usermode"))]
@@ -154,18 +177,20 @@ pub fn build() {
                 .arg("distclean")
                 .status(),
         );*/
+        let configure = qemu_path.join("configure");
+
         #[cfg(feature = "usermode")]
-        Command::new("./configure")
-            .current_dir(&qemu_path)
+        Command::new(configure)
+            .current_dir(&build_dir)
             //.arg("--as-static-lib")
             .arg("--as-shared-lib")
             .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
-            .args(&["--disable-blobs", "--disable-bsd-user", "--disable-fdt"])
+            .args(["--disable-blobs", "--disable-bsd-user", "--disable-fdt"])
             .status()
             .expect("Configure failed");
         #[cfg(not(feature = "usermode"))]
-        Command::new("./configure")
-            .current_dir(&qemu_path)
+        Command::new(configure)
+            .current_dir(&build_dir)
             //.arg("--as-static-lib")
             .arg("--as-shared-lib")
             .arg(&format!("--target-list={}-{}", cpu_target, target_suffix))
@@ -173,14 +198,14 @@ pub fn build() {
             .expect("Configure failed");
         if let Ok(j) = jobs {
             Command::new("make")
-                .current_dir(&qemu_path)
+                .current_dir(&build_dir)
                 .arg("-j")
                 .arg(&j)
                 .status()
                 .expect("Make failed");
         } else {
             Command::new("make")
-                .current_dir(&qemu_path)
+                .current_dir(&build_dir)
                 .arg("-j")
                 .status()
                 .expect("Make failed");
@@ -210,7 +235,7 @@ pub fn build() {
 
     #[cfg(feature = "usermode")]
     Command::new("ld")
-        .current_dir(&out_dir_path)
+        .current_dir(out_dir_path)
         .arg("-o")
         .arg("libqemu-partially-linked.o")
         .arg("-r")
@@ -284,7 +309,7 @@ pub fn build() {
         .expect("Partial linked failure");
 
     Command::new("ar")
-        .current_dir(&out_dir_path)
+        .current_dir(out_dir_path)
         .arg("crus")
         .arg("libqemu-partially-linked.a")
         .arg("libqemu-partially-linked.o")
@@ -354,11 +379,11 @@ pub fn build() {
     #[cfg(feature = "usermode")]
     {
         let qasan_dir = Path::new("libqasan");
-        let qasan_dir = fs::canonicalize(&qasan_dir).unwrap();
+        let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
         let src_dir = Path::new("src");
 
         assert!(Command::new("make")
-            .current_dir(&out_dir_path)
+            .current_dir(out_dir_path)
             .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)
             .arg("-C")
@@ -368,7 +393,7 @@ pub fn build() {
             .expect("make failed")
             .success());
         assert!(Command::new("make")
-            .current_dir(&out_dir_path)
+            .current_dir(out_dir_path)
             .env("CC", &cross_cc)
             .env("OUT_DIR", &target_dir)
             .arg("-C")

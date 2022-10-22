@@ -77,12 +77,6 @@ pub trait HasClientPerfMonitor {
 
     /// Mutatable ref to [`ClientPerfMonitor`]
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
-
-    /// This node's stability
-    fn stability(&self) -> &Option<f32>;
-
-    /// This node's stability (mutable)
-    fn stability_mut(&mut self) -> &mut Option<f32>;
 }
 
 /// Trait for elements offering metadata
@@ -181,9 +175,6 @@ where
     named_metadata: NamedSerdeAnyMap,
     /// MaxSize testcase size for mutators that appreciate it
     max_size: usize,
-    /// The stability of the current fuzzing process
-    stability: Option<f32>,
-
     /// Performance statistics for this fuzzer
     #[cfg(feature = "introspection")]
     introspection_monitor: ClientPerfMonitor,
@@ -436,7 +427,7 @@ where
                 manager,
                 in_dir,
                 forced,
-                &mut |_, _, path| I::from_file(&path),
+                &mut |_, _, path| I::from_file(path),
             )?;
         }
         manager.fire(
@@ -577,7 +568,6 @@ where
         let mut state = Self {
             rand,
             executions: 0,
-            stability: None,
             start_time: Duration::from_millis(0),
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
@@ -609,18 +599,6 @@ where
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         &mut self.introspection_monitor
     }
-
-    /// This node's stability
-    #[inline]
-    fn stability(&self) -> &Option<f32> {
-        &self.stability
-    }
-
-    /// This node's stability (mutable)
-    #[inline]
-    fn stability_mut(&mut self) -> &mut Option<f32> {
-        &mut self.stability
-    }
 }
 
 #[cfg(not(feature = "introspection"))]
@@ -637,18 +615,6 @@ where
 
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
         unimplemented!()
-    }
-
-    /// This node's stability
-    #[inline]
-    fn stability(&self) -> &Option<f32> {
-        &self.stability
-    }
-
-    /// This node's stability (mutable)
-    #[inline]
-    fn stability_mut(&mut self) -> &mut Option<f32> {
-        &mut self.stability
     }
 }
 
