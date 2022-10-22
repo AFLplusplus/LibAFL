@@ -1,25 +1,22 @@
 use core::marker::PhantomData;
-use core::pin::Pin;
+
 use std::{
     ffi::CString,
-    fs::{File, OpenOptions},
-    io::Write,
     os::raw::c_char,
 };
 
 use cxx::UniquePtr;
-use libafl::bolts::fs::INPUTFILE_STD;
+use libafl::bolts::fs::{InputFile, INPUTFILE_STD};
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,
     prelude::AsSlice,
-    state::State,
     Error,
 };
-use std::str;
 
-use crate::tinyinst::litecov::{self, get_coverage_map, Coverage, DebuggerStatus, LiteCov};
+
+use crate::tinyinst::litecov::{get_coverage_map, Coverage, DebuggerStatus, LiteCov};
 
 pub struct TinyInstExecutor<I, OT, S>
 where
@@ -38,6 +35,8 @@ where
     phantom: PhantomData<(I, S, OT)>,
     bitmap: *mut u8,
     map_size: usize,
+    cur_input: InputFile,
+    use_stdin: bool,
 }
 
 impl<I, OT, S> std::fmt::Debug for TinyInstExecutor<I, OT, S>
@@ -75,12 +74,12 @@ where
         }
         argv.push(core::ptr::null_mut());
 
-        let mut cur_file = File::create(".cur_input").expect("Unable to create file");
-        cur_file.write_all(input.target_bytes().as_slice())?;
-        cur_file.flush()?;
-        // cur_file.write_all(b"bad12")?;
+        if !self.use_stdin {
+            self.cur_input.write_buf(input.target_bytes().as_slice())?;
+        }
 
         unsafe {
+            self.instrumentation_ptr.pin_mut().Kill();
             status = self.instrumentation_ptr.pin_mut().Run(
                 self.argc as i32,
                 argv.as_mut_ptr(),
@@ -123,10 +122,22 @@ where
 
         // Convert args into c string vector
         let argc = args.len();
+        let mut use_stdin = true;
+
         let argv_vec_cstr: Vec<CString> = args
             .iter()
-            .map(|arg| CString::new(arg.as_str()).unwrap())
+            .map(|arg| {
+                if arg == "@@" {
+                    println!("Not using stdin");
+                    use_stdin = false;
+                    CString::new(INPUTFILE_STD).unwrap()
+                } else {
+                    CString::new(arg.as_str()).unwrap()
+                }
+            })
             .collect();
+
+        let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
         let mut argv: Vec<*mut c_char> = Vec::with_capacity(argc + 1);
         for arg in &argv_vec_cstr {
             argv.push(arg.as_ptr() as *mut c_char);
@@ -167,6 +178,8 @@ where
             phantom: PhantomData,
             bitmap,
             map_size,
+            cur_input,
+            use_stdin,
         }
     }
 }
