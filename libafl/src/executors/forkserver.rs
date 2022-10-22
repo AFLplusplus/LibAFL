@@ -172,6 +172,7 @@ pub struct Forkserver {
 
 impl Forkserver {
     /// Create a new [`Forkserver`]
+    #[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)]
     pub fn new(
         target: OsString,
         args: Vec<OsString>,
