@@ -170,9 +170,10 @@ pub struct Forkserver {
     last_run_timed_out: i32,
 }
 
+#[allow(clippy::fn_params_excessive_bools)]
 impl Forkserver {
     /// Create a new [`Forkserver`]
-    #[allow(clippy::fn_params_excessive_bools, clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         target: OsString,
         args: Vec<OsString>,
@@ -560,6 +561,7 @@ where
 
 /// The builder for `ForkserverExecutor`
 #[derive(Debug)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct ForkserverExecutorBuilder<'a, SP> {
     program: Option<OsString>,
     arguments: Vec<OsString>,
