@@ -1,0 +1,3 @@
+[tasks.build_test]
+command = "cl"
+args = ["./test/test.c", "-o", "./test/test.exe"]

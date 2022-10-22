@@ -17,6 +17,7 @@ vendor
 *.dll
 *.exe
 *.dSYM
+*.obj
 
 .cur_input
 .venv
