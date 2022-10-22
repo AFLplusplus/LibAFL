@@ -1,10 +1,9 @@
 use core::marker::PhantomData;
-
 use std::{ffi::CString, os::raw::c_char};
 
 use cxx::UniquePtr;
-use libafl::bolts::fs::{InputFile, INPUTFILE_STD};
 use libafl::{
+    bolts::fs::{InputFile, INPUTFILE_STD},
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     observers::ObserversTuple,

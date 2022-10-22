@@ -1,5 +1,3 @@
-
-
 #[cxx::bridge]
 pub mod common {
     // C++ types and signatures exposed to Rust.
