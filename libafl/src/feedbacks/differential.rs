@@ -140,7 +140,6 @@ where
         fn err(name: &str) -> Error {
             Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))
         }
-
         let o1: &O1 = observers
             .match_name(&self.o1_name)
             .ok_or_else(|| err(&self.o1_name))?;
@@ -148,7 +147,7 @@ where
             .match_name(&self.o2_name)
             .ok_or_else(|| err(&self.o2_name))?;
 
-        Ok(o1 != o2)
+        Ok((self.compare_fn)(o1, o2) == DiffResult::Diff)
     }
 }
 

@@ -4,11 +4,13 @@
 
 use alloc::string::String;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{bolts::tuples::Named, observers::Observer};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct StdOutObserver {
     /// The name of the observer.
     pub name: String,
