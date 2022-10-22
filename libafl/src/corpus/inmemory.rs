@@ -43,7 +43,7 @@ where
     #[inline]
     fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
+            return Err(Error::key_not_found(format!("Index {idx} out of bounds")));
         }
         Ok(self.entries[idx].replace(testcase))
     }
@@ -104,6 +104,7 @@ pub mod pybind {
     };
 
     #[pyclass(unsendable, name = "InMemoryCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for InMemoryCorpus
     pub struct PythonInMemoryCorpus {

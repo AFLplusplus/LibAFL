@@ -1,10 +1,13 @@
 //! A `QEMU`-based executor for binary-only instrumentation in `LibAFL`
 use core::fmt::{self, Debug, Formatter};
 
+#[cfg(feature = "fork")]
+use libafl::bolts::shmem::ShMemProvider;
+#[cfg(feature = "fork")]
+use libafl::executors::InProcessForkExecutor;
 use libafl::{
-    bolts::shmem::ShMemProvider,
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor, InProcessForkExecutor},
+    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::Input,
@@ -130,6 +133,7 @@ where
     }
 }
 
+#[cfg(feature = "fork")]
 pub struct QemuForkExecutor<'a, H, I, OT, QT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
@@ -142,6 +146,7 @@ where
     inner: InProcessForkExecutor<'a, H, I, OT, S, SP>,
 }
 
+#[cfg(feature = "fork")]
 impl<'a, H, I, OT, QT, S, SP> Debug for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
@@ -158,6 +163,7 @@ where
     }
 }
 
+#[cfg(feature = "fork")]
 impl<'a, H, I, OT, QT, S, SP> QemuForkExecutor<'a, H, I, OT, QT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,
@@ -217,6 +223,7 @@ where
     }
 }
 
+#[cfg(feature = "fork")]
 impl<'a, EM, H, I, OT, QT, S, Z, SP> Executor<EM, I, S, Z>
     for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
 where
@@ -241,6 +248,7 @@ where
     }
 }
 
+#[cfg(feature = "fork")]
 impl<'a, H, I, OT, QT, S, SP> HasObservers<I, OT, S> for QemuForkExecutor<'a, H, I, OT, QT, S, SP>
 where
     H: FnMut(&I) -> ExitKind,

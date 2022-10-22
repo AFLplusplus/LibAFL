@@ -41,13 +41,13 @@ where
     }
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
-        let sender = format!("#{}", sender_id);
+        let sender = format!("#{sender_id}");
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {
             String::new()
         };
-        let head = format!("{}{} {}", event_msg, pad, sender);
+        let head = format!("{event_msg}{pad} {sender}");
         let global_fmt = format!(
             "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
@@ -70,7 +70,7 @@ where
             pad, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {
-            write!(fmt, ", {}: {}", key, val).unwrap();
+            write!(fmt, ", {key}: {val}").unwrap();
         }
         (self.print_fn)(fmt);
 

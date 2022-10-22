@@ -62,7 +62,9 @@ pub use asan::{init_with_asan, QemuAsanHelper};
 pub mod calls;
 
 pub mod executor;
-pub use executor::{QemuExecutor, QemuForkExecutor};
+pub use executor::QemuExecutor;
+#[cfg(feature = "fork")]
+pub use executor::QemuForkExecutor;
 
 pub mod emu;
 pub use emu::*;
@@ -95,14 +97,14 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     let regsm = PyModule::new(py, "regs")?;
     for r in Regs::iter() {
         let v: i32 = r.into();
-        regsm.add(&format!("{:?}", r), v)?;
+        regsm.add(&format!("{r:?}"), v)?;
     }
     m.add_submodule(regsm)?;
 
     let mmapm = PyModule::new(py, "mmap")?;
     for r in emu::MmapPerms::iter() {
         let v: i32 = r.into();
-        mmapm.add(&format!("{:?}", r), v)?;
+        mmapm.add(&format!("{r:?}"), v)?;
     }
     m.add_submodule(mmapm)?;
 

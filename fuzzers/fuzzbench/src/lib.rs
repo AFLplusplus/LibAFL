@@ -71,22 +71,19 @@ pub fn libafl_main() {
             Arg::new("out")
                 .short('o')
                 .long("output")
-                .help("The directory to place finds in ('corpus')")
-                .takes_value(true),
+                .help("The directory to place finds in ('corpus')"),
         )
         .arg(
             Arg::new("in")
                 .short('i')
                 .long("input")
-                .help("The directory to read initial inputs from ('seeds')")
-                .takes_value(true),
+                .help("The directory to read initial inputs from ('seeds')"),
         )
         .arg(
             Arg::new("tokens")
                 .short('x')
                 .long("tokens")
-                .help("A file to read tokens from, to be used during fuzzing")
-                .takes_value(true),
+                .help("A file to read tokens from, to be used during fuzzing"),
         )
         .arg(
             Arg::new("logfile")
@@ -102,7 +99,7 @@ pub fn libafl_main() {
                 .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
         )
-        .arg(Arg::new("remaining").multiple_values(true))
+        .arg(Arg::new("remaining"))
         .try_get_matches()
     {
         Ok(res) => res,
@@ -123,8 +120,8 @@ pub fn libafl_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    if let Some(filenames) = res.values_of("remaining") {
-        let filenames: Vec<&str> = filenames.collect();
+    if let Some(filenames) = res.get_many::<String>("remaining") {
+        let filenames: Vec<&str> = filenames.map(|v| v.as_str()).collect();
         if !filenames.is_empty() {
             run_testcases(&filenames);
             return;
@@ -133,7 +130,7 @@ pub fn libafl_main() {
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
     let mut out_dir = PathBuf::from(
-        res.value_of("out")
+        res.get_one::<String>("out")
             .expect("The --output parameter is missing")
             .to_string(),
     );
@@ -149,7 +146,7 @@ pub fn libafl_main() {
     out_dir.push("queue");
 
     let in_dir = PathBuf::from(
-        res.value_of("in")
+        res.get_one::<String>("in")
             .expect("The --input parameter is missing")
             .to_string(),
     );
@@ -158,14 +155,13 @@ pub fn libafl_main() {
         return;
     }
 
-    let tokens = res.value_of("tokens").map(PathBuf::from);
+    let tokens = res.get_one::<String>("tokens").map(PathBuf::from);
 
-    let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
+    let logfile = PathBuf::from(res.get_one::<String>("logfile").unwrap());
 
     let timeout = Duration::from_millis(
-        res.value_of("timeout")
+        res.get_one::<String>("timeout")
             .unwrap()
-            .to_string()
             .parse()
             .expect("Could not parse timeout in milliseconds"),
     );

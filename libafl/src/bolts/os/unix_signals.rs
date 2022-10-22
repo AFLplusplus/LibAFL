@@ -417,10 +417,10 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
         if sigaction(sig as i32, addr_of_mut!(sa), ptr::null_mut()) < 0 {
             #[cfg(feature = "std")]
             {
-                let err_str = CString::new(format!("Failed to setup {} handler", sig)).unwrap();
+                let err_str = CString::new(format!("Failed to setup {sig} handler")).unwrap();
                 libc::perror(err_str.as_ptr());
             }
-            return Err(Error::unknown(format!("Could not set up {} handler", sig)));
+            return Err(Error::unknown(format!("Could not set up {sig} handler")));
         }
     }
     compiler_fence(Ordering::SeqCst);

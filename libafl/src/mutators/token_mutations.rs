@@ -171,16 +171,16 @@ impl Tokens {
             }
             let pos_quote = match line.find('\"') {
                 Some(x) => x,
-                None => return Err(Error::illegal_argument(format!("Illegal line: {}", line))),
+                None => return Err(Error::illegal_argument(format!("Illegal line: {line}"))),
             };
             if line.chars().nth(line.len() - 1) != Some('"') {
-                return Err(Error::illegal_argument(format!("Illegal line: {}", line)));
+                return Err(Error::illegal_argument(format!("Illegal line: {line}")));
             }
 
             // extract item
             let item = match line.get(pos_quote + 1..line.len() - 1) {
                 Some(x) => x,
-                None => return Err(Error::illegal_argument(format!("Illegal line: {}", line))),
+                None => return Err(Error::illegal_argument(format!("Illegal line: {line}"))),
             };
             if item.is_empty() {
                 continue;
@@ -567,6 +567,7 @@ where
                     while size != 0 {
                         if v.0[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.1, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -575,6 +576,7 @@ where
                     while size != 0 {
                         if v.1[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.0, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -582,8 +584,6 @@ where
                 }
             }
         }
-
-        //println!("{:?}", result);
 
         Ok(result)
     }

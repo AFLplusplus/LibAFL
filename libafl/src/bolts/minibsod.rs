@@ -442,7 +442,7 @@ pub fn generate_minibsod<W: Write>(
 
         match std::fs::read_to_string("/proc/self/maps") {
             Ok(maps) => writer.write_all(maps.as_bytes())?,
-            Err(e) => writeln!(writer, "Couldn't load mappings: {:?}", e)?,
+            Err(e) => writeln!(writer, "Couldn't load mappings: {e:?}")?,
         };
     }
 

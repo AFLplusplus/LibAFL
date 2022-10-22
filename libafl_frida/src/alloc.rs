@@ -169,7 +169,7 @@ impl Allocator {
                 for (start, end) in &occupied_ranges {
                     if (shadow_start <= *end) && (*start <= shadow_end) {
                         // println!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
-                        println!("shadow_bit {:x} is not suitable", try_shadow_bit);
+                        println!("shadow_bit {try_shadow_bit:x} is not suitable");
                         break;
                     }
                 }
@@ -195,7 +195,7 @@ impl Allocator {
             }
         }
 
-        println!("shadow_bit {:x} is suitable", shadow_bit);
+        println!("shadow_bit {shadow_bit:x} is suitable");
         assert!(shadow_bit != 0);
         // attempt to pre-map the entire shadow-memory space
 
@@ -275,7 +275,7 @@ impl Allocator {
         if size > self.options.max_allocation {
             #[allow(clippy::manual_assert)]
             if self.options.max_allocation_panics {
-                panic!("ASAN: Allocation is too large: 0x{:x}", size);
+                panic!("ASAN: Allocation is too large: 0x{size:x}");
             }
 
             return std::ptr::null_mut();
@@ -310,7 +310,7 @@ impl Allocator {
             ) {
                 Ok(mapping) => mapping as usize,
                 Err(err) => {
-                    println!("An error occurred while mapping memory: {:?}", err);
+                    println!("An error occurred while mapping memory: {err:?}");
                     return std::ptr::null_mut();
                 }
             };

@@ -76,7 +76,7 @@ where
     #[inline]
     fn replace(&mut self, idx: usize, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
+            return Err(Error::key_not_found(format!("Index {idx} out of bounds")));
         }
         self.save_testcase(&mut testcase)?;
         let previous = self.entries[idx].replace(testcase);
@@ -94,62 +94,15 @@ where
             self.remove_testcase(&prev)?;
             Ok(Some(prev))
         }
-    }
-
-    /// Get by id
-    #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
-        Ok(&self.entries[idx])
-    }
-
-    /// Current testcase scheduled
-    #[inline]
-    fn current(&self) -> &Option<usize> {
-        &self.current
-    }
-
-    /// Current testcase scheduled (mutable)
-    #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
-        &mut self.current
-    }
-}
-
-impl<I> OnDiskCorpus<I>
-where
-    I: Input,
-{
-    /// Creates the [`OnDiskCorpus`].
-    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
-    pub fn new<P>(dir_path: P) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-    {
-        fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
-            fs::create_dir_all(&dir_path)?;
-            Ok(OnDiskCorpus {
-                entries: vec![],
-                current: None,
-                dir_path,
-                meta_format: None,
-            })
+        if self.meta_format.is_some() {
+            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
+            filename.set_file_name(format!(
+                ".{}.metadata",
+                filename.file_name().unwrap().to_string_lossy()
+            ));
+            fs::remove_file(filename)?;
         }
-        new(dir_path.as_ref().to_path_buf())
-    }
-
-    /// Creates the [`OnDiskCorpus`] specifying the type of `Metadata` to be saved to disk.
-    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
-    pub fn new_save_meta(
-        dir_path: PathBuf,
-        meta_format: Option<OnDiskMetadataFormat>,
-    ) -> Result<Self, Error> {
-        fs::create_dir_all(&dir_path)?;
-        Ok(Self {
-            entries: vec![],
-            current: None,
-            dir_path,
-            meta_format,
-        })
+        Ok(())
     }
 
     fn save_testcase(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
@@ -164,7 +117,7 @@ where
 
             let mut ctr = 2;
             let filename = loop {
-                let lockfile = format!(".{}.lafl_lock", file);
+                let lockfile = format!(".{file}.lafl_lock");
                 // try to create lockfile.
 
                 if OpenOptions::new()
@@ -176,7 +129,7 @@ where
                     break self.dir_path.join(file);
                 }
 
-                file = format!("{}-{}", &file_orig, ctr);
+                file = format!("{}-{ctr}", &file_orig);
                 ctr += 1;
             };
 
@@ -247,6 +200,7 @@ pub mod pybind {
     };
 
     #[pyclass(unsendable, name = "OnDiskCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for OnDiskCorpus
     pub struct PythonOnDiskCorpus {

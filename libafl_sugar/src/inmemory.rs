@@ -137,7 +137,7 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| println!("{}", s));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         let mut run_client = |state: Option<_>,
                               mut mgr: LlmpRestartingEventManager<_, _, _, _>,
@@ -348,7 +348,7 @@ where
         match launcher.build().launch() {
             Ok(()) => (),
             Err(Error::ShuttingDown) => println!("\nFuzzing stopped by user. Good Bye."),
-            Err(err) => panic!("Fuzzingg failed {:?}", err),
+            Err(err) => panic!("Fuzzingg failed {err:?}"),
         }
     }
 }
