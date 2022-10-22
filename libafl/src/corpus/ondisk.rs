@@ -94,15 +94,62 @@ where
             self.remove_testcase(&prev)?;
             Ok(Some(prev))
         }
-        if self.meta_format.is_some() {
-            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
-            filename.set_file_name(format!(
-                ".{}.metadata",
-                filename.file_name().unwrap().to_string_lossy()
-            ));
-            fs::remove_file(filename)?;
+    }
+
+    /// Get by id
+    #[inline]
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+        Ok(&self.entries[idx])
+    }
+
+    /// Current testcase scheduled
+    #[inline]
+    fn current(&self) -> &Option<usize> {
+        &self.current
+    }
+
+    /// Current testcase scheduled (mutable)
+    #[inline]
+    fn current_mut(&mut self) -> &mut Option<usize> {
+        &mut self.current
+    }
+}
+
+impl<I> OnDiskCorpus<I>
+where
+    I: Input,
+{
+    /// Creates the [`OnDiskCorpus`].
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn new<P>(dir_path: P) -> Result<Self, Error>
+    where
+        P: AsRef<Path>,
+    {
+        fn new<I: Input>(dir_path: PathBuf) -> Result<OnDiskCorpus<I>, Error> {
+            fs::create_dir_all(&dir_path)?;
+            Ok(OnDiskCorpus {
+                entries: vec![],
+                current: None,
+                dir_path,
+                meta_format: None,
+            })
         }
-        Ok(())
+        new(dir_path.as_ref().to_path_buf())
+    }
+
+    /// Creates the [`OnDiskCorpus`] specifying the type of `Metadata` to be saved to disk.
+    /// Will error, if [`std::fs::create_dir_all()`] failed for `dir_path`.
+    pub fn new_save_meta(
+        dir_path: PathBuf,
+        meta_format: Option<OnDiskMetadataFormat>,
+    ) -> Result<Self, Error> {
+        fs::create_dir_all(&dir_path)?;
+        Ok(Self {
+            entries: vec![],
+            current: None,
+            dir_path,
+            meta_format,
+        })
     }
 
     fn save_testcase(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
