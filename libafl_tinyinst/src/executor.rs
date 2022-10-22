@@ -1,9 +1,6 @@
 use core::marker::PhantomData;
 
-use std::{
-    ffi::CString,
-    os::raw::c_char,
-};
+use std::{ffi::CString, os::raw::c_char};
 
 use cxx::UniquePtr;
 use libafl::bolts::fs::{InputFile, INPUTFILE_STD};
@@ -15,7 +12,6 @@ use libafl::{
     Error,
 };
 
-
 use crate::tinyinst::litecov::{get_coverage_map, Coverage, DebuggerStatus, LiteCov};
 
 pub struct TinyInstExecutor<I, OT, S>
@@ -24,12 +20,8 @@ where
 {
     instrumentation_ptr: UniquePtr<LiteCov>,
     coverage_ptr: UniquePtr<Coverage>,
-    newcoverage_ptr: UniquePtr<Coverage>,
     argc: usize,
-    // argv: Vec<*mut c_char>,
     argv: Vec<CString>,
-    tinyinst_argc: usize,
-    tinyinst_argv: Vec<*mut c_char>,
     timeout: u32,
     observers: OT,
     phantom: PhantomData<(I, S, OT)>,
@@ -65,8 +57,6 @@ where
         _mgr: &mut EM,
         input: &I,
     ) -> Result<ExitKind, Error> {
-        let mut status: DebuggerStatus = DebuggerStatus::DEBUGGER_NONE;
-
         let mut argv: Vec<*mut c_char> = Vec::with_capacity(self.argc + 1);
 
         for arg in &self.argv {
@@ -78,6 +68,8 @@ where
             self.cur_input.write_buf(input.target_bytes().as_slice())?;
         }
 
+        #[allow(unused_assignments)]
+        let mut status = DebuggerStatus::DEBUGGER_NONE;
         unsafe {
             self.instrumentation_ptr.pin_mut().Kill();
             status = self.instrumentation_ptr.pin_mut().Run(
@@ -163,16 +155,12 @@ where
         println!("post init");
 
         let coverage_ptr = Coverage::new();
-        let newcoverage_ptr = Coverage::new();
 
         Self {
             instrumentation_ptr,
             coverage_ptr,
-            newcoverage_ptr,
             argc,
             argv: argv_vec_cstr,
-            tinyinst_argc,
-            tinyinst_argv,
             timeout,
             observers,
             phantom: PhantomData,

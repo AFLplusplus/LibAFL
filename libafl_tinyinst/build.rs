@@ -17,6 +17,18 @@ fn main() {
 
     println!("cargo:warning=Generating Bridge files.");
 
+    // Get tinyinst from git
+    Command::new("git")
+        .args(&[
+            "submodule",
+            "update",
+            "--init",
+            "--recursive",
+            ".\\TinyInst",
+        ])
+        .status()
+        .unwrap();
+
     // source
     Command::new("cxxbridge")
         .args(&["src/tinyinst.rs", "-o"])
