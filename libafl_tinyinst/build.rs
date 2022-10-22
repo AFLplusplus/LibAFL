@@ -24,6 +24,7 @@ fn main() {
             "update",
             "--init",
             "--recursive",
+            "--remote",
             ".\\TinyInst",
         ])
         .status()
