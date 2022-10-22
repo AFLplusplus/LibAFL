@@ -1,6 +1,5 @@
 use std::{
     env,
-    path::Path,
     process::{exit, Command},
 };
 

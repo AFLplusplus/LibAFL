@@ -20,8 +20,8 @@ use libafl::{
 
 use libafl_tinyinst::executor::TinyInstExecutor;
 
-/// Coverage map with explicit assignments due to the lack of instrumentation
-static mut SIGNALS: [u8; 8 * 1024 * 1024] = [0; 8 * 1024 * 1024];
+const MAP_SIZE: usize = 8 * 1024 * 1024;
+static mut SIGNALS: [u8; MAP_SIZE] = [0; MAP_SIZE];
 
 fn main() {
     // Tinyinst things
@@ -32,12 +32,11 @@ fn main() {
         "coverage.txt".to_string(),
     ];
 
-    // let args = vec![".\\test\\test.exe".to_string(), "cur_file".to_string()];
-    let args = vec![".\\test\\test.exe".to_string(), "cur_file".to_string()];
+    let args = vec![".\\test\\test.exe".to_string(), ".cur_input".to_string()];
     let observer =
         unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
 
-    let input = BytesInput::new(b"bad12".to_vec());
+    let input = BytesInput::new(b"bad".to_vec());
     let rand = StdRand::new();
     let mut corpus = CachedOnDiskCorpus::new(PathBuf::from("./corpus_discovered"), 64).unwrap();
     corpus

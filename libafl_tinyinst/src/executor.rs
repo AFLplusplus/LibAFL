@@ -8,6 +8,7 @@ use std::{
 };
 
 use cxx::UniquePtr;
+use libafl::bolts::fs::INPUTFILE_STD;
 use libafl::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
@@ -74,7 +75,7 @@ where
         }
         argv.push(core::ptr::null_mut());
 
-        let mut cur_file = File::create("cur_file").expect("Unable to create file");
+        let mut cur_file = File::create(".cur_input").expect("Unable to create file");
         cur_file.write_all(input.target_bytes().as_slice())?;
         cur_file.flush()?;
         // cur_file.write_all(b"bad12")?;
