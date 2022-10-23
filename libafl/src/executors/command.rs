@@ -27,10 +27,7 @@ use crate::{
         AsSlice,
     },
     inputs::HasTargetBytes,
-    observers::{
-        stdio::{ObservesOutput, ObservesStdErr, ObservesStdOut},
-        Observer, ObserversTuple,
-    },
+    observers::ObserversTuple,
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
@@ -69,134 +66,6 @@ fn clone_command(cmd: &Command) -> Command {
         new_cmd.current_dir(cwd);
     }
     new_cmd
-}
-
-/// Trait for a type that implements all building blocks for stdout and stderr output observation
-pub trait OutputObserversList {
-    /// Returns true if a `stdout` observer was added to the list
-    fn has_stdout(&self) -> bool;
-    /// Returns true if a `stderr` observer was added to the list
-    fn has_stderr(&self) -> bool;
-
-    /// Runs observe_stdout for all stdout observers in the list
-    fn observe_stdout<OT: MatchName>(&self, observers: &mut OT, stdout: &str);
-    /// Runs observe_stderr for all stderr observers in the list
-    fn observe_stderr<OT: MatchName>(&self, observers: &mut OT, stderr: &str);
-}
-
-impl OutputObserversList for () {
-    fn has_stdout(&self) -> bool {
-        false
-    }
-    /// Indicates if this type contains a `stderr`
-    fn has_stderr(&self) -> bool {
-        false
-    }
-
-    fn observe_stdout<OT: MatchName>(&self, _observers: &mut OT, _stdout: &str) {}
-
-    fn observe_stderr<OT: MatchName>(&self, _observers: &mut OT, _stderr: &str) {}
-}
-
-/// The names of the executors the [`CommandExecutor`] should fill during execution
-/// Used together with [`CommandExecutor::into_executor_output_observing`
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct OutputObservers<I, O, S, T>
-where
-    O: Observer<I, S>,
-    T: OutputObserversList,
-{
-    /// if the observer is for `stdout`: `false`, if for `stderr`: true
-    is_stderr: bool,
-    name: String,
-    tail: T,
-    phantom: PhantomData<(I, O, S)>,
-}
-
-impl<I, O, S, T> OutputObservers<I, O, S, T>
-where
-    O: Observer<I, S> + ObservesOutput,
-    T: OutputObserversList,
-{
-    /// Adds an observer for `stdout` to the active observers
-    pub fn stdout(observer: &O) -> OutputObservers<I, O, S, ()> {
-        OutputObservers {
-            is_stderr: false,
-            name: observer.name().into(),
-            tail: (),
-            phantom: PhantomData,
-        }
-    }
-
-    /// Adds an observer for `stdout` to the active observers
-    pub fn add_stdout<O2>(self, observer: &O2) -> OutputObservers<I, O2, S, Self>
-    where
-        O2: Observer<I, S> + ObservesOutput + ObservesStdOut,
-    {
-        OutputObservers {
-            is_stderr: false,
-            name: observer.name().into(),
-            tail: self,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Adds an observer for `stdout` to the active observers
-    pub fn stderr(observer: &O) -> OutputObservers<I, O, S, ()> {
-        OutputObservers {
-            is_stderr: false,
-            name: observer.name().into(),
-            tail: (),
-            phantom: PhantomData,
-        }
-    }
-
-    /// Adds an observer for `stdout` to the active observers
-    pub fn add_stderr<O2>(self, observer: &O2) -> OutputObservers<I, O2, S, Self>
-    where
-        O2: Observer<I, S> + ObservesOutput + ObservesStdErr,
-    {
-        OutputObservers {
-            is_stderr: false,
-            name: observer.name().into(),
-            tail: self,
-            phantom: PhantomData,
-        }
-    }
-}
-
-impl<I, O, S, T> OutputObserversList for OutputObservers<I, O, S, T>
-where
-    O: Observer<I, S> + ObservesOutput,
-    T: OutputObserversList,
-{
-    fn has_stdout(&self) -> bool {
-        !self.is_stderr || self.tail.has_stdout()
-    }
-
-    fn has_stderr(&self) -> bool {
-        self.is_stderr || self.tail.has_stdout()
-    }
-
-    fn observe_stdout<OT: MatchName>(&self, observers: &mut OT, stdout: &str) {
-        if !self.is_stderr {
-            observers
-                .match_name_mut::<O>(&self.name)
-                .unwrap()
-                .observe_stdout(&stdout);
-        }
-        self.tail.observe_stdout(observers, stdout)
-    }
-
-    fn observe_stderr<OT: MatchName>(&self, observers: &mut OT, stderr: &str) {
-        if self.is_stderr {
-            observers
-                .match_name_mut::<O>(&self.name)
-                .unwrap()
-                .observe_stdout(&stderr);
-        }
-        self.tail.observe_stdout(observers, stderr)
-    }
 }
 
 /// A simple Configurator that takes the most common parameters
@@ -279,9 +148,9 @@ impl CommandConfigurator for StdCommandConfigurator {
 }
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
-/// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] (or [`CommandConfigurator::into_executor_output_observing`]) on it on it.
+/// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can also use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<EM, I, OL, OT, S, T, Z>
+pub struct CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
@@ -290,13 +159,10 @@ where
     configurer: T,
     /// The obsevers used by this executor
     observers: OT,
-    /// A list of the observers (that should be present in observers)
-    /// that will process output
-    output_observers: OL,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
-impl CommandExecutor<(), (), (), (), (), (), ()> {
+impl CommandExecutor<(), (), (), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -315,11 +181,10 @@ impl CommandExecutor<(), (), (), (), (), (), ()> {
     }
 }
 
-impl<EM, I, OL, OT, S, T, Z> Debug for CommandExecutor<EM, I, OL, OT, S, T, Z>
+impl<EM, I, OT, S, T, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
-    OL: OutputObserversList,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("CommandExecutor")
@@ -329,10 +194,9 @@ where
     }
 }
 
-impl<EM, I, OL, OT, S, T, Z> CommandExecutor<EM, I, OL, OT, S, T, Z>
+impl<EM, I, OT, S, T, Z> CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
-    OL: OutputObserversList,
     OT: Debug,
 {
     /// Accesses the inner value
@@ -341,19 +205,17 @@ where
     }
 }
 
-impl<EM, I, OL, OT, S, Z> CommandExecutor<EM, I, OL, OT, S, StdCommandConfigurator, Z>
+impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>
 where
-    OL: OutputObserversList,
-    OT: MatchName + Debug,
+    OT: MatchName + Debug + ObserversTuple<I, S>,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
-    pub fn from_cmd_with_file_output_observing<P>(
+    pub fn from_cmd_with_file<P>(
         cmd: &Command,
         debug_child: bool,
-        observers: OT,
+        mut observers: OT,
         path: P,
-        output_observers: OL,
     ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -365,10 +227,12 @@ where
         }
         command.stdin(Stdio::null());
 
-        if output_observers.has_stdout() {
+        let has_stdout_observer = observers.observes_stdout();
+        if has_stdout_observer {
             command.stdout(Stdio::piped());
         }
-        if output_observers.has_stderr() {
+        let has_stderr_observer = observers.observes_stderr();
+        if has_stderr_observer {
             command.stderr(Stdio::piped());
         }
 
@@ -380,27 +244,24 @@ where
                 },
                 command,
                 debug_child,
-                has_stdout_observer: output_observers.has_stdout(),
-                has_stderr_observer: output_observers.has_stderr(),
+                has_stdout_observer,
+                has_stderr_observer,
             },
-            output_observers,
             phantom: PhantomData,
         })
     }
 
-    /// Parses an AFL-like comandline, replacing `@@` with the input file.
+    /// Parses an AFL-like commandline, replacing `@@` with the input file.
     /// If no `@@` was found, will use stdin for input.
     /// The arg 0 is the program.
-    pub fn parse_afl_cmdline_output_observing<IT, O>(
+    pub fn parse_afl_cmdline<IT, O>(
         args: IT,
         observers: OT,
         debug_child: bool,
-        output_observers: OL,
     ) -> Result<Self, Error>
     where
         IT: IntoIterator<Item = O>,
         O: AsRef<OsStr>,
-        OL: OutputObserversList,
     {
         let mut atat_at = None;
         let mut builder = CommandExecutorBuilder::new();
@@ -428,52 +289,17 @@ where
             }
         }
 
-        builder.build_output_observing(observers, output_observers)
-    }
-}
-
-impl<EM, I, OT, S, Z> CommandExecutor<EM, I, (), OT, S, StdCommandConfigurator, Z>
-where
-    OT: MatchName + Debug,
-{
-    /// Parses an AFL-like comandline, replacing `@@` with the input file.
-    /// If no `@@` was found, will use stdin for input.
-    /// The arg 0 is the program.
-    pub fn parse_afl_cmdline<IT, O>(
-        args: IT,
-        observers: OT,
-        debug_child: bool,
-    ) -> Result<Self, Error>
-    where
-        IT: IntoIterator<Item = O>,
-        O: AsRef<OsStr>,
-    {
-        CommandExecutor::parse_afl_cmdline_output_observing(args, observers, debug_child, ())
-    }
-
-    /// Creates a new `CommandExecutor`.
-    /// Instead of parsing the Command for `@@`, it will
-    pub fn from_cmd_with_file<P>(
-        cmd: &Command,
-        debug_child: bool,
-        observers: OT,
-        path: P,
-    ) -> Result<Self, Error>
-    where
-        P: AsRef<Path>,
-    {
-        Self::from_cmd_with_file_output_observing(cmd, debug_child, observers, path, ())
+        builder.build(observers)
     }
 }
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, OL, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OL, OT, S, T, Z>
+impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S, T, Z>
 where
     I: Input + HasTargetBytes,
     T: CommandConfigurator,
-    OL: OutputObserversList,
-    OT: Debug + MatchName,
+    OT: Debug + MatchName + ObserversTuple<I, S>,
     T: Debug,
 {
     fn run_target(
@@ -508,35 +334,31 @@ where
             }
         };
 
-        if self.output_observers.has_stderr() {
+        if self.observers.observes_stderr() {
             let mut stderr = String::new();
             child.stderr.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
                 )
             })?.read_to_string(&mut stderr)?;
-            self.output_observers
-                .observe_stderr(&mut self.observers, &stderr);
+            self.observers.observe_stderr(&stderr);
         }
-        if self.output_observers.has_stdout() {
+        if self.observers.observes_stdout() {
             let mut stdout = String::new();
             child.stdout.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor",
                 )
             })?.read_to_string(&mut stdout)?;
-            self.output_observers
-                .observe_stdout(&mut self.observers, &stdout);
+            self.observers.observe_stdout(&stdout);
         }
 
         res
     }
 }
 
-impl<EM, I, OL, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
-    for CommandExecutor<EM, I, OL, OT, S, T, Z>
-where
-    OL: OutputObserversList,
+impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
+    for CommandExecutor<EM, I, OT, S, T, Z>
 {
     fn observers(&self) -> &OT {
         &self.observers
@@ -686,27 +508,13 @@ impl CommandExecutorBuilder {
         self
     }
 
-    /// Builds the `ComandExecutor`
+    /// Builds the `CommandExecutor`.
     pub fn build<EM, I, OT, S, Z>(
         &self,
-        observers: OT,
-    ) -> Result<CommandExecutor<EM, I, (), OT, S, StdCommandConfigurator, Z>, Error>
+        mut observers: OT,
+    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, Error>
     where
-        OT: Debug + MatchName,
-    {
-        self.build_output_observing(observers, ())
-    }
-
-    /// Builds the `CommandExecutor`, adding a list of [`OutputObserver`]s to be used.
-    /// The [`OutputObserver`] need to be (owned) part of the `observers` tuple list, as well!
-    pub fn build_output_observing<EM, I, OL, OT, S, Z>(
-        &self,
-        observers: OT,
-        output_observers: OL,
-    ) -> Result<CommandExecutor<EM, I, OL, OT, S, StdCommandConfigurator, Z>, Error>
-    where
-        OL: OutputObserversList,
-        OT: Debug + MatchName,
+        OT: Debug + MatchName + ObserversTuple<I, S>,
     {
         let program = if let Some(program) = &self.program {
             program
@@ -737,23 +545,22 @@ impl CommandExecutorBuilder {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
-        if output_observers.has_stdout() {
+        if observers.observes_stdout() {
             command.stdout(Stdio::piped());
         }
-        if output_observers.has_stderr() {
+        if observers.observes_stderr() {
             // we need stderr for `AsanBacktaceObserver`, and others
             command.stderr(Stdio::piped());
         }
 
         let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
-            has_stdout_observer: output_observers.has_stdout(),
-            has_stderr_observer: output_observers.has_stderr(),
+            has_stdout_observer: observers.observes_stdout(),
+            has_stderr_observer: observers.observes_stderr(),
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator
-            .into_executor_output_observing::<EM, I, OL, OT, S, Z>(observers, output_observers))
+        Ok(configurator.into_executor::<EM, I, OT, S, Z>(observers))
     }
 }
 
@@ -797,30 +604,13 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<EM, I, OT, S, Z>(
-        self,
-        observers: OT,
-    ) -> CommandExecutor<EM, I, (), OT, S, Self, Z>
-    where
-        OT: Debug + MatchName,
-    {
-        self.into_executor_output_observing(observers, ())
-    }
-
-    /// Create an `Executor` from this `CommandConfigurator`.
     /// It will observe the outputs with the respective given observer name.
-    fn into_executor_output_observing<EM, I, OL, OT, S, Z>(
-        self,
-        observers: OT,
-        output_observers: OL,
-    ) -> CommandExecutor<EM, I, OL, OT, S, Self, Z>
+    fn into_executor<EM, I, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
         OT: Debug + MatchName,
-        OL: OutputObserversList,
     {
         CommandExecutor {
             observers,
-            output_observers,
             configurer: self,
             phantom: PhantomData,
         }

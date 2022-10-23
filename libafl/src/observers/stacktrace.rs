@@ -13,10 +13,7 @@ use backtrace::Backtrace;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    stdio::{ObservesOutput, ObservesStdErr},
-    ObserverWithHashField,
-};
+use super::ObserverWithHashField;
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
@@ -237,17 +234,6 @@ impl ObserverWithHashField for AsanBacktraceObserver {
     }
 }
 
-impl ObservesOutput for AsanBacktraceObserver {
-    /// React to new `stdout`
-    fn observe_stdout(&mut self, _stdout: &str) {}
-    /// Do nothing on new `stderr`
-    fn observe_stderr(&mut self, stderr: &str) {
-        self.parse_asan_output(stderr);
-    }
-}
-
-impl ObservesStdErr for AsanBacktraceObserver {}
-
 impl Default for AsanBacktraceObserver {
     fn default() -> Self {
         Self::new("AsanBacktraceObserver")
@@ -269,6 +255,17 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
+    }
+
+    /// Do nothing on new `stderr`
+    #[inline]
+    fn observes_stderr(&mut self) -> bool {
+        true
+    }
+
+    /// Do nothing on new `stderr`
+    fn observe_stderr(&mut self, stderr: &str) {
+        self.parse_asan_output(stderr);
     }
 }
 

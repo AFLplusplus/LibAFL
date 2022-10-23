@@ -8,20 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{bolts::tuples::Named, observers::Observer};
 
-/// Trait that should be used in observer processing stdout or stderr
-pub trait ObservesOutput {
-    /// React to new `stdout`
-    fn observe_stdout(&mut self, stdout: &str);
-    /// React to new `stderr`
-    fn observe_stderr(&mut self, stderr: &str);
-}
-
-/// Marker trait for observers processing `stdout`
-pub trait ObservesStdOut: ObservesOutput {}
-
-/// Marker trait for observers processing `stderr`
-pub trait ObservesStdErr: ObservesOutput {}
-
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -41,18 +27,16 @@ impl StdOutObserver {
     }
 }
 
-impl ObservesOutput for StdOutObserver {
+impl<I, S> Observer<I, S> for StdOutObserver {
+    #[inline]
+    fn observes_stdout(&mut self) -> bool {
+        true
+    }
     /// React to new `stdout`
     fn observe_stdout(&mut self, stdout: &str) {
         self.stdout = Some(stdout.into());
     }
-    /// Do nothing on new `stderr`
-    fn observe_stderr(&mut self, _stderr: &str) {}
 }
-
-impl ObservesStdOut for StdOutObserver {}
-
-impl<I, S> Observer<I, S> for StdOutObserver {}
 
 impl Named for StdOutObserver {
     fn name(&self) -> &str {
@@ -70,17 +54,6 @@ pub struct StdErrObserver {
     pub stderr: Option<String>,
 }
 
-impl ObservesOutput for StdErrObserver {
-    /// React to new `stdout`
-    fn observe_stdout(&mut self, _stdout: &str) {}
-    /// Do nothing on new `stderr`
-    fn observe_stderr(&mut self, stderr: &str) {
-        self.stderr = Some(stderr.into());
-    }
-}
-
-impl ObservesStdErr for StdErrObserver {}
-
 /// An observer that captures stderr of a target.
 impl StdErrObserver {
     /// Create a new [`StdErrObserver`] with the given name.
@@ -90,7 +63,17 @@ impl StdErrObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for StdErrObserver {}
+impl<I, S> Observer<I, S> for StdErrObserver {
+    #[inline]
+    fn observes_stderr(&mut self) -> bool {
+        true
+    }
+
+    /// Do nothing on new `stderr`
+    fn observe_stderr(&mut self, stderr: &str) {
+        self.stderr = Some(stderr.into());
+    }
+}
 
 impl Named for StdErrObserver {
     fn name(&self) -> &str {

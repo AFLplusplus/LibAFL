@@ -16,12 +16,12 @@ use libafl::{
     },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::command::{CommandConfigurator, OutputObservers},
+    executors::command::CommandConfigurator,
     feedback_and,
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
-    inputs::{BytesInput, HasTargetBytes, Input},
+    inputs::{HasTargetBytes, Input},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::{get_asan_runtime_flags, AsanBacktraceObserver, StdMapObserver},
@@ -108,11 +108,7 @@ pub fn main() {
         }
     }
 
-    // Hint: use .add_stderr or .add_stdout to add more observers here
-    let output_observers = OutputObservers::stderr(&bt_observer);
-
-    let mut executor = MyExecutor { shmem_id }
-        .into_executor_output_observing(tuple_list!(observer, bt_observer), output_observers);
+    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
