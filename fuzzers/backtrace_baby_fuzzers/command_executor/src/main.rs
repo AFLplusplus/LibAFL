@@ -105,7 +105,12 @@ pub fn main() {
         }
     }
 
-    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
+    let mut executor = MyExecutor { shmem_id }.into_executor(
+        tuple_list!(observer, bt_observer),
+        None,
+        None,
+        Some("ASANBacktraceObserver".to_string()),
+    );
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);

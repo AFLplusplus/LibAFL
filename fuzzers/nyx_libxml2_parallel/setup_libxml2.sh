@@ -23,7 +23,3 @@ python3 "../../libafl_nyx/packer/packer/nyx_packer.py" \
     --purge || exit
 
 python3 ../../libafl_nyx/packer/packer/nyx_config_gen.py /tmp/nyx_libxml2/ Kernel || exit
-sudo modprobe -r kvm-intel # or kvm-amd for AMD 
-sudo modprobe -r kvm
-sudo modprobe kvm enable_vmware_backdoor=y
-sudo modprobe kvm-intel
