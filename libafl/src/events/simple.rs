@@ -537,7 +537,6 @@ pub mod pybind {
     use crate::{
         events::{pybind::PythonEventManager, SimpleEventManager},
         monitors::pybind::PythonMonitor,
-        observers::pybind::PythonObserversTuple,
         state::pybind::PythonStdState,
     };
 

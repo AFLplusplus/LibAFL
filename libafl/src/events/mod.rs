@@ -618,7 +618,6 @@ pub mod pybind {
         executors::pybind::PythonExecutor,
         fuzzer::pybind::PythonStdFuzzer,
         inputs::BytesInput,
-        observers::{pybind::PythonObserversTuple, UsesObservers},
         state::{pybind::PythonStdState, UsesState},
         Error,
     };

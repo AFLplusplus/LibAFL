@@ -73,7 +73,7 @@ pub mod pybind {
             ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
             Testcase,
         },
-        inputs::BytesInput,
+        inputs::{BytesInput, UsesInput},
         Error,
     };
 
@@ -171,9 +171,11 @@ pub mod pybind {
         }
     }
 
-    impl Corpus for PythonCorpus {
+    impl UsesInput for PythonCorpus {
         type Input = BytesInput;
+    }
 
+    impl Corpus for PythonCorpus {
         #[inline]
         fn count(&self) -> usize {
             unwrap_me!(self.wrapper, c, { c.count() })
