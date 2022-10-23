@@ -13,7 +13,10 @@ use backtrace::Backtrace;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use super::ObserverWithHashField;
+use super::{
+    stdio::{ObservesOutput, ObservesStdErr},
+    ObserverWithHashField,
+};
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
@@ -165,12 +168,12 @@ pub fn get_asan_runtime_flags() -> String {
 
 /// An observer looking at the backtrace of target command using ASAN output
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ASANBacktraceObserver {
+pub struct AsanBacktraceObserver {
     observer_name: String,
     hash: Option<u64>,
 }
 
-impl ASANBacktraceObserver {
+impl AsanBacktraceObserver {
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: &str) -> Self {
@@ -216,7 +219,7 @@ impl ASANBacktraceObserver {
     }
 }
 
-impl ObserverWithHashField for ASANBacktraceObserver {
+impl ObserverWithHashField for AsanBacktraceObserver {
     /// Gets the hash value of this observer.
     #[must_use]
     fn hash(&self) -> &Option<u64> {
@@ -234,13 +237,24 @@ impl ObserverWithHashField for ASANBacktraceObserver {
     }
 }
 
-impl Default for ASANBacktraceObserver {
-    fn default() -> Self {
-        Self::new("ASANBacktraceObserver")
+impl ObservesOutput for AsanBacktraceObserver {
+    /// React to new `stdout`
+    fn observe_stdout(&mut self, _stdout: &str) {}
+    /// Do nothing on new `stderr`
+    fn observe_stderr(&mut self, stderr: &str) {
+        self.parse_asan_output(stderr);
     }
 }
 
-impl<I, S> Observer<I, S> for ASANBacktraceObserver
+impl ObservesStdErr for AsanBacktraceObserver {}
+
+impl Default for AsanBacktraceObserver {
+    fn default() -> Self {
+        Self::new("AsanBacktraceObserver")
+    }
+}
+
+impl<I, S> Observer<I, S> for AsanBacktraceObserver
 where
     I: Debug,
 {
@@ -258,7 +272,7 @@ where
     }
 }
 
-impl Named for ASANBacktraceObserver {
+impl Named for AsanBacktraceObserver {
     fn name(&self) -> &str {
         &self.observer_name
     }

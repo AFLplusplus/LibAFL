@@ -1,5 +1,5 @@
 //! The [`StdOutObserver`] and [`StdErrObserver`] observers look at the stdout of a program
-//! The executor must explicitely support these observers.
+//! The executor must explicitly support these observers.
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].
 
 use alloc::string::String;
@@ -7,6 +7,20 @@ use alloc::string::String;
 use serde::{Deserialize, Serialize};
 
 use crate::{bolts::tuples::Named, observers::Observer};
+
+/// Trait that should be used in observer processing stdout or stderr
+pub trait ObservesOutput {
+    /// React to new `stdout`
+    fn observe_stdout(&mut self, stdout: &str);
+    /// React to new `stderr`
+    fn observe_stderr(&mut self, stderr: &str);
+}
+
+/// Marker trait for observers processing `stdout`
+pub trait ObservesStdOut: ObservesOutput {}
+
+/// Marker trait for observers processing `stderr`
+pub trait ObservesStdErr: ObservesOutput {}
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
@@ -27,6 +41,17 @@ impl StdOutObserver {
     }
 }
 
+impl ObservesOutput for StdOutObserver {
+    /// React to new `stdout`
+    fn observe_stdout(&mut self, stdout: &str) {
+        self.stdout = Some(stdout.into());
+    }
+    /// Do nothing on new `stderr`
+    fn observe_stderr(&mut self, _stderr: &str) {}
+}
+
+impl ObservesStdOut for StdOutObserver {}
+
 impl<I, S> Observer<I, S> for StdOutObserver {}
 
 impl Named for StdOutObserver {
@@ -44,6 +69,17 @@ pub struct StdErrObserver {
     /// The stderr of the target during its last execution.
     pub stderr: Option<String>,
 }
+
+impl ObservesOutput for StdErrObserver {
+    /// React to new `stdout`
+    fn observe_stdout(&mut self, _stdout: &str) {}
+    /// Do nothing on new `stderr`
+    fn observe_stderr(&mut self, stderr: &str) {
+        self.stderr = Some(stderr.into());
+    }
+}
+
+impl ObservesStdErr for StdErrObserver {}
 
 /// An observer that captures stderr of a target.
 impl StdErrObserver {
