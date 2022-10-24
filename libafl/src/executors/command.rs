@@ -27,9 +27,7 @@ use crate::{
         AsSlice,
     },
     inputs::{HasTargetBytes, UsesInput},
-    observers::{
-        ObserversTuple, UsesObservers,
-    },
+    observers::{ObserversTuple, UsesObservers},
     state::UsesState,
     std::borrow::ToOwned,
 };
@@ -206,7 +204,8 @@ where
 
 impl<EM, OT, S, Z> CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>
 where
-    OT: MatchName + Debug + ObserversTuple<S>, S: UsesState,
+    OT: MatchName + Debug + ObserversTuple<S>,
+    S: UsesInput,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
@@ -533,7 +532,8 @@ impl CommandExecutorBuilder {
         mut observers: OT,
     ) -> Result<CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>, Error>
     where
-        OT: Debug + MatchName + ObserversTuple<S>, S: UsesState,
+        OT: Debug + MatchName + ObserversTuple<S>,
+        S: UsesInput,
     {
         let program = if let Some(program) = &self.program {
             program
@@ -579,9 +579,7 @@ impl CommandExecutorBuilder {
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator.into_executor::<EM, OT, S, Z>(
-            observers,
-        ))
+        Ok(configurator.into_executor::<EM, OT, S, Z>(observers))
     }
 }
 
@@ -631,10 +629,7 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<EM, OT, S, Z>(
-        self,
-        observers: OT,
-    ) -> CommandExecutor<EM, OT, S, Self, Z>
+    fn into_executor<EM, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, OT, S, Self, Z>
     where
         OT: Debug + MatchName,
     {

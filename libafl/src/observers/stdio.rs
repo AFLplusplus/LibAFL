@@ -27,7 +27,10 @@ impl StdOutObserver {
     }
 }
 
-impl<S> Observer<S> for StdOutObserver where S: UsesInput {
+impl<S> Observer<S> for StdOutObserver
+where
+    S: UsesInput,
+{
     #[inline]
     fn observes_stdout(&mut self) -> bool {
         true
@@ -63,7 +66,10 @@ impl StdErrObserver {
     }
 }
 
-impl<S> Observer<S> for StdErrObserver where S: UsesInput {
+impl<S> Observer<S> for StdErrObserver
+where
+    S: UsesInput,
+{
     #[inline]
     fn observes_stderr(&mut self) -> bool {
         true
