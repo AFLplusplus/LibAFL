@@ -2,8 +2,7 @@ use libafl;
 #[cfg(target_os = "linux")]
 use libafl_qemu;
 use libafl_sugar;
-use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::{prelude::*, types::PyDict};
 
 const LIBAFL_CODE: &str = r#"
 class BaseObserver:

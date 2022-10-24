@@ -17,7 +17,7 @@ use super::ObserverWithHashField;
 use crate::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
-    inputs::Input,
+    inputs::UsesInput,
     observers::Observer,
     Error,
 };
@@ -97,11 +97,16 @@ impl<'a> ObserverWithHashField for BacktraceObserver<'a> {
     }
 }
 
-impl<'a, I, S> Observer<I, S> for BacktraceObserver<'a>
+impl<'a, S> Observer<S> for BacktraceObserver<'a>
 where
-    I: Input + Debug,
+    S: UsesInput,
 {
-    fn post_exec(&mut self, _state: &mut S, _input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
             if exit_kind == &ExitKind::Crash {
                 self.update_hash(collect_backtrace());
@@ -115,7 +120,7 @@ where
     fn post_exec_child(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::Child {
@@ -165,12 +170,12 @@ pub fn get_asan_runtime_flags() -> String {
 
 /// An observer looking at the backtrace of target command using ASAN output
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ASANBacktraceObserver {
+pub struct AsanBacktraceObserver {
     observer_name: String,
     hash: Option<u64>,
 }
 
-impl ASANBacktraceObserver {
+impl AsanBacktraceObserver {
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: &str) -> Self {
@@ -216,7 +221,7 @@ impl ASANBacktraceObserver {
     }
 }
 
-impl ObserverWithHashField for ASANBacktraceObserver {
+impl ObserverWithHashField for AsanBacktraceObserver {
     /// Gets the hash value of this observer.
     #[must_use]
     fn hash(&self) -> &Option<u64> {
@@ -234,31 +239,42 @@ impl ObserverWithHashField for ASANBacktraceObserver {
     }
 }
 
-impl Default for ASANBacktraceObserver {
+impl Default for AsanBacktraceObserver {
     fn default() -> Self {
-        Self::new("ASANBacktraceObserver")
+        Self::new("AsanBacktraceObserver")
     }
 }
 
-impl<I, S> Observer<I, S> for ASANBacktraceObserver
+impl<S> Observer<S> for AsanBacktraceObserver
 where
-    I: Debug,
+    S: UsesInput,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Do nothing on new `stderr`
+    #[inline]
+    fn observes_stderr(&mut self) -> bool {
+        true
+    }
+
+    /// Do nothing on new `stderr`
+    fn observe_stderr(&mut self, stderr: &str) {
+        self.parse_asan_output(stderr);
+    }
 }
 
-impl Named for ASANBacktraceObserver {
+impl Named for AsanBacktraceObserver {
     fn name(&self) -> &str {
         &self.observer_name
     }

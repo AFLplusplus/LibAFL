@@ -156,7 +156,7 @@ jobs:
     - uses: lyricwulf/abc@v1
       with: 
         # todo: remove afl++-clang when nyx support samcov_pcguard
-        linux: llvm llvm-dev clang nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libgtk-3-dev afl++-clang pax-utils z3 libz3-dev
+        linux: llvm llvm-dev clang nasm ninja-build gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libgtk-3-dev afl++-clang pax-utils
         # update bash for macos to support `declare -A` command`
         macos: llvm libpng nasm coreutils z3 bash
     - name: pip install

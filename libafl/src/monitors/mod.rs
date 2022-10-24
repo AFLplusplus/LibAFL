@@ -277,6 +277,67 @@ impl Default for NopMonitor {
     }
 }
 
+#[cfg(feature = "std")]
+/// Tracking monitor during fuzzing that just prints to `stdout`.
+#[derive(Debug, Clone, Default)]
+pub struct SimplePrintingMonitor {
+    start_time: Duration,
+    client_stats: Vec<ClientStats>,
+}
+
+#[cfg(feature = "std")]
+impl SimplePrintingMonitor {
+    /// Create a new [`SimplePrintingMonitor`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[cfg(feature = "std")]
+impl Monitor for SimplePrintingMonitor {
+    /// the client monitor, mutable
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+        &mut self.client_stats
+    }
+
+    /// the client monitor
+    fn client_stats(&self) -> &[ClientStats] {
+        &self.client_stats
+    }
+
+    /// Time this fuzzing run stated
+    fn start_time(&mut self) -> Duration {
+        self.start_time
+    }
+
+    fn display(&mut self, event_msg: String, sender_id: u32) {
+        println!(
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            event_msg,
+            sender_id,
+            format_duration_hms(&(current_time() - self.start_time)),
+            self.client_stats().len(),
+            self.corpus_size(),
+            self.objective_size(),
+            self.total_execs(),
+            self.execs_per_sec()
+        );
+
+        // Only print perf monitor if the feature is enabled
+        #[cfg(feature = "introspection")]
+        {
+            // Print the client performance monitor.
+            println!(
+                "Client {:03}:\n{}",
+                sender_id, self.client_stats[sender_id as usize].introspection_monitor
+            );
+            // Separate the spacing just a bit
+            println!();
+        }
+    }
+}
+
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]
 pub struct SimpleMonitor<F>

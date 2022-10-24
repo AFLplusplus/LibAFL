@@ -1,7 +1,7 @@
 use std::{cell::UnsafeCell, cmp::max};
 
 use hashbrown::{hash_map::Entry, HashMap};
-use libafl::{inputs::Input, state::HasMetadata};
+use libafl::{inputs::UsesInput, state::HasMetadata};
 pub use libafl_targets::{
     edges_max_num, EDGES_MAP, EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE, EDGES_MAP_SIZE, MAX_EDGES_NUM,
 };
@@ -66,25 +66,21 @@ impl Default for QemuEdgeCoverageHelper {
     }
 }
 
-impl<I, S> QemuHelper<I, S> for QemuEdgeCoverageHelper
+impl<S> QemuHelper<S> for QemuEdgeCoverageHelper
 where
-    I: Input,
-    S: HasMetadata,
+    S: UsesInput + HasMetadata,
 {
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
-        QT: QemuHelperTuple<I, S>,
+        QT: QemuHelperTuple<S>,
     {
         if self.use_hitcounts {
             hooks.edges_raw(
-                Some(gen_unique_edge_ids::<I, QT, S>),
+                Some(gen_unique_edge_ids::<QT, S>),
                 Some(trace_edge_hitcount),
             );
         } else {
-            hooks.edges_raw(
-                Some(gen_unique_edge_ids::<I, QT, S>),
-                Some(trace_edge_single),
-            );
+            hooks.edges_raw(Some(gen_unique_edge_ids::<QT, S>), Some(trace_edge_single));
         }
     }
 }
@@ -126,25 +122,25 @@ impl Default for QemuEdgeCoverageChildHelper {
     }
 }
 
-impl<I, S> QemuHelper<I, S> for QemuEdgeCoverageChildHelper
+impl<S> QemuHelper<S> for QemuEdgeCoverageChildHelper
 where
-    I: Input,
+    S: UsesInput,
     S: HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
-        QT: QemuHelperTuple<I, S>,
+        QT: QemuHelperTuple<S>,
     {
         if self.use_hitcounts {
             hooks.edges_raw(
-                Some(gen_hashed_edge_ids::<I, QT, S>),
+                Some(gen_hashed_edge_ids::<QT, S>),
                 Some(trace_edge_hitcount_ptr),
             );
         } else {
             hooks.edges_raw(
-                Some(gen_hashed_edge_ids::<I, QT, S>),
+                Some(gen_hashed_edge_ids::<QT, S>),
                 Some(trace_edge_single_ptr),
             );
         }
@@ -153,16 +149,16 @@ where
 
 thread_local!(static PREV_LOC : UnsafeCell<u64> = UnsafeCell::new(0));
 
-pub fn gen_unique_edge_ids<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn gen_unique_edge_ids<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
 ) -> Option<u64>
 where
     S: HasMetadata,
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.helpers().match_first_type::<QemuEdgeCoverageHelper>() {
         if !h.must_instrument(src.into()) && !h.must_instrument(dest.into()) {
@@ -213,15 +209,15 @@ pub extern "C" fn trace_edge_single(id: u64, _data: u64) {
     }
 }
 
-pub fn gen_hashed_edge_ids<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn gen_hashed_edge_ids<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     src: GuestAddr,
     dest: GuestAddr,
 ) -> Option<u64>
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks
         .helpers()
@@ -250,28 +246,28 @@ pub extern "C" fn trace_edge_single_ptr(id: u64, _data: u64) {
     }
 }
 
-pub fn gen_addr_block_ids<I, QT, S>(
-    _hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn gen_addr_block_ids<QT, S>(
+    _hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     // GuestAddress is u32 for 32 bit guests
     #[allow(clippy::unnecessary_cast)]
     Some(pc as u64)
 }
 
-pub fn gen_hashed_block_ids<I, QT, S>(
-    _hooks: &mut QemuHooks<'_, I, QT, S>,
+pub fn gen_hashed_block_ids<QT, S>(
+    _hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     // GuestAddress is u32 for 32 bit guests
     #[allow(clippy::unnecessary_cast)]

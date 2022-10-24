@@ -58,10 +58,7 @@ pub fn main() {
     let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_and!(
-        CrashFeedback::new(),
-        NewHashFeedback::<BacktraceObserver>::new(&bt_observer)
-    );
+    let mut objective = feedback_and!(CrashFeedback::new(), NewHashFeedback::new(&bt_observer));
 
     // create a State from scratch
     let mut state = StdState::new(

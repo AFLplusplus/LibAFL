@@ -33,8 +33,8 @@ use windows::Win32::{
 use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
-    observers::ObserversTuple,
+    observers::UsesObservers,
+    state::UsesState,
     Error,
 };
 
@@ -77,6 +77,7 @@ const ITIMER_REAL: c_int = 0;
 
 /// The timeout executor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
+    /// The wrapped [`Executor`]
     executor: E,
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
@@ -263,18 +264,19 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasInProcessHandlers,
-    I: Input,
+    E: Executor<EM, Z> + HasInProcessHandlers,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     #[allow(clippy::cast_sign_loss)]
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -333,17 +335,18 @@ where
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
-    I: Input,
+    E: Executor<EM, Z>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
@@ -364,17 +367,18 @@ where
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
-    I: Input,
+    E: Executor<EM, Z>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
@@ -393,18 +397,31 @@ where
     }
 }
 
-impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutExecutor<E>
+impl<E> UsesState for TimeoutExecutor<E>
 where
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    E: UsesState,
+{
+    type State = E::State;
+}
+
+impl<E> UsesObservers for TimeoutExecutor<E>
+where
+    E: UsesObservers,
+{
+    type Observers = E::Observers;
+}
+
+impl<E> HasObservers for TimeoutExecutor<E>
+where
+    E: HasObservers,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.executor.observers_mut()
     }
 }

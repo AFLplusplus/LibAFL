@@ -1,28 +1,27 @@
 //! A `ShadowExecutor` wraps an executor to have shadow observer that will not be considered by the feedbacks and the manager
 
-use core::{
-    fmt::{self, Debug, Formatter},
-    marker::PhantomData,
-};
+use core::fmt::{self, Debug, Formatter};
 
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
-    observers::ObserversTuple,
+    observers::{ObserversTuple, UsesObservers},
+    state::UsesState,
     Error,
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
-pub struct ShadowExecutor<E: Debug, I: Debug, S, SOT: Debug> {
+pub struct ShadowExecutor<E, SOT> {
     /// The wrapped executor
     executor: E,
     /// The shadow observers
     shadow_observers: SOT,
-    /// phantom data
-    phantom: PhantomData<(I, S)>,
 }
 
-impl<E: Debug, I: Debug, S, SOT: Debug> Debug for ShadowExecutor<E, I, S, SOT> {
+impl<E, SOT> Debug for ShadowExecutor<E, SOT>
+where
+    E: UsesState + Debug,
+    SOT: ObserversTuple<E::State> + Debug,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ShadowExecutor")
             .field("executor", &self.executor)
@@ -31,16 +30,16 @@ impl<E: Debug, I: Debug, S, SOT: Debug> Debug for ShadowExecutor<E, I, S, SOT> {
     }
 }
 
-impl<E: Debug, I: Debug, S, SOT: Debug> ShadowExecutor<E, I, S, SOT>
+impl<E, SOT> ShadowExecutor<E, SOT>
 where
-    SOT: ObserversTuple<I, S>,
+    E: HasObservers + Debug,
+    SOT: ObserversTuple<E::State> + Debug,
 {
     /// Create a new `ShadowExecutor`, wrapping the given `executor`.
     pub fn new(executor: E, shadow_observers: SOT) -> Self {
         Self {
             executor,
             shadow_observers,
-            phantom: PhantomData,
         }
     }
 
@@ -57,38 +56,50 @@ where
     }
 }
 
-impl<E, EM, I, S, SOT, Z> Executor<EM, I, S, Z> for ShadowExecutor<E, I, S, SOT>
+impl<E, EM, SOT, Z> Executor<EM, Z> for ShadowExecutor<E, SOT>
 where
-    E: Executor<EM, I, S, Z>,
-    I: Input,
-    SOT: ObserversTuple<I, S>,
+    E: Executor<EM, Z> + HasObservers,
+    SOT: ObserversTuple<E::State>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
 }
 
-impl<E, I, OT, S, SOT> HasObservers<I, OT, S> for ShadowExecutor<E, I, S, SOT>
+impl<E, SOT> UsesState for ShadowExecutor<E, SOT>
 where
-    I: Debug,
-    S: Debug,
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    SOT: ObserversTuple<I, S>,
+    E: UsesState,
+{
+    type State = E::State;
+}
+
+impl<E, SOT> UsesObservers for ShadowExecutor<E, SOT>
+where
+    E: UsesObservers,
+{
+    type Observers = E::Observers;
+}
+
+impl<E, SOT> HasObservers for ShadowExecutor<E, SOT>
+where
+    E: HasObservers,
+    SOT: ObserversTuple<E::State>,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.executor.observers_mut()
     }
 }
