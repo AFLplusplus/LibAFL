@@ -170,12 +170,12 @@ pub fn get_asan_runtime_flags() -> String {
 
 /// An observer looking at the backtrace of target command using ASAN output
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ASANBacktraceObserver {
+pub struct AsanBacktraceObserver {
     observer_name: String,
     hash: Option<u64>,
 }
 
-impl ASANBacktraceObserver {
+impl AsanBacktraceObserver {
     /// Creates a new [`BacktraceObserver`] with the given name.
     #[must_use]
     pub fn new(observer_name: &str) -> Self {
@@ -221,7 +221,7 @@ impl ASANBacktraceObserver {
     }
 }
 
-impl ObserverWithHashField for ASANBacktraceObserver {
+impl ObserverWithHashField for AsanBacktraceObserver {
     /// Gets the hash value of this observer.
     #[must_use]
     fn hash(&self) -> &Option<u64> {
@@ -239,13 +239,13 @@ impl ObserverWithHashField for ASANBacktraceObserver {
     }
 }
 
-impl Default for ASANBacktraceObserver {
+impl Default for AsanBacktraceObserver {
     fn default() -> Self {
-        Self::new("ASANBacktraceObserver")
+        Self::new("AsanBacktraceObserver")
     }
 }
 
-impl<S> Observer<S> for ASANBacktraceObserver
+impl<S> Observer<S> for AsanBacktraceObserver
 where
     S: UsesInput,
 {
@@ -261,9 +261,20 @@ where
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Do nothing on new `stderr`
+    #[inline]
+    fn observes_stderr(&mut self) -> bool {
+        true
+    }
+
+    /// Do nothing on new `stderr`
+    fn observe_stderr(&mut self, stderr: &str) {
+        self.parse_asan_output(stderr);
+    }
 }
 
-impl Named for ASANBacktraceObserver {
+impl Named for AsanBacktraceObserver {
     fn name(&self) -> &str {
         &self.observer_name
     }

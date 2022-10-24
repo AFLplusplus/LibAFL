@@ -1,5 +1,5 @@
 //! The [`StdOutObserver`] and [`StdErrObserver`] observers look at the stdout of a program
-//! The executor must explicitely support these observers.
+//! The executor must explicitly support these observers.
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].
 
 use alloc::string::String;
@@ -27,7 +27,16 @@ impl StdOutObserver {
     }
 }
 
-impl<S> Observer<S> for StdOutObserver where S: UsesInput {}
+impl<S> Observer<S> for StdOutObserver where S: UsesInput {
+    #[inline]
+    fn observes_stdout(&mut self) -> bool {
+        true
+    }
+    /// React to new `stdout`
+    fn observe_stdout(&mut self, stdout: &str) {
+        self.stdout = Some(stdout.into());
+    }
+}
 
 impl Named for StdOutObserver {
     fn name(&self) -> &str {
@@ -54,7 +63,17 @@ impl StdErrObserver {
     }
 }
 
-impl<S> Observer<S> for StdErrObserver where S: UsesInput {}
+impl<S> Observer<S> for StdErrObserver where S: UsesInput {
+    #[inline]
+    fn observes_stderr(&mut self) -> bool {
+        true
+    }
+
+    /// Do nothing on new `stderr`
+    fn observe_stderr(&mut self, stderr: &str) {
+        self.stderr = Some(stderr.into());
+    }
+}
 
 impl Named for StdErrObserver {
     fn name(&self) -> &str {

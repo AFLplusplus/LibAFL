@@ -90,6 +90,28 @@ where
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    /// If this observer observes `stdout`
+    #[inline]
+    fn observes_stdout(&mut self) -> bool {
+        false
+    }
+    /// If this observer observes `stderr`
+    #[inline]
+    fn observes_stderr(&mut self) -> bool {
+        false
+    }
+
+    /// React to new `stdout`
+    /// To use this, always return `true` from `observes_stdout`
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_stdout(&mut self, stdout: &str) {}
+    /// React to new `stderr`
+    /// To use this, always return `true` from `observes_stderr`
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_stderr(&mut self, stderr: &str) {}
 }
 
 /// Defines the observer type shared across traits of the type.
@@ -125,6 +147,16 @@ where
         input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
+
+    /// Returns true if a `stdout` observer was added to the list
+    fn observes_stdout(&mut self) -> bool;
+    /// Returns true if a `stderr` observer was added to the list
+    fn observes_stderr(&mut self) -> bool;
+
+    /// Runs `observe_stdout` for all stdout observers in the list
+    fn observe_stdout(&mut self, stdout: &str);
+    /// Runs `observe_stderr` for all stderr observers in the list
+    fn observe_stderr(&mut self, stderr: &str);
 }
 
 impl<S> ObserversTuple<S> for ()
@@ -156,6 +188,26 @@ where
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Returns true if a `stdout` observer was added to the list
+    #[inline]
+    fn observes_stdout(&mut self) -> bool {
+        false
+    }
+    /// Returns true if a `stderr` observer was added to the list
+    #[inline]
+    fn observes_stderr(&mut self) -> bool {
+        false
+    }
+
+    /// Runs `observe_stdout` for all stdout observers in the list
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_stdout(&mut self, stdout: &str) {}
+    /// Runs `observe_stderr` for all stderr observers in the list
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_stderr(&mut self, stderr: &str) {}
 }
 
 impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
@@ -193,9 +245,31 @@ where
         self.0.post_exec_child(state, input, exit_kind)?;
         self.1.post_exec_child_all(state, input, exit_kind)
     }
+
+    /// Returns true if a `stdout` observer was added to the list
+    #[inline]
+    fn observes_stdout(&mut self) -> bool {
+        self.0.observes_stdout() || self.1.observes_stdout()
+    }
+    /// Returns true if a `stderr` observer was added to the list
+    #[inline]
+    fn observes_stderr(&mut self) -> bool {
+        self.0.observes_stderr() || self.1.observes_stderr()
+    }
+
+    /// Runs `observe_stdout` for all stdout observers in the list
+    #[inline]
+    fn observe_stdout(&mut self, stdout: &str) {
+        self.0.observe_stdout(stdout);
+    }
+    /// Runs `observe_stderr` for all stderr observers in the list
+    #[inline]
+    fn observe_stderr(&mut self, stderr: &str) {
+        self.1.observe_stderr(stderr);
+    }
 }
 
-/// A trait for obervers with a hash field
+/// A trait for [`Observer`]`s` with a hash field
 pub trait ObserverWithHashField {
     /// get the value of the hash field
     fn hash(&self) -> &Option<u64>;
@@ -897,6 +971,23 @@ pub mod pybind {
             }
             Ok(())
         }
+
+        // TODO: expose stdout/stderr to python
+        #[inline]
+        fn observes_stdout(&mut self) -> bool {
+            false
+        }
+
+        #[inline]
+        fn observes_stderr(&mut self) -> bool {
+            false
+        }
+
+        #[inline]
+        fn observe_stderr(&mut self, _: &str) {}
+
+        #[inline]
+        fn observe_stdout(&mut self, _: &str) {}
     }
 
     impl MatchName for PythonObserversTuple {

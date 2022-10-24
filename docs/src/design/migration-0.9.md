@@ -33,7 +33,7 @@ where
         CS: Scheduler<I, S>,
         EX: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
         EM: EventManager<EX, I, S, Z>,
-        OT: ObserversTuple<I, S>,
+        OT: ObserversTuple<S>,
         Z: Evaluator<EX, EM, I, S> + HasScheduler<CS, I, S>,
     {
         // --- SNIP ---
