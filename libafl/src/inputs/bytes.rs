@@ -1,9 +1,8 @@
 //! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 
-use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
+use alloc::{borrow::ToOwned, boxed::Box, rc::Rc, string::String, vec::Vec};
 use core::{cell::RefCell, convert::From, hash::Hasher};
-use std::prelude::rust_2015::Box;
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
 
