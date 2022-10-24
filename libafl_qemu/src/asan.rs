@@ -280,7 +280,7 @@ impl AsanGiovese {
     }
 
     #[inline]
-    #[clippy::must_use_candidate]
+    #[allow(clippy::must_use_candidate)]
     pub fn unpoison(emu: &Emulator, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             let n = n as isize;
@@ -549,12 +549,10 @@ impl QemuAsanHelper {
         self.enabled = enabled;
     }
 
-    #[allow(clippy::unused_self)]
     pub fn alloc(&mut self, _emulator: &Emulator, start: GuestAddr, end: GuestAddr) {
         self.rt.alloc_insert(start, end);
     }
 
-    #[allow(clippy::unused_self)]
     pub fn dealloc(&mut self, emulator: &Emulator, addr: GuestAddr) {
         let chunk = self.rt.alloc_search(addr);
         if let Some(ck) = chunk {
@@ -642,7 +640,6 @@ impl QemuAsanHelper {
         }
     }
 
-    #[allow(clippy::unused_self)]
     pub fn poison(
         &mut self,
         emulator: &Emulator,
