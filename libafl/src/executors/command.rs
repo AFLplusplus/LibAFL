@@ -212,7 +212,7 @@ where
     pub fn from_cmd_with_file<P>(
         cmd: &Command,
         debug_child: bool,
-        mut observers: OT,
+        observers: OT,
         path: P,
     ) -> Result<Self, Error>
     where
@@ -529,7 +529,7 @@ impl CommandExecutorBuilder {
     /// Builds the `ComandExecutor`
     pub fn build<EM, OT, S, Z>(
         &self,
-        mut observers: OT,
+        observers: OT,
     ) -> Result<CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>, Error>
     where
         OT: Debug + MatchName + ObserversTuple<S>,

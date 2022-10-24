@@ -141,13 +141,13 @@ where
 
     /// Returns true if a `stdout` observer was added to the list
     #[inline]
-    fn observes_stdout(&mut self) -> bool {
-        self.primary.as_mut().observes_stdout() || self.secondary.as_mut().observes_stdout()
+    fn observes_stdout(&self) -> bool {
+        self.primary.as_ref().observes_stdout() || self.secondary.as_ref().observes_stdout()
     }
     /// Returns true if a `stderr` observer was added to the list
     #[inline]
-    fn observes_stderr(&mut self) -> bool {
-        self.primary.as_mut().observes_stderr() || self.secondary.as_mut().observes_stderr()
+    fn observes_stderr(&self) -> bool {
+        self.primary.as_ref().observes_stderr() || self.secondary.as_ref().observes_stderr()
     }
 
     /// Runs `observe_stdout` for all stdout observers in the list

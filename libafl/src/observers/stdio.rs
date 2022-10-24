@@ -32,9 +32,10 @@ where
     S: UsesInput,
 {
     #[inline]
-    fn observes_stdout(&mut self) -> bool {
+    fn observes_stdout(&self) -> bool {
         true
     }
+
     /// React to new `stdout`
     fn observe_stdout(&mut self, stdout: &str) {
         self.stdout = Some(stdout.into());
@@ -71,11 +72,11 @@ where
     S: UsesInput,
 {
     #[inline]
-    fn observes_stderr(&mut self) -> bool {
+    fn observes_stderr(&self) -> bool {
         true
     }
 
-    /// Do nothing on new `stderr`
+    /// React to new `stderr`
     fn observe_stderr(&mut self, stderr: &str) {
         self.stderr = Some(stderr.into());
     }
