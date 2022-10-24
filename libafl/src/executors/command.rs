@@ -617,7 +617,7 @@ impl CommandExecutorBuilder {
 ///     EM::State: UsesInput,
 ///     EM::Input: HasTargetBytes
 /// {
-///     MyExecutor.into_executor((), None, None, None)
+///     MyExecutor.into_executor(())
 /// }
 /// ```
 
