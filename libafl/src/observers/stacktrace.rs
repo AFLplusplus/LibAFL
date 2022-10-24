@@ -264,7 +264,7 @@ where
 
     /// Do nothing on new `stderr`
     #[inline]
-    fn observes_stderr(&mut self) -> bool {
+    fn observes_stderr(&self) -> bool {
         true
     }
 

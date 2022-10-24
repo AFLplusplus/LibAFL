@@ -93,12 +93,12 @@ where
 
     /// If this observer observes `stdout`
     #[inline]
-    fn observes_stdout(&mut self) -> bool {
+    fn observes_stdout(&self) -> bool {
         false
     }
     /// If this observer observes `stderr`
     #[inline]
-    fn observes_stderr(&mut self) -> bool {
+    fn observes_stderr(&self) -> bool {
         false
     }
 
@@ -107,6 +107,7 @@ where
     #[inline]
     #[allow(unused_variables)]
     fn observe_stdout(&mut self, stdout: &str) {}
+
     /// React to new `stderr`
     /// To use this, always return `true` from `observes_stderr`
     #[inline]
@@ -149,9 +150,9 @@ where
     ) -> Result<(), Error>;
 
     /// Returns true if a `stdout` observer was added to the list
-    fn observes_stdout(&mut self) -> bool;
+    fn observes_stdout(&self) -> bool;
     /// Returns true if a `stderr` observer was added to the list
-    fn observes_stderr(&mut self) -> bool;
+    fn observes_stderr(&self) -> bool;
 
     /// Runs `observe_stdout` for all stdout observers in the list
     fn observe_stdout(&mut self, stdout: &str);
@@ -191,12 +192,13 @@ where
 
     /// Returns true if a `stdout` observer was added to the list
     #[inline]
-    fn observes_stdout(&mut self) -> bool {
+    fn observes_stdout(&self) -> bool {
         false
     }
+
     /// Returns true if a `stderr` observer was added to the list
     #[inline]
-    fn observes_stderr(&mut self) -> bool {
+    fn observes_stderr(&self) -> bool {
         false
     }
 
@@ -204,6 +206,7 @@ where
     #[inline]
     #[allow(unused_variables)]
     fn observe_stdout(&mut self, stdout: &str) {}
+
     /// Runs `observe_stderr` for all stderr observers in the list
     #[inline]
     #[allow(unused_variables)]
@@ -248,12 +251,13 @@ where
 
     /// Returns true if a `stdout` observer was added to the list
     #[inline]
-    fn observes_stdout(&mut self) -> bool {
+    fn observes_stdout(&self) -> bool {
         self.0.observes_stdout() || self.1.observes_stdout()
     }
+
     /// Returns true if a `stderr` observer was added to the list
     #[inline]
-    fn observes_stderr(&mut self) -> bool {
+    fn observes_stderr(&self) -> bool {
         self.0.observes_stderr() || self.1.observes_stderr()
     }
 
@@ -261,10 +265,13 @@ where
     #[inline]
     fn observe_stdout(&mut self, stdout: &str) {
         self.0.observe_stdout(stdout);
+        self.1.observe_stdout(stdout);
     }
+
     /// Runs `observe_stderr` for all stderr observers in the list
     #[inline]
     fn observe_stderr(&mut self, stderr: &str) {
+        self.0.observe_stderr(stderr);
         self.1.observe_stderr(stderr);
     }
 }
@@ -974,12 +981,12 @@ pub mod pybind {
 
         // TODO: expose stdout/stderr to python
         #[inline]
-        fn observes_stdout(&mut self) -> bool {
+        fn observes_stdout(&self) -> bool {
             false
         }
 
         #[inline]
-        fn observes_stderr(&mut self) -> bool {
+        fn observes_stderr(&self) -> bool {
             false
         }
 
