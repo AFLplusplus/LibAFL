@@ -23,13 +23,10 @@ use core::cell::RefCell;
 #[cfg(feature = "cmin")]
 pub use minimizer::*;
 
-use crate::{inputs::Input, Error};
+use crate::{inputs::UsesInput, Error};
 
 /// Corpus with all current testcases
-pub trait Corpus<I>: serde::Serialize + for<'de> serde::Deserialize<'de>
-where
-    I: Input,
-{
+pub trait Corpus: UsesInput + serde::Serialize + for<'de> serde::Deserialize<'de> {
     /// Returns the number of elements
     fn count(&self) -> usize;
 
@@ -39,16 +36,20 @@ where
     }
 
     /// Add an entry to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error>;
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<usize, Error>;
 
     /// Replaces the testcase at the given idx, returning the existing.
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error>;
+    fn replace(
+        &mut self,
+        idx: usize,
+        testcase: Testcase<Self::Input>,
+    ) -> Result<Testcase<Self::Input>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error>;
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<Self::Input>>, Error>;
 
     /// Get by id
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error>;
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<usize>;
@@ -72,7 +73,7 @@ pub mod pybind {
             ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
             Testcase,
         },
-        inputs::BytesInput,
+        inputs::{BytesInput, UsesInput},
         Error,
     };
 
@@ -170,7 +171,11 @@ pub mod pybind {
         }
     }
 
-    impl Corpus<BytesInput> for PythonCorpus {
+    impl UsesInput for PythonCorpus {
+        type Input = BytesInput;
+    }
+
+    impl Corpus for PythonCorpus {
         #[inline]
         fn count(&self) -> usize {
             unwrap_me!(self.wrapper, c, { c.count() })

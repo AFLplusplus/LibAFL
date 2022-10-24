@@ -1,5 +1,5 @@
 //! Executor for differential fuzzing.
-//! It wraps two exeutors that will be run after each other with the same input.
+//! It wraps two executors that will be run after each other with the same input.
 //! In comparison to the [`crate::executors::CombinedExecutor`] it also runs the secondary executor in `run_target`.
 //!
 use core::{cell::UnsafeCell, fmt::Debug};
@@ -9,38 +9,28 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::{ownedref::OwnedPtrMut, tuples::MatchName},
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
-    observers::ObserversTuple,
+    inputs::UsesInput,
+    observers::{ObserversTuple, UsesObservers},
+    state::UsesState,
     Error,
 };
 
 /// A [`DiffExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
 #[derive(Debug)]
-pub struct DiffExecutor<A, B, OTA, OTB>
-where
-    A: Debug,
-    B: Debug,
-    OTA: Debug,
-    OTB: Debug,
-{
+pub struct DiffExecutor<A, B, OTA, OTB> {
     primary: A,
     secondary: B,
     observers: UnsafeCell<ProxyObserversTuple<OTA, OTB>>,
 }
 
-impl<A, B, OTA, OTB> DiffExecutor<A, B, OTA, OTB>
-where
-    A: Debug,
-    B: Debug,
-    OTA: Debug,
-    OTB: Debug,
-{
+impl<A, B, OTA, OTB> DiffExecutor<A, B, OTA, OTB> {
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
+    pub fn new<EM, Z>(primary: A, secondary: B) -> Self
     where
-        A: Executor<EM, I, S, Z>,
-        B: Executor<EM, I, S, Z>,
-        I: Input,
+        A: Executor<EM, Z>,
+        B: Executor<EM, Z, State = A::State>,
+        EM: UsesState<State = A::State>,
+        Z: UsesState<State = A::State>,
     {
         Self {
             primary,
@@ -63,20 +53,21 @@ where
     }
 }
 
-impl<A, B, EM, I, OTA, OTB, S, Z> Executor<EM, I, S, Z> for DiffExecutor<A, B, OTA, OTB>
+impl<A, B, EM, OTA, OTB, Z> Executor<EM, Z> for DiffExecutor<A, B, OTA, OTB>
 where
-    A: Executor<EM, I, S, Z>,
-    B: Executor<EM, I, S, Z>,
-    I: Input,
+    A: Executor<EM, Z>,
+    B: Executor<EM, Z, State = A::State>,
+    EM: UsesState<State = A::State>,
     OTA: Debug,
     OTB: Debug,
+    Z: UsesState<State = A::State>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
         self.primary.post_run_reset();
@@ -104,12 +95,13 @@ pub struct ProxyObserversTuple<A, B> {
     secondary: OwnedPtrMut<B>,
 }
 
-impl<A, B, I, S> ObserversTuple<I, S> for ProxyObserversTuple<A, B>
+impl<A, B, S> ObserversTuple<S> for ProxyObserversTuple<A, B>
 where
-    A: ObserversTuple<I, S>,
-    B: ObserversTuple<I, S>,
+    A: ObserversTuple<S>,
+    B: ObserversTuple<S>,
+    S: UsesInput,
 {
-    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.primary.as_mut().pre_exec_all(state, input)?;
         self.secondary.as_mut().pre_exec_all(state, input)
     }
@@ -117,7 +109,7 @@ where
     fn post_exec_all(
         &mut self,
         state: &mut S,
-        input: &I,
+        input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.primary
@@ -128,7 +120,7 @@ where
             .post_exec_all(state, input, exit_kind)
     }
 
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.primary.as_mut().pre_exec_child_all(state, input)?;
         self.secondary.as_mut().pre_exec_child_all(state, input)
     }
@@ -136,7 +128,7 @@ where
     fn post_exec_child_all(
         &mut self,
         state: &mut S,
-        input: &I,
+        input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.primary
@@ -197,13 +189,30 @@ impl<A, B> ProxyObserversTuple<A, B> {
     }
 }
 
-impl<A, B, I, OTA, OTB, S> HasObservers<I, ProxyObserversTuple<OTA, OTB>, S>
-    for DiffExecutor<A, B, OTA, OTB>
+impl<A, B, OTA, OTB> UsesObservers for DiffExecutor<A, B, OTA, OTB>
 where
-    A: HasObservers<I, OTA, S>,
-    B: HasObservers<I, OTB, S>,
-    OTA: ObserversTuple<I, S>,
-    OTB: ObserversTuple<I, S>,
+    A: HasObservers<Observers = OTA>,
+    B: HasObservers<Observers = OTB, State = A::State>,
+    OTA: ObserversTuple<A::State>,
+    OTB: ObserversTuple<A::State>,
+{
+    type Observers = ProxyObserversTuple<OTA, OTB>;
+}
+
+impl<A, B, OTA, OTB> UsesState for DiffExecutor<A, B, OTA, OTB>
+where
+    A: UsesState,
+    B: UsesState<State = A::State>,
+{
+    type State = A::State;
+}
+
+impl<A, B, OTA, OTB> HasObservers for DiffExecutor<A, B, OTA, OTB>
+where
+    A: HasObservers<Observers = OTA>,
+    B: HasObservers<Observers = OTB, State = A::State>,
+    OTA: ObserversTuple<A::State>,
+    OTB: ObserversTuple<A::State>,
 {
     #[inline]
     fn observers(&self) -> &ProxyObserversTuple<OTA, OTB> {

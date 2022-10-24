@@ -2,7 +2,7 @@
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
-use core::{convert::Into, default::Default, option::Option, time::Duration};
+use core::{default::Default, option::Option, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
@@ -181,14 +181,11 @@ where
         self.fuzzed = fuzzed;
     }
 
-    /// Create a new Testcase instace given an input
+    /// Create a new Testcase instance given an input
     #[inline]
-    pub fn new<T>(input: T) -> Self
-    where
-        T: Into<I>,
-    {
+    pub fn new(input: I) -> Self {
         let mut slf = Testcase {
-            input: Some(input.into()),
+            input: Some(input),
             ..Testcase::default()
         };
         slf.input.as_mut().unwrap().wrapped_as_testcase();

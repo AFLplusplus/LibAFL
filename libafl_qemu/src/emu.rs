@@ -244,8 +244,10 @@ extern "C" {
 
     static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 
+    /*
     fn libafl_save_qemu_snapshot(name: *const u8);
     fn libafl_load_qemu_snapshot(name: *const u8);
+     */
 }
 
 #[cfg(not(feature = "usermode"))]

@@ -12,13 +12,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, SchedulerTestcaseMetaData, Testcase},
-    inputs::Input,
+    inputs::UsesInput,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -89,27 +89,25 @@ crate::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<F, I, S> {
+pub struct WeightedScheduler<F, S> {
     strat: Option<PowerSchedule>,
-    phantom: PhantomData<(F, I, S)>,
+    phantom: PhantomData<(F, S)>,
 }
 
-impl<F, I, S> Default for WeightedScheduler<F, I, S>
+impl<F, S> Default for WeightedScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F, I, S> WeightedScheduler<F, I, S>
+impl<F, S> WeightedScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Create a new [`WeightedScheduler`] without any scheduling strategy
     #[must_use]
@@ -219,11 +217,17 @@ where
     }
 }
 
-impl<F, I, S> Scheduler<I, S> for WeightedScheduler<F, I, S>
+impl<F, S> UsesState for WeightedScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasRand,
-    I: Input,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<F, S> Scheduler for WeightedScheduler<F, S>
+where
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
@@ -264,7 +268,12 @@ where
         Ok(())
     }
 
-    fn on_replace(&self, state: &mut S, idx: usize, _testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &self,
+        state: &mut S,
+        idx: usize,
+        _testcase: &Testcase<S::Input>,
+    ) -> Result<(), Error> {
         // Recreate the alias table
         self.on_add(state, idx)
     }
@@ -273,7 +282,7 @@ where
         &self,
         state: &mut S,
         _idx: usize,
-        _testcase: &Option<Testcase<I>>,
+        _testcase: &Option<Testcase<S::Input>>,
     ) -> Result<(), Error> {
         // Recreate the alias table
         self.create_alias_table(state)?;
@@ -343,4 +352,4 @@ where
 }
 
 /// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler<I, S> = WeightedScheduler<CorpusWeightTestcaseScore<I, S>, I, S>;
+pub type StdWeightedScheduler<S> = WeightedScheduler<CorpusWeightTestcaseScore<S>, S>;

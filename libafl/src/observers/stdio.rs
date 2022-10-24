@@ -6,7 +6,7 @@ use alloc::string::String;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::tuples::Named, observers::Observer};
+use crate::{bolts::tuples::Named, inputs::UsesInput, observers::Observer};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
@@ -27,7 +27,10 @@ impl StdOutObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for StdOutObserver {
+impl<S> Observer<S> for StdOutObserver
+where
+    S: UsesInput,
+{
     #[inline]
     fn observes_stdout(&mut self) -> bool {
         true
@@ -63,7 +66,10 @@ impl StdErrObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for StdErrObserver {
+impl<S> Observer<S> for StdErrObserver
+where
+    S: UsesInput,
+{
     #[inline]
     fn observes_stderr(&mut self) -> bool {
         true

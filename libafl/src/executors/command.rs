@@ -26,8 +26,9 @@ use crate::{
         tuples::MatchName,
         AsSlice,
     },
-    inputs::HasTargetBytes,
-    observers::ObserversTuple,
+    inputs::{HasTargetBytes, UsesInput},
+    observers::{ObserversTuple, UsesObservers},
+    state::UsesState,
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
@@ -149,20 +150,16 @@ impl CommandConfigurator for StdCommandConfigurator {
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
-/// Instead, you can also use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<EM, I, OT, S, T, Z>
-where
-    T: Debug,
-    OT: Debug,
-{
-    /// The wrapped command configurer
+/// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
+pub struct CommandExecutor<EM, OT, S, T, Z> {
+    /// The wrapped comand configurer
     configurer: T,
-    /// The obsevers used by this executor
+    /// The observers used by this executor
     observers: OT,
-    phantom: PhantomData<(EM, I, S, Z)>,
+    phantom: PhantomData<(EM, S, Z)>,
 }
 
-impl CommandExecutor<(), (), (), (), (), ()> {
+impl CommandExecutor<(), (), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -181,7 +178,7 @@ impl CommandExecutor<(), (), (), (), (), ()> {
     }
 }
 
-impl<EM, I, OT, S, T, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, OT, S, T, Z> Debug for CommandExecutor<EM, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
@@ -194,7 +191,7 @@ where
     }
 }
 
-impl<EM, I, OT, S, T, Z> CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, OT, S, T, Z> CommandExecutor<EM, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
@@ -205,9 +202,10 @@ where
     }
 }
 
-impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>
+impl<EM, OT, S, Z> CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>
 where
-    OT: MatchName + Debug + ObserversTuple<I, S>,
+    OT: MatchName + Debug + ObserversTuple<S>,
+    S: UsesInput,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
@@ -295,19 +293,21 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<EM, OT, S, T, Z>
 where
-    I: Input + HasTargetBytes,
-    T: CommandConfigurator,
-    OT: Debug + MatchName + ObserversTuple<I, S>,
-    T: Debug,
+    EM: UsesState<State = S>,
+    S: UsesInput,
+    S::Input: HasTargetBytes,
+    T: CommandConfigurator + Debug,
+    OT: Debug + MatchName + ObserversTuple<S>,
+    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
 
@@ -357,8 +357,26 @@ where
     }
 }
 
-impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
-    for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, OT, S, T, Z> UsesState for CommandExecutor<EM, OT, S, T, Z>
+where
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<EM, OT, S, T, Z> UsesObservers for CommandExecutor<EM, OT, S, T, Z>
+where
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    type Observers = OT;
+}
+
+impl<EM, OT, S, T, Z> HasObservers for CommandExecutor<EM, OT, S, T, Z>
+where
+    S: UsesInput,
+    T: Debug,
+    OT: ObserversTuple<S>,
 {
     fn observers(&self) -> &OT {
         &self.observers
@@ -508,13 +526,14 @@ impl CommandExecutorBuilder {
         self
     }
 
-    /// Builds the `CommandExecutor`.
-    pub fn build<EM, I, OT, S, Z>(
+    /// Builds the `ComandExecutor`
+    pub fn build<EM, OT, S, Z>(
         &self,
         mut observers: OT,
-    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, Error>
+    ) -> Result<CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>, Error>
     where
-        OT: Debug + MatchName + ObserversTuple<I, S>,
+        OT: Debug + MatchName + ObserversTuple<S>,
+        S: UsesInput,
     {
         let program = if let Some(program) = &self.program {
             program
@@ -560,7 +579,7 @@ impl CommandExecutorBuilder {
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator.into_executor::<EM, I, OT, S, Z>(observers))
+        Ok(configurator.into_executor::<EM, OT, S, Z>(observers))
     }
 }
 
@@ -569,7 +588,7 @@ impl CommandExecutorBuilder {
 #[cfg_attr(all(feature = "std", unix), doc = " ```")]
 #[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}};
-/// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
+/// use libafl::{Error, bolts::AsSlice, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::UsesState};
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
@@ -591,8 +610,14 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, I, S, Z> {
-///     MyExecutor.into_executor(())
+/// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
+/// where
+///     EM: UsesState,
+///     Z: UsesState<State = EM::State>,
+///     EM::State: UsesInput,
+///     EM::Input: HasTargetBytes
+/// {
+///     MyExecutor.into_executor((), None, None, None)
 /// }
 /// ```
 
@@ -604,8 +629,7 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    /// It will observe the outputs with the respective given observer name.
-    fn into_executor<EM, I, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
+    fn into_executor<EM, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, OT, S, Self, Z>
     where
         OT: Debug + MatchName,
     {
@@ -627,12 +651,14 @@ mod tests {
         },
         inputs::BytesInput,
         monitors::SimpleMonitor,
+        state::NopState,
+        NopFuzzer,
     };
 
     #[test]
     #[cfg(unix)]
     fn test_builder() {
-        let mut mgr = SimpleEventManager::<BytesInput, _, ()>::new(SimpleMonitor::new(|status| {
+        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
             println!("{status}");
         }));
 
@@ -645,8 +671,8 @@ mod tests {
 
         executor
             .run_target(
-                &mut (),
-                &mut (),
+                &mut NopFuzzer::new(),
+                &mut NopState::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )
@@ -657,7 +683,8 @@ mod tests {
     #[cfg(unix)]
     fn test_parse_afl_cmdline() {
         use alloc::string::ToString;
-        let mut mgr = SimpleEventManager::<BytesInput, _, ()>::new(SimpleMonitor::new(|status| {
+
+        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
             println!("{status}");
         }));
 
@@ -666,8 +693,8 @@ mod tests {
                 .unwrap();
         executor
             .run_target(
-                &mut (),
-                &mut (),
+                &mut NopFuzzer::new(),
+                &mut NopState::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )

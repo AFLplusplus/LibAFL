@@ -46,10 +46,7 @@ pub fn main() {
     let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_and!(
-        CrashFeedback::new(),
-        NewHashFeedback::<AsanBacktraceObserver>::new(&bt_observer)
-    );
+    let mut objective = feedback_and!(CrashFeedback::new(), NewHashFeedback::new(&bt_observer));
     // let mut objective = CrashFeedback::new();
 
     // create a State from scratch
@@ -93,7 +90,7 @@ pub fn main() {
             let mut command = Command::new("./test_command");
 
             let command = command
-                .args(&[self.shmem_id.as_str()])
+                .args([self.shmem_id.as_str()])
                 .env("ASAN_OPTIONS", get_asan_runtime_flags());
 
             command

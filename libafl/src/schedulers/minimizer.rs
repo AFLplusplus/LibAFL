@@ -11,9 +11,9 @@ use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
     corpus::{Corpus, Testcase},
     feedbacks::MapIndexesMetadata,
-    inputs::Input,
+    inputs::UsesInput,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -61,44 +61,48 @@ impl Default for TopRatedsMetadata {
 /// corpus that exercise all the requested features (e.g. all the coverage seen so far)
 /// prioritizing [`Testcase`]`s` using [`TestcaseScore`]
 #[derive(Debug, Clone)]
-pub struct MinimizerScheduler<CS, F, I, M, S>
-where
-    CS: Scheduler<I, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata,
-{
+pub struct MinimizerScheduler<CS, F, M> {
     base: CS,
     skip_non_favored_prob: u64,
-    phantom: PhantomData<(F, I, M, S)>,
+    phantom: PhantomData<(F, M)>,
 }
 
-impl<CS, F, I, M, S> Scheduler<I, S> for MinimizerScheduler<CS, F, I, M, S>
+impl<CS, F, M> UsesState for MinimizerScheduler<CS, F, M>
 where
-    CS: Scheduler<I, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
+    CS: UsesState,
+{
+    type State = CS::State;
+}
+
+impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
+where
+    CS: Scheduler,
+    F: TestcaseScore<CS::State>,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut CS::State, idx: usize) -> Result<(), Error> {
         self.update_score(state, idx)?;
         self.base.on_add(state, idx)
     }
 
     /// Replaces the testcase at the given idx
-    fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
+    fn on_replace(
+        &self,
+        state: &mut CS::State,
+        idx: usize,
+        testcase: &Testcase<<CS::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
         self.base.on_replace(state, idx, testcase)
     }
 
     /// Removes an entry from the corpus, returning M if M was present.
     fn on_remove(
         &self,
-        state: &mut S,
+        state: &mut CS::State,
         idx: usize,
-        testcase: &Option<Testcase<I>>,
+        testcase: &Option<Testcase<<CS::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, idx, testcase)?;
         let mut entries = if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {
@@ -164,7 +168,7 @@ where
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut CS::State) -> Result<usize, Error> {
         self.cull(state)?;
         let mut idx = self.base.next(state)?;
         while {
@@ -182,18 +186,17 @@ where
     }
 }
 
-impl<CS, F, I, M, S> MinimizerScheduler<CS, F, I, M, S>
+impl<CS, F, M> MinimizerScheduler<CS, F, M>
 where
-    CS: Scheduler<I, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
+    CS: Scheduler,
+    F: TestcaseScore<CS::State>,
     M: AsSlice<usize> + SerdeAny + HasRefCnt,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    pub fn update_score(&self, state: &mut CS::State, idx: usize) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata().get::<TopRatedsMetadata>().is_none() {
             state.add_metadata(TopRatedsMetadata::new());
@@ -269,7 +272,7 @@ where
 
     /// Cull the `Corpus` using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
-    pub fn cull(&self, state: &mut S) -> Result<(), Error> {
+    pub fn cull(&self, state: &mut CS::State) -> Result<(), Error> {
         let top_rated = match state.metadata().get::<TopRatedsMetadata>() {
             None => return Ok(()),
             Some(val) => val,
@@ -324,10 +327,10 @@ where
 }
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`.
-pub type LenTimeMinimizerScheduler<CS, I, M, S> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<I, S>, I, M, S>;
+pub type LenTimeMinimizerScheduler<CS, M> =
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, M>;
 
 /// A [`MinimizerScheduler`] with [`LenTimeMulTestcaseScore`] to prioritize quick and small [`Testcase`]`s`
 /// that exercise all the entries registered in the [`MapIndexesMetadata`].
-pub type IndexesLenTimeMinimizerScheduler<CS, I, S> =
-    MinimizerScheduler<CS, LenTimeMulTestcaseScore<I, S>, I, MapIndexesMetadata, S>;
+pub type IndexesLenTimeMinimizerScheduler<CS> =
+    MinimizerScheduler<CS, LenTimeMulTestcaseScore<<CS as UsesState>::State>, MapIndexesMetadata>;

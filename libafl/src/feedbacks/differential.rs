@@ -16,7 +16,7 @@ use crate::{
     feedbacks::Feedback,
     inputs::Input,
     observers::{Observer, ObserversTuple},
-    state::{HasClientPerfMonitor, HasMetadata},
+    state::{HasClientPerfMonitor, HasMetadata, State},
     Error,
 };
 
@@ -48,7 +48,7 @@ impl DiffResult {
 
 /// A [`DiffFeedback`] compares the content of two [`Observer`]s using the given compare function.
 #[derive(Serialize, Deserialize)]
-pub struct DiffFeedback<F, O1, O2>
+pub struct DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
 {
@@ -60,10 +60,10 @@ where
     o2_name: String,
     /// The function used to compare the two observers
     compare_fn: F,
-    phantomm: PhantomData<(O1, O2)>,
+    phantomm: PhantomData<(O1, O2, I, S)>,
 }
 
-impl<F, O1, O2> DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     O1: Named,
@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<F, O1, O2> Named for DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> Named for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     O1: Named,
@@ -101,7 +101,7 @@ where
     }
 }
 
-impl<F, O1, O2> Debug for DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> Debug for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     O1: Named,
@@ -116,13 +116,13 @@ where
     }
 }
 
-impl<F, I, O1, O2, S> Feedback<I, S> for DiffFeedback<F, O1, O2>
+impl<F, I, O1, O2, S> Feedback<S> for DiffFeedback<F, I, O1, O2, S>
 where
     F: FnMut(&O1, &O2) -> DiffResult,
     I: Input,
-    S: HasMetadata + HasClientPerfMonitor,
-    O1: Observer<I, S> + PartialEq<O2>,
-    O2: Observer<I, S>,
+    S: HasMetadata + HasClientPerfMonitor + State<Input = I>,
+    O1: Observer<S> + PartialEq<O2>,
+    O2: Observer<S>,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -134,8 +134,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S> + MatchName,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S> + MatchName,
     {
         fn err(name: &str) -> Error {
             Error::illegal_argument(format!("DiffFeedback: observer {name} not found"))
@@ -154,19 +154,16 @@ where
 #[cfg(test)]
 mod tests {
     use alloc::string::{String, ToString};
+    use core::marker::PhantomData;
 
     use crate::{
-        bolts::{
-            serdeany::SerdeAnyMap,
-            tuples::{tuple_list, Named},
-        },
+        bolts::tuples::{tuple_list, Named},
         events::EventFirer,
         executors::ExitKind,
         feedbacks::{differential::DiffResult, DiffFeedback, Feedback},
-        inputs::{BytesInput, Input},
-        monitors::ClientPerfMonitor,
+        inputs::{BytesInput, UsesInput},
         observers::Observer,
-        state::{HasClientPerfMonitor, HasMetadata},
+        state::{NopState, UsesState},
     };
 
     #[derive(Debug)]
@@ -182,7 +179,7 @@ mod tests {
             }
         }
     }
-    impl<I, S> Observer<I, S> for NopObserver {}
+    impl<S> Observer<S> for NopObserver where S: UsesInput {}
     impl PartialEq for NopObserver {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value
@@ -194,39 +191,30 @@ mod tests {
         }
     }
 
-    struct NopEventFirer;
-    impl<I: Input> EventFirer<I> for NopEventFirer {
-        fn fire<S>(
+    struct NopEventFirer<S> {
+        phantom: PhantomData<S>,
+    }
+    impl<S> UsesState for NopEventFirer<S>
+    where
+        S: UsesInput,
+    {
+        type State = S;
+    }
+    impl<S> EventFirer for NopEventFirer<S>
+    where
+        S: UsesInput,
+    {
+        fn fire(
             &mut self,
             _state: &mut S,
-            _event: crate::events::Event<I>,
+            _event: crate::events::Event<S::Input>,
         ) -> Result<(), crate::Error> {
             Ok(())
         }
     }
 
-    struct NopState;
-    impl HasMetadata for NopState {
-        fn metadata(&self) -> &SerdeAnyMap {
-            unimplemented!()
-        }
-
-        fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
-            unimplemented!()
-        }
-    }
-    impl HasClientPerfMonitor for NopState {
-        fn introspection_monitor(&self) -> &ClientPerfMonitor {
-            unimplemented!()
-        }
-
-        fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor {
-            unimplemented!()
-        }
-    }
-
     fn test_diff(should_equal: bool) {
-        let mut nop_state = NopState;
+        let mut nop_state = NopState::new();
 
         let o1 = NopObserver::new("o1", true);
         let o2 = NopObserver::new("o2", should_equal);
@@ -245,7 +233,9 @@ mod tests {
             diff_feedback
                 .is_interesting(
                     &mut nop_state,
-                    &mut NopEventFirer {},
+                    &mut NopEventFirer {
+                        phantom: PhantomData
+                    },
                     &BytesInput::new(vec![0]),
                     &observers,
                     &ExitKind::Ok
