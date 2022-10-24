@@ -38,6 +38,8 @@ pub struct GramatronInput {
 }
 
 impl Input for GramatronInput {
+    const NAME: &'static str = "GramatronInput";
+
     /// Generate a name for this input
     #[must_use]
     fn generate_name(&self, _idx: usize) -> String {

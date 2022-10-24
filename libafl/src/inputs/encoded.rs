@@ -196,6 +196,8 @@ pub struct EncodedInput {
 }
 
 impl Input for EncodedInput {
+    const NAME: &'static str = "EncodedInput";
+
     /// Generate a name for this input
     #[must_use]
     fn generate_name(&self, _idx: usize) -> String {

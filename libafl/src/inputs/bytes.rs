@@ -3,14 +3,17 @@
 
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 use core::{cell::RefCell, convert::From, hash::Hasher};
+use std::prelude::rust_2015::Box;
 #[cfg(feature = "std")]
 use std::{fs::File, io::Read, path::Path};
 
 use ahash::AHasher;
+#[cfg(feature = "std")]
+use postcard::{de_flavors::Slice, Deserializer};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use crate::{bolts::fs::write_file_atomic, Error};
+use crate::{bolts::fs::write_file_atomic, bolts::AsSlice, inputs::ConvertibleInput, Error};
 use crate::{
     bolts::{ownedref::OwnedSlice, HasLen},
     inputs::{HasBytesVec, HasTargetBytes, Input},
@@ -24,6 +27,8 @@ pub struct BytesInput {
 }
 
 impl Input for BytesInput {
+    const NAME: &'static str = "BytesInput";
+
     #[cfg(feature = "std")]
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
@@ -51,6 +56,24 @@ impl Input for BytesInput {
         hasher.write(self.bytes());
         format!("{:016x}", hasher.finish())
     }
+}
+
+/// Dynamic deserialisation of any input type that has target bytes
+#[cfg(feature = "std")]
+pub fn target_bytes_to_bytes<I: HasTargetBytes + for<'a> Deserialize<'a>>(
+    buf: &[u8],
+) -> Result<Box<dyn ConvertibleInput>, <&mut Deserializer<Slice> as serde::de::Deserializer>::Error>
+{
+    let orig: I = postcard::from_bytes(buf)?;
+    Ok(Box::new(BytesInput {
+        bytes: orig.target_bytes().as_slice().to_vec(),
+    }))
+}
+
+#[cfg(feature = "std")]
+inventory::submit! {
+    use crate::inputs::{GeneralizedInput, InputConversion};
+    InputConversion::new(GeneralizedInput::NAME, BytesInput::NAME, target_bytes_to_bytes::<GeneralizedInput>)
 }
 
 /// Rc Ref-cell from Input
@@ -103,5 +126,24 @@ impl BytesInput {
     #[must_use]
     pub fn new(bytes: Vec<u8>) -> Self {
         Self { bytes }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use alloc::vec::Vec;
+
+    use crate::{
+        bolts::AsSlice,
+        inputs::{BytesInput, GeneralizedInput, HasTargetBytes, Input},
+    };
+
+    #[test]
+    fn deserialize_generalised_to_bytes() {
+        let generalised = GeneralizedInput::new(b"hello".to_vec());
+        let mut buf = Vec::new();
+        generalised.serialize_dynamic(&mut buf).unwrap();
+        let bytes = BytesInput::deserialize_dynamic(&buf).unwrap().unwrap();
+        assert_eq!(bytes.target_bytes().as_slice(), b"hello");
     }
 }

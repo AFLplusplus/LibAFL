@@ -15,15 +15,21 @@ pub use generalized::*;
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
-use core::{clone::Clone, fmt::Debug};
+use core::{
+    clone::Clone,
+    fmt::{Debug, Formatter},
+};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
 
+use downcast_rs::{impl_downcast, Downcast};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
+use postcard::{de_flavors::Slice, Deserializer};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
@@ -33,6 +39,9 @@ use crate::{bolts::ownedref::OwnedSlice, Error};
 /// An input for the target
 #[cfg(not(feature = "std"))]
 pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+    /// Name for this input type
+    const NAME: &'static str;
+
     /// Write this input to the file
     fn to_file<P>(&self, _path: P) -> Result<(), Error> {
         Err(Error::not_implemented("Not supported in no_std"))
@@ -52,7 +61,12 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
 /// An input for the target
 #[cfg(feature = "std")]
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
+pub trait Input:
+    Clone + ConvertibleInput + Serialize + serde::de::DeserializeOwned + Debug
+{
+    /// Name for this input type
+    const NAME: &'static str;
+
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
     where
@@ -72,6 +86,20 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
         Ok(postcard::from_bytes(&bytes)?)
     }
 
+    /// Serializes this input to the dynamic serialisation format to pass between different fuzzers
+    fn serialize_dynamic(&self, buf: &mut Vec<u8>) -> Result<(), postcard::Error> {
+        buf.extend_from_slice(postcard::to_allocvec(Self::NAME)?.as_slice());
+        buf.extend_from_slice(postcard::to_allocvec(self)?.as_slice());
+        Ok(())
+    }
+
+    /// Deserializes this input type from the dynamic serialization format, if possible
+    fn deserialize_dynamic(
+        buf: &[u8],
+    ) -> Result<Option<Self>, <&mut Deserializer<Slice> as serde::de::Deserializer>::Error> {
+        convert_named(buf)
+    }
+
     /// Generate a name for this input
     fn generate_name(&self, idx: usize) -> String;
 
@@ -79,10 +107,82 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     fn wrapped_as_testcase(&mut self) {}
 }
 
+/// Utility trait for downcasting inputs for conversion
+#[cfg(feature = "std")]
+pub trait ConvertibleInput: Downcast {}
+
+#[cfg(feature = "std")]
+impl_downcast!(ConvertibleInput);
+
+#[cfg(feature = "std")]
+impl<I: Input> ConvertibleInput for I {}
+
+/// Function signature for conversion methods
+#[cfg(feature = "std")]
+pub type InputConversionFn = fn(
+    &[u8],
+) -> Result<
+    Box<dyn ConvertibleInput>,
+    <&mut Deserializer<Slice> as serde::de::Deserializer>::Error,
+>;
+
+/// Struct for converting between input types at deserialisation time
+#[cfg(feature = "std")]
+pub struct InputConversion {
+    from: &'static str,
+    to: &'static str,
+    converter: InputConversionFn,
+}
+
+#[cfg(feature = "std")]
+impl Debug for InputConversion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("InputConversion")
+            .field("from", &self.from)
+            .field("to", &self.to)
+            .finish()
+    }
+}
+
+#[cfg(feature = "std")]
+impl InputConversion {
+    /// Create a new input conversion to be registered
+    pub const fn new(from: &'static str, to: &'static str, converter: InputConversionFn) -> Self {
+        Self {
+            from,
+            to,
+            converter,
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+inventory::collect!(InputConversion);
+
+/// Converts from a serialisation-specified type to the intended type, if such a conversion exists
+#[cfg(feature = "std")]
+pub fn convert_named<T: Input>(
+    bytes: &[u8],
+) -> Result<Option<T>, <&mut Deserializer<Slice> as serde::de::Deserializer>::Error> {
+    let mut deser = Deserializer::from_bytes(bytes);
+    let from = String::deserialize(&mut deser)?;
+    for conversion in inventory::iter::<InputConversion> {
+        if conversion.from == from && conversion.to == T::NAME {
+            return Ok((conversion.converter)(deser.finalize()?)?
+                .downcast()
+                .ok()
+                .map(|boxed| *boxed));
+        }
+    }
+    Ok(None)
+}
+
 /// An input for tests, mainly. There is no real use much else.
 #[derive(Copy, Clone, Serialize, Deserialize, Debug, Hash)]
 pub struct NopInput {}
 impl Input for NopInput {
+    const NAME: &'static str = "NopInput";
+
     fn generate_name(&self, _idx: usize) -> String {
         "nop-input".to_string()
     }

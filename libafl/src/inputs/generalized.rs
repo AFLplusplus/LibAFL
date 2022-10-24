@@ -35,6 +35,8 @@ pub struct GeneralizedInput {
 }
 
 impl Input for GeneralizedInput {
+    const NAME: &'static str = "GeneralizedInput";
+
     /// Generate a name for this input
     fn generate_name(&self, _idx: usize) -> String {
         let mut hasher = AHasher::new_with_keys(0, 0);
