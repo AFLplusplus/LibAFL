@@ -114,7 +114,7 @@ where
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
         if self.first_exec {
-            self.hooks.helpers().first_exec_all(&self.hooks);
+            self.hooks.helpers().first_exec_all(self.hooks);
             self.first_exec = false;
         }
         self.hooks.helpers_mut().pre_exec_all(&emu, input);
@@ -274,7 +274,7 @@ where
     ) -> Result<ExitKind, Error> {
         let emu = Emulator::new_empty();
         if self.first_exec {
-            self.hooks.helpers().first_exec_all(&self.hooks);
+            self.hooks.helpers().first_exec_all(self.hooks);
             self.first_exec = false;
         }
         self.hooks.helpers_mut().pre_exec_all(&emu, input);

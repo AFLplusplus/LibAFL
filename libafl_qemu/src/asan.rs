@@ -307,6 +307,7 @@ impl AsanGiovese {
     }
 
     #[inline]
+    #[allow(clippy::mut_from_ref)]
     fn get_shadow_page(emu: &Emulator, page: GuestAddr) -> &mut [i8] {
         unsafe {
             let h = emu.g2h::<*const c_void>(page) as isize;
@@ -367,7 +368,7 @@ impl AsanGiovese {
         self.alloc_tree
             .lock()
             .unwrap()
-            .query(query..query + 1)
+            .query(query..=query)
             .next()
             .map(|entry| *entry.interval)
     }
