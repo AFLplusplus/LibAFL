@@ -923,10 +923,10 @@ where
                 }
             }
             QasanAction::Alloc => {
-                h.alloc(&emulator, a1, a2);
+                h.alloc(&emulator, a1 as GuestAddr, a2 as GuestAddr);
             }
             QasanAction::Dealloc => {
-                h.dealloc(&emulator, a1);
+                h.dealloc(&emulator, a1 as GuestAddr);
             }
             QasanAction::Enable => {
                 h.set_enabled(true);
