@@ -7,12 +7,14 @@ use core::{cell::RefCell, convert::From, hash::Hasher};
 use std::{fs::File, io::Read, path::Path};
 
 use ahash::AHasher;
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 use postcard::{de_flavors::Slice, Deserializer};
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "input_conversion")]
+use crate::inputs::ConvertibleInput;
 #[cfg(feature = "std")]
-use crate::{bolts::fs::write_file_atomic, bolts::AsSlice, inputs::ConvertibleInput, Error};
+use crate::{bolts::fs::write_file_atomic, bolts::AsSlice, Error};
 use crate::{
     bolts::{ownedref::OwnedSlice, HasLen},
     inputs::{HasBytesVec, HasTargetBytes, Input},
@@ -58,7 +60,7 @@ impl Input for BytesInput {
 }
 
 /// Dynamic deserialisation of any input type that has target bytes
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 pub fn target_bytes_to_bytes<I: HasTargetBytes + for<'a> Deserialize<'a>>(
     buf: &[u8],
 ) -> Result<Box<dyn ConvertibleInput>, <&mut Deserializer<Slice> as serde::de::Deserializer>::Error>
@@ -69,7 +71,7 @@ pub fn target_bytes_to_bytes<I: HasTargetBytes + for<'a> Deserialize<'a>>(
     }))
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 inventory::submit! {
     use crate::inputs::{GeneralizedInput, InputConversion};
     InputConversion::new(GeneralizedInput::NAME, BytesInput::NAME, target_bytes_to_bytes::<GeneralizedInput>)

@@ -26,6 +26,7 @@ use core::{
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
 
+#[cfg(feature = "input_conversion")]
 use downcast_rs::{impl_downcast, Downcast};
 #[cfg(feature = "nautilus")]
 pub use nautilus::*;
@@ -108,17 +109,17 @@ pub trait Input:
 }
 
 /// Utility trait for downcasting inputs for conversion
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 pub trait ConvertibleInput: Downcast {}
 
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 impl_downcast!(ConvertibleInput);
 
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 impl<I: Input> ConvertibleInput for I {}
 
 /// Function signature for conversion methods
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 pub type InputConversionFn = fn(
     &[u8],
 ) -> Result<
@@ -127,14 +128,14 @@ pub type InputConversionFn = fn(
 >;
 
 /// Struct for converting between input types at deserialisation time
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 pub struct InputConversion {
     from: &'static str,
     to: &'static str,
     converter: InputConversionFn,
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 impl Debug for InputConversion {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("InputConversion")
@@ -144,7 +145,7 @@ impl Debug for InputConversion {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 impl InputConversion {
     /// Create a new input conversion to be registered
     pub const fn new(from: &'static str, to: &'static str, converter: InputConversionFn) -> Self {
@@ -156,11 +157,11 @@ impl InputConversion {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 inventory::collect!(InputConversion);
 
 /// Converts from a serialisation-specified type to the intended type, if such a conversion exists
-#[cfg(feature = "std")]
+#[cfg(feature = "input_conversion")]
 pub fn convert_named<T: Input>(
     bytes: &[u8],
 ) -> Result<Option<T>, <&mut Deserializer<Slice> as serde::de::Deserializer>::Error> {

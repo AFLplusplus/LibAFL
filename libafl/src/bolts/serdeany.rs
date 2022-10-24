@@ -605,7 +605,7 @@ create_serde_registry_for_trait!(serdeany_registry, crate::bolts::serdeany::Serd
 pub use serdeany_registry::*;
 
 /// Register a `SerdeAny` type in the [`RegistryBuilder`]
-#[cfg(feature = "std")]
+#[cfg(feature = "ctor")]
 #[macro_export]
 macro_rules! register_at_startup {
     ($struct_type:ty) => {
@@ -619,7 +619,7 @@ macro_rules! register_at_startup {
 }
 
 /// Do nothing for `no_std`, you have to register it manually in `main()` with [`RegistryBuilder::register`]
-#[cfg(not(feature = "std"))]
+#[cfg(not(feature = "ctor"))]
 #[macro_export]
 macro_rules! register_at_startup {
     ($struct_type:ty) => {};
