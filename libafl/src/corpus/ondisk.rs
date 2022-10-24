@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, Testcase},
-    inputs::Input,
+    inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
 };
@@ -54,7 +54,14 @@ where
     meta_format: Option<OnDiskMetadataFormat>,
 }
 
-impl<I> Corpus<I> for OnDiskCorpus<I>
+impl<I> UsesInput for OnDiskCorpus<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> Corpus for OnDiskCorpus<I>
 where
     I: Input,
 {

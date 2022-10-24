@@ -1,6 +1,6 @@
 //! Nautilus grammar mutator, see <https://github.com/nautilus-fuzz/nautilus>
 use alloc::string::String;
-use core::fmt::Debug;
+use core::{fmt::Debug, marker::PhantomData};
 use std::fs::create_dir_all;
 
 use grammartec::{chunkstore::ChunkStore, context::Context};
@@ -16,6 +16,7 @@ use crate::{
     generators::NautilusContext,
     inputs::NautilusInput,
     observers::ObserversTuple,
+    prelude::UsesInput,
     state::{HasClientPerfMonitor, HasMetadata},
     Error,
 };
@@ -52,33 +53,37 @@ impl NautilusChunksMetadata {
 }
 
 /// A nautilus feedback for grammar fuzzing
-pub struct NautilusFeedback<'a> {
+pub struct NautilusFeedback<'a, S> {
     ctx: &'a Context,
+    phantom: PhantomData<S>,
 }
 
-impl Debug for NautilusFeedback<'_> {
+impl<S> Debug for NautilusFeedback<'_, S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "NautilusFeedback {{}}")
     }
 }
 
-impl<'a> NautilusFeedback<'a> {
+impl<'a, S> NautilusFeedback<'a, S> {
     /// Create a new [`NautilusFeedback`]
     #[must_use]
     pub fn new(context: &'a NautilusContext) -> Self {
-        Self { ctx: &context.ctx }
+        Self {
+            ctx: &context.ctx,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl<'a> Named for NautilusFeedback<'a> {
+impl<'a, S> Named for NautilusFeedback<'a, S> {
     fn name(&self) -> &str {
         "NautilusFeedback"
     }
 }
 
-impl<'a, S> Feedback<NautilusInput, S> for NautilusFeedback<'a>
+impl<'a, S> Feedback<S> for NautilusFeedback<'a, S>
 where
-    S: HasMetadata + HasClientPerfMonitor,
+    S: HasMetadata + HasClientPerfMonitor + UsesInput<Input = NautilusInput>,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
@@ -90,8 +95,8 @@ where
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<NautilusInput>,
-        OT: ObserversTuple<NautilusInput, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         Ok(false)
     }

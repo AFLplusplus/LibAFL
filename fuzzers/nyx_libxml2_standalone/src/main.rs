@@ -48,7 +48,7 @@ fn main() {
     // let monitor = SimpleMonitor::new(|x|-> () {println!("{}",x)});
     let monitor = TuiMonitor::new("test_fuzz".to_string(), true);
 
-    let mut mgr: SimpleEventManager<BytesInput, _, _> = SimpleEventManager::new(monitor);
+    let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));

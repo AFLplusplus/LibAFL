@@ -48,29 +48,40 @@ use self::push::PushStage;
 use crate::{
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::{Executor, HasObservers},
-    inputs::Input,
+    inputs::UsesInput,
     observers::ObserversTuple,
     schedulers::Scheduler,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasRand},
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata, HasRand, UsesState},
     Error, EvaluatorObservers, ExecutesInput, ExecutionProcessor, HasScheduler,
 };
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<E, EM, S, Z> {
+pub trait Stage<E, EM, Z>: UsesState
+where
+    E: UsesState<State = Self::State>,
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
+{
     /// Run the stage
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Self::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error>;
 }
 
 /// A tuple holding all `Stages` used for fuzzing.
-pub trait StagesTuple<E, EM, S, Z> {
+pub trait StagesTuple<E, EM, S, Z>
+where
+    E: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+    S: UsesInput,
+{
     /// Performs all `Stages` in this tuple
     fn perform_all(
         &mut self,
@@ -82,7 +93,13 @@ pub trait StagesTuple<E, EM, S, Z> {
     ) -> Result<(), Error>;
 }
 
-impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for () {
+impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for ()
+where
+    E: UsesState<State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+    S: UsesInput,
+{
     fn perform_all(
         &mut self,
         _: &mut Z,
@@ -95,16 +112,19 @@ impl<E, EM, S, Z> StagesTuple<E, EM, S, Z> for () {
     }
 }
 
-impl<Head, Tail, E, EM, S, Z> StagesTuple<E, EM, S, Z> for (Head, Tail)
+impl<Head, Tail, E, EM, Z> StagesTuple<E, EM, Head::State, Z> for (Head, Tail)
 where
-    Head: Stage<E, EM, S, Z>,
-    Tail: StagesTuple<E, EM, S, Z>,
+    Head: Stage<E, EM, Z>,
+    Tail: StagesTuple<E, EM, Head::State, Z>,
+    E: UsesState<State = Head::State>,
+    EM: UsesState<State = Head::State>,
+    Z: UsesState<State = Head::State>,
 {
     fn perform_all(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Head::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -120,23 +140,35 @@ where
 
 /// A [`Stage`] that will call a closure
 #[derive(Debug)]
-pub struct ClosureStage<CB, E, EM, S, Z>
+pub struct ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
+    E: UsesState,
 {
     closure: CB,
-    phantom: PhantomData<(E, EM, S, Z)>,
+    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CB, E, EM, S, Z> Stage<E, EM, S, Z> for ClosureStage<CB, E, EM, S, Z>
+impl<CB, E, EM, Z> UsesState for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
+    E: UsesState,
+{
+    type State = E::State;
+}
+
+impl<CB, E, EM, Z> Stage<E, EM, Z> for ClosureStage<CB, E, EM, Z>
+where
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -145,9 +177,10 @@ where
 }
 
 /// A stage that takes a closure
-impl<CB, E, EM, S, Z> ClosureStage<CB, E, EM, S, Z>
+impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
+    E: UsesState,
 {
     /// Create a new [`ClosureStage`]
     #[must_use]
@@ -159,9 +192,10 @@ where
     }
 }
 
-impl<CB, E, EM, S, Z> From<CB> for ClosureStage<CB, E, EM, S, Z>
+impl<CB, E, EM, Z> From<CB> for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut S, &mut EM, usize) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, usize) -> Result<(), Error>,
+    E: UsesState,
 {
     #[must_use]
     fn from(closure: CB) -> Self {
@@ -172,30 +206,12 @@ where
 /// Allows us to use a [`push::PushStage`] as a normal [`Stage`]
 #[allow(clippy::type_complexity)]
 #[derive(Debug)]
-pub struct PushStageAdapter<CS, EM, I, OT, PS, S, Z>
-where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions + HasMetadata,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
-{
+pub struct PushStageAdapter<CS, EM, OT, PS, Z> {
     push_stage: PS,
-    phantom: PhantomData<(CS, EM, I, OT, S, Z)>,
+    phantom: PhantomData<(CS, EM, OT, Z)>,
 }
 
-impl<CS, EM, I, OT, PS, S, Z> PushStageAdapter<CS, EM, I, OT, PS, S, Z>
-where
-    CS: Scheduler<I, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions + HasMetadata,
-    Z: ExecutionProcessor<I, OT, S> + EvaluatorObservers<I, OT, S> + HasScheduler<CS, I, S>,
-{
+impl<CS, EM, OT, PS, Z> PushStageAdapter<CS, EM, OT, PS, Z> {
     /// Create a new [`PushStageAdapter`], wrapping the given [`PushStage`]
     /// to be used as a normal [`Stage`]
     #[must_use]
@@ -207,25 +223,34 @@ where
     }
 }
 
-impl<CS, E, EM, I, OT, PS, S, Z> Stage<E, EM, S, Z> for PushStageAdapter<CS, EM, I, OT, PS, S, Z>
+impl<CS, EM, OT, PS, Z> UsesState for PushStageAdapter<CS, EM, OT, PS, Z>
 where
-    CS: Scheduler<I, S>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I> + EventRestarter<S> + HasEventManagerId + ProgressReporter<I>,
-    I: Input,
-    OT: ObserversTuple<I, S>,
-    PS: PushStage<CS, EM, I, OT, S, Z>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasExecutions + HasMetadata,
-    Z: ExecutesInput<I, OT, S, Z>
-        + ExecutionProcessor<I, OT, S>
-        + EvaluatorObservers<I, OT, S>
-        + HasScheduler<CS, I, S>,
+    CS: UsesState,
+{
+    type State = CS::State;
+}
+
+impl<CS, E, EM, OT, PS, Z> Stage<E, EM, Z> for PushStageAdapter<CS, EM, OT, PS, Z>
+where
+    CS: Scheduler,
+    CS::State: HasClientPerfMonitor + HasExecutions + HasMetadata + HasRand,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = CS::State>,
+    EM: EventFirer<State = CS::State>
+        + EventRestarter
+        + HasEventManagerId
+        + ProgressReporter<State = CS::State>,
+    OT: ObserversTuple<CS::State>,
+    PS: PushStage<CS, EM, OT, Z>,
+    Z: ExecutesInput<E, EM, State = CS::State>
+        + ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<CS>,
 {
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut CS::State,
         event_mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -281,20 +306,19 @@ impl From<bool> for SkippableStageDecision {
 
 /// The [`SkippableStage`] wraps any [`Stage`] so that it can be skipped, according to a condition.
 #[derive(Debug, Clone)]
-pub struct SkippableStage<CD, E, EM, S, ST, Z>
-where
-    CD: FnMut(&mut S) -> SkippableStageDecision,
-    ST: Stage<E, EM, S, Z>,
-{
+pub struct SkippableStage<CD, E, EM, ST, Z> {
     wrapped_stage: ST,
     condition: CD,
-    phantom: PhantomData<(E, EM, S, Z)>,
+    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CD, E, EM, S, ST, Z> SkippableStage<CD, E, EM, S, ST, Z>
+impl<CD, E, EM, ST, Z> SkippableStage<CD, E, EM, ST, Z>
 where
-    CD: FnMut(&mut S) -> SkippableStageDecision,
-    ST: Stage<E, EM, S, Z>,
+    CD: FnMut(&mut ST::State) -> SkippableStageDecision,
+    ST: Stage<E, EM, Z>,
+    E: UsesState<State = ST::State>,
+    EM: UsesState<State = ST::State>,
+    Z: UsesState<State = ST::State>,
 {
     /// Create a new [`SkippableStage`]
     pub fn new(wrapped_stage: ST, condition: CD) -> Self {
@@ -306,10 +330,24 @@ where
     }
 }
 
-impl<CD, E, EM, S, ST, Z> Stage<E, EM, S, Z> for SkippableStage<CD, E, EM, S, ST, Z>
+impl<CD, E, EM, ST, Z> UsesState for SkippableStage<CD, E, EM, ST, Z>
 where
-    CD: FnMut(&mut S) -> SkippableStageDecision,
-    ST: Stage<E, EM, S, Z>,
+    CD: FnMut(&mut ST::State) -> SkippableStageDecision,
+    ST: Stage<E, EM, Z>,
+    E: UsesState<State = ST::State>,
+    EM: UsesState<State = ST::State>,
+    Z: UsesState<State = ST::State>,
+{
+    type State = ST::State;
+}
+
+impl<CD, E, EM, ST, Z> Stage<E, EM, Z> for SkippableStage<CD, E, EM, ST, Z>
+where
+    CD: FnMut(&mut ST::State) -> SkippableStageDecision,
+    ST: Stage<E, EM, Z>,
+    E: UsesState<State = ST::State>,
+    EM: UsesState<State = ST::State>,
+    Z: UsesState<State = ST::State>,
 {
     /// Run the stage
     #[inline]
@@ -317,7 +355,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut ST::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -344,7 +382,10 @@ pub mod pybind {
         executors::pybind::PythonExecutor,
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
         stages::{mutational::pybind::PythonStdMutationalStage, Stage, StagesTuple},
-        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        state::{
+            pybind::{PythonStdState, PythonStdStateWrapper},
+            UsesState,
+        },
         Error,
     };
 
@@ -360,7 +401,11 @@ pub mod pybind {
         }
     }
 
-    impl Stage<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer> for PyObjectStage {
+    impl UsesState for PyObjectStage {
+        type State = PythonStdState;
+    }
+
+    impl Stage<PythonExecutor, PythonEventManager, PythonStdFuzzer> for PyObjectStage {
         #[inline]
         fn perform(
             &mut self,
@@ -444,7 +489,11 @@ pub mod pybind {
         }
     }
 
-    impl Stage<PythonExecutor, PythonEventManager, PythonStdState, PythonStdFuzzer> for PythonStage {
+    impl UsesState for PythonStage {
+        type State = PythonStdState;
+    }
+
+    impl Stage<PythonExecutor, PythonEventManager, PythonStdFuzzer> for PythonStage {
         #[inline]
         #[allow(clippy::let_and_return)]
         fn perform(

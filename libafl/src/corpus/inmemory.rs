@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, Testcase},
-    inputs::Input,
+    inputs::{Input, UsesInput},
     Error,
 };
 
@@ -22,7 +22,14 @@ where
     current: Option<usize>,
 }
 
-impl<I> Corpus<I> for InMemoryCorpus<I>
+impl<I> UsesInput for InMemoryCorpus<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> Corpus for InMemoryCorpus<I>
 where
     I: Input,
 {

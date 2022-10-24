@@ -60,7 +60,7 @@ fn main() {
         corpus
             .add(Testcase::new(input))
             .expect("error in adding corpus");
-        let solutions = OnDiskCorpus::<BytesInput>::new(PathBuf::from("./crashes")).unwrap();
+        let solutions = OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap();
 
         // libafl stuff
         let mut feedback = MaxMapFeedback::new(&observer);
