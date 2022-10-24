@@ -135,7 +135,7 @@ mod test {
 
     use crate::{
         bolts::AsSlice,
-        inputs::{BytesInput, GeneralizedInput, HasTargetBytes, Input},
+        inputs::{BytesInput, GeneralizedInput, HasTargetBytes, Input, NopInput},
     };
 
     #[test]
@@ -145,5 +145,16 @@ mod test {
         generalised.serialize_dynamic(&mut buf).unwrap();
         let bytes = BytesInput::deserialize_dynamic(&buf).unwrap().unwrap();
         assert_eq!(bytes.target_bytes().as_slice(), b"hello");
+    }
+
+    #[test]
+    fn failed_deserialize_from_nop() {
+        // note that NopInput implements HasTargetBytes, but because we have not submitted the
+        // conversion BytesInput cannot be converted from NopInput
+
+        let nop = NopInput {};
+        let mut buf = Vec::new();
+        nop.serialize_dynamic(&mut buf).unwrap();
+        assert!(BytesInput::deserialize_dynamic(&buf).unwrap().is_none());
     }
 }
