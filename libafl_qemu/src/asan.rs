@@ -676,12 +676,12 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.syscalls(qasan_fake_syscall::<I, QT, S>);
+        hooks.syscalls(qasan_fake_syscall::<QT, S>);
     }
 
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
-        QT: QemuHelperTuple<I, S>,
+        QT: QemuHelperTuple<S>,
     {
         hooks.reads(
             Some(gen_readwrite_asan::<QT, S>),

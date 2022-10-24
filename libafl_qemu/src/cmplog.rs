@@ -101,11 +101,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-<<<<<<< HEAD
-    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
-=======
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
->>>>>>> origin/main
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
