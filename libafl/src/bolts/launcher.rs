@@ -180,9 +180,7 @@ where
                             .build()
                             .launch()?;
 
-                        (self.run_client.take().unwrap())(state, mgr, bind_to.id)
-                            .expect("Client closure failed");
-                        break;
+                        return (self.run_client.take().unwrap())(state, mgr, bind_to.id);
                     }
                 };
             }
@@ -250,10 +248,7 @@ where
                     .build()
                     .launch()?;
 
-                (self.run_client.take().unwrap())(state, mgr, core_id)
-                    .expect("Client closure failed");
-
-                unreachable!("Fuzzer client code should never get here!");
+                return (self.run_client.take().unwrap())(state, mgr, core_id);
             }
             Err(std::env::VarError::NotPresent) => {
                 // I am a broker
