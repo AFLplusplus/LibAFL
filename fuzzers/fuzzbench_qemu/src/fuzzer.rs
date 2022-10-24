@@ -336,7 +336,7 @@ fn fuzz(
 
         ExitKind::Ok
     };
-    
+
     let mut hooks = QemuHooks::new(
         &emu,
         tuple_list!(
