@@ -24,7 +24,7 @@ use libafl::{
     inputs::{HasTargetBytes, Input},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{get_asan_runtime_flags, ASANBacktraceObserver, StdMapObserver},
+    observers::{get_asan_runtime_flags, AsanBacktraceObserver, StdMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -40,7 +40,7 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", signals.as_mut_slice());
     // Create a stacktrace observer
-    let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
+    let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 
     // Feedback to rate the interestingness of an input, obtained by ANDing the interestingness of both feedbacks
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -48,7 +48,7 @@ pub fn main() {
     // A feedback to choose if an input is a solution or not
     let mut objective = feedback_and!(
         CrashFeedback::new(),
-        NewHashFeedback::<ASANBacktraceObserver>::new(&bt_observer)
+        NewHashFeedback::<AsanBacktraceObserver>::new(&bt_observer)
     );
     // let mut objective = CrashFeedback::new();
 
@@ -76,7 +76,7 @@ pub fn main() {
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(mon);
 
-    // A queue policy to get testcasess from the corpus
+    // A queue policy to get testcases from the corpus
     let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
@@ -108,12 +108,7 @@ pub fn main() {
         }
     }
 
-    let mut executor = MyExecutor { shmem_id }.into_executor(
-        tuple_list!(observer, bt_observer),
-        None,
-        None,
-        Some("ASANBacktraceObserver".to_string()),
-    );
+    let mut executor = MyExecutor { shmem_id }.into_executor(tuple_list!(observer, bt_observer));
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);

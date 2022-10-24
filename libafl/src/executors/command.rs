@@ -27,7 +27,7 @@ use crate::{
         AsSlice,
     },
     inputs::HasTargetBytes,
-    observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
+    observers::ObserversTuple,
     std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
@@ -45,10 +45,10 @@ enum InputLocation {
     },
     /// Deliver input via `StdIn`
     StdIn,
-    /// Deliver the iniput via the specified [`InputFile`]
+    /// Deliver the input via the specified [`InputFile`]
     /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
     File {
-        /// The fiel to write input to. The target should read input from this location.
+        /// The file to write input to. The target should read input from this location.
         out_file: InputFile,
     },
 }
@@ -79,7 +79,6 @@ pub struct StdCommandConfigurator {
     debug_child: bool,
     has_stdout_observer: bool,
     has_stderr_observer: bool,
-    has_asan_observer: bool,
     /// true: input gets delivered via stdink
     input_location: InputLocation,
     /// The Command to execute
@@ -104,7 +103,7 @@ impl CommandConfigurator for StdCommandConfigurator {
                 if self.has_stdout_observer {
                     cmd.stdout(Stdio::piped());
                 }
-                if self.has_stderr_observer || self.has_asan_observer {
+                if self.has_stderr_observer {
                     cmd.stderr(Stdio::piped());
                 }
 
@@ -150,23 +149,16 @@ impl CommandConfigurator for StdCommandConfigurator {
 
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
-/// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
+/// Instead, you can also use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
 pub struct CommandExecutor<EM, I, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
 {
-    /// The wrapped comand configurer
+    /// The wrapped command configurer
     configurer: T,
+    /// The obsevers used by this executor
     observers: OT,
-    /// cache if the AsanBacktraceObserver is present
-    has_asan_observer: Option<String>,
-    /// If set, we found a [`StdErrObserver`] in the observer list.
-    /// Pipe the child's `stderr` instead of closing it.
-    has_stdout_observer: Option<String>,
-    /// If set, we found a [`StdOutObserver`] in the observer list
-    /// Pipe the child's `stdout` instead of closing it.
-    has_stderr_observer: Option<String>,
     phantom: PhantomData<(EM, I, S, Z)>,
 }
 
@@ -215,18 +207,15 @@ where
 
 impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>
 where
-    OT: MatchName + Debug,
+    OT: MatchName + Debug + ObserversTuple<I, S>,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
     pub fn from_cmd_with_file<P>(
         cmd: &Command,
         debug_child: bool,
-        observers: OT,
+        mut observers: OT,
         path: P,
-        has_stdout_observer: Option<String>,
-        has_stderr_observer: Option<String>,
-        has_asan_observer: Option<String>,
     ) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -238,43 +227,37 @@ where
         }
         command.stdin(Stdio::null());
 
-        if has_stdout_observer.is_some() {
+        let has_stdout_observer = observers.observes_stdout();
+        if has_stdout_observer {
             command.stdout(Stdio::piped());
         }
-        if has_stderr_observer.is_some() || has_asan_observer.is_some() {
+        let has_stderr_observer = observers.observes_stderr();
+        if has_stderr_observer {
             command.stderr(Stdio::piped());
         }
 
         Ok(Self {
             observers,
-
             configurer: StdCommandConfigurator {
                 input_location: InputLocation::File {
                     out_file: InputFile::create(path)?,
                 },
                 command,
                 debug_child,
-                has_stdout_observer: has_stdout_observer.is_some(),
-                has_stderr_observer: has_stderr_observer.is_some(),
-                has_asan_observer: has_asan_observer.is_some(),
+                has_stdout_observer,
+                has_stderr_observer,
             },
-            has_stdout_observer,
-            has_stderr_observer,
-            has_asan_observer,
             phantom: PhantomData,
         })
     }
 
-    /// Parses an AFL-like comandline, replacing `@@` with the input file.
+    /// Parses an AFL-like commandline, replacing `@@` with the input file.
     /// If no `@@` was found, will use stdin for input.
     /// The arg 0 is the program.
     pub fn parse_afl_cmdline<IT, O>(
         args: IT,
         observers: OT,
         debug_child: bool,
-        has_stdout_observer: Option<String>,
-        has_stderr_observer: Option<String>,
-        has_asan_observer: Option<String>,
     ) -> Result<Self, Error>
     where
         IT: IntoIterator<Item = O>,
@@ -283,16 +266,6 @@ where
         let mut atat_at = None;
         let mut builder = CommandExecutorBuilder::new();
         builder.debug_child(debug_child);
-        if let Some(name) = has_stdout_observer {
-            builder.stdout_observer(name);
-        }
-        if let Some(name) = has_stderr_observer {
-            builder.stderr_observer(name);
-        }
-        if let Some(name) = has_asan_observer {
-            builder.asan_observer(name);
-        }
-
         let afl_delim = OsStr::new("@@");
 
         for (pos, arg) in args.into_iter().enumerate() {
@@ -326,7 +299,7 @@ impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S,
 where
     I: Input + HasTargetBytes,
     T: CommandConfigurator,
-    OT: Debug + MatchName,
+    OT: Debug + MatchName + ObserversTuple<I, S>,
     T: Debug,
 {
     fn run_target(
@@ -361,37 +334,23 @@ where
             }
         };
 
-        if self.has_asan_observer.is_some() || self.has_stderr_observer.is_some() {
+        if self.observers.observes_stderr() {
             let mut stderr = String::new();
             child.stderr.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
                 )
             })?.read_to_string(&mut stderr)?;
-            if let Some(name) = self.has_asan_observer.as_ref() {
-                self.observers
-                    .match_name_mut::<ASANBacktraceObserver>(name)
-                    .unwrap()
-                    .parse_asan_output(&stderr);
-            }
-            if let Some(name) = self.has_stderr_observer.as_ref() {
-                self.observers
-                    .match_name_mut::<StdErrObserver>(name)
-                    .unwrap()
-                    .stderr = Some(stderr);
-            }
+            self.observers.observe_stderr(&stderr);
         }
-        if let Some(name) = self.has_stdout_observer.as_ref() {
+        if self.observers.observes_stdout() {
             let mut stdout = String::new();
             child.stdout.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor",
                 )
             })?.read_to_string(&mut stdout)?;
-            self.observers
-                .match_name_mut::<StdOutObserver>(name)
-                .unwrap()
-                .stdout = Some(stdout);
+            self.observers.observe_stdout(&stdout);
         }
 
         res
@@ -419,9 +378,6 @@ pub struct CommandExecutorBuilder {
     input_location: InputLocation,
     cwd: Option<PathBuf>,
     envs: Vec<(OsString, OsString)>,
-    has_stdout_observer: Option<String>,
-    has_stderr_observer: Option<String>,
-    has_asan_observer: Option<String>,
 }
 
 impl Default for CommandExecutorBuilder {
@@ -441,28 +397,7 @@ impl CommandExecutorBuilder {
             cwd: None,
             envs: vec![],
             debug_child: false,
-            has_stdout_observer: None,
-            has_stderr_observer: None,
-            has_asan_observer: None,
         }
-    }
-
-    /// Set the stdout observer name
-    pub fn stdout_observer(&mut self, name: String) -> &mut Self {
-        self.has_stdout_observer = Some(name);
-        self
-    }
-
-    /// Set the stderr observer name
-    pub fn stderr_observer(&mut self, name: String) -> &mut Self {
-        self.has_stderr_observer = Some(name);
-        self
-    }
-
-    /// Set the asan observer name
-    pub fn asan_observer(&mut self, name: String) -> &mut Self {
-        self.has_asan_observer = Some(name);
-        self
     }
 
     /// Set the binary to execute
@@ -573,13 +508,13 @@ impl CommandExecutorBuilder {
         self
     }
 
-    /// Builds the `ComandExecutor`
+    /// Builds the `CommandExecutor`.
     pub fn build<EM, I, OT, S, Z>(
         &self,
-        observers: OT,
+        mut observers: OT,
     ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, Error>
     where
-        OT: Debug + MatchName,
+        OT: Debug + MatchName + ObserversTuple<I, S>,
     {
         let program = if let Some(program) = &self.program {
             program
@@ -610,28 +545,22 @@ impl CommandExecutorBuilder {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
-        if self.has_stderr_observer.is_some() || self.has_asan_observer.is_some() {
-            // we need stderr for ASANBackt
-            command.stderr(Stdio::piped());
-        }
-        if self.has_stdout_observer.is_some() {
+        if observers.observes_stdout() {
             command.stdout(Stdio::piped());
+        }
+        if observers.observes_stderr() {
+            // we need stderr for `AsanBacktaceObserver`, and others
+            command.stderr(Stdio::piped());
         }
 
         let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
-            has_stdout_observer: self.has_stdout_observer.is_some(),
-            has_stderr_observer: self.has_stderr_observer.is_some(),
-            has_asan_observer: self.has_asan_observer.is_some(),
+            has_stdout_observer: observers.observes_stdout(),
+            has_stderr_observer: observers.observes_stderr(),
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator.into_executor::<EM, I, OT, S, Z>(
-            observers,
-            self.has_stdout_observer.clone(),
-            self.has_stderr_observer.clone(),
-            self.has_asan_observer.clone(),
-        ))
+        Ok(configurator.into_executor::<EM, I, OT, S, Z>(observers))
     }
 }
 
@@ -663,7 +592,7 @@ impl CommandExecutorBuilder {
 /// }
 ///
 /// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, I, S, Z> {
-///     MyExecutor.into_executor((), None, None, None)
+///     MyExecutor.into_executor(())
 /// }
 /// ```
 
@@ -675,21 +604,13 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<EM, I, OT, S, Z>(
-        self,
-        observers: OT,
-        has_stdout_observer: Option<String>,
-        has_stderr_observer: Option<String>,
-        has_asan_observer: Option<String>,
-    ) -> CommandExecutor<EM, I, OT, S, Self, Z>
+    /// It will observe the outputs with the respective given observer name.
+    fn into_executor<EM, I, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
     where
         OT: Debug + MatchName,
     {
         CommandExecutor {
             observers,
-            has_asan_observer,
-            has_stdout_observer,
-            has_stderr_observer,
             configurer: self,
             phantom: PhantomData,
         }
@@ -740,15 +661,9 @@ mod tests {
             println!("{status}");
         }));
 
-        let mut executor = CommandExecutor::parse_afl_cmdline(
-            &["file".to_string(), "@@".to_string()],
-            (),
-            true,
-            None,
-            None,
-            None,
-        )
-        .unwrap();
+        let mut executor =
+            CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], (), true)
+                .unwrap();
         executor
             .run_target(
                 &mut (),

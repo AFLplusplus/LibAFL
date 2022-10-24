@@ -33,7 +33,7 @@ use crate::{
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input},
     mutators::Tokens,
-    observers::{get_asan_runtime_flags_with_log_path, ASANBacktraceObserver, ObserversTuple},
+    observers::{get_asan_runtime_flags_with_log_path, AsanBacktraceObserver, ObserversTuple},
     Error,
 };
 
@@ -966,13 +966,13 @@ where
             if self.has_asan_observer.is_none() {
                 self.has_asan_observer = Some(
                     self.observers()
-                        .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                        .match_name::<AsanBacktraceObserver>("AsanBacktraceObserver")
                         .is_some(),
                 );
             }
             if self.has_asan_observer.unwrap() {
                 self.observers_mut()
-                    .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
+                    .match_name_mut::<AsanBacktraceObserver>("AsanBacktraceObserver")
                     .unwrap()
                     .parse_asan_output_from_asan_log_file(pid)?;
             }
