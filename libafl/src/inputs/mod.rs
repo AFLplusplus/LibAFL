@@ -167,6 +167,9 @@ pub fn convert_named<T: Input>(
 ) -> Result<Option<T>, <&mut Deserializer<Slice> as serde::de::Deserializer>::Error> {
     let mut deser = Deserializer::from_bytes(bytes);
     let from = String::deserialize(&mut deser)?;
+    if from == T::NAME {
+        return Ok(Some(T::deserialize(&mut deser)?));
+    }
     for conversion in inventory::iter::<InputConversion> {
         if conversion.from == from && conversion.to == T::NAME {
             return Ok((conversion.converter)(deser.finalize()?)?
