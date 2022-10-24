@@ -11,7 +11,7 @@ use crate::{
         ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
         Corpus, Testcase,
     },
-    inputs::Input,
+    inputs::{Input, UsesInput},
     Error,
 };
 
@@ -28,7 +28,14 @@ where
     cache_max_len: usize,
 }
 
-impl<I> Corpus<I> for CachedOnDiskCorpus<I>
+impl<I> UsesInput for CachedOnDiskCorpus<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> Corpus for CachedOnDiskCorpus<I>
 where
     I: Input,
 {

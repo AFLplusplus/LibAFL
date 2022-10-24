@@ -453,19 +453,21 @@ pub mod prelude {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "std")]
-    use crate::events::SimpleEventManager;
+
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, Testcase},
+        events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
+        feedbacks::ConstFeedback,
+        fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        Fuzzer, StdFuzzer,
+        StdFuzzer,
     };
 
     #[test]
@@ -474,25 +476,31 @@ mod tests {
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4]);
+        let testcase = Testcase::new(vec![0; 4].into());
         corpus.add(testcase).unwrap();
+
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
 
         let mut state = StdState::new(
             rand,
             corpus,
             InMemoryCorpus::<BytesInput>::new(),
-            &mut (),
-            &mut (),
+            &mut feedback,
+            &mut objective,
         )
         .unwrap();
 
-        let monitor = SimpleMonitor::new(|s| {
+        let _monitor = SimpleMonitor::new(|s| {
             println!("{s}");
         });
-        let mut event_manager = SimpleEventManager::new(monitor);
+        let mut event_manager = NopEventManager::new();
+
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
 
         let scheduler = RandScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
@@ -515,8 +523,8 @@ mod tests {
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: StdState<
+            _,
             InMemoryCorpus<BytesInput>,
-            BytesInput,
             StdRand,
             InMemoryCorpus<BytesInput>,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();

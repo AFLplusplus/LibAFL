@@ -4,49 +4,45 @@ use alloc::string::{String, ToString};
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
+    bolts::tuples::MatchName,
     corpus::{Corpus, SchedulerTestcaseMetaData},
     executors::{Executor, HasObservers},
     fuzzer::Evaluator,
-    inputs::Input,
     mutators::Mutator,
-    observers::{MapObserver, ObserversTuple},
+    observers::MapObserver,
     schedulers::{
         powersched::SchedulerMetadata, testcase_score::CorpusPowerTestcaseScore, TestcaseScore,
     },
     stages::{MutationalStage, Stage},
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
+
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
-where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: Mutator<I, S>,
-    O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
-{
+pub struct PowerMutationalStage<E, F, EM, M, O, Z> {
     map_observer_name: String,
     mutator: M,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, F, EM, I, O, OT, S, Z)>,
+    phantom: PhantomData<(E, F, EM, O, Z)>,
 }
 
-impl<E, F, EM, I, M, O, OT, S, Z> MutationalStage<E, EM, I, M, S, Z>
-    for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
+impl<E, F, EM, M, O, Z> UsesState for PowerMutationalStage<E, F, EM, M, O, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: Mutator<I, S>,
+    E: UsesState,
+{
+    type State = E::State;
+}
+
+impl<E, F, EM, M, O, Z> MutationalStage<E, EM, M, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
+where
+    E: Executor<EM, Z> + HasObservers,
+    EM: UsesState<State = E::State>,
+    F: TestcaseScore<E::State>,
+    M: Mutator<E::State>,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, I, S>,
+    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    Z: Evaluator<E, EM, State = E::State>,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -62,7 +58,7 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_sign_loss)]
-    fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut E::State, corpus_idx: usize) -> Result<usize, Error> {
         // Update handicap
         let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
         let score = F::compute(&mut *testcase, state)? as usize;
@@ -75,7 +71,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -129,17 +125,15 @@ where
     }
 }
 
-impl<E, F, EM, I, M, O, OT, S, Z> Stage<E, EM, S, Z>
-    for PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
+impl<E, F, EM, M, O, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, M, O, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: Mutator<I, S>,
+    E: Executor<EM, Z> + HasObservers,
+    EM: UsesState<State = E::State>,
+    F: TestcaseScore<E::State>,
+    M: Mutator<E::State>,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata + HasRand,
-    Z: Evaluator<E, EM, I, S>,
+    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -147,7 +141,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -156,16 +150,15 @@ where
     }
 }
 
-impl<E, F, EM, I, M, O, OT, S, Z> PowerMutationalStage<E, F, EM, I, M, O, OT, S, Z>
+impl<E, F, EM, M, O, Z> PowerMutationalStage<E, F, EM, M, O, Z>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    F: TestcaseScore<I, S>,
-    I: Input,
-    M: Mutator<I, S>,
+    E: Executor<EM, Z> + HasObservers,
+    EM: UsesState<State = E::State>,
+    F: TestcaseScore<E::State>,
+    M: Mutator<E::State>,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    Z: Evaluator<E, EM, State = E::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new(mutator: M, map_observer_name: &O) -> Self {
@@ -178,5 +171,5 @@ where
 }
 
 /// The standard powerscheduling stage
-pub type StdPowerMutationalStage<E, EM, I, M, O, OT, S, Z> =
-    PowerMutationalStage<E, CorpusPowerTestcaseScore<I, S>, EM, I, M, O, OT, S, Z>;
+pub type StdPowerMutationalStage<E, EM, M, O, Z> =
+    PowerMutationalStage<E, CorpusPowerTestcaseScore<<E as UsesState>::State>, EM, M, O, Z>;

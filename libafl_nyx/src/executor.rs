@@ -3,8 +3,9 @@ use std::{fmt::Debug, marker::PhantomData};
 use libafl::{
     bolts::AsSlice,
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input},
-    observers::ObserversTuple,
+    inputs::{HasTargetBytes, UsesInput},
+    observers::{ObserversTuple, UsesObservers},
+    state::{State, UsesState},
     Error,
 };
 use libnyx::NyxReturnValue;
@@ -12,16 +13,16 @@ use libnyx::NyxReturnValue;
 use crate::helper::NyxHelper;
 
 /// executor for nyx standalone mode
-pub struct NyxExecutor<'a, I, S, OT> {
+pub struct NyxExecutor<'a, S, OT> {
     /// implement nyx function
     pub helper: &'a mut NyxHelper,
     /// observers
     observers: OT,
     /// phantom data to keep generic type <I,S>
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
+impl<'a, S, OT> Debug for NyxExecutor<'a, S, OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NyxInprocessExecutor")
             .field("helper", &self.helper)
@@ -29,17 +30,35 @@ impl<'a, I, S, OT> Debug for NyxExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, EM, I, S, Z, OT> Executor<EM, I, S, Z> for NyxExecutor<'a, I, S, OT>
+impl<'a, S, OT> UsesState for NyxExecutor<'a, S, OT>
 where
-    I: Input + HasTargetBytes,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<'a, S, OT> UsesObservers for NyxExecutor<'a, S, OT>
+where
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    type Observers = OT;
+}
+
+impl<'a, EM, S, Z, OT> Executor<EM, Z> for NyxExecutor<'a, S, OT>
+where
+    EM: UsesState<State = S>,
+    S: UsesInput,
+    S::Input: HasTargetBytes,
+    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &I,
-    ) -> Result<libafl::executors::ExitKind, libafl::Error> {
+        input: &Self::Input,
+    ) -> Result<ExitKind, Error> {
         let input_owned = input.target_bytes();
         let input = input_owned.as_slice();
         self.helper.nyx_process.set_input(input, input.len() as u32);
@@ -68,7 +87,7 @@ where
     }
 }
 
-impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
+impl<'a, S, OT> NyxExecutor<'a, S, OT> {
     pub fn new(helper: &'a mut NyxHelper, observers: OT) -> Result<Self, Error> {
         Ok(Self {
             helper,
@@ -83,10 +102,10 @@ impl<'a, I, S, OT> NyxExecutor<'a, I, S, OT> {
     }
 }
 
-impl<'a, I, S, OT> HasObservers<I, OT, S> for NyxExecutor<'a, I, S, OT>
+impl<'a, S, OT> HasObservers for NyxExecutor<'a, S, OT>
 where
-    I: Input,
-    OT: ObserversTuple<I, S>,
+    S: State,
+    OT: ObserversTuple<S>,
 {
     fn observers(&self) -> &OT {
         &self.observers

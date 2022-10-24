@@ -22,7 +22,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{ASANBacktraceObserver, ConstMapObserver, HitcountsMapObserver},
+    observers::{AsanBacktraceObserver, ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -50,7 +50,7 @@ pub fn main() {
         shmem_map,
     ));
 
-    let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
+    let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

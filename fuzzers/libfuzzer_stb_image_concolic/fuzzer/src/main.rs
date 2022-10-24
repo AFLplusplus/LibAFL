@@ -4,13 +4,13 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use clap::{self, Parser};
 use std::{
     env,
     path::PathBuf,
     process::{Child, Command, Stdio},
 };
 
+use clap::{self, Parser};
 use libafl::{
     bolts::{
         current_nanos,
@@ -48,7 +48,6 @@ use libafl::{
     state::{HasCorpus, StdState},
     Error,
 };
-
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,
@@ -116,7 +115,6 @@ fn fuzz(
     let cmplog = unsafe { &mut CMPLOG_MAP };
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
-    
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
     let mut feedback = feedback_or!(
@@ -139,12 +137,13 @@ fn fuzz(
             // Corpus in which we store solutions (crashes in this example),
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
-        // States of the feedbacks.
-        // The feedbacks can report the data that should persist in the State.
-        &mut feedback,
-        // Same for objective feedbacks
-        &mut objective,
-        ).unwrap()
+            // States of the feedbacks.
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
+        )
+        .unwrap()
     });
 
     println!("We're a client, let's fuzz :)");

@@ -4,17 +4,18 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::time::Duration;
+use core::{marker::PhantomData, time::Duration};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, SchedulerTestcaseMetaData},
-    inputs::Input,
+    inputs::UsesInput,
     schedulers::Scheduler,
-    state::{HasCorpus, HasMetadata},
+    state::{HasCorpus, HasMetadata, UsesState},
     Error,
 };
+
 /// The n fuzz size
 pub const N_FUZZ_SIZE: usize = 1 << 21;
 
@@ -148,17 +149,24 @@ pub enum PowerSchedule {
 
 /// A corpus scheduler using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler {
+pub struct PowerQueueScheduler<S> {
     strat: PowerSchedule,
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> Scheduler<I, S> for PowerQueueScheduler
+impl<S> UsesState for PowerQueueScheduler<S>
 where
-    S: HasCorpus<I> + HasMetadata,
-    I: Input,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<S> Scheduler for PowerQueueScheduler<S>
+where
+    S: HasCorpus + HasMetadata,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: usize) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(self.strat)));
         }
@@ -189,7 +197,7 @@ where
         Ok(())
     }
 
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty(String::from("No entries in corpus")))
         } else {
@@ -232,10 +240,13 @@ where
     }
 }
 
-impl PowerQueueScheduler {
+impl<S> PowerQueueScheduler<S> {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
     pub fn new(strat: PowerSchedule) -> Self {
-        PowerQueueScheduler { strat }
+        PowerQueueScheduler {
+            strat,
+            phantom: PhantomData,
+        }
     }
 }

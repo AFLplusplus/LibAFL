@@ -20,11 +20,11 @@ use crate::{
         HasObserverName,
     },
     fuzzer::Evaluator,
-    inputs::Input,
+    inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState},
     Error,
 };
 
@@ -63,33 +63,33 @@ impl UnstableEntriesMetadata {
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<I, O, OT, S>
-where
-    I: Input,
-    O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
-{
+pub struct CalibrationStage<O, OT, S> {
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
     track_stability: bool,
-    phantom: PhantomData<(I, O, OT, S)>,
+    phantom: PhantomData<(O, OT, S)>,
 }
 
 const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
 const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S>
+impl<O, OT, S> UsesState for CalibrationStage<O, OT, S>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
-    I: Input,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<O, OT, E::State>
+where
+    E: Executor<EM, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<State = E::State>,
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    OT: ObserversTuple<E::State>,
+    E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
+    Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return, clippy::too_many_lines)]
@@ -97,7 +97,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut E::State,
         mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -285,16 +285,15 @@ where
     }
 }
 
-impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
+impl<O, OT, S> CalibrationStage<O, OT, S>
 where
-    I: Input,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
+    OT: ObserversTuple<S>,
+    S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new<N, R>(map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>) -> Self
+    pub fn new<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
     where
         O::Entry:
             PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
@@ -313,7 +312,7 @@ where
 
     /// Create a new [`CalibrationStage`], but without checking stability.
     #[must_use]
-    pub fn ignore_stability<N, R>(map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>) -> Self
+    pub fn ignore_stability<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
     where
         O::Entry:
             PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,

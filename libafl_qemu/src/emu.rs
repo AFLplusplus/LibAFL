@@ -244,10 +244,11 @@ extern "C" {
 
     static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 
-    #[allow(unused)]
+    /*
     fn libafl_save_qemu_snapshot(name: *const u8);
     #[allow(unused)]
     fn libafl_load_qemu_snapshot(name: *const u8);
+     */
 }
 
 #[cfg(emulation_mode = "systemmode")]
