@@ -82,11 +82,11 @@ tui = { version = "0.18", default-features = false, features = ['crossterm'], op
 crossterm = { version = "0.24", optional = true }
 clap = {version = "3.2", features = ["derive", "wrap_help"], optional = true}
 
-prometheus-client = "0.18.0" # may need to add option = true?
-tide = "0.16.0" # same as above
-async-std = { version = "1.8.0", features = ["attributes"] } # tide cratesio says to add this
-# serde = { version = "1.0", features = ["derive"] } # tide cratesio says to add this
-futures = "0.3.24" # to use block_on()
+prometheus-client = "0.18.0" # for prometheus monitor
+tide = "0.16.0"
+async-std = { version = "1.8.0", features = ["attributes"] }
+# serde = { version = "1.0", features = ["derive"] }
+futures = "0.3.24" 
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 
