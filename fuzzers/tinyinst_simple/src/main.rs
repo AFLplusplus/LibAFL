@@ -50,9 +50,10 @@ fn main() {
     let scheduler = RandScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    let monitor = SimpleMonitor::new(|x| -> () { println!("{}", x) });
+    // let monitor = TuiMonitor::new("test_fuzz".to_string(), true);
 
-    let mut mgr: SimpleEventManager<BytesInput, _, _> = SimpleEventManager::new(monitor);
+    let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
         TinyInstExecutor::new(
             tinyinst_args,
