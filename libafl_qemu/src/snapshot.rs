@@ -105,7 +105,7 @@ impl QemuSnapshotHelper {
     }
 
     #[must_use]
-    pub fn with_mmap_limit(mmap_limit: usize, stop_execution: Box<StopExecutionCallback>) -> Self {
+    pub fn with_mmap_limit(mmap_limit: usize, stop_execution: StopExecutionCallback) -> Self {
         Self {
             accesses: ThreadLocal::new(),
             maps: MappingInfo::default(),
@@ -187,6 +187,7 @@ impl QemuSnapshotHelper {
     }
 
     pub fn access(&mut self, addr: GuestAddr, size: usize) {
+        // ASSUMPTION: the access can only cross 2 pages
         debug_assert!(size > 0);
         let page = addr & SNAPSHOT_PAGE_MASK;
         self.page_access(page);
@@ -472,7 +473,7 @@ impl<S> QemuHelper<S> for QemuSnapshotHelper
 where
     S: UsesInput + HasMetadata,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {

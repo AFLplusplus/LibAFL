@@ -70,7 +70,7 @@ impl<S> QemuHelper<S> for QemuEdgeCoverageHelper
 where
     S: UsesInput + HasMetadata,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
@@ -129,7 +129,7 @@ where
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
