@@ -164,7 +164,7 @@ pub fn build() {
     }
 
     #[cfg(feature = "usermode")]
-    let output_lib = build_dir.join(&format!("libqemu-{cpu_target}.so"));
+    let output_lib = build_dir.join(format!("libqemu-{cpu_target}.so"));
     #[cfg(not(feature = "usermode"))]
     let output_lib = build_dir.join(&format!("libqemu-system-{}.so", cpu_target));
 
@@ -215,7 +215,7 @@ pub fn build() {
     let mut objects = vec![];
     for dir in &[
         build_dir.join("libcommon.fa.p"),
-        build_dir.join(&format!("libqemu-{cpu_target}-{target_suffix}.fa.p")),
+        build_dir.join(format!("libqemu-{cpu_target}-{target_suffix}.fa.p")),
     ] {
         for path in fs::read_dir(dir).unwrap() {
             let path = path.unwrap().path();
