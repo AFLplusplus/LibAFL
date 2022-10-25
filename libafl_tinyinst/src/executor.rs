@@ -5,7 +5,7 @@ use cxx::UniquePtr;
 use libafl::{
     bolts::fs::{InputFile, INPUTFILE_STD},
     executors::{Executor, ExitKind, HasObservers},
-    inputs::{HasTargetBytes, Input, UsesInput},
+    inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     prelude::AsSlice,
     state::{State, UsesState},
