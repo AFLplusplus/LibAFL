@@ -63,8 +63,8 @@ pub fn libafl_main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match Command::new("libafl_fuzzbench")
-        .version("0.8.1")
+    let res = match Command::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer for Fuzzbench")
         .arg(
