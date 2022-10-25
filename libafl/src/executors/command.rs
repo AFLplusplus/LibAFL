@@ -689,7 +689,7 @@ mod tests {
         }));
 
         let mut executor =
-            CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], (), true)
+            CommandExecutor::parse_afl_cmdline(["file".to_string(), "@@".to_string()], (), true)
                 .unwrap();
         executor
             .run_target(
