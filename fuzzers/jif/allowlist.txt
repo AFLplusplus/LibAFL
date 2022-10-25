@@ -1,0 +1,4 @@
+# Enable instrumentation for a whole folder
+src:*/blink/*
+# Enable instrumentation for all functions in those files
+fun:*
