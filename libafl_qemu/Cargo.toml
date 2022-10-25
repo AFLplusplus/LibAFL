@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["usermode", "fork"]
+default = ["fork"]
 python = ["pyo3", "pyo3-build-config"]
 fork = ["libafl/fork"]
 
@@ -24,6 +24,7 @@ aarch64 = [] # build qemu for aarch64
 be = []
 
 usermode = []
+systemmode = []
 
 clippy = [] # special feature for clippy, don't use in normal projects§
 
