@@ -46,8 +46,30 @@ fn main() {
 
     // shim
     std::fs::copy("./src/shim.cc", "./tinyinst/shim.cc").unwrap();
-
     std::fs::copy("./src/shim.h", "./tinyinst/shim.h").unwrap();
+
+    // runresult
+    std::fs::copy("./src/runresult.h", "./tinyinst/runresult.h").unwrap();
+
+    // instrumentation
+    std::fs::copy(
+        "./src/instrumentation.cpp",
+        "./tinyinst/instrumentation.cpp",
+    )
+    .unwrap();
+    std::fs::copy("./src/instrumentation.h", "./tinyinst/instrumentation.h").unwrap();
+
+    // tinyinstinstrumentation
+    std::fs::copy(
+        "./src/tinyinstinstrumentation.cpp",
+        "./tinyinst/tinyinstinstrumentation.cpp",
+    )
+    .unwrap();
+    std::fs::copy(
+        "./src/tinyinstinstrumentation.h",
+        "./tinyinst/tinyinstinstrumentation.h",
+    )
+    .unwrap();
 
     let dst = Config::new("TinyInst")
         .generator("Visual Studio 17 2022") // make this configurable from env variable
