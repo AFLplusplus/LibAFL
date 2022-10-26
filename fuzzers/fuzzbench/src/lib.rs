@@ -38,7 +38,7 @@ use libafl::{
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, StdMutationalStage,
@@ -71,19 +71,22 @@ pub fn libafl_main() {
             Arg::new("out")
                 .short('o')
                 .long("output")
-                .help("The directory to place finds in ('corpus')"),
+                .help("The directory to place finds in ('corpus')")
+                .takes_value(true),
         )
         .arg(
             Arg::new("in")
                 .short('i')
                 .long("input")
-                .help("The directory to read initial inputs from ('seeds')"),
+                .help("The directory to read initial inputs from ('seeds')")
+                .takes_value(true),
         )
         .arg(
             Arg::new("tokens")
                 .short('x')
                 .long("tokens")
-                .help("A file to read tokens from, to be used during fuzzing"),
+                .help("A file to read tokens from, to be used during fuzzing")
+                .takes_value(true),
         )
         .arg(
             Arg::new("logfile")
@@ -99,7 +102,7 @@ pub fn libafl_main() {
                 .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1200"),
         )
-        .arg(Arg::new("remaining"))
+        .arg(Arg::new("remaining").multiple_values(true))
         .try_get_matches()
     {
         Ok(res) => res,
@@ -120,8 +123,8 @@ pub fn libafl_main() {
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    if let Some(filenames) = res.get_many::<String>("remaining") {
-        let filenames: Vec<&str> = filenames.map(|v| v.as_str()).collect();
+    if let Some(filenames) = res.values_of("remaining") {
+        let filenames: Vec<&str> = filenames.collect();
         if !filenames.is_empty() {
             run_testcases(&filenames);
             return;
@@ -157,11 +160,12 @@ pub fn libafl_main() {
 
     let tokens = res.get_one::<String>("tokens").map(PathBuf::from);
 
-    let logfile = PathBuf::from(res.get_one::<String>("logfile").unwrap());
+    let logfile = PathBuf::from(res.get_one::<String>("logfile").unwrap().to_string());
 
     let timeout = Duration::from_millis(
         res.get_one::<String>("timeout")
             .unwrap()
+            .to_string()
             .parse()
             .expect("Could not parse timeout in milliseconds"),
     );
@@ -313,8 +317,9 @@ fn fuzz(
     let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler =
-        IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
+        PowerSchedule::EXPLORE,
+    ));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
