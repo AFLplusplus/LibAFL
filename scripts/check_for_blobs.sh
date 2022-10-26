@@ -1,11 +1,11 @@
 #!/bin/bash
 
-blobs=`find . -type f -exec sh -c '
+blobs=$(find . -type f -exec sh -c '
   for f; do 
     mimetype -b "$f" | grep -Eq "application/(x-object|x-executable)" && 
     printf "%s\n" "$f"
   done
-' sh {} +`
+' sh {} +)
 
 if [ -z "$blobs" ]
 then
