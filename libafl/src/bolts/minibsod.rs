@@ -191,27 +191,105 @@ pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
+    use libc::{
+        _REG_CS, _REG_R10, _REG_R11, _REG_R12, _REG_R13, _REG_R14, _REG_R15, _REG_R8, _REG_R9,
+        _REG_RAX, _REG_RBP, _REG_RBX, _REG_RCX, _REG_RDI, _REG_RDX, _REG_RFLAGS, _REG_RIP,
+        _REG_RSI, _REG_RSP,
+    };
+
     let mcontext = &ucontext.uc_mcontext;
 
-    write!(writer, "r8 : {:#016x}, ", mcontext.__gregs[4])?;
-    write!(writer, "r9 : {:#016x}, ", mcontext.__gregs[5])?;
-    write!(writer, "r10: {:#016x}, ", mcontext.__gregs[6])?;
-    writeln!(writer, "r11: {:#016x}, ", mcontext.__gregs[7])?;
-    write!(writer, "r12: {:#016x}, ", mcontext.__gregs[8])?;
-    write!(writer, "r13: {:#016x}, ", mcontext.__gregs[9])?;
-    write!(writer, "r14: {:#016x}, ", mcontext.__gregs[10])?;
-    writeln!(writer, "r15: {:#016x}, ", mcontext.__gregs[11])?;
-    write!(writer, "rdi: {:#016x}, ", mcontext.__gregs[0])?;
-    write!(writer, "rsi: {:#016x}, ", mcontext.__gregs[1])?;
-    write!(writer, "rbp: {:#016x}, ", mcontext.__gregs[12])?;
-    writeln!(writer, "rbx: {:#016x}, ", mcontext.__gregs[13])?;
-    write!(writer, "rdx: {:#016x}, ", mcontext.__gregs[2])?;
-    write!(writer, "rax: {:#016x}, ", mcontext.__gregs[14])?;
-    write!(writer, "rcx: {:#016x}, ", mcontext.__gregs[3])?;
-    writeln!(writer, "rsp: {:#016x}, ", mcontext.__gregs[24])?;
-    write!(writer, "rip: {:#016x}, ", mcontext.__gregs[21])?;
-    write!(writer, "cs: {:#016x}, ", mcontext.__gregs[22])?;
-    writeln!(writer, "rflags: {:#016x}, ", mcontext.__gregs[23])?;
+    write!(
+        writer,
+        "r8 : {:#016x}, ",
+        mcontext.__gregs[_REG_R8 as usize]
+    )?;
+    write!(
+        writer,
+        "r9 : {:#016x}, ",
+        mcontext.__gregs[_REG_R9 as usize]
+    )?;
+    write!(
+        writer,
+        "r10: {:#016x}, ",
+        mcontext.__gregs[_REG_R10 as usize]
+    )?;
+    writeln!(
+        writer,
+        "r11: {:#016x}, ",
+        mcontext.__gregs[_REG_R11 as usize]
+    )?;
+    write!(
+        writer,
+        "r12: {:#016x}, ",
+        mcontext.__gregs[_REG_R12 as usize]
+    )?;
+    write!(
+        writer,
+        "r13: {:#016x}, ",
+        mcontext.__gregs[_REG_R13 as usize]
+    )?;
+    write!(
+        writer,
+        "r14: {:#016x}, ",
+        mcontext.__gregs[_REG_R14 as usize]
+    )?;
+    writeln!(
+        writer,
+        "r15: {:#016x}, ",
+        mcontext.__gregs[_REG_R15 as usize]
+    )?;
+    write!(
+        writer,
+        "rdi: {:#016x}, ",
+        mcontext.__gregs[_REG_RDI as usize]
+    )?;
+    write!(
+        writer,
+        "rsi: {:#016x}, ",
+        mcontext.__gregs[_REG_RSI as usize]
+    )?;
+    write!(
+        writer,
+        "rbp: {:#016x}, ",
+        mcontext.__gregs[_REG_RBP as usize]
+    )?;
+    writeln!(
+        writer,
+        "rbx: {:#016x}, ",
+        mcontext.__gregs[_REG_RBX as usize]
+    )?;
+    write!(
+        writer,
+        "rdx: {:#016x}, ",
+        mcontext.__gregs[_REG_RDX as usize]
+    )?;
+    write!(
+        writer,
+        "rax: {:#016x}, ",
+        mcontext.__gregs[_REG_RAX as usize]
+    )?;
+    write!(
+        writer,
+        "rcx: {:#016x}, ",
+        mcontext.__gregs[_REG_RCX as usize]
+    )?;
+    writeln!(
+        writer,
+        "rsp: {:#016x}, ",
+        mcontext.__gregs[_REG_RSP as usize]
+    )?;
+    write!(
+        writer,
+        "rip: {:#016x}, ",
+        mcontext.__gregs[_REG_RIP as usize]
+    )?;
+    write!(writer, "cs: {:#016x}, ", mcontext.__gregs[_REG_CS as usize])?;
+    writeln!(
+        writer,
+        "rflags: {:#016x}, ",
+        mcontext.__gregs[_REG_RFLAGS as usize]
+    )?;
 
     Ok(())
 }
