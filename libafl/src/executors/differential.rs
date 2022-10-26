@@ -25,12 +25,10 @@ pub struct DiffExecutor<A, B, OTA, OTB> {
 
 impl<A, B, OTA, OTB> DiffExecutor<A, B, OTA, OTB> {
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, Z>(primary: A, secondary: B) -> Self
+    pub fn new(primary: A, secondary: B) -> Self
     where
-        A: Executor<EM, Z>,
-        B: Executor<EM, Z, State = A::State>,
-        EM: UsesState<State = A::State>,
-        Z: UsesState<State = A::State>,
+        A: UsesState,
+        B: UsesState<State = A::State>,
     {
         Self {
             primary,
