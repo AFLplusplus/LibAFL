@@ -1,4 +1,5 @@
 use std::{env, fs, path::Path, process::Command};
+
 use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
@@ -30,9 +31,9 @@ pub fn build() {
     assert_unique_feature!("usermode", "systemmode");
     let emulation_mode = if cfg!(feature = "usermode") {
         "usermode".to_string()
-    }else if cfg!(feature = "systemmode") {
+    } else if cfg!(feature = "systemmode") {
         "systemmode".to_string()
-    }else{
+    } else {
         env::var("EMULATION_MODE").unwrap_or_else(|_| {
             println!(
                 "cargo:warning=No emulation mode feature enabled or EMULATION_MODE env specified for libafl_qemu, supported: usermode, systemmmode - defaulting to usermode"
@@ -88,7 +89,11 @@ pub fn build() {
     // features at once (disabling the check for mutually exclusive options)
     // resulting in cpu_target being set to 'x86_64' above which obviously
     // doesn't support BE.
-    if cfg!(feature = "be") && cfg!(feature = "arm") && cfg!(feature = "usermode") && !cfg!(feature = "clippy"){
+    if cfg!(feature = "be")
+        && cfg!(feature = "arm")
+        && cfg!(feature = "usermode")
+        && !cfg!(feature = "clippy")
+    {
         // We have told rustc which CPU target to use above (it doesn't need
         // to make any changes for endianness), however, we need QEMU to be
         // built for the right endian-ness, so we update the cpu_target for
@@ -169,17 +174,16 @@ pub fn build() {
 
     let build_dir = qemu_path.join("build");
 
-
     let target_suffix = if emulation_mode == "usermode" {
         "linux-user".to_string()
-    }else{
+    } else {
         "softmmu".to_string()
     };
 
     let output_lib = if emulation_mode == "usermode" {
-        build_dir.join(&format!("libqemu-{cpu_target}.so"))
-    }else{
-        build_dir.join(&format!("libqemu-system-{cpu_target}.so"))
+        build_dir.join(format!("libqemu-{cpu_target}.so"))
+    } else {
+        build_dir.join(format!("libqemu-system-{cpu_target}.so"))
     };
 
     println!("cargo:rerun-if-changed={}", output_lib.to_string_lossy());
@@ -197,10 +201,15 @@ pub fn build() {
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .args(["--disable-blobs", "--disable-bsd-user", "--disable-fdt", "--disable-system"])
+                .args([
+                    "--disable-blobs",
+                    "--disable-bsd-user",
+                    "--disable-fdt",
+                    "--disable-system",
+                ])
                 .status()
                 .expect("Configure failed");
-        }else{
+        } else {
             Command::new("./configure")
                 .current_dir(&qemu_path)
                 //.arg("--as-static-lib")
@@ -338,7 +347,7 @@ pub fn build() {
     let mut objects = vec![];
     for dir in &[
         build_dir.join("libcommon.fa.p"),
-        build_dir.join(&format!("libqemu-{cpu_target}-{target_suffix}.fa.p")),
+        build_dir.join(format!("libqemu-{cpu_target}-{target_suffix}.fa.p")),
     ] {
         for path in fs::read_dir(dir).unwrap() {
             let path = path.unwrap().path();
@@ -379,7 +388,7 @@ pub fn build() {
             .arg("--end-group")
             .status()
             .expect("Partial linked failure");
-    }else{
+    } else {
         Command::new("ld")
             .current_dir(out_dir_path)
             .arg("-o")

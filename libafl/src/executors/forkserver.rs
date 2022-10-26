@@ -594,7 +594,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             None => OsString::from(".cur_input"),
         };
 
-        let input_file = InputFile::create(&input_filename)?;
+        let input_file = InputFile::create(input_filename)?;
 
         let map = match &mut self.shmem_provider {
             None => None,
@@ -677,7 +677,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                     ));
                 }
 
-                println!("Autodict size {:x}", dict_size);
+                println!("Autodict size {dict_size:x}");
 
                 let (rlen, buf) = forkserver.read_st_size(dict_size as usize)?;
 

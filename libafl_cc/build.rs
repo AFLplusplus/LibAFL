@@ -80,7 +80,7 @@ fn find_llvm_config() -> Result<String, String> {
 
 fn exec_llvm_config(args: &[&str]) -> String {
     let llvm_config = find_llvm_config().expect("Unexpected error");
-    match Command::new(&llvm_config).args(args).output() {
+    match Command::new(llvm_config).args(args).output() {
         Ok(output) => String::from_utf8(output.stdout)
             .expect("Unexpected llvm-config output")
             .trim()
@@ -161,7 +161,7 @@ fn main() {
     let src_dir = Path::new("src");
 
     let dest_path = Path::new(&out_dir).join("clang_constants.rs");
-    let mut clang_constants_file = File::create(&dest_path).expect("Could not create file");
+    let mut clang_constants_file = File::create(dest_path).expect("Could not create file");
 
     println!("cargo:rerun-if-env-changed=LLVM_CONFIG");
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
