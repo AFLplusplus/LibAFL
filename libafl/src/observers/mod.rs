@@ -286,6 +286,47 @@ pub trait ObserverWithHashField {
     fn clear_hash(&mut self);
 }
 
+/// A trait for [`Observer`]`s` which observe over differential execution.
+pub trait DifferentialObserver<OTA, OTB, S>: Observer<S>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    /// Observe the first observer after the first target was executed
+    fn observe_first(&self, observers: &OTA);
+
+    /// Observe the second observer after the second target was executed
+    fn observe_second(&self, observers: &OTB);
+}
+
+/// Differential observers tuple, for when you're using multiple differential observers.
+pub trait DifferentialObserversTuple<OTA, OTB, S>: ObserversTuple<S>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+}
+
+impl<OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for ()
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+}
+
+impl<Head, Tail, OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for (Head, Tail)
+where
+    Head: DifferentialObserver<OTA, OTB, S>,
+    Tail: DifferentialObserversTuple<OTA, OTB, S>,
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+}
+
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
