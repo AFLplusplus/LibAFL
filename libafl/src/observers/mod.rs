@@ -293,11 +293,11 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    /// Observe the first observer after the first target was executed
-    fn observe_first(&self, observers: &OTA);
+    /// Observe the first observer tuple after the first target was executed
+    fn observe_first(&self, observers: &OTA) -> Result<(), Error>;
 
-    /// Observe the second observer after the second target was executed
-    fn observe_second(&self, observers: &OTB);
+    /// Observe the second observer tuple after the second target was executed
+    fn observe_second(&self, observers: &OTB) -> Result<(), Error>;
 }
 
 /// Differential observers tuple, for when you're using multiple differential observers.
@@ -307,6 +307,13 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
+    /// Observe the first observer tuple after the first target was executed in all differential
+    /// observers
+    fn observe_first_all(&self, observers: &OTA) -> Result<(), Error>;
+
+    /// Observe the second observer tuple after the second target was executed in all differential
+    /// observers
+    fn observe_second_all(&self, observers: &OTB) -> Result<(), Error>;
 }
 
 impl<OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for ()
@@ -315,6 +322,13 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
+    fn observe_first_all(&self, _: &OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn observe_second_all(&self, _: &OTB) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 impl<Head, Tail, OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for (Head, Tail)
@@ -325,6 +339,15 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
+    fn observe_first_all(&self, observers: &OTA) -> Result<(), Error> {
+        self.0.observe_first(observers)?;
+        self.1.observe_first_all(observers)
+    }
+
+    fn observe_second_all(&self, observers: &OTB) -> Result<(), Error> {
+        self.0.observe_second(observers)?;
+        self.1.observe_second_all(observers)
+    }
 }
 
 /// A simple observer, just overlooking the runtime of the target.

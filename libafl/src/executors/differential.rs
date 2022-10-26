@@ -58,7 +58,7 @@ where
     A: Executor<EM, Z> + HasObservers,
     B: Executor<EM, Z, State = A::State> + HasObservers,
     EM: UsesState<State = A::State>,
-    DOT: Debug,
+    DOT: DifferentialObserversTuple<A::Observers, B::Observers, A::State>,
     Z: UsesState<State = A::State>,
 {
     fn run_target(
@@ -68,10 +68,27 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        let observers = self.observers.get_mut();
+        observers.primary.as_mut().pre_exec_all(state, input)?;
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
         self.primary.post_run_reset();
+        observers
+            .primary
+            .as_mut()
+            .post_exec_all(state, input, &ret1)?;
+        observers
+            .differential
+            .observe_first_all(observers.primary.as_ref())?;
+        observers.secondary.as_mut().pre_exec_all(state, input)?;
         let ret2 = self.secondary.run_target(fuzzer, state, mgr, input)?;
         self.secondary.post_run_reset();
+        observers
+            .secondary
+            .as_mut()
+            .post_exec_all(state, input, &ret2)?;
+        observers
+            .differential
+            .observe_second_all(observers.secondary.as_ref())?;
         if ret1 == ret2 {
             Ok(ret1)
         } else {
