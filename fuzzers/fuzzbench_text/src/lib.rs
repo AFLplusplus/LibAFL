@@ -44,7 +44,7 @@ use libafl::{
     },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{
-        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
         calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
@@ -377,8 +377,9 @@ fn fuzz_binary(
     let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler =
-        IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
+        PowerSchedule::EXPLORE,
+    ));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -532,7 +533,7 @@ fn fuzz_text(
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
     // New maximization map feedback linked to the edges observer and the feedback state
-    let mut map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
+    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);
 
     let calibration = CalibrationStage::new(&map_feedback);
 
@@ -602,8 +603,9 @@ fn fuzz_text(
     let grimoire = StdMutationalStage::new(grimoire_mutator);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler =
-        IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
+        PowerSchedule::EXPLORE,
+    ));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
