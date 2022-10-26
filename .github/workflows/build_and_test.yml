@@ -30,6 +30,8 @@ jobs:
           crate: mdbook-linkcheck
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+      - name: Install mimetype
+      - run: sudo apt-get install libfile-mimeinfo-perl
       - name: Check for binary blobs
         if: runner.os == 'Linux'
         run: ./scripts/check_for_blobs.sh
