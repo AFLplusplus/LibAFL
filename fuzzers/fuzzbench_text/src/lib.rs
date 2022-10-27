@@ -268,6 +268,7 @@ pub fn libafl_main() {
     crashes.push("crashes");
     report.push("report");
     out_dir.push("queue");
+    drop(fs::create_dir(&report));
 
     let in_dir = PathBuf::from(
         res.get_one::<String>("in")
