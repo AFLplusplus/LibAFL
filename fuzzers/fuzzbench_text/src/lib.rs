@@ -10,6 +10,7 @@ use std::{
     env,
     fs::{self, File, OpenOptions},
     io::{self, Read, Write},
+    marker::PhantomData,
     path::{Path, PathBuf},
     process,
 };
@@ -31,7 +32,7 @@ use libafl::{
     feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
-    inputs::{BytesInput, GeneralizedInput, HasTargetBytes},
+    inputs::{BytesInput, GeneralizedInput, HasTargetBytes, UsesInput},
     monitors::SimpleMonitor,
     mutators::{
         grimoire::{
@@ -47,10 +48,10 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage, Stage,
         StdMutationalStage, TracingStage,
     },
-    state::{HasCorpus, HasMetadata, StdState},
+    state::{HasCorpus, HasMetadata, HasRand, HasSolutions, StdState, UsesState},
     Error,
 };
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
@@ -61,6 +62,121 @@ use libafl_targets::{
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
+use serde::{Deserialize, Serialize};
+
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+pub struct FuzzbenchDumpMetadata {
+    pub last_queue: usize,
+    pub last_crash: usize,
+}
+
+libafl::impl_serdeany!(FuzzbenchDumpMetadata);
+
+pub struct FuzzbenchDumpStage<CB, EM, Z> {
+    crashes_dir: PathBuf,
+    queue_dir: PathBuf,
+    to_bytes: CB,
+    phantom: PhantomData<(EM, Z)>,
+}
+
+impl<CB, EM, Z> UsesState for FuzzbenchDumpStage<CB, EM, Z>
+where
+    EM: UsesState,
+{
+    type State = EM::State;
+}
+
+impl<CB, E, EM, Z> Stage<E, EM, Z> for FuzzbenchDumpStage<CB, EM, Z>
+where
+    CB: FnMut(&<Z::State as UsesInput>::Input) -> Vec<u8>,
+    EM: UsesState<State = Z::State>,
+    E: UsesState<State = Z::State>,
+    Z: UsesState,
+    Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+{
+    #[inline]
+    fn perform(
+        &mut self,
+        _fuzzer: &mut Z,
+        _executor: &mut E,
+        state: &mut Z::State,
+        _manager: &mut EM,
+        _corpus_idx: usize,
+    ) -> Result<(), Error> {
+        let meta = state
+            .metadata()
+            .get::<FuzzbenchDumpMetadata>()
+            .map(|m| m.clone())
+            .unwrap_or_else(|| FuzzbenchDumpMetadata::default());
+
+        let queue_count = state.corpus().count();
+        let crashes_count = state.solutions().count();
+
+        for i in meta.last_queue..queue_count {
+            let mut testcase = state.corpus().get(i)?.borrow_mut();
+            let input = testcase.load_input()?;
+            let bytes = (self.to_bytes)(input);
+
+            let fname = self.queue_dir.join(format!("id_{}", i));
+            let mut f = File::create(fname).expect("Unable to open file");
+            drop(f.write(&bytes));
+        }
+
+        for i in meta.last_crash..crashes_count {
+            let mut testcase = state.solutions().get(i)?.borrow_mut();
+            let input = testcase.load_input()?;
+            let bytes = (self.to_bytes)(input);
+
+            let fname = self.crashes_dir.join(format!("id_{}", i));
+            let mut f = File::create(fname).expect("Unable to open file");
+            drop(f.write(&bytes));
+        }
+
+        state.add_metadata(FuzzbenchDumpMetadata {
+            last_queue: queue_count,
+            last_crash: crashes_count,
+        });
+
+        Ok(())
+    }
+}
+
+impl<CB, EM, Z> FuzzbenchDumpStage<CB, EM, Z>
+where
+    CB: FnMut(&<Z::State as UsesInput>::Input) -> Vec<u8>,
+    EM: UsesState<State = Z::State>,
+    Z: UsesState,
+    Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
+{
+    #[must_use]
+    pub fn new(to_bytes: CB, report_dir: &Path) -> Self {
+        let mut crashes_dir = report_dir.to_path_buf();
+        crashes_dir.push("crashes");
+        if fs::create_dir(&crashes_dir).is_err() {
+            println!("Crashes dir at {:?} already exists.", &crashes_dir);
+            if !crashes_dir.is_dir() {
+                panic!(
+                    "Crashes dir at {:?} is not a valid directory!",
+                    &crashes_dir
+                );
+            }
+        }
+        let mut queue_dir = report_dir.to_path_buf();
+        queue_dir.push("queue");
+        if fs::create_dir(&queue_dir).is_err() {
+            println!("Queue dir at {:?} already exists.", &queue_dir);
+            if !queue_dir.is_dir() {
+                panic!("Queue dir at {:?} is not a valid directory!", &queue_dir);
+            }
+        }
+        Self {
+            to_bytes,
+            crashes_dir,
+            queue_dir,
+            phantom: PhantomData,
+        }
+    }
+}
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
@@ -148,7 +264,9 @@ pub fn libafl_main() {
         }
     }
     let mut crashes = out_dir.clone();
+    let mut report = out_dir.clone();
     crashes.push("crashes");
+    report.push("report");
     out_dir.push("queue");
 
     let in_dir = PathBuf::from(
@@ -174,7 +292,7 @@ pub fn libafl_main() {
     );
 
     if check_if_textual(&in_dir, &tokens) {
-        fuzz_text(out_dir, crashes, in_dir, tokens, logfile, timeout)
+        fuzz_text(out_dir, crashes, report, in_dir, tokens, logfile, timeout)
             .expect("An error occurred while fuzzing");
     } else {
         fuzz_binary(out_dir, crashes, in_dir, tokens, logfile, timeout)
@@ -471,6 +589,7 @@ fn fuzz_binary(
 fn fuzz_text(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
+    report_dir: PathBuf,
     seed_dir: PathBuf,
     tokenfile: Option<PathBuf>,
     logfile: PathBuf,
@@ -644,8 +763,21 @@ fn fuzz_text(
         timeout * 10,
     ));
 
+    let fuzzbench = FuzzbenchDumpStage::new(
+        |input: &GeneralizedInput| input.target_bytes().as_slice().to_vec(),
+        &report_dir,
+    );
+
     // The order of the stages matter!
-    let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
+    let mut stages = tuple_list!(
+        fuzzbench,
+        generalization,
+        calibration,
+        tracing,
+        i2s,
+        power,
+        grimoire
+    );
 
     // Read tokens
     if state.metadata().get::<Tokens>().is_none() {
