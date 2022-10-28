@@ -28,8 +28,11 @@ impl<A, B, OTA, OTB, DOT> DiffExecutor<A, B, OTA, OTB, DOT> {
     /// Create a new `DiffExecutor`, wrapping the given `executor`s.
     pub fn new(primary: A, secondary: B, observers: DOT) -> Self
     where
-        A: UsesState,
-        B: UsesState<State = A::State>,
+        A: UsesState + HasObservers<Observers = OTA>,
+        B: UsesState<State = A::State> + HasObservers<Observers = OTB>,
+        DOT: DifferentialObserversTuple<OTA, OTB, A::State>,
+        OTA: ObserversTuple<A::State>,
+        OTB: ObserversTuple<A::State>,
     {
         Self {
             primary,
@@ -68,6 +71,7 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
+        self.observers(); // update in advance
         let observers = self.observers.get_mut();
         observers.primary.as_mut().pre_exec_all(state, input)?;
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;

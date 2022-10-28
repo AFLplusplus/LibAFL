@@ -294,10 +294,14 @@ where
     S: UsesInput,
 {
     /// Observe the first observer tuple after the first target was executed
-    fn observe_first(&self, observers: &OTA) -> Result<(), Error>;
+    fn observe_first(&mut self, _observers: &OTA) -> Result<(), Error> {
+        Ok(())
+    }
 
     /// Observe the second observer tuple after the second target was executed
-    fn observe_second(&self, observers: &OTB) -> Result<(), Error>;
+    fn observe_second(&mut self, _observers: &OTB) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 /// Differential observers tuple, for when you're using multiple differential observers.
@@ -309,11 +313,11 @@ where
 {
     /// Observe the first observer tuple after the first target was executed in all differential
     /// observers
-    fn observe_first_all(&self, observers: &OTA) -> Result<(), Error>;
+    fn observe_first_all(&mut self, observers: &OTA) -> Result<(), Error>;
 
     /// Observe the second observer tuple after the second target was executed in all differential
     /// observers
-    fn observe_second_all(&self, observers: &OTB) -> Result<(), Error>;
+    fn observe_second_all(&mut self, observers: &OTB) -> Result<(), Error>;
 }
 
 impl<OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for ()
@@ -322,11 +326,11 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    fn observe_first_all(&self, _: &OTA) -> Result<(), Error> {
+    fn observe_first_all(&mut self, _: &OTA) -> Result<(), Error> {
         Ok(())
     }
 
-    fn observe_second_all(&self, _: &OTB) -> Result<(), Error> {
+    fn observe_second_all(&mut self, _: &OTB) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -339,12 +343,12 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    fn observe_first_all(&self, observers: &OTA) -> Result<(), Error> {
+    fn observe_first_all(&mut self, observers: &OTA) -> Result<(), Error> {
         self.0.observe_first(observers)?;
         self.1.observe_first_all(observers)
     }
 
-    fn observe_second_all(&self, observers: &OTB) -> Result<(), Error> {
+    fn observe_second_all(&mut self, observers: &OTB) -> Result<(), Error> {
         self.0.observe_second(observers)?;
         self.1.observe_second_all(observers)
     }
@@ -401,6 +405,14 @@ impl Named for TimeObserver {
     fn name(&self) -> &str {
         &self.name
     }
+}
+
+impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for TimeObserver
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
 }
 
 /// A simple observer with a list of things.
