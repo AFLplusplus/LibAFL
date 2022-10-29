@@ -98,6 +98,30 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
+#[cfg(all(target_vendor = "freebsd", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    let mcontext = unsafe { &*ucontext.uc_mcontext };
+    for reg in 0..29_u8 {
+        writeln!(
+            writer,
+            "x{:02}: 0x{:016x} ",
+            reg, mcontext.mc_gpregs.gp_x[reg as usize]
+        )?;
+        if reg % 4 == 3 {
+            writeln!(writer)?;
+        }
+    }
+    write!(writer, "lr: 0x{:016x} ", mcontext.mc_gpregs.gp_lr)?;
+    write!(writer, "sp: 0x{:016x} ", mcontext.mc_gpregs.gp_sp)?;
+
+    Ok(())
+}
+
+/// Write the content of all important registers
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
@@ -389,6 +413,21 @@ fn write_crash<W: Write>(
         writer,
         "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
         signal, ucontext.uc_mcontext.arm_pc, ucontext.uc_mcontext.fault_address
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "freebsd", target_arch = "aarch64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at 0x{:016x}",
+        signal, ucontext.uc_mcontext.mc_gpregs.gp_elr
     )?;
 
     Ok(())
