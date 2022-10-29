@@ -528,23 +528,29 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 #[cfg(target_vendor = "apple")]
 mod apple {
     use alloc::vec::Vec;
+    #[cfg(target_arch = "x86_64")]
     use core::ptr::addr_of_mut;
     use std::thread::available_parallelism;
 
+    #[cfg(target_arch = "x86_64")]
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
         thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
         THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
     };
+    #[cfg(target_arch = "aarch64")]
+    use libc::{pthread_set_qos_class_self_np, qos_class_t::QOS_CLASS_USER_INITIATED};
 
     use super::CoreId;
     use crate::Error;
 
+    #[cfg(target_arch = "x86_64")]
     #[repr(C)]
     struct thread_affinity_policy_data_t {
         affinity_tag: integer_t,
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[link(name = "System", kind = "framework")]
     extern "C" {
         fn thread_policy_set(
@@ -563,6 +569,7 @@ mod apple {
             .collect::<Vec<_>>())
     }
 
+    #[cfg(target_arch = "x86_64")]
     pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         let mut info = thread_affinity_policy_data_t {
             affinity_tag: core_id.id.try_into().unwrap(),
@@ -579,16 +586,26 @@ mod apple {
             // 0 == KERN_SUCCESS
             if result == KERN_SUCCESS {
                 Ok(())
-            } else if result == KERN_NOT_SUPPORTED {
-                // 46 == KERN_NOT_SUPPORTED
-                // Seting a core affinity is not supported on aarch64 apple...
-                // We won't report this as an error to the user, a there's nothing they could do about it.
-                // Error codes, see <https://opensource.apple.com/source/xnu/xnu-792/osfmk/mach/kern_return.h>
-                //|| (cfg!(all(target_vendor = "apple", target_arch = "aarch64"))
-                //    && result == KERN_NOT_SUPPORTED)
-                Err(Error::unsupported(
-                    "Setting a core affinity is not supported on this platform (KERN_NOT_SUPPORTED)",
-                ))
+            } else {
+                Err(Error::unknown(format!(
+                    "Failed to set_for_current {:?}",
+                    result
+                )))
+            }
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_for_current(_: CoreId) -> Result<(), Error> {
+        unsafe {
+            // This is the best we can do, unlike on intel architecture
+            // the system does not allow to pin a process/thread to specific cpu
+            // but instead choosing at best between the two available groups
+            // energy consumption's efficient one and the other focusing more on performance.
+            let result = pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
+
+            if result == 0 {
+                Ok(())
             } else {
                 Err(Error::unknown(format!(
                     "Failed to set_for_current {:?}",
