@@ -129,8 +129,8 @@ where
     }
 
     /// Set the number of iterations to be used by this mutational stage
-    pub fn set_iters(state: &mut Z::State, next: usize) {
-        Self::metadata_mut(state).iters = Some(next);
+    pub fn set_iters(state: &mut Z::State, iters: usize) {
+        Self::metadata_mut(state).iters = Some(iters);
     }
 
     /// Get the set iterations
