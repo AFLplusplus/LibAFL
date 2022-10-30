@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
 struct TuneableMutationalStageMetadata {
-    iters: Option<usize>,
+    iters: Option<u64>,
 }
 
 impl_serdeany!(TuneableMutationalStageMetadata);
@@ -46,12 +46,12 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_possible_truncation)]
-    fn iterations(&self, state: &mut Z::State, _corpus_idx: usize) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut Z::State, _corpus_idx: usize) -> Result<u64, Error> {
         Ok(if let Some(iters) = Self::get_iters(state) {
             iters
         } else {
             // fall back to random
-            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize
+            1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS)
         })
     }
 }
@@ -129,12 +129,12 @@ where
     }
 
     /// Set the number of iterations to be used by this mutational stage
-    pub fn set_iters(state: &mut Z::State, iters: usize) {
+    pub fn set_iters(state: &mut Z::State, iters: u64) {
         Self::metadata_mut(state).iters = Some(iters);
     }
 
     /// Get the set iterations
-    pub fn get_iters(state: &Z::State) -> Option<usize> {
+    pub fn get_iters(state: &Z::State) -> Option<u64> {
         Self::metadata(state).iters
     }
 

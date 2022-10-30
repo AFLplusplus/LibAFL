@@ -16,8 +16,8 @@ use crate::{
 };
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct TuneableSchedulerMetadata {
-    pub next: Option<usize>,
+struct TuneableSchedulerMetadata {
+    next: Option<usize>,
 }
 
 impl_serdeany!(TuneableSchedulerMetadata);

@@ -19,9 +19,9 @@ use crate::{
 };
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
-pub struct TuneableScheduledMutatorMetadata {
-    pub next: Option<usize>,
-    pub iters: Option<u64>,
+struct TuneableScheduledMutatorMetadata {
+    next: Option<usize>,
+    iters: Option<u64>,
 }
 
 impl_serdeany!(TuneableScheduledMutatorMetadata);
@@ -94,7 +94,7 @@ where
 {
     /// Compute the number of iterations used to apply stacked mutations
     fn iterations(&self, state: &mut S, _: &S::Input) -> u64 {
-        if let Some((_next, iters)) = Self::get_next_and_iters(state) {
+        if let Some(iters) = Self::get_iters(state) {
             iters
         } else {
             // fall back to random
@@ -106,7 +106,7 @@ where
     fn schedule(&self, state: &mut S, _: &S::Input) -> usize {
         debug_assert!(!self.mutations().is_empty());
         #[allow(clippy::cast_possible_truncation)]
-        if let Some((next, _iters)) = Self::get_next_and_iters(state) {
+        if let Some(next) = Self::get_next(state) {
             debug_assert!(self.mutations().len() > next);
             next
         } else {
@@ -133,14 +133,14 @@ where
         }
     }
 
-    pub fn metadata_mut(state: &mut S) -> &mut TuneableScheduledMutatorMetadata {
+    fn metadata_mut(state: &mut S) -> &mut TuneableScheduledMutatorMetadata {
         state
             .metadata_mut()
             .get_mut::<TuneableScheduledMutatorMetadata>()
             .unwrap()
     }
 
-    pub fn metadata(state: &S) -> &TuneableScheduledMutatorMetadata {
+    fn metadata(state: &S) -> &TuneableScheduledMutatorMetadata {
         state
             .metadata()
             .get::<TuneableScheduledMutatorMetadata>()
