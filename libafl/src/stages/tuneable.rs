@@ -1,13 +1,14 @@
 //! A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
-use std::marker::PhantomData;
 
 use crate::{
+    bolts::rands::Rand,
     impl_serdeany,
-    prelude::{Mutator, Rand},
+    mutators::Mutator,
     stages::{mutational::DEFAULT_MUTATIONAL_MAX_ITERATIONS, MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error, Evaluator,
 };
+use core::marker::PhantomData;
 use serde::{Deserialize, Serialize};
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
