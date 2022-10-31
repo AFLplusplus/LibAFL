@@ -1,5 +1,9 @@
 //! A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
 
+use core::marker::PhantomData;
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
     bolts::rands::Rand,
     impl_serdeany,
@@ -8,8 +12,6 @@ use crate::{
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error, Evaluator,
 };
-use core::marker::PhantomData;
-use serde::{Deserialize, Serialize};
 
 #[derive(Default, Clone, Copy, Eq, PartialEq, Debug, Serialize, Deserialize)]
 struct TuneableMutationalStageMetadata {
