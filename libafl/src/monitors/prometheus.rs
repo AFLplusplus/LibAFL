@@ -18,8 +18,6 @@
 // When using docker, you may need to point prometheus.yml to the docker0 interface or host.docker.internal
 // ====================
 
-// #[cfg(feature = "introspection")]
-// use alloc::string::ToString;
 use alloc::{borrow::ToOwned, fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
 
@@ -145,9 +143,6 @@ where
             })
             .set(total_clients);
 
-        // Could either create multiple new stats for 'custom' stats, or create a single 'custom_stat' metric--
-        // and cycle through each one, dynamically adding the label of the actual stat name.
-
         // display stats in a SimpleMonitor format
         let fmt = format!(
             "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
@@ -169,6 +164,7 @@ where
             // Update metrics added to the user_stats hashmap by feedback event-fires
             // You can filter for each custom stat in promQL via labels of both the stat name and client id
             println!("{}: {}", key, val);
+            #[allow(clippy::cast_precision_loss)]
             let value: f64 = match val {
                 UserStats::Number(n) => n as f64,
                 UserStats::Float(f) => f,
@@ -178,7 +174,7 @@ where
             self.custom_stat
                 .get_or_create(&Labels {
                     client: sender_id,
-                    stat: key.to_owned(),
+                    stat: key.clone(),
                 })
                 .set(value);
         }
@@ -219,7 +215,7 @@ where
                 custom_stat_clone,
             ))
             .map_err(|err| println!("{:?}", err))
-            .ok(); // TODO: less ugly way to get rid of the 'must use Result' thing
+            .ok();
         });
         Self {
             print_fn,
@@ -281,6 +277,7 @@ where
 }
 
 // set up an HTTP endpoint /metrics
+#[allow(clippy::too_many_arguments)]
 pub async fn serve_metrics(
     listener: String,
     corpus: Family<Labels, Gauge>,
