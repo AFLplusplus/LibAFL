@@ -21,7 +21,7 @@ introspection = [] # Include performance statistics of the fuzzing pipeline
 concolic_mutation = ["z3"] # include a simple concolic mutator based on z3
 python = ["pyo3"]
 tui_monitor = ["tui", "crossterm"] # enable TuiMonitor with crossterm
-prometheus_monitor = []
+prometheus_monitor = ["std", "async-std", "prometheus-client", "tide", "futures"]
 cli = ["clap"]  # expose bolts::cli
 qemu_cli = ["cli"]
 frida_cli = ["cli"]
@@ -56,7 +56,6 @@ hashbrown =  { version = "0.12", features = ["serde", "ahash-compile-time-rng"],
 num-traits = { version = "0.2", default-features = false }
 xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
 serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] } # serialization lib
-# added "derive" feature to above bc of tide
 erased-serde = { version = "0.3.21", default-features = false, features = ["alloc"] } # erased serde
 postcard = { version = "1.0", features = ["alloc"] } # no_std compatible serde serialization fromat
 bincode = {version = "1.3", optional = true }
@@ -82,11 +81,10 @@ tui = { version = "0.18", default-features = false, features = ['crossterm'], op
 crossterm = { version = "0.24", optional = true }
 clap = {version = "3.2", features = ["derive", "wrap_help"], optional = true}
 
-prometheus-client = "0.18.0" # for prometheus monitor
-tide = "0.16.0"
-async-std = { version = "1.8.0", features = ["attributes"] }
-# serde = { version = "1.0", features = ["derive"] }
-futures = "0.3.24" 
+prometheus-client = { version= "0.18.0", optional = true}
+tide = { version = "0.16.0", optional = true }
+async-std = { version = "1.8.0", features = ["attributes"], optional = true }
+futures = { version = "0.3.24", optional = true }
 
 wait-timeout = { version = "0.2", optional = true } # used by CommandExecutor to wait for child process
 

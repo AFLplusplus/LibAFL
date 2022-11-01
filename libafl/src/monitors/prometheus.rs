@@ -18,35 +18,29 @@
 // When using docker, you may need to point prometheus.yml to the docker0 interface or host.docker.internal
 // ====================
 
-use alloc::{borrow::ToOwned, fmt::Debug, string::String, vec::Vec};
+use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
+use std::{
+    boxed::Box,
+    sync::{atomic::AtomicU64, Arc},
+    thread,
+};
+
+// using thread in order to start the HTTP server in a separate thread
+use futures::executor::block_on;
+// using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
+use prometheus_client::{
+    encoding::text::{encode, Encode, SendSyncEncodeMetric},
+    metrics::{family::Family, gauge::Gauge},
+    registry::Registry,
+};
+// using tide for the HTTP server library (fast, async, simple)
+use tide::Request;
 
 use crate::{
     bolts::{current_time, format_duration_hms},
-    monitors::{ClientStats, Monitor},
-    prelude::UserStats,
+    monitors::{ClientStats, Monitor, UserStats},
 };
-
-// -- imports for prometheus instrumentation --
-// using the official rust client library for Prometheus: https://github.com/prometheus/client_rust
-use prometheus_client::encoding::text::encode;
-use prometheus_client::encoding::text::SendSyncEncodeMetric;
-use prometheus_client::metrics::gauge::Gauge;
-use prometheus_client::registry::Registry;
-
-use prometheus_client::encoding::text::Encode;
-use prometheus_client::metrics::family::Family;
-
-use std::boxed::Box;
-use std::sync::atomic::AtomicU64;
-use std::sync::Arc;
-// using thread in order to start the HTTP server in a separate thread
-use futures::executor::block_on;
-use std::thread;
-
-// using tide for the HTTP server library (fast, async, simple)
-use tide::Request;
-// -- end of imports for instrumentation --
 
 /// Tracking monitor during fuzzing.
 #[derive(Clone)]
@@ -104,42 +98,42 @@ where
         self.corpus_count
             .get_or_create(&Labels {
                 client: sender_id,
-                stat: "".to_owned(),
+                stat: String::new(),
             })
             .set(corpus_size);
         let objective_size = self.objective_size();
         self.objective_count
             .get_or_create(&Labels {
                 client: sender_id,
-                stat: "".to_owned(),
+                stat: String::new(),
             })
             .set(objective_size);
         let total_execs = self.total_execs();
         self.executions
             .get_or_create(&Labels {
                 client: sender_id,
-                stat: "".to_owned(),
+                stat: String::new(),
             })
             .set(total_execs);
         let execs_per_sec = self.execs_per_sec();
         self.exec_rate
             .get_or_create(&Labels {
                 client: sender_id,
-                stat: "".to_owned(),
+                stat: String::new(),
             })
             .set(execs_per_sec);
         let run_time = (current_time() - self.start_time).as_secs();
         self.runtime
             .get_or_create(&Labels {
                 client: sender_id,
-                stat: "".to_owned(),
+                stat: String::new(),
             })
             .set(run_time); // run time in seconds, which can be converted to a time format by Grafana or similar
         let total_clients = self.client_stats().len().try_into().unwrap(); // convert usize to u64 (unlikely that # of clients will be > 2^64 -1...)
         self.clients_count
             .get_or_create(&Labels {
                 client: sender_id,
-                stat: "".to_owned(),
+                stat: String::new(),
             })
             .set(total_clients);
 
@@ -163,7 +157,7 @@ where
         for (key, val) in cur_client_clone.user_monitor {
             // Update metrics added to the user_stats hashmap by feedback event-fires
             // You can filter for each custom stat in promQL via labels of both the stat name and client id
-            println!("{}: {}", key, val);
+            println!("{key}: {val}");
             #[allow(clippy::cast_precision_loss)]
             let value: f64 = match val {
                 UserStats::Number(n) => n as f64,
@@ -214,7 +208,7 @@ where
                 clients_count_clone,
                 custom_stat_clone,
             ))
-            .map_err(|err| println!("{:?}", err))
+            .map_err(|err| println!("{err:?}"))
             .ok();
         });
         Self {
@@ -258,7 +252,7 @@ where
                 clients_count_clone,
                 custom_stat_clone,
             ))
-            .map_err(|err| println!("{:?}", err))
+            .map_err(|err| println!("{err:?}"))
             .ok();
         });
         Self {
