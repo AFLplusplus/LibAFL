@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use lazy_static::lazy_static;
-use libafl::{prelude::UsesInput, state::HasMetadata};
+use libafl::{inputs::UsesInput, state::HasMetadata};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 
