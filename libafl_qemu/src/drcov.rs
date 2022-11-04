@@ -58,7 +58,7 @@ impl QemuDrCovHelper {
     }
 }
 
-impl<I, S> QemuHelper<S> for QemuDrCovHelper
+impl<S> QemuHelper<S> for QemuDrCovHelper
 where
     I: Input,
     S: HasMetadata,
