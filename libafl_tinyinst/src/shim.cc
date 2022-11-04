@@ -1,5 +1,6 @@
 #include "shim.h"
 
+// litecov
 std::unique_ptr<LiteCov> litecov_new() {
   return std::make_unique<LiteCov>();
 }
@@ -14,4 +15,9 @@ void get_coverage_map(uint8_t *bitmap, size_t map_size, Coverage &newcoverage) {
       if (offset < map_size) { bitmap[offset] = 1; }
     }
   }
+}
+
+// tinyinstinstrumentation
+std::unique_ptr<TinyInstInstrumentation> tinyinstinstrumentation_new() {
+  return std::make_unique<TinyInstInstrumentation>();
 }

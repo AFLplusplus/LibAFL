@@ -7,8 +7,67 @@ pub mod common {
     }
 }
 
+// #[cxx::bridge]
+// pub mod tinyinst {
+//     #[repr(u32)]
+//     enum RunResult {
+//         OK,
+//         CRASH,
+//         HANG,
+//         OTHER_ERROR,
+//     }
+
+//     unsafe extern "C++" {
+//         include!("tinyinstinstrumentation.h");
+//         // for constructors
+//         include!("shim.h");
+//         include!("coverage.h");
+//         type TinyInstInstrumentation;
+//         pub fn tinyinstinstrumentation_new() -> UniquePtr<TinyInstInstrumentation>;
+
+//         type RunResult;
+//         // type Coverage;
+//         pub unsafe fn Init(
+//             self: Pin<&mut TinyInstInstrumentation>,
+//             argc: i32,
+//             argv: *mut *mut c_char,
+//         );
+//         pub unsafe fn Run(
+//             self: Pin<&mut TinyInstInstrumentation>,
+//             argc: i32,
+//             argv: *mut *mut c_char,
+//             init_timeout: u32,
+//             timeout: u32,
+//         ) -> RunResult;
+
+//         pub unsafe fn RunWithCrashAnalysis(
+//             self: Pin<&mut TinyInstInstrumentation>,
+//             argc: i32,
+//             argv: *mut *mut c_char,
+//             init_timeout: u32,
+//             timeout: u32,
+//         ) -> RunResult;
+
+//         pub fn CleanTarget(self: Pin<&mut TinyInstInstrumentation>);
+//         pub fn HasNewCoverage(self: Pin<&mut TinyInstInstrumentation>) -> bool;
+
+//         // pub fn GetCoverage(coverage: Pin<&mut Coverage>);
+//         pub fn ClearCoverage(self: Pin<&mut TinyInstInstrumentation>);
+//         // pub fn IgnoreCoverage(coverage: Pin<&mut Coverage>);
+
+//     }
+// }
+
 #[cxx::bridge]
 pub mod litecov {
+    #[repr(u32)]
+    enum RunResult {
+        OK,
+        CRASH,
+        HANG,
+        OTHER_ERROR,
+    }
+
     #[repr(u32)]
     enum DebuggerStatus {
         DEBUGGER_NONE,
@@ -26,6 +85,7 @@ pub mod litecov {
         include!("coverage.h");
         // for constructors.
         include!("shim.h");
+        include!("tinyinstinstrumentation.h");
 
         type ModuleCovData;
         pub fn ClearInstrumentationData(self: Pin<&mut ModuleCovData>);
@@ -76,6 +136,46 @@ pub mod litecov {
             coverage: Pin<&mut Coverage>,
         );
 
+        // TinyinstInstrumentation
+        type TinyInstInstrumentation;
+        pub fn tinyinstinstrumentation_new() -> UniquePtr<TinyInstInstrumentation>;
+
+        type RunResult;
+        // type Coverage;
+        pub unsafe fn Init(
+            self: Pin<&mut TinyInstInstrumentation>,
+            argc: i32,
+            argv: *mut *mut c_char,
+        );
+        pub unsafe fn Run(
+            self: Pin<&mut TinyInstInstrumentation>,
+            argc: i32,
+            argv: *mut *mut c_char,
+            init_timeout: u32,
+            timeout: u32,
+        ) -> RunResult;
+
+        pub unsafe fn RunWithCrashAnalysis(
+            self: Pin<&mut TinyInstInstrumentation>,
+            argc: i32,
+            argv: *mut *mut c_char,
+            init_timeout: u32,
+            timeout: u32,
+        ) -> RunResult;
+
+        pub fn CleanTarget(self: Pin<&mut TinyInstInstrumentation>);
+        pub fn HasNewCoverage(self: Pin<&mut TinyInstInstrumentation>) -> bool;
+
+        pub fn GetCoverage(
+            self: Pin<&mut TinyInstInstrumentation>,
+            coverage: Pin<&mut Coverage>,
+            clear_coverage: bool,
+        );
+        pub fn ClearCoverage(self: Pin<&mut TinyInstInstrumentation>);
+        pub fn IgnoreCoverage(
+            self: Pin<&mut TinyInstInstrumentation>,
+            coverage: Pin<&mut Coverage>,
+        );
     }
 }
 
