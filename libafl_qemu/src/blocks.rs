@@ -21,6 +21,7 @@ pub struct Instruction {
  *      - operand string
  *      - instruction length
  */
+#[must_use]
 pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Vec<Instruction> {
     #[allow(unused_mut)]
     let mut code = {
@@ -101,5 +102,5 @@ pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Vec<Instruction> {
         } // TODO handle faults
     }
 
-    return block;
+    block
 }

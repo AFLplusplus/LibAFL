@@ -2,7 +2,7 @@ use std::{collections::HashSet, path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use lazy_static::lazy_static;
-use libafl::{inputs::Input, state::HasMetadata};
+use libafl::{prelude::UsesInput, state::HasMetadata};
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
 
@@ -60,26 +60,25 @@ impl QemuDrCovHelper {
 
 impl<S> QemuHelper<S> for QemuDrCovHelper
 where
-    I: Input,
-    S: HasMetadata,
+    S: UsesInput + HasMetadata,
 {
     fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.blocks_raw(Some(gen_unique_block_ids::<I, QT, S>), Some(trace_block));
+        hooks.blocks_raw(Some(gen_unique_block_ids::<QT, S>), Some(trace_block));
     }
 
-    fn pre_exec(&mut self, _emulator: &Emulator, _input: &I) {}
+    fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
 
-    fn post_exec(&mut self, emulator: &Emulator, _input: &I) {
+    fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
         if DRCOV_IDS.lock().unwrap().len() > self.drcov_len {
             println!("New DrCov lenght = {}", DRCOV_IDS.lock().unwrap().len());
             let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
             for id in DRCOV_IDS.lock().unwrap().iter() {
                 for (pc, idm) in DRCOV_MAP.lock().unwrap().iter() {
                     if *idm == *id {
-                        let block = pc2basicblock(*pc, &emulator);
+                        let block = pc2basicblock(*pc, emulator);
                         let mut block_len = 0;
                         for instr in &block {
                             block_len += instr.insn_len;
@@ -104,14 +103,14 @@ where
     }
 }
 
-pub fn gen_unique_block_ids<I, QT, S>(
+pub fn gen_unique_block_ids<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
     S: HasMetadata,
-    I: Input,
+    S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.helpers().match_first_type::<QemuDrCovHelper>() {
