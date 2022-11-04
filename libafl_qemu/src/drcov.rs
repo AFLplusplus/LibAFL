@@ -1,18 +1,17 @@
+use std::{collections::HashSet, path::PathBuf, sync::Mutex};
+
 use hashbrown::{hash_map::Entry, HashMap};
+use lazy_static::lazy_static;
 use libafl::{inputs::Input, state::HasMetadata};
-use std::path::PathBuf;
-use std::collections::HashSet;
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
-use lazy_static::lazy_static;
-use std::sync::Mutex;
 
 use crate::{
-    Emulator,
+    blocks::pc2basicblock,
     emu::GuestAddr,
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
-    blocks::pc2basicblock,
+    Emulator,
 };
 
 lazy_static! {
@@ -30,9 +29,7 @@ pub struct QemuDrCovMetadata {
 impl QemuDrCovMetadata {
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            current_id: 0,
-        }
+        Self { current_id: 0 }
     }
 }
 
@@ -61,19 +58,16 @@ impl QemuDrCovHelper {
     }
 }
 
-impl<I, S> QemuHelper<I, S> for QemuDrCovHelper
+impl<I, S> QemuHelper<S> for QemuDrCovHelper
 where
     I: Input,
     S: HasMetadata,
 {
-    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, I, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
-        QT: QemuHelperTuple<I, S>,
+        QT: QemuHelperTuple<S>,
     {
-        hooks.blocks_raw(
-            Some(gen_unique_block_ids::<I, QT, S>),
-            Some(trace_block),
-        );
+        hooks.blocks_raw(Some(gen_unique_block_ids::<I, QT, S>), Some(trace_block));
     }
 
     fn pre_exec(&mut self, _emulator: &Emulator, _input: &I) {}
@@ -91,30 +85,34 @@ where
                             block_len += instr.insn_len;
                         }
                         block_len -= &block.last().unwrap().insn_len;
-                        drcov_vec.push(
-                            DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len)
-                        );
+                        drcov_vec
+                            .push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
                     }
                 }
             }
 
             let mut rangemap = RangeMap::<usize, (u16, String)>::new();
-            rangemap.insert((GuestAddr::MIN as usize)..(GuestAddr::MAX as usize), (0, "test".to_string()));
-            DrCovWriter::new(&rangemap).write(&self.filename, &drcov_vec).expect("Failed to write coverage file");
+            rangemap.insert(
+                (GuestAddr::MIN as usize)..(GuestAddr::MAX as usize),
+                (0, "test".to_string()),
+            );
+            DrCovWriter::new(&rangemap)
+                .write(&self.filename, &drcov_vec)
+                .expect("Failed to write coverage file");
         }
         self.drcov_len = DRCOV_IDS.lock().unwrap().len();
     }
 }
 
 pub fn gen_unique_block_ids<I, QT, S>(
-    hooks: &mut QemuHooks<'_, I, QT, S>,
+    hooks: &mut QemuHooks<'_, QT, S>,
     state: Option<&mut S>,
     pc: GuestAddr,
 ) -> Option<u64>
 where
     S: HasMetadata,
     I: Input,
-    QT: QemuHelperTuple<I, S>,
+    QT: QemuHelperTuple<S>,
 {
     if let Some(h) = hooks.helpers().match_first_type::<QemuDrCovHelper>() {
         if !h.must_instrument(pc.into()) {
@@ -125,10 +123,7 @@ where
     if state.metadata().get::<QemuDrCovMetadata>().is_none() {
         state.add_metadata(QemuDrCovMetadata::new());
     }
-    let meta = state
-        .metadata_mut()
-        .get_mut::<QemuDrCovMetadata>()
-        .unwrap();
+    let meta = state.metadata_mut().get_mut::<QemuDrCovMetadata>().unwrap();
 
     match DRCOV_MAP.lock().unwrap().entry(pc) {
         Entry::Occupied(e) => {

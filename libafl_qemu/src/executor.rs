@@ -17,13 +17,7 @@ use libafl::{
     Error,
 };
 
-use crate::{
-    emu::{
-        Emulator,
-    },
-    helper::QemuHelperTuple,
-    hooks::QemuHooks,
-};
+use crate::{emu::Emulator, helper::QemuHelperTuple, hooks::QemuHooks};
 
 pub struct QemuExecutor<'a, H, OT, QT, S>
 where

@@ -48,8 +48,8 @@ pub use hooks::*;
 
 pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
-pub mod drcov;
 pub mod cmplog;
+pub mod drcov;
 pub use cmplog::QemuCmpLogHelper;
 #[cfg(emulation_mode = "usermode")]
 pub mod snapshot;
@@ -60,8 +60,8 @@ pub mod asan;
 #[cfg(emulation_mode = "usermode")]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
-pub mod calls;
 pub mod blocks;
+pub mod calls;
 
 pub mod executor;
 pub use executor::QemuExecutor;

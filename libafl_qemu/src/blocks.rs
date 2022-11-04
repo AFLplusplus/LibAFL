@@ -1,8 +1,6 @@
 use capstone::prelude::*;
-use crate::{
-    Emulator,
-    GuestAddr,
-};
+
+use crate::{Emulator, GuestAddr};
 
 pub struct Instruction {
     pub start_addr: GuestAddr,
@@ -23,11 +21,7 @@ pub struct Instruction {
  *      - operand string
  *      - instruction length
  */
-pub fn pc2basicblock(
-    pc: GuestAddr,
-    emu: &Emulator,
-) -> Vec<Instruction>
-{
+pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Vec<Instruction> {
     #[allow(unused_mut)]
     let mut code = {
         #[cfg(emulation_mode = "usermode")]
@@ -73,14 +67,12 @@ pub fn pc2basicblock(
         }
         let insn = insns.first().unwrap();
         let insn_detail: InsnDetail = cs.insn_detail(insn).unwrap();
-        block.push(
-            Instruction {
-                start_addr: insn.address() as GuestAddr,
-                mnemonic: insn.mnemonic().unwrap().to_string(),
-                operands: insn.op_str().unwrap().to_string(),
-                insn_len: insn.len(),
-            }
-        );
+        block.push(Instruction {
+            start_addr: insn.address() as GuestAddr,
+            mnemonic: insn.mnemonic().unwrap().to_string(),
+            operands: insn.op_str().unwrap().to_string(),
+            insn_len: insn.len(),
+        });
         for detail in insn_detail.groups() {
             match u32::from(detail.0) {
                 capstone::InsnGroupType::CS_GRP_BRANCH_RELATIVE
