@@ -1,10 +1,5 @@
 #include "shim.h"
 
-// litecov
-std::unique_ptr<LiteCov> litecov_new() {
-  return std::make_unique<LiteCov>();
-}
-
 std::unique_ptr<Coverage> coverage_new() {
   return std::make_unique<Coverage>();
 }

@@ -12,10 +12,10 @@ use libafl::{
     Error,
 };
 
-use crate::tinyinst::litecov::{get_coverage_map, Coverage, DebuggerStatus, LiteCov};
+use crate::tinyinst::litecov::{get_coverage_map, Coverage, RunResult, TinyInstInstrumentation};
 
 pub struct TinyInstExecutor<S, OT> {
-    instrumentation_ptr: UniquePtr<LiteCov>,
+    instrumentation_ptr: UniquePtr<TinyInstInstrumentation>,
     coverage_ptr: UniquePtr<Coverage>,
     argc: usize,
     argv: Vec<CString>,
@@ -65,12 +65,12 @@ where
         }
 
         #[allow(unused_assignments)]
-        let mut status = DebuggerStatus::DEBUGGER_NONE;
+        let mut status = RunResult::OK;
         unsafe {
-            self.instrumentation_ptr.pin_mut().Kill();
             status = self.instrumentation_ptr.pin_mut().Run(
                 self.argc as i32,
                 argv.as_mut_ptr(),
+                self.timeout,
                 self.timeout,
             );
 
@@ -81,14 +81,12 @@ where
         }
 
         match status {
-            DebuggerStatus::DEBUGGER_CRASHED | DebuggerStatus::DEBUGGER_HANGED => {
-                Ok(ExitKind::Crash)
-            }
-            DebuggerStatus::DEBUGGER_NONE => {
-                Err(Error::unknown("The harness was not run.".to_string()))
-            }
-
-            _ => Ok(ExitKind::Ok),
+            RunResult::CRASH | RunResult::HANG => Ok(ExitKind::Crash),
+            RunResult::OK => Ok(ExitKind::Ok),
+            RunResult::OTHER_ERROR => Err(Error::unknown(
+                "Tinyinst RunResult is other error".to_string(),
+            )),
+            _ => Err(Error::unknown("Tinyinst RunResult is unknown".to_string())),
         }
     }
 }
@@ -106,7 +104,7 @@ where
         bitmap: *mut u8,
         map_size: usize,
     ) -> Self {
-        let mut instrumentation_ptr = LiteCov::new();
+        let mut instrumentation_ptr = TinyInstInstrumentation::new();
         let instrumentation = instrumentation_ptr.pin_mut();
 
         // Convert args into c string vector
