@@ -535,8 +535,8 @@ mod apple {
     #[cfg(target_arch = "x86_64")]
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
-        thread_policy_flavor_t, thread_policy_t, thread_t, KERN_NOT_SUPPORTED, KERN_SUCCESS,
-        THREAD_AFFINITY_POLICY, THREAD_AFFINITY_POLICY_COUNT,
+        thread_policy_flavor_t, thread_policy_t, thread_t, KERN_SUCCESS, THREAD_AFFINITY_POLICY,
+        THREAD_AFFINITY_POLICY_COUNT,
     };
     #[cfg(target_arch = "aarch64")]
     use libc::{
