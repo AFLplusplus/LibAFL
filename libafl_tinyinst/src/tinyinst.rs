@@ -22,6 +22,7 @@ pub mod litecov {
         // for constructors.
         include!("shim.h");
         include!("tinyinstinstrumentation.h");
+        include!("aflcov.h");
 
         type ModuleCovData;
         pub fn ClearInstrumentationData(self: Pin<&mut ModuleCovData>);
@@ -78,6 +79,11 @@ pub mod litecov {
             self: Pin<&mut TinyInstInstrumentation>,
             coverage: Pin<&mut Coverage>,
         );
+
+        // Testing AFLCOV
+        type AFLCov;
+        pub unsafe fn aflcov_new(coverage: *mut u8, capacity: usize) -> UniquePtr<AFLCov>;
+        pub fn add_coverage(self: Pin<&mut AFLCov>, addr: u64);
     }
 }
 
@@ -91,5 +97,11 @@ impl litecov::TinyInstInstrumentation {
 impl litecov::Coverage {
     pub fn new() -> UniquePtr<litecov::Coverage> {
         litecov::coverage_new()
+    }
+}
+
+impl litecov::AFLCov {
+    pub unsafe fn new(coverage: *mut u8, capacity: usize) -> UniquePtr<litecov::AFLCov> {
+        litecov::aflcov_new(coverage, capacity)
     }
 }

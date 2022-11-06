@@ -12,7 +12,9 @@ use libafl::{
     Error,
 };
 
-use crate::tinyinst::litecov::{get_coverage_map, Coverage, RunResult, TinyInstInstrumentation};
+use crate::tinyinst::litecov::{
+    get_coverage_map, AFLCov, Coverage, RunResult, TinyInstInstrumentation,
+};
 
 pub struct TinyInstExecutor<S, OT> {
     instrumentation_ptr: UniquePtr<TinyInstInstrumentation>,
@@ -22,10 +24,12 @@ pub struct TinyInstExecutor<S, OT> {
     timeout: u32,
     observers: OT,
     phantom: PhantomData<S>,
-    bitmap: *mut u8,
-    map_size: usize,
+    coverage: *mut u8,
+    coverage_size: usize,
     cur_input: InputFile,
     use_stdin: bool,
+    aflcov: UniquePtr<AFLCov>,
+    test: u64,
 }
 
 impl<S, OT> std::fmt::Debug for TinyInstExecutor<S, OT> {
@@ -77,7 +81,11 @@ where
             self.instrumentation_ptr
                 .pin_mut()
                 .GetCoverage(self.coverage_ptr.pin_mut(), true);
-            get_coverage_map(self.bitmap, self.map_size, self.coverage_ptr.pin_mut());
+            get_coverage_map(
+                self.coverage,
+                self.coverage_size,
+                self.coverage_ptr.pin_mut(),
+            );
         }
 
         match status {
@@ -101,8 +109,8 @@ where
         args: Vec<String>,
         timeout: u32,
         observers: OT,
-        bitmap: *mut u8,
-        map_size: usize,
+        coverage: *mut u8,
+        coverage_size: usize,
     ) -> Self {
         let mut instrumentation_ptr = TinyInstInstrumentation::new();
         let instrumentation = instrumentation_ptr.pin_mut();
@@ -159,10 +167,12 @@ where
             timeout,
             observers,
             phantom: PhantomData,
-            bitmap,
-            map_size,
+            coverage,
+            coverage_size,
             cur_input,
             use_stdin,
+            aflcov: AFLCov::new(coverage, coverage_size),
+            test: 0,
         }
     }
 }
