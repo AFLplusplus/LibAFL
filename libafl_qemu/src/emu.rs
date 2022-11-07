@@ -7,7 +7,7 @@ use core::{
 };
 #[cfg(emulation_mode = "usermode")]
 use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{ffi::CString, slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -226,6 +226,7 @@ extern "C" {
 extern "C" {
     fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
 
+    fn vm_start();
     fn qemu_main_loop();
     fn qemu_cleanup();
 
@@ -244,11 +245,9 @@ extern "C" {
 
     static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 
-    /*
     fn libafl_save_qemu_snapshot(name: *const u8);
     #[allow(unused)]
     fn libafl_load_qemu_snapshot(name: *const u8);
-     */
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -723,7 +722,10 @@ impl Emulator {
         #[cfg(emulation_mode = "usermode")]
         libafl_qemu_run();
         #[cfg(emulation_mode = "systemmode")]
-        qemu_main_loop();
+        {
+            vm_start();
+            qemu_main_loop();
+        }
     }
 
     #[cfg(emulation_mode = "usermode")]
@@ -910,7 +912,7 @@ impl Emulator {
         }
     }
 
-    /*#[cfg(emulation_mode = "systemmode")]
+    #[cfg(emulation_mode = "systemmode")]
     pub fn save_snapshot(&self, name: &str) {
         let s = CString::new(name).expect("Invalid snapshot name");
         unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _) };
@@ -920,7 +922,7 @@ impl Emulator {
     pub fn load_snapshot(&self, name: &str) {
         let s = CString::new(name).expect("Invalid snapshot name");
         unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _) };
-    }*/
+    }
 
     #[cfg(emulation_mode = "usermode")]
     pub fn set_pre_syscall_hook(
