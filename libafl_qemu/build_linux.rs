@@ -44,8 +44,6 @@ pub fn build() {
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
 
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=src/asan-giovese.c");
-    println!("cargo:rerun-if-changed=src/asan-giovese.h");
     println!("cargo:rerun-if-env-changed=CROSS_CC");
 
     // Make sure we have at most one architecutre feature set
@@ -215,7 +213,7 @@ pub fn build() {
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .arg("--enable-slirp=internal")
+                .arg(if cfg!(feature = "slirp") {"--enable-slirp"} else {"--disable-slirp"})
                 .arg("--enable-fdt=internal")
                 .arg("--audio-drv-list=")
                 .arg("--disable-alsa")
@@ -422,7 +420,6 @@ pub fn build() {
                 build_dir.display()
             ))
             .arg(format!("{}/libfdt.a", build_dir.display()))
-            .arg(format!("{}/libslirp.a", build_dir.display()))
             .arg(format!("{}/libmigration.fa", build_dir.display()))
             .arg(format!("{}/libhwcore.fa", build_dir.display()))
             .arg(format!("{}/libqom.fa", build_dir.display()))
@@ -457,6 +454,8 @@ pub fn build() {
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
     println!("cargo:rustc-link-lib=z");
+    #[cfg(all(feature = "slirp", feature = "systemmode"))]
+    println!("cargo:rustc-link-lib=slirp");
 
     if emulation_mode == "systemmode" {
         println!("cargo:rustc-link-lib=pixman-1");
