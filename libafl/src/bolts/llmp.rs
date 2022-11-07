@@ -315,7 +315,7 @@ impl Listener {
             Listener::Tcp(inner) => match inner.accept() {
                 Ok(res) => ListenerStream::Tcp(res.0, res.1),
                 Err(err) => {
-                    println!("Ignoring failed accept: {:?}", err);
+                    println!("Ignoring failed accept: {err:?}");
                     ListenerStream::Empty()
                 }
             },
@@ -366,7 +366,7 @@ const fn llmp_align(to_align: usize) -> usize {
 #[cfg(feature = "std")]
 #[inline]
 fn msg_offset_from_env(env_name: &str) -> Result<Option<u64>, Error> {
-    let msg_offset_str = env::var(&format!("{}_OFFSET", env_name))?;
+    let msg_offset_str = env::var(format!("{env_name}_OFFSET"))?;
     Ok(if msg_offset_str == _NULL_ENV_STR {
         None
     } else {
@@ -433,7 +433,7 @@ fn recv_tcp_msg(stream: &mut TcpStream) -> Result<Vec<u8>, Error> {
     bytes.resize(size as usize, 0_u8);
 
     #[cfg(feature = "llmp_debug")]
-    println!("LLMP TCP: Receiving payload of size {}", size);
+    println!("LLMP TCP: Receiving payload of size {size}");
 
     stream
         .read_exact(&mut bytes)
@@ -818,7 +818,7 @@ where
     #[cfg(feature = "std")]
     #[inline]
     fn client_id_from_env(env_name: &str) -> Result<Option<ClientId>, Error> {
-        let client_id_str = env::var(&format!("{}_CLIENT_ID", env_name))?;
+        let client_id_str = env::var(format!("{env_name}_CLIENT_ID"))?;
         Ok(if client_id_str == _NULL_ENV_STR {
             None
         } else {
@@ -829,7 +829,7 @@ where
     /// Writes the `id` to an env var
     #[cfg(feature = "std")]
     fn client_id_to_env(env_name: &str, id: ClientId) {
-        env::set_var(&format!("{}_CLIENT_ID", env_name), &format!("{}", id));
+        env::set_var(format!("{env_name}_CLIENT_ID"), format!("{id}"));
     }
 
     /// Reattach to a vacant `out_shmem`, to with a previous sender stored the information in an env before.
@@ -956,7 +956,7 @@ where
         let page = map.page_mut();
         let last_msg = self.last_msg_sent;
         assert!((*page).size_used + EOP_MSG_SIZE <= (*page).size_total,
-                "PROGRAM ABORT : BUG: EOP does not fit in page! page {:?}, size_current {:?}, size_total {:?}", page,
+                "PROGRAM ABORT : BUG: EOP does not fit in page! page {page:?}, size_current {:?}, size_total {:?}",
                 ptr::addr_of!((*page).size_used), ptr::addr_of!((*page).size_total));
 
         let mut ret: *mut LlmpMsg = if last_msg.is_null() {
@@ -1133,7 +1133,7 @@ where
         let mut new_map = new_map_shmem.page_mut();
 
         #[cfg(all(feature = "llmp_debug", feature = "std"))]
-        println!("got new map at: {:?}", new_map);
+        println!("got new map at: {new_map:?}");
 
         (*new_map).current_msg_id.store(
             (*old_map).current_msg_id.load(Ordering::Relaxed),
@@ -1232,7 +1232,7 @@ where
             - size_of::<LlmpMsg>();
 
         if buf_len_padded > old_len_padded.try_into().unwrap() {
-            return Err(Error::illegal_argument(format!("Cannot shrink msg of size {} (paded: {}) to requested larger size of {} (padded: {})!", (*msg).buf_len, old_len_padded, shrinked_len, buf_len_padded)));
+            return Err(Error::illegal_argument(format!("Cannot shrink msg of size {} (paded: {old_len_padded}) to requested larger size of {shrinked_len} (padded: {buf_len_padded})!", (*msg).buf_len)));
         }
 
         (*msg).buf_len = shrinked_len as u64;
@@ -1722,10 +1722,10 @@ where
     #[cfg(feature = "std")]
     pub unsafe fn msg_to_env(&self, msg: *const LlmpMsg, map_env_name: &str) -> Result<(), Error> {
         if msg.is_null() {
-            env::set_var(&format!("{}_OFFSET", map_env_name), _NULL_ENV_STR);
+            env::set_var(format!("{map_env_name}_OFFSET"), _NULL_ENV_STR);
         } else {
             env::set_var(
-                &format!("{}_OFFSET", map_env_name),
+                format!("{map_env_name}_OFFSET"),
                 format!("{}", self.msg_to_offset(msg)?),
             );
         }
@@ -1857,13 +1857,13 @@ where
         A: ToSocketAddrs,
     {
         let mut stream = TcpStream::connect(addr)?;
-        println!("B2B: Connected to {:?}", stream);
+        println!("B2B: Connected to {stream:?}");
 
         match recv_tcp_msg(&mut stream)?.try_into()? {
             TcpResponse::BrokerConnectHello {
                 broker_shmem_description: _,
                 hostname,
-            } => println!("B2B: Connected to {}", hostname),
+            } => println!("B2B: Connected to {hostname}"),
             _ => {
                 return Err(Error::illegal_state(
                     "Unexpected response from B2B server received.".to_string(),
@@ -1880,7 +1880,7 @@ where
 
         let broker_id = match recv_tcp_msg(&mut stream)?.try_into()? {
             TcpResponse::RemoteBrokerAccepted { broker_id } => {
-                println!("B2B: Got Connection Ack, broker_id {}", broker_id);
+                println!("B2B: Got Connection Ack, broker_id {broker_id}");
                 broker_id
             }
             _ => {
@@ -1891,7 +1891,7 @@ where
         };
 
         // TODO: use broker ids!
-        println!("B2B: We are broker {}", broker_id);
+        println!("B2B: We are broker {broker_id}");
 
         // TODO: handle broker_ids properly/at all.
         let map_description = Self::b2b_thread_on(
@@ -1931,7 +1931,7 @@ where
         (*out).buf_len_padded = actual_size;
         /* We need to replace the message ID with our own */
         if let Err(e) = self.llmp_out.send(out, false) {
-            panic!("Error sending msg: {:?}", e);
+            panic!("Error sending msg: {e:?}");
         }
         self.llmp_out.last_msg_sent = out;
         Ok(())
@@ -1979,7 +1979,7 @@ where
         if let Err(_e) = unsafe { setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
             #[cfg(feature = "std")]
-            println!("Failed to setup signal handlers: {}", _e);
+            println!("Failed to setup signal handlers: {_e}");
         }
 
         while !self.is_shutting_down() {
@@ -2017,7 +2017,7 @@ where
     pub fn launch_tcp_listener_on(&mut self, port: u16) -> Result<thread::JoinHandle<()>, Error> {
         let listener = tcp_bind(port)?;
         // accept connections and process them, spawning a new thread for each one
-        println!("Server listening on port {}", port);
+        println!("Server listening on port {port}");
         self.launch_listener(Listener::Tcp(listener))
     }
 
@@ -2076,7 +2076,7 @@ where
                 match LlmpSender::new(shmem_provider_bg.clone(), b2b_client_id, false) {
                     Ok(new_sender) => new_sender,
                     Err(e) => {
-                        panic!("B2B: Could not map shared map: {}", e);
+                        panic!("B2B: Could not map shared map: {e}");
                     }
                 };
 
@@ -2180,7 +2180,7 @@ where
             TcpRequest::LocalClientHello { shmem_description } => {
                 match Self::announce_new_client(sender, shmem_description) {
                     Ok(()) => (),
-                    Err(e) => println!("Error forwarding client on map: {:?}", e),
+                    Err(e) => println!("Error forwarding client on map: {e:?}"),
                 };
 
                 if let Err(e) = send_tcp_msg(
@@ -2189,12 +2189,12 @@ where
                         client_id: *current_client_id,
                     },
                 ) {
-                    println!("An error occurred sending via tcp {}", e);
+                    println!("An error occurred sending via tcp {e}");
                 };
                 *current_client_id += 1;
             }
             TcpRequest::RemoteBrokerHello { hostname } => {
-                println!("B2B new client: {}", hostname);
+                println!("B2B new client: {hostname}");
 
                 // TODO: Clean up broker ids.
                 if send_tcp_msg(
@@ -2213,7 +2213,7 @@ where
                     Self::b2b_thread_on(stream, *current_client_id, broker_shmem_description)
                 {
                     if Self::announce_new_client(sender, &shmem_description).is_err() {
-                        println!("B2B: Error announcing client {:?}", shmem_description);
+                        println!("B2B: Error announcing client {shmem_description:?}");
                     };
                     *current_client_id += 1;
                 }
@@ -2284,7 +2284,7 @@ where
                         match send_tcp_msg(&mut stream, &broker_hello) {
                             Ok(()) => {}
                             Err(e) => {
-                                eprintln!("Error sending initial hello: {:?}", e);
+                                eprintln!("Error sending initial hello: {e:?}");
                                 continue;
                             }
                         }
@@ -2292,14 +2292,14 @@ where
                         let buf = match recv_tcp_msg(&mut stream) {
                             Ok(buf) => buf,
                             Err(e) => {
-                                eprintln!("Error receving from tcp: {:?}", e);
+                                eprintln!("Error receving from tcp: {e:?}");
                                 continue;
                             }
                         };
                         let req = match buf.try_into() {
                             Ok(req) => req,
                             Err(e) => {
-                                eprintln!("Could not deserialize tcp message: {:?}", e);
+                                eprintln!("Could not deserialize tcp message: {e:?}");
                                 continue;
                             }
                         };
@@ -2347,7 +2347,7 @@ where
             match (*msg).tag {
                 // first, handle the special, llmp-internal messages
                 LLMP_SLOW_RECEIVER_PANIC => {
-                    return Err(Error::unknown(format!("The broker was too slow to handle messages of client {} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!", client_id)));
+                    return Err(Error::unknown(format!("The broker was too slow to handle messages of client {client_id} in time, so it quit. Either the client sent messages too fast, or we (the broker) got stuck!")));
                 }
                 LLMP_TAG_NEW_SHM_CLIENT => {
                     /* This client informs us about yet another new client
@@ -2386,7 +2386,7 @@ where
                         }
                         Err(e) => {
                             #[cfg(feature = "std")]
-                            println!("Error adding client! Ignoring: {:?}", e);
+                            println!("Error adding client! Ignoring: {e:?}");
                             #[cfg(not(feature = "std"))]
                             return Err(Error::unknown(format!(
                                 "Error adding client! PANIC! {:?}",
@@ -2474,11 +2474,11 @@ where
         Ok(Self {
             sender: LlmpSender::on_existing_from_env(
                 shmem_provider.clone(),
-                &format!("{}_SENDER", env_name),
+                &format!("{env_name}_SENDER"),
             )?,
             receiver: LlmpReceiver::on_existing_from_env(
                 shmem_provider,
-                &format!("{}_RECEIVER", env_name),
+                &format!("{env_name}_RECEIVER"),
             )?,
         })
     }
@@ -2487,8 +2487,8 @@ where
     /// A new client can attach to exactly the same state by calling [`LlmpClient::on_existing_shmem()`].
     #[cfg(feature = "std")]
     pub fn to_env(&self, env_name: &str) -> Result<(), Error> {
-        self.sender.to_env(&format!("{}_SENDER", env_name))?;
-        self.receiver.to_env(&format!("{}_RECEIVER", env_name))
+        self.sender.to_env(&format!("{env_name}_SENDER"))?;
+        self.receiver.to_env(&format!("{env_name}_RECEIVER"))
     }
 
     /// Describe this client in a way that it can be recreated, for example after crash
@@ -2679,7 +2679,7 @@ where
                 }
             }
         };
-        println!("Connected to port {}", port);
+        println!("Connected to port {port}");
 
         let broker_shmem_description = if let TcpResponse::BrokerConnectHello {
             broker_shmem_description,
@@ -2776,7 +2776,7 @@ mod tests {
         dbg!(std::env::vars());
 
         for (key, value) in std::env::vars_os() {
-            println!("{:?}: {:?}", key, value);
+            println!("{key:?}: {value:?}");
         }
 
         /* recreate the client from env, check if it still works */

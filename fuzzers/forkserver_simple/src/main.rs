@@ -74,7 +74,9 @@ pub fn main() {
         )
         .get_matches();
 
-    let corpus_dirs = vec![PathBuf::from(res.value_of("in").unwrap().to_string())];
+    let corpus_dirs = vec![PathBuf::from(
+        res.get_one::<String>("in").unwrap().to_string(),
+    )];
 
     const MAP_SIZE: usize = 65536;
 
@@ -115,7 +117,7 @@ pub fn main() {
         // Must be a crash
         CrashFeedback::new(),
         // Take it onlt if trigger new coverage over crashes
-        MaxMapFeedback::<_, _, _, u8>::new(&edges_observer)
+        MaxMapFeedback::new(&edges_observer)
     );
 
     // create a State from scratch
@@ -159,7 +161,7 @@ pub fn main() {
 
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
-        .program(res.value_of("executable").unwrap())
+        .program(res.get_one::<String>("executable").unwrap())
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
@@ -170,13 +172,16 @@ pub fn main() {
     let mut executor = TimeoutForkserverExecutor::with_signal(
         forkserver,
         Duration::from_millis(
-            res.value_of("timeout")
+            res.get_one::<String>("timeout")
                 .unwrap()
                 .to_string()
                 .parse()
                 .expect("Could not parse timeout in milliseconds"),
         ),
-        res.value_of("signal").unwrap().parse::<Signal>().unwrap(),
+        res.get_one::<String>("signal")
+            .unwrap()
+            .parse::<Signal>()
+            .unwrap(),
     )
     .expect("Failed to create the executor.");
 

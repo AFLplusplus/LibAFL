@@ -7,7 +7,7 @@ use core::cmp::{max, min};
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::Corpus,
-    inputs::{GeneralizedInput, GeneralizedItem},
+    inputs::{GeneralizedInput, GeneralizedItem, UsesInput},
     mutators::{token_mutations::Tokens, MutationResult, Mutator},
     stages::generalization::GeneralizedIndexesMetadata,
     state::{HasCorpus, HasMetadata, HasRand},
@@ -24,7 +24,7 @@ fn extend_with_random_generalized<S>(
     gap_indices: &mut Vec<usize>,
 ) -> Result<(), Error>
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: HasMetadata + HasRand + HasCorpus<Input = GeneralizedInput>,
 {
     let rand_idx = state.rand_mut().next() as usize;
 
@@ -128,9 +128,9 @@ pub struct GrimoireExtensionMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<GeneralizedInput, S> for GrimoireExtensionMutator
+impl<S> Mutator<S> for GrimoireExtensionMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: UsesInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
@@ -176,9 +176,9 @@ pub struct GrimoireRecursiveReplacementMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<GeneralizedInput, S> for GrimoireRecursiveReplacementMutator
+impl<S> Mutator<S> for GrimoireRecursiveReplacementMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: UsesInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,
@@ -247,9 +247,9 @@ impl GrimoireRecursiveReplacementMutator {
 #[derive(Debug, Default)]
 pub struct GrimoireStringReplacementMutator {}
 
-impl<S> Mutator<GeneralizedInput, S> for GrimoireStringReplacementMutator
+impl<S> Mutator<S> for GrimoireStringReplacementMutator
 where
-    S: HasMetadata + HasRand,
+    S: UsesInput<Input = GeneralizedInput> + HasMetadata + HasRand,
 {
     fn mutate(
         &mut self,
@@ -355,9 +355,9 @@ pub struct GrimoireRandomDeleteMutator {
     gap_indices: Vec<usize>,
 }
 
-impl<S> Mutator<GeneralizedInput, S> for GrimoireRandomDeleteMutator
+impl<S> Mutator<S> for GrimoireRandomDeleteMutator
 where
-    S: HasMetadata + HasRand + HasCorpus<GeneralizedInput>,
+    S: UsesInput<Input = GeneralizedInput> + HasMetadata + HasRand + HasCorpus,
 {
     fn mutate(
         &mut self,

@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::mutators::str_decode;
 use crate::{
     bolts::{rands::Rand, AsSlice},
-    inputs::{HasBytesVec, Input},
+    inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{CmpValues, CmpValuesMetadata},
     state::{HasMaxSize, HasMetadata, HasRand},
@@ -171,16 +171,16 @@ impl Tokens {
             }
             let pos_quote = match line.find('\"') {
                 Some(x) => x,
-                None => return Err(Error::illegal_argument(format!("Illegal line: {}", line))),
+                None => return Err(Error::illegal_argument(format!("Illegal line: {line}"))),
             };
             if line.chars().nth(line.len() - 1) != Some('"') {
-                return Err(Error::illegal_argument(format!("Illegal line: {}", line)));
+                return Err(Error::illegal_argument(format!("Illegal line: {line}")));
             }
 
             // extract item
             let item = match line.get(pos_quote + 1..line.len() - 1) {
                 Some(x) => x,
-                None => return Err(Error::illegal_argument(format!("Illegal line: {}", line))),
+                None => return Err(Error::illegal_argument(format!("Illegal line: {line}"))),
             };
             if item.is_empty() {
                 continue;
@@ -295,15 +295,15 @@ impl<'it> IntoIterator for &'it Tokens {
 #[derive(Debug, Default)]
 pub struct TokenInsert;
 
-impl<I, S> Mutator<I, S> for TokenInsert
+impl<S> Mutator<S> for TokenInsert
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -361,15 +361,15 @@ impl TokenInsert {
 #[derive(Debug, Default)]
 pub struct TokenReplace;
 
-impl<I, S> Mutator<I, S> for TokenReplace
+impl<S> Mutator<S> for TokenReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -423,16 +423,16 @@ impl TokenReplace {
 #[derive(Debug, Default)]
 pub struct I2SRandReplace;
 
-impl<I, S> Mutator<I, S> for I2SRandReplace
+impl<S> Mutator<S> for I2SRandReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -567,6 +567,7 @@ where
                     while size != 0 {
                         if v.0[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.1, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -575,6 +576,7 @@ where
                     while size != 0 {
                         if v.1[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.0, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -582,8 +584,6 @@ where
                 }
             }
         }
-
-        //println!("{:?}", result);
 
         Ok(result)
     }

@@ -1,6 +1,6 @@
 [package]
 name = "libafl_qemu"
-version = "0.8.1"
+version.workspace = true
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>"]
 description = "QEMU user backend library for LibAFL"
 documentation = "https://docs.rs/libafl_qemu"
@@ -12,8 +12,9 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["usermode"]
+default = ["fork"]
 python = ["pyo3", "pyo3-build-config"]
+fork = ["libafl/fork"]
 
 # The following architecture features are mutually exclusive.
 x86_64 = [] # build qemu for x86_64 (default)
@@ -23,12 +24,13 @@ aarch64 = [] # build qemu for aarch64
 be = []
 
 usermode = []
+systemmode = []
 
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-libafl = { path = "../libafl", version = "0.8.1" }
-libafl_targets = { path = "../libafl_targets", version = "0.8.1" }
+libafl = { path = "../libafl", version = "0.8.2", default-features = false, features = ["std", "derive", "llmp_compression"] }
+libafl_targets = { path = "../libafl_targets", version = "0.8.2" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.12", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
@@ -39,16 +41,16 @@ libc = "0.2"
 strum = "0.24"
 strum_macros = "0.24"
 syscall-numbers = "3.0"
-bio = "0.41"
+meminterval = "0.3"
 thread_local = "1.1.4"
 capstone = "0.11.0"
 #pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
-pyo3 = { version = "0.15", optional = true }
+pyo3 = { version = "0.17", features = ["pyproto"], optional = true }
 
 [build-dependencies]
 cc = { version = "1.0" }
 which = "4.2"
-pyo3-build-config = { version = "0.16", optional = true }
+pyo3-build-config = { version = "0.15", optional = true }
 
 [lib]
 name = "libafl_qemu"

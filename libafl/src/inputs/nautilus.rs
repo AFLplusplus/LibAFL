@@ -33,7 +33,7 @@ impl Input for NautilusInput {
             hasher.write(term.symbol.as_bytes());
         }
         format!("{:016x}", hasher.finish())*/
-        format!("id:{}", idx)
+        format!("id:{idx}")
     }
 }
 

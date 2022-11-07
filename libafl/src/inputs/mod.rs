@@ -109,3 +109,10 @@ pub trait HasBytesVec {
     /// The internal bytes map (as mutable borrow)
     fn bytes_mut(&mut self) -> &mut Vec<u8>;
 }
+
+/// Defines the input type shared across traits of the type.
+/// Needed for consistency across HasCorpus/HasSolutions and friends.
+pub trait UsesInput {
+    /// Type which will be used throughout this state.
+    type Input: Input;
+}

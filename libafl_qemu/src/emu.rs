@@ -5,11 +5,11 @@ use core::{
     ffi::c_void,
     ptr::{addr_of, addr_of_mut, null},
 };
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 use libc::c_int;
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
@@ -185,7 +185,7 @@ impl MapInfo {
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 extern "C" {
     fn qemu_user_init(argc: i32, argv: *const *const u8, envp: *const *const u8) -> i32;
 
@@ -222,7 +222,7 @@ extern "C" {
         unsafe extern "C" fn(u64, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> u64;
 }
 
-#[cfg(not(feature = "usermode"))]
+#[cfg(emulation_mode = "systemmode")]
 extern "C" {
     fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
 
@@ -244,11 +244,14 @@ extern "C" {
 
     static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 
+    /*
     fn libafl_save_qemu_snapshot(name: *const u8);
+    #[allow(unused)]
     fn libafl_load_qemu_snapshot(name: *const u8);
+     */
 }
 
-#[cfg(not(feature = "usermode"))]
+#[cfg(emulation_mode = "systemmode")]
 extern "C" fn qemu_cleanup_atexit() {
     unsafe {
         qemu_cleanup();
@@ -357,9 +360,11 @@ extern "C" {
         data: *const (),
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
+
+    fn cpu_reset(cpu: CPUStatePtr);
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 #[cfg_attr(feature = "python", pyclass(unsendable))]
 pub struct GuestMaps {
     orig_c_iter: *const c_void,
@@ -367,7 +372,7 @@ pub struct GuestMaps {
 }
 
 // Consider a private new only for Emulator
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 impl GuestMaps {
     #[must_use]
     pub(crate) fn new() -> Self {
@@ -381,7 +386,7 @@ impl GuestMaps {
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 impl Iterator for GuestMaps {
     type Item = MapInfo;
 
@@ -402,7 +407,7 @@ impl Iterator for GuestMaps {
     }
 }
 
-#[cfg(all(feature = "usermode", feature = "python"))]
+#[cfg(all(emulation_mode = "usermode", feature = "python"))]
 #[pyproto]
 impl PyIterProtocol for GuestMaps {
     fn __iter__(slf: PyRef<Self>) -> PyRef<Self> {
@@ -413,7 +418,7 @@ impl PyIterProtocol for GuestMaps {
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 impl Drop for GuestMaps {
     fn drop(&mut self) {
         unsafe {
@@ -462,13 +467,13 @@ impl CPU {
         }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
         unsafe { (addr as usize + guest_base) as *mut T }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
         unsafe { (addr as usize - guest_base) as GuestAddr }
@@ -481,12 +486,12 @@ impl CPU {
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        #[cfg(feature = "usermode")]
+        #[cfg(emulation_mode = "usermode")]
         {
             let host_addr = Emulator::new_empty().g2h(addr);
             copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
         }
-        #[cfg(not(feature = "usermode"))]
+        #[cfg(emulation_mode = "systemmode")]
         cpu_memory_rw_debug(self.ptr, addr, buf.as_ptr() as *mut u8, buf.len() as i32, 1);
     }
 
@@ -497,12 +502,12 @@ impl CPU {
     /// It just adds `guest_base` and writes to that location, without checking the bounds.
     /// This may only be safely used for valid guest addresses!
     pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
-        #[cfg(feature = "usermode")]
+        #[cfg(emulation_mode = "usermode")]
         {
             let host_addr = Emulator::new_empty().g2h(addr);
             copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
         }
-        #[cfg(not(feature = "usermode"))]
+        #[cfg(emulation_mode = "systemmode")]
         cpu_memory_rw_debug(self.ptr, addr, buf.as_mut_ptr(), buf.len() as i32, 0);
     }
 
@@ -519,7 +524,7 @@ impl CPU {
         let reg = reg.into();
         let success = unsafe { libafl_qemu_write_reg(self.ptr, reg, addr_of!(val) as *const u8) };
         if success == 0 {
-            Err(format!("Failed to write to register {}", reg))
+            Err(format!("Failed to write to register {reg}"))
         } else {
             Ok(())
         }
@@ -534,10 +539,14 @@ impl CPU {
         let mut val = T::zero();
         let success = unsafe { libafl_qemu_read_reg(self.ptr, reg, addr_of_mut!(val) as *mut u8) };
         if success == 0 {
-            Err(format!("Failed to read register {}", reg))
+            Err(format!("Failed to read register {reg}"))
         } else {
             Ok(val)
         }
+    }
+
+    pub fn cpu_reset(&self) {
+        unsafe { cpu_reset(self.ptr) };
     }
 }
 
@@ -571,13 +580,13 @@ impl Emulator {
         #[allow(clippy::cast_possible_wrap)]
         let argc = argv.len() as i32;
         unsafe {
-            #[cfg(feature = "usermode")]
+            #[cfg(emulation_mode = "usermode")]
             qemu_user_init(
                 argc,
                 argv.as_ptr() as *const *const u8,
                 envp.as_ptr() as *const *const u8,
             );
-            #[cfg(not(feature = "usermode"))]
+            #[cfg(emulation_mode = "systemmode")]
             {
                 qemu_init(
                     argc,
@@ -596,7 +605,7 @@ impl Emulator {
         Emulator { _private: () }
     }
 
-    #[cfg(not(feature = "usermode"))]
+    #[cfg(emulation_mode = "systemmode")]
     pub fn start(&self, cpu: &CPU) {
         unsafe {
             libafl_cpu_thread_fn(cpu.ptr);
@@ -604,7 +613,7 @@ impl Emulator {
     }
 
     /// This function gets the memory mappings from the emulator.
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn mappings(&self) -> GuestMaps {
         GuestMaps::new()
@@ -637,13 +646,13 @@ impl Emulator {
         }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
         unsafe { (addr as usize + guest_base) as *mut T }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn h2g<T>(&self, addr: *const T) -> GuestAddr {
         unsafe { (addr as usize - guest_base) as GuestAddr }
@@ -711,47 +720,53 @@ impl Emulator {
     /// Should, in general, be safe to call.
     /// Of course, the emulated target is not contained securely and can corrupt state or interact with the operating system.
     pub unsafe fn run(&self) {
-        #[cfg(feature = "usermode")]
+        #[cfg(emulation_mode = "usermode")]
         libafl_qemu_run();
-        #[cfg(not(feature = "usermode"))]
+        #[cfg(emulation_mode = "systemmode")]
         qemu_main_loop();
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn binary_path<'a>(&self) -> &'a str {
         unsafe { from_utf8_unchecked(from_raw_parts(exec_path, strlen(exec_path))) }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn load_addr(&self) -> GuestAddr {
         unsafe { libafl_load_addr() as GuestAddr }
     }
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    pub fn load_addr(&self) -> GuestAddr {
+        // Only work if the binary is linked to the correct address and not pie
+        return 0x0 as GuestAddr;
+    }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn get_brk(&self) -> GuestAddr {
         unsafe { libafl_get_brk() as GuestAddr }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn set_brk(&self, brk: GuestAddr) {
         unsafe { libafl_set_brk(brk.into()) };
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn get_mmap_start(&self) -> GuestAddr {
         unsafe { mmap_next_start }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn set_mmap_start(&self, start: GuestAddr) {
         unsafe { mmap_next_start = start };
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     fn mmap(
         &self,
         addr: GuestAddr,
@@ -767,7 +782,7 @@ impl Emulator {
         }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn map_private(
         &self,
         addr: GuestAddr,
@@ -775,11 +790,11 @@ impl Emulator {
         perms: MmapPerms,
     ) -> Result<GuestAddr, String> {
         self.mmap(addr, size, perms, libc::MAP_PRIVATE | libc::MAP_ANONYMOUS)
-            .map_err(|_| format!("Failed to map {}", addr))
+            .map_err(|_| format!("Failed to map {addr}"))
             .map(|addr| addr as GuestAddr)
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn map_fixed(
         &self,
         addr: GuestAddr,
@@ -792,26 +807,26 @@ impl Emulator {
             perms,
             libc::MAP_FIXED | libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
         )
-        .map_err(|_| format!("Failed to map {}", addr))
+        .map_err(|_| format!("Failed to map {addr}"))
         .map(|addr| addr as GuestAddr)
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
         let res = unsafe { target_mprotect(addr.into(), size as u64, perms.into()) };
         if res == 0 {
             Ok(())
         } else {
-            Err(format!("Failed to mprotect {}", addr))
+            Err(format!("Failed to mprotect {addr}"))
         }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn unmap(&self, addr: GuestAddr, size: usize) -> Result<(), String> {
         if unsafe { target_munmap(addr.into(), size as u64) } == 0 {
             Ok(())
         } else {
-            Err(format!("Failed to unmap {}", addr))
+            Err(format!("Failed to unmap {addr}"))
         }
     }
 
@@ -881,33 +896,33 @@ impl Emulator {
         unsafe { libafl_add_backdoor_hook(exec, data) };
     }
 
-    #[cfg(not(feature = "usermode"))]
+    #[cfg(emulation_mode = "systemmode")]
     pub fn set_vcpu_start(&self, hook: extern "C" fn(cpu: CPU)) {
         unsafe {
             libafl_start_vcpu = core::mem::transmute(hook);
         }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn set_on_thread_hook(&self, hook: extern "C" fn(tid: u32)) {
         unsafe {
             libafl_on_thread_hook = hook;
         }
     }
 
-    /*#[cfg(not(feature = "usermode"))]
+    /*#[cfg(emulation_mode = "systemmode")]
     pub fn save_snapshot(&self, name: &str) {
         let s = CString::new(name).expect("Invalid snapshot name");
         unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _) };
     }
 
-    #[cfg(not(feature = "usermode"))]
+    #[cfg(emulation_mode = "systemmode")]
     pub fn load_snapshot(&self, name: &str) {
         let s = CString::new(name).expect("Invalid snapshot name");
         unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _) };
     }*/
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn set_pre_syscall_hook(
         &self,
         hook: extern "C" fn(i32, u64, u64, u64, u64, u64, u64, u64, u64) -> SyscallHookResult,
@@ -917,7 +932,7 @@ impl Emulator {
         }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn set_post_syscall_hook(
         &self,
         hook: extern "C" fn(u64, i32, u64, u64, u64, u64, u64, u64, u64, u64) -> u64,

@@ -1,5 +1,5 @@
 //! Errors that can be caught by the `libafl_frida` address sanitizer.
-use std::io::Write;
+use std::{fmt::Debug, io::Write, marker::PhantomData};
 
 use backtrace::Backtrace;
 use capstone::{arch::BuildsCapstone, Capstone};
@@ -13,7 +13,7 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::{HasTargetBytes, Input},
+    inputs::{HasTargetBytes, UsesInput},
     observers::{Observer, ObserversTuple},
     state::{HasClientPerfMonitor, HasMetadata},
     Error, SerdeAny,
@@ -176,8 +176,8 @@ impl AsanErrors {
                 } else {
                     writeln!(
                         output,
-                        " at 0x{:x}, faulting address 0x{:x}",
-                        error.pc, fault_address
+                        " at 0x{:x}, faulting address 0x{fault_address:x}",
+                        error.pc
                     )
                     .unwrap();
                 }
@@ -196,7 +196,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, error.registers[reg]).unwrap();
+                    write!(output, "x{reg:02}: 0x{:016x} ", error.registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -220,7 +220,7 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "{}: 0x{:016x} ", name, error.registers[reg]).unwrap();
+                    write!(output, "{name}: 0x{:016x} ", error.registers[reg]).unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
@@ -264,10 +264,10 @@ impl AsanErrors {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
+                        writeln!(output, "\t => {insn}").unwrap();
                         output.reset().unwrap();
                     } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
+                        writeln!(output, "\t    {insn}").unwrap();
                     }
                 }
                 backtrace_printer
@@ -332,7 +332,7 @@ impl AsanErrors {
                         )
                         .unwrap();
                     } else {
-                        writeln!(output, " at 0x{:x}", _pc).unwrap();
+                        writeln!(output, " at 0x{_pc:x}").unwrap();
                     }
 
                     #[allow(clippy::non_ascii_literal)]
@@ -344,7 +344,7 @@ impl AsanErrors {
                                 .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                                 .unwrap();
                         }
-                        write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
+                        write!(output, "x{reg:02}: 0x{val:016x} ").unwrap();
                         output.reset().unwrap();
                         if reg % 4 == 3 {
                             writeln!(output).unwrap();
@@ -358,7 +358,7 @@ impl AsanErrors {
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
             AsanError::DoubleFree((ptr, mut metadata, backtrace)) => {
-                writeln!(output, " of {:?}", ptr).unwrap();
+                writeln!(output, " of {ptr:?}").unwrap();
                 output.reset().unwrap();
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
 
@@ -389,12 +389,12 @@ impl AsanErrors {
                 }
             }
             AsanError::UnallocatedFree((ptr, backtrace)) => {
-                writeln!(output, " of {:#016x}", ptr).unwrap();
+                writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
             }
             AsanError::Leak((ptr, mut metadata)) => {
-                writeln!(output, " of {:#016x}", ptr).unwrap();
+                writeln!(output, " of {ptr:#016x}").unwrap();
                 output.reset().unwrap();
 
                 #[allow(clippy::non_ascii_literal)]
@@ -455,14 +455,14 @@ impl AsanErrors {
                             .set_color(ColorSpec::new().set_fg(Some(Color::Yellow)))
                             .unwrap();
                     }
-                    write!(output, "x{:02}: 0x{:016x} ", reg, val).unwrap();
+                    write!(output, "x{reg:02}: 0x{val:016x} ").unwrap();
                     output.reset().unwrap();
                     if reg % 4 == 3 {
                         writeln!(output).unwrap();
                     }
                 }
                 #[cfg(target_arch = "aarch64")]
-                writeln!(output, "pc : 0x{:016x} ", pc).unwrap();
+                writeln!(output, "pc : 0x{pc:016x} ").unwrap();
 
                 #[cfg(target_arch = "x86_64")]
                 for reg in 0..ASAN_SAVE_REGISTER_COUNT {
@@ -488,7 +488,7 @@ impl AsanErrors {
                 }
 
                 #[cfg(target_arch = "x86_64")]
-                writeln!(output, "Rip: 0x{:016x}", pc).unwrap();
+                writeln!(output, "Rip: 0x{pc:016x}").unwrap();
 
                 #[allow(clippy::non_ascii_literal)]
                 writeln!(output, "{:━^100}", " CODE ").unwrap();
@@ -524,10 +524,10 @@ impl AsanErrors {
                         output
                             .set_color(ColorSpec::new().set_fg(Some(Color::Red)))
                             .unwrap();
-                        writeln!(output, "\t => {}", insn).unwrap();
+                        writeln!(output, "\t => {insn}").unwrap();
                         output.reset().unwrap();
                     } else {
-                        writeln!(output, "\t    {}", insn).unwrap();
+                        writeln!(output, "\t    {insn}").unwrap();
                     }
                 }
                 backtrace_printer.print_trace(&backtrace, output).unwrap();
@@ -551,8 +551,11 @@ pub struct AsanErrorsObserver {
     errors: OwnedPtr<Option<AsanErrors>>,
 }
 
-impl<I, S> Observer<I, S> for AsanErrorsObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl<S> Observer<S> for AsanErrorsObserver
+where
+    S: UsesInput,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         unsafe {
             if ASAN_ERRORS.is_some() {
                 ASAN_ERRORS.as_mut().unwrap().clear();
@@ -607,27 +610,28 @@ impl AsanErrorsObserver {
 
 /// A feedback reporting potential [`struct@AsanErrors`] from an `AsanErrorsObserver`
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct AsanErrorsFeedback {
+pub struct AsanErrorsFeedback<S> {
     errors: Option<AsanErrors>,
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> Feedback<I, S> for AsanErrorsFeedback
+impl<S> Feedback<S> for AsanErrorsFeedback<S>
 where
-    I: Input + HasTargetBytes,
-    S: HasClientPerfMonitor,
+    S: UsesInput + Debug + HasClientPerfMonitor,
+    S::Input: HasTargetBytes,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &I,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         let observer = observers
             .match_name::<AsanErrorsObserver>("AsanErrors")
@@ -645,7 +649,11 @@ where
         }
     }
 
-    fn append_metadata(&mut self, _state: &mut S, testcase: &mut Testcase<I>) -> Result<(), Error> {
+    fn append_metadata(
+        &mut self,
+        _state: &mut S,
+        testcase: &mut Testcase<S::Input>,
+    ) -> Result<(), Error> {
         if let Some(errors) = &self.errors {
             testcase.add_metadata(errors.clone());
         }
@@ -653,28 +661,31 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.errors = None;
         Ok(())
     }
 }
 
-impl Named for AsanErrorsFeedback {
+impl<S> Named for AsanErrorsFeedback<S> {
     #[inline]
     fn name(&self) -> &str {
         "AsanErrors"
     }
 }
 
-impl AsanErrorsFeedback {
+impl<S> AsanErrorsFeedback<S> {
     /// Create a new `AsanErrorsFeedback`
     #[must_use]
     pub fn new() -> Self {
-        Self { errors: None }
+        Self {
+            errors: None,
+            phantom: PhantomData,
+        }
     }
 }
 
-impl Default for AsanErrorsFeedback {
+impl<S> Default for AsanErrorsFeedback<S> {
     fn default() -> Self {
         Self::new()
     }

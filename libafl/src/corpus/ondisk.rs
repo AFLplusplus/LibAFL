@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, Testcase},
-    inputs::Input,
+    inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
 };
@@ -54,7 +54,14 @@ where
     meta_format: Option<OnDiskMetadataFormat>,
 }
 
-impl<I> Corpus<I> for OnDiskCorpus<I>
+impl<I> UsesInput for OnDiskCorpus<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> Corpus for OnDiskCorpus<I>
 where
     I: Input,
 {
@@ -76,7 +83,7 @@ where
     #[inline]
     fn replace(&mut self, idx: usize, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {} out of bounds", idx)));
+            return Err(Error::key_not_found(format!("Index {idx} out of bounds")));
         }
         self.save_testcase(&mut testcase)?;
         let previous = self.entries[idx].replace(testcase);
@@ -164,7 +171,7 @@ where
 
             let mut ctr = 2;
             let filename = loop {
-                let lockfile = format!(".{}.lafl_lock", file);
+                let lockfile = format!(".{file}.lafl_lock");
                 // try to create lockfile.
 
                 if OpenOptions::new()
@@ -176,7 +183,7 @@ where
                     break self.dir_path.join(file);
                 }
 
-                file = format!("{}-{}", &file_orig, ctr);
+                file = format!("{}-{ctr}", &file_orig);
                 ctr += 1;
             };
 
@@ -247,6 +254,7 @@ pub mod pybind {
     };
 
     #[pyclass(unsendable, name = "OnDiskCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for OnDiskCorpus
     pub struct PythonOnDiskCorpus {

@@ -99,7 +99,7 @@ exec_sec = {}
                         .map(|c| if c.is_whitespace() { '_' } else { c })
                         .filter(|c| c.is_alphanumeric() || *c == '_')
                         .collect();
-                    writeln!(&mut file, "{} = \"{}\"", k, val)
+                    writeln!(&mut file, "{k} = \"{val}\"")
                         .expect("Failed to write to the TOML file");
                 }
             }
@@ -207,7 +207,7 @@ where
                 "exec_sec": self.base.execs_per_sec(),
                 "clients": &self.client_stats()[1..]
             });
-            writeln!(&file, "{}", line).expect("Unable to write JSON to file");
+            writeln!(&file, "{line}").expect("Unable to write JSON to file");
         }
         self.base.display(event_msg, sender_id);
     }

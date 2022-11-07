@@ -33,9 +33,9 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
             if brew_cellar_location.is_empty() {
                 return Err("Empty return from brew --cellar".to_string());
             }
-            let cellar_glob = format!("{}/llvm/*/bin/llvm-config", brew_cellar_location);
+            let cellar_glob = format!("{brew_cellar_location}/llvm/*/bin/llvm-config");
             let glob_results = glob(&cellar_glob).unwrap_or_else(|err| {
-                panic!("Could not read glob path {} ({})", &cellar_glob, err);
+                panic!("Could not read glob path {} ({err})", &cellar_glob);
             });
             match glob_results.last() {
                 Some(path) => Ok(path.unwrap()),
@@ -45,7 +45,7 @@ fn find_llvm_config_brew() -> Result<PathBuf, String> {
                 )),
             }
         }
-        Err(err) => Err(format!("Could not execute brew --cellar: {:?}", err)),
+        Err(err) => Err(format!("Could not execute brew --cellar: {err:?}")),
     }
 }
 
@@ -59,13 +59,13 @@ fn find_llvm_config() -> Result<String, String> {
     match find_llvm_config_brew() {
         Ok(llvm_dir) => return Ok(llvm_dir.to_str().unwrap().to_string()),
         Err(err) => {
-            println!("cargo:warning={}", err);
+            println!("cargo:warning={err}");
         }
     };
 
     #[cfg(not(target_vendor = "apple"))]
     for version in (LLVM_VERSION_MIN..=LLVM_VERSION_MAX).rev() {
-        let llvm_config_name: String = format!("llvm-config-{}", version);
+        let llvm_config_name: String = format!("llvm-config-{version}");
         if which(&llvm_config_name).is_ok() {
             return Ok(llvm_config_name);
         }
@@ -80,12 +80,12 @@ fn find_llvm_config() -> Result<String, String> {
 
 fn exec_llvm_config(args: &[&str]) -> String {
     let llvm_config = find_llvm_config().expect("Unexpected error");
-    match Command::new(&llvm_config).args(args).output() {
+    match Command::new(llvm_config).args(args).output() {
         Ok(output) => String::from_utf8(output.stdout)
             .expect("Unexpected llvm-config output")
             .trim()
             .to_string(),
-        Err(e) => panic!("Could not execute llvm-config: {}", e),
+        Err(e) => panic!("Could not execute llvm-config: {e}"),
     }
 }
 
@@ -122,7 +122,7 @@ fn build_pass(
     let dot_offset = src_file.rfind('.').unwrap();
     let src_stub = &src_file[..dot_offset];
 
-    println!("cargo:rerun-if-changed=src/{}", src_file);
+    println!("cargo:rerun-if-changed=src/{src_file}");
     if cfg!(unix) {
         assert!(Command::new(bindir_path.join("clang++"))
             .arg("-v")
@@ -130,12 +130,12 @@ fn build_pass(
             .arg(src_dir.join(src_file))
             .args(ldflags)
             .arg("-o")
-            .arg(out_dir.join(format!("{}.{}", src_stub, dll_extension())))
+            .arg(out_dir.join(format!("{src_stub}.{}", dll_extension())))
             .status()
-            .unwrap_or_else(|_| panic!("Failed to compile {}", src_file))
+            .unwrap_or_else(|_| panic!("Failed to compile {src_file}"))
             .success());
     } else if cfg!(windows) {
-        println!("{:?}", cxxflags);
+        println!("{cxxflags:?}");
         assert!(Command::new(bindir_path.join("clang-cl"))
             .arg("-v")
             .args(cxxflags)
@@ -145,11 +145,11 @@ fn build_pass(
             .arg(format!(
                 "/OUT:{}",
                 out_dir
-                    .join(format!("{}.{}", src_stub, dll_extension()))
+                    .join(format!("{src_stub}.{}", dll_extension()))
                     .display()
             ))
             .status()
-            .unwrap_or_else(|_| panic!("Failed to compile {}", src_file))
+            .unwrap_or_else(|_| panic!("Failed to compile {src_file}"))
             .success());
     }
 }
@@ -161,7 +161,7 @@ fn main() {
     let src_dir = Path::new("src");
 
     let dest_path = Path::new(&out_dir).join("clang_constants.rs");
-    let mut clang_constants_file = File::create(&dest_path).expect("Could not create file");
+    let mut clang_constants_file = File::create(dest_path).expect("Could not create file");
 
     println!("cargo:rerun-if-env-changed=LLVM_CONFIG");
     println!("cargo:rerun-if-env-changed=LIBAFL_EDGES_MAP_SIZE");
@@ -197,12 +197,12 @@ pub const LIBAFL_CC_LLVM_VERSION: Option<usize> = None;
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_EDGES_MAP_SIZE");
-    cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={}", edges_map_size));
+    cxxflags.push(format!("-DLIBAFL_EDGES_MAP_SIZE={edges_map_size}"));
 
     let acc_map_size: usize = option_env!("LIBAFL_ACCOUNTING_MAP_SIZE")
         .map_or(Ok(65536), str::parse)
         .expect("Could not parse LIBAFL_ACCOUNTING_MAP_SIZE");
-    cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={}", acc_map_size));
+    cxxflags.push(format!("-DLIBAFL_ACCOUNTING_MAP_SIZE={acc_map_size}"));
 
     let llvm_version = find_llvm_version();
 

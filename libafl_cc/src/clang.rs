@@ -10,6 +10,9 @@ use std::{
 
 use crate::{CompilerWrapper, Error, LIB_EXT, LIB_PREFIX};
 
+/// The `OUT_DIR` for `LLVM` compiler passes
+pub const OUT_DIR: &str = env!("OUT_DIR");
+
 fn dll_extension<'a>() -> &'a str {
     if cfg!(target_os = "windows") {
         "dll"
@@ -190,7 +193,7 @@ impl CompilerWrapper for ClangWrapper {
             linking = false;
             new_args.push(
                 PathBuf::from(env!("OUT_DIR"))
-                    .join(format!("{}no-link-rt.{}", LIB_PREFIX, LIB_EXT))
+                    .join(format!("{LIB_PREFIX}no-link-rt.{LIB_EXT}"))
                     .into_os_string()
                     .into_string()
                     .unwrap(),
@@ -261,7 +264,7 @@ impl CompilerWrapper for ClangWrapper {
         S: AsRef<str>,
     {
         let lib_file = dir
-            .join(format!("{}{}.{}", LIB_PREFIX, name.as_ref(), LIB_EXT))
+            .join(format!("{LIB_PREFIX}{}.{LIB_EXT}", name.as_ref()))
             .into_os_string()
             .into_string()
             .unwrap();
@@ -278,7 +281,7 @@ impl CompilerWrapper for ClangWrapper {
                     .add_link_arg("-Wl,--no-whole-archive")
             }
         } else {
-            self.add_link_arg(format!("-Wl,-wholearchive:{}", lib_file))
+            self.add_link_arg(format!("-Wl,-wholearchive:{lib_file}"))
         }
     }
 
@@ -469,7 +472,7 @@ mod tests {
             .unwrap()
             .run()
         {
-            println!("Ignored error {:?} - clang is probably not installed.", res);
+            println!("Ignored error {res:?} - clang is probably not installed.");
         }
     }
 }

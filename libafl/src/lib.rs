@@ -27,7 +27,7 @@ Welcome to `LibAFL`
     clippy::module_name_repetitions,
     clippy::unreadable_literal
 )]
-#![cfg_attr(debug_assertions, warn(
+#![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -37,7 +37,7 @@ Welcome to `LibAFL`
     unused_qualifications,
     //unused_results
 ))]
-#![cfg_attr(not(debug_assertions), deny(
+#![cfg_attr(test, deny(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -50,10 +50,9 @@ Welcome to `LibAFL`
     //unused_results
 ))]
 #![cfg_attr(
-    not(debug_assertions),
+    test,
     deny(
         bad_style,
-        const_err,
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
@@ -138,9 +137,10 @@ impl ErrorBacktrace {
 
 #[cfg(feature = "errors_backtrace")]
 fn display_error_backtrace(f: &mut fmt::Formatter, err: &ErrorBacktrace) -> fmt::Result {
-    write!(f, "\nBacktrace: {:?}", err)
+    write!(f, "\nBacktrace: {err:?}")
 }
 #[cfg(not(feature = "errors_backtrace"))]
+#[allow(clippy::unnecessary_wraps)]
 fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fmt::Result {
     fmt::Result::Ok(())
 }
@@ -343,7 +343,7 @@ impl fmt::Display for Error {
 /// Stringify the postcard serializer error
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
-        Self::serialize(format!("{:?}", err))
+        Self::serialize(format!("{err:?}"))
     }
 }
 
@@ -351,14 +351,14 @@ impl From<postcard::Error> for Error {
 #[cfg(feature = "std")]
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
-        Self::serialize(format!("{:?}", err))
+        Self::serialize(format!("{err:?}"))
     }
 }
 
 #[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
-        Self::unknown(format!("Unix error: {:?}", err))
+        Self::unknown(format!("Unix error: {err:?}"))
     }
 }
 
@@ -372,32 +372,32 @@ impl From<io::Error> for Error {
 
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
-        Self::unknown(format!("Could not convert byte / utf-8: {:?}", err))
+        Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
 }
 
 #[cfg(feature = "std")]
 impl From<VarError> for Error {
     fn from(err: VarError) -> Self {
-        Self::empty(format!("Could not get env var: {:?}", err))
+        Self::empty(format!("Could not get env var: {err:?}"))
     }
 }
 
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
-        Self::unknown(format!("Failed to parse Int: {:?}", err))
+        Self::unknown(format!("Failed to parse Int: {err:?}"))
     }
 }
 
 impl From<TryFromIntError> for Error {
     fn from(err: TryFromIntError) -> Self {
-        Self::illegal_state(format!("Expected conversion failed: {:?}", err))
+        Self::illegal_state(format!("Expected conversion failed: {err:?}"))
     }
 }
 
 impl From<TryFromSliceError> for Error {
     fn from(err: TryFromSliceError) -> Self {
-        Self::illegal_argument(format!("Could not convert slice: {:?}", err))
+        Self::illegal_argument(format!("Could not convert slice: {err:?}"))
     }
 }
 
@@ -418,7 +418,7 @@ impl From<pyo3::PyErr> for Error {
             ) {
                 Self::shutting_down()
             } else {
-                Self::illegal_state(format!("Python exception: {:?}", err))
+                Self::illegal_state(format!("Python exception: {err:?}"))
             }
         })
     }
@@ -428,6 +428,7 @@ impl From<pyo3::PyErr> for Error {
 impl std::error::Error for Error {}
 
 /// The purpose of this module is to alleviate imports of many components by adding a glob import.
+#[cfg(feature = "prelude")]
 pub mod prelude {
     pub use super::{
         bolts::{bolts_prelude::*, *},
@@ -452,19 +453,21 @@ pub mod prelude {
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-    #[cfg(feature = "std")]
-    use crate::events::SimpleEventManager;
+
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, Testcase},
+        events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
+        feedbacks::ConstFeedback,
+        fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        Fuzzer, StdFuzzer,
+        StdFuzzer,
     };
 
     #[test]
@@ -473,25 +476,31 @@ mod tests {
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4]);
+        let testcase = Testcase::new(vec![0; 4].into());
         corpus.add(testcase).unwrap();
+
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
 
         let mut state = StdState::new(
             rand,
             corpus,
             InMemoryCorpus::<BytesInput>::new(),
-            &mut (),
-            &mut (),
+            &mut feedback,
+            &mut objective,
         )
         .unwrap();
 
-        let monitor = SimpleMonitor::new(|s| {
-            println!("{}", s);
+        let _monitor = SimpleMonitor::new(|s| {
+            println!("{s}");
         });
-        let mut event_manager = SimpleEventManager::new(monitor);
+        let mut event_manager = NopEventManager::new();
+
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
 
         let scheduler = RandScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
@@ -509,13 +518,13 @@ mod tests {
         for i in 0..1000 {
             fuzzer
                 .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
-                .unwrap_or_else(|_| panic!("Error in iter {}", i));
+                .unwrap_or_else(|_| panic!("Error in iter {i}"));
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: StdState<
+            _,
             InMemoryCorpus<BytesInput>,
-            BytesInput,
             StdRand,
             InMemoryCorpus<BytesInput>,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();

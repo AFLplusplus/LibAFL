@@ -33,13 +33,13 @@ use crate::bolts::core_affinity::CoreId;
 use crate::bolts::os::startable_self;
 #[cfg(all(unix, feature = "std", feature = "fork"))]
 use crate::bolts::os::{dup2, fork, ForkResult};
+use crate::inputs::UsesInput;
 #[cfg(feature = "std")]
 use crate::{
     bolts::{core_affinity::Cores, shmem::ShMemProvider},
     events::{EventConfig, LlmpRestartingEventManager, ManagerKind, RestartingMgr},
-    inputs::Input,
     monitors::Monitor,
-    observers::ObserversTuple,
+    state::{HasClientPerfMonitor, HasExecutions},
     Error,
 };
 
@@ -49,14 +49,13 @@ const _AFL_LAUNCHER_CLIENT: &str = "AFL_LAUNCHER_CLIENT";
 #[cfg(feature = "std")]
 #[derive(TypedBuilder)]
 #[allow(clippy::type_complexity, missing_debug_implementations)]
-pub struct Launcher<'a, CF, I, MT, OT, S, SP>
+pub struct Launcher<'a, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
-    I: Input + 'a,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
+    S::Input: 'a,
     MT: Monitor,
     SP: ShMemProvider + 'static,
-    OT: ObserversTuple<I, S> + 'a,
-    S: DeserializeOwned + 'a,
+    S: DeserializeOwned + UsesInput + 'a,
 {
     /// The ShmemProvider to use
     shmem_provider: SP,
@@ -86,17 +85,15 @@ where
     #[builder(default = true)]
     spawn_broker: bool,
     #[builder(setter(skip), default = PhantomData)]
-    phantom_data: PhantomData<(&'a I, &'a OT, &'a S, &'a SP)>,
+    phantom_data: PhantomData<(&'a S, &'a SP)>,
 }
 
-impl<CF, I, MT, OT, S, SP> Debug for Launcher<'_, CF, I, MT, OT, S, SP>
+impl<CF, MT, S, SP> Debug for Launcher<'_, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
-    I: Input,
-    OT: ObserversTuple<I, S> + DeserializeOwned,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
     MT: Monitor + Clone,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned,
+    S: DeserializeOwned + UsesInput,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("Launcher")
@@ -111,14 +108,12 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<'a, CF, I, MT, OT, S, SP> Launcher<'a, CF, I, MT, OT, S, SP>
+impl<'a, CF, MT, S, SP> Launcher<'a, CF, MT, S, SP>
 where
-    CF: FnOnce(Option<S>, LlmpRestartingEventManager<I, OT, S, SP>, usize) -> Result<(), Error>,
-    I: Input,
-    OT: ObserversTuple<I, S> + DeserializeOwned,
+    CF: FnOnce(Option<S>, LlmpRestartingEventManager<S, SP>, usize) -> Result<(), Error>,
     MT: Monitor + Clone,
+    S: DeserializeOwned + UsesInput + HasExecutions + HasClientPerfMonitor,
     SP: ShMemProvider + 'static,
-    S: DeserializeOwned,
 {
     /// Launch the broker and the clients and fuzz
     #[cfg(all(unix, feature = "std", feature = "fork"))]
@@ -157,7 +152,7 @@ where
                         self.shmem_provider.post_fork(false)?;
                         handles.push(child.pid);
                         #[cfg(feature = "std")]
-                        println!("child spawned and bound to core {}", id);
+                        println!("child spawned and bound to core {id}");
                     }
                     ForkResult::Child => {
                         println!("{:?} PostFork", unsafe { libc::getpid() });
@@ -175,7 +170,7 @@ where
                         }
 
                         // Fuzzer client. keeps retrying the connection to broker till the broker starts
-                        let (state, mgr) = RestartingMgr::<I, MT, OT, S, SP>::builder()
+                        let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
                             .shmem_provider(self.shmem_provider.clone())
                             .broker_port(self.broker_port)
                             .kind(ManagerKind::Client {
@@ -185,9 +180,7 @@ where
                             .build()
                             .launch()?;
 
-                        (self.run_client.take().unwrap())(state, mgr, bind_to.id)
-                            .expect("Client closure failed");
-                        break;
+                        return (self.run_client.take().unwrap())(state, mgr, bind_to.id);
                     }
                 };
             }
@@ -198,7 +191,7 @@ where
             println!("I am broker!!.");
 
             // TODO we don't want always a broker here, think about using different laucher process to spawn different configurations
-            RestartingMgr::<I, MT, OT, S, SP>::builder()
+            RestartingMgr::<MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)
@@ -221,7 +214,7 @@ where
                 unsafe {
                     libc::waitpid(*handle, &mut status, 0);
                     if status != 0 {
-                        println!("Client with pid {} exited with status {}", handle, status);
+                        println!("Client with pid {handle} exited with status {status}");
                     }
                 }
             }
@@ -245,7 +238,7 @@ where
                 //todo: silence stdout and stderr for clients
 
                 // the actual client. do the fuzzing
-                let (state, mgr) = RestartingMgr::<I, MT, OT, S, SP>::builder()
+                let (state, mgr) = RestartingMgr::<MT, S, SP>::builder()
                     .shmem_provider(self.shmem_provider.clone())
                     .broker_port(self.broker_port)
                     .kind(ManagerKind::Client {
@@ -255,15 +248,13 @@ where
                     .build()
                     .launch()?;
 
-                (self.run_client.take().unwrap())(state, mgr, core_id)
-                    .expect("Client closure failed");
-
-                unreachable!("Fuzzer client code should never get here!");
+                return (self.run_client.take().unwrap())(state, mgr, core_id);
             }
             Err(std::env::VarError::NotPresent) => {
                 // I am a broker
                 // before going to the broker loop, spawn n clients
 
+                #[cfg(windows)]
                 if self.stdout_file.is_some() {
                     println!("Child process file stdio is not supported on Windows yet. Dumping to stdout instead...");
                 }
@@ -298,7 +289,7 @@ where
             #[cfg(feature = "std")]
             println!("I am broker!!.");
 
-            RestartingMgr::<I, MT, OT, S, SP>::builder()
+            RestartingMgr::<MT, S, SP>::builder()
                 .shmem_provider(self.shmem_provider.clone())
                 .monitor(Some(self.monitor.clone()))
                 .broker_port(self.broker_port)

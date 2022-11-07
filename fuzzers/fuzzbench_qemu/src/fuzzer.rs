@@ -45,7 +45,7 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    //asan::QemuAsanHelper,
+    //asan::{init_with_asan, QemuAsanHelper},
     cmplog,
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
     edges,
@@ -62,14 +62,16 @@ use libafl_qemu::{
 #[cfg(unix)]
 use nix::{self, unistd::dup};
 
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+
 /// The fuzzer main
 pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match Command::new("libafl_qemu_fuzzbench")
-        .version("0.4.0")
+    let res = match Command::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
         .arg(
@@ -125,7 +127,7 @@ pub fn main() {
     );
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
-    let mut out_dir = PathBuf::from(res.value_of("out").unwrap().to_string());
+    let mut out_dir = PathBuf::from(res.get_one::<String>("out").unwrap().to_string());
     if fs::create_dir(&out_dir).is_err() {
         println!("Out dir at {:?} already exists.", &out_dir);
         if !out_dir.is_dir() {
@@ -137,18 +139,18 @@ pub fn main() {
     crashes.push("crashes");
     out_dir.push("queue");
 
-    let in_dir = PathBuf::from(res.value_of("in").unwrap().to_string());
+    let in_dir = PathBuf::from(res.get_one::<String>("in").unwrap().to_string());
     if !in_dir.is_dir() {
         println!("In dir at {:?} is not a valid directory!", &in_dir);
         return;
     }
 
-    let tokens = res.value_of("tokens").map(PathBuf::from);
+    let tokens = res.get_one::<String>("tokens").map(PathBuf::from);
 
-    let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
+    let logfile = PathBuf::from(res.get_one::<String>("logfile").unwrap().to_string());
 
     let timeout = Duration::from_millis(
-        res.value_of("timeout")
+        res.get_one::<String>("timeout")
             .unwrap()
             .to_string()
             .parse()
@@ -173,6 +175,7 @@ fn fuzz(
     let args: Vec<String> = env::args().collect();
     let env: Vec<(String, String)> = env::vars().collect();
     let emu = Emulator::new(&args, &env);
+    //let emu = init_with_asan(&mut args, &mut env);
 
     let mut elf_buffer = Vec::new();
     let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
@@ -198,7 +201,9 @@ fn fuzz(
     emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = emu
+        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+        .unwrap();
     println!("Placing input at {:#x}", input_addr);
 
     let log = RefCell::new(
@@ -313,9 +318,9 @@ fn fuzz(
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
-        if len > 4096 {
-            buf = &buf[0..4096];
-            len = 4096;
+        if len > MAX_INPUT_SIZE {
+            buf = &buf[0..MAX_INPUT_SIZE];
+            len = MAX_INPUT_SIZE;
         }
 
         unsafe {
@@ -337,7 +342,7 @@ fn fuzz(
         tuple_list!(
             QemuEdgeCoverageHelper::default(),
             QemuCmpLogHelper::default(),
-            //QemuAsanHelper::new(),
+            //QemuAsanHelper::default(),
             //QemuSnapshotHelper::new()
         ),
     );

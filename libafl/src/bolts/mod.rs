@@ -153,6 +153,7 @@ pub fn format_duration_hms(duration: &time::Duration) -> String {
 }
 
 /// The purpose of this module is to alleviate imports of the bolts by adding a glob import.
+#[cfg(feature = "prelude")]
 pub mod bolts_prelude {
     #[cfg(feature = "std")]
     pub use super::build_id::*;

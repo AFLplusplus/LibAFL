@@ -9,7 +9,7 @@ use core::{
     ptr::{self, addr_of},
 };
 
-use libafl::{executors::inprocess::inprocess_get_state, inputs::Input};
+use libafl::{executors::inprocess::inprocess_get_state, inputs::UsesInput};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
@@ -23,7 +23,7 @@ use crate::{
 enum Hook {
     Function(*const c_void),
     Closure(FatPtr),
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     Once(FatPtr),
     Empty,
 }
@@ -40,35 +40,35 @@ type DynamicLenHookCl<QT, S> =
 */
 
 static mut QEMU_HOOKS_PTR: *const c_void = ptr::null();
-unsafe fn get_qemu_hooks<'a, I, QT, S>() -> &'a mut QemuHooks<'a, I, QT, S>
+unsafe fn get_qemu_hooks<'a, QT, S>() -> &'a mut QemuHooks<'a, QT, S>
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
-    (QEMU_HOOKS_PTR as *mut QemuHooks<'a, I, QT, S>)
+    (QEMU_HOOKS_PTR as *mut QemuHooks<'a, QT, S>)
         .as_mut()
         .expect("A high-level hook is installed but QemuHooks is not initialized")
 }
 
 static mut GENERIC_HOOKS: Vec<Hook> = vec![];
 
-extern "C" fn generic_hook_wrapper<I, QT, S>(pc: GuestAddr, index: u64)
+extern "C" fn generic_hook_wrapper<QT, S>(pc: GuestAddr, index: u64)
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let hook = &mut GENERIC_HOOKS[index as usize];
         match hook {
             Hook::Function(ptr) => {
-                let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, GuestAddr) =
+                let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) =
                     transmute(*ptr);
                 (func)(hooks, inprocess_get_state::<S>(), pc);
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
-                    dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, GuestAddr),
+                    dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr),
                 > = transmute(ptr);
                 (func)(hooks, inprocess_get_state::<S>(), pc);
             }
@@ -79,18 +79,18 @@ where
 
 static mut EDGE_HOOKS: Vec<(Hook, Hook)> = vec![];
 
-extern "C" fn gen_edge_hook_wrapper<I, QT, S>(src: GuestAddr, dst: GuestAddr, index: u64) -> u64
+extern "C" fn gen_edge_hook_wrapper<QT, S>(src: GuestAddr, dst: GuestAddr, index: u64) -> u64
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let (gen, _) = &mut EDGE_HOOKS[index as usize];
         match gen {
             Hook::Function(ptr) => {
                 let func: fn(
-                    &mut QemuHooks<'_, I, QT, S>,
+                    &mut QemuHooks<'_, QT, S>,
                     Option<&mut S>,
                     GuestAddr,
                     GuestAddr,
@@ -100,7 +100,7 @@ where
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(
-                        &mut QemuHooks<'_, I, QT, S>,
+                        &mut QemuHooks<'_, QT, S>,
                         Option<&mut S>,
                         GuestAddr,
                         GuestAddr,
@@ -113,21 +113,21 @@ where
     }
 }
 
-extern "C" fn exec_edge_hook_wrapper<I, QT, S>(id: u64, index: u64)
+extern "C" fn exec_edge_hook_wrapper<QT, S>(id: u64, index: u64)
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let (_, exec) = &mut EDGE_HOOKS[index as usize];
         match exec {
             Hook::Function(ptr) => {
-                let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
+                let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
                 (func)(hooks, inprocess_get_state::<S>(), id);
             }
             Hook::Closure(ptr) => {
-                let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64)> =
+                let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64)> =
                     transmute(ptr);
                 (func)(hooks, inprocess_get_state::<S>(), id);
             }
@@ -138,30 +138,23 @@ where
 
 static mut BLOCK_HOOKS: Vec<(Hook, Hook)> = vec![];
 
-extern "C" fn gen_block_hook_wrapper<I, QT, S>(pc: GuestAddr, index: u64) -> u64
+extern "C" fn gen_block_hook_wrapper<QT, S>(pc: GuestAddr, index: u64) -> u64
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let (gen, _) = &mut BLOCK_HOOKS[index as usize];
         match gen {
             Hook::Function(ptr) => {
-                let func: fn(
-                    &mut QemuHooks<'_, I, QT, S>,
-                    Option<&mut S>,
-                    GuestAddr,
-                ) -> Option<u64> = transmute(*ptr);
+                let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) -> Option<u64> =
+                    transmute(*ptr);
                 (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
-                    dyn FnMut(
-                        &mut QemuHooks<'_, I, QT, S>,
-                        Option<&mut S>,
-                        GuestAddr,
-                    ) -> Option<u64>,
+                    dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, GuestAddr) -> Option<u64>,
                 > = transmute(ptr);
                 (func)(hooks, inprocess_get_state::<S>(), pc).map_or(SKIP_EXEC_HOOK, |id| id)
             }
@@ -170,21 +163,21 @@ where
     }
 }
 
-extern "C" fn exec_block_hook_wrapper<I, QT, S>(id: u64, index: u64)
+extern "C" fn exec_block_hook_wrapper<QT, S>(id: u64, index: u64)
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let (_, exec) = &mut BLOCK_HOOKS[index as usize];
         match exec {
             Hook::Function(ptr) => {
-                let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
+                let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64) = transmute(*ptr);
                 (func)(hooks, inprocess_get_state::<S>(), id);
             }
             Hook::Closure(ptr) => {
-                let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64)> =
+                let func: &mut Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64)> =
                     transmute(ptr);
                 (func)(hooks, inprocess_get_state::<S>(), id);
             }
@@ -196,18 +189,18 @@ where
 static mut READ_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook, Hook)> = vec![];
 static mut WRITE_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook, Hook)> = vec![];
 
-extern "C" fn gen_read_hook_wrapper<I, QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
+extern "C" fn gen_read_hook_wrapper<QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let (gen, _, _, _, _, _) = &mut READ_HOOKS[index as usize];
         match gen {
             Hook::Function(ptr) => {
                 let func: fn(
-                    &mut QemuHooks<'_, I, QT, S>,
+                    &mut QemuHooks<'_, QT, S>,
                     Option<&mut S>,
                     GuestAddr,
                     usize,
@@ -217,7 +210,7 @@ where
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(
-                        &mut QemuHooks<'_, I, QT, S>,
+                        &mut QemuHooks<'_, QT, S>,
                         Option<&mut S>,
                         GuestAddr,
                         usize,
@@ -230,18 +223,18 @@ where
     }
 }
 
-extern "C" fn gen_write_hook_wrapper<I, QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
+extern "C" fn gen_write_hook_wrapper<QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let (gen, _, _, _, _, _) = &mut WRITE_HOOKS[index as usize];
         match gen {
             Hook::Function(ptr) => {
                 let func: fn(
-                    &mut QemuHooks<'_, I, QT, S>,
+                    &mut QemuHooks<'_, QT, S>,
                     Option<&mut S>,
                     GuestAddr,
                     usize,
@@ -251,7 +244,7 @@ where
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(
-                        &mut QemuHooks<'_, I, QT, S>,
+                        &mut QemuHooks<'_, QT, S>,
                         Option<&mut S>,
                         GuestAddr,
                         usize,
@@ -266,23 +259,23 @@ where
 
 macro_rules! define_rw_exec_hook {
     ($name:ident, $field:tt, $global:ident) => {
-        extern "C" fn $name<I, QT, S>(id: u64, addr: GuestAddr, index: u64)
+        extern "C" fn $name<QT, S>(id: u64, addr: GuestAddr, index: u64)
         where
-            I: Input,
-            QT: QemuHelperTuple<I, S>,
+            S: UsesInput,
+            QT: QemuHelperTuple<S>,
         {
             unsafe {
-                let hooks = get_qemu_hooks::<I, QT, S>();
+                let hooks = get_qemu_hooks::<QT, S>();
                 let exec = &mut $global[index as usize].$field;
                 match exec {
                     Hook::Function(ptr) => {
-                        let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64, GuestAddr) =
+                        let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64, GuestAddr) =
                             transmute(*ptr);
                         (func)(hooks, inprocess_get_state::<S>(), id, addr);
                     }
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
-                            dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u64, GuestAddr),
+                            dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u64, GuestAddr),
                         > = transmute(ptr);
                         (func)(hooks, inprocess_get_state::<S>(), id, addr);
                     }
@@ -295,18 +288,18 @@ macro_rules! define_rw_exec_hook {
 
 macro_rules! define_rw_exec_hook_n {
     ($name:ident, $field:tt, $global:ident) => {
-        extern "C" fn $name<I, QT, S>(id: u64, addr: GuestAddr, size: usize, index: u64)
+        extern "C" fn $name<QT, S>(id: u64, addr: GuestAddr, size: usize, index: u64)
         where
-            I: Input,
-            QT: QemuHelperTuple<I, S>,
+            S: UsesInput,
+            QT: QemuHelperTuple<S>,
         {
             unsafe {
-                let hooks = get_qemu_hooks::<I, QT, S>();
+                let hooks = get_qemu_hooks::<QT, S>();
                 let exec = &mut $global[index as usize].$field;
                 match exec {
                     Hook::Function(ptr) => {
                         let func: fn(
-                            &mut QemuHooks<'_, I, QT, S>,
+                            &mut QemuHooks<'_, QT, S>,
                             Option<&mut S>,
                             u64,
                             GuestAddr,
@@ -317,7 +310,7 @@ macro_rules! define_rw_exec_hook_n {
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
                             dyn FnMut(
-                                &mut QemuHooks<'_, I, QT, S>,
+                                &mut QemuHooks<'_, QT, S>,
                                 Option<&mut S>,
                                 u64,
                                 GuestAddr,
@@ -347,18 +340,18 @@ define_rw_exec_hook_n!(exec_write_n_hook_wrapper, 5, WRITE_HOOKS);
 
 static mut CMP_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook)> = vec![];
 
-extern "C" fn gen_cmp_hook_wrapper<I, QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
+extern "C" fn gen_cmp_hook_wrapper<QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let (gen, _, _, _, _) = &mut CMP_HOOKS[index as usize];
         match gen {
             Hook::Function(ptr) => {
                 let func: fn(
-                    &mut QemuHooks<'_, I, QT, S>,
+                    &mut QemuHooks<'_, QT, S>,
                     Option<&mut S>,
                     GuestAddr,
                     usize,
@@ -368,7 +361,7 @@ where
             Hook::Closure(ptr) => {
                 let func: &mut Box<
                     dyn FnMut(
-                        &mut QemuHooks<'_, I, QT, S>,
+                        &mut QemuHooks<'_, QT, S>,
                         Option<&mut S>,
                         GuestAddr,
                         usize,
@@ -383,18 +376,18 @@ where
 
 macro_rules! define_cmp_exec_hook {
     ($name:ident, $field:tt, $itype:ty) => {
-        extern "C" fn $name<I, QT, S>(id: u64, v0: $itype, v1: $itype, index: u64)
+        extern "C" fn $name<QT, S>(id: u64, v0: $itype, v1: $itype, index: u64)
         where
-            I: Input,
-            QT: QemuHelperTuple<I, S>,
+            S: UsesInput,
+            QT: QemuHelperTuple<S>,
         {
             unsafe {
-                let hooks = get_qemu_hooks::<I, QT, S>();
+                let hooks = get_qemu_hooks::<QT, S>();
                 let exec = &mut CMP_HOOKS[index as usize].$field;
                 match exec {
                     Hook::Function(ptr) => {
                         let func: fn(
-                            &mut QemuHooks<'_, I, QT, S>,
+                            &mut QemuHooks<'_, QT, S>,
                             Option<&mut S>,
                             u64,
                             $itype,
@@ -405,7 +398,7 @@ macro_rules! define_cmp_exec_hook {
                     Hook::Closure(ptr) => {
                         let func: &mut Box<
                             dyn FnMut(
-                                &mut QemuHooks<'_, I, QT, S>,
+                                &mut QemuHooks<'_, QT, S>,
                                 Option<&mut S>,
                                 u64,
                                 $itype,
@@ -426,34 +419,32 @@ define_cmp_exec_hook!(exec_cmp2_hook_wrapper, 2, u16);
 define_cmp_exec_hook!(exec_cmp4_hook_wrapper, 3, u32);
 define_cmp_exec_hook!(exec_cmp8_hook_wrapper, 4, u64);
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 static mut ON_THREAD_HOOKS: Vec<Hook> = vec![];
-#[cfg(feature = "usermode")]
-extern "C" fn on_thread_hooks_wrapper<I, QT, S>(tid: u32)
+#[cfg(emulation_mode = "usermode")]
+extern "C" fn on_thread_hooks_wrapper<QT, S>(tid: u32)
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
         for hook in &mut ON_THREAD_HOOKS {
-            let hooks = get_qemu_hooks::<I, QT, S>();
+            let hooks = get_qemu_hooks::<QT, S>();
             match hook {
                 Hook::Function(ptr) => {
-                    let func: fn(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32) =
-                        transmute(*ptr);
+                    let func: fn(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32) = transmute(*ptr);
                     (func)(hooks, inprocess_get_state::<S>(), tid);
                 }
                 Hook::Closure(ptr) => {
-                    let mut func: Box<
-                        dyn FnMut(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32),
-                    > = transmute(*ptr);
+                    let mut func: Box<dyn FnMut(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32)> =
+                        transmute(*ptr);
                     (func)(hooks, inprocess_get_state::<S>(), tid);
 
                     // Forget the closure so that drop is not called on captured variables.
                     core::mem::forget(func);
                 }
                 Hook::Once(ptr) => {
-                    let func: Box<dyn FnOnce(&mut QemuHooks<'_, I, QT, S>, Option<&mut S>, u32)> =
+                    let func: Box<dyn FnOnce(&mut QemuHooks<'_, QT, S>, Option<&mut S>, u32)> =
                         transmute(*ptr);
                     (func)(hooks, inprocess_get_state::<S>(), tid);
                     *hook = Hook::Empty;
@@ -464,10 +455,10 @@ where
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 static mut SYSCALL_HOOKS: Vec<Hook> = vec![];
-#[cfg(feature = "usermode")]
-extern "C" fn syscall_hooks_wrapper<I, QT, S>(
+#[cfg(emulation_mode = "usermode")]
+extern "C" fn syscall_hooks_wrapper<QT, S>(
     sys_num: i32,
     a0: u64,
     a1: u64,
@@ -479,18 +470,18 @@ extern "C" fn syscall_hooks_wrapper<I, QT, S>(
     a7: u64,
 ) -> SyscallHookResult
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let mut res = SyscallHookResult::new(None);
         for hook in &SYSCALL_HOOKS {
             match hook {
                 Hook::Function(ptr) => {
                     #[allow(clippy::type_complexity)]
                     let func: fn(
-                        &mut QemuHooks<'_, I, QT, S>,
+                        &mut QemuHooks<'_, QT, S>,
                         Option<&mut S>,
                         i32,
                         u64,
@@ -524,7 +515,7 @@ where
                     #[allow(clippy::type_complexity)]
                     let mut func: Box<
                         dyn FnMut(
-                            &mut QemuHooks<'_, I, QT, S>,
+                            &mut QemuHooks<'_, QT, S>,
                             Option<&mut S>,
                             i32,
                             u64,
@@ -566,10 +557,10 @@ where
     }
 }
 
-#[cfg(feature = "usermode")]
+#[cfg(emulation_mode = "usermode")]
 static mut SYSCALL_POST_HOOKS: Vec<Hook> = vec![];
-#[cfg(feature = "usermode")]
-extern "C" fn syscall_after_hooks_wrapper<I, QT, S>(
+#[cfg(emulation_mode = "usermode")]
+extern "C" fn syscall_after_hooks_wrapper<QT, S>(
     result: u64,
     sys_num: i32,
     a0: u64,
@@ -582,18 +573,18 @@ extern "C" fn syscall_after_hooks_wrapper<I, QT, S>(
     a7: u64,
 ) -> u64
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     unsafe {
-        let hooks = get_qemu_hooks::<I, QT, S>();
+        let hooks = get_qemu_hooks::<QT, S>();
         let mut res = result;
         for hook in &SYSCALL_POST_HOOKS {
             match hook {
                 Hook::Function(ptr) => {
                     #[allow(clippy::type_complexity)]
                     let func: fn(
-                        &mut QemuHooks<'_, I, QT, S>,
+                        &mut QemuHooks<'_, QT, S>,
                         Option<&mut S>,
                         u64,
                         i32,
@@ -625,7 +616,7 @@ where
                     #[allow(clippy::type_complexity)]
                     let mut func: Box<
                         dyn FnMut(
-                            &mut QemuHooks<'_, I, QT, S>,
+                            &mut QemuHooks<'_, QT, S>,
                             Option<&mut S>,
                             u64,
                             i32,
@@ -666,20 +657,20 @@ where
 
 static mut HOOKS_IS_INITIALIZED: bool = false;
 
-pub struct QemuHooks<'a, I, QT, S>
+pub struct QemuHooks<'a, QT, S>
 where
-    QT: QemuHelperTuple<I, S>,
-    I: Input,
+    QT: QemuHelperTuple<S>,
+    S: UsesInput,
 {
     helpers: QT,
     emulator: &'a Emulator,
-    phantom: PhantomData<(I, S)>,
+    phantom: PhantomData<S>,
 }
 
-impl<'a, I, QT, S> Debug for QemuHooks<'a, I, QT, S>
+impl<'a, QT, S> Debug for QemuHooks<'a, QT, S>
 where
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("QemuHooks")
@@ -689,10 +680,10 @@ where
     }
 }
 
-impl<'a, I, QT, S> QemuHooks<'a, I, QT, S>
+impl<'a, QT, S> QemuHooks<'a, QT, S>
 where
-    QT: QemuHelperTuple<I, S>,
-    I: Input,
+    QT: QemuHelperTuple<S>,
+    S: UsesInput,
 {
     pub fn new(emulator: &'a Emulator, helpers: QT) -> Box<Self> {
         unsafe {
@@ -754,7 +745,7 @@ where
             let index = GENERIC_HOOKS.len();
             self.emulator.set_hook(
                 addr,
-                generic_hook_wrapper::<I, QT, S>,
+                generic_hook_wrapper::<QT, S>,
                 index as u64,
                 invalidate_block,
             );
@@ -771,7 +762,7 @@ where
         let index = GENERIC_HOOKS.len();
         self.emulator.set_hook(
             addr,
-            generic_hook_wrapper::<I, QT, S>,
+            generic_hook_wrapper::<QT, S>,
             index as u64,
             invalidate_block,
         );
@@ -791,12 +782,12 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_edge_hook_wrapper::<I, QT, S>)
+                    Some(gen_edge_hook_wrapper::<QT, S>)
                 },
                 if execution_hook.is_none() {
                     None
                 } else {
-                    Some(exec_edge_hook_wrapper::<I, QT, S>)
+                    Some(exec_edge_hook_wrapper::<QT, S>)
                 },
                 index as u64,
             );
@@ -823,12 +814,12 @@ where
             if generation_hook.is_none() {
                 None
             } else {
-                Some(gen_edge_hook_wrapper::<I, QT, S>)
+                Some(gen_edge_hook_wrapper::<QT, S>)
             },
             if execution_hook.is_none() {
                 None
             } else {
-                Some(exec_edge_hook_wrapper::<I, QT, S>)
+                Some(exec_edge_hook_wrapper::<QT, S>)
             },
             index as u64,
         );
@@ -851,7 +842,7 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_edge_hook_wrapper::<I, QT, S>)
+                    Some(gen_edge_hook_wrapper::<QT, S>)
                 },
                 execution_hook,
                 index as u64,
@@ -876,12 +867,12 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_block_hook_wrapper::<I, QT, S>)
+                    Some(gen_block_hook_wrapper::<QT, S>)
                 },
                 if execution_hook.is_none() {
                     None
                 } else {
-                    Some(exec_block_hook_wrapper::<I, QT, S>)
+                    Some(exec_block_hook_wrapper::<QT, S>)
                 },
                 index as u64,
             );
@@ -908,12 +899,12 @@ where
             if generation_hook.is_none() {
                 None
             } else {
-                Some(gen_block_hook_wrapper::<I, QT, S>)
+                Some(gen_block_hook_wrapper::<QT, S>)
             },
             if execution_hook.is_none() {
                 None
             } else {
-                Some(exec_block_hook_wrapper::<I, QT, S>)
+                Some(exec_block_hook_wrapper::<QT, S>)
             },
             index as u64,
         );
@@ -934,7 +925,7 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_block_hook_wrapper::<I, QT, S>)
+                    Some(gen_block_hook_wrapper::<QT, S>)
                 },
                 execution_hook,
                 index as u64,
@@ -967,32 +958,32 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_read_hook_wrapper::<I, QT, S>)
+                    Some(gen_read_hook_wrapper::<QT, S>)
                 },
                 if execution_hook1.is_none() {
                     None
                 } else {
-                    Some(exec_read1_hook_wrapper::<I, QT, S>)
+                    Some(exec_read1_hook_wrapper::<QT, S>)
                 },
                 if execution_hook2.is_none() {
                     None
                 } else {
-                    Some(exec_read2_hook_wrapper::<I, QT, S>)
+                    Some(exec_read2_hook_wrapper::<QT, S>)
                 },
                 if execution_hook4.is_none() {
                     None
                 } else {
-                    Some(exec_read4_hook_wrapper::<I, QT, S>)
+                    Some(exec_read4_hook_wrapper::<QT, S>)
                 },
                 if execution_hook8.is_none() {
                     None
                 } else {
-                    Some(exec_read8_hook_wrapper::<I, QT, S>)
+                    Some(exec_read8_hook_wrapper::<QT, S>)
                 },
                 if execution_hook_n.is_none() {
                     None
                 } else {
-                    Some(exec_read_n_hook_wrapper::<I, QT, S>)
+                    Some(exec_read_n_hook_wrapper::<QT, S>)
                 },
                 index as u64,
             );
@@ -1037,32 +1028,32 @@ where
             if generation_hook.is_none() {
                 None
             } else {
-                Some(gen_read_hook_wrapper::<I, QT, S>)
+                Some(gen_read_hook_wrapper::<QT, S>)
             },
             if execution_hook1.is_none() {
                 None
             } else {
-                Some(exec_read1_hook_wrapper::<I, QT, S>)
+                Some(exec_read1_hook_wrapper::<QT, S>)
             },
             if execution_hook2.is_none() {
                 None
             } else {
-                Some(exec_read2_hook_wrapper::<I, QT, S>)
+                Some(exec_read2_hook_wrapper::<QT, S>)
             },
             if execution_hook4.is_none() {
                 None
             } else {
-                Some(exec_read4_hook_wrapper::<I, QT, S>)
+                Some(exec_read4_hook_wrapper::<QT, S>)
             },
             if execution_hook8.is_none() {
                 None
             } else {
-                Some(exec_read8_hook_wrapper::<I, QT, S>)
+                Some(exec_read8_hook_wrapper::<QT, S>)
             },
             if execution_hook_n.is_none() {
                 None
             } else {
-                Some(exec_read_n_hook_wrapper::<I, QT, S>)
+                Some(exec_read_n_hook_wrapper::<QT, S>)
             },
             index as u64,
         );
@@ -1093,7 +1084,7 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_read_hook_wrapper::<I, QT, S>)
+                    Some(gen_read_hook_wrapper::<QT, S>)
                 },
                 execution_hook1,
                 execution_hook2,
@@ -1134,32 +1125,32 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_write_hook_wrapper::<I, QT, S>)
+                    Some(gen_write_hook_wrapper::<QT, S>)
                 },
                 if execution_hook1.is_none() {
                     None
                 } else {
-                    Some(exec_write1_hook_wrapper::<I, QT, S>)
+                    Some(exec_write1_hook_wrapper::<QT, S>)
                 },
                 if execution_hook2.is_none() {
                     None
                 } else {
-                    Some(exec_write2_hook_wrapper::<I, QT, S>)
+                    Some(exec_write2_hook_wrapper::<QT, S>)
                 },
                 if execution_hook4.is_none() {
                     None
                 } else {
-                    Some(exec_write4_hook_wrapper::<I, QT, S>)
+                    Some(exec_write4_hook_wrapper::<QT, S>)
                 },
                 if execution_hook8.is_none() {
                     None
                 } else {
-                    Some(exec_write8_hook_wrapper::<I, QT, S>)
+                    Some(exec_write8_hook_wrapper::<QT, S>)
                 },
                 if execution_hook_n.is_none() {
                     None
                 } else {
-                    Some(exec_write_n_hook_wrapper::<I, QT, S>)
+                    Some(exec_write_n_hook_wrapper::<QT, S>)
                 },
                 index as u64,
             );
@@ -1204,32 +1195,32 @@ where
             if generation_hook.is_none() {
                 None
             } else {
-                Some(gen_write_hook_wrapper::<I, QT, S>)
+                Some(gen_write_hook_wrapper::<QT, S>)
             },
             if execution_hook1.is_none() {
                 None
             } else {
-                Some(exec_write1_hook_wrapper::<I, QT, S>)
+                Some(exec_write1_hook_wrapper::<QT, S>)
             },
             if execution_hook2.is_none() {
                 None
             } else {
-                Some(exec_write2_hook_wrapper::<I, QT, S>)
+                Some(exec_write2_hook_wrapper::<QT, S>)
             },
             if execution_hook4.is_none() {
                 None
             } else {
-                Some(exec_write4_hook_wrapper::<I, QT, S>)
+                Some(exec_write4_hook_wrapper::<QT, S>)
             },
             if execution_hook8.is_none() {
                 None
             } else {
-                Some(exec_write8_hook_wrapper::<I, QT, S>)
+                Some(exec_write8_hook_wrapper::<QT, S>)
             },
             if execution_hook_n.is_none() {
                 None
             } else {
-                Some(exec_write_n_hook_wrapper::<I, QT, S>)
+                Some(exec_write_n_hook_wrapper::<QT, S>)
             },
             index as u64,
         );
@@ -1260,7 +1251,7 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_write_hook_wrapper::<I, QT, S>)
+                    Some(gen_write_hook_wrapper::<QT, S>)
                 },
                 execution_hook1,
                 execution_hook2,
@@ -1298,27 +1289,27 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_cmp_hook_wrapper::<I, QT, S>)
+                    Some(gen_cmp_hook_wrapper::<QT, S>)
                 },
                 if execution_hook1.is_none() {
                     None
                 } else {
-                    Some(exec_cmp1_hook_wrapper::<I, QT, S>)
+                    Some(exec_cmp1_hook_wrapper::<QT, S>)
                 },
                 if execution_hook2.is_none() {
                     None
                 } else {
-                    Some(exec_cmp2_hook_wrapper::<I, QT, S>)
+                    Some(exec_cmp2_hook_wrapper::<QT, S>)
                 },
                 if execution_hook4.is_none() {
                     None
                 } else {
-                    Some(exec_cmp4_hook_wrapper::<I, QT, S>)
+                    Some(exec_cmp4_hook_wrapper::<QT, S>)
                 },
                 if execution_hook8.is_none() {
                     None
                 } else {
-                    Some(exec_cmp8_hook_wrapper::<I, QT, S>)
+                    Some(exec_cmp8_hook_wrapper::<QT, S>)
                 },
                 index as u64,
             );
@@ -1357,27 +1348,27 @@ where
             if generation_hook.is_none() {
                 None
             } else {
-                Some(gen_cmp_hook_wrapper::<I, QT, S>)
+                Some(gen_cmp_hook_wrapper::<QT, S>)
             },
             if execution_hook1.is_none() {
                 None
             } else {
-                Some(exec_cmp1_hook_wrapper::<I, QT, S>)
+                Some(exec_cmp1_hook_wrapper::<QT, S>)
             },
             if execution_hook2.is_none() {
                 None
             } else {
-                Some(exec_cmp2_hook_wrapper::<I, QT, S>)
+                Some(exec_cmp2_hook_wrapper::<QT, S>)
             },
             if execution_hook4.is_none() {
                 None
             } else {
-                Some(exec_cmp4_hook_wrapper::<I, QT, S>)
+                Some(exec_cmp4_hook_wrapper::<QT, S>)
             },
             if execution_hook8.is_none() {
                 None
             } else {
-                Some(exec_cmp8_hook_wrapper::<I, QT, S>)
+                Some(exec_cmp8_hook_wrapper::<QT, S>)
             },
             index as u64,
         );
@@ -1406,7 +1397,7 @@ where
                 if generation_hook.is_none() {
                     None
                 } else {
-                    Some(gen_cmp_hook_wrapper::<I, QT, S>)
+                    Some(gen_cmp_hook_wrapper::<QT, S>)
                 },
                 execution_hook1,
                 execution_hook2,
@@ -1426,16 +1417,16 @@ where
         }
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn thread_creation(&self, hook: fn(&mut Self, Option<&mut S>, tid: u32)) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
-            .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
+            .set_on_thread_hook(on_thread_hooks_wrapper::<QT, S>);
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn thread_creation_closure(
         &self,
         hook: Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u32) + 'a>,
@@ -1444,19 +1435,19 @@ where
             ON_THREAD_HOOKS.push(Hook::Closure(transmute(hook)));
         }
         self.emulator
-            .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
+            .set_on_thread_hook(on_thread_hooks_wrapper::<QT, S>);
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     pub fn thread_creation_once(&self, hook: Box<dyn FnOnce(&mut Self, Option<&mut S>, u32) + 'a>) {
         unsafe {
             ON_THREAD_HOOKS.push(Hook::Once(transmute(hook)));
         }
         self.emulator
-            .set_on_thread_hook(on_thread_hooks_wrapper::<I, QT, S>);
+            .set_on_thread_hook(on_thread_hooks_wrapper::<QT, S>);
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn syscalls(
         &self,
@@ -1478,10 +1469,10 @@ where
             SYSCALL_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
-            .set_pre_syscall_hook(syscall_hooks_wrapper::<I, QT, S>);
+            .set_pre_syscall_hook(syscall_hooks_wrapper::<QT, S>);
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn syscalls_closure(
         &self,
@@ -1505,10 +1496,10 @@ where
             SYSCALL_HOOKS.push(Hook::Closure(transmute(hook)));
         }
         self.emulator
-            .set_pre_syscall_hook(syscall_hooks_wrapper::<I, QT, S>);
+            .set_pre_syscall_hook(syscall_hooks_wrapper::<QT, S>);
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn after_syscalls(
         &self,
@@ -1531,10 +1522,10 @@ where
             SYSCALL_POST_HOOKS.push(Hook::Function(hook as *const libc::c_void));
         }
         self.emulator
-            .set_post_syscall_hook(syscall_after_hooks_wrapper::<I, QT, S>);
+            .set_post_syscall_hook(syscall_after_hooks_wrapper::<QT, S>);
     }
 
-    #[cfg(feature = "usermode")]
+    #[cfg(emulation_mode = "usermode")]
     #[allow(clippy::type_complexity)]
     pub fn after_syscalls_closure(
         &self,
@@ -1559,6 +1550,6 @@ where
             SYSCALL_POST_HOOKS.push(Hook::Closure(transmute(hook)));
         }
         self.emulator
-            .set_post_syscall_hook(syscall_after_hooks_wrapper::<I, QT, S>);
+            .set_post_syscall_hook(syscall_after_hooks_wrapper::<QT, S>);
     }
 }

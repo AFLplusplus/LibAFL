@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_libpng_launcher"
-version = "0.8.1"
+version = "0.8.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 
@@ -23,7 +23,7 @@ libafl = { path = "../../libafl/", features = ["std", "derive", "llmp_compressio
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
-clap = { version = "3.2", features = ["derive"] }
+clap = { version = "4.0", features = ["derive"] }
 mimalloc = { version = "*", default-features = false }
 
 [lib]

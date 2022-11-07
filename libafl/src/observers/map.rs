@@ -24,6 +24,7 @@ use crate::{
         AsIter, AsIterMut, AsMutSlice, AsSlice, HasLen,
     },
     executors::ExitKind,
+    inputs::UsesInput,
     observers::Observer,
     Error,
 };
@@ -198,8 +199,9 @@ where
     name: String,
 }
 
-impl<'a, I, S, T> Observer<I, S> for StdMapObserver<'a, T>
+impl<'a, S, T> Observer<S> for StdMapObserver<'a, T>
 where
+    S: UsesInput,
     T: Bounded
         + PartialEq
         + Default
@@ -210,7 +212,7 @@ where
         + Debug,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -499,13 +501,14 @@ where
     name: String,
 }
 
-impl<'a, I, S, T, const N: usize> Observer<I, S> for ConstMapObserver<'a, T, N>
+impl<'a, S, T, const N: usize> Observer<S> for ConstMapObserver<'a, T, N>
 where
+    S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -770,13 +773,14 @@ where
     name: String,
 }
 
-impl<'a, I, S, T> Observer<I, S> for VariableMapObserver<'a, T>
+impl<'a, S, T> Observer<S> for VariableMapObserver<'a, T>
 where
+    S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -1038,18 +1042,24 @@ where
     base: M,
 }
 
-impl<I, S, M> Observer<I, S> for HitcountsMapObserver<M>
+impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<I, S> + AsMutSlice<u8>,
+    M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<u8>,
+    S: UsesInput,
 {
     #[inline]
-    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.base.pre_exec(state, input)
     }
 
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
-    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         let map = self.as_mut_slice();
         let len = map.len();
         if (len & 1) != 0 {
@@ -1237,19 +1247,25 @@ where
     base: M,
 }
 
-impl<I, S, M> Observer<I, S> for HitcountsIterableMapObserver<M>
+impl<S, M> Observer<S> for HitcountsIterableMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<I, S>,
+    M: MapObserver<Entry = u8> + Observer<S>,
     for<'it> M: AsIterMut<'it, Item = u8>,
+    S: UsesInput,
 {
     #[inline]
-    fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.base.pre_exec(state, input)
     }
 
     #[inline]
     #[allow(clippy::cast_ptr_alignment)]
-    fn post_exec(&mut self, state: &mut S, input: &I, exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        input: &S::Input,
+        exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         for item in self.as_iter_mut() {
             *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };
         }
@@ -1429,13 +1445,14 @@ where
     iter_idx: usize,
 }
 
-impl<'a, I, S, T> Observer<I, S> for MultiMapObserver<'a, T>
+impl<'a, S, T> Observer<S> for MultiMapObserver<'a, T>
 where
+    S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -1685,13 +1702,14 @@ where
     name: String,
 }
 
-impl<I, S, T> Observer<I, S> for OwnedMapObserver<T>
+impl<S, T> Observer<S> for OwnedMapObserver<T>
 where
+    S: UsesInput,
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
     Self: MapObserver,
 {
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.reset_map()
     }
 }
@@ -1904,7 +1922,7 @@ pub mod pybind {
         AsIter, AsIterMut, AsMutSlice, AsSlice, Debug, Error, HasLen, Iter, IterMut, MapObserver,
         Named, Observer, OwnedMapObserver, StdMapObserver, String, Vec,
     };
-    use crate::observers::pybind::PythonObserver;
+    use crate::{inputs::UsesInput, observers::pybind::PythonObserver};
 
     #[macro_export]
     macro_rules! mapob_unwrap_me {
@@ -2009,6 +2027,7 @@ pub mod pybind {
             }
 
             #[pyclass(unsendable, name = $py_name2)]
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Serialize, Deserialize, Debug, Clone)]
             /// Python class for OwnedMapObserver (i.e. StdMapObserver with owned map)
             pub struct $struct_name2 {
@@ -2079,6 +2098,7 @@ pub mod pybind {
 
             // Should not be exposed to user
             #[pyclass(unsendable, name = $py_name_trait)]
+            #[allow(clippy::unsafe_derive_deserialize)]
             #[derive(Serialize, Deserialize, Debug, Clone)]
             /// MapObserver + Observer Trait binding
             pub struct $struct_name_trait {
@@ -2238,12 +2258,13 @@ pub mod pybind {
                 }
             }
 
-            impl<I, S> Observer<I, S> for $struct_name_trait
+            impl<S> Observer<S> for $struct_name_trait
             where
                 Self: MapObserver,
+                S: UsesInput,
             {
                 #[inline]
-                fn pre_exec(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+                fn pre_exec(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.pre_exec(state, input) })
                 }
             }

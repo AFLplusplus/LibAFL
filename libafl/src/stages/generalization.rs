@@ -1,4 +1,4 @@
-//! The tracing stage can trace the target and enrich a testcase with metadata, for example for `CmpLog`.
+//! The tracing stage can trace the target and enrich a [`crate::corpus::Testcase`] with metadata, for example for `CmpLog`.
 
 use alloc::{
     string::{String, ToString},
@@ -16,12 +16,12 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec},
+    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec, UsesInput},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
     stages::Stage,
     start_timer,
-    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, UsesState},
     Error,
 };
 
@@ -60,23 +60,32 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct GeneralizationStage<EM, O, OT, S, Z>
-where
-    O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
-{
+pub struct GeneralizationStage<EM, O, OT, Z> {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(EM, O, OT, S, Z)>,
+    phantom: PhantomData<(EM, O, OT, Z)>,
 }
 
-impl<E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for GeneralizationStage<EM, O, OT, S, Z>
+impl<EM, O, OT, Z> UsesState for GeneralizationStage<EM, O, OT, Z>
+where
+    EM: UsesState,
+    EM::State: UsesInput<Input = GeneralizedInput>,
+{
+    type State = EM::State;
+}
+
+impl<E, EM, O, Z> Stage<E, EM, Z> for GeneralizationStage<EM, O, E::Observers, Z>
 where
     O: MapObserver,
-    E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
+    E: Executor<EM, Z> + HasObservers,
+    E::Observers: ObserversTuple<E::State>,
+    E::State: UsesInput<Input = GeneralizedInput>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasCorpus,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     #[inline]
     #[allow(clippy::too_many_lines)]
@@ -84,7 +93,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut E::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -347,11 +356,16 @@ where
     }
 }
 
-impl<EM, O, OT, S, Z> GeneralizationStage<EM, O, OT, S, Z>
+impl<EM, O, OT, Z> GeneralizationStage<EM, O, OT, Z>
 where
+    EM: UsesState,
     O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
+    OT: ObserversTuple<EM::State>,
+    EM::State: UsesInput<Input = GeneralizedInput>
+        + HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasCorpus,
 {
     /// Create a new [`GeneralizationStage`].
     #[must_use]
@@ -375,13 +389,14 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut EM::State,
         manager: &mut EM,
         novelties: &[usize],
         input: &GeneralizedInput,
     ) -> Result<bool, Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
+        Z: UsesState<State = EM::State>,
     {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
@@ -418,7 +433,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut EM::State,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -426,7 +441,8 @@ where
         split_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
+        Z: UsesState<State = EM::State>,
     {
         let mut start = 0;
         while start < payload.len() {
@@ -460,7 +476,7 @@ where
         &self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut EM::State,
         manager: &mut EM,
         payload: &mut Vec<Option<u8>>,
         novelties: &[usize],
@@ -468,7 +484,8 @@ where
         closing_char: u8,
     ) -> Result<(), Error>
     where
-        E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
+        E: Executor<EM, Z> + HasObservers<Observers = OT, State = EM::State>,
+        Z: UsesState<State = EM::State>,
     {
         let mut index = 0;
         while index < payload.len() {
