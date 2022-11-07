@@ -78,7 +78,7 @@ def remove_left_recursion(grammar):
             for rule in rules:
                 tokens = gettokens(rule)
                 if tokens[0] == lhs:
-                    left_recursion = False
+                    no_left_recursion = False
                     break
             else:
                 continue
