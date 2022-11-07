@@ -1,7 +1,7 @@
 use core::time::Duration;
 use std::path::PathBuf;
 
-use clap::{Arg, Command};
+use clap::{self, Parser};
 #[cfg(not(target_vendor = "apple"))]
 use libafl::bolts::shmem::StdShMemProvider;
 #[cfg(target_vendor = "apple")]
@@ -30,53 +30,68 @@ use libafl::{
 };
 use nix::sys::signal::Signal;
 
+/// The commandline args this fuzzer accepts
+#[derive(Debug, Parser)]
+#[command(
+    name = "forkserver_simple",
+    about = "This is a simple example fuzzer to fuzz a executable instrumented by afl-cc.",
+    author = "tokatoka <tokazerkje@outlook.com>"
+)]
+struct Opt {
+    #[arg(
+        help = "The instrumented binary we want to fuzz",
+        name = "EXEC",
+        required = true
+    )]
+    executable: String,
+
+    #[arg(
+        help = "The directory to read initial inputs from ('seeds')",
+        name = "INPUT_DIR",
+        required = true
+    )]
+    in_dir: PathBuf,
+
+    #[arg(
+        help = "Timeout for each individual execution, in milliseconds",
+        short = 't',
+        long = "timeout",
+        default_value = "1200"
+    )]
+    timeout: u64,
+
+    #[arg(
+        help = "If not set, the child's stdout and stderror will be redirected to /dev/null",
+        short = 'd',
+        long = "debug-child",
+        default_value = "false"
+    )]
+    debug_child: bool,
+
+    #[arg(
+        help = "Arguments passed to the target",
+        name = "arguments",
+        num_args(1..),
+        allow_hyphen_values = true,
+        default_value = "[].to_vec()"
+    )]
+    arguments: Vec<String>,
+
+    #[arg(
+        help = "Signal used to stop child",
+        short = 's',
+        long = "signal",
+        value_parser = str::parse::<Signal>,
+        default_value = "SIGKILL"
+    )]
+    signal: Signal,
+}
+
 #[allow(clippy::similar_names)]
 pub fn main() {
-    let res = Command::new("forkserver_simple")
-        .about("Example Forkserver fuzer")
-        .arg(
-            Arg::new("executable")
-                .help("The instrumented binary we want to fuzz")
-                .required(true)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("in")
-                .help("The directory to read initial inputs from ('seeds')")
-                .required(true)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("timeout")
-                .help("Timeout for each individual execution, in milliseconds")
-                .short('t')
-                .long("timeout")
-                .default_value("1200"),
-        )
-        .arg(
-            Arg::new("debug_child")
-                .help("If not set, the child's stdout and stderror will be redirected to /dev/null")
-                .short('d')
-                .long("debug-child"),
-        )
-        .arg(
-            Arg::new("arguments")
-                .help("Arguments passed to the target")
-                .multiple_values(true)
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("signal")
-                .help("Signal used to stop child")
-                .short('s')
-                .long("signal")
-                .default_value("SIGKILL"),
-        )
-        .get_matches();
+    let opt = Opt::parse();
 
-    let corpus_dirs = vec![PathBuf::from(
-        res.get_one::<String>("in").unwrap().to_string(),
-    )];
+    let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
 
     const MAP_SIZE: usize = 65536;
 
@@ -151,17 +166,14 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // If we should debug the child
-    let debug_child = res.is_present("debug_child");
+    let debug_child = opt.debug_child;
 
     // Create the executor for the forkserver
-    let args = match res.values_of("arguments") {
-        Some(vec) => vec.map(|s| s.to_string()).collect::<Vec<String>>().to_vec(),
-        None => [].to_vec(),
-    };
+    let args = opt.arguments;
 
     let mut tokens = Tokens::new();
     let forkserver = ForkserverExecutor::builder()
-        .program(res.get_one::<String>("executable").unwrap())
+        .program(opt.executable)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
@@ -171,17 +183,8 @@ pub fn main() {
 
     let mut executor = TimeoutForkserverExecutor::with_signal(
         forkserver,
-        Duration::from_millis(
-            res.get_one::<String>("timeout")
-                .unwrap()
-                .to_string()
-                .parse()
-                .expect("Could not parse timeout in milliseconds"),
-        ),
-        res.get_one::<String>("signal")
-            .unwrap()
-            .parse::<Signal>()
-            .unwrap(),
+        Duration::from_millis(opt.timeout),
+        opt.signal,
     )
     .expect("Failed to create the executor.");
 
