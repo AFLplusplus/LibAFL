@@ -421,18 +421,14 @@ where
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
 
         if self.executor.uses_shmem_testcase() {
-            match &mut self.executor.shmem_mut() {
-                Some(shmem) => {
-                    let target_bytes = input.target_bytes();
-                    let size = target_bytes.as_slice().len();
-                    let size_in_bytes = size.to_ne_bytes();
-                    // The first four bytes tells the size of the shmem.
-                    shmem.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
-                    shmem.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                        .copy_from_slice(target_bytes.as_slice());
-                }
-                None => {}
-            }
+            let shmem = &mut self.executor.shmem_mut().as_mut().unwrap();
+            let target_bytes = input.target_bytes();
+            let size = target_bytes.as_slice().len();
+            let size_in_bytes = size.to_ne_bytes();
+            // The first four bytes tells the size of the shmem.
+            shmem.as_mut_slice()[..4].copy_from_slice(&size_in_bytes[..4]);
+            shmem.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                .copy_from_slice(target_bytes.as_slice());
         } else {
             self.executor
                 .input_file_mut()
