@@ -762,7 +762,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self.use_stdin = use_stdin;
         self
     }
-
 }
 
 impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
@@ -940,7 +939,7 @@ where
             let size_in_bytes = size.to_ne_bytes();
             // The first four bytes tells the size of the shmem.
             map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
-                .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);    
+                .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
             map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
                 .copy_from_slice(target_bytes.as_slice());
         } else {
