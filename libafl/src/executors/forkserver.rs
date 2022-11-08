@@ -934,24 +934,15 @@ where
 
         // Write to testcase
         if self.uses_shmem_testcase {
-            match &mut self.map {
-                Some(map) => {
-                    let target_bytes = input.target_bytes();
-                    let size = target_bytes.as_slice().len();
-                    let size_in_bytes = size.to_ne_bytes();
-                    // The first four bytes tells the size of the shmem.
-                    map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
-                        .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);
-                    map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
-                        .copy_from_slice(target_bytes.as_slice());
-                }
-                None => {
-                    return Err(Error::illegal_state(
-                        "No ShMemProvider is specified but `uses_shmem_testcase` is set"
-                            .to_string(),
-                    ));
-                }
-            }
+            let map = &mut self.map.as_mut().unwrap();
+            let target_bytes = input.target_bytes();
+            let size = target_bytes.as_slice().len();
+            let size_in_bytes = size.to_ne_bytes();
+            // The first four bytes tells the size of the shmem.
+            map.as_mut_slice()[..SHMEM_FUZZ_HDR_SIZE]
+                .copy_from_slice(&size_in_bytes[..SHMEM_FUZZ_HDR_SIZE]);    
+            map.as_mut_slice()[SHMEM_FUZZ_HDR_SIZE..(SHMEM_FUZZ_HDR_SIZE + size)]
+                .copy_from_slice(target_bytes.as_slice());
         } else {
             self.input_file.write_buf(input.target_bytes().as_slice())?;
         }
