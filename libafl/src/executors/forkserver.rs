@@ -659,6 +659,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             if (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ) && map.is_some() {
                 println!("Using SHARED MEMORY FUZZING feature.");
                 send_status |= FS_OPT_SHDMEM_FUZZ;
+                self.uses_shmem_testcase = true;
             }
 
             if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
@@ -762,11 +763,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         self
     }
 
-    /// Specify if input bytes are to be loaded from shared memory (if not, they are written to a file)
-    pub fn use_shmem_testcase(mut self, use_shmem_testcase: bool) -> Self {
-        self.uses_shmem_testcase = use_shmem_testcase;
-        self
-    }
 }
 
 impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
