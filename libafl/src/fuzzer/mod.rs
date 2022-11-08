@@ -31,41 +31,45 @@ use crate::{
 const STATS_TIMEOUT_DEFAULT: Duration = Duration::from_secs(15);
 
 /// Holds a scheduler
-pub trait HasScheduler<CS>: UsesState
-where
-    CS: Scheduler<State = Self::State>,
-{
+pub trait HasScheduler: UsesState {
+    /// The [`Scheduler`] for this fuzzer
+    type Scheduler: Scheduler<State = Self::State>;
+
     /// The scheduler
-    fn scheduler(&self) -> &CS;
+    fn scheduler(&self) -> &Self::Scheduler;
 
     /// The scheduler (mutable)
-    fn scheduler_mut(&mut self) -> &mut CS;
+    fn scheduler_mut(&mut self) -> &mut Self::Scheduler;
 }
 
 /// Holds an feedback
-pub trait HasFeedback<F>: UsesState
+pub trait HasFeedback: UsesState
 where
-    F: Feedback<Self::State>,
     Self::State: HasClientPerfMonitor,
 {
+    /// The feedback type
+    type Feedback: Feedback<Self::State>;
+
     /// The feedback
-    fn feedback(&self) -> &F;
+    fn feedback(&self) -> &Self::Feedback;
 
     /// The feedback (mutable)
-    fn feedback_mut(&mut self) -> &mut F;
+    fn feedback_mut(&mut self) -> &mut Self::Feedback;
 }
 
 /// Holds an objective feedback
-pub trait HasObjective<OF>: UsesState
+pub trait HasObjective: UsesState
 where
-    OF: Feedback<Self::State>,
     Self::State: HasClientPerfMonitor,
 {
+    /// The type of the [`Feedback`] used to find objectives for this fuzzer
+    type Objective: Feedback<Self::State>;
+
     /// The objective feedback
-    fn objective(&self) -> &OF;
+    fn objective(&self) -> &Self::Objective;
 
     /// The objective feedback (mutable)
-    fn objective_mut(&mut self) -> &mut OF;
+    fn objective_mut(&mut self) -> &mut Self::Objective;
 }
 
 /// Evaluate if an input is interesting using the feedback
@@ -263,13 +267,15 @@ where
     type State = CS::State;
 }
 
-impl<CS, F, OF, OT> HasScheduler<CS> for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF, OT> HasScheduler for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor,
 {
+    type Scheduler = CS;
+
     fn scheduler(&self) -> &CS {
         &self.scheduler
     }
@@ -279,29 +285,33 @@ where
     }
 }
 
-impl<CS, F, OF, OT> HasFeedback<F> for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF, OT> HasFeedback for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor,
 {
-    fn feedback(&self) -> &F {
+    type Feedback = F;
+
+    fn feedback(&self) -> &Self::Feedback {
         &self.feedback
     }
 
-    fn feedback_mut(&mut self) -> &mut F {
+    fn feedback_mut(&mut self) -> &mut Self::Feedback {
         &mut self.feedback
     }
 }
 
-impl<CS, F, OF, OT> HasObjective<OF> for StdFuzzer<CS, F, OF, OT>
+impl<CS, F, OF, OT> HasObjective for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
     CS::State: HasClientPerfMonitor,
 {
+    type Objective = OF;
+
     fn objective(&self) -> &OF {
         &self.objective
     }
