@@ -421,7 +421,7 @@ where
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
 
         if self.executor.uses_shmem_testcase() {
-            let shmem = &mut self.executor.shmem_mut().as_mut().unwrap();
+            let shmem = unsafe { &mut self.executor.shmem_mut().as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
             let size = target_bytes.as_slice().len();
             let size_in_bytes = size.to_ne_bytes();
@@ -929,7 +929,7 @@ where
 
         // Write to testcase
         if self.uses_shmem_testcase {
-            let map = &mut self.map.as_mut().unwrap();
+            let map = unsafe { &mut self.map.as_mut().unwrap_unchecked() };
             let target_bytes = input.target_bytes();
             let size = target_bytes.as_slice().len();
             let size_in_bytes = size.to_ne_bytes();
