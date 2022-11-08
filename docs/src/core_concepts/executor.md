@@ -40,7 +40,7 @@ Another feature of the `ForkserverExecutor` to mention is the shared memory test
 
 See AFL++'s [_documentation_](https://github.com/AFLplusplus/AFLplusplus/blob/stable/instrumentation/README.persistent_mode.md#5-shared-memory-fuzzing) or the fuzzer example in `forkserver_simple/src/program.c` for reference.
 
-It is very simple, when you call `ForkserverExecutor::new()` with `use_shmem_testcase` true, the `ForkserverExecutor` sets things up and your harness can just fetch the input from `__AFL_FUZZ_TESTCASE_BUF`
+It is very simple, when you build a new `ForkserverExecutor`, you can call `.use_shmem_testcase(true)` on its `::builder()`. Then the `ForkserverExecutor` sets things up and your harness can just fetch the input from `__AFL_FUZZ_TESTCASE_BUF`.
 
 ## InprocessForkExecutor
 Finally, we'll talk about the `InProcessForkExecutor`.

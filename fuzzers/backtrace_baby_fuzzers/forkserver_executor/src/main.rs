@@ -94,6 +94,7 @@ pub fn main() {
         .program("./target/release/program")
         .arg_input_file_std()
         .shmem_provider(&mut shmem_provider)
+        .use_shmem_testcase(true)
         .build(tuple_list!(bt_observer, edges_observer))
         .unwrap();
 

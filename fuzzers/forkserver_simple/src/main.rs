@@ -176,6 +176,7 @@ pub fn main() {
         .program(opt.executable)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
+        .use_shmem_testcase(true)
         .autotokens(&mut tokens)
         .parse_afl_cmdline(args)
         .build(tuple_list!(time_observer, edges_observer))
