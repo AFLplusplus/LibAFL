@@ -30,13 +30,16 @@ pub struct AccountingIndexesMetadata {
 
 crate::impl_serdeany!(AccountingIndexesMetadata);
 
-impl AsSlice<usize> for AccountingIndexesMetadata {
+impl AsSlice for AccountingIndexesMetadata {
+    type Entry = usize;
     /// Convert to a slice
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<usize> for AccountingIndexesMetadata {
+impl AsMutSlice for AccountingIndexesMetadata {
+    type Entry = usize;
+
     /// Convert to a slice
     fn as_mut_slice(&mut self) -> &mut [usize] {
         self.list.as_mut_slice()

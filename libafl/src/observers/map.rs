@@ -404,20 +404,22 @@ where
     }
 }
 
-impl<'a, T> AsSlice<T> for StdMapObserver<'a, T>
+impl<'a, T> AsSlice for StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
     #[must_use]
     #[inline]
     fn as_slice(&self) -> &[T] {
         self.map.as_slice()
     }
 }
-impl<'a, T> AsMutSlice<T> for StdMapObserver<'a, T>
+impl<'a, T> AsMutSlice for StdMapObserver<'a, T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
     #[must_use]
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
@@ -700,19 +702,21 @@ where
     }
 }
 
-impl<'a, T, const N: usize> AsSlice<T> for ConstMapObserver<'a, T, N>
+impl<'a, T, const N: usize> AsSlice for ConstMapObserver<'a, T, N>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
     #[inline]
     fn as_slice(&self) -> &[T] {
         self.map.as_slice()
     }
 }
-impl<'a, T, const N: usize> AsMutSlice<T> for ConstMapObserver<'a, T, N>
+impl<'a, T, const N: usize> AsMutSlice for ConstMapObserver<'a, T, N>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
         self.map.as_mut_slice()
@@ -969,7 +973,7 @@ where
     }
 }
 
-impl<'a, T> AsSlice<T> for VariableMapObserver<'a, T>
+impl<'a, T> AsSlice for VariableMapObserver<'a, T>
 where
     T: Bounded
         + PartialEq
@@ -980,16 +984,18 @@ where
         + serde::de::DeserializeOwned
         + Debug,
 {
+    type Entry = T;
     #[inline]
     fn as_slice(&self) -> &[T] {
         let cnt = self.usable_count();
         &self.map.as_slice()[..cnt]
     }
 }
-impl<'a, T> AsMutSlice<T> for VariableMapObserver<'a, T>
+impl<'a, T> AsMutSlice for VariableMapObserver<'a, T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
         self.map.as_mut_slice()
@@ -1044,7 +1050,7 @@ where
 
 impl<S, M> Observer<S> for HitcountsMapObserver<M>
 where
-    M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<u8>,
+    M: MapObserver<Entry = u8> + Observer<S> + AsMutSlice<Entry = u8>,
     S: UsesInput,
 {
     #[inline]
@@ -1155,21 +1161,23 @@ where
     }
 }
 
-impl<M> AsSlice<u8> for HitcountsMapObserver<M>
+impl<M> AsSlice for HitcountsMapObserver<M>
 where
-    M: MapObserver + AsSlice<u8>,
+    M: MapObserver + AsSlice,
 {
+    type Entry = <M as AsSlice>::Entry;
     #[inline]
-    fn as_slice(&self) -> &[u8] {
+    fn as_slice(&self) -> &[Self::Entry] {
         self.base.as_slice()
     }
 }
-impl<M> AsMutSlice<u8> for HitcountsMapObserver<M>
+impl<M> AsMutSlice for HitcountsMapObserver<M>
 where
-    M: MapObserver + AsMutSlice<u8>,
+    M: MapObserver + AsMutSlice,
 {
+    type Entry = <M as AsMutSlice>::Entry;
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [u8] {
+    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
         self.base.as_mut_slice()
     }
 }
@@ -1349,21 +1357,23 @@ where
     }
 }
 
-impl<M> AsSlice<u8> for HitcountsIterableMapObserver<M>
+impl<M> AsSlice for HitcountsIterableMapObserver<M>
 where
-    M: MapObserver + AsSlice<u8>,
+    M: MapObserver + AsSlice,
 {
+    type Entry = <M as AsSlice>::Entry;
     #[inline]
-    fn as_slice(&self) -> &[u8] {
+    fn as_slice(&self) -> &[Self::Entry] {
         self.base.as_slice()
     }
 }
-impl<M> AsMutSlice<u8> for HitcountsIterableMapObserver<M>
+impl<M> AsMutSlice for HitcountsIterableMapObserver<M>
 where
-    M: MapObserver + AsMutSlice<u8>,
+    M: MapObserver + AsMutSlice,
 {
+    type Entry = <M as AsMutSlice>::Entry;
     #[inline]
-    fn as_mut_slice(&mut self) -> &mut [u8] {
+    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
         self.base.as_mut_slice()
     }
 }
@@ -1873,20 +1883,22 @@ where
     }
 }
 
-impl<T> AsSlice<T> for OwnedMapObserver<T>
+impl<T> AsSlice for OwnedMapObserver<T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
     #[must_use]
     #[inline]
     fn as_slice(&self) -> &[T] {
         self.map.as_slice()
     }
 }
-impl<T> AsMutSlice<T> for OwnedMapObserver<T>
+impl<T> AsMutSlice for OwnedMapObserver<T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
+    type Entry = T;
     #[must_use]
     #[inline]
     fn as_mut_slice(&mut self) -> &mut [T] {
@@ -2171,13 +2183,15 @@ pub mod pybind {
                 }
             }
 
-            impl AsSlice<$datatype> for $struct_name_trait {
+            impl AsSlice for $struct_name_trait {
+                type Item = $datatype;
                 fn as_slice(&self) -> &[$datatype] {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_slice()) }} )
                 }
             }
 
-            impl AsMutSlice<$datatype> for $struct_name_trait {
+            impl AsMutSlice for $struct_name_trait {
+                type Item = $datatype;
                 fn as_mut_slice(&mut self) -> &mut [$datatype] {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_mut_slice()) }} )
                 }
