@@ -245,9 +245,9 @@ extern "C" {
 
     static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 
-    fn libafl_save_qemu_snapshot(name: *const u8);
+    fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
     #[allow(unused)]
-    fn libafl_load_qemu_snapshot(name: *const u8);
+    fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -913,15 +913,15 @@ impl Emulator {
     }
 
     #[cfg(emulation_mode = "systemmode")]
-    pub fn save_snapshot(&self, name: &str) {
+    pub fn save_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _) };
+        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _, sync) };
     }
 
     #[cfg(emulation_mode = "systemmode")]
-    pub fn load_snapshot(&self, name: &str) {
+    pub fn load_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _) };
+        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _, sync) };
     }
 
     #[cfg(emulation_mode = "usermode")]
