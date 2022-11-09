@@ -434,7 +434,7 @@ where
 #[rustversion::nightly]
 impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<u8>,
+    O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: UsesInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {

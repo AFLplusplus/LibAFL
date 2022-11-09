@@ -2184,14 +2184,14 @@ pub mod pybind {
             }
 
             impl AsSlice for $struct_name_trait {
-                type Item = $datatype;
+                type Entry = $datatype;
                 fn as_slice(&self) -> &[$datatype] {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_slice()) }} )
                 }
             }
 
             impl AsMutSlice for $struct_name_trait {
-                type Item = $datatype;
+                type Entry = $datatype;
                 fn as_mut_slice(&mut self) -> &mut [$datatype] {
                     mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { unsafe { std::mem::transmute(m.as_mut_slice()) }} )
                 }
