@@ -16,9 +16,10 @@ use crate::{
     corpus::Corpus,
     executors::{Executor, HasObservers},
     feedbacks::map::MapNoveltiesMetadata,
-    inputs::{GeneralizedInput, GeneralizedItem, HasBytesVec},
+    inputs::{GeneralizedInput, HasBytesVec, UsesInput},
     mark_feature_time,
     observers::{MapObserver, ObserversTuple},
+    prelude::UsesState,
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
@@ -60,23 +61,38 @@ fn find_next_char(list: &[Option<u8>], mut idx: usize, ch: u8) -> usize {
 
 /// A stage that runs a tracer executor
 #[derive(Clone, Debug)]
-pub struct GetDepsStage<I>
+pub struct GetDepsStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     map_observer_name: String,
     #[allow(clippy::type_complexity)]
     phantom: PhantomData<(EM, O, OT, S, Z)>,
 }
 
-impl<E, EM, O, OT, S, Z> Stage<E, EM, S, Z> for GetDepsStage<EM, O, OT, S, Z>
+impl<EM, O, OT, S, Z> UsesState for GetDepsStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    E: Executor<EM, GeneralizedInput, S, Z> + HasObservers<GeneralizedInput, OT, S>,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
+{
+    type State = S;
+}
+
+impl<E, EM, O, OT, S, Z> Stage<E, EM, Z> for GetDepsStage<EM, O, OT, S, Z>
+where
+    O: MapObserver,
+    E: Executor<EM, Z> + HasObservers<Observers = OT, State = S>,
+    EM: UsesState<State = S>,
+    Z: UsesState<State = S>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor
+        + HasExecutions
+        + HasMetadata
+        + HasCorpus<Input = GeneralizedInput>
+        + UsesInput<Input = GeneralizedInput>,
 {
     #[inline]
     #[allow(clippy::too_many_lines)]
@@ -137,8 +153,8 @@ where
 impl<EM, O, OT, S, Z> GetDepsStage<EM, O, OT, S, Z>
 where
     O: MapObserver,
-    OT: ObserversTuple<GeneralizedInput, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<GeneralizedInput>,
+    OT: ObserversTuple<S>,
+    S: HasClientPerfMonitor + HasExecutions + HasMetadata + HasCorpus<Input = GeneralizedInput>,
 {
     /// Create a new [`GetDepsStage`].
     #[must_use]

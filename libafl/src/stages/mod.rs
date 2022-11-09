@@ -30,6 +30,9 @@ pub use generalization::GeneralizationStage;
 pub mod owned;
 pub use owned::StagesOwnedList;
 
+pub mod getdeps;
+pub use getdeps::GetDepsStage;
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
