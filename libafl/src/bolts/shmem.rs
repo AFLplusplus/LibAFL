@@ -1285,12 +1285,14 @@ pub mod win32_shmem {
         }
     }
 
-    impl AsSlice<u8> for Win32ShMem {
+    impl AsSlice for Win32ShMem {
+        type Entry = u8;
         fn as_slice(&self) -> &[u8] {
             unsafe { slice::from_raw_parts(self.map, self.map_size) }
         }
     }
-    impl AsMutSlice<u8> for Win32ShMem {
+    impl AsMutSlice for Win32ShMem {
+        type Entry = u8;
         fn as_mut_slice(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
         }
