@@ -3,6 +3,7 @@
 //! For example, they are supported on the [`crate::executors::CommandExecutor`].
 
 use alloc::string::String;
+use std::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +16,7 @@ pub struct StdOutObserver {
     /// The name of the observer.
     pub name: String,
     /// The stdout of the target during its last execution.
-    pub stdout: Option<String>,
+    pub stdout: Option<Vec<u8>>,
 }
 
 /// An observer that captures stdout of a target.
@@ -37,7 +38,7 @@ where
     }
 
     /// React to new `stdout`
-    fn observe_stdout(&mut self, stdout: &str) {
+    fn observe_stdout(&mut self, stdout: &[u8]) {
         self.stdout = Some(stdout.into());
     }
 }
@@ -55,7 +56,7 @@ pub struct StdErrObserver {
     /// The name of the observer.
     pub name: String,
     /// The stderr of the target during its last execution.
-    pub stderr: Option<String>,
+    pub stderr: Option<Vec<u8>>,
 }
 
 /// An observer that captures stderr of a target.
@@ -77,7 +78,7 @@ where
     }
 
     /// React to new `stderr`
-    fn observe_stderr(&mut self, stderr: &str) {
+    fn observe_stderr(&mut self, stderr: &[u8]) {
         self.stderr = Some(stderr.into());
     }
 }

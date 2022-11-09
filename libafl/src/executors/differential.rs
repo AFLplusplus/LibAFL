@@ -151,13 +151,13 @@ where
     }
 
     /// Runs `observe_stdout` for all stdout observers in the list
-    fn observe_stdout(&mut self, stdout: &str) {
+    fn observe_stdout(&mut self, stdout: &[u8]) {
         self.primary.as_mut().observe_stderr(stdout);
         self.secondary.as_mut().observe_stderr(stdout);
     }
 
     /// Runs `observe_stderr` for all stderr observers in the list
-    fn observe_stderr(&mut self, stderr: &str) {
+    fn observe_stderr(&mut self, stderr: &[u8]) {
         self.primary.as_mut().observe_stderr(stderr);
         self.secondary.as_mut().observe_stderr(stderr);
     }
