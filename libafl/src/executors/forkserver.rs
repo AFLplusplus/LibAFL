@@ -739,9 +739,6 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             if item.as_ref() == "@@" && use_stdin {
                 use_stdin = false;
                 res.push(OsString::from(".cur_input"));
-                if self.uses_shmem_testcase {
-                    println!("WARNING: @@ is used but uses_shmem_testcase is set, check your configuration");
-                }
             } else if let Some(name) = &self.input_filename {
                 if name == item.as_ref() && use_stdin {
                     use_stdin = false;
