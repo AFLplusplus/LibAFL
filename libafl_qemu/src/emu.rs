@@ -658,11 +658,15 @@ impl Emulator {
     }
 
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        self.current_cpu().unwrap().write_mem(addr, buf);
+        self.current_cpu()
+            .unwrap_or(self.cpu_from_index(0))
+            .write_mem(addr, buf);
     }
 
     pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
-        self.current_cpu().unwrap().read_mem(addr, buf);
+        self.current_cpu()
+            .unwrap_or(self.cpu_from_index(0))
+            .read_mem(addr, buf);
     }
 
     #[must_use]
