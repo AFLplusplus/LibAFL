@@ -35,15 +35,19 @@ use core::{iter::Iterator, time};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Can be converted to a slice
-pub trait AsSlice<T> {
+pub trait AsSlice {
+    /// Type of the entries in this slice
+    type Entry;
     /// Convert to a slice
-    fn as_slice(&self) -> &[T];
+    fn as_slice(&self) -> &[Self::Entry];
 }
 
 /// Can be converted to a mutable slice
-pub trait AsMutSlice<T> {
+pub trait AsMutSlice {
+    /// Type of the entries in this mut slice
+    type Entry;
     /// Convert to a slice
-    fn as_mut_slice(&mut self) -> &mut [T];
+    fn as_mut_slice(&mut self) -> &mut [Self::Entry];
 }
 
 /// Create an `Iterator` from a reference

@@ -214,13 +214,15 @@ pub struct MapIndexesMetadata {
 
 crate::impl_serdeany!(MapIndexesMetadata);
 
-impl AsSlice<usize> for MapIndexesMetadata {
+impl AsSlice for MapIndexesMetadata {
+    type Entry = usize;
     /// Convert to a slice
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<usize> for MapIndexesMetadata {
+impl AsMutSlice for MapIndexesMetadata {
+    type Entry = usize;
     /// Convert to a slice
     fn as_mut_slice(&mut self) -> &mut [usize] {
         self.list.as_mut_slice()
@@ -254,14 +256,16 @@ pub struct MapNoveltiesMetadata {
 
 crate::impl_serdeany!(MapNoveltiesMetadata);
 
-impl AsSlice<usize> for MapNoveltiesMetadata {
+impl AsSlice for MapNoveltiesMetadata {
+    type Entry = usize;
     /// Convert to a slice
     #[must_use]
     fn as_slice(&self) -> &[usize] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<usize> for MapNoveltiesMetadata {
+impl AsMutSlice for MapNoveltiesMetadata {
+    type Entry = usize;
     /// Convert to a slice
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [usize] {
@@ -430,7 +434,7 @@ where
 #[rustversion::nightly]
 impl<O, S> Feedback<S> for MapFeedback<DifferentIsNovel, O, MaxReducer, S, u8>
 where
-    O: MapObserver<Entry = u8> + AsSlice<u8>,
+    O: MapObserver<Entry = u8> + AsSlice<Entry = u8>,
     for<'it> O: AsIter<'it, Item = u8>,
     S: UsesInput + HasNamedMetadata + HasClientPerfMonitor + Debug,
 {

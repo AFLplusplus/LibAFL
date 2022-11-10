@@ -7,6 +7,12 @@ pub use multi::MultiMonitor;
 #[allow(missing_docs)]
 pub mod tui;
 
+#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+#[allow(missing_docs)]
+pub mod prometheus;
+#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+pub use prometheus::PrometheusMonitor;
+
 #[cfg(feature = "std")]
 pub mod disk;
 use alloc::{fmt::Debug, string::String, vec::Vec};

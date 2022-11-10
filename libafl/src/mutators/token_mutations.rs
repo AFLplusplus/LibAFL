@@ -266,7 +266,8 @@ where
     }
 }
 
-impl AsSlice<Vec<u8>> for Tokens {
+impl AsSlice for Tokens {
+    type Entry = Vec<u8>;
     fn as_slice(&self) -> &[Vec<u8>] {
         self.tokens()
     }
