@@ -20,7 +20,6 @@
   - [Mutator](./core_concepts/mutator.md)
   - [Generator](./core_concepts/generator.md)
   - [Stage](./core_concepts/stage.md)
-  - [Launcher](./core_concepts/launcher.md)
 
 - [Design](./design/design.md)
   - [Architecture](./design/architecture.md)
@@ -38,5 +37,4 @@
   - [Binary-Only Fuzzing with `Frida`](./advanced_features/frida.md)
   - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic.md)
   - [LibAFL in `no_std` environments (Kernels, Hypervisors, ...)](./advanced_features/no_std.md)
-  - [Multicore Fuzzing With Launcher](./advanced_features/launcher.md)
   - [Snapshot Fuzzing in Nyx](./advanced_features/nyx.md)
