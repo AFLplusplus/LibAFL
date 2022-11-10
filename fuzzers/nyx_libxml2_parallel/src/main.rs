@@ -33,7 +33,6 @@ fn main() {
         .ids
         .first()
         .expect("unable to get first core id")
-        .clone();
 
     // region: fuzzer start function
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id: usize| {
