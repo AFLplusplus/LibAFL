@@ -20,6 +20,35 @@ struct TuneableMutationalStageMetadata {
 
 impl_serdeany!(TuneableMutationalStageMetadata);
 
+/// Set the number of iterations to be used by this mutational stage
+pub fn set_iters<S: HasMetadata>(state: &mut S, iters: u64) -> Result<(), Error> {
+    let metadata = state
+        .metadata_mut()
+        .get_mut::<TuneableMutationalStageMetadata>()
+        .ok_or_else(|| Error::illegal_state("TuneableMutationslStage not in use"));
+    metadata.map(|metadata| {
+        metadata.iters = Some(iters);
+    })
+}
+
+/// Get the set iterations
+pub fn get_iters<S: HasMetadata>(state: &S) -> Result<Option<u64>, Error> {
+    state
+        .metadata()
+        .get::<TuneableMutationalStageMetadata>()
+        .ok_or_else(|| Error::illegal_state("TuneableMutationslStage not in use"))
+        .map(|metadata| metadata.iters)
+}
+
+/// Reset this to a normal, randomized, stage
+pub fn reset<S: HasMetadata>(state: &mut S) -> Result<(), Error> {
+    state
+        .metadata_mut()
+        .get_mut::<TuneableMutationalStageMetadata>()
+        .ok_or_else(|| Error::illegal_state("TuneableMutationslStage not in use"))
+        .map(|metadata| metadata.iters = None)
+}
+
 /// A [`crate::stages::MutationalStage`] where the mutator iteration can be tuned at runtime
 #[derive(Clone, Debug)]
 pub struct TuneableMutationalStage<E, EM, M, Z> {
@@ -50,7 +79,7 @@ where
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_possible_truncation)]
     fn iterations(&self, state: &mut Z::State, _corpus_idx: usize) -> Result<u64, Error> {
-        Ok(if let Some(iters) = Self::get_iters(state) {
+        Ok(if let Some(iters) = get_iters(state)? {
             iters
         } else {
             // fall back to random
@@ -115,35 +144,5 @@ where
             mutator,
             phantom: PhantomData,
         }
-    }
-
-    fn metadata_mut(state: &mut Z::State) -> &mut TuneableMutationalStageMetadata {
-        state
-            .metadata_mut()
-            .get_mut::<TuneableMutationalStageMetadata>()
-            .unwrap()
-    }
-
-    fn metadata(state: &Z::State) -> &TuneableMutationalStageMetadata {
-        state
-            .metadata()
-            .get::<TuneableMutationalStageMetadata>()
-            .unwrap()
-    }
-
-    /// Set the number of iterations to be used by this mutational stage
-    pub fn set_iters(state: &mut Z::State, iters: u64) {
-        Self::metadata_mut(state).iters = Some(iters);
-    }
-
-    /// Get the set iterations
-    pub fn get_iters(state: &Z::State) -> Option<u64> {
-        Self::metadata(state).iters
-    }
-
-    /// Reset this to a normal, randomized, stage
-    pub fn reset(state: &mut Z::State) {
-        let metadata = Self::metadata_mut(state);
-        metadata.iters = None;
     }
 }

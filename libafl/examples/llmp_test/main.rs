@@ -18,9 +18,9 @@ use libafl::{
     Error,
 };
 
-const _TAG_SIMPLE_U32_V1: Tag = 0x51300321;
-const _TAG_MATH_RESULT_V1: Tag = 0x77474331;
-const _TAG_1MEG_V1: Tag = 0xB1111161;
+const _TAG_SIMPLE_U32_V1: Tag = 0x5130_0321;
+const _TAG_MATH_RESULT_V1: Tag = 0x7747_4331;
+const _TAG_1MEG_V1: Tag = 0xB111_1161;
 
 #[cfg(all(unix, feature = "std"))]
 fn adder_loop(port: u16) -> ! {
@@ -71,15 +71,17 @@ fn large_msg_loop(port: u16) -> ! {
     let mut client =
         llmp::LlmpClient::create_attach_to_tcp(StdShMemProvider::new().unwrap(), port).unwrap();
 
+    #[allow(clippy::large_stack_arrays)]
     let meg_buf = [1u8; 1 << 20];
 
     loop {
         client.send_buf(_TAG_1MEG_V1, &meg_buf).unwrap();
         println!("Sending the next megabyte");
-        thread::sleep(time::Duration::from_millis(100))
+        thread::sleep(time::Duration::from_millis(100));
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 #[cfg(all(unix, feature = "std"))]
 fn broker_message_hook(
     client_id: u32,
@@ -133,20 +135,20 @@ fn main() {
         .unwrap_or_else(|| "4242".into())
         .parse::<u16>()
         .unwrap();
-    println!("Launching in mode {} on port {}", mode, port);
+    println!("Launching in mode {mode} on port {port}");
 
     match mode.as_str() {
         "broker" => {
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
             broker.launch_tcp_listener_on(port).unwrap();
-            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
+            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)));
         }
         "b2b" => {
             let mut broker = llmp::LlmpBroker::new(StdShMemProvider::new().unwrap()).unwrap();
             broker.launch_tcp_listener_on(b2b_port).unwrap();
             // connect back to the main broker.
             broker.connect_b2b(("127.0.0.1", port)).unwrap();
-            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)))
+            broker.loop_forever(&mut broker_message_hook, Some(Duration::from_millis(5)));
         }
         "ctr" => {
             let mut client =
@@ -158,8 +160,8 @@ fn main() {
                 client
                     .send_buf(_TAG_SIMPLE_U32_V1, &counter.to_le_bytes())
                     .unwrap();
-                println!("CTR Client writing {}", counter);
-                thread::sleep(Duration::from_secs(1))
+                println!("CTR Client writing {counter}");
+                thread::sleep(Duration::from_secs(1));
             }
         }
         "adder" => {
