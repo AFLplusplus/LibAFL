@@ -82,8 +82,9 @@ are all present as associated types for `E`. Additionally, we don't even need to
 ## Scope
 
 You are affected by this change if:
- - You specified explicit generics for a type (e.g., `MaxMapFeedback::<_, (), _>::new(...)`)
- - You implemented a custom component (e.g., `Mutator`, `Executor`, `State`, `Fuzzer`, `Feedback`, `Observer`, etc.)
+
+- You specified explicit generics for a type (e.g., `MaxMapFeedback::<_, (), _>::new(...)`)
+- You implemented a custom component (e.g., `Mutator`, `Executor`, `State`, `Fuzzer`, `Feedback`, `Observer`, etc.)
 
 If you did neither of these, congrats! You are likely unaffected by these changes.
 

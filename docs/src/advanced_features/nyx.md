@@ -33,7 +33,7 @@ git clone https://github.com/nyx-fuzz/packer
 python3 "./packer/packer/nyx_packer.py" \
     ./libxml2/xmllint \   # your target binary
     /tmp/nyx_libxml2 \    # the nyx work directory
-    afl \				  # instruction type
+    afl \                 # instruction type
     instrumentation \
     -args "/tmp/input" \  # the args of the program, means that we will run `xmllint /tmp/input` in each run.
     -file "/tmp/input" \  # the input will be generated in `/tmp/input`. If no `--file`, then input will be passed through stdin
@@ -47,13 +47,11 @@ Then, you can generate the config file:
 python3 ./packer/packer/nyx_config_gen.py /tmp/nyx_libxml2/ Kernel || exit
 ```
 
-# LibAFL's code
-
 ## Standalone fuzzing
 
 In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/nyx_libxml2_standalone/src/main.rs). First you need to run `./setup_libxml2.sh`, It will prepare your target and create your nyx work directory in `/tmp/libxml2`. After that, you can start write your code.
 
-First to create `Nyxhelper`:
+First, to create `Nyxhelper`:
 
 ```rust
 let share_dir = Path::new("/tmp/nyx_libxml2/");
@@ -62,7 +60,7 @@ let parallel_mode = false; // close parallel_mode
 let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap();// we don't need last parmeter in standalone mode, so just use None
 ```
 
-Then fetch `trace_bits`, create observer and `NyxExecutor`:
+Then, fetch `trace_bits`, create an observer and the `NyxExecutor`:
 
 ```rust
 let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
