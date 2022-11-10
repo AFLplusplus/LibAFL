@@ -101,7 +101,6 @@ where
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
     /// Create a new [`DumpToDiskStage`]
-    #[must_use]
     pub fn new<A, B>(to_bytes: CB, corpus_dir: A, solutions_dir: B) -> Result<Self, Error>
     where
         A: Into<PathBuf>,

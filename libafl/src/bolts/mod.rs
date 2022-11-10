@@ -54,7 +54,7 @@ impl<T> AsSlice for Vec<T> {
     type Entry = T;
 
     fn as_slice(&self) -> &[Self::Entry] {
-        &self
+        self
     }
 }
 
