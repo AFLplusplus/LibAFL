@@ -29,10 +29,7 @@ fn main() {
     let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     let cores = Cores::all().expect("unable to get all core id");
-    let parent_cpu_id = cores
-        .ids
-        .first()
-        .expect("unable to get first core id")
+    let parent_cpu_id = cores.ids.first().expect("unable to get first core id");
 
     // region: fuzzer start function
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id: usize| {
