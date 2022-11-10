@@ -27,6 +27,7 @@ When you want to execute the harness as fast as possible, you will most probably
 Next, we'll take a look at the `ForkserverExecutor`. In this case, it is `afl-cc` (from AFLplusplus/AFLplusplus) that compiles the harness code, and therefore, we can't use `EDGES_MAP` anymore. Hopefully, we have [_a way_](https://github.com/AFLplusplus/AFLplusplus/blob/2e15661f184c77ac1fbb6f868c894e946cbb7f17/instrumentation/afl-compiler-rt.o.c#L270) to tell the forkserver which map to record the coverage.
 
 As you can see from the forkserver example,
+
 ```rust,ignore
 //Coverage map shared between observer and executor
 let mut shmem = StdShMemProvider::new().unwrap().new_shmem(MAP_SIZE).unwrap();
@@ -34,6 +35,7 @@ let mut shmem = StdShMemProvider::new().unwrap().new_shmem(MAP_SIZE).unwrap();
 shmem.write_to_env("__AFL_SHM_ID").unwrap();
 let mut shmem_buf = shmem.as_mut_slice();
 ```
+
 Here we make a shared memory region; `shmem`, and write this to environmental variable `__AFL_SHM_ID`. Then the instrumented binary, or the forkserver, finds this shared memory region (from the aforementioned env var) to record its coverage. On your fuzzer side, you can pass this shmem map to your `Observer` to obtain coverage feedbacks combined with any `Feedback`.
 
 Another feature of the `ForkserverExecutor` to mention is the shared memory testcases. In normal cases, the mutated input is passed between the forkserver and the instrumented binary via `.cur_input` file. You can improve your forkserver fuzzer's performance by passing the input with shared memory.
@@ -43,6 +45,7 @@ See AFL++'s [_documentation_](https://github.com/AFLplusplus/AFLplusplus/blob/st
 It is very simple, when you call `ForkserverExecutor::new()` with `use_shmem_testcase` true, the `ForkserverExecutor` sets things up and your harness can just fetch the input from `__AFL_FUZZ_TESTCASE_BUF`
 
 ## InprocessForkExecutor
+
 Finally, we'll talk about the `InProcessForkExecutor`.
 `InProcessForkExecutor` has only one difference from `InprocessExecutor`; It forks before running the harness and that's it.
 

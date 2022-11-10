@@ -36,6 +36,7 @@ It then sends the information needed to map the newly-allocated page in connecte
 Once the receiver maps the new page, flags it as safe for unmapping from the sending process (to avoid race conditions if we have more than a single EOP in a short time), and then continues to read from the new `ShMem`.
 
 The schema for client's maps to the broker is as follows:
+
 ```text
 [client0]        [client1]    ...    [clientN]
   |                  |                 /

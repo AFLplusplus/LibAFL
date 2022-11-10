@@ -378,4 +378,4 @@ Bye!
 
 As you can see, after the panic message, the `objectives` count of the log increased by one and you will find the crashing input in `crashes/`.
 
-The complete code can be found in `./fuzzers/baby_fuzzer`.
+The complete code can be found in [`./fuzzers/baby_fuzzer`](https://github.com/AFLplusplus/LibAFL/tree/main/fuzzers/baby_fuzzer) alongside other `baby_` fuzzers.
