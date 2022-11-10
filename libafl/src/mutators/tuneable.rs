@@ -41,7 +41,7 @@ impl TuneableScheduledMutatorMetadata {
             .ok_or_else(|| Error::illegal_state("TuneableScheduledMutator not in use"))
     }
 
-    /// Gets the stored metadata, used to alter the [`TuneableSchedularMutator`] behavior, mut
+    /// Gets the stored metadata, used to alter the [`TuneableScheduledMutator`] behavior, mut
     pub fn get_mut<S: HasMetadata>(state: &mut S) -> Result<&mut Self, Error> {
         state
             .metadata_mut()
@@ -214,8 +214,10 @@ mod test {
         BitFlipMutator, ByteDecMutator, TuneableScheduledMutator, TuneableScheduledMutatorMetadata,
     };
     use crate::{
-        bolts::tuples::tuple_list, inputs::BytesInput, mutators::ByteRandMutator,
-        mutators::ScheduledMutator, state::NopState,
+        bolts::tuples::tuple_list,
+        inputs::BytesInput,
+        mutators::{ByteRandMutator, ScheduledMutator},
+        state::NopState,
     };
 
     #[test]
