@@ -1,7 +1,7 @@
 //! The [`DumpToDiskStage`] is a stage that dumps the corpus and the solutions to disk to e.g. allow AFL to sync
 
-use core::{clone::Clone, marker::PhantomData};
 use alloc::vec::Vec;
+use core::{clone::Clone, marker::PhantomData};
 use std::{fs, fs::File, io::Write, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -44,7 +44,6 @@ where
     CB: FnMut(&<Z::State as UsesInput>::Input) -> Vec<u8>,
     EM: UsesState<State = Z::State>,
     E: UsesState<State = Z::State>,
-    //T: Vec<Entry = u8>,
     Z: UsesState,
     Z::State: HasCorpus + HasSolutions + HasRand + HasMetadata,
 {
@@ -72,7 +71,7 @@ where
 
             let fname = self.corpus_dir.join(format!("id_{i}"));
             let mut f = File::create(fname)?;
-            drop(f.write_all(bytes.as_slice()));
+            drop(f.write_all(&bytes));
         }
 
         for i in meta.last_solution..solutions_count {
@@ -82,7 +81,7 @@ where
 
             let fname = self.solutions_dir.join(format!("id_{i}"));
             let mut f = File::create(fname)?;
-            drop(f.write_all(bytes.as_slice()));
+            drop(f.write_all(&bytes));
         }
 
         state.add_metadata(DumpToDiskMetadata {

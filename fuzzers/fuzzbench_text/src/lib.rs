@@ -639,7 +639,7 @@ fn fuzz_text(
     ));
 
     let fuzzbench = DumpToDiskStage::new(
-        |input: &GeneralizedInput| input.target_bytes().as_slice().to_vec(),
+        |input: &GeneralizedInput| input.target_bytes().into(),
         &report_dir.join("queue"),
         &report_dir.join("crashes"),
     )
