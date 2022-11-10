@@ -18,6 +18,7 @@ Be it a specific target, a particular instrumentation backend, or a custom mutat
 
 LibAFL gives you many of the benefits of an off-the-shelf fuzzer, while being completely customizable.
 Some highlight features currently include:
+
 - `multi platform`: LibAFL works pretty much anywhere you can find a Rust compiler for. We already used it on *Windows*, *Android*, *MacOS*, and *Linux*, on *x86_64*, *aarch64*, ...
 - `portable`: `LibAFL` can be built in `no_std` mode.
 This means it does not require a specific OS-dependent runtime to function.

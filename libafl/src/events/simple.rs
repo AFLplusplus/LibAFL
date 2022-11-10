@@ -128,7 +128,7 @@ where
 {
 }
 
-impl<MT, S> HasCustomBufHandlers<S> for SimpleEventManager<MT, S>
+impl<MT, S> HasCustomBufHandlers for SimpleEventManager<MT, S>
 where
     MT: Monitor, //CE: CustomEvent<I, OT>,
     S: UsesInput,
@@ -136,7 +136,9 @@ where
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<
+            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+        >,
     ) {
         self.custom_buf_handlers.push(handler);
     }
@@ -371,7 +373,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<MT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<MT, S, SP>
+impl<MT, S, SP> HasCustomBufHandlers for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
     S: UsesInput,

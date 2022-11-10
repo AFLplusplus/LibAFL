@@ -31,13 +31,15 @@ pub struct LogMutationMetadata {
 
 crate::impl_serdeany!(LogMutationMetadata);
 
-impl AsSlice<String> for LogMutationMetadata {
+impl AsSlice for LogMutationMetadata {
+    type Entry = String;
     #[must_use]
     fn as_slice(&self) -> &[String] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<String> for LogMutationMetadata {
+impl AsMutSlice for LogMutationMetadata {
+    type Entry = String;
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [String] {
         self.list.as_mut_slice()

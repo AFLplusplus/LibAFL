@@ -1,5 +1,5 @@
 //! The command executor executes a sub program for each run
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -335,21 +335,21 @@ where
         };
 
         if self.observers.observes_stderr() {
-            let mut stderr = String::new();
+            let mut stderr = Vec::new();
             child.stderr.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
                 )
-            })?.read_to_string(&mut stderr)?;
+            })?.read_to_end(&mut stderr)?;
             self.observers.observe_stderr(&stderr);
         }
         if self.observers.observes_stdout() {
-            let mut stdout = String::new();
+            let mut stdout = Vec::new();
             child.stdout.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor",
                 )
-            })?.read_to_string(&mut stdout)?;
+            })?.read_to_end(&mut stdout)?;
             self.observers.observe_stdout(&stdout);
         }
 

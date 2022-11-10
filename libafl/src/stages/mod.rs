@@ -247,7 +247,7 @@ where
     Z: ExecutesInput<E, EM, State = CS::State>
         + ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
-        + HasScheduler<CS>,
+        + HasScheduler<Scheduler = CS>,
 {
     fn perform(
         &mut self,
