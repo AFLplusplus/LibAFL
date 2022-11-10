@@ -53,16 +53,16 @@ In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/
 
 First, to create `Nyxhelper`:
 
-```rust
+```rust,ignore
 let share_dir = Path::new("/tmp/nyx_libxml2/");
 let cpu_id = 0; // use first cpu
 let parallel_mode = false; // close parallel_mode
-let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap();// we don't need last parmeter in standalone mode, so just use None
+let mut helper = NyxHelper::new(share_dir, cpu_id, true, parallel_mode, None).unwrap(); // we don't the set the last parameter in standalone mode, we just use None, here
 ```
 
 Then, fetch `trace_bits`, create an observer and the `NyxExecutor`:
 
-```rust
+```rust,ignore
 let trace_bits = unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
 let observer = StdMapObserver::new("trace", trace_bits);
 let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap();
@@ -76,13 +76,13 @@ In the [example fuzzer](https://github.com/AFLplusplus/LibAFL/blob/main/fuzzers/
 
 Parallel fuzzing relies on [`Launcher`](../message_passing/spawn_instances.md), so spawn logic should be written in the scoop of anonymous function `run_client`:
 
-```rust
-let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id: usize{}
+```rust,ignore
+let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id: usize| {}
 ```
 
 In `run_client`, you need to create `NyxHelper` first:
 
-```rust
+```rust,ignore
 let share_dir = Path::new("/tmp/nyx_libxml2/");
 let cpu_id = _core_id as u32;
 let parallel_mode = true;
@@ -98,7 +98,7 @@ let mut helper = NyxHelper::new(
 
 Then you can fetch the trace_bits and create an observer and `NyxExecutor`
 
-```rust
+```rust,ignore
 let trace_bits =
     unsafe { std::slice::from_raw_parts_mut(helper.trace_bits, helper.map_size) };
 let observer = StdMapObserver::new("trace", trace_bits);
@@ -107,7 +107,7 @@ let mut executor = NyxExecutor::new(&mut helper, tuple_list!(observer)).unwrap()
 
 Finally, open a `Launcher` as normal to start fuzzing:
 
-```rust
+```rust,ignore
 match Launcher::builder()
     .shmem_provider(shmem_provider)
     .configuration(EventConfig::from_name("default"))

@@ -19,7 +19,7 @@ Thus, you have to compile your harness to a dynamic library. Frida instruments y
 
 For example in our `frida_libpng` example, we load the dynamic library and find the symbol to harness as follows:
 
-```rust
+```rust,ignore
         let lib = libloading::Library::new(module_name).unwrap();
         let target_func: libloading::Symbol<
             unsafe extern "C" fn(data: *const u8, size: usize) -> i32,
@@ -37,7 +37,7 @@ All of these runtimes can be slotted into `FridaInstrumentationHelper` at build 
 
 Combined with any `Runtime` you'd like to use, you can initialize the `FridaInstrumentationHelper` like this:
 
-```rust
+```rust,ignore
 
         let gum = Gum::obtain();
         let frida_options = FridaOptions::parse_env_options();
@@ -55,7 +55,7 @@ Combined with any `Runtime` you'd like to use, you can initialize the `FridaInst
 
 After setting up the `FridaInstrumentationHelper`. You can obtain the pointer to the coverage map by calling `map_ptr_mut()`.
 
-```rust
+```rust,ignore
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new_from_ptr(
             "edges",
             frida_helper.map_ptr_mut().unwrap(),
@@ -65,7 +65,7 @@ After setting up the `FridaInstrumentationHelper`. You can obtain the pointer to
 
 You can then link this observer to `FridaInProcessExecutor` as follows:
 
-```rust
+```rust,ignore
         let mut executor = FridaInProcessExecutor::new(
             &gum,
             InProcessExecutor::new(
