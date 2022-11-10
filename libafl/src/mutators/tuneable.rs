@@ -33,7 +33,7 @@ pub struct TuneableScheduledMutatorMetadata {
 }
 
 impl TuneableScheduledMutatorMetadata {
-    /// Gets the stored metadata, used to alter the [`TuneableSchedularMutator`] behavior
+    /// Gets the stored metadata, used to alter the [`TuneableScheduledMutator`] behavior
     pub fn get<S: HasMetadata>(state: &S) -> Result<&Self, Error> {
         state
             .metadata()
@@ -140,7 +140,7 @@ where
         } else {
             let ret = metadata.next[metadata.next_idx];
             metadata.next_idx += 1_usize;
-            if metadata.next_idx >= self.mutations.len() {
+            if metadata.next_idx >= metadata.next.len() {
                 metadata.next_idx = 0;
             }
             debug_assert!(
@@ -214,8 +214,8 @@ mod test {
         BitFlipMutator, ByteDecMutator, TuneableScheduledMutator, TuneableScheduledMutatorMetadata,
     };
     use crate::{
-        bolts::tuples::tuple_list, inputs::BytesInput, mutators::ScheduledMutator,
-        prelude::ByteRandMutator, state::NopState,
+        bolts::tuples::tuple_list, inputs::BytesInput, mutators::ByteRandMutator,
+        mutators::ScheduledMutator, state::NopState,
     };
 
     #[test]
