@@ -20,10 +20,12 @@
   - [Mutator](./core_concepts/mutator.md)
   - [Generator](./core_concepts/generator.md)
   - [Stage](./core_concepts/stage.md)
+  - [Launcher](./core_concepts/launcher.md)
 
 - [Design](./design/design.md)
   - [Architecture](./design/architecture.md)
   - [Metadata](./design/metadata.md)
+  - [Migrating from LibAFL <0.9 to 0.9](./design/migration-0.9.md)
 
 - [Message Passing](./message_passing/message_passing.md)
   - [Spawning Instances](./message_passing/spawn_instances.md)
@@ -33,5 +35,8 @@
   - [Introduction](./tutorial/intro.md)
 
 - [Advanced Features](./advanced_features/advanced_features.md)
-  - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic/concolic.md)
-  - [LibAFL in `no_std` environments (Kernels, Hypervisors, ...)](./advanced_features/no_std/no_std.md)
+  - [Binary-Only Fuzzing with `Frida`](./advanced_features/frida.md)
+  - [Concolic Tracing & Hybrid Fuzzing](./advanced_features/concolic.md)
+  - [LibAFL in `no_std` environments (Kernels, Hypervisors, ...)](./advanced_features/no_std.md)
+  - [Multicore Fuzzing With Launcher](./advanced_features/launcher.md)
+  - [Snapshot Fuzzing in Nyx](./advanced_features/nyx.md)

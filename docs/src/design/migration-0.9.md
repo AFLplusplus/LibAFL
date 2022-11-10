@@ -1,6 +1,6 @@
-# Migrating from libafl <0.9 to 0.9
+# Migrating from LibAFL <0.9 to 0.9
 
-Internal APIs of libafl have changed in version 0.9 to prefer associated types in cases where components were "fixed" to
+Internal APIs of LibAFL have changed in version 0.9 to prefer associated types in cases where components were "fixed" to
 particular versions of other components. As a result, many existing custom components will not be compatible between
 versions prior to 0.9 and version 0.9.
 
