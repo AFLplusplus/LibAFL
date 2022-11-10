@@ -30,6 +30,12 @@ jobs:
           crate: mdbook-linkcheck
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+      - name: Install mimetype
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libfile-mimeinfo-perl
+      - name: Check for binary blobs
+        if: runner.os == 'Linux'
+        run: ./scripts/check_for_blobs.sh
       - name: Build libafl debug
         run: cargo build -p libafl
       - name: Build the book
@@ -96,7 +102,7 @@ jobs:
       # Skipping `python` as it has to be built with the `maturin` tool
       # `agpl`, `nautilus` require nightly
       # `sancov_pcguard_edges` is tested seperately
-      run: cargo hack check --each-feature --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386,be
+      run: cargo hack check --each-feature --clean-per-run --exclude-features=prelude,agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode --no-dev-deps
     - name: Check nightly features
       run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
     - name: Build examples

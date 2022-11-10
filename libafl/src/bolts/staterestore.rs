@@ -37,7 +37,7 @@ impl StateShMemContent {
                 slice::from_raw_parts(self.buf.as_ptr(), self.buf_len_checked(shmem_size)?)
             };
             let filename = postcard::from_bytes::<String>(bytes)?;
-            Some(temp_dir().join(&filename))
+            Some(temp_dir().join(filename))
         } else {
             None
         })

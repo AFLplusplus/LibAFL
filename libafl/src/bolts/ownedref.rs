@@ -290,7 +290,8 @@ impl<'a, T> From<OwnedSliceMut<'a, T>> for OwnedSlice<'a, T> {
     }
 }
 
-impl<'a, T: Sized> AsSlice<T> for OwnedSlice<'a, T> {
+impl<'a, T: Sized> AsSlice for OwnedSlice<'a, T> {
+    type Entry = T;
     /// Get the [`OwnedSlice`] as slice.
     #[must_use]
     fn as_slice(&self) -> &[T] {
@@ -416,7 +417,8 @@ impl<'a, T: 'a + Sized> OwnedSliceMut<'a, T> {
     }
 }
 
-impl<'a, T: Sized> AsSlice<T> for OwnedSliceMut<'a, T> {
+impl<'a, T: Sized> AsSlice for OwnedSliceMut<'a, T> {
+    type Entry = T;
     /// Get the value as slice
     #[must_use]
     fn as_slice(&self) -> &[T] {
@@ -427,7 +429,8 @@ impl<'a, T: Sized> AsSlice<T> for OwnedSliceMut<'a, T> {
         }
     }
 }
-impl<'a, T: Sized> AsMutSlice<T> for OwnedSliceMut<'a, T> {
+impl<'a, T: Sized> AsMutSlice for OwnedSliceMut<'a, T> {
+    type Entry = T;
     /// Get the value as mut slice
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [T] {

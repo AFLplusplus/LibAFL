@@ -44,6 +44,8 @@ use libafl_qemu::{
     Regs,
 };
 
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+
 pub fn fuzz() {
     // Hardcoded parameters
     let timeout = Duration::from_secs(1);
@@ -83,7 +85,9 @@ pub fn fuzz() {
     emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
     emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu.map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = emu
+        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+        .unwrap();
     println!("Placing input at {:#x}", input_addr);
 
     // The wrapped harness function, calling out to the LLVM-style harness
@@ -91,9 +95,9 @@ pub fn fuzz() {
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
-        if len > 4096 {
-            buf = &buf[0..4096];
-            len = 4096;
+        if len > MAX_INPUT_SIZE {
+            buf = &buf[0..MAX_INPUT_SIZE];
+            len = MAX_INPUT_SIZE;
         }
 
         unsafe {

@@ -269,8 +269,8 @@ where
     }
 
     /// Do nothing on new `stderr`
-    fn observe_stderr(&mut self, stderr: &str) {
-        self.parse_asan_output(stderr);
+    fn observe_stderr(&mut self, stderr: &[u8]) {
+        self.parse_asan_output(&String::from_utf8_lossy(stderr));
     }
 }
 

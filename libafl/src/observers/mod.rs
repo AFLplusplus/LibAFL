@@ -106,13 +106,13 @@ where
     /// To use this, always return `true` from `observes_stdout`
     #[inline]
     #[allow(unused_variables)]
-    fn observe_stdout(&mut self, stdout: &str) {}
+    fn observe_stdout(&mut self, stdout: &[u8]) {}
 
     /// React to new `stderr`
     /// To use this, always return `true` from `observes_stderr`
     #[inline]
     #[allow(unused_variables)]
-    fn observe_stderr(&mut self, stderr: &str) {}
+    fn observe_stderr(&mut self, stderr: &[u8]) {}
 }
 
 /// Defines the observer type shared across traits of the type.
@@ -155,9 +155,9 @@ where
     fn observes_stderr(&self) -> bool;
 
     /// Runs `observe_stdout` for all stdout observers in the list
-    fn observe_stdout(&mut self, stdout: &str);
+    fn observe_stdout(&mut self, stdout: &[u8]);
     /// Runs `observe_stderr` for all stderr observers in the list
-    fn observe_stderr(&mut self, stderr: &str);
+    fn observe_stderr(&mut self, stderr: &[u8]);
 }
 
 impl<S> ObserversTuple<S> for ()
@@ -205,12 +205,12 @@ where
     /// Runs `observe_stdout` for all stdout observers in the list
     #[inline]
     #[allow(unused_variables)]
-    fn observe_stdout(&mut self, stdout: &str) {}
+    fn observe_stdout(&mut self, stdout: &[u8]) {}
 
     /// Runs `observe_stderr` for all stderr observers in the list
     #[inline]
     #[allow(unused_variables)]
-    fn observe_stderr(&mut self, stderr: &str) {}
+    fn observe_stderr(&mut self, stderr: &[u8]) {}
 }
 
 impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
@@ -263,14 +263,14 @@ where
 
     /// Runs `observe_stdout` for all stdout observers in the list
     #[inline]
-    fn observe_stdout(&mut self, stdout: &str) {
+    fn observe_stdout(&mut self, stdout: &[u8]) {
         self.0.observe_stdout(stdout);
         self.1.observe_stdout(stdout);
     }
 
     /// Runs `observe_stderr` for all stderr observers in the list
     #[inline]
-    fn observe_stderr(&mut self, stderr: &str) {
+    fn observe_stderr(&mut self, stderr: &[u8]) {
         self.0.observe_stderr(stderr);
         self.1.observe_stderr(stderr);
     }
@@ -991,10 +991,10 @@ pub mod pybind {
         }
 
         #[inline]
-        fn observe_stderr(&mut self, _: &str) {}
+        fn observe_stderr(&mut self, _: &[u8]) {}
 
         #[inline]
-        fn observe_stdout(&mut self, _: &str) {}
+        fn observe_stdout(&mut self, _: &[u8]) {}
     }
 
     impl MatchName for PythonObserversTuple {
