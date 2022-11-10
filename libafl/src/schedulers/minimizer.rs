@@ -78,7 +78,7 @@ impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
-    M: AsSlice<usize> + SerdeAny + HasRefCnt,
+    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
@@ -190,7 +190,7 @@ impl<CS, F, M> MinimizerScheduler<CS, F, M>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
-    M: AsSlice<usize> + SerdeAny + HasRefCnt,
+    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score using the `MinimizerScheduler`

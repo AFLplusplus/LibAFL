@@ -44,7 +44,9 @@ where
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     current_corpus_idx: Option<usize>,
     testcases_to_do: usize,
@@ -64,7 +66,9 @@ where
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
@@ -86,7 +90,9 @@ where
     OT: ObserversTuple<CS::State>,
     CS::State:
         HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     #[inline]
     fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, OT, Z> {
@@ -197,7 +203,9 @@ where
     OT: ObserversTuple<CS::State>,
     CS::State:
         HasClientPerfMonitor + HasCorpus + HasRand + HasExecutions + HasMetadata + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     type Item = Result<<CS::State as UsesInput>::Input, Error>;
 
@@ -213,7 +221,9 @@ where
     M: Mutator<CS::State>,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasCorpus + HasRand + Clone + Debug,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     /// Creates a new default mutational stage
     #[must_use]
