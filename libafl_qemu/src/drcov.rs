@@ -38,15 +38,21 @@ libafl::impl_serdeany!(QemuDrCovMetadata);
 #[derive(Debug)]
 pub struct QemuDrCovHelper {
     filter: QemuInstrumentationFilter,
+    module_mapping: RangeMap<usize, (u16, String)>,
     filename: PathBuf,
     drcov_len: usize,
 }
 
 impl QemuDrCovHelper {
     #[must_use]
-    pub fn new(filter: QemuInstrumentationFilter, filename: PathBuf) -> Self {
+    pub fn new(
+        filter: QemuInstrumentationFilter,
+        module_mapping: RangeMap<usize, (u16, String)>,
+        filename: PathBuf,
+    ) -> Self {
         Self {
             filter,
+            module_mapping,
             filename,
             drcov_len: 0,
         }
@@ -90,12 +96,7 @@ where
                 }
             }
 
-            let mut rangemap = RangeMap::<usize, (u16, String)>::new();
-            rangemap.insert(
-                (GuestAddr::MIN as usize)..(GuestAddr::MAX as usize),
-                (0, "test".to_string()),
-            );
-            DrCovWriter::new(&rangemap)
+            DrCovWriter::new(&self.module_mapping)
                 .write(&self.filename, &drcov_vec)
                 .expect("Failed to write coverage file");
         }
