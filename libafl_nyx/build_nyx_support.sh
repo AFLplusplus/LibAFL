@@ -9,6 +9,20 @@ echo "[*] Making sure all Nyx is checked out"
 
 git status 1>/dev/null 2>/dev/null
 
+if [ ! -d ./QEMU-Nyx ]; then
+    git clone https://github.com/nyx-fuzz/QEMU-Nyx.git || exit 1
+    pushd QEMU-Nyx
+    git reset --hard 80f22f77d6aab14e62bf11c80db4e210bbca5fb5
+    popd
+fi
+
+if [ ! -d ./packer ]; then
+    git clone https://github.com/syheliel/packer.git || exit 1
+    pushd QEMU-Nyx
+    git reset --hard 86b159bafc0b2ba8feeaa8761a45b6201d34084f
+    popd
+fi
+
 git submodule init || exit 1
 echo "[*] initializing QEMU-Nyx submodule"
 git submodule update ./QEMU-Nyx 2>/dev/null # ignore errors
