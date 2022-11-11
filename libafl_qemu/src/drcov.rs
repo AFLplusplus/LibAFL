@@ -76,7 +76,8 @@ where
         QT: QemuHelperTuple<S>,
     {
         hooks.blocks(
-            Some(gen_unique_block_ids::<QT, S>), Some(exec_trace_block::<QT, S>)
+            Some(gen_unique_block_ids::<QT, S>),
+            Some(exec_trace_block::<QT, S>),
         );
     }
 
@@ -119,13 +120,20 @@ where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    if let Some(h) = hooks.helpers().match_first_type::<QemuDrCovHelper>() {
-        if !h.must_instrument(pc.into()) {
-            return None;
-        }
+    let drcov_helper = hooks
+        .helpers()
+        .match_first_type::<QemuDrCovHelper>()
+        .unwrap();
+    if !drcov_helper.must_instrument(pc.into()) {
+        return None;
     }
+
     let state = state.expect("The gen_unique_block_ids hook works only for in-process fuzzing");
-    if state.metadata().get::<QemuDrCovMetadata>().is_none() {
+    if state
+        .metadata_mut()
+        .get_mut::<QemuDrCovMetadata>()
+        .is_none()
+    {
         state.add_metadata(QemuDrCovMetadata::new());
     }
     let meta = state.metadata_mut().get_mut::<QemuDrCovMetadata>().unwrap();
@@ -133,7 +141,7 @@ where
     match DRCOV_MAP.lock().unwrap().entry(pc) {
         Entry::Occupied(e) => {
             let id = *e.get();
-            if hooks.helpers().match_first_type::<QemuDrCovHelper>().unwrap().full_trace {
+            if drcov_helper.full_trace {
                 Some(id)
             } else {
                 None
@@ -143,7 +151,7 @@ where
             let id = meta.current_id;
             e.insert(id);
             meta.current_id = id + 1;
-            if hooks.helpers().match_first_type::<QemuDrCovHelper>().unwrap().full_trace {
+            if drcov_helper.full_trace {
                 // GuestAddress is u32 for 32 bit guests
                 #[allow(clippy::unnecessary_cast)]
                 Some(id as u64)
@@ -154,17 +162,18 @@ where
     }
 }
 
-pub fn exec_trace_block<QT, S>(
-    hooks: &mut QemuHooks<'_, QT, S>,
-    _state: Option<&mut S>,
-    id: u64,
-)
+pub fn exec_trace_block<QT, S>(hooks: &mut QemuHooks<'_, QT, S>, _state: Option<&mut S>, id: u64)
 where
     S: HasMetadata,
     S: UsesInput,
     QT: QemuHelperTuple<S>,
 {
-    if hooks.helpers().match_first_type::<QemuDrCovHelper>().unwrap().full_trace {
+    if hooks
+        .helpers()
+        .match_first_type::<QemuDrCovHelper>()
+        .unwrap()
+        .full_trace
+    {
         DRCOV_IDS.lock().unwrap().insert(id);
     }
 }
