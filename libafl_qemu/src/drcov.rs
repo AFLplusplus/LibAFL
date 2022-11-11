@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf, sync::Mutex};
+use std::{path::PathBuf, sync::Mutex};
 
 use hashbrown::{hash_map::Entry, HashMap};
 use lazy_static::lazy_static;
@@ -15,7 +15,7 @@ use crate::{
 };
 
 lazy_static! {
-    static ref DRCOV_IDS: Mutex<HashSet<u64>> = Mutex::new(HashSet::new());
+    static ref DRCOV_IDS: Mutex<Vec<u64>> = Mutex::new(Vec::new());
     static ref DRCOV_MAP: Mutex<HashMap<GuestAddr, u64>> = Mutex::new(HashMap::new());
 }
 
@@ -84,29 +84,48 @@ where
     fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
 
     fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
-        if DRCOV_IDS.lock().unwrap().len() > self.drcov_len {
-            println!("New DrCov lenght = {}", DRCOV_IDS.lock().unwrap().len());
-            let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
-            for id in DRCOV_IDS.lock().unwrap().iter() {
-                for (pc, idm) in DRCOV_MAP.lock().unwrap().iter() {
-                    if *idm == *id {
-                        let block = pc2basicblock(*pc, emulator);
-                        let mut block_len = 0;
-                        for instr in &block {
-                            block_len += instr.insn_len;
+        if self.full_trace {
+            if DRCOV_IDS.lock().unwrap().len() > self.drcov_len {
+                let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
+                for id in DRCOV_IDS.lock().unwrap().iter() {
+                    for (pc, idm) in DRCOV_MAP.lock().unwrap().iter() {
+                        if *idm == *id {
+                            let block = pc2basicblock(*pc, emulator);
+                            let mut block_len = 0;
+                            for instr in &block {
+                                block_len += instr.insn_len;
+                            }
+                            block_len -= &block.last().unwrap().insn_len;
+                            drcov_vec
+                                .push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
                         }
-                        block_len -= &block.last().unwrap().insn_len;
-                        drcov_vec
-                            .push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
                     }
                 }
-            }
 
-            DrCovWriter::new(&self.module_mapping)
-                .write(&self.filename, &drcov_vec)
-                .expect("Failed to write coverage file");
+                DrCovWriter::new(&self.module_mapping)
+                    .write(&self.filename, &drcov_vec)
+                    .expect("Failed to write coverage file");
+            }
+            self.drcov_len = DRCOV_IDS.lock().unwrap().len();
+        } else {
+            if DRCOV_MAP.lock().unwrap().len() > self.drcov_len {
+                let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
+                for (pc, _) in DRCOV_MAP.lock().unwrap().iter() {
+                    let block = pc2basicblock(*pc, emulator);
+                    let mut block_len = 0;
+                    for instr in &block {
+                        block_len += instr.insn_len;
+                    }
+                    block_len -= &block.last().unwrap().insn_len;
+                    drcov_vec.push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
+                }
+
+                DrCovWriter::new(&self.module_mapping)
+                    .write(&self.filename, &drcov_vec)
+                    .expect("Failed to write coverage file");
+            }
+            self.drcov_len = DRCOV_MAP.lock().unwrap().len();
         }
-        self.drcov_len = DRCOV_IDS.lock().unwrap().len();
     }
 }
 
@@ -174,6 +193,6 @@ where
         .unwrap()
         .full_trace
     {
-        DRCOV_IDS.lock().unwrap().insert(id);
+        DRCOV_IDS.lock().unwrap().push(id);
     }
 }
