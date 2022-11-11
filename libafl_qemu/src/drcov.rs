@@ -40,6 +40,7 @@ pub struct QemuDrCovHelper {
     filter: QemuInstrumentationFilter,
     module_mapping: RangeMap<usize, (u16, String)>,
     filename: PathBuf,
+    full_trace: bool,
     drcov_len: usize,
 }
 
@@ -49,11 +50,13 @@ impl QemuDrCovHelper {
         filter: QemuInstrumentationFilter,
         module_mapping: RangeMap<usize, (u16, String)>,
         filename: PathBuf,
+        full_trace: bool,
     ) -> Self {
         Self {
             filter,
             module_mapping,
             filename,
+            full_trace,
             drcov_len: 0,
         }
     }
@@ -72,7 +75,9 @@ where
     where
         QT: QemuHelperTuple<S>,
     {
-        hooks.blocks_raw(Some(gen_unique_block_ids::<QT, S>), Some(trace_block));
+        hooks.blocks(
+            Some(gen_unique_block_ids::<QT, S>), Some(exec_trace_block::<QT, S>)
+        );
     }
 
     fn pre_exec(&mut self, _emulator: &Emulator, _input: &S::Input) {}
@@ -128,19 +133,38 @@ where
     match DRCOV_MAP.lock().unwrap().entry(pc) {
         Entry::Occupied(e) => {
             let id = *e.get();
-            Some(id)
+            if hooks.helpers().match_first_type::<QemuDrCovHelper>().unwrap().full_trace {
+                Some(id)
+            } else {
+                None
+            }
         }
         Entry::Vacant(e) => {
             let id = meta.current_id;
             e.insert(id);
             meta.current_id = id + 1;
-            // GuestAddress is u32 for 32 bit guests
-            #[allow(clippy::unnecessary_cast)]
-            Some(id as u64)
+            if hooks.helpers().match_first_type::<QemuDrCovHelper>().unwrap().full_trace {
+                // GuestAddress is u32 for 32 bit guests
+                #[allow(clippy::unnecessary_cast)]
+                Some(id as u64)
+            } else {
+                None
+            }
         }
     }
 }
 
-pub extern "C" fn trace_block(id: u64, _data: u64) {
-    DRCOV_IDS.lock().unwrap().insert(id);
+pub fn exec_trace_block<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
+    _state: Option<&mut S>,
+    id: u64,
+)
+where
+    S: HasMetadata,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
+{
+    if hooks.helpers().match_first_type::<QemuDrCovHelper>().unwrap().full_trace {
+        DRCOV_IDS.lock().unwrap().insert(id);
+    }
 }
