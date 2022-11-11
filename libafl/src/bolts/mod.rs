@@ -29,7 +29,7 @@ pub mod shmem;
 pub mod staterestore;
 pub mod tuples;
 
-use alloc::string::String;
+use alloc::{string::String, vec::Vec};
 use core::{iter::Iterator, time};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -50,6 +50,54 @@ pub trait AsMutSlice {
     fn as_mut_slice(&mut self) -> &mut [Self::Entry];
 }
 
+impl<T> AsSlice for Vec<T> {
+    type Entry = T;
+
+    fn as_slice(&self) -> &[Self::Entry] {
+        self
+    }
+}
+
+impl<T> AsMutSlice for Vec<T> {
+    type Entry = T;
+
+    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+        self
+    }
+}
+
+impl<T> AsSlice for &[T] {
+    type Entry = T;
+
+    fn as_slice(&self) -> &[Self::Entry] {
+        self
+    }
+}
+
+impl<T> AsSlice for [T] {
+    type Entry = T;
+
+    fn as_slice(&self) -> &[Self::Entry] {
+        self
+    }
+}
+
+impl<T> AsMutSlice for &mut [T] {
+    type Entry = T;
+
+    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+        self
+    }
+}
+
+impl<T> AsMutSlice for [T] {
+    type Entry = T;
+
+    fn as_mut_slice(&mut self) -> &mut [Self::Entry] {
+        self
+    }
+}
+
 /// Create an `Iterator` from a reference
 pub trait AsIter<'it> {
     /// The item type
@@ -57,7 +105,7 @@ pub trait AsIter<'it> {
     /// The iterator type
     type IntoIter: Iterator<Item = &'it Self::Item>;
 
-    /// Create an interator from &self
+    /// Create an iterator from &self
     fn as_iter(&'it self) -> Self::IntoIter;
 }
 
@@ -68,7 +116,7 @@ pub trait AsIterMut<'it> {
     /// The iterator type
     type IntoIter: Iterator<Item = &'it mut Self::Item>;
 
-    /// Create an interator from &mut self
+    /// Create an iterator from &mut self
     fn as_iter_mut(&'it mut self) -> Self::IntoIter;
 }
 

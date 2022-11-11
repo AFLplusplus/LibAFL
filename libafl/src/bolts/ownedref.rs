@@ -331,6 +331,20 @@ where
     }
 }
 
+/// Create a vector from an [`OwnedSliceMut`], or return the owned vec.
+impl<'a, T> From<OwnedSlice<'a, T>> for Vec<T>
+where
+    T: Clone,
+{
+    fn from(slice: OwnedSlice<'a, T>) -> Self {
+        let slice = slice.into_owned();
+        match slice.inner {
+            OwnedSliceInner::Owned(vec) => vec,
+            _ => panic!("Could not own slice!"),
+        }
+    }
+}
+
 /// Wrap a mutable slice and convert to a Vec on serialize.
 /// We use a hidden inner enum so the public API can be safe,
 /// unless the user uses the unsafe [`OwnedSliceMut::from_raw_parts_mut`]
@@ -482,6 +496,20 @@ impl<'a, T> From<Vec<T>> for OwnedSliceMut<'a, T> {
     fn from(vec: Vec<T>) -> Self {
         Self {
             inner: OwnedSliceMutInner::Owned(vec),
+        }
+    }
+}
+
+/// Create a vector from an [`OwnedSliceMut`], or return the owned vec.
+impl<'a, T> From<OwnedSliceMut<'a, T>> for Vec<T>
+where
+    T: Clone,
+{
+    fn from(slice: OwnedSliceMut<'a, T>) -> Self {
+        let slice = slice.into_owned();
+        match slice.inner {
+            OwnedSliceMutInner::Owned(vec) => vec,
+            _ => panic!("Could not own slice!"),
         }
     }
 }
