@@ -8,6 +8,8 @@ A crate is an individual library in Rust's Cargo build system, that you can use 
 libafl = { version = "*" }
 ```
 
+## Crate List
+
 For LibAFL, each crate has its self-contained purpose, and the user may not need to use all of them in its project.
 Following the naming convention of the folders in the project's root, they are:
 
@@ -19,13 +21,13 @@ This crate has a number of feature flags that enable and disable certain aspects
 The features can be found in [LibAFL's `Cargo.toml`](https://github.com/AFLplusplus/LibAFL/blob/main/libafl/Cargo.toml) under "`[features]`", and are usually explained with comments there.
 Some features worthy of remark are:
 
-- `std` enables the parts of the code that use the Rust standard library. Without this flag, LibAFL is `no_std` compatible. This disables a range of features, but allows us to use LibAFL in embedded environments, read [the `no_std` section](../advanced_features/no_std/no_std.md) for further details.
+- `std` enables the parts of the code that use the Rust standard library. Without this flag, LibAFL is `no_std` compatible. This disables a range of features, but allows us to use LibAFL in embedded environments, read [the `no_std` section](../advanced_features/no_std.md) for further details.
 - `derive` enables the usage of the `derive(...)` macros defined in libafl_derive from libafl.
 - `rand_trait` allows you to use LibAFL's very fast (*but insecure!*) random number generator wherever compatibility with Rust's [`rand` crate](https://crates.io/crates/rand) is needed.
 - `llmp_bind_public` makes LibAFL's LLMP bind to a public TCP port, over which other fuzzers nodes can communicate with this instance.
 - `introspection` adds performance statistics to LibAFL.
 
-You can chose the features by using `features = ["feature1", "feature2", ...]` for LibAFL in your `Cargo.toml`.
+You can choose the features by using `features = ["feature1", "feature2", ...]` for LibAFL in your `Cargo.toml`.
 Out of this list, by default, `std`, `derive`, and `rand_trait` are already set.
 You can choose to disable them by setting `default-features = false` in your `Cargo.toml`.
 
@@ -52,7 +54,7 @@ Currently, the supported flags are:
 - `pcguard_edges` defines the SanitizerCoverage trace-pc-guard hooks to track the executed edges in a map.
 - `pcguard_hitcounts defines the SanitizerCoverage trace-pc-guard hooks to track the executed edges with the hitcounts (like AFL) in a map.
 - `libfuzzer` exposes a compatibility layer with libFuzzer style harnesses.
-- `value_profile` defines the SanitizerCoverage trace-cmp hooks to track the matching bits of each comparison in a map. 
+- `value_profile` defines the SanitizerCoverage trace-cmp hooks to track the matching bits of each comparison in a map.
 
 ### libafl_cc
 
@@ -64,10 +66,9 @@ To understand it deeper, look through the tutorials and examples.
 ### libafl_frida
 
 This library bridges LibAFL with Frida as instrumentation backend.
-
 With this crate, you can instrument targets on Linux/macOS/Windows/Android for coverage collection.
-
 Additionally, it supports CmpLog, and AddressSanitizer instrumentation and runtimes for aarch64.
+See further information, as well as usage instructions, [later in the book](../advanced_features/frida.md).
 
 ### libafl_qemu
 
@@ -75,3 +76,13 @@ This library bridges LibAFL with QEMU user-mode to fuzz ELF cross-platform binar
 
 It works on Linux and can collect edge coverage without collisions!
 It also supports a wide range of hooks and instrumentation options.
+
+### libafl_nyx
+
+[Nyx](https://nyx-fuzz.com/) is a KVM-based snapshot fuzzer. `libafl_nyx` adds these capabilities to LibAFL. There is a specific section explaining usage of libafl_nyx [later in the book](../advanced_features/nyx.md).
+
+### libafl_concolic
+
+Concolic fuzzing is the combination of fuzzing and a symbolic execution engine.
+This can reach greater depth than normal fuzzing, and is exposed in this crate.
+There is a specific section explaining usage of libafl_concolic [later in the book](../advanced_features/concolic.md).

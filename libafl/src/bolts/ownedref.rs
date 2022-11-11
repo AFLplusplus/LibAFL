@@ -290,7 +290,8 @@ impl<'a, T> From<OwnedSliceMut<'a, T>> for OwnedSlice<'a, T> {
     }
 }
 
-impl<'a, T: Sized> AsSlice<T> for OwnedSlice<'a, T> {
+impl<'a, T: Sized> AsSlice for OwnedSlice<'a, T> {
+    type Entry = T;
     /// Get the [`OwnedSlice`] as slice.
     #[must_use]
     fn as_slice(&self) -> &[T] {
@@ -326,6 +327,20 @@ where
             OwnedSliceInner::Owned(v) => Self {
                 inner: OwnedSliceInner::Owned(v),
             },
+        }
+    }
+}
+
+/// Create a vector from an [`OwnedSliceMut`], or return the owned vec.
+impl<'a, T> From<OwnedSlice<'a, T>> for Vec<T>
+where
+    T: Clone,
+{
+    fn from(slice: OwnedSlice<'a, T>) -> Self {
+        let slice = slice.into_owned();
+        match slice.inner {
+            OwnedSliceInner::Owned(vec) => vec,
+            _ => panic!("Could not own slice!"),
         }
     }
 }
@@ -416,7 +431,8 @@ impl<'a, T: 'a + Sized> OwnedSliceMut<'a, T> {
     }
 }
 
-impl<'a, T: Sized> AsSlice<T> for OwnedSliceMut<'a, T> {
+impl<'a, T: Sized> AsSlice for OwnedSliceMut<'a, T> {
+    type Entry = T;
     /// Get the value as slice
     #[must_use]
     fn as_slice(&self) -> &[T] {
@@ -427,7 +443,8 @@ impl<'a, T: Sized> AsSlice<T> for OwnedSliceMut<'a, T> {
         }
     }
 }
-impl<'a, T: Sized> AsMutSlice<T> for OwnedSliceMut<'a, T> {
+impl<'a, T: Sized> AsMutSlice for OwnedSliceMut<'a, T> {
+    type Entry = T;
     /// Get the value as mut slice
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [T] {
@@ -479,6 +496,20 @@ impl<'a, T> From<Vec<T>> for OwnedSliceMut<'a, T> {
     fn from(vec: Vec<T>) -> Self {
         Self {
             inner: OwnedSliceMutInner::Owned(vec),
+        }
+    }
+}
+
+/// Create a vector from an [`OwnedSliceMut`], or return the owned vec.
+impl<'a, T> From<OwnedSliceMut<'a, T>> for Vec<T>
+where
+    T: Clone,
+{
+    fn from(slice: OwnedSliceMut<'a, T>) -> Self {
+        let slice = slice.into_owned();
+        match slice.inner {
+            OwnedSliceMutInner::Owned(vec) => vec,
+            _ => panic!("Could not own slice!"),
         }
     }
 }

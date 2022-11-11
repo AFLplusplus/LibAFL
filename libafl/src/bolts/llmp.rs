@@ -574,7 +574,7 @@ impl LlmpMsg {
         slice::from_raw_parts(self.buf.as_ptr(), self.buf_len as usize)
     }
 
-    /// Gets the buffer from this message as slice, with the corrent length.
+    /// Gets the buffer from this message as slice, with the correct length.
     #[inline]
     pub fn try_as_slice<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> Result<&[u8], Error> {
         unsafe {
@@ -586,7 +586,7 @@ impl LlmpMsg {
         }
     }
 
-    /// Returns true, if the pointer is, indeed, in the page of this shared map.
+    /// Returns `true`, if the pointer is, indeed, in the page of this shared map.
     #[inline]
     pub fn in_shmem<SHM: ShMem>(&self, map: &mut LlmpSharedMap<SHM>) -> bool {
         let map_size = map.shmem.as_slice().len();

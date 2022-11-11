@@ -1,5 +1,4 @@
-//| The [`MutationalStage`] is the default stage used during fuzzing.
-//! For the current input, it will perform a range of random mutations, and then run them in the executor.
+//! The [`SyncFromDiskStage`] is a stage that imports inputs from disk for e.g. sync with AFL
 
 use core::marker::PhantomData;
 use std::{
