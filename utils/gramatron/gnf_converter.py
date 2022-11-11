@@ -50,42 +50,26 @@ def remove_left_recursion(grammar):
     # similar to { "A": ["BC"], "B": ["AD"] }.
     # Therefore, we need to call this function each time
     # the rule is updated.
-    old_grammar = copy.deepcopy(grammar)
-    new_grammar = defaultdict(list)
-    no_left_recursion = False
-    while not no_left_recursion:
-        for lhs, rules in old_grammar.items():
-            left_recursion = []
-            others = []
-            for rule in rules:
-                tokens = gettokens(rule)
-                if tokens[0] == lhs:
-                    left_recursion.append(tokens)
-                else:
-                    others.append(tokens)
-            if left_recursion:
-                new_rule = get_nonterminal()
-                for r in others:
-                    r.append(new_rule)
-                left_recursion = [r[1:] + [new_rule] for r in left_recursion]
-                left_recursion.append(["' '"])
-                new_grammar[lhs] = [' '.join(rule) for rule in others]
-                new_grammar[new_rule] = [' '.join(rule) for rule in left_recursion]
+    new_grammar = defaultdict(list) 
+    for lhs, rules in grammar.items():
+        left_recursion = []
+        others = []
+        for rule in rules:
+            tokens = gettokens(rule)
+            if tokens[0] == lhs:
+                left_recursion.append(tokens)
             else:
-                new_grammar[lhs] = [' '.join(rule) for rule in others]
-        no_left_recursion = True
-        for lhs, rules in old_grammar.items():
-            for rule in rules:
-                tokens = gettokens(rule)
-                if tokens[0] == lhs:
-                    no_left_recursion = False
-                    break
-            else:
-                continue
-            break
-        if not no_left_recursion:
-            old_grammar = copy.deepcopy(new_grammar)
-            new_grammar = defaultdict(list)
+                others.append(tokens)
+        if left_recursion:
+            new_rule = get_nonterminal()
+            for r in others:
+                r.append(new_rule)
+            left_recursion = [r[1:] + [new_rule] for r in left_recursion]
+            left_recursion.append(["' '"])
+            new_grammar[lhs] = [' '.join(rule) for rule in others]
+            new_grammar[new_rule] = [' '.join(rule) for rule in left_recursion]
+        else:
+            new_grammar[lhs] = [' '.join(rule) for rule in others]
     return new_grammar
 
 def get_reachable(grammar, start):
