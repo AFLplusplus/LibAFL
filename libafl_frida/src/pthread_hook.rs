@@ -1,9 +1,11 @@
+use std::{
+    cell::UnsafeCell,
+    convert::{TryFrom, TryInto},
+    sync::RwLock,
+};
+
 /// Rust bindings for Apple's [`pthread_introspection`](https://opensource.apple.com/source/libpthread/libpthread-218.20.1/pthread/introspection.h.auto.html) hooks.
-use lazy_static::lazy_static;
 use libc;
-use std::cell::UnsafeCell;
-use std::convert::{TryFrom, TryInto};
-use std::sync::RwLock;
 
 const PTHREAD_INTROSPECTION_THREAD_CREATE: libc::c_uint = 1;
 const PTHREAD_INTROSPECTION_THREAD_START: libc::c_uint = 2;
@@ -74,9 +76,7 @@ unsafe impl Sync for PreviousHook {}
 #[allow(non_upper_case_globals)]
 static PREVIOUS_HOOK: PreviousHook = PreviousHook(UnsafeCell::new(None));
 
-lazy_static! {
-    static ref CURRENT_HOOK: RwLock<Option<PthreadIntrospectionHook>> = RwLock::new(None);
-}
+static CURRENT_HOOK: RwLock<Option<PthreadIntrospectionHook>> = RwLock::new(None);
 
 extern "C" fn pthread_introspection_hook(
     event: libc::c_uint,
@@ -97,9 +97,13 @@ pub type PthreadIntrospectionHook =
 /// Event type describing the lifecycle of a pthread.
 #[derive(Debug, PartialEq, Eq)]
 pub enum EventType {
+    /// `pthread` creation
     Create,
+    /// `pthread` starts
     Start,
+    /// `pthread` terminates
     Terminate,
+    /// `pthread` is being destroyed
     Destroy,
 }
 
@@ -117,7 +121,7 @@ impl TryFrom<libc::c_uint> for EventType {
     }
 }
 
-impl std::convert::From<EventType> for libc::c_uint {
+impl From<EventType> for libc::c_uint {
     fn from(event: EventType) -> Self {
         match event {
             EventType::Create => PTHREAD_INTROSPECTION_THREAD_CREATE,
@@ -182,10 +186,13 @@ pub fn reset() {
 /// The following tests fail if they are not run sequentially.
 #[cfg(test)]
 mod test {
+    use std::{
+        sync::{Arc, Mutex},
+        thread,
+        time::Duration,
+    };
+
     use serial_test::serial;
-    use std::sync::{Arc, Mutex};
-    use std::thread;
-    use std::time::Duration;
 
     #[test]
     #[serial]
@@ -198,7 +205,7 @@ mod test {
         thread::sleep(Duration::from_millis(50));
 
         super::reset();
-        assert!(*triggered.lock().unwrap() == false);
+        assert!(!*triggered.lock().unwrap());
     }
 
     #[test]
@@ -220,7 +227,7 @@ mod test {
         thread::sleep(Duration::from_millis(50));
 
         super::reset();
-        assert!(*triggered.lock().unwrap() == true);
+        assert!(*triggered.lock().unwrap());
     }
 
     #[test]
@@ -242,7 +249,7 @@ mod test {
         thread::sleep(Duration::from_millis(50));
 
         super::reset();
-        assert!(*triggered.lock().unwrap() == true);
+        assert!(*triggered.lock().unwrap());
     }
 
     #[test]
@@ -265,6 +272,6 @@ mod test {
         });
         thread::sleep(Duration::from_millis(50));
 
-        assert!(*triggered.lock().unwrap() == false);
+        assert!(!*triggered.lock().unwrap());
     }
 }
