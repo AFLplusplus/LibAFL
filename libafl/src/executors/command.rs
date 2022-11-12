@@ -35,10 +35,10 @@ use crate::{
 use crate::{inputs::Input, Error};
 
 /// How to deliver input to an external program
-/// `StdIn`: The traget reads from stdin
+/// `StdIn`: The target reads from stdin
 /// `File`: The target reads from the specified [`InputFile`]
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum InputLocation {
+pub enum InputLocation {
     /// Mutate a commandline argument to deliver an input
     Arg {
         /// The offset of the argument to mutate

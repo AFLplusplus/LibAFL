@@ -9,6 +9,8 @@ use std::{
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+#[cfg(test)]
+use crate::bolts::rands::StdRand;
 use crate::{
     bolts::{
         rands::Rand,
@@ -599,8 +601,11 @@ impl<I, C, R, SC> HasClientPerfMonitor for StdState<I, C, R, SC> {
 }
 
 #[cfg(test)]
+/// A very simple state without any bells or whistles, for testing.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct NopState<I> {
+    metadata: SerdeAnyMap,
+    rand: StdRand,
     phantom: PhantomData<I>,
 }
 
@@ -610,6 +615,8 @@ impl<I> NopState<I> {
     #[must_use]
     pub fn new() -> Self {
         NopState {
+            metadata: SerdeAnyMap::new(),
+            rand: StdRand::default(),
             phantom: PhantomData,
         }
     }
@@ -637,11 +644,24 @@ impl<I> HasExecutions for NopState<I> {
 #[cfg(test)]
 impl<I> HasMetadata for NopState<I> {
     fn metadata(&self) -> &SerdeAnyMap {
-        unimplemented!()
+        &self.metadata
     }
 
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
-        unimplemented!()
+        &mut self.metadata
+    }
+}
+
+#[cfg(test)]
+impl<I> HasRand for NopState<I> {
+    type Rand = StdRand;
+
+    fn rand(&self) -> &Self::Rand {
+        &self.rand
+    }
+
+    fn rand_mut(&mut self) -> &mut Self::Rand {
+        &mut self.rand
     }
 }
 
