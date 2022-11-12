@@ -1,27 +1,34 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for `stb_image`.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
-use std::{env, path::PathBuf};
+use std::{
+    env,
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+};
 
+use clap::{self, Parser};
 use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Named},
+        AsMutSlice, AsSlice,
     },
-    corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
-    events::setup_restarting_mgr_std,
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    events::{setup_restarting_mgr_std, EventConfig},
     executors::{
         command::CommandConfigurator, inprocess::InProcessExecutor, ExitKind, ShadowExecutor,
     },
     feedback_or,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes, Input},
+    monitors::MultiMonitor,
     mutators::{
         scheduled::{havoc_mutations, StdScheduledMutator},
         token_mutations::I2SRandReplace,
@@ -33,26 +40,23 @@ use libafl::{
         },
         StdMapObserver, TimeObserver,
     },
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{
         ConcolicTracingStage, ShadowTracingStage, SimpleConcolicMutationalStage,
         StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, StdState},
-    stats::MultiStats,
     Error,
 };
-
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,
 };
 
-use structopt::StructOpt;
-
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 struct Opt {
     /// This node should do concolic tracing + solving instead of traditional fuzzing
-    #[structopt(short, long)]
+    #[arg(short, long)]
     concolic: bool,
 }
 
@@ -61,7 +65,7 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     println!(
         "Workdir: {:?}",
@@ -84,11 +88,11 @@ fn fuzz(
     concolic: bool,
 ) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port, "default".into()) {
+        match setup_restarting_mgr_std(monitor, broker_port, EventConfig::from_name("default")) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
@@ -111,20 +115,17 @@ fn fuzz(
     let cmplog = unsafe { &mut CMPLOG_MAP };
     let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        MaxMapFeedback::new_tracking(&edges_observer, true, false),
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -137,15 +138,18 @@ fn fuzz(
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(feedback_state),
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
         )
+        .unwrap()
     });
 
     println!("We're a client, let's fuzz :)");
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -204,13 +208,13 @@ fn fuzz(
         // The shared memory for the concolic runtime to write its trace to
         let mut concolic_shmem = StdShMemProvider::new()
             .unwrap()
-            .new_map(DEFAULT_SIZE)
+            .new_shmem(DEFAULT_SIZE)
             .unwrap();
         concolic_shmem.write_to_env(DEFAULT_ENV_NAME).unwrap();
 
         // The concolic observer observers the concolic shared memory map.
         let concolic_observer =
-            ConcolicObserver::new("concolic".to_string(), concolic_shmem.map_mut());
+            ConcolicObserver::new("concolic".to_string(), concolic_shmem.as_mut_slice());
 
         let concolic_observer_name = concolic_observer.name().to_string();
 
@@ -239,22 +243,11 @@ fn fuzz(
     Ok(())
 }
 
-use std::process::{Child, Command, Stdio};
-
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MyCommandConfigurator;
 
-impl<EM, I, S, Z> CommandConfigurator<EM, I, S, Z> for MyCommandConfigurator
-where
-    I: HasTargetBytes + Input,
-{
-    fn spawn_child(
-        &mut self,
-        _fuzzer: &mut Z,
-        _state: &mut S,
-        _mgr: &mut EM,
-        input: &I,
-    ) -> Result<Child, Error> {
+impl CommandConfigurator for MyCommandConfigurator {
+    fn spawn_child<I: Input + HasTargetBytes>(&mut self, input: &I) -> Result<Child, Error> {
         input.to_file("cur_input")?;
 
         Ok(Command::new("./target_symcc.out")

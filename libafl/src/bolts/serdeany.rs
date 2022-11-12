@@ -1,37 +1,12 @@
 //! Poor-rust-man's downcasts for stuff we send over the wire (or shared maps)
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-use alloc;
 use alloc::boxed::Box;
-use core::any::{Any, TypeId};
+use core::{any::Any, fmt::Debug};
 
-// yolo
-
-/// Get a `type_id` from its previously unpacked `u64`.
-/// Opposite of [`unpack_type_id(id)`].
-///
-/// # Safety
-/// Probably not safe for future compilers, fine for now.
-#[must_use]
-pub fn pack_type_id(id: u64) -> TypeId {
-    assert_eq_size!(TypeId, u64);
-    unsafe { *(&id as *const u64 as *const TypeId) }
-}
-
-/// Unpack a `type_id` to an `u64`
-/// Opposite of [`pack_type_id(id)`].
-///
-/// # Safety
-/// Probably not safe for future compilers, fine for now.
-#[must_use]
-pub fn unpack_type_id(id: TypeId) -> u64 {
-    assert_eq_size!(TypeId, u64);
-    unsafe { *(&id as *const _ as *const u64) }
-}
+use serde::{de::DeserializeSeed, Deserialize, Deserializer, Serialize, Serializer};
 
 /// A (de)serializable Any trait
-pub trait SerdeAny: Any + erased_serde::Serialize {
+pub trait SerdeAny: Any + erased_serde::Serialize + Debug {
     /// returns this as Any trait
     fn as_any(&self) -> &dyn Any;
     /// returns this as mutable Any trait
@@ -41,10 +16,11 @@ pub trait SerdeAny: Any + erased_serde::Serialize {
 }
 
 /// Wrap a type for serialization
-pub struct Wrap<'a, T: ?Sized>(pub &'a T);
+#[derive(Debug)]
+pub struct Wrap<'a, T: ?Sized + Debug>(pub &'a T);
 impl<'a, T> Serialize for Wrap<'a, T>
 where
-    T: ?Sized + erased_serde::Serialize + 'a,
+    T: ?Sized + erased_serde::Serialize + 'a + Debug,
 {
     /// Serialize the type
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -60,6 +36,7 @@ pub type DeserializeCallback<B> =
     fn(&mut dyn erased_serde::Deserializer) -> Result<Box<B>, erased_serde::Error>;
 
 /// Callback struct for deserialization of a [`SerdeAny`] type.
+#[allow(missing_debug_implementations)]
 pub struct DeserializeCallbackSeed<B>
 where
     B: ?Sized,
@@ -68,7 +45,7 @@ where
     pub cb: DeserializeCallback<B>,
 }
 
-impl<'de, B> serde::de::DeserializeSeed<'de> for DeserializeCallbackSeed<B>
+impl<'de, B> DeserializeSeed<'de> for DeserializeCallbackSeed<B>
 where
     B: ?Sized,
 {
@@ -76,7 +53,7 @@ where
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
-        D: serde::de::Deserializer<'de>,
+        D: Deserializer<'de>,
     {
         let mut erased = <dyn erased_serde::Deserializer>::erase(deserializer);
         (self.cb)(&mut erased).map_err(serde::de::Error::custom)
@@ -92,21 +69,26 @@ macro_rules! create_serde_registry_for_trait {
         pub mod $mod_name {
 
             use alloc::boxed::Box;
-            use core::any::{Any, TypeId};
-            use core::fmt;
+            use core::{any::TypeId, fmt};
+
+            use hashbrown::{
+                hash_map::{Keys, Values, ValuesMut},
+                HashMap,
+            };
             use postcard;
             use serde::{Deserialize, Serialize};
-
-            use hashbrown::hash_map::{Keys, Values, ValuesMut};
-            use hashbrown::HashMap;
-
-            use $crate::bolts::serdeany::{
-                pack_type_id, unpack_type_id, DeserializeCallback, DeserializeCallbackSeed,
+            use $crate::{
+                bolts::{
+                    anymap::{pack_type_id, unpack_type_id},
+                    serdeany::{DeserializeCallback, DeserializeCallbackSeed},
+                },
+                Error,
             };
-            use $crate::Error;
 
             /// Visitor object used internally for the [`SerdeAny`] registry.
+            #[derive(Debug)]
             pub struct BoxDynVisitor {}
+            #[allow(unused_qualifications)]
             impl<'de> serde::de::Visitor<'de> for BoxDynVisitor {
                 type Value = Box<dyn $trait_name>;
 
@@ -123,7 +105,7 @@ macro_rules! create_serde_registry_for_trait {
                         *REGISTRY
                             .deserializers
                             .as_ref()
-                            .unwrap()
+                            .expect("Empty types registry")
                             .get(&id)
                             .expect("Cannot deserialize an unregistered type")
                     };
@@ -133,19 +115,19 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
+            #[allow(unused_qualifications)]
             struct Registry {
                 deserializers: Option<HashMap<u64, DeserializeCallback<dyn $trait_name>>>,
                 finalized: bool,
             }
 
+            #[allow(unused_qualifications)]
             impl Registry {
                 pub fn register<T>(&mut self)
                 where
                     T: $trait_name + Serialize + serde::de::DeserializeOwned,
                 {
-                    if self.finalized {
-                        panic!("Registry is already finalized!");
-                    }
+                    assert!(!self.finalized, "Registry is already finalized!");
 
                     let deserializers = self.deserializers.get_or_insert_with(HashMap::default);
                     deserializers.insert(unpack_type_id(TypeId::of::<T>()), |de| {
@@ -165,8 +147,10 @@ macro_rules! create_serde_registry_for_trait {
 
             /// This shugar must be used to register all the structs which
             /// have trait objects that can be serialized and deserialized in the program
+            #[derive(Debug)]
             pub struct RegistryBuilder {}
 
+            #[allow(unused_qualifications)]
             impl RegistryBuilder {
                 /// Register a given struct type for trait object (de)serialization
                 pub fn register<T>()
@@ -186,9 +170,9 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
-            #[derive(Serialize, Deserialize)]
             /// A (de)serializable anymap containing (de)serializable trait objects registered
             /// in the registry
+            #[derive(Debug, Serialize, Deserialize)]
             pub struct SerdeAnyMap {
                 map: HashMap<u64, Box<dyn $trait_name>>,
             }
@@ -202,6 +186,7 @@ macro_rules! create_serde_registry_for_trait {
                 }
             }
 
+            /*
             #[cfg(feature = "anymap_debug")]
             impl fmt::Debug for SerdeAnyMap {
                 fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -215,8 +200,9 @@ macro_rules! create_serde_registry_for_trait {
                 fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                     write!(f, "SerdeAnymap with {} elements", self.len())
                 }
-            }
+            }*/
 
+            #[allow(unused_qualifications)]
             impl SerdeAnyMap {
                 /// Get an element from the map.
                 #[must_use]
@@ -312,18 +298,29 @@ macro_rules! create_serde_registry_for_trait {
             }
 
             /// A serializable [`HashMap`] wrapper for [`SerdeAny`] types, addressable by name.
-            #[derive(Serialize, Deserialize)]
+            #[allow(unused_qualifications)]
+            #[derive(Debug, Serialize, Deserialize)]
             pub struct NamedSerdeAnyMap {
                 map: HashMap<u64, HashMap<u64, Box<dyn $trait_name>>>,
             }
 
+            // Cloning by serializing and deserializing. It ain't fast, but it's honest work.
+            // We unwrap postcard, it should not have a reason to fail.
+            impl Clone for NamedSerdeAnyMap {
+                fn clone(&self) -> Self {
+                    let serialized = postcard::to_allocvec(&self).unwrap();
+                    postcard::from_bytes(&serialized).unwrap()
+                }
+            }
+
+            #[allow(unused_qualifications)]
             impl NamedSerdeAnyMap {
                 /// Get an element by name
                 #[must_use]
                 #[inline]
                 pub fn get<T>(&self, name: &str) -> Option<&T>
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
@@ -335,6 +332,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get an element of a given type contained in this map by [`TypeId`].
                 #[must_use]
+                #[allow(unused_qualifications)]
                 #[inline]
                 pub fn by_typeid(&self, name: &str, typeid: &TypeId) -> Option<&dyn $trait_name> {
                     match self.map.get(&unpack_type_id(*typeid)) {
@@ -350,7 +348,7 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn get_mut<T>(&mut self, name: &str) -> Option<&mut T>
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
                         None => None,
@@ -378,6 +376,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all elements of a type contained in this map.
                 #[must_use]
+                #[allow(unused_qualifications)]
                 #[inline]
                 pub fn get_all<T>(
                     &self,
@@ -388,7 +387,7 @@ macro_rules! create_serde_registry_for_trait {
                     >,
                 >
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     #[allow(clippy::manual_map)]
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
@@ -401,6 +400,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all elements of a given type contained in this map by [`TypeId`].
                 #[must_use]
+                #[allow(unused_qualifications)]
                 #[inline]
                 pub fn all_by_typeid(
                     &self,
@@ -420,6 +420,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all elements contained in this map, as mut.
                 #[inline]
+                #[allow(unused_qualifications)]
                 pub fn get_all_mut<T>(
                     &mut self,
                 ) -> Option<
@@ -429,7 +430,7 @@ macro_rules! create_serde_registry_for_trait {
                     >,
                 >
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     #[allow(clippy::manual_map)]
                     match self.map.get_mut(&unpack_type_id(TypeId::of::<T>())) {
@@ -443,6 +444,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all [`TypeId`]`s` contained in this map, as mut.
                 #[inline]
+                #[allow(unused_qualifications)]
                 pub fn all_by_typeid_mut(
                     &mut self,
                     typeid: &TypeId,
@@ -461,6 +463,7 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Get all [`TypeId`]`s` contained in this map.
                 #[inline]
+                #[allow(unused_qualifications)]
                 pub fn all_typeids(
                     &self,
                 ) -> core::iter::Map<
@@ -472,9 +475,10 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Run `func` for each element in this map.
                 #[inline]
-                pub fn for_each(
+                #[allow(unused_qualifications)]
+                pub fn for_each<F: FnMut(&TypeId, &Box<dyn $trait_name>) -> Result<(), Error>>(
                     &self,
-                    func: fn(&TypeId, &Box<dyn $trait_name>) -> Result<(), Error>,
+                    func: &mut F,
                 ) -> Result<(), Error> {
                     for (id, h) in self.map.iter() {
                         for x in h.values() {
@@ -486,9 +490,11 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Run `func` for each element in this map, getting a mutable borrow.
                 #[inline]
-                pub fn for_each_mut(
+                pub fn for_each_mut<
+                    F: FnMut(&TypeId, &mut Box<dyn $trait_name>) -> Result<(), Error>,
+                >(
                     &mut self,
-                    func: fn(&TypeId, &mut Box<dyn $trait_name>) -> Result<(), Error>,
+                    func: &mut F,
                 ) -> Result<(), Error> {
                     for (id, h) in self.map.iter_mut() {
                         for x in h.values_mut() {
@@ -500,15 +506,19 @@ macro_rules! create_serde_registry_for_trait {
 
                 /// Insert an element into this map.
                 #[inline]
-                pub fn insert(&mut self, val: Box<dyn $trait_name>, name: &str) {
-                    let id = unpack_type_id((*val).type_id());
+                #[allow(unused_qualifications)]
+                pub fn insert<T>(&mut self, val: T, name: &str)
+                where
+                    T: $trait_name,
+                {
+                    let id = unpack_type_id(TypeId::of::<T>());
                     if !self.map.contains_key(&id) {
                         self.map.insert(id, HashMap::default());
                     }
                     self.map
                         .get_mut(&id)
                         .unwrap()
-                        .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), val);
+                        .insert(xxhash_rust::xxh3::xxh3_64(name.as_bytes()), Box::new(val));
                 }
 
                 /// Returns the `len` of this map.
@@ -529,7 +539,7 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn contains_type<T>(&self) -> bool
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     self.map.contains_key(&unpack_type_id(TypeId::of::<T>()))
                 }
@@ -539,7 +549,7 @@ macro_rules! create_serde_registry_for_trait {
                 #[inline]
                 pub fn contains<T>(&self, name: &str) -> bool
                 where
-                    T: Any,
+                    T: $trait_name,
                 {
                     match self.map.get(&unpack_type_id(TypeId::of::<T>())) {
                         None => false,
@@ -563,14 +573,15 @@ macro_rules! create_serde_registry_for_trait {
             }
         }
 
-        impl<'a> Serialize for dyn $trait_name {
+        #[allow(unused_qualifications)]
+        impl Serialize for dyn $trait_name {
             fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
             where
                 S: Serializer,
             {
                 use serde::ser::SerializeSeq;
 
-                let id = $crate::bolts::serdeany::unpack_type_id(self.type_id());
+                let id = $crate::bolts::anymap::unpack_type_id(self.type_id());
                 let mut seq = se.serialize_seq(Some(2))?;
                 seq.serialize_element(&id)?;
                 seq.serialize_element(&$crate::bolts::serdeany::Wrap(self))?;
@@ -578,6 +589,7 @@ macro_rules! create_serde_registry_for_trait {
             }
         }
 
+        #[allow(unused_qualifications)]
         impl<'de> Deserialize<'de> for Box<dyn $trait_name> {
             fn deserialize<D>(deserializer: D) -> Result<Box<dyn $trait_name>, D::Error>
             where
@@ -592,40 +604,36 @@ macro_rules! create_serde_registry_for_trait {
 create_serde_registry_for_trait!(serdeany_registry, crate::bolts::serdeany::SerdeAny);
 pub use serdeany_registry::*;
 
-/// Implement a [`SerdeAny`], registering it in the [`RegistryBuilder`]
+/// Register a `SerdeAny` type in the [`RegistryBuilder`]
 #[cfg(feature = "std")]
 #[macro_export]
-macro_rules! impl_serdeany {
-    ($struct_name:ident) => {
-        impl $crate::bolts::serdeany::SerdeAny for $struct_name {
-            fn as_any(&self) -> &dyn ::core::any::Any {
-                self
+macro_rules! register_at_startup {
+    ($struct_type:ty) => {
+        const _: () = {
+            #[$crate::ctor]
+            fn constructor() {
+                $crate::bolts::serdeany::RegistryBuilder::register::<$struct_type>();
             }
-
-            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
-                self
-            }
-
-            fn as_any_boxed(
-                self: ::std::boxed::Box<Self>,
-            ) -> ::std::boxed::Box<dyn ::core::any::Any> {
-                self
-            }
-        }
-
-        #[allow(non_snake_case)]
-        #[$crate::ctor]
-        fn $struct_name() {
-            $crate::bolts::serdeany::RegistryBuilder::register::<$struct_name>();
-        }
+        };
     };
 }
 
+/// Do nothing for `no_std`, you have to register it manually in `main()` with [`RegistryBuilder::register`]
 #[cfg(not(feature = "std"))]
 #[macro_export]
+macro_rules! register_at_startup {
+    ($struct_type:ty) => {};
+}
+
+/// Implement a [`SerdeAny`], registering it in the [`RegistryBuilder`] when on std
+#[macro_export]
 macro_rules! impl_serdeany {
-    ($struct_name:ident) => {
-        impl $crate::bolts::serdeany::SerdeAny for $struct_name {
+    ($struct_name:ident < $( $lt:tt $( : $clt:tt $(+ $dlt:tt )* )? ),+ > $(, < $( $opt:tt ),+ >)*) =>
+    {
+        impl < $( $lt $( : $clt $(+ $dlt )* )? ),+ >
+            $crate::bolts::serdeany::SerdeAny
+            for $struct_name < $( $lt ),+ >
+        {
             fn as_any(&self) -> &dyn ::core::any::Any {
                 self
             }
@@ -635,10 +643,37 @@ macro_rules! impl_serdeany {
             }
 
             fn as_any_boxed(
-                self: ::alloc::boxed::Box<Self>,
-            ) -> ::alloc::boxed::Box<dyn ::core::any::Any> {
+                self: $crate::alloc::boxed::Box<$struct_name < $( $lt ),+ >>,
+            ) -> $crate::alloc::boxed::Box<dyn ::core::any::Any> {
                 self
             }
         }
+
+        $(
+            $crate::register_at_startup!($struct_name < $( $opt ),+ >);
+        )*
+    };
+    ($struct_name:ident) =>
+    {
+        impl
+            $crate::bolts::serdeany::SerdeAny
+            for $struct_name
+        {
+            fn as_any(&self) -> &dyn ::core::any::Any {
+                self
+            }
+
+            fn as_any_mut(&mut self) -> &mut dyn ::core::any::Any {
+                self
+            }
+
+            fn as_any_boxed(
+                self: $crate::alloc::boxed::Box<$struct_name>,
+            ) -> $crate::alloc::boxed::Box<dyn ::core::any::Any> {
+                self
+            }
+        }
+
+        $crate::register_at_startup!($struct_name);
     };
 }

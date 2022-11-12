@@ -2,15 +2,16 @@
 
 use alloc::collections::vec_deque::VecDeque;
 use core::cell::RefCell;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{
         ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
         Corpus, Testcase,
     },
-    inputs::Input,
+    inputs::{Input, UsesInput},
     Error,
 };
 
@@ -27,7 +28,14 @@ where
     cache_max_len: usize,
 }
 
-impl<I> Corpus<I> for CachedOnDiskCorpus<I>
+impl<I> UsesInput for CachedOnDiskCorpus<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> Corpus for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
@@ -45,7 +53,7 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         // TODO finish
         self.inner.replace(idx, testcase)
     }
@@ -66,19 +74,18 @@ where
         let testcase = { self.inner.get(idx)? };
         if testcase.borrow().input().is_none() {
             let _ = testcase.borrow_mut().load_input()?;
-            let current = *self.current();
+            let mut borrowed_num = 0;
             while self.cached_indexes.borrow().len() >= self.cache_max_len {
                 let removed = self.cached_indexes.borrow_mut().pop_front().unwrap();
-                if let Some(cur) = current {
-                    if cur == removed {
-                        self.cached_indexes.borrow_mut().push_back(cur);
-                        if self.cache_max_len == 1 {
-                            break;
-                        }
-                        continue;
+                if let Ok(mut borrowed) = self.inner.get(removed)?.try_borrow_mut() {
+                    *borrowed.input_mut() = None;
+                } else {
+                    self.cached_indexes.borrow_mut().push_back(removed);
+                    borrowed_num += 1;
+                    if self.cache_max_len == borrowed_num {
+                        break;
                     }
                 }
-                *self.inner.get(removed)?.borrow_mut().input_mut() = None;
             }
             self.cached_indexes.borrow_mut().push_back(idx);
         }
@@ -91,7 +98,7 @@ where
         self.inner.current()
     }
 
-    /// Current testcase scheduled (mut)
+    /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<usize> {
         self.inner.current_mut()
@@ -105,8 +112,8 @@ where
     /// Creates the [`CachedOnDiskCorpus`].
     pub fn new(dir_path: PathBuf, cache_max_len: usize) -> Result<Self, Error> {
         if cache_max_len == 0 {
-            return Err(Error::IllegalArgument(
-                "The max cache len in CachedOnDiskCorpus cannot be 0".into(),
+            return Err(Error::illegal_argument(
+                "The max cache len in CachedOnDiskCorpus cannot be 0",
             ));
         }
         Ok(Self {
@@ -123,8 +130,8 @@ where
         cache_max_len: usize,
     ) -> Result<Self, Error> {
         if cache_max_len == 0 {
-            return Err(Error::IllegalArgument(
-                "The max cache len in CachedOnDiskCorpus cannot be 0".into(),
+            return Err(Error::illegal_argument(
+                "The max cache len in CachedOnDiskCorpus cannot be 0",
             ));
         }
         Ok(Self {
@@ -132,5 +139,48 @@ where
             cached_indexes: RefCell::new(VecDeque::new()),
             cache_max_len,
         })
+    }
+}
+
+/// ``CachedOnDiskCorpus`` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use alloc::string::String;
+    use std::path::PathBuf;
+
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        corpus::{pybind::PythonCorpus, CachedOnDiskCorpus},
+        inputs::BytesInput,
+    };
+
+    #[pyclass(unsendable, name = "CachedOnDiskCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for CachedOnDiskCorpus
+    pub struct PythonCachedOnDiskCorpus {
+        /// Rust wrapped CachedOnDiskCorpus object
+        pub inner: CachedOnDiskCorpus<BytesInput>,
+    }
+
+    #[pymethods]
+    impl PythonCachedOnDiskCorpus {
+        #[new]
+        fn new(path: String, cache_max_len: usize) -> Self {
+            Self {
+                inner: CachedOnDiskCorpus::new(PathBuf::from(path), cache_max_len).unwrap(),
+            }
+        }
+
+        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
+            PythonCorpus::new_cached_on_disk(slf)
+        }
+    }
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonCachedOnDiskCorpus>()?;
+        Ok(())
     }
 }

@@ -1,11 +1,15 @@
+use alloc::string::String;
+
+use serde::{Deserialize, Serialize};
+
 use crate::{
     bolts::tuples::Named,
+    inputs::UsesInput,
     observers::{
         concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
         Observer,
     },
 };
-use serde::{Deserialize, Serialize};
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.
 #[derive(Serialize, Deserialize, Debug)]
@@ -15,9 +19,10 @@ pub struct ConcolicObserver<'map> {
     name: String,
 }
 
-impl<'map, I, S> Observer<I, S> for ConcolicObserver<'map> {}
+impl<'map, S> Observer<S> for ConcolicObserver<'map> where S: UsesInput {}
 
 impl<'map> ConcolicObserver<'map> {
+    /// Create the concolic observer metadata for this run
     #[must_use]
     pub fn create_metadata_from_current_map(&self) -> ConcolicMetadata {
         let reader = MessageFileReader::from_length_prefixed_buffer(self.map)

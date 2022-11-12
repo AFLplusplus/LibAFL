@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# shellcheck disable=SC2016
 echo "Warning: this script is not a proper fix to do LLMP fuzzing." \
      'Instead, run `afl-persistent-config` with SIP disabled.'
 

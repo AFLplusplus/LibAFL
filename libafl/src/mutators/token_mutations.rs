@@ -1,11 +1,13 @@
-//! Tokens are what afl calls extras or dictionaries.
+//! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
 use alloc::vec::Vec;
-use core::{convert::TryInto, marker::PhantomData, mem::size_of};
-use serde::{Deserialize, Serialize};
-
-#[cfg(feature = "std")]
-use crate::mutators::str_decode;
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+use core::slice::from_raw_parts;
+use core::{
+    mem::size_of,
+    ops::{Add, AddAssign},
+    slice::Iter,
+};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -13,9 +15,14 @@ use std::{
     path::Path,
 };
 
+use hashbrown::HashSet;
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+use crate::mutators::str_decode;
 use crate::{
-    bolts::rands::Rand,
-    inputs::{HasBytesVec, Input},
+    bolts::{rands::Rand, AsSlice},
+    inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{CmpValues, CmpValuesMetadata},
     state::{HasMaxSize, HasMetadata, HasRand},
@@ -23,9 +30,12 @@ use crate::{
 };
 
 /// A state metadata holding a list of tokens
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct Tokens {
-    token_vec: Vec<Vec<u8>>,
+    // We keep a vec and a set, set for faster deduplication, vec for access
+    tokens_vec: Vec<Vec<u8>>,
+    tokens_set: HashSet<Vec<u8>>,
 }
 
 crate::impl_serdeany!(Tokens);
@@ -34,18 +44,97 @@ crate::impl_serdeany!(Tokens);
 impl Tokens {
     /// Creates a new tokens metadata (old-skool afl name: `dictornary`)
     #[must_use]
-    pub fn new(token_vec: Vec<Vec<u8>>) -> Self {
-        Self { token_vec }
+    pub fn new() -> Self {
+        Self {
+            ..Tokens::default()
+        }
+    }
+
+    /// Add tokens from a slice of Vecs of bytes
+    pub fn add_tokens<IT, V>(&mut self, tokens: IT) -> &mut Self
+    where
+        IT: IntoIterator<Item = V>,
+        V: AsRef<Vec<u8>>,
+    {
+        for token in tokens {
+            self.add_token(token.as_ref());
+        }
+        self
+    }
+
+    /// Build tokens from files
+    #[cfg(feature = "std")]
+    pub fn add_from_files<IT, P>(mut self, files: IT) -> Result<Self, Error>
+    where
+        IT: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        for file in files {
+            self.add_from_file(file)?;
+        }
+        Ok(self)
+    }
+
+    /// Parse autodict section
+    pub fn parse_autodict(&mut self, slice: &[u8], size: usize) {
+        let mut head = 0;
+        loop {
+            if head >= size {
+                // Sanity Check
+                assert!(head == size);
+                break;
+            }
+            let size = slice[head] as usize;
+            head += 1;
+            if size > 0 {
+                self.add_token(&slice[head..head + size].to_vec());
+                #[cfg(feature = "std")]
+                println!(
+                    "Token size: {} content: {:x?}",
+                    size,
+                    &slice[head..head + size].to_vec()
+                );
+                head += size;
+            }
+        }
+    }
+
+    /// Create a token section from a start and an end pointer
+    /// Reads from an autotokens section, returning the count of new entries read
+    ///
+    /// # Safety
+    /// The caller must ensure that the region between `token_start` and `token_stop`
+    /// is a valid region, containing autotokens in the exepcted format.
+    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
+    pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
+        let mut ret = Self::default();
+        if token_start.is_null() || token_stop.is_null() {
+            return Ok(Self::new());
+        }
+        if token_stop < token_start {
+            return Err(Error::illegal_argument(format!(
+                "Tried to create tokens from illegal section: stop < start ({:?} < {:?})",
+                token_stop, token_start
+            )));
+        }
+        let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
+        // println!("size: {}", section_size);
+        let slice = from_raw_parts(token_start, section_size);
+
+        // Now we know the beginning and the end of the token section.. let's parse them into tokens
+        ret.parse_autodict(slice, section_size);
+
+        Ok(ret)
     }
 
     /// Creates a new instance from a file
     #[cfg(feature = "std")]
-    pub fn from_tokens_file<P>(file: P) -> Result<Self, Error>
+    pub fn from_file<P>(file: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
     {
-        let mut ret = Self::new(vec![]);
-        ret.add_tokens_from_file(file)?;
+        let mut ret = Self::new();
+        ret.add_from_file(file)?;
         Ok(ret)
     }
 
@@ -53,21 +142,19 @@ impl Tokens {
     /// Returns `false` if the token was already present and did not get added.
     #[allow(clippy::ptr_arg)]
     pub fn add_token(&mut self, token: &Vec<u8>) -> bool {
-        if self.token_vec.contains(token) {
+        if !self.tokens_set.insert(token.clone()) {
             return false;
         }
-        self.token_vec.push(token.clone());
+        self.tokens_vec.push(token.clone());
         true
     }
 
     /// Reads a tokens file, returning the count of new entries read
     #[cfg(feature = "std")]
-    pub fn add_tokens_from_file<P>(&mut self, file: P) -> Result<u32, Error>
+    pub fn add_from_file<P>(&mut self, file: P) -> Result<&mut Self, Error>
     where
         P: AsRef<Path>,
     {
-        let mut entries = 0;
-
         // println!("Loading tokens file {:?} ...", file);
 
         let file = File::open(file)?; // panic if not found
@@ -84,16 +171,16 @@ impl Tokens {
             }
             let pos_quote = match line.find('\"') {
                 Some(x) => x,
-                None => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::illegal_argument(format!("Illegal line: {line}"))),
             };
             if line.chars().nth(line.len() - 1) != Some('"') {
-                return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line));
+                return Err(Error::illegal_argument(format!("Illegal line: {line}")));
             }
 
             // extract item
             let item = match line.get(pos_quote + 1..line.len() - 1) {
                 Some(x) => x,
-                None => return Err(Error::IllegalArgument("Illegal line: ".to_owned() + line)),
+                None => return Err(Error::illegal_argument(format!("Illegal line: {line}"))),
             };
             if item.is_empty() {
                 continue;
@@ -103,49 +190,121 @@ impl Tokens {
             let token: Vec<u8> = match str_decode(item) {
                 Ok(val) => val,
                 Err(_) => {
-                    return Err(Error::IllegalArgument(
-                        "Illegal line (hex decoding): ".to_owned() + line,
-                    ))
+                    return Err(Error::illegal_argument(format!(
+                        "Illegal line (hex decoding): {}",
+                        line
+                    )))
                 }
             };
 
             // add
-            if self.add_token(&token) {
-                entries += 1;
-            }
+            self.add_token(&token);
         }
 
-        Ok(entries)
+        Ok(self)
+    }
+
+    /// Returns the amount of tokens in this Tokens instance
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.tokens_vec.len()
+    }
+
+    /// Returns if this tokens-instance is empty
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.tokens_vec.is_empty()
     }
 
     /// Gets the tokens stored in this db
     #[must_use]
     pub fn tokens(&self) -> &[Vec<u8>] {
-        &self.token_vec
+        &self.tokens_vec
+    }
+}
+
+impl AddAssign for Tokens {
+    fn add_assign(&mut self, other: Self) {
+        self.add_tokens(&other);
+    }
+}
+
+impl AddAssign<&[Vec<u8>]> for Tokens {
+    fn add_assign(&mut self, other: &[Vec<u8>]) {
+        self.add_tokens(other);
+    }
+}
+
+impl Add<&[Vec<u8>]> for Tokens {
+    type Output = Self;
+    fn add(self, other: &[Vec<u8>]) -> Self {
+        let mut ret = self;
+        ret.add_tokens(other);
+        ret
+    }
+}
+
+impl Add for Tokens {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        self.add(other.tokens_vec.as_slice())
+    }
+}
+
+impl<IT, V> From<IT> for Tokens
+where
+    IT: IntoIterator<Item = V>,
+    V: AsRef<Vec<u8>>,
+{
+    fn from(tokens: IT) -> Self {
+        let mut ret = Self::default();
+        ret.add_tokens(tokens);
+        ret
+    }
+}
+
+impl AsSlice for Tokens {
+    type Entry = Vec<u8>;
+    fn as_slice(&self) -> &[Vec<u8>] {
+        self.tokens()
+    }
+}
+
+impl Add for &Tokens {
+    type Output = Tokens;
+
+    fn add(self, other: Self) -> Tokens {
+        let mut ret: Tokens = self.clone();
+        ret.add_tokens(other);
+        ret
+    }
+}
+
+impl<'it> IntoIterator for &'it Tokens {
+    type Item = <Iter<'it, Vec<u8>> as Iterator>::Item;
+    type IntoIter = Iter<'it, Vec<u8>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
     }
 }
 
 /// Inserts a random token at a random position in the `Input`.
-#[derive(Default)]
-pub struct TokenInsert<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
-    phantom: PhantomData<(I, R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct TokenInsert;
 
-impl<I, R, S> Mutator<I, S> for TokenInsert<I, R, S>
+impl<S> Mutator<S> for TokenInsert
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -184,54 +343,34 @@ where
     }
 }
 
-impl<I, R, S> Named for TokenInsert<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl Named for TokenInsert {
     fn name(&self) -> &str {
         "TokenInsert"
     }
 }
 
-impl<I, R, S> TokenInsert<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl TokenInsert {
     /// Create a `TokenInsert` `Mutation`.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// A `TokenReplace` [`Mutator`] replaces a random part of the input with one of a range of tokens.
 /// From AFL terms, this is called as `Dictionary` mutation (which doesn't really make sense ;) ).
-#[derive(Default)]
-pub struct TokenReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
-    phantom: PhantomData<(I, R, S)>,
-}
+#[derive(Debug, Default)]
+pub struct TokenReplace;
 
-impl<I, R, S> Mutator<I, S> for TokenReplace<I, R, S>
+impl<S> Mutator<S> for TokenReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -266,55 +405,35 @@ where
     }
 }
 
-impl<I, R, S> Named for TokenReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl Named for TokenReplace {
     fn name(&self) -> &str {
         "TokenReplace"
     }
 }
 
-impl<I, R, S> TokenReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl TokenReplace {
     /// Creates a new `TokenReplace` struct.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
 /// A `I2SRandReplace` [`Mutator`] replaces a random matching input-2-state comparison operand with the other.
-/// it needs a valid [`CmpValuesMetadata`] in the state.
-#[derive(Default)]
-pub struct I2SRandReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
-    phantom: PhantomData<(I, R, S)>,
-}
+/// It needs a valid [`CmpValuesMetadata`] in the state.
+#[derive(Debug, Default)]
+pub struct I2SRandReplace;
 
-impl<I, R, S> Mutator<I, S> for I2SRandReplace<I, R, S>
+impl<S> Mutator<S> for I2SRandReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -449,6 +568,7 @@ where
                     while size != 0 {
                         if v.0[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.1, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -457,6 +577,7 @@ where
                     while size != 0 {
                         if v.1[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.0, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -465,35 +586,21 @@ where
             }
         }
 
-        //println!("{:?}", result);
-
         Ok(result)
     }
 }
 
-impl<I, R, S> Named for I2SRandReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl Named for I2SRandReplace {
     fn name(&self) -> &str {
         "I2SRandReplace"
     }
 }
 
-impl<I, R, S> I2SRandReplace<I, R, S>
-where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand<R> + HasMaxSize,
-    R: Rand,
-{
+impl I2SRandReplace {
     /// Creates a new `I2SRandReplace` struct.
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
+        Self
     }
 }
 
@@ -517,7 +624,7 @@ token1="A\x41A"
 token2="B"
         "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
-        let tokens = Tokens::from_tokens_file(&"test.tkns").unwrap();
+        let tokens = Tokens::from_file("test.tkns").unwrap();
         #[cfg(feature = "std")]
         println!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);

@@ -19,7 +19,7 @@
 19	Mul { a: 18, b: 17 }
 20	Integer { value: 7, bits: 32 }
 21	SignedLessThan { a: 19, b: 20 }
-22	PathConstraint { constraint: 21, taken: false, site_id: 11229456 }
+22	PathConstraint { constraint: 21, taken: false, location: 11229456 }
 22	Concat { a: 12, b: 11 }
 23	Concat { a: 13, b: 22 }
 24	Concat { a: 14, b: 23 }
@@ -27,4 +27,4 @@
 26	SignedRem { a: 24, b: 25 }
 27	Integer { value: 0, bits: 32 }
 28	NotEqual { a: 26, b: 27 }
-29	PathConstraint { constraint: 28, taken: true, site_id: 11122032 }
+29	PathConstraint { constraint: 28, taken: true, location: 11122032 }

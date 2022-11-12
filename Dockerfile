@@ -29,7 +29,6 @@ COPY libafl_derive/Cargo.toml libafl_derive/Cargo.toml
 COPY scripts/dummy.rs libafl_derive/src/lib.rs
 
 COPY libafl/Cargo.toml libafl/build.rs libafl/
-COPY libafl/benches libafl/benches
 COPY libafl/examples libafl/examples
 COPY scripts/dummy.rs libafl/src/lib.rs
 
@@ -39,22 +38,18 @@ COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 
 COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
-COPY libafl_qemu/src/weaks.c libafl_qemu/src/weaks.c
 
 COPY libafl_sugar/Cargo.toml libafl_sugar/
 COPY scripts/dummy.rs libafl_sugar/src/lib.rs
 
 COPY libafl_cc/Cargo.toml libafl_cc/Cargo.toml
-COPY scripts/dummy.rs libafl_cc/src/lib.rs
 COPY libafl_cc/build.rs libafl_cc/build.rs
-COPY libafl_cc/src/cmplog-routines-pass.cc libafl_cc/src/cmplog-routines-pass.cc
+COPY libafl_cc/src libafl_cc/src
+COPY scripts/dummy.rs libafl_cc/src/lib.rs
 
 COPY libafl_targets/Cargo.toml libafl_targets/build.rs libafl_targets/
 COPY libafl_targets/src libafl_targets/src
 COPY scripts/dummy.rs libafl_targets/src/lib.rs
-
-COPY libafl_tests/Cargo.toml libafl_tests/build.rs libafl_tests/
-COPY scripts/dummy.rs libafl_tests/src/lib.rs
 
 COPY libafl_concolic/test/dump_constraints/Cargo.toml libafl_concolic/test/dump_constraints/
 COPY scripts/dummy.rs libafl_concolic/test/dump_constraints/src/lib.rs
@@ -68,6 +63,11 @@ COPY scripts/dummy.rs libafl_concolic/symcc_runtime/src/lib.rs
 COPY libafl_concolic/symcc_libafl/Cargo.toml libafl_concolic/symcc_libafl/
 COPY scripts/dummy.rs libafl_concolic/symcc_libafl/src/lib.rs
 
+COPY libafl_nyx/Cargo.toml libafl_nyx/build.rs libafl_nyx/
+COPY scripts/dummy.rs libafl_nyx/src/lib.rs
+
+COPY utils utils
+
 RUN cargo build && cargo build --release
 
 COPY scripts scripts
@@ -78,7 +78,6 @@ COPY docs docs
 # Dep chain:
 # libafl_cc (independent)
 # libafl_derive -> libafl
-# libafl_tests -> libafl
 # libafl -> libafl_targets
 # libafl_targets -> libafl_frida
 
@@ -87,8 +86,6 @@ COPY libafl_cc/src libafl_cc/src
 RUN touch libafl_cc/src/lib.rs
 COPY libafl_derive/src libafl_derive/src
 RUN touch libafl_derive/src/lib.rs
-COPY libafl_tests/src libafl_tests/src
-RUN touch libafl_tests/src/lib.rs
 COPY libafl/src libafl/src
 RUN touch libafl/src/lib.rs
 COPY libafl_targets/src libafl_targets/src
@@ -100,6 +97,8 @@ RUN touch libafl_frida/src/lib.rs
 COPY libafl_concolic/symcc_libafl libafl_concolic/symcc_libafl
 COPY libafl_concolic/symcc_runtime libafl_concolic/symcc_runtime
 COPY libafl_concolic/test libafl_concolic/test
+COPY libafl_nyx/src libafl_nyx/src
+RUN touch libafl_nyx/src/lib.rs
 RUN cargo build && cargo build --release
 
 # Copy fuzzers over

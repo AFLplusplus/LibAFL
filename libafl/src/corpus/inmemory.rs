@@ -2,9 +2,14 @@
 
 use alloc::vec::Vec;
 use core::cell::RefCell;
+
 use serde::{Deserialize, Serialize};
 
-use crate::{corpus::Corpus, corpus::Testcase, inputs::Input, Error};
+use crate::{
+    corpus::{Corpus, Testcase},
+    inputs::{Input, UsesInput},
+    Error,
+};
 
 /// A corpus handling all in memory.
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -17,7 +22,14 @@ where
     current: Option<usize>,
 }
 
-impl<I> Corpus<I> for InMemoryCorpus<I>
+impl<I> UsesInput for InMemoryCorpus<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> Corpus for InMemoryCorpus<I>
 where
     I: Input,
 {
@@ -36,12 +48,11 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         if idx >= self.entries.len() {
-            return Err(Error::KeyNotFound(format!("Index {} out of bounds", idx)));
+            return Err(Error::key_not_found(format!("Index {idx} out of bounds")));
         }
-        self.entries[idx] = RefCell::new(testcase);
-        Ok(())
+        Ok(self.entries[idx].replace(testcase))
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
@@ -66,7 +77,7 @@ where
         &self.current
     }
 
-    /// Current testcase scheduled (mut)
+    /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<usize> {
         &mut self.current
@@ -85,5 +96,45 @@ where
             entries: vec![],
             current: None,
         }
+    }
+}
+
+/// `InMemoryCorpus` Python bindings
+#[cfg(feature = "python")]
+pub mod pybind {
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        corpus::{pybind::PythonCorpus, InMemoryCorpus},
+        inputs::BytesInput,
+    };
+
+    #[pyclass(unsendable, name = "InMemoryCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    /// Python class for InMemoryCorpus
+    pub struct PythonInMemoryCorpus {
+        /// Rust wrapped InMemoryCorpus object
+        pub inner: InMemoryCorpus<BytesInput>,
+    }
+
+    #[pymethods]
+    impl PythonInMemoryCorpus {
+        #[new]
+        fn new() -> Self {
+            Self {
+                inner: InMemoryCorpus::new(),
+            }
+        }
+
+        fn as_corpus(slf: Py<Self>) -> PythonCorpus {
+            PythonCorpus::new_in_memory(slf)
+        }
+    }
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonInMemoryCorpus>()?;
+        Ok(())
     }
 }

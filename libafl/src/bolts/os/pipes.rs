@@ -1,25 +1,28 @@
 //! Unix `pipe` wrapper for `LibAFL`
-use crate::Error;
-#[cfg(feature = "std")]
-use nix::unistd::{close, pipe, read, write};
 #[cfg(feature = "std")]
 use std::{
     io::{self, ErrorKind, Read, Write},
     os::unix::io::RawFd,
 };
 
-#[cfg(not(feature = "std"))]
-type RawFd = i32;
+#[cfg(feature = "std")]
+use nix::unistd::{close, pipe, read, write};
 
+use crate::Error;
+
+/// A unix pipe wrapper for `LibAFL`
 #[cfg(feature = "std")]
 #[derive(Debug, Clone)]
 pub struct Pipe {
+    /// The read end of the pipe
     read_end: Option<RawFd>,
+    /// The write end of the pipe
     write_end: Option<RawFd>,
 }
 
 #[cfg(feature = "std")]
 impl Pipe {
+    /// Create a new `Unix` pipe
     pub fn new() -> Result<Self, Error> {
         let (read_end, write_end) = pipe()?;
         Ok(Self {
@@ -28,6 +31,7 @@ impl Pipe {
         })
     }
 
+    /// Close the read end of a pipe
     pub fn close_read_end(&mut self) {
         if let Some(read_end) = self.read_end {
             let _ = close(read_end);
@@ -35,6 +39,7 @@ impl Pipe {
         }
     }
 
+    /// Close the write end of a pipe
     pub fn close_write_end(&mut self) {
         if let Some(write_end) = self.write_end {
             let _ = close(write_end);
@@ -42,11 +47,13 @@ impl Pipe {
         }
     }
 
+    /// The read end
     #[must_use]
     pub fn read_end(&self) -> Option<RawFd> {
         self.read_end
     }
 
+    /// The write end
     #[must_use]
     pub fn write_end(&self) -> Option<RawFd> {
         self.write_end
@@ -60,7 +67,7 @@ impl Read for Pipe {
         match self.read_end {
             Some(read_end) => match read(read_end, buf) {
                 Ok(res) => Ok(res),
-                Err(e) => Err(io::Error::from_raw_os_error(e.as_errno().unwrap() as i32)),
+                Err(e) => Err(io::Error::from_raw_os_error(e as i32)),
             },
             None => Err(io::Error::new(
                 ErrorKind::BrokenPipe,
@@ -77,7 +84,7 @@ impl Write for Pipe {
         match self.write_end {
             Some(write_end) => match write(write_end, buf) {
                 Ok(res) => Ok(res),
-                Err(e) => Err(io::Error::from_raw_os_error(e.as_errno().unwrap() as i32)),
+                Err(e) => Err(io::Error::from_raw_os_error(e as i32)),
             },
             None => Err(io::Error::new(
                 ErrorKind::BrokenPipe,

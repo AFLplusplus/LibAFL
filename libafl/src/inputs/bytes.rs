@@ -1,31 +1,26 @@
 //! The `BytesInput` is the "normal" input, a map of bytes, that can be sent directly to the client
-//! (As opposed to other, more abstract, imputs, like an Grammar-Based AST Input)
-
-use ahash::AHasher;
-use core::hash::Hasher;
+//! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From};
-use serde::{Deserialize, Serialize};
+use core::{cell::RefCell, convert::From, hash::Hasher};
 #[cfg(feature = "std")]
-use std::{
-    fs::File,
-    io::{Read, Write},
-    path::Path,
-};
+use std::{fs::File, io::Read, path::Path};
+
+use ahash::AHasher;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
-use crate::Error;
+use crate::{bolts::fs::write_file_atomic, Error};
 use crate::{
-    bolts::ownedref::OwnedSlice,
-    inputs::{HasBytesVec, HasLen, HasTargetBytes, Input},
+    bolts::{ownedref::OwnedSlice, HasLen},
+    inputs::{HasBytesVec, HasTargetBytes, Input},
 };
 
 /// A bytes input is the basic input
-#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct BytesInput {
     /// The raw input bytes
-    bytes: Vec<u8>,
+    pub(crate) bytes: Vec<u8>,
 }
 
 impl Input for BytesInput {
@@ -35,12 +30,10 @@ impl Input for BytesInput {
     where
         P: AsRef<Path>,
     {
-        let mut file = File::create(path)?;
-        file.write_all(&self.bytes)?;
-        Ok(())
+        write_file_atomic(path, &self.bytes)
     }
 
-    /// Load the contents of this input from a file
+    /// Load the content of this input from a file
     #[cfg(feature = "std")]
     fn from_file<P>(path: P) -> Result<Self, Error>
     where
@@ -82,7 +75,7 @@ impl HasBytesVec for BytesInput {
 impl HasTargetBytes for BytesInput {
     #[inline]
     fn target_bytes(&self) -> OwnedSlice<u8> {
-        OwnedSlice::Ref(&self.bytes)
+        OwnedSlice::from(&self.bytes)
     }
 }
 
@@ -110,20 +103,5 @@ impl BytesInput {
     #[must_use]
     pub fn new(bytes: Vec<u8>) -> Self {
         Self { bytes }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::bolts::rands::{Rand, StdRand};
-
-    #[test]
-    fn test_input() {
-        let mut rand = StdRand::with_seed(0);
-        assert_ne!(rand.next(), rand.next());
-        assert!(rand.below(100) < 100);
-        assert_eq!(rand.below(1), 0);
-        assert_eq!(rand.between(10, 10), 10);
-        assert!(rand.between(11, 20) > 10);
     }
 }

@@ -1,32 +1,13 @@
-//! special handling to build and link libafl
-
-use rustc_version::{version_meta, Channel};
-
-#[allow(clippy::ptr_arg, clippy::upper_case_acronyms)]
+#[rustversion::nightly]
 fn main() {
-    #[cfg(target_os = "windows")]
-    #[allow(clippy::ptr_arg, clippy::upper_case_acronyms)]
-    windows::build!(
-        windows::win32::system_services::{HANDLE, BOOL, PAGE_TYPE, PSTR, ExitProcess},
-        windows::win32::windows_programming::CloseHandle,
-        // API needed for the shared memory
-        windows::win32::system_services::{CreateFileMappingA, OpenFileMappingA, MapViewOfFile, UnmapViewOfFile},
-        windows::win32::debug::{SetUnhandledExceptionFilter, EXCEPTION_POINTERS, EXCEPTION_RECORD, LPTOP_LEVEL_EXCEPTION_FILTER}
-    );
+    println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rustc-cfg=unstable_feature");
+}
 
-    // Set cfg flags depending on release channel
-    match version_meta().unwrap().channel {
-        Channel::Stable => {
-            println!("cargo:rustc-cfg=RUSTC_IS_STABLE");
-        }
-        Channel::Beta => {
-            println!("cargo:rustc-cfg=RUSTC_IS_BETA");
-        }
-        Channel::Nightly => {
-            println!("cargo:rustc-cfg=RUSTC_IS_NIGHTLY");
-        }
-        Channel::Dev => {
-            println!("cargo:rustc-cfg=RUSTC_IS_DEV");
-        }
+#[rustversion::not(nightly)]
+fn main() {
+    println!("cargo:rerun-if-changed=build.rs");
+    if cfg!(feature = "nautilus") {
+        panic!("The 'nautilus' feature of libafl requires a nightly compiler");
     }
 }

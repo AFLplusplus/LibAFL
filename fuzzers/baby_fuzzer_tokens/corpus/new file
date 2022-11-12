@@ -1,0 +1,4 @@
+fn pippo(v) { return "hello world " + v; }
+var a = 666;
+name = "scozzo" + a;
+pippo(name);

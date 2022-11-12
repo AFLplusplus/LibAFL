@@ -1,7 +1,12 @@
 //! A libfuzzer-like fuzzer with llmp-multithreading support and restarts
 //! The example harness is built for libpng.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
 use core::time::Duration;
+#[cfg(feature = "crash")]
+use std::ptr;
 use std::{env, path::PathBuf};
 
 use libafl::{
@@ -9,29 +14,28 @@ use libafl::{
         current_nanos,
         rands::StdRand,
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
-    corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        PowerQueueCorpusScheduler,
-    },
-    events::{setup_restarting_mgr_std, EventRestarter},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    events::{setup_restarting_mgr_std, EventConfig, EventRestarter},
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
-    stages::{
-        calibrate::CalibrationStage,
-        power::{PowerMutationalStage, PowerSchedule},
+    monitors::MultiMonitor,
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
     },
+    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
+    },
+    stages::{calibrate::CalibrationStage, power::StdPowerMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
     Error,
 };
-
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
 
 /// The main fn, `no_mangle` as it is a C main
@@ -55,13 +59,14 @@ pub fn libafl_main() {
 }
 
 /// The actual fuzzer
+#[cfg(not(test))]
 fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{}", s));
 
     // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
     let (state, mut restarting_mgr) =
-        match setup_restarting_mgr_std(stats, broker_port, "default".into()) {
+        match setup_restarting_mgr_std(monitor, broker_port, EventConfig::AlwaysUnique) {
             Ok(res) => res,
             Err(err) => match err {
                 Error::ShuttingDown => {
@@ -80,20 +85,21 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        map_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+    let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
     // If not restarting, create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -106,16 +112,19 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(feedback_state),
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
         )
+        .unwrap()
     });
 
     println!("We're a client, let's fuzz :)");
 
     // Create a PNG dictionary if not existing
     if state.metadata().get::<Tokens>().is_none() {
-        state.add_metadata(Tokens::new(vec![
+        state.add_metadata(Tokens::from([
             vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
             "IHDR".as_bytes().to_vec(),
             "IDAT".as_bytes().to_vec(),
@@ -128,13 +137,14 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
 
     let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
 
-    let calibration = CalibrationStage::new(&mut state, &edges_observer);
-    let power = PowerMutationalStage::new(mutator, PowerSchedule::FAST, &edges_observer);
+    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
 
     let mut stages = tuple_list!(calibration, power);
 
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(PowerQueueCorpusScheduler::new());
+    let scheduler = IndexesLenTimeMinimizerScheduler::new(StdWeightedScheduler::with_schedule(
+        PowerSchedule::FAST,
+    ));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -143,6 +153,14 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
         let buf = target.as_slice();
+        #[cfg(feature = "crash")]
+        if buf.len() > 4 && buf[4] == 0 {
+            unsafe {
+                eprintln!("Crashing (for testing purposes)");
+                let addr = ptr::null_mut();
+                *addr = 1;
+            }
+        }
         libfuzzer_test_one_input(buf);
         ExitKind::Ok
     };
@@ -182,8 +200,8 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
     let iters = 1_000_000;
     fuzzer.fuzz_loop_for(
         &mut stages,
-        &mut state,
         &mut executor,
+        &mut state,
         &mut restarting_mgr,
         iters,
     )?;

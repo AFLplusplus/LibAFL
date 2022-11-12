@@ -1,9 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use clap::{App, Arg};
 use core::{cell::RefCell, time::Duration};
-#[cfg(unix)]
-use nix::{self, unistd::dup};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -14,6 +11,7 @@ use std::{
     process,
 };
 
+use clap::{Arg, Command};
 use libafl::{
     bolts::{
         current_nanos, current_time,
@@ -21,50 +19,71 @@ use libafl::{
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
-    corpus::{Corpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus, QueueCorpusScheduler},
+    corpus::{Corpus, OnDiskCorpus},
     events::SimpleRestartingEventManager,
     executors::{ExitKind, ShadowExecutor, TimeoutExecutor},
-    feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedback_or,
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::{
-        scheduled::{havoc_mutations, StdScheduledMutator},
-        tokens_mutations, I2SRandReplace, Tokens,
+        scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
+        StdMOptMutator, StdScheduledMutator, Tokens,
     },
     observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
-    stages::{ShadowTracingStage, StdMutationalStage},
+    schedulers::{
+        powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, PowerQueueScheduler,
+    },
+    stages::{
+        calibrate::CalibrationStage, power::StdPowerMutationalStage, ShadowTracingStage,
+        StdMutationalStage,
+    },
     state::{HasCorpus, HasMetadata, StdState},
-    stats::SimpleStats,
     Error,
 };
 use libafl_qemu::{
-    amd64::Amd64Regs, elf::EasyElf, emu, filter_qemu_args, hooks, hooks::CmpLogObserver, MmapPerms,
+    //asan::{init_with_asan, QemuAsanHelper},
+    cmplog,
+    cmplog::{CmpLogObserver, QemuCmpLogHelper},
+    edges,
+    edges::QemuEdgeCoverageHelper,
+    elf::EasyElf,
+    emu::Emulator,
+    filter_qemu_args,
+    hooks::QemuHooks,
+    //snapshot::QemuSnapshotHelper,
+    MmapPerms,
     QemuExecutor,
+    Regs,
 };
+#[cfg(unix)]
+use nix::{self, unistd::dup};
 
-/// The fuzzer main (as `no_mangle` C function)
-#[no_mangle]
-pub fn libafl_qemu_main() {
+pub const MAX_INPUT_SIZE: usize = 1048576; // 1MB
+
+/// The fuzzer main
+pub fn main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match App::new("libafl_qemu_fuzzbench")
-        .version("0.4.0")
+    let res = match Command::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
         .arg(
             Arg::new("out")
-                .about("The directory to place finds in ('corpus')")
+                .help("The directory to place finds in ('corpus')")
                 .long("libafl-out")
                 .required(true)
                 .takes_value(true),
         )
         .arg(
             Arg::new("in")
-                .about("The directory to read initial inputs from ('seeds')")
+                .help("The directory to read initial inputs from ('seeds')")
                 .long("libafl-in")
                 .required(true)
                 .takes_value(true),
@@ -72,19 +91,19 @@ pub fn libafl_qemu_main() {
         .arg(
             Arg::new("tokens")
                 .long("libafl-tokens")
-                .about("A file to read tokens from, to be used during fuzzing")
+                .help("A file to read tokens from, to be used during fuzzing")
                 .takes_value(true),
         )
         .arg(
             Arg::new("logfile")
                 .long("libafl-logfile")
-                .about("Duplicates all output to this file")
+                .help("Duplicates all output to this file")
                 .default_value("libafl.log"),
         )
         .arg(
             Arg::new("timeout")
                 .long("libafl-timeout")
-                .about("Timeout for each individual execution, in milliseconds")
+                .help("Timeout for each individual execution, in milliseconds")
                 .default_value("1000"),
         )
         .try_get_matches_from(filter_qemu_args())
@@ -96,7 +115,7 @@ pub fn libafl_qemu_main() {
                 env::current_exe()
                     .unwrap_or_else(|_| "fuzzer".into())
                     .to_string_lossy(),
-                err.info,
+                err,
             );
             return;
         }
@@ -108,7 +127,7 @@ pub fn libafl_qemu_main() {
     );
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
-    let mut out_dir = PathBuf::from(res.value_of("out").unwrap().to_string());
+    let mut out_dir = PathBuf::from(res.get_one::<String>("out").unwrap().to_string());
     if fs::create_dir(&out_dir).is_err() {
         println!("Out dir at {:?} already exists.", &out_dir);
         if !out_dir.is_dir() {
@@ -120,18 +139,18 @@ pub fn libafl_qemu_main() {
     crashes.push("crashes");
     out_dir.push("queue");
 
-    let in_dir = PathBuf::from(res.value_of("in").unwrap().to_string());
+    let in_dir = PathBuf::from(res.get_one::<String>("in").unwrap().to_string());
     if !in_dir.is_dir() {
         println!("In dir at {:?} is not a valid directory!", &in_dir);
         return;
     }
 
-    let tokens = res.value_of("tokens").map(PathBuf::from);
+    let tokens = res.get_one::<String>("tokens").map(PathBuf::from);
 
-    let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
+    let logfile = PathBuf::from(res.get_one::<String>("logfile").unwrap().to_string());
 
     let timeout = Duration::from_millis(
-        res.value_of("timeout")
+        res.get_one::<String>("timeout")
             .unwrap()
             .to_string()
             .parse()
@@ -151,34 +170,40 @@ fn fuzz(
     logfile: PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
+    env::remove_var("LD_LIBRARY_PATH");
+
+    let args: Vec<String> = env::args().collect();
+    let env: Vec<(String, String)> = env::vars().collect();
+    let emu = Emulator::new(&args, &env);
+    //let emu = init_with_asan(&mut args, &mut env);
+
     let mut elf_buffer = Vec::new();
-    let elf = EasyElf::from_file(emu::binary_path(), &mut elf_buffer)?;
+    let elf = EasyElf::from_file(emu.binary_path(), &mut elf_buffer)?;
 
     let test_one_input_ptr = elf
-        .resolve_symbol("LLVMFuzzerTestOneInput", emu::load_addr())
+        .resolve_symbol("LLVMFuzzerTestOneInput", emu.load_addr())
         .expect("Symbol LLVMFuzzerTestOneInput not found");
     println!("LLVMFuzzerTestOneInput @ {:#x}", test_one_input_ptr);
 
-    emu::set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu::run();
+    emu.set_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    unsafe { emu.run() };
 
-    println!(
-        "Break at {:#x}",
-        emu::read_reg::<_, u64>(Amd64Regs::Rip).unwrap()
-    );
+    println!("Break at {:#x}", emu.read_reg::<_, u64>(Regs::Rip).unwrap());
 
-    let stack_ptr: u64 = emu::read_reg(Amd64Regs::Rsp).unwrap();
-    let mut ret_addr = [0u64];
-    emu::read_mem(stack_ptr, &mut ret_addr);
-    let ret_addr = ret_addr[0];
+    let stack_ptr: u64 = emu.read_reg(Regs::Rsp).unwrap();
+    let mut ret_addr = [0; 8];
+    unsafe { emu.read_mem(stack_ptr, &mut ret_addr) };
+    let ret_addr = u64::from_le_bytes(ret_addr);
 
     println!("Stack pointer = {:#x}", stack_ptr);
     println!("Return address = {:#x}", ret_addr);
 
-    emu::remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
-    emu::set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
+    emu.remove_breakpoint(test_one_input_ptr); // LLVMFuzzerTestOneInput
+    emu.set_breakpoint(ret_addr); // LLVMFuzzerTestOneInput ret addr
 
-    let input_addr = emu::map_private(0, 4096, MmapPerms::ReadWrite).unwrap();
+    let input_addr = emu
+        .map_private(0, MAX_INPUT_SIZE, MmapPerms::ReadWrite)
+        .unwrap();
     println!("Placing input at {:#x}", input_addr);
 
     let log = RefCell::new(
@@ -197,7 +222,7 @@ fn fuzz(
     let file_null = File::open("/dev/null")?;
 
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let stats = SimpleStats::new(|s| {
+    let monitor = SimpleMonitor::new(|s| {
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
         #[cfg(windows)]
@@ -207,7 +232,8 @@ fn fuzz(
 
     let mut shmem_provider = StdShMemProvider::new()?;
 
-    let (state, mut mgr) = match SimpleRestartingEventManager::launch(stats, &mut shmem_provider) {
+    let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
+    {
         // The restarting state will spawn the same process again as child, then restarted it each time it crashes.
         Ok(res) => res,
         Err(err) => match err {
@@ -221,8 +247,8 @@ fn fuzz(
     };
 
     // Create an observation channel using the coverage map
-    let edges = unsafe { &mut hooks::EDGES_MAP };
-    let edges_counter = unsafe { &mut hooks::MAX_EDGES_NUM };
+    let edges = unsafe { &mut edges::EDGES_MAP };
+    let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
     let edges_observer =
         HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
 
@@ -230,22 +256,23 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut hooks::CMPLOG_MAP }, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", unsafe { &mut cmplog::CMPLOG_MAP }, true);
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&edges_observer);
+    let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
+
+    let calibration = CalibrationStage::new(&map_feedback);
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR
-    let feedback = feedback_or!(
+    let mut feedback = feedback_or!(
         // New maximization map feedback linked to the edges observer and the feedback state
-        MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+        map_feedback,
         // Time feedback, this one does not need a feedback state
         TimeFeedback::new_with_observer(&time_observer)
     );
 
     // A feedback to choose if an input is a solution or not
-    let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = state.unwrap_or_else(|| {
@@ -258,13 +285,30 @@ fn fuzz(
             // on disk so the user can get them after stopping the fuzzer
             OnDiskCorpus::new(objective_dir).unwrap(),
             // States of the feedbacks.
-            // They are the data related to the feedbacks that you want to persist in the State.
-            tuple_list!(feedback_state),
+            // The feedbacks can report the data that should persist in the State.
+            &mut feedback,
+            // Same for objective feedbacks
+            &mut objective,
         )
+        .unwrap()
     });
 
+    // Setup a randomic Input2State stage
+    let i2s = StdMutationalStage::new(StdScheduledMutator::new(tuple_list!(I2SRandReplace::new())));
+
+    // Setup a MOPT mutator
+    let mutator = StdMOptMutator::new(
+        &mut state,
+        havoc_mutations().merge(tokens_mutations()),
+        7,
+        5,
+    )?;
+
+    let power = StdPowerMutationalStage::new(mutator, &edges_observer);
+
     // A minimization+queue policy to get testcasess from the corpus
-    let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+    let scheduler =
+        IndexesLenTimeMinimizerScheduler::new(PowerQueueScheduler::new(PowerSchedule::FAST));
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -274,39 +318,43 @@ fn fuzz(
         let target = input.target_bytes();
         let mut buf = target.as_slice();
         let mut len = buf.len();
-        if len > 4096 {
-            buf = &buf[0..4096];
-            len = 4096;
+        if len > MAX_INPUT_SIZE {
+            buf = &buf[0..MAX_INPUT_SIZE];
+            len = MAX_INPUT_SIZE;
         }
 
-        emu::write_mem(input_addr, buf);
+        unsafe {
+            emu.write_mem(input_addr, buf);
 
-        emu::write_reg(Amd64Regs::Rdi, input_addr).unwrap();
-        emu::write_reg(Amd64Regs::Rsi, len).unwrap();
-        emu::write_reg(Amd64Regs::Rip, test_one_input_ptr).unwrap();
-        emu::write_reg(Amd64Regs::Rsp, stack_ptr).unwrap();
+            emu.write_reg(Regs::Rdi, input_addr).unwrap();
+            emu.write_reg(Regs::Rsi, len).unwrap();
+            emu.write_reg(Regs::Rip, test_one_input_ptr).unwrap();
+            emu.write_reg(Regs::Rsp, stack_ptr).unwrap();
 
-        emu::run();
+            emu.run();
+        }
 
         ExitKind::Ok
     };
 
+    let mut hooks = QemuHooks::new(
+        &emu,
+        tuple_list!(
+            QemuEdgeCoverageHelper::default(),
+            QemuCmpLogHelper::default(),
+            //QemuAsanHelper::default(),
+            //QemuSnapshotHelper::new()
+        ),
+    );
+
     let executor = QemuExecutor::new(
+        &mut hooks,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,
         &mut state,
         &mut mgr,
     )?;
-
-    // Track edge coverage
-    executor.hook_edge_generation(hooks::gen_unique_edge_ids);
-    executor.hook_edge_execution(hooks::trace_edge_hitcount);
-    // Track 2-4-8 cmps with CmpLog
-    executor.hook_cmp_generation(hooks::gen_unique_cmp_ids);
-    executor.hook_cmp8_execution(hooks::trace_cmp8_cmplog);
-    executor.hook_cmp4_execution(hooks::trace_cmp4_cmplog);
-    executor.hook_cmp2_execution(hooks::trace_cmp2_cmplog);
 
     // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
     let executor = TimeoutExecutor::new(executor, timeout);
@@ -316,7 +364,7 @@ fn fuzz(
     // Read tokens
     if let Some(tokenfile) = tokenfile {
         if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::from_tokens_file(tokenfile)?);
+            state.add_metadata(Tokens::from_file(tokenfile)?);
         }
     }
 
@@ -332,13 +380,8 @@ fn fuzz(
 
     let tracing = ShadowTracingStage::new(&mut executor);
 
-    // Setup a randomic Input2State stage
-    let i2s = StdMutationalStage::new(I2SRandReplace::new());
-
-    // Setup a mutational stage with a basic bytes mutator
-    let mutator = StdScheduledMutator::new(havoc_mutations().merge(tokens_mutations()));
-
-    let mut stages = tuple_list!(tracing, i2s, StdMutationalStage::new(mutator));
+    // The order of the stages matter!
+    let mut stages = tuple_list!(calibration, tracing, i2s, power);
 
     // Remove target ouput (logs still survive)
     #[cfg(unix)]

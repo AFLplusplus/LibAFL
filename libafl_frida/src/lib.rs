@@ -3,12 +3,76 @@ The frida executor is a binary-only mode for `LibAFL`.
 It can report coverage and, on supported architecutres, even reports memory access errors.
 */
 
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
+#![deny(clippy::pedantic)]
+#![allow(
+    clippy::unreadable_literal,
+    clippy::type_repetition_in_bounds,
+    clippy::missing_errors_doc,
+    clippy::cast_possible_truncation,
+    clippy::used_underscore_binding,
+    clippy::ptr_as_ptr,
+    clippy::missing_panics_doc,
+    clippy::missing_docs_in_private_items,
+    clippy::module_name_repetitions,
+    clippy::unreadable_literal
+)]
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    missing_docs,
+    //unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        private_in_public,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+
 /// The frida-asan allocator
+#[cfg(unix)]
 pub mod alloc;
-/// Handling of ASAN errors
-pub mod asan_errors;
-/// The frida address sanitizer runtime
-pub mod asan_rt;
+
+#[cfg(unix)]
+pub mod asan;
+
+#[cfg(windows)]
+/// Windows specific hooks to catch __fastfail like exceptions with Frida, see https://github.com/AFLplusplus/LibAFL/issues/395 for more details
+pub mod windows_hooks;
+
+pub mod coverage_rt;
 
 /// Hooking thread lifecycle events. Seems like this is apple-only for now.
 #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -21,10 +85,17 @@ pub mod cmplog_rt;
 /// The `LibAFL` firda helper
 pub mod helper;
 
+pub mod drcov_rt;
+
+/// The frida executor
+pub mod executor;
+
+/// Utilities
+#[cfg(unix)]
+pub mod utils;
+
 // for parsing asan and cmplog cores
-use libafl::bolts::os::parse_core_bind_arg;
-// for getting current core_id
-use core_affinity::get_core_ids;
+use libafl::bolts::core_affinity::{get_core_ids, CoreId, Cores};
 
 /// A representation of the various Frida options
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -35,6 +106,7 @@ pub struct FridaOptions {
     enable_asan_continue_after_error: bool,
     enable_asan_allocation_backtraces: bool,
     asan_max_allocation: usize,
+    asan_max_total_allocation: usize,
     asan_max_allocation_panics: bool,
     enable_coverage: bool,
     enable_drcov: bool,
@@ -43,7 +115,7 @@ pub struct FridaOptions {
 }
 
 impl FridaOptions {
-    /// Parse the frida options from the [`LIBAFL_FRIDA_OPTIONS`] environment variable.
+    /// Parse the frida options from the "`LIBAFL_FRIDA_OPTIONS`" environment variable.
     ///
     /// Options are `:` separated, and each options is a `name=value` string.
     ///
@@ -64,10 +136,6 @@ impl FridaOptions {
                 match name {
                     "asan" => {
                         options.enable_asan = value.parse().unwrap();
-                        #[cfg(not(target_arch = "aarch64"))]
-                        if options.enable_asan {
-                            panic!("ASAN is not currently supported on targets other than aarch64");
-                        }
                     }
                     "asan-detect-leaks" => {
                         options.enable_asan_leak_detection = value.parse().unwrap();
@@ -81,11 +149,14 @@ impl FridaOptions {
                     "asan-max-allocation" => {
                         options.asan_max_allocation = value.parse().unwrap();
                     }
+                    "asan-max-total-allocation" => {
+                        options.asan_max_total_allocation = value.parse().unwrap();
+                    }
                     "asan-max-allocation-panics" => {
                         options.asan_max_allocation_panics = value.parse().unwrap();
                     }
                     "asan-cores" => {
-                        asan_cores = parse_core_bind_arg(value);
+                        asan_cores = Cores::from_cmdline(value).ok();
                     }
                     "instrument-suppress-locations" => {
                         options.instrument_suppress_locations = Some(
@@ -114,30 +185,28 @@ impl FridaOptions {
                     "drcov" => {
                         options.enable_drcov = value.parse().unwrap();
                         #[cfg(not(target_arch = "aarch64"))]
-                        if options.enable_drcov {
-                            panic!(
-                                "DrCov is not currently supported on targets other than aarch64"
-                            );
-                        }
+                        assert!(
+                            !options.enable_drcov,
+                            "DrCov is not currently supported on targets other than aarch64"
+                        );
                     }
                     "cmplog" => {
                         options.enable_cmplog = value.parse().unwrap();
                         #[cfg(not(target_arch = "aarch64"))]
-                        if options.enable_cmplog {
-                            panic!(
-                                "cmplog is not currently supported on targets other than aarch64"
-                            );
-                        }
+                        assert!(
+                            !options.enable_cmplog,
+                            "cmplog is not currently supported on targets other than aarch64"
+                        );
 
-                        if !cfg!(feature = "cmplog") && options.enable_cmplog {
-                            panic!("cmplog feature is disabled!");
+                        if options.enable_cmplog {
+                            assert!(cfg!(feature = "cmplog"), "cmplog feature is disabled!");
                         }
                     }
                     "cmplog-cores" => {
-                        cmplog_cores = parse_core_bind_arg(value);
+                        cmplog_cores = Cores::from_cmdline(value).ok();
                     }
                     _ => {
-                        panic!("unknown FRIDA option: '{}'", option);
+                        panic!("unknown FRIDA option: '{option}'");
                     }
                 }
             } // end of for loop
@@ -150,8 +219,8 @@ impl FridaOptions {
                         1,
                         "Client should only be bound to a single core"
                     );
-                    let core_id = core_ids[0].id;
-                    options.enable_asan = asan_cores.contains(&core_id);
+                    let core_id: CoreId = core_ids[0];
+                    options.enable_asan = asan_cores.ids.contains(&core_id);
                 }
             }
             if options.enable_cmplog {
@@ -162,8 +231,8 @@ impl FridaOptions {
                         1,
                         "Client should only be bound to a single core"
                     );
-                    let core_id = core_ids[0].id;
-                    options.enable_cmplog = cmplog_cores.contains(&core_id);
+                    let core_id = core_ids[0];
+                    options.enable_cmplog = cmplog_cores.ids.contains(&core_id);
                 }
             }
         }
@@ -212,6 +281,13 @@ impl FridaOptions {
         self.asan_max_allocation
     }
 
+    /// The maximum total allocation size that the ASAN allocator should allocate
+    #[must_use]
+    #[inline]
+    pub fn asan_max_total_allocation(&self) -> usize {
+        self.asan_max_total_allocation
+    }
+
     /// Should we panic if the max ASAN allocation size is exceeded
     #[must_use]
     #[inline]
@@ -254,8 +330,9 @@ impl Default for FridaOptions {
             enable_asan: false,
             enable_asan_leak_detection: false,
             enable_asan_continue_after_error: false,
-            enable_asan_allocation_backtraces: true,
+            enable_asan_allocation_backtraces: false,
             asan_max_allocation: 1 << 30,
+            asan_max_total_allocation: 1 << 32,
             asan_max_allocation_panics: false,
             enable_coverage: true,
             enable_drcov: false,

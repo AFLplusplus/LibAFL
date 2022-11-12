@@ -1,22 +1,27 @@
 //! Exception handling for Windows
 
-pub use crate::bolts::bindings::windows::win32::debug::{
-    SetUnhandledExceptionFilter, EXCEPTION_POINTERS,
-};
-use crate::Error;
-use std::os::raw::{c_long, c_void};
-
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
-    convert::TryFrom,
     fmt::{self, Display, Formatter},
     ptr,
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+use std::os::raw::{c_long, c_void};
 
-use num_enum::{IntoPrimitive, TryFromPrimitive};
+use num_enum::TryFromPrimitive;
+pub use windows::Win32::{
+    Foundation::NTSTATUS,
+    System::{
+        Diagnostics::Debug::{
+            AddVectoredExceptionHandler, UnhandledExceptionFilter, EXCEPTION_POINTERS,
+        },
+        Threading::{IsProcessorFeaturePresent, PROCESSOR_FEATURE_ID},
+    },
+};
+
+use crate::Error;
 
 //const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
@@ -34,55 +39,56 @@ pub const SIGABRT: i32 = 22;
 pub const SIGABRT2: i32 = 22;
 
 // From https://github.com/wine-mirror/wine/blob/master/include/winnt.h#L611
-pub const STATUS_WAIT_0: u32 = 0x00000000;
-pub const STATUS_ABANDONED_WAIT_0: u32 = 0x00000080;
-pub const STATUS_USER_APC: u32 = 0x000000C0;
-pub const STATUS_TIMEOUT: u32 = 0x00000102;
-pub const STATUS_PENDING: u32 = 0x00000103;
-pub const STATUS_SEGMENT_NOTIFICATION: u32 = 0x40000005;
-pub const STATUS_FATAL_APP_EXIT: u32 = 0x40000015;
-pub const STATUS_GUARD_PAGE_VIOLATION: u32 = 0x80000001;
-pub const STATUS_DATATYPE_MISALIGNMENT: u32 = 0x80000002;
-pub const STATUS_BREAKPOINT: u32 = 0x80000003;
-pub const STATUS_SINGLE_STEP: u32 = 0x80000004;
-pub const STATUS_LONGJUMP: u32 = 0x80000026;
-pub const STATUS_UNWIND_CONSOLIDATE: u32 = 0x80000029;
-pub const STATUS_ACCESS_VIOLATION: u32 = 0xC0000005;
-pub const STATUS_IN_PAGE_ERROR: u32 = 0xC0000006;
-pub const STATUS_INVALID_HANDLE: u32 = 0xC0000008;
-pub const STATUS_NO_MEMORY: u32 = 0xC0000017;
-pub const STATUS_ILLEGAL_INSTRUCTION: u32 = 0xC000001D;
-pub const STATUS_NONCONTINUABLE_EXCEPTION: u32 = 0xC0000025;
-pub const STATUS_INVALID_DISPOSITION: u32 = 0xC0000026;
-pub const STATUS_ARRAY_BOUNDS_EXCEEDED: u32 = 0xC000008C;
-pub const STATUS_FLOAT_DENORMAL_OPERAND: u32 = 0xC000008D;
-pub const STATUS_FLOAT_DIVIDE_BY_ZERO: u32 = 0xC000008E;
-pub const STATUS_FLOAT_INEXACT_RESULT: u32 = 0xC000008F;
-pub const STATUS_FLOAT_INVALID_OPERATION: u32 = 0xC0000090;
-pub const STATUS_FLOAT_OVERFLOW: u32 = 0xC0000091;
-pub const STATUS_FLOAT_STACK_CHECK: u32 = 0xC0000092;
-pub const STATUS_FLOAT_UNDERFLOW: u32 = 0xC0000093;
-pub const STATUS_INTEGER_DIVIDE_BY_ZERO: u32 = 0xC0000094;
-pub const STATUS_INTEGER_OVERFLOW: u32 = 0xC0000095;
-pub const STATUS_PRIVILEGED_INSTRUCTION: u32 = 0xC0000096;
-pub const STATUS_STACK_OVERFLOW: u32 = 0xC00000FD;
-pub const STATUS_DLL_NOT_FOUND: u32 = 0xC0000135;
-pub const STATUS_ORDINAL_NOT_FOUND: u32 = 0xC0000138;
-pub const STATUS_ENTRYPOINT_NOT_FOUND: u32 = 0xC0000139;
-pub const STATUS_CONTROL_C_EXIT: u32 = 0xC000013A;
-pub const STATUS_DLL_INIT_FAILED: u32 = 0xC0000142;
-pub const STATUS_FLOAT_MULTIPLE_FAULTS: u32 = 0xC00002B4;
-pub const STATUS_FLOAT_MULTIPLE_TRAPS: u32 = 0xC00002B5;
-pub const STATUS_REG_NAT_CONSUMPTION: u32 = 0xC00002C9;
-pub const STATUS_HEAP_CORRUPTION: u32 = 0xC0000374;
-pub const STATUS_STACK_BUFFER_OVERRUN: u32 = 0xC0000409;
-pub const STATUS_INVALID_CRUNTIME_PARAMETER: u32 = 0xC0000417;
-pub const STATUS_ASSERTION_FAILURE: u32 = 0xC0000420;
-pub const STATUS_SXS_EARLY_DEACTIVATION: u32 = 0xC015000F;
-pub const STATUS_SXS_INVALID_DEACTIVATION: u32 = 0xC0150010;
+pub const STATUS_WAIT_0: i32 = 0x00000000;
+pub const STATUS_ABANDONED_WAIT_0: i32 = 0x00000080;
+pub const STATUS_USER_APC: i32 = 0x000000C0;
+pub const STATUS_TIMEOUT: i32 = 0x00000102;
+pub const STATUS_PENDING: i32 = 0x00000103;
+pub const STATUS_SEGMENT_NOTIFICATION: i32 = 0x40000005;
+pub const STATUS_FATAL_APP_EXIT: i32 = 0x40000015;
+pub const STATUS_GUARD_PAGE_VIOLATION: i32 = 0x80000001;
+pub const STATUS_DATATYPE_MISALIGNMENT: i32 = 0x80000002;
+pub const STATUS_BREAKPOINT: i32 = 0x80000003;
+pub const STATUS_SINGLE_STEP: i32 = 0x80000004;
+pub const STATUS_LONGJUMP: i32 = 0x80000026;
+pub const STATUS_UNWIND_CONSOLIDATE: i32 = 0x80000029;
+pub const STATUS_ACCESS_VIOLATION: i32 = 0xC0000005;
+pub const STATUS_IN_PAGE_ERROR: i32 = 0xC0000006;
+pub const STATUS_INVALID_HANDLE: i32 = 0xC0000008;
+pub const STATUS_NO_MEMORY: i32 = 0xC0000017;
+pub const STATUS_ILLEGAL_INSTRUCTION: i32 = 0xC000001D;
+pub const STATUS_NONCONTINUABLE_EXCEPTION: i32 = 0xC0000025;
+pub const STATUS_INVALID_DISPOSITION: i32 = 0xC0000026;
+pub const STATUS_ARRAY_BOUNDS_EXCEEDED: i32 = 0xC000008C;
+pub const STATUS_FLOAT_DENORMAL_OPERAND: i32 = 0xC000008D;
+pub const STATUS_FLOAT_DIVIDE_BY_ZERO: i32 = 0xC000008E;
+pub const STATUS_FLOAT_INEXACT_RESULT: i32 = 0xC000008F;
+pub const STATUS_FLOAT_INVALID_OPERATION: i32 = 0xC0000090;
+pub const STATUS_FLOAT_OVERFLOW: i32 = 0xC0000091;
+pub const STATUS_FLOAT_STACK_CHECK: i32 = 0xC0000092;
+pub const STATUS_FLOAT_UNDERFLOW: i32 = 0xC0000093;
+pub const STATUS_INTEGER_DIVIDE_BY_ZERO: i32 = 0xC0000094;
+pub const STATUS_INTEGER_OVERFLOW: i32 = 0xC0000095;
+pub const STATUS_PRIVILEGED_INSTRUCTION: i32 = 0xC0000096;
+pub const STATUS_STACK_OVERFLOW: i32 = 0xC00000FD;
+pub const STATUS_DLL_NOT_FOUND: i32 = 0xC0000135;
+pub const STATUS_ORDINAL_NOT_FOUND: i32 = 0xC0000138;
+pub const STATUS_ENTRYPOINT_NOT_FOUND: i32 = 0xC0000139;
+pub const STATUS_CONTROL_C_EXIT: i32 = 0xC000013A;
+pub const STATUS_DLL_INIT_FAILED: i32 = 0xC0000142;
+pub const STATUS_FLOAT_MULTIPLE_FAULTS: i32 = 0xC00002B4;
+pub const STATUS_FLOAT_MULTIPLE_TRAPS: i32 = 0xC00002B5;
+pub const STATUS_REG_NAT_CONSUMPTION: i32 = 0xC00002C9;
+pub const STATUS_HEAP_CORRUPTION: i32 = 0xC0000374;
+pub const STATUS_STACK_BUFFER_OVERRUN: i32 = 0xC0000409;
+pub const STATUS_INVALID_CRUNTIME_PARAMETER: i32 = 0xC0000417;
+pub const STATUS_ASSERTION_FAILURE: i32 = 0xC0000420;
+pub const STATUS_SXS_EARLY_DEACTIVATION: i32 = 0xC015000F;
+pub const STATUS_SXS_INVALID_DEACTIVATION: i32 = 0xC0150010;
+pub const STATUS_NOT_IMPLEMENTED: i32 = 0xC0000002;
 
-#[derive(IntoPrimitive, TryFromPrimitive, Clone, Copy)]
-#[repr(u32)]
+#[derive(Debug, TryFromPrimitive, Clone, Copy)]
+#[repr(i32)]
 pub enum ExceptionCode {
     // From https://docs.microsoft.com/en-us/windows/win32/debug/getexceptioncode
     AccessViolation = STATUS_ACCESS_VIOLATION,
@@ -131,6 +137,9 @@ pub enum ExceptionCode {
     AssertionFailure = STATUS_ASSERTION_FAILURE,
     SXSEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
     SXSInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
+    NotImplemented = STATUS_NOT_IMPLEMENTED,
+    #[num_enum(default)]
+    Other,
 }
 
 pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
@@ -152,7 +161,7 @@ pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
 
 impl PartialEq for ExceptionCode {
     fn eq(&self, other: &Self) -> bool {
-        *self as u32 == *other as u32
+        *self as i32 == *other as i32
     }
 }
 
@@ -205,18 +214,20 @@ impl Display for ExceptionCode {
             ExceptionCode::HeapCorruption => write!(f, "STATUS_HEAP_CORRUPTION")?,
             ExceptionCode::StackBufferOverrun => write!(f, "STATUS_STACK_BUFFER_OVERRUN")?,
             ExceptionCode::InvalidCRuntimeParameter => {
-                write!(f, "STATUS_INVALID_CRUNTIME_PARAMETER")?
+                write!(f, "STATUS_INVALID_CRUNTIME_PARAMETER")?;
             }
             ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE")?,
             ExceptionCode::SXSEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION")?,
             ExceptionCode::SXSInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION")?,
+            ExceptionCode::NotImplemented => write!(f, "STATUS_NOT_IMPLEMENTED")?,
+            ExceptionCode::Other => write!(f, "Other/User defined exception")?,
         };
 
         Ok(())
     }
 }
 
-pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 45] = [
+pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 47] = [
     ExceptionCode::AccessViolation,
     ExceptionCode::ArrayBoundsExceeded,
     ExceptionCode::Breakpoint,
@@ -262,6 +273,8 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 45] = [
     ExceptionCode::AssertionFailure,
     ExceptionCode::SXSEarlyDeactivation,
     ExceptionCode::SXSInvalidDeactivation,
+    ExceptionCode::NotImplemented,
+    ExceptionCode::Other,
 ];
 
 pub trait Handler {
@@ -307,26 +320,22 @@ unsafe fn internal_handle_exception(
     }
 }
 
-type NativeHandlerType = extern "system" fn(*mut EXCEPTION_POINTERS) -> c_long;
-static mut PREVIOUS_HANDLER: Option<NativeHandlerType> = None;
-
-/// Internal function that is being called whenever an exception arrives (stdcall).
-unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_POINTERS) -> c_long {
+/// Function that is being called whenever an exception arrives (stdcall).
+/// # Safety
+/// This function is unsafe because it is called by the OS
+pub unsafe extern "system" fn handle_exception(
+    exception_pointers: *mut EXCEPTION_POINTERS,
+) -> c_long {
     let code = exception_pointers
         .as_mut()
         .unwrap()
-        .exception_record
+        .ExceptionRecord
         .as_mut()
         .unwrap()
-        .exception_code;
-    let exception_code = ExceptionCode::try_from(code).unwrap();
+        .ExceptionCode;
+    let exception_code = ExceptionCode::try_from(code.0).unwrap();
     // println!("Received {}", exception_code);
-    let ret = internal_handle_exception(exception_code, exception_pointers);
-    if let Some(prev_handler) = PREVIOUS_HANDLER {
-        prev_handler(exception_pointers)
-    } else {
-        ret
-    }
+    internal_handle_exception(exception_code, exception_pointers)
 }
 
 type NativeSignalHandlerType = unsafe extern "C" fn(i32);
@@ -364,10 +373,11 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     if catch_assertions {
         signal(SIGABRT, handle_signal);
     }
-    if let Some(prev) = SetUnhandledExceptionFilter(Some(core::mem::transmute(
-        handle_exception as *const c_void,
-    ))) {
-        PREVIOUS_HANDLER = Some(core::mem::transmute(prev as *const c_void));
-    }
+    // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
+    // See https://github.com/AFLplusplus/LibAFL/pull/403
+    AddVectoredExceptionHandler(
+        1,
+        Some(core::mem::transmute(handle_exception as *const c_void)),
+    );
     Ok(())
 }

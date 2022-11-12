@@ -1,260 +1,203 @@
-//! The Minimizer schedulers are a family of corpus schedulers that feed the fuzzer
-// with testcases only from a subset of the total corpus.
+//! Whole corpus minimizers, for reducing the number of samples/the total size/the average runtime
+//! of your corpus.
+
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{hash::Hash, marker::PhantomData};
+
+use hashbrown::{HashMap, HashSet};
+use num_traits::ToPrimitive;
+use z3::{ast::Bool, Config, Context, Optimize};
 
 use crate::{
-    bolts::{rands::Rand, serdeany::SerdeAny, AsSlice},
-    corpus::{Corpus, CorpusScheduler, Testcase},
-    feedbacks::MapIndexesMetadata,
-    inputs::{HasLen, Input},
-    state::{HasCorpus, HasMetadata, HasRand},
-    Error,
+    bolts::{
+        tuples::{MatchName, Named},
+        AsIter,
+    },
+    corpus::Corpus,
+    executors::{Executor, HasObservers},
+    observers::{MapObserver, ObserversTuple},
+    schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
+    state::{HasCorpus, HasMetadata, UsesState},
+    Error, HasScheduler,
 };
 
-use core::marker::PhantomData;
-use hashbrown::{HashMap, HashSet};
-use serde::{Deserialize, Serialize};
-
-/// Default probability to skip the non-favored values
-pub const DEFAULT_SKIP_NON_FAVORED_PROB: u64 = 95;
-
-/// A testcase metadata saying if a testcase is favored
-#[derive(Serialize, Deserialize)]
-pub struct IsFavoredMetadata {}
-
-crate::impl_serdeany!(IsFavoredMetadata);
-
-/// A state metadata holding a map of favoreds testcases for each map entry
-#[derive(Serialize, Deserialize)]
-pub struct TopRatedsMetadata {
-    /// map index -> corpus index
-    pub map: HashMap<usize, usize>,
-}
-
-crate::impl_serdeany!(TopRatedsMetadata);
-
-impl TopRatedsMetadata {
-    /// Creates a new [`struct@TopRatedsMetadata`]
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::default(),
-        }
-    }
-}
-
-impl Default for TopRatedsMetadata {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Compute the favor factor of a [`Testcase`]. Lower is better.
-pub trait FavFactor<I>
+/// `CorpusMinimizers` minimize corpora according to internal logic. See various implementations for
+/// details.
+pub trait CorpusMinimizer<E>
 where
-    I: Input,
+    E: UsesState,
+    E::State: HasCorpus,
 {
-    /// Computes the favor factor of a [`Testcase`]. Lower is better.
-    fn compute(testcase: &mut Testcase<I>) -> Result<u64, Error>;
-}
-
-/// Multiply the testcase size with the execution time.
-/// This favors small and quick testcases.
-pub struct LenTimeMulFavFactor<I>
-where
-    I: Input + HasLen,
-{
-    phantom: PhantomData<I>,
-}
-
-impl<I> FavFactor<I> for LenTimeMulFavFactor<I>
-where
-    I: Input + HasLen,
-{
-    fn compute(entry: &mut Testcase<I>) -> Result<u64, Error> {
-        // TODO maybe enforce entry.exec_time().is_some()
-        Ok(entry.exec_time().map_or(1, |d| d.as_millis()) as u64 * entry.cached_len()? as u64)
-    }
-}
-
-/// The [`MinimizerCorpusScheduler`] employs a genetic algorithm to compute a subset of the
-/// corpus that exercise all the requested features (e.g. all the coverage seen so far)
-/// prioritizing [`Testcase`]`s` using [`FavFactor`]
-pub struct MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
-where
-    CS: CorpusScheduler<I, S>,
-    F: FavFactor<I>,
-    I: Input,
-    M: AsSlice<usize> + SerdeAny,
-    S: HasCorpus<C, I> + HasMetadata,
-    C: Corpus<I>,
-{
-    base: CS,
-    skip_non_favored_prob: u64,
-    phantom: PhantomData<(C, F, I, M, R, S)>,
-}
-
-impl<C, CS, F, I, M, R, S> CorpusScheduler<I, S> for MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
-where
-    CS: CorpusScheduler<I, S>,
-    F: FavFactor<I>,
-    I: Input,
-    M: AsSlice<usize> + SerdeAny,
-    S: HasCorpus<C, I> + HasMetadata + HasRand<R>,
-    C: Corpus<I>,
-    R: Rand,
-{
-    /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: usize) -> Result<(), Error> {
-        self.update_score(state, idx)?;
-        self.base.on_add(state, idx)
-    }
-
-    /// Replaces the testcase at the given idx
-    fn on_replace(&self, state: &mut S, idx: usize, testcase: &Testcase<I>) -> Result<(), Error> {
-        self.base.on_replace(state, idx, testcase)
-    }
-
-    /// Removes an entry from the corpus, returning M if M was present.
-    fn on_remove(
+    /// Minimize the corpus of the provided state.
+    fn minimize<CS, EM, Z>(
         &self,
-        state: &mut S,
-        idx: usize,
-        testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
-        self.base.on_remove(state, idx, testcase)
-    }
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        state: &mut E::State,
+    ) -> Result<(), Error>
+    where
+        E: Executor<EM, Z> + HasObservers,
+        CS: Scheduler<State = E::State>,
+        EM: UsesState<State = E::State>,
+        Z: HasScheduler<Scheduler = CS, State = E::State>;
+}
 
-    /// Gets the next entry
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        self.cull(state)?;
-        let mut idx = self.base.next(state)?;
-        while {
-            let has = !state
-                .corpus()
-                .get(idx)?
-                .borrow()
-                .has_metadata::<IsFavoredMetadata>();
-            has
-        } && state.rand_mut().below(100) < self.skip_non_favored_prob
-        {
-            idx = self.base.next(state)?;
+/// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
+///
+/// Algorithm based on WMOPT: <https://hexhive.epfl.ch/publications/files/21ISSTA2.pdf>
+#[derive(Debug)]
+pub struct MapCorpusMinimizer<E, O, T, TS>
+where
+    E: UsesState,
+    E::State: HasCorpus + HasMetadata,
+    TS: TestcaseScore<E::State>,
+{
+    obs_name: String,
+    phantom: PhantomData<(E, O, T, TS)>,
+}
+
+/// Standard corpus minimizer, which weights inputs by length and time.
+pub type StdCorpusMinimizer<E, O, T> =
+    MapCorpusMinimizer<E, O, T, LenTimeMulTestcaseScore<<E as UsesState>::State>>;
+
+impl<E, O, T, TS> MapCorpusMinimizer<E, O, T, TS>
+where
+    E: UsesState,
+    E::State: HasCorpus + HasMetadata,
+    TS: TestcaseScore<E::State>,
+{
+    /// Constructs a new `MapCorpusMinimizer` from a provided observer. This observer will be used
+    /// in the future to get observed maps from an executed input.
+    pub fn new(obs: &O) -> Self
+    where
+        O: Named,
+    {
+        Self {
+            obs_name: obs.name().to_string(),
+            phantom: PhantomData,
         }
-        Ok(idx)
     }
 }
 
-impl<C, CS, F, I, M, R, S> MinimizerCorpusScheduler<C, CS, F, I, M, R, S>
+impl<E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<E, O, T, TS>
 where
-    CS: CorpusScheduler<I, S>,
-    F: FavFactor<I>,
-    I: Input,
-    M: AsSlice<usize> + SerdeAny,
-    S: HasCorpus<C, I> + HasMetadata + HasRand<R>,
-    C: Corpus<I>,
-    R: Rand,
+    E: UsesState,
+    for<'a> O: MapObserver<Entry = T> + AsIter<'a, Item = T>,
+    E::State: HasMetadata + HasCorpus,
+    T: Copy + Hash + Eq,
+    TS: TestcaseScore<E::State>,
 {
-    /// Update the `Corpus` score using the `MinimizerCorpusScheduler`
-    #[allow(clippy::unused_self)]
-    pub fn update_score(&self, state: &mut S, idx: usize) -> Result<(), Error> {
-        // Create a new top rated meta if not existing
-        if state.metadata().get::<TopRatedsMetadata>().is_none() {
-            state.add_metadata(TopRatedsMetadata::new());
+    fn minimize<CS, EM, Z>(
+        &self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        manager: &mut EM,
+        state: &mut E::State,
+    ) -> Result<(), Error>
+    where
+        E: Executor<EM, Z> + HasObservers,
+        CS: Scheduler<State = E::State>,
+        EM: UsesState<State = E::State>,
+        Z: HasScheduler<Scheduler = CS, State = E::State>,
+    {
+        let cfg = Config::default();
+        let ctx = Context::new(&cfg);
+        let opt = Optimize::new(&ctx);
+
+        let mut seed_exprs = HashMap::new();
+        let mut cov_map = HashMap::new();
+
+        for idx in 0..state.corpus().count() {
+            let (weight, input) = {
+                let mut testcase = state.corpus().get(idx)?.borrow_mut();
+                let weight = TS::compute(&mut *testcase, state)?
+                    .to_u64()
+                    .expect("Weight must be computable.");
+                let input = testcase
+                    .input()
+                    .as_ref()
+                    .expect("Input must be available.")
+                    .clone();
+                (weight, input)
+            };
+
+            // Execute the input; we cannot rely on the metadata already being present.
+            executor.observers_mut().pre_exec_all(state, &input)?;
+            let kind = executor.run_target(fuzzer, state, manager, &input)?;
+            executor
+                .observers_mut()
+                .post_exec_all(state, &input, &kind)?;
+
+            let seed_expr = Bool::fresh_const(&ctx, "seed");
+            let obs: &O = executor
+                .observers()
+                .match_name::<O>(&self.obs_name)
+                .expect("Observer must be present.");
+
+            // Store coverage, mapping coverage map indices to hit counts (if present) and the
+            // associated seeds for the map indices with those hit counts.
+            for (i, e) in obs.as_iter().copied().enumerate() {
+                cov_map
+                    .entry(i)
+                    .or_insert_with(HashMap::new)
+                    .entry(e)
+                    .or_insert_with(HashSet::new)
+                    .insert(seed_expr.clone());
+            }
+
+            // Keep track of that seed's index and weight
+            seed_exprs.insert(seed_expr, (idx, weight));
         }
 
-        let mut new_favoreds = vec![];
-        {
-            let mut entry = state.corpus().get(idx)?.borrow_mut();
-            let factor = F::compute(&mut *entry)?;
-            let meta = entry.metadata().get::<M>().ok_or_else(|| {
-                Error::KeyNotFound(format!(
-                    "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
-                    idx
-                ))
-            })?;
-            for elem in meta.as_slice() {
-                if let Some(old_idx) = state
-                    .metadata()
-                    .get::<TopRatedsMetadata>()
-                    .unwrap()
-                    .map
-                    .get(elem)
-                {
-                    if factor > F::compute(&mut *state.corpus().get(*old_idx)?.borrow_mut())? {
-                        continue;
-                    }
+        for (_, cov) in cov_map {
+            for (_, seeds) in cov {
+                // At least one seed for each hit count of each coverage map index
+                if let Some(reduced) = seeds.into_iter().reduce(|s1, s2| s1 | s2) {
+                    opt.assert(&reduced);
                 }
-
-                new_favoreds.push((*elem, idx));
             }
         }
-
-        for pair in new_favoreds {
-            state
-                .metadata_mut()
-                .get_mut::<TopRatedsMetadata>()
-                .unwrap()
-                .map
-                .insert(pair.0, pair.1);
+        for (seed, (_, weight)) in &seed_exprs {
+            // opt will attempt to minimise the number of violated assertions.
+            //
+            // To tell opt to minimize the number of seeds, we tell opt to maximize the number of
+            // not seeds.
+            //
+            // Additionally, each seed has a weight associated with them; the higher, the more z3
+            // doesn't want to violate the assertion. Thus, inputs which have higher weights will be
+            // less likely to appear in the final corpus -- provided all their coverage points are
+            // hit by at least one other input.
+            opt.assert_soft(&!seed, *weight, None);
         }
-        Ok(())
-    }
 
-    /// Cull the `Corpus` using the `MinimizerCorpusScheduler`
-    #[allow(clippy::unused_self)]
-    pub fn cull(&self, state: &mut S) -> Result<(), Error> {
-        let top_rated = match state.metadata().get::<TopRatedsMetadata>() {
-            None => return Ok(()),
-            Some(val) => val,
+        // Perform the optimization!
+        opt.check(&[]);
+
+        let res = if let Some(model) = opt.get_model() {
+            let mut removed = Vec::with_capacity(state.corpus().count());
+            for (seed, (idx, _)) in seed_exprs {
+                // if the model says the seed isn't there, mark it for deletion
+                if !model.eval(&seed, true).unwrap().as_bool().unwrap() {
+                    removed.push(idx);
+                }
+            }
+            // reverse order; if indexes are stored in a vec, we need to remove from back to front
+            removed.sort_unstable_by(|idx1, idx2| idx2.cmp(idx1));
+            for idx in removed {
+                let removed = state.corpus_mut().remove(idx)?;
+                // scheduler needs to know we've removed the input, or it will continue to try
+                // to use now-missing inputs
+                fuzzer.scheduler_mut().on_remove(state, idx, &removed)?;
+            }
+            Ok(())
+        } else {
+            Err(Error::unknown("Corpus minimization failed; unsat."))
         };
 
-        let mut acc = HashSet::new();
-
-        for (key, idx) in &top_rated.map {
-            if !acc.contains(key) {
-                let mut entry = state.corpus().get(*idx)?.borrow_mut();
-                let meta = entry.metadata().get::<M>().ok_or_else(|| {
-                    Error::KeyNotFound(format!(
-                        "Metadata needed for MinimizerCorpusScheduler not found in testcase #{}",
-                        idx
-                    ))
-                })?;
-                for elem in meta.as_slice() {
-                    acc.insert(*elem);
-                }
-
-                entry.add_metadata(IsFavoredMetadata {});
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Creates a new [`MinimizerCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
-    /// and has a default probability to skip non-faved [`Testcase`]s of [`DEFAULT_SKIP_NON_FAVORED_PROB`].
-    pub fn new(base: CS) -> Self {
-        Self {
-            base,
-            skip_non_favored_prob: DEFAULT_SKIP_NON_FAVORED_PROB,
-            phantom: PhantomData,
-        }
-    }
-
-    /// Creates a new [`MinimizerCorpusScheduler`] that wraps a `base` [`CorpusScheduler`]
-    /// and has a non-default probability to skip non-faved [`Testcase`]s using (`skip_non_favored_prob`).
-    pub fn with_skip_prob(base: CS, skip_non_favored_prob: u64) -> Self {
-        Self {
-            base,
-            skip_non_favored_prob,
-            phantom: PhantomData,
-        }
+        res
     }
 }
-
-/// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`.
-pub type LenTimeMinimizerCorpusScheduler<C, CS, I, M, R, S> =
-    MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, M, R, S>;
-
-/// A [`MinimizerCorpusScheduler`] with [`LenTimeMulFavFactor`] to prioritize quick and small [`Testcase`]`s`
-/// that exercise all the entries registered in the [`MapIndexesMetadata`].
-pub type IndexesLenTimeMinimizerCorpusScheduler<C, CS, I, R, S> =
-    MinimizerCorpusScheduler<C, CS, LenTimeMulFavFactor<I>, I, MapIndexesMetadata, R, S>;

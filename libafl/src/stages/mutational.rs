@@ -1,33 +1,34 @@
+//| The [`MutationalStage`] is the default stage used during fuzzing.
+//! For the current input, it will perform a range of random mutations, and then run them in the executor.
+
 use core::marker::PhantomData;
 
+#[cfg(feature = "introspection")]
+use crate::monitors::PerfFeature;
 use crate::{
     bolts::rands::Rand,
     corpus::Corpus,
     fuzzer::Evaluator,
-    inputs::Input,
     mark_feature_time,
     mutators::Mutator,
     stages::Stage,
     start_timer,
-    state::{HasClientPerfStats, HasCorpus, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
     Error,
 };
-
-#[cfg(feature = "introspection")]
-use crate::stats::PerfFeature;
 
 // TODO multi mutators stage
 
 /// A Mutational stage is the stage in a fuzzing run that mutates inputs.
 /// Mutational stages will usually have a range of mutations that are
 /// being applied to the input one by one, between executions.
-pub trait MutationalStage<C, E, EM, I, M, S, Z>: Stage<E, EM, S, Z>
+pub trait MutationalStage<E, EM, M, Z>: Stage<E, EM, Z>
 where
-    C: Corpus<I>,
-    M: Mutator<I, S>,
-    I: Input,
-    S: HasClientPerfStats + HasCorpus<C, I>,
-    Z: Evaluator<E, EM, I, S>,
+    E: UsesState<State = Self::State>,
+    M: Mutator<Self::State>,
+    EM: UsesState<State = Self::State>,
+    Z: Evaluator<E, EM, State = Self::State>,
+    Self::State: HasClientPerfMonitor + HasCorpus,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -36,7 +37,7 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut S, corpus_idx: usize) -> Result<usize, Error>;
+    fn iterations(&self, state: &mut Z::State, corpus_idx: usize) -> Result<u64, Error>;
 
     /// Runs this (mutational) stage for the given testcase
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
@@ -44,7 +45,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Z::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
@@ -75,35 +76,25 @@ where
     }
 }
 
-/// Default value, how many iterations each stage gets, as an upper bound
+/// Default value, how many iterations each stage gets, as an upper bound.
 /// It may randomly continue earlier.
 pub static DEFAULT_MUTATIONAL_MAX_ITERATIONS: u64 = 128;
 
 /// The default mutational stage
 #[derive(Clone, Debug)]
-pub struct StdMutationalStage<C, E, EM, I, M, R, S, Z>
-where
-    C: Corpus<I>,
-    M: Mutator<I, S>,
-    I: Input,
-    R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
-    Z: Evaluator<E, EM, I, S>,
-{
+pub struct StdMutationalStage<E, EM, M, Z> {
     mutator: M,
     #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, R, S, Z)>,
+    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<C, E, EM, I, M, R, S, Z> MutationalStage<C, E, EM, I, M, S, Z>
-    for StdMutationalStage<C, E, EM, I, M, R, S, Z>
+impl<E, EM, M, Z> MutationalStage<E, EM, M, Z> for StdMutationalStage<E, EM, M, Z>
 where
-    C: Corpus<I>,
-    M: Mutator<I, S>,
-    I: Input,
-    R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
-    Z: Evaluator<E, EM, I, S>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -118,19 +109,29 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations(&self, state: &mut S, _corpus_idx: usize) -> Result<usize, Error> {
-        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
+    fn iterations(&self, state: &mut Z::State, _corpus_idx: usize) -> Result<u64, Error> {
+        Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 }
 
-impl<C, E, EM, I, M, R, S, Z> Stage<E, EM, S, Z> for StdMutationalStage<C, E, EM, I, M, R, S, Z>
+impl<E, EM, M, Z> UsesState for StdMutationalStage<E, EM, M, Z>
 where
-    C: Corpus<I>,
-    M: Mutator<I, S>,
-    I: Input,
-    R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
-    Z: Evaluator<E, EM, I, S>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
+{
+    type State = Z::State;
+}
+
+impl<E, EM, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, M, Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -138,27 +139,26 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Z::State,
         manager: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
 
         #[cfg(feature = "introspection")]
-        state.introspection_stats_mut().finish_stage();
+        state.introspection_monitor_mut().finish_stage();
 
         ret
     }
 }
 
-impl<C, E, EM, I, M, R, S, Z> StdMutationalStage<C, E, EM, I, M, R, S, Z>
+impl<E, EM, M, Z> StdMutationalStage<E, EM, M, Z>
 where
-    C: Corpus<I>,
-    M: Mutator<I, S>,
-    I: Input,
-    R: Rand,
-    S: HasClientPerfStats + HasCorpus<C, I> + HasRand<R>,
-    Z: Evaluator<E, EM, I, S>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    M: Mutator<Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand,
 {
     /// Creates a new default mutational stage
     pub fn new(mutator: M) -> Self {
@@ -166,5 +166,49 @@ where
             mutator,
             phantom: PhantomData,
         }
+    }
+}
+
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+/// `StdMutationalStage` Python bindings
+pub mod pybind {
+    use pyo3::prelude::*;
+
+    use crate::{
+        events::pybind::PythonEventManager,
+        executors::pybind::PythonExecutor,
+        fuzzer::pybind::PythonStdFuzzer,
+        mutators::pybind::PythonMutator,
+        stages::{pybind::PythonStage, StdMutationalStage},
+    };
+
+    #[pyclass(unsendable, name = "StdMutationalStage")]
+    #[derive(Debug)]
+    /// Python class for StdMutationalStage
+    pub struct PythonStdMutationalStage {
+        /// Rust wrapped StdMutationalStage object
+        pub inner:
+            StdMutationalStage<PythonExecutor, PythonEventManager, PythonMutator, PythonStdFuzzer>,
+    }
+
+    #[pymethods]
+    impl PythonStdMutationalStage {
+        #[new]
+        fn new(mutator: PythonMutator) -> Self {
+            Self {
+                inner: StdMutationalStage::new(mutator),
+            }
+        }
+
+        fn as_stage(slf: Py<Self>) -> PythonStage {
+            PythonStage::new_std_mutational(slf)
+        }
+    }
+
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonStdMutationalStage>()?;
+        Ok(())
     }
 }

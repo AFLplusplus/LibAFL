@@ -1,14 +1,18 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
+use core::{
+    any::TypeId,
+    ptr::{addr_of, addr_of_mut},
+};
+
 pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
-
-use core::any::TypeId;
-
 use xxhash_rust::xxh3::xxh3_64;
 
-#[cfg(feature = "RUSTC_IS_NIGHTLY")]
-/// From https://stackoverflow.com/a/60138532/7658998
-const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+/// Returns if the type `T` is equal to `U`
+/// From <https://stackoverflow.com/a/60138532/7658998>
+#[rustversion::nightly]
+#[must_use]
+pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // Helper trait. `VALUE` is false, except for the specialization of the
     // case where `T == U`.
     trait TypeEq<U: ?Sized> {
@@ -28,14 +32,16 @@ const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     <T as TypeEq<U>>::VALUE
 }
 
-#[cfg(not(feature = "RUSTC_IS_NIGHTLY"))]
-const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
+/// Returns if the type `T` is equal to `U`
+#[rustversion::not(nightly)]
+#[must_use]
+pub const fn type_eq<T: ?Sized, U: ?Sized>() -> bool {
     // BEWARE! This is not unsafe, it is SUPER UNSAFE
     true
 }
 
 /// Gets the length of the element
-pub trait HasLen {
+pub trait HasConstLen {
     /// The length as constant `usize`
     const LEN: usize;
 
@@ -47,7 +53,7 @@ pub trait HasLen {
     }
 }
 
-impl HasLen for () {
+impl HasConstLen for () {
     const LEN: usize = 0;
 
     fn len(&self) -> usize {
@@ -55,9 +61,9 @@ impl HasLen for () {
     }
 }
 
-impl<Head, Tail> HasLen for (Head, Tail)
+impl<Head, Tail> HasConstLen for (Head, Tail)
 where
-    Tail: HasLen,
+    Tail: HasConstLen,
 {
     const LEN: usize = 1 + Tail::LEN;
 
@@ -78,7 +84,7 @@ pub trait HasNameId {
 }
 
 /// Gets the id and `const_name` for the given index in a tuple
-pub trait HasNameIdTuple: HasLen {
+pub trait HasNameIdTuple: HasConstLen {
     /// Gets the `const_name` for the entry at the given index
     fn const_name_for(&self, index: usize) -> Option<&'static str>;
 
@@ -142,7 +148,7 @@ where
 {
     fn match_first_type<T: 'static>(&self) -> Option<&T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            unsafe { (&self.0 as *const _ as *const T).as_ref() }
+            unsafe { (addr_of!(self.0) as *const T).as_ref() }
         } else {
             self.1.match_first_type::<T>()
         }
@@ -150,7 +156,7 @@ where
 
     fn match_first_type_mut<T: 'static>(&mut self) -> Option<&mut T> {
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+            unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }
         } else {
             self.1.match_first_type_mut::<T>()
         }
@@ -160,14 +166,16 @@ where
 /// Match by type
 pub trait MatchType {
     /// Match by type and call the passed `f` function with a borrow, if found
-    fn match_type<T: 'static>(&self, f: fn(t: &T));
+    fn match_type<T: 'static, FN: FnMut(&T)>(&self, f: &mut FN);
     /// Match by type and call the passed `f` function with a mutable borrow, if found
-    fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T));
+    fn match_type_mut<T: 'static, FN: FnMut(&mut T)>(&mut self, f: &mut FN);
 }
 
 impl MatchType for () {
-    fn match_type<T: 'static>(&self, _f: fn(t: &T)) {}
-    fn match_type_mut<T: 'static>(&mut self, _f: fn(t: &mut T)) {}
+    /// Match by type and call the passed `f` function with a borrow, if found
+    fn match_type<T: 'static, FN: FnMut(&T)>(&self, _: &mut FN) {}
+    /// Match by type and call the passed `f` function with a mutable borrow, if found
+    fn match_type_mut<T: 'static, FN: FnMut(&mut T)>(&mut self, _: &mut FN) {}
 }
 
 impl<Head, Tail> MatchType for (Head, Tail)
@@ -175,20 +183,20 @@ where
     Head: 'static,
     Tail: MatchType,
 {
-    fn match_type<T: 'static>(&self, f: fn(t: &T)) {
+    fn match_type<T: 'static, FN: FnMut(&T)>(&self, f: &mut FN) {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            f(unsafe { (&self.0 as *const _ as *const T).as_ref() }.unwrap());
+            f(unsafe { (addr_of!(self.0) as *const T).as_ref() }.unwrap());
         }
-        self.1.match_type::<T>(f);
+        self.1.match_type::<T, FN>(f);
     }
 
-    fn match_type_mut<T: 'static>(&mut self, f: fn(t: &mut T)) {
+    fn match_type_mut<T: 'static, FN: FnMut(&mut T)>(&mut self, f: &mut FN) {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() {
-            f(unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }.unwrap());
+            f(unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }.unwrap());
         }
-        self.1.match_type_mut::<T>(f);
+        self.1.match_type_mut::<T, FN>(f);
     }
 }
 
@@ -199,7 +207,7 @@ pub trait Named {
 }
 
 /// A named tuple
-pub trait NamedTuple: HasLen {
+pub trait NamedTuple: HasConstLen {
     /// Gets the name of this tuple
     fn name(&self, index: usize) -> Option<&str>;
 }
@@ -251,7 +259,7 @@ where
 {
     fn match_name<T>(&self, name: &str) -> Option<&T> {
         if type_eq::<Head, T>() && name == self.0.name() {
-            unsafe { (&self.0 as *const _ as *const T).as_ref() }
+            unsafe { (addr_of!(self.0) as *const T).as_ref() }
         } else {
             self.1.match_name::<T>(name)
         }
@@ -259,7 +267,7 @@ where
 
     fn match_name_mut<T>(&mut self, name: &str) -> Option<&mut T> {
         if type_eq::<Head, T>() && name == self.0.name() {
-            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+            unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }
         } else {
             self.1.match_name_mut::<T>(name)
         }
@@ -291,7 +299,7 @@ where
     fn match_name_type<T: 'static>(&self, name: &str) -> Option<&T> {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
-            unsafe { (&self.0 as *const _ as *const T).as_ref() }
+            unsafe { (addr_of!(self.0) as *const T).as_ref() }
         } else {
             self.1.match_name_type::<T>(name)
         }
@@ -300,7 +308,7 @@ where
     fn match_name_type_mut<T: 'static>(&mut self, name: &str) -> Option<&mut T> {
         // Switch this check to https://stackoverflow.com/a/60138532/7658998 when in stable and remove 'static
         if TypeId::of::<T>() == TypeId::of::<Head>() && name == self.0.name() {
-            unsafe { (&mut self.0 as *mut _ as *mut T).as_mut() }
+            unsafe { (addr_of_mut!(self.0) as *mut T).as_mut() }
         } else {
             self.1.match_name_type_mut::<T>(name)
         }
@@ -360,7 +368,7 @@ where
     }
 }
 
-/// Merge two `TupeList`
+/// Merge two `TupleList`
 pub trait Merge<T> {
     /// The Resulting [`TupleList`], of an [`Merge::merge()`] call
     type MergeResult;
@@ -469,11 +477,11 @@ pub fn test_macros() {
     let mut t = tuple_list!(1, "a");
 
     tuple_for_each!(f1, std::fmt::Display, t, |x| {
-        println!("{}", x);
+        println!("{x}");
     });
 
     tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
-        println!("{}", x);
+        println!("{x}");
     });
 }
 

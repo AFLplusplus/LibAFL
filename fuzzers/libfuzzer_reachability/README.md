@@ -15,12 +15,13 @@ To build this example, run
 
 ```bash
 cargo build --release
+clang -c weak.c -o weak.o
 ```
 
 This will build the library with the fuzzer (src/lib.rs) with the libfuzzer compatibility layer and the SanitizerCoverage runtime functions for coverage feedback.
 In addition, it will also build two C and C++ compiler wrappers (bin/libafl_c(libafl_c/xx).rs) that you must use to compile the target.
 
-The compiler wrappers, `libafl_cc` and libafl_cxx`, will end up in `./target/release/` (or `./target/debug`, in case you did not build with the `--release` flag).
+The compiler wrappers, `libafl_cc` and `libafl_cxx`, will end up in `./target/release/` (or `./target/debug`, in case you did not build with the `--release` flag).
 
 Then download libpng, and unpack the archive:
 ```bash
@@ -33,7 +34,7 @@ Now compile libpng, using the libafl_cc compiler wrapper:
 ```bash
 cd libpng-1.6.37
 ./configure
-make CC="$(pwd)/../target/release/libafl_cc" CXX="$(pwd)/../target/release/libafl_cxx" -j `nproc`
+LIBAFL_WEAK=../weak.o make CC="$(pwd)/../target/release/libafl_cc" CXX="$(pwd)/../target/release/libafl_cxx" -j `nproc`
 ```
 
 You can find the static lib at `libpng-1.6.37/.libs/libpng16.a`.
@@ -42,12 +43,16 @@ Now, we have to build the libfuzzer harness and link all together to create our 
 
 ```
 cd ..
-./target/release/libafl_cxx ./harness.cc libpng-1.6.37/.libs/libpng16.a -I libpng-1.6.37/ -o fuzzer_libpng -lz -lm
+LIBAFL_WEAK=./weak.o ./target/release/libafl_cxx ./harness.cc libpng-1.6.37/.libs/libpng16.a -I libpng-1.6.37/ -o fuzzer_libpng -lz -lm
 ```
 
 Afterward, the fuzzer will be ready to run.
 Note that, unless you use the `launcher`, you will have to run the binary multiple times to actually start the fuzz process, see `Run` in the following.
 This allows you to run multiple different builds of the same fuzzer alongside, for example, with and without ASAN (`-fsanitize=address`) or with different mutators.
+
+This example also shows you how to use a user-defined variable from LibAFL.
+`diff.patch` adds an array `__libafl_target_list` to `png.c`. In order to read from this variable from LibAFL, you need to weakly define __libafl_target_list as in `weak.c`.
+For building, you have to set `LIBAFL_WEAK` to point to the compiled `weak.o`, so that the compiler can find this `weak.o` file and link successfully.
 
 ## Run
 

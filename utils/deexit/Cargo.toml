@@ -1,0 +1,20 @@
+[package]
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+name = "deexit"
+version = "0.1.0"
+edition = "2021"
+description = "DeExit: Replace exits with aborts to catch them during in-process fuzzing"
+documentation = "https://docs.rs/libafl"
+repository = "https://github.com/AFLplusplus/LibAFL/"
+readme = "../../README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["fuzzing", "libafl", "ldpreload"]
+categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[lib]
+name = "deexit"
+crate-type = ["cdylib"]

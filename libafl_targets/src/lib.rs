@@ -1,20 +1,77 @@
 //! `libafl_targets` contains runtime code, injected in the target itself during compilation.
+//!
+//!
+#![no_std]
+#![deny(rustdoc::broken_intra_doc_links)]
+#![deny(clippy::all)]
+#![deny(clippy::pedantic)]
+#![allow(
+    clippy::unreadable_literal,
+    clippy::type_repetition_in_bounds,
+    clippy::missing_errors_doc,
+    clippy::cast_possible_truncation,
+    clippy::used_underscore_binding,
+    clippy::ptr_as_ptr,
+    clippy::missing_panics_doc,
+    clippy::missing_docs_in_private_items,
+    clippy::module_name_repetitions,
+    clippy::unreadable_literal
+)]
+#![cfg_attr(not(test), warn(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    //unused_results
+))]
+#![cfg_attr(test, deny(
+    missing_debug_implementations,
+    missing_docs,
+    //trivial_casts,
+    trivial_numeric_casts,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_qualifications,
+    unused_must_use,
+    missing_docs,
+    //unused_results
+))]
+#![cfg_attr(
+    test,
+    deny(
+        bad_style,
+        dead_code,
+        improper_ctypes,
+        non_shorthand_field_patterns,
+        no_mangle_generic_items,
+        overflowing_literals,
+        path_statements,
+        patterns_in_fns_without_body,
+        private_in_public,
+        unconditional_recursion,
+        unused,
+        unused_allocation,
+        unused_comparisons,
+        unused_parens,
+        while_true
+    )
+)]
+
+#[cfg(feature = "std")]
+#[macro_use]
+extern crate std;
+#[allow(unused_imports)]
+#[macro_use]
+extern crate alloc;
 
 include!(concat!(env!("OUT_DIR"), "/constants.rs"));
 
-#[cfg(any(
-    feature = "sancov_pcguard_edges",
-    feature = "sancov_pcguard_hitcounts",
-    feature = "sancov_pcguard_edges_ptr",
-    feature = "sancov_pcguard_hitcounts_ptr"
-))]
+#[cfg(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts",))]
 pub mod sancov_pcguard;
-#[cfg(any(
-    feature = "sancov_pcguard_edges",
-    feature = "sancov_pcguard_hitcounts",
-    feature = "sancov_pcguard_edges_ptr",
-    feature = "sancov_pcguard_hitcounts_ptr"
-))]
+#[cfg(any(feature = "sancov_pcguard_edges", feature = "sancov_pcguard_hitcounts",))]
 pub use sancov_pcguard::*;
 
 #[cfg(any(feature = "sancov_cmplog", feature = "sancov_value_profile"))]
@@ -27,6 +84,11 @@ pub mod libfuzzer;
 #[cfg(feature = "libfuzzer")]
 pub use libfuzzer::*;
 
+#[cfg(feature = "sancov_8bit")]
+pub mod sancov_8bit;
+#[cfg(feature = "sancov_8bit")]
+pub use sancov_8bit::*;
+
 pub mod coverage;
 pub use coverage::*;
 
@@ -36,4 +98,10 @@ pub use value_profile::*;
 pub mod cmplog;
 pub use cmplog::*;
 
+#[cfg(feature = "std")]
 pub mod drcov;
+
+#[cfg(target_os = "linux")]
+pub mod forkserver;
+#[cfg(target_os = "linux")]
+pub use forkserver::*;

@@ -17,17 +17,26 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#ifndef _WIN32
+  #include <unistd.h>
+  #include <sys/time.h>
+#endif
 
 #include <list>
 #include <string>
 #include <fstream>
-#include <sys/time.h>
 #include "llvm/Config/llvm-config.h"
+
+#if USE_NEW_PM
+  #include "llvm/Passes/PassPlugin.h"
+  #include "llvm/Passes/PassBuilder.h"
+  #include "llvm/IR/PassManager.h"
+#else
+  #include "llvm/IR/LegacyPassManager.h"
+#endif
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/IRBuilder.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -55,7 +64,6 @@ namespace {
 /* Function that we never instrument or analyze */
 /* Note: this ignore check is also called in isInInstrumentList() */
 bool isIgnoreFunction(const llvm::Function *F) {
-
   // Starting from "LLVMFuzzer" these are functions used in libfuzzer based
   // fuzzing campaign installations, e.g. oss-fuzz
 
@@ -93,9 +101,7 @@ bool isIgnoreFunction(const llvm::Function *F) {
   };
 
   for (auto const &ignoreListFunc : ignoreList) {
-
     if (F->getName().startswith(ignoreListFunc)) { return true; }
-
   }
 
   static constexpr const char *ignoreSubstringList[] = {
@@ -107,48 +113,68 @@ bool isIgnoreFunction(const llvm::Function *F) {
   };
 
   for (auto const &ignoreListFunc : ignoreSubstringList) {
-
     // hexcoder: F->getName().contains() not avaiilable in llvm 3.8.0
     if (StringRef::npos != F->getName().find(ignoreListFunc)) { return true; }
-
   }
 
   return false;
-
 }
 
-class CmpLogRoutines : public ModulePass {
+#if USE_NEW_PM
+class CmpLogRoutines : public PassInfoMixin<CmpLogRoutines> {
+ public:
+  CmpLogRoutines() {
+#else
 
+class CmpLogRoutines : public ModulePass {
  public:
   static char ID;
-  CmpLogRoutines() : ModulePass(ID) {}
+  CmpLogRoutines() : ModulePass(ID) {
+#endif
+  }
 
-  bool runOnModule(Module &M) override;
-
-#if LLVM_VERSION_MAJOR < 4
-  const char *getPassName() const override {
-
+#if USE_NEW_PM
+  PreservedAnalyses run(Module &M, ModuleAnalysisManager &MAM);
 #else
+  bool        runOnModule(Module &M) override;
+
+  #if LLVM_VERSION_MAJOR < 4
+  const char *getPassName() const override {
+  #else
   StringRef getPassName() const override {
 
-#endif
+  #endif
     return "cmplog routines";
-
   }
+#endif
 
  private:
   bool hookRtns(Module &M);
-
 };
 
 }  // namespace
 
+#if USE_NEW_PM
+extern "C" ::llvm::PassPluginLibraryInfo LLVM_ATTRIBUTE_WEAK
+llvmGetPassPluginInfo() {
+  return {LLVM_PLUGIN_API_VERSION, "CmpLogRoutines", "v0.1",
+          [](PassBuilder &PB) {
+  #if LLVM_VERSION_MAJOR <= 13
+            using OptimizationLevel = typename PassBuilder::OptimizationLevel;
+  #endif
+            PB.registerOptimizerLastEPCallback(
+                [](ModulePassManager &MPM, OptimizationLevel OL) {
+                  MPM.addPass(CmpLogRoutines());
+                });
+          }};
+}
+#else
 char CmpLogRoutines::ID = 0;
+#endif
 
 bool CmpLogRoutines::hookRtns(Module &M) {
-
   std::vector<CallInst *> calls, llvmStdStd, llvmStdC, gccStdStd, gccStdC;
-  LLVMContext &           C = M.getContext();
+  LLVMContext            &C = M.getContext();
 
   Type *VoidTy = Type::getVoidTy(C);
   // PointerType *VoidPtrTy = PointerType::get(VoidTy, 0);
@@ -246,20 +272,16 @@ bool CmpLogRoutines::hookRtns(Module &M) {
 
   /* iterate over all functions, bbs and instruction and add suitable calls */
   for (auto &F : M) {
-
-    if (isIgnoreFunction(&F)) continue;
+    if (isIgnoreFunction(&F)) { continue; }
 
     for (auto &BB : F) {
-
       for (auto &IN : BB) {
-
         CallInst *callInst = nullptr;
 
         if ((callInst = dyn_cast<CallInst>(&IN))) {
-
           Function *Callee = callInst->getCalledFunction();
-          if (!Callee) continue;
-          if (callInst->getCallingConv() != llvm::CallingConv::C) continue;
+          if (!Callee) { continue; }
+          if (callInst->getCallingConv() != llvm::CallingConv::C) { continue; }
 
           FunctionType *FT = Callee->getFunctionType();
 
@@ -316,9 +338,7 @@ bool CmpLogRoutines::hookRtns(Module &M) {
 
           if (isGccStdStringCString || isGccStdStringStdString ||
               isLlvmStdStringStdString || isLlvmStdStringCString) {
-
             isPtrRtn = false;
-
           }
 
           if (isPtrRtn) { calls.push_back(callInst); }
@@ -326,133 +346,129 @@ bool CmpLogRoutines::hookRtns(Module &M) {
           if (isGccStdStringCString) { gccStdC.push_back(callInst); }
           if (isLlvmStdStringStdString) { llvmStdStd.push_back(callInst); }
           if (isLlvmStdStringCString) { llvmStdC.push_back(callInst); }
-
         }
-
       }
-
     }
-
   }
 
   if (!calls.size() && !gccStdStd.size() && !gccStdC.size() &&
-      !llvmStdStd.size() && !llvmStdC.size())
+      !llvmStdStd.size() && !llvmStdC.size()) {
     return false;
+  }
 
   for (auto &callInst : calls) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogHookFn, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   for (auto &callInst : gccStdStd) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogGccStdStd, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   for (auto &callInst : gccStdC) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogGccStdC, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   for (auto &callInst : llvmStdStd) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogLlvmStdStd, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   for (auto &callInst : llvmStdC) {
-
     Value *v1P = callInst->getArgOperand(0), *v2P = callInst->getArgOperand(1);
 
     IRBuilder<> IRB(callInst->getParent());
     IRB.SetInsertPoint(callInst);
 
     std::vector<Value *> args;
-    Value *              v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
-    Value *              v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
+    Value               *v1Pcasted = IRB.CreatePointerCast(v1P, i8PtrTy);
+    Value               *v2Pcasted = IRB.CreatePointerCast(v2P, i8PtrTy);
     args.push_back(v1Pcasted);
     args.push_back(v2Pcasted);
 
     IRB.CreateCall(cmplogLlvmStdC, args);
 
     // errs() << callInst->getCalledFunction()->getName() << "\n";
-
   }
 
   return true;
-
 }
 
+#if USE_NEW_PM
+PreservedAnalyses CmpLogRoutines::run(Module &M, ModuleAnalysisManager &MAM) {
+#else
 bool CmpLogRoutines::runOnModule(Module &M) {
-
+#endif
   hookRtns(M);
+
+#if USE_NEW_PM
+  auto PA = PreservedAnalyses::all();
+#endif
   verifyModule(M);
 
+#if USE_NEW_PM
+  return PA;
+#else
   return true;
-
+#endif
 }
 
+#if USE_NEW_PM
+#else
 static void registerCmpLogRoutinesPass(const PassManagerBuilder &,
                                        legacy::PassManagerBase &PM) {
-
   auto p = new CmpLogRoutines();
   PM.add(p);
-
 }
 
 static RegisterStandardPasses RegisterCmpLogRoutinesPass(
@@ -461,9 +477,10 @@ static RegisterStandardPasses RegisterCmpLogRoutinesPass(
 static RegisterStandardPasses RegisterCmpLogRoutinesPass0(
     PassManagerBuilder::EP_EnabledOnOptLevel0, registerCmpLogRoutinesPass);
 
-#if LLVM_VERSION_MAJOR >= 11
+  #if LLVM_VERSION_MAJOR >= 11
 static RegisterStandardPasses RegisterCmpLogRoutinesPassLTO(
     PassManagerBuilder::EP_FullLinkTimeOptimizationLast,
     registerCmpLogRoutinesPass);
-#endif
+  #endif
 
+#endif

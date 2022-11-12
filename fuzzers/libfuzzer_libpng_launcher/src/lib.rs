@@ -2,39 +2,112 @@
 //! The example harness is built for libpng.
 //! In this example, you will see the use of the `launcher` feature.
 //! The `launcher` will spawn new processes for each cpu core.
+use mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
 
-use clap::{load_yaml, App};
 use core::time::Duration;
-use std::{env, path::PathBuf};
+use std::{env, net::SocketAddr, path::PathBuf};
 
+use clap::{self, Parser};
 use libafl::{
     bolts::{
+        core_affinity::Cores,
         current_nanos,
         launcher::Launcher,
-        os::parse_core_bind_arg,
         rands::StdRand,
         shmem::{ShMemProvider, StdShMemProvider},
         tuples::{tuple_list, Merge},
+        AsSlice,
     },
-    corpus::{
-        Corpus, InMemoryCorpus, IndexesLenTimeMinimizerCorpusScheduler, OnDiskCorpus,
-        QueueCorpusScheduler,
-    },
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    events::EventConfig,
     executors::{inprocess::InProcessExecutor, ExitKind, TimeoutExecutor},
     feedback_or, feedback_or_fast,
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    monitors::{MultiMonitor, OnDiskTOMLMonitor},
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
-    stats::MultiStats,
     Error,
 };
-
 use libafl_targets::{libfuzzer_initialize, libfuzzer_test_one_input, EDGES_MAP, MAX_EDGES_NUM};
+
+/// Parse a millis string to a [`Duration`]. Used for arg parsing.
+fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
+    Ok(Duration::from_millis(time.parse()?))
+}
+
+/// The commandline args this fuzzer accepts
+#[derive(Debug, Parser)]
+#[command(
+    name = "libfuzzer_libpng_launcher",
+    about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
+    author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
+)]
+struct Opt {
+    #[arg(
+        short,
+        long,
+        value_parser = Cores::from_cmdline,
+        help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
+        name = "CORES"
+    )]
+    cores: Cores,
+
+    #[arg(
+        short = 'p',
+        long,
+        help = "Choose the broker TCP port, default is 1337",
+        name = "PORT",
+        default_value = "1337"
+    )]
+    broker_port: u16,
+
+    #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
+    remote_broker_addr: Option<SocketAddr>,
+
+    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
+    input: Vec<PathBuf>,
+
+    #[arg(
+        short,
+        long,
+        help = "Set the output directory, default is ./out",
+        name = "OUTPUT",
+        default_value = "./out"
+    )]
+    output: PathBuf,
+
+    #[arg(
+        value_parser = timeout_from_millis_str,
+        short,
+        long,
+        help = "Set the exeucution timeout in milliseconds, default is 10000",
+        name = "TIMEOUT",
+        default_value = "10000"
+    )]
+    timeout: Duration,
+    /*
+    /// This fuzzer has hard-coded tokens
+    #[arg(
+
+        short = "x",
+        long,
+        help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
+        name = "TOKENS",
+        multiple = true
+    )]
+    tokens: Vec<PathBuf>,
+    */
+}
 
 /// The main fn, `no_mangle` as it is a C symbol
 #[no_mangle]
@@ -42,13 +115,10 @@ pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
-    let yaml = load_yaml!("clap-config.yaml");
-    let matches = App::from(yaml).get_matches();
+    let opt = Opt::parse();
 
-    let broker_port = 1337;
-
-    let cores = parse_core_bind_arg(matches.value_of("cores").unwrap())
-        .expect("No valid core count given!");
+    let broker_port = opt.broker_port;
+    let cores = opt.cores;
 
     println!(
         "Workdir: {:?}",
@@ -57,12 +127,12 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let stats = MultiStats::new(|s| println!("{}", s));
+    let monitor = OnDiskTOMLMonitor::new(
+        "./fuzzer_stats.toml",
+        MultiMonitor::new(|s| println!("{}", s)),
+    );
 
-    let mut run_client = |state: Option<StdState<_, _, _, _, _>>, mut restarting_mgr| {
-        let corpus_dirs = &[PathBuf::from("./corpus")];
-        let objective_dir = PathBuf::from("./crashes");
-
+    let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map
         let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
         let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("edges", edges));
@@ -70,20 +140,17 @@ pub fn libafl_main() {
         // Create an observation channel to keep track of the execution time
         let time_observer = TimeObserver::new("time");
 
-        // The state of the edges feedback.
-        let feedback_state = MapFeedbackState::with_observer(&edges_observer);
-
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
-        let feedback = feedback_or!(
+        let mut feedback = feedback_or!(
             // New maximization map feedback linked to the edges observer and the feedback state
-            MaxMapFeedback::new_tracking(&feedback_state, &edges_observer, true, false),
+            MaxMapFeedback::new_tracking(&edges_observer, true, false),
             // Time feedback, this one does not need a feedback state
             TimeFeedback::new_with_observer(&time_observer)
         );
 
         // A feedback to choose if an input is a solution or not
-        let objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {
@@ -94,18 +161,21 @@ pub fn libafl_main() {
                 InMemoryCorpus::new(),
                 // Corpus in which we store solutions (crashes in this example),
                 // on disk so the user can get them after stopping the fuzzer
-                OnDiskCorpus::new(objective_dir).unwrap(),
+                OnDiskCorpus::new(&opt.output).unwrap(),
                 // States of the feedbacks.
-                // They are the data related to the feedbacks that you want to persist in the State.
-                tuple_list!(feedback_state),
+                // The feedbacks can report the data that should persist in the State.
+                &mut feedback,
+                // Same for objective feedbacks
+                &mut objective,
             )
+            .unwrap()
         });
 
         println!("We're a client, let's fuzz :)");
 
         // Create a PNG dictionary if not existing
         if state.metadata().get::<Tokens>().is_none() {
-            state.add_metadata(Tokens::new(vec![
+            state.add_metadata(Tokens::from([
                 vec![137, 80, 78, 71, 13, 10, 26, 10], // PNG header
                 "IHDR".as_bytes().to_vec(),
                 "IDAT".as_bytes().to_vec(),
@@ -119,7 +189,7 @@ pub fn libafl_main() {
         let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
         // A minimization+queue policy to get testcasess from the corpus
-        let scheduler = IndexesLenTimeMinimizerCorpusScheduler::new(QueueCorpusScheduler::new());
+        let scheduler = IndexesLenTimeMinimizerScheduler::new(QueueScheduler::new());
 
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -142,7 +212,7 @@ pub fn libafl_main() {
                 &mut restarting_mgr,
             )?,
             // 10 seconds timeout
-            Duration::new(10, 0),
+            opt.timeout,
         );
 
         // The actual target run starts here.
@@ -155,8 +225,8 @@ pub fn libafl_main() {
         // In case the corpus is empty (on first run), reset
         if state.corpus().count() < 1 {
             state
-                .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, corpus_dirs)
-                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", corpus_dirs));
+                .load_initial_inputs(&mut fuzzer, &mut executor, &mut restarting_mgr, &opt.input)
+                .unwrap_or_else(|_| panic!("Failed to load initial corpus at {:?}", &opt.input));
             println!("We imported {} inputs from disk.", state.corpus().count());
         }
 
@@ -166,11 +236,12 @@ pub fn libafl_main() {
 
     match Launcher::builder()
         .shmem_provider(shmem_provider)
-        .configuration("launcher default".into())
-        .stats(stats)
+        .configuration(EventConfig::from_name("default"))
+        .monitor(monitor)
         .run_client(&mut run_client)
         .cores(&cores)
         .broker_port(broker_port)
+        .remote_broker_addr(opt.remote_broker_addr)
         .stdout_file(Some("/dev/null"))
         .build()
         .launch()

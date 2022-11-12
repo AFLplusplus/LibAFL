@@ -1,41 +1,49 @@
 #![no_std]
 // Embedded targets: build with no_main
-#![cfg_attr(not(any(windows, unix)), no_main)]
+#![cfg_attr(not(any(windows)), no_main)]
 // Embedded needs alloc error handlers which only work on nightly right now...
-#![cfg_attr(not(any(windows, unix)), feature(default_alloc_error_handler))]
+#![cfg_attr(not(any(windows)), feature(default_alloc_error_handler))]
+
+#[cfg(any(windows, unix))]
+extern crate alloc;
+#[cfg(any(windows, unix))]
+use alloc::ffi::CString;
+#[cfg(not(any(windows)))]
+use core::panic::PanicInfo;
 
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
-    corpus::{InMemoryCorpus, QueueCorpusScheduler},
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
+    corpus::InMemoryCorpus,
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, ExitKind},
-    feedbacks::{CrashFeedback, MapFeedbackState, MaxMapFeedback},
+    feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
+    monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
+    schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
-    stats::SimpleStats,
 };
-
 #[cfg(any(windows, unix))]
-use cstr_core::CString;
-#[cfg(any(windows, unix))]
-use libc::{c_char, printf};
-
-#[cfg(not(any(windows, unix)))]
-use core::panic::PanicInfo;
+use libc::{abort, printf};
 use static_alloc::Bump;
 
 #[global_allocator]
 static A: Bump<[u8; 512 * 1024 * 1024]> = Bump::uninit();
 
-#[cfg(not(any(windows, unix)))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    loop {}
+    #[cfg(unix)]
+    unsafe {
+        abort();
+    }
+    #[cfg(not(unix))]
+    loop {
+        // On embedded, there's not much left to do.
+    }
 }
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
@@ -46,8 +54,20 @@ fn signals_set(idx: usize) {
     unsafe { SIGNALS[idx] = 1 };
 }
 
+/// Provide custom time in `no_std` environment
+/// Use a time provider of your choice
+#[no_mangle]
+pub extern "C" fn external_current_millis() -> u64 {
+    // TODO: use "real" time here
+    1000
+}
+
+/// The main of this program.
+/// # Panics
+/// Will panic once the fuzzer finds the correct conditions.
 #[allow(clippy::similar_names)]
-pub fn main() {
+#[no_mangle]
+pub extern "C" fn main(_argc: isize, _argv: *const *const u8) -> isize {
     // The closure that we want to fuzz
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -57,6 +77,7 @@ pub fn main() {
             signals_set(1);
             if buf.len() > 1 && buf[1] == b'b' {
                 signals_set(2);
+                #[allow(clippy::manual_assert)]
                 if buf.len() > 2 && buf[2] == b'c' {
                     panic!("=)");
                 }
@@ -68,14 +89,11 @@ pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
 
-    // The state of the edges feedback.
-    let feedback_state = MapFeedbackState::with_observer(&observer);
-
     // Feedback to rate the interestingness of an input
-    let feedback = MaxMapFeedback::new(&feedback_state, &observer);
+    let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let objective = CrashFeedback::new();
+    let mut objective = CrashFeedback::new();
 
     // create a State from scratch
     let mut state = StdState::new(
@@ -87,28 +105,29 @@ pub fn main() {
         // on disk so the user can get them after stopping the fuzzer
         InMemoryCorpus::new(),
         // States of the feedbacks.
-        // They are the data related to the feedbacks that you want to persist in the State.
-        tuple_list!(feedback_state),
-    );
+        // The feedbacks can report the data that should persist in the State.
+        &mut feedback,
+        // Same for objective feedbacks
+        &mut objective,
+    )
+    .unwrap();
 
-    // The Stats trait define how the fuzzer stats are reported to the user
-    let stats = SimpleStats::new(|s| {
+    // The Monitor trait define how the fuzzer stats are reported to the user
+    let monitor = SimpleMonitor::new(|s| {
         // TODO: Print `s` here, if your target permits it.
         #[cfg(any(windows, unix))]
         unsafe {
-            printf(
-                b"%s\n\0".as_ptr() as *const c_char,
-                CString::new(s).unwrap().as_ptr() as *const c_char,
-            );
+            let s = CString::new(s).unwrap();
+            printf(b"%s\n\0".as_ptr().cast(), s.as_ptr());
         }
     });
 
     // The event manager handle the various events generated during the fuzzing loop
     // such as the notification of the addition of a new item to the corpus
-    let mut mgr = SimpleEventManager::new(stats);
+    let mut mgr = SimpleEventManager::new(monitor);
 
     // A queue policy to get testcasess from the corpus
-    let scheduler = QueueCorpusScheduler::new();
+    let scheduler = QueueScheduler::new();
 
     // A fuzzer with feedbacks and a corpus scheduler
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
@@ -138,4 +157,6 @@ pub fn main() {
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
         .expect("Error in the fuzzing loop");
+
+    0
 }

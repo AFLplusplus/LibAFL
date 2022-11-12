@@ -1,8 +1,8 @@
 [package]
 name = "libfuzzer_reachability"
-version = "0.5.0"
+version = "0.8.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [features]
 default = ["std"]
@@ -17,13 +17,13 @@ debug = true
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 which = { version = "4.0.2" }
-num_cpus = "1.0"
 
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
+mimalloc = { version = "*", default-features = false }
 
 [lib]
 name = "libfuzzer_libpng"

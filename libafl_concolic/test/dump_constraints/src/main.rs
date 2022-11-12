@@ -11,59 +11,61 @@ use std::{
     string::ToString,
 };
 
-use structopt::StructOpt;
-
+use clap::{self, Parser};
 use libafl::{
-    bolts::shmem::{ShMem, ShMemProvider, StdShMemProvider},
+    bolts::{
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        AsSlice,
+    },
     observers::concolic::{
         serialization_format::{MessageFileReader, MessageFileWriter, DEFAULT_ENV_NAME},
         EXPRESSION_PRUNING, HITMAP_ENV_NAME, NO_FLOAT_ENV_NAME, SELECTIVE_SYMBOLICATION_ENV_NAME,
     },
 };
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[command(
     name = "dump_constraints",
     about = "Dump tool for concolic constraints."
 )]
 struct Opt {
     /// Outputs plain text instead of binary
-    #[structopt(short, long)]
+    #[arg(short, long)]
     plain_text: bool,
 
     /// Outputs coverage information to the given file
-    #[structopt(short, long)]
+    #[arg(short, long)]
     coverage_file: Option<PathBuf>,
 
     /// Symbolizes only the given input file offsets.
-    #[structopt(short, long)]
+    #[arg(short, long)]
     symbolize_offsets: Option<Vec<usize>>,
 
     /// Concretize all floating point operations.
-    #[structopt(long)]
+    #[arg(long)]
     no_float: bool,
 
     /// Prune expressions from high-frequency code locations.
-    #[structopt(long)]
+    #[arg(long)]
     prune: bool,
 
     /// Trace file path, "trace" by default.
-    #[structopt(parse(from_os_str), short, long)]
+    #[arg(short, long)]
     output: Option<PathBuf>,
 
     /// Target program and arguments
-    #[structopt(last = true)]
+    #[arg(last = true)]
     program: Vec<OsString>,
 }
 
 fn main() {
     const COVERAGE_MAP_SIZE: usize = 65536;
 
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
 
     let mut shmemprovider = StdShMemProvider::default();
     let concolic_shmem = shmemprovider
-        .new_map(1024 * 1024 * 1024)
+        .new_shmem(1024 * 1024 * 1024)
         .expect("unable to create shared mapping");
     concolic_shmem
         .write_to_env(DEFAULT_ENV_NAME)
@@ -71,7 +73,7 @@ fn main() {
 
     let coverage_map = StdShMemProvider::new()
         .unwrap()
-        .new_map(COVERAGE_MAP_SIZE)
+        .new_shmem(COVERAGE_MAP_SIZE)
         .unwrap();
     //let the forkserver know the shmid
     coverage_map.write_to_env(HITMAP_ENV_NAME).unwrap();
@@ -95,7 +97,7 @@ fn main() {
         std::env::set_var(EXPRESSION_PRUNING, "1");
     }
 
-    let res = Command::new(&opt.program.first().expect("no program argument given"))
+    let res = Command::new(opt.program.first().expect("no program argument given"))
         .args(opt.program.iter().skip(1))
         .status()
         .expect("failed to spawn program");
@@ -105,12 +107,12 @@ fn main() {
                 File::create(coverage_file_path).expect("unable to open coverage file"),
             );
             for (index, count) in coverage_map
-                .map()
+                .as_slice()
                 .iter()
                 .enumerate()
                 .filter(|(_, &v)| v != 0)
             {
-                writeln!(&mut f, "{}\t{}", index, count).expect("failed to write coverage file");
+                writeln!(f, "{index}\t{count}").expect("failed to write coverage file");
             }
         }
 
@@ -118,12 +120,12 @@ fn main() {
         let output_file_path = opt.output.unwrap_or_else(|| "trace".into());
         let mut output_file =
             BufWriter::new(File::create(output_file_path).expect("unable to open output file"));
-        let mut reader = MessageFileReader::from_length_prefixed_buffer(concolic_shmem.map())
+        let mut reader = MessageFileReader::from_length_prefixed_buffer(concolic_shmem.as_slice())
             .expect("unable to create trace reader");
         if opt.plain_text {
             while let Some(message) = reader.next_message() {
                 if let Ok((id, message)) = message {
-                    writeln!(&mut output_file, "{}\t{:?}", id, message)
+                    writeln!(output_file, "{id}\t{message:?}")
                         .expect("failed to write to output file");
                 } else {
                     break;

@@ -1,236 +1,331 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
-use crate::{
-    bolts::current_time,
-    corpus::{Corpus, PowerScheduleTestcaseMetaData},
-    executors::{Executor, HasObservers},
-    fuzzer::Evaluator,
-    inputs::Input,
-    observers::{MapObserver, ObserversTuple},
-    stages::Stage,
-    state::{HasCorpus, HasMetadata},
-    Error,
-};
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{marker::PhantomData, time::Duration};
-use num::Integer;
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
+
+use hashbrown::HashSet;
+use num_traits::Bounded;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
-pub struct CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
-where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    I: Input,
-    O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
-{
-    map_observer_name: String,
-    stage_max: usize,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(C, E, EM, I, O, OT, S, T, Z)>,
+use crate::{
+    bolts::{current_time, tuples::Named, AsIter},
+    corpus::{Corpus, SchedulerTestcaseMetaData},
+    events::{EventFirer, LogSeverity},
+    executors::{Executor, ExitKind, HasObservers},
+    feedbacks::{
+        map::{IsNovel, MapFeedback, MapFeedbackMetadata, Reducer},
+        HasObserverName,
+    },
+    fuzzer::Evaluator,
+    inputs::UsesInput,
+    observers::{MapObserver, ObserversTuple},
+    schedulers::powersched::SchedulerMetadata,
+    stages::Stage,
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState},
+    Error,
+};
+
+crate::impl_serdeany!(UnstableEntriesMetadata);
+/// The metadata to keep unstable entries
+/// In libafl, the stability is the number of the unstable entries divided by the size of the map
+/// This is different from AFL++, which shows the number of the unstable entries divided by the number of filled entries.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UnstableEntriesMetadata {
+    unstable_entries: HashSet<usize>,
+    map_len: usize,
 }
 
-const CAL_STAGE_MAX: usize = 8;
+impl UnstableEntriesMetadata {
+    #[must_use]
+    /// Create a new [`struct@UnstableEntriesMetadata`]
+    pub fn new(entries: HashSet<usize>, map_len: usize) -> Self {
+        Self {
+            unstable_entries: entries,
+            map_len,
+        }
+    }
 
-impl<C, E, EM, I, O, OT, S, T, Z> Stage<E, EM, S, Z>
-    for CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
+    /// Getter
+    #[must_use]
+    pub fn unstable_entries(&self) -> &HashSet<usize> {
+        &self.unstable_entries
+    }
+
+    /// Getter
+    #[must_use]
+    pub fn map_len(&self) -> usize {
+        self.map_len
+    }
+}
+
+/// The calibration stage will measure the average exec time and the target's stability for this input.
+#[derive(Clone, Debug)]
+pub struct CalibrationStage<O, OT, S> {
+    map_observer_name: String,
+    map_name: String,
+    stage_max: usize,
+    track_stability: bool,
+    phantom: PhantomData<(O, OT, S)>,
+}
+
+const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
+const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
+
+impl<O, OT, S> UsesState for CalibrationStage<O, OT, S>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    I: Input,
-    O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<O, OT, E::State>
+where
+    E: Executor<EM, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<State = E::State>,
+    O: MapObserver,
+    for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
+    OT: ObserversTuple<E::State>,
+    E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
+    Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]
-    #[allow(clippy::let_and_return)]
+    #[allow(clippy::let_and_return, clippy::too_many_lines)]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
-        manager: &mut EM,
+        state: &mut E::State,
+        mgr: &mut EM,
         corpus_idx: usize,
     ) -> Result<(), Error> {
-        let iter = self.stage_max;
-        let handicap = state
-            .metadata()
-            .get::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?
-            .queue_cycles;
+        // Run this stage only once for each corpus entry
+        if state.corpus().get(corpus_idx)?.borrow_mut().fuzz_level() > 0 {
+            return Ok(());
+        }
 
-        let start = current_time();
+        let mut iter = self.stage_max;
 
-        for _i in 0..iter {
+        let input = state
+            .corpus()
+            .get(corpus_idx)?
+            .borrow_mut()
+            .load_input()?
+            .clone();
+
+        // Run once to get the initial calibration map
+        executor.observers_mut().pre_exec_all(state, &input)?;
+
+        let mut start = current_time();
+
+        let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+        let mut total_time = if exit_kind == ExitKind::Ok {
+            current_time() - start
+        } else {
+            mgr.log(
+                state,
+                LogSeverity::Warn,
+                "Corpus entry errored on execution!".into(),
+            )?;
+            // assume one second as default time
+            Duration::from_secs(1)
+        };
+
+        executor
+            .observers_mut()
+            .post_exec_all(state, &input, &exit_kind)?;
+
+        let map_first = &executor
+            .observers()
+            .match_name::<O>(&self.map_observer_name)
+            .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+            .to_vec();
+
+        let mut unstable_entries: Vec<usize> = vec![];
+        let map_len: usize = map_first.len();
+        // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
+        // run is found to be unstable, with CAL_STAGE_MAX total runs.
+        let mut i = 1;
+        let mut has_errors = false;
+
+        while i < iter {
             let input = state
                 .corpus()
                 .get(corpus_idx)?
                 .borrow_mut()
                 .load_input()?
                 .clone();
-            let _ = executor.run_target(fuzzer, state, manager, &input)?;
+
+            executor.observers_mut().pre_exec_all(state, &input)?;
+            start = current_time();
+
+            let exit_kind = executor.run_target(fuzzer, state, mgr, &input)?;
+            if exit_kind != ExitKind::Ok {
+                if !has_errors {
+                    mgr.log(
+                        state,
+                        LogSeverity::Warn,
+                        "Corpus entry errored on execution!".into(),
+                    )?;
+
+                    has_errors = true;
+                    if iter < CAL_STAGE_MAX {
+                        iter += 2;
+                    };
+                }
+                continue;
+            };
+
+            total_time += current_time() - start;
+
+            executor
+                .observers_mut()
+                .post_exec_all(state, &input, &exit_kind)?;
+
+            if self.track_stability {
+                let map = &executor
+                    .observers()
+                    .match_name::<O>(&self.map_observer_name)
+                    .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+                    .to_vec();
+
+                let history_map = &mut state
+                    .named_metadata_mut()
+                    .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
+                    .unwrap()
+                    .history_map;
+
+                if history_map.len() < map_len {
+                    history_map.resize(map_len, O::Entry::default());
+                }
+
+                for (idx, (first, (cur, history))) in map_first
+                    .iter()
+                    .zip(map.iter().zip(history_map.iter_mut()))
+                    .enumerate()
+                {
+                    if *first != *cur && *history != O::Entry::max_value() {
+                        *history = O::Entry::max_value();
+                        unstable_entries.push(idx);
+                    };
+                }
+
+                if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
+                    iter += 2;
+                }
+            }
+            i += 1;
         }
 
-        let end = current_time();
+        #[allow(clippy::cast_precision_loss)]
+        if !unstable_entries.is_empty() {
+            // If we see new stable entries executing this new corpus entries, then merge with the existing one
+            if state.has_metadata::<UnstableEntriesMetadata>() {
+                let existing = state
+                    .metadata_mut()
+                    .get_mut::<UnstableEntriesMetadata>()
+                    .unwrap();
+                for item in unstable_entries {
+                    existing.unstable_entries.insert(item); // Insert newly found items
+                }
+                existing.map_len = map_len;
+            } else {
+                state.add_metadata::<UnstableEntriesMetadata>(UnstableEntriesMetadata::new(
+                    HashSet::from_iter(unstable_entries),
+                    map_len,
+                ));
+            }
+        };
 
-        let map = executor
-            .observers()
-            .match_name::<O>(&self.map_observer_name)
-            .ok_or_else(|| Error::KeyNotFound("MapObserver not found".to_string()))?;
+        // If weighted scheduler or powerscheduler is used, update it
+        let use_powerschedule = state.has_metadata::<SchedulerMetadata>()
+            && state
+                .corpus()
+                .get(corpus_idx)?
+                .borrow()
+                .has_metadata::<SchedulerTestcaseMetaData>();
 
-        let bitmap_size = map.count_bytes();
+        if use_powerschedule {
+            let map = executor
+                .observers()
+                .match_name::<O>(&self.map_observer_name)
+                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?;
 
-        let psmeta = state
-            .metadata_mut()
-            .get_mut::<PowerScheduleMetadata>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleMetadata not found".to_string()))?;
+            let bitmap_size = map.count_bytes();
 
-        psmeta.set_exec_time(psmeta.exec_time() + (end - start));
-        psmeta.set_cycles(psmeta.cycles() + (iter as u64));
-        psmeta.set_bitmap_size(psmeta.bitmap_size() + bitmap_size);
-        psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
+            let psmeta = state.metadata_mut().get_mut::<SchedulerMetadata>().unwrap();
+            let handicap = psmeta.queue_cycles();
 
-        // println!("psmeta: {:#?}", psmeta);
-        let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+            psmeta.set_exec_time(psmeta.exec_time() + total_time);
+            psmeta.set_cycles(psmeta.cycles() + (iter as u64));
+            psmeta.set_bitmap_size(psmeta.bitmap_size() + bitmap_size);
+            psmeta.set_bitmap_entries(psmeta.bitmap_entries() + 1);
 
-        testcase.set_exec_time((end - start) / (iter as u32));
-        // println!("time: {:#?}", testcase.exec_time());
-        let data = testcase
-            .metadata_mut()
-            .get_mut::<PowerScheduleTestcaseMetaData>()
-            .ok_or_else(|| Error::KeyNotFound("PowerScheduleTestData not found".to_string()))?;
+            let mut testcase = state.corpus().get(corpus_idx)?.borrow_mut();
+            let fuzz_level = testcase.fuzz_level();
 
-        data.set_bitmap_size(bitmap_size);
-        data.set_handicap(handicap);
-        data.set_fuzz_level(data.fuzz_level() + 1);
-        // println!("data: {:#?}", data);
+            testcase.set_exec_time(total_time / (iter as u32));
+            testcase.set_fuzz_leve(fuzz_level + 1);
+            // println!("time: {:#?}", testcase.exec_time());
+
+            let data = testcase
+                .metadata_mut()
+                .get_mut::<SchedulerTestcaseMetaData>()
+                .ok_or_else(|| {
+                    Error::key_not_found("SchedulerTestcaseMetaData not found".to_string())
+                })?;
+
+            data.set_bitmap_size(bitmap_size);
+            data.set_handicap(handicap);
+        }
 
         Ok(())
     }
 }
 
-pub const N_FUZZ_SIZE: usize = 1 << 21;
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PowerScheduleMetadata {
-    /// Measured exec time during calibration
-    exec_time: Duration,
-    /// Calibration cycles
-    cycles: u64,
-    /// Size of the observer map
-    bitmap_size: u64,
-    /// Number of filled map entries
-    bitmap_entries: u64,
-    /// Queue cycles
-    queue_cycles: u64,
-    /// The vector to contain the frequency of each execution path.
-    n_fuzz: Vec<u32>,
-}
-
-/// The metadata for runs in the calibration stage.
-impl PowerScheduleMetadata {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            exec_time: Duration::from_millis(0),
-            cycles: 0,
-            bitmap_size: 0,
-            bitmap_entries: 0,
-            queue_cycles: 0,
-            n_fuzz: vec![0; N_FUZZ_SIZE],
-        }
-    }
-
-    #[must_use]
-    pub fn exec_time(&self) -> Duration {
-        self.exec_time
-    }
-
-    pub fn set_exec_time(&mut self, time: Duration) {
-        self.exec_time = time;
-    }
-
-    #[must_use]
-    pub fn cycles(&self) -> u64 {
-        self.cycles
-    }
-
-    pub fn set_cycles(&mut self, val: u64) {
-        self.cycles = val;
-    }
-
-    #[must_use]
-    pub fn bitmap_size(&self) -> u64 {
-        self.bitmap_size
-    }
-
-    pub fn set_bitmap_size(&mut self, val: u64) {
-        self.bitmap_size = val;
-    }
-
-    #[must_use]
-    pub fn bitmap_entries(&self) -> u64 {
-        self.bitmap_entries
-    }
-
-    pub fn set_bitmap_entries(&mut self, val: u64) {
-        self.bitmap_entries = val;
-    }
-
-    #[must_use]
-    pub fn queue_cycles(&self) -> u64 {
-        self.queue_cycles
-    }
-
-    pub fn set_queue_cycles(&mut self, val: u64) {
-        self.queue_cycles = val;
-    }
-
-    #[must_use]
-    pub fn n_fuzz(&self) -> &[u32] {
-        &self.n_fuzz
-    }
-
-    #[must_use]
-    pub fn n_fuzz_mut(&mut self) -> &mut [u32] {
-        &mut self.n_fuzz
-    }
-}
-
-crate::impl_serdeany!(PowerScheduleMetadata);
-
-impl<C, E, I, EM, O, OT, S, T, Z> CalibrationStage<C, E, EM, I, O, OT, S, T, Z>
+impl<O, OT, S> CalibrationStage<O, OT, S>
 where
-    T: Integer + Default + Copy + 'static + serde::Serialize + serde::de::DeserializeOwned,
-    C: Corpus<I>,
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    I: Input,
-    O: MapObserver<T>,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<C, I> + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    O: MapObserver,
+    OT: ObserversTuple<S>,
+    S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
-    pub fn new(state: &mut S, map_observer_name: &O) -> Self {
-        state.add_metadata::<PowerScheduleMetadata>(PowerScheduleMetadata::new());
+    /// Create a new [`CalibrationStage`].
+    #[must_use]
+    pub fn new<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
+    where
+        O::Entry:
+            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+        R: Reducer<O::Entry>,
+        for<'it> O: AsIter<'it, Item = O::Entry>,
+        N: IsNovel<O::Entry>,
+    {
         Self {
-            map_observer_name: map_observer_name.name().to_string(),
-            stage_max: CAL_STAGE_MAX,
+            map_observer_name: map_feedback.observer_name().to_string(),
+            map_name: map_feedback.name().to_string(),
+            stage_max: CAL_STAGE_START,
+            track_stability: true,
             phantom: PhantomData,
         }
     }
-}
 
-impl Default for PowerScheduleMetadata {
-    fn default() -> Self {
-        Self::new()
+    /// Create a new [`CalibrationStage`], but without checking stability.
+    #[must_use]
+    pub fn ignore_stability<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
+    where
+        O::Entry:
+            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+        R: Reducer<O::Entry>,
+        for<'it> O: AsIter<'it, Item = O::Entry>,
+        N: IsNovel<O::Entry>,
+    {
+        Self {
+            map_observer_name: map_feedback.observer_name().to_string(),
+            map_name: map_feedback.name().to_string(),
+            stage_max: CAL_STAGE_START,
+            track_stability: false,
+            phantom: PhantomData,
+        }
     }
 }

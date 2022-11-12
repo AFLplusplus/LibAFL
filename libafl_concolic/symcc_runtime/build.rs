@@ -66,7 +66,9 @@ fn main() {
         write_symcc_runtime_bindings_file(&out_path, &cpp_bindings);
         write_cpp_function_export_macro(&out_path, &cpp_bindings);
 
-        if std::env::var("CARGO_FEATURE_NO_CPP_RUNTIME").is_err() {
+        if std::env::var("CARGO_FEATURE_NO_CPP_RUNTIME").is_err()
+            && std::env::var("DOCS_RS").is_err()
+        {
             let rename_header_path = out_path.join("rename.h");
             write_symcc_rename_header(&rename_header_path, &cpp_bindings);
             build_and_link_symcc_runtime(&symcc_src_path, &rename_header_path);
@@ -79,7 +81,7 @@ fn main() {
 fn write_cpp_function_export_macro(out_path: &Path, cpp_bindings: &bindgen::Bindings) {
     let mut macro_file = File::create(out_path.join("cpp_exports_macro.rs")).unwrap();
     writeln!(
-        &mut macro_file,
+        macro_file,
         "#[doc(hidden)]
         #[macro_export]
         macro_rules! export_cpp_runtime_functions {{
@@ -90,14 +92,14 @@ fn write_cpp_function_export_macro(out_path: &Path, cpp_bindings: &bindgen::Bind
         .captures_iter(&cpp_bindings.to_string())
         .for_each(|captures| {
             writeln!(
-                &mut macro_file,
+                macro_file,
                 "    symcc_runtime::export_c_symbol!({});",
                 &captures[1]
             )
             .unwrap();
         });
     writeln!(
-        &mut macro_file,
+        macro_file,
         " }};
         }}",
     )
@@ -105,11 +107,15 @@ fn write_cpp_function_export_macro(out_path: &Path, cpp_bindings: &bindgen::Bind
 }
 
 fn checkout_symcc(out_path: &Path) -> PathBuf {
-    let repo_dir = out_path.join("libafl_symcc_src");
-    if !repo_dir.exists() {
-        clone_symcc(&repo_dir);
+    if std::env::var("DOCS_RS").is_ok() {
+        "symcc".into()
+    } else {
+        let repo_dir = out_path.join("libafl_symcc_src");
+        if !repo_dir.exists() {
+            clone_symcc(&repo_dir);
+        }
+        repo_dir
     }
-    repo_dir
 }
 
 fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {
@@ -143,7 +149,7 @@ fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {
         .expect("Unable to generate bindings");
     let mut rust_runtime_macro = File::create(out_path.join("rust_exports_macro.rs")).unwrap();
     writeln!(
-        &mut rust_runtime_macro,
+        rust_runtime_macro,
         "#[doc(hidden)]
         #[macro_export]
         macro_rules! invoke_macro_with_rust_runtime_exports {{
@@ -154,7 +160,7 @@ fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {
         .captures_iter(&rust_bindings.to_string())
         .for_each(|captures| {
             writeln!(
-                &mut rust_runtime_macro,
+                rust_runtime_macro,
                 "    $macro!({},{}; $($extra_ident),*);",
                 &captures[1].replace("_rsym_", ""),
                 &FUNCTION_NAME_REGEX.captures(&captures[1]).unwrap()[1]
@@ -162,7 +168,7 @@ fn write_rust_runtime_macro_file(out_path: &Path, symcc_src_path: &Path) {
             .unwrap();
         });
     writeln!(
-        &mut rust_runtime_macro,
+        rust_runtime_macro,
         " }};
         }}",
     )
@@ -175,20 +181,20 @@ fn write_symcc_runtime_bindings_file(out_path: &Path, cpp_bindings: &bindgen::Bi
         if let Some(captures) = FUNCTION_NAME_REGEX.captures(l) {
             let function_name = &captures[1];
             writeln!(
-                &mut bindings_file,
+                bindings_file,
                 "#[link_name=\"{}{}\"]",
                 SYMCC_RUNTIME_FUNCTION_NAME_PREFIX, function_name
             )
             .unwrap();
         }
-        writeln!(&mut bindings_file, "{}", l).unwrap();
+        writeln!(bindings_file, "{l}").unwrap();
     });
 }
 
 fn write_symcc_rename_header(rename_header_path: &Path, cpp_bindings: &bindgen::Bindings) {
     let mut rename_header_file = File::create(rename_header_path).unwrap();
     writeln!(
-        &mut rename_header_file,
+        rename_header_file,
         "#ifndef PREFIX_EXPORTS_H
         #define PREFIX_EXPORTS_H",
     )
@@ -201,14 +207,14 @@ fn write_symcc_rename_header(rename_header_path: &Path, cpp_bindings: &bindgen::
         .map(|captures| captures[1].to_string())
         .for_each(|val| {
             writeln!(
-                &mut rename_header_file,
-                "#define {} {}{}",
-                &val, SYMCC_RUNTIME_FUNCTION_NAME_PREFIX, &val
+                rename_header_file,
+                "#define {} {SYMCC_RUNTIME_FUNCTION_NAME_PREFIX}{}",
+                &val, &val
             )
             .unwrap();
         });
 
-    writeln!(&mut rename_header_file, "#endif").unwrap();
+    writeln!(rename_header_file, "#endif").unwrap();
 }
 
 fn build_and_link_symcc_runtime(symcc_src_path: &Path, rename_header_path: &Path) {
@@ -239,12 +245,12 @@ fn link_with_cpp_stdlib() {
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
-        println!("Checking for build tool {}...", tool);
+        println!("Checking for build tool {tool}...");
 
         if let Ok(path) = which::which(tool) {
             println!("Found build tool {}", path.to_str().unwrap());
         } else {
-            println!("ERROR: missing build tool {}", tool);
+            println!("ERROR: missing build tool {tool}");
             exit(1);
         };
     }

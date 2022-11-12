@@ -1,7 +1,7 @@
-//! Corpuses contain the testcases, either in mem, on disk, or somewhere else.
+//! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
 pub mod testcase;
-pub use testcase::{PowerScheduleTestcaseMetaData, Testcase};
+pub use testcase::{SchedulerTestcaseMetaData, Testcase};
 
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
@@ -16,34 +16,17 @@ pub mod cached;
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
 
-pub mod queue;
-pub use queue::QueueCorpusScheduler;
-
+#[cfg(feature = "cmin")]
 pub mod minimizer;
-pub use minimizer::{
-    FavFactor, IndexesLenTimeMinimizerCorpusScheduler, IsFavoredMetadata,
-    LenTimeMinimizerCorpusScheduler, LenTimeMulFavFactor, MinimizerCorpusScheduler,
-    TopRatedsMetadata,
-};
+use core::cell::RefCell;
 
-pub mod powersched;
-pub use powersched::PowerQueueCorpusScheduler;
+#[cfg(feature = "cmin")]
+pub use minimizer::*;
 
-use alloc::borrow::ToOwned;
-use core::{cell::RefCell, marker::PhantomData};
-
-use crate::{
-    bolts::rands::Rand,
-    inputs::Input,
-    state::{HasCorpus, HasRand},
-    Error,
-};
+use crate::{inputs::UsesInput, Error};
 
 /// Corpus with all current testcases
-pub trait Corpus<I>: serde::Serialize + serde::de::DeserializeOwned
-where
-    I: Input,
-{
+pub trait Corpus: UsesInput + serde::Serialize + for<'de> serde::Deserialize<'de> {
     /// Returns the number of elements
     fn count(&self) -> usize;
 
@@ -53,118 +36,195 @@ where
     }
 
     /// Add an entry to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error>;
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<usize, Error>;
 
-    /// Replaces the testcase at the given idx
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<(), Error>;
+    /// Replaces the testcase at the given idx, returning the existing.
+    fn replace(
+        &mut self,
+        idx: usize,
+        testcase: Testcase<Self::Input>,
+    ) -> Result<Testcase<Self::Input>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error>;
+    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<Self::Input>>, Error>;
 
     /// Get by id
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error>;
+    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<usize>;
 
-    /// Current testcase scheduled (mut)
+    /// Current testcase scheduled (mutable)
     fn current_mut(&mut self) -> &mut Option<usize>;
 }
 
-/// The scheduler define how the fuzzer requests a testcase from the corpus.
-/// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait CorpusScheduler<I, S>
-where
-    I: Input,
-{
-    /// Add an entry to the corpus and return its index
-    fn on_add(&self, _state: &mut S, _idx: usize) -> Result<(), Error> {
-        Ok(())
+/// `Corpus` Python bindings
+#[cfg(feature = "python")]
+#[allow(missing_docs)]
+pub mod pybind {
+    use std::cell::RefCell;
+
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        corpus::{
+            cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
+            ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
+            Testcase,
+        },
+        inputs::{BytesInput, UsesInput},
+        Error,
+    };
+
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    enum PythonCorpusWrapper {
+        InMemory(Py<PythonInMemoryCorpus>),
+        CachedOnDisk(Py<PythonCachedOnDiskCorpus>),
+        OnDisk(Py<PythonOnDiskCorpus>),
     }
 
-    /// Replaces the testcase at the given idx
-    fn on_replace(
-        &self,
-        _state: &mut S,
-        _idx: usize,
-        _testcase: &Testcase<I>,
-    ) -> Result<(), Error> {
-        Ok(())
+    /// Corpus Trait binding
+    #[pyclass(unsendable, name = "Corpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
+    #[derive(Serialize, Deserialize, Debug, Clone)]
+    pub struct PythonCorpus {
+        wrapper: PythonCorpusWrapper,
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
-    fn on_remove(
-        &self,
-        _state: &mut S,
-        _idx: usize,
-        _testcase: &Option<Testcase<I>>,
-    ) -> Result<(), Error> {
-        Ok(())
+    macro_rules! unwrap_me {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_body!(
+                $wrapper,
+                $name,
+                $body,
+                PythonCorpusWrapper,
+                {
+                    InMemory,
+                    CachedOnDisk,
+                    OnDisk
+                }
+            )
+        };
     }
 
-    /// Gets the next entry
-    fn next(&self, state: &mut S) -> Result<usize, Error>;
-}
+    macro_rules! unwrap_me_mut {
+        ($wrapper:expr, $name:ident, $body:block) => {
+            crate::unwrap_me_mut_body!(
+                $wrapper,
+                $name,
+                $body,
+                PythonCorpusWrapper,
+                {
+                    InMemory,
+                    CachedOnDisk,
+                    OnDisk
+                }
+            )
+        };
+    }
 
-/// Feed the fuzzer simpply with a random testcase on request
-pub struct RandCorpusScheduler<C, I, R, S>
-where
-    S: HasCorpus<C, I> + HasRand<R>,
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-{
-    phantom: PhantomData<(C, I, R, S)>,
-}
+    #[pymethods]
+    impl PythonCorpus {
+        #[staticmethod]
+        #[must_use]
+        pub fn new_in_memory(py_in_memory_corpus: Py<PythonInMemoryCorpus>) -> Self {
+            Self {
+                wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus),
+            }
+        }
 
-impl<C, I, R, S> CorpusScheduler<I, S> for RandCorpusScheduler<C, I, R, S>
-where
-    S: HasCorpus<C, I> + HasRand<R>,
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-{
-    /// Gets the next entry at random
-    fn next(&self, state: &mut S) -> Result<usize, Error> {
-        if state.corpus().count() == 0 {
-            Err(Error::Empty("No entries in corpus".to_owned()))
-        } else {
-            let len = state.corpus().count();
-            let id = state.rand_mut().below(len as u64) as usize;
-            *state.corpus_mut().current_mut() = Some(id);
-            Ok(id)
+        #[staticmethod]
+        #[must_use]
+        pub fn new_cached_on_disk(py_cached_on_disk_corpus: Py<PythonCachedOnDiskCorpus>) -> Self {
+            Self {
+                wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus),
+            }
+        }
+
+        #[staticmethod]
+        #[must_use]
+        pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
+            Self {
+                wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus),
+            }
+        }
+
+        #[pyo3(name = "count")]
+        fn pycount(&self) -> usize {
+            self.count()
+        }
+
+        #[pyo3(name = "current")]
+        fn pycurrent(&self) -> Option<usize> {
+            *self.current()
+        }
+
+        #[pyo3(name = "get")]
+        fn pyget(&self, idx: usize) -> PythonTestcaseWrapper {
+            let t: &mut Testcase<BytesInput> = unwrap_me!(self.wrapper, c, {
+                c.get(idx)
+                    .map(|v| unsafe { v.as_ptr().as_mut().unwrap() })
+                    .expect("PythonCorpus::get failed")
+            });
+            PythonTestcaseWrapper::wrap(t)
         }
     }
-}
 
-impl<C, I, R, S> RandCorpusScheduler<C, I, R, S>
-where
-    S: HasCorpus<C, I> + HasRand<R>,
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-{
-    /// Create a new [`RandCorpusScheduler`] that just schedules randomly.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            phantom: PhantomData,
+    impl UsesInput for PythonCorpus {
+        type Input = BytesInput;
+    }
+
+    impl Corpus for PythonCorpus {
+        #[inline]
+        fn count(&self) -> usize {
+            unwrap_me!(self.wrapper, c, { c.count() })
+        }
+
+        #[inline]
+        fn add(&mut self, testcase: Testcase<BytesInput>) -> Result<usize, Error> {
+            unwrap_me_mut!(self.wrapper, c, { c.add(testcase) })
+        }
+
+        #[inline]
+        fn replace(
+            &mut self,
+            idx: usize,
+            testcase: Testcase<BytesInput>,
+        ) -> Result<Testcase<BytesInput>, Error> {
+            unwrap_me_mut!(self.wrapper, c, { c.replace(idx, testcase) })
+        }
+
+        #[inline]
+        fn remove(&mut self, idx: usize) -> Result<Option<Testcase<BytesInput>>, Error> {
+            unwrap_me_mut!(self.wrapper, c, { c.remove(idx) })
+        }
+
+        #[inline]
+        fn get(&self, idx: usize) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
+            let ptr = unwrap_me!(self.wrapper, c, {
+                c.get(idx)
+                    .map(|v| v as *const RefCell<Testcase<BytesInput>>)
+            })?;
+            Ok(unsafe { ptr.as_ref().unwrap() })
+        }
+
+        #[inline]
+        fn current(&self) -> &Option<usize> {
+            let ptr = unwrap_me!(self.wrapper, c, { c.current() as *const Option<usize> });
+            unsafe { ptr.as_ref().unwrap() }
+        }
+
+        #[inline]
+        fn current_mut(&mut self) -> &mut Option<usize> {
+            let ptr = unwrap_me_mut!(self.wrapper, c, { c.current_mut() as *mut Option<usize> });
+            unsafe { ptr.as_mut().unwrap() }
         }
     }
-}
 
-impl<C, I, R, S> Default for RandCorpusScheduler<C, I, R, S>
-where
-    S: HasCorpus<C, I> + HasRand<R>,
-    C: Corpus<I>,
-    I: Input,
-    R: Rand,
-{
-    fn default() -> Self {
-        Self::new()
+    /// Register the classes to the python module
+    pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {
+        m.add_class::<PythonCorpus>()?;
+        Ok(())
     }
 }
-
-/// A [`StdCorpusScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s
-/// The current `Std` is a [`RandCorpusScheduler`], although this may change in the future, if another [`CorpusScheduler`] delivers better results.
-pub type StdCorpusScheduler<C, I, R, S> = RandCorpusScheduler<C, I, R, S>;

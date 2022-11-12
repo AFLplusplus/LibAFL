@@ -1,7 +1,14 @@
 target
+target-bin
 out
 Cargo.lock
+vendor
 
+.DS_Store
+.env
+
+*.tmp
+*.swp
 *.o
 *.a
 *.so
@@ -13,6 +20,7 @@ Cargo.lock
 *.dSYM
 
 .cur_input
+.venv
 
 crashes
 
@@ -26,7 +34,19 @@ test.dict
 # Ignore all built fuzzers
 fuzzer_*
 AFLplusplus
+test_*
+*_fuzzer
+*_harness
 
 # Ignore common dummy and logfiles
 *.log
 a
+
+forkserver_test
+__pycache__
+*.lafl_lock
+
+*atomic_file_testfile*
+**/libxml2
+**/corpus_discovered
+**/libxml2-*.tar.gz
