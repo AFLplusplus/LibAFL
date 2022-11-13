@@ -452,6 +452,7 @@ where
                     &mut data.staterestorer_ptr,
                     &mut staterestorer as *mut _ as *mut c_void,
                 );
+                data.allocator_pid = std::process::id() as usize;
                 data.shutdown_handler = shutdown_handler::<SP> as *const c_void;
             }
 

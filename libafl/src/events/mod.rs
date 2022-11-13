@@ -37,6 +37,7 @@ use crate::{
 /// Check if ctrl-c is sent with this struct
 #[cfg(unix)]
 pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData {
+    allocator_pid: 0,
     staterestorer_ptr: core::ptr::null_mut(),
     shutdown_handler: core::ptr::null(),
 };
@@ -46,6 +47,7 @@ pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData
 #[cfg(unix)]
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
+    allocator_pid: usize,
     staterestorer_ptr: *mut c_void,
     shutdown_handler: *const c_void,
 }
@@ -60,7 +62,7 @@ impl ShutdownSignalData {
         SP: ShMemProvider,
     {
         let ptr = self.staterestorer_ptr;
-        if ptr.is_null() {
+        if ptr.is_null() || self.allocator_pid != std::process::id() as usize {
             None
         } else {
             Some((ptr as *mut StateRestorer<SP>).as_mut().unwrap())
@@ -82,9 +84,15 @@ pub unsafe fn shutdown_handler<SP>(
         signal,
         std::process::id()
     );
-    if let Some(sr) = data.staterestorer::<SP>() {
-        println!("bbb");
-        drop(sr);
+
+    let ptr = data.staterestorer_ptr;
+    if ptr.is_null() || data.allocator_pid != std::process::id() as usize {
+        // Do nothing
+    }
+    else{
+        // The process allocated the staterestorer map must take care of it
+        let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
+        std::ptr::drop_in_place(sr);
     }
     println!("Bye!");
     std::process::exit(0);

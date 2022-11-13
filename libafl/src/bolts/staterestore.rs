@@ -67,15 +67,6 @@ where
     phantom: PhantomData<*const SP>,
 }
 
-impl<SP> Drop for StateRestorer<SP>
-where
-    SP: ShMemProvider,
-{
-    fn drop(&mut self) {
-        println!("aaa");
-    }
-}
-
 impl<SP> StateRestorer<SP>
 where
     SP: ShMemProvider,
