@@ -1,6 +1,6 @@
 # Variables
 [env]
-CARGO_TARGET_DIR = { value = "target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
+CARGO_TARGET_DIR = { value = "${PROJECT_DIR}/target", condition = { env_not_set = ["CARGO_TARGET_DIR"] } }
 FUZZER_NAME='libfuzzer_stb_image_concolic'
 
 # Compilers
