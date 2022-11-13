@@ -55,6 +55,7 @@ pub type ShutdownFuncPtr =
     unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut ShutdownSignalData);
 
 /// Shutdown handler. SigTerm, SigInterrupt, SigQuit call this
+/// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
 pub unsafe fn shutdown_handler<SP>(
     signal: Signal,
     _info: siginfo_t,
