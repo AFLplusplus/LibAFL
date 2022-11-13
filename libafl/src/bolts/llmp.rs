@@ -165,7 +165,7 @@ const LLMP_PAGE_HEADER_LEN: usize = size_of::<LlmpPage>();
 
 /// The llmp broker registers a signal handler for cleanups on `SIGINT`.
 #[cfg(unix)]
-static mut GLOBAL_SIGHANDLER_STATE: LlmpBrokerSignalHandler = LlmpBrokerSignalHandler {
+static mut LLMP_SIGHANDLER_STATE: LlmpShutdownSignalHandler = LlmpShutdownSignalHandler {
     shutting_down: false,
 };
 
@@ -1770,12 +1770,12 @@ where
 /// A signal handler for the [`LlmpBroker`].
 #[cfg(unix)]
 #[derive(Debug, Clone)]
-pub struct LlmpBrokerSignalHandler {
+pub struct LlmpShutdownSignalHandler {
     shutting_down: bool,
 }
 
 #[cfg(unix)]
-impl Handler for LlmpBrokerSignalHandler {
+impl Handler for LlmpShutdownSignalHandler {
     fn handle(&mut self, _signal: Signal, _info: siginfo_t, _context: &mut ucontext_t) {
         unsafe {
             ptr::write_volatile(&mut self.shutting_down, true);
@@ -1957,7 +1957,7 @@ where
     #[cfg(unix)]
     #[allow(clippy::unused_self)]
     fn is_shutting_down(&self) -> bool {
-        unsafe { ptr::read_volatile(&GLOBAL_SIGHANDLER_STATE.shutting_down) }
+        unsafe { ptr::read_volatile(&LLMP_SIGHANDLER_STATE.shutting_down) }
     }
 
     /// Always returns true on platforms, where no shutdown signal handlers are supported
@@ -1976,7 +1976,7 @@ where
         F: FnMut(ClientId, Tag, Flags, &[u8]) -> Result<LlmpMsgHookResult, Error>,
     {
         #[cfg(unix)]
-        if let Err(_e) = unsafe { setup_signal_handler(&mut GLOBAL_SIGHANDLER_STATE) } {
+        if let Err(_e) = unsafe { setup_signal_handler(&mut LLMP_SIGHANDLER_STATE) } {
             // We can live without a proper ctrl+c signal handler. Print and ignore.
             #[cfg(feature = "std")]
             println!("Failed to setup signal handlers: {_e}");

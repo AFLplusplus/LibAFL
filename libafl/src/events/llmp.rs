@@ -895,7 +895,7 @@ where
             loop {
                 println!("Spawning next client (id {ctr})");
 
-                // On Unix, we fork
+                // On Unix, we fork (when fork feature is enabled)
                 #[cfg(all(unix, feature = "fork"))]
                 let child_status = {
                     self.shmem_provider.pre_fork()?;
