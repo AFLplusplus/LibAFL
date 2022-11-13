@@ -34,11 +34,13 @@ use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::
 use crate::{
     bolts::{
         llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
+        os::unix_signals::setup_signal_handler,
         shmem::ShMemProvider,
     },
     events::{
-        BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
-        EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
+        shutdown_handler, BrokerEventResult, Event, EventConfig, EventFirer, EventManager,
+        EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId,
+        ProgressReporter, SHUTDOWN_SIGHANDLER_DATA,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},
@@ -885,10 +887,29 @@ where
             mgr.to_env(_ENV_FUZZER_BROKER_CLIENT_INITIAL);
 
             // First, create a channel from the current fuzzer to the next to store state between restarts.
-            let staterestorer: StateRestorer<SP> =
+            let mut staterestorer: StateRestorer<SP> =
                 StateRestorer::new(self.shmem_provider.new_shmem(256 * 1024 * 1024)?);
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+
+            unsafe {
+                let data = &mut SHUTDOWN_SIGHANDLER_DATA;
+                // Write the pointer to staterestorer so we can release its shmem later
+                core::ptr::write_volatile(
+                    &mut data.staterestorer_ptr,
+                    &mut staterestorer as *mut _ as *mut std::ffi::c_void,
+                );
+                data.allocator_pid = std::process::id() as usize;
+                data.shutdown_handler = shutdown_handler::<SP> as *const std::ffi::c_void;
+            }
+
+            // We setup signal handlers to clean up shmem segments used by state restorer
+            #[cfg(unix)]
+            if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
+                // We can live without a proper ctrl+c signal handler. Print and ignore.
+                #[cfg(feature = "std")]
+                println!("Failed to setup signal handlers: {_e}");
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop

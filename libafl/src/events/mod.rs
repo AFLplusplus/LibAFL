@@ -8,9 +8,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{
-    ffi::c_void, fmt, hash::Hasher, marker::PhantomData, time::Duration,
-};
+use core::{ffi::c_void, fmt, hash::Hasher, marker::PhantomData, time::Duration};
 
 use ahash::AHasher;
 pub use llmp::*;
@@ -56,20 +54,6 @@ pub struct ShutdownSignalData {
 pub type ShutdownFuncPtr =
     unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut ShutdownSignalData);
 
-impl ShutdownSignalData {
-    unsafe fn staterestorer<'a, SP>(&self) -> Option<&'a mut StateRestorer<SP>>
-    where
-        SP: ShMemProvider,
-    {
-        let ptr = self.staterestorer_ptr;
-        if ptr.is_null() || self.allocator_pid != std::process::id() as usize {
-            None
-        } else {
-            Some((ptr as *mut StateRestorer<SP>).as_mut().unwrap())
-        }
-    }
-}
-
 /// Shutdown handler. SigTerm, SigInterrupt, SigQuit call this
 pub unsafe fn shutdown_handler<SP>(
     signal: Signal,
@@ -88,10 +72,10 @@ pub unsafe fn shutdown_handler<SP>(
     let ptr = data.staterestorer_ptr;
     if ptr.is_null() || data.allocator_pid != std::process::id() as usize {
         // Do nothing
-    }
-    else{
+    } else {
         // The process allocated the staterestorer map must take care of it
         let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
+        // println!("{:#?}", sr);
         std::ptr::drop_in_place(sr);
     }
     println!("Bye!");
