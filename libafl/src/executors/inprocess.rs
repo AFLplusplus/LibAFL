@@ -184,7 +184,7 @@ where
         Self: Executor<EM, Z, State = S>,
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
-        Z: HasObjective<OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>,
     {
         let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
         #[cfg(windows)]
@@ -342,7 +342,7 @@ impl InProcessHandlers {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State>,
         H: FnMut(&<E::State as UsesInput>::Input) -> ExitKind + ?Sized,
     {
         #[cfg(unix)]
@@ -614,7 +614,7 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -687,7 +687,7 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State>,
     {
         if !data.is_valid() {
             #[cfg(feature = "std")]
@@ -765,7 +765,7 @@ mod unix_signal_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State>,
     {
         #[cfg(all(target_os = "android", target_arch = "aarch64"))]
         let _context = &mut *(((_context as *mut _ as *mut libc::c_void as usize) + 128)
@@ -949,7 +949,7 @@ mod windows_exception_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State>,
     {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(move |panic_info| {
@@ -1039,7 +1039,7 @@ mod windows_exception_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State>,
     {
         let data: &mut InProcessExecutorHandlerData =
             &mut *(global_state as *mut InProcessExecutorHandlerData);
@@ -1135,7 +1135,7 @@ mod windows_exception_handler {
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
         OF: Feedback<E::State>,
         E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = E::State>,
+        Z: HasObjective<Objective = OF, State = E::State>,
     {
         // Have we set a timer_before?
         if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
@@ -1701,7 +1701,7 @@ where
         EM: EventFirer<State = S> + EventRestarter,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>,
     {
         let handlers = InChildProcessHandlers::new::<Self>()?;
         Ok(Self {
@@ -1748,7 +1748,7 @@ where
         EM: EventFirer<State = S> + EventRestarter<State = S>,
         OF: Feedback<S>,
         S: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<OF, State = S>,
+        Z: HasObjective<Objective = OF, State = S>,
     {
         let handlers = InChildProcessHandlers::with_timeout::<Self>()?;
         let milli_sec = timeout.as_millis();

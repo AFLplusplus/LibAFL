@@ -45,8 +45,8 @@ where
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = Self::State>
         + ExecutesInput<E, EM>
-        + HasFeedback<F1>
-        + HasScheduler<CS>,
+        + HasFeedback<Feedback = F1>
+        + HasScheduler<Scheduler = CS>,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -198,8 +198,8 @@ where
     OT: ObserversTuple<CS::State>,
     Z: ExecutionProcessor<OT, State = CS::State>
         + ExecutesInput<E, EM>
-        + HasFeedback<F1>
-        + HasScheduler<CS>,
+        + HasFeedback<Feedback = F1>
+        + HasScheduler<Scheduler = CS>,
 {
     fn perform(
         &mut self,
@@ -246,8 +246,8 @@ where
     CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasMaxSize,
     Z: ExecutionProcessor<OT, State = CS::State>
         + ExecutesInput<E, EM>
-        + HasFeedback<F1>
-        + HasScheduler<CS>,
+        + HasFeedback<Feedback = F1>
+        + HasScheduler<Scheduler = CS>,
 {
     /// The mutator, added to this stage
     #[inline]
