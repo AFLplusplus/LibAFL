@@ -64,10 +64,22 @@ cl /c harness_win.cpp && link harness_win.obj /dll
 
 # Fuzzer
 [tasks.fuzzer]
+linux_alias = "fuzzer_unix"
+mac_alias = "fuzzer_unix"
+windows_alias = "fuzzer_windows"
+
+[tasks.fuzzer_unix]
 script_runner="@shell"
 script='''
 cargo build --release
 cp ${CARGO_TARGET_DIR}${SEP}release${SEP}${FUZZER_NAME} .
+'''
+
+[tasks.fuzzer_windows]
+script_runner="@shell"
+script='''
+cargo build --release
+cp ./target/release/${FUZZER_NAME} .
 '''
 
 # Run the fuzzer
