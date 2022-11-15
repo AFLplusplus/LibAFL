@@ -76,7 +76,6 @@ struct Opt {
         name = "arguments",
         num_args(1..),
         allow_hyphen_values = true,
-        default_value = "[].to_vec()"
     )]
     arguments: Vec<String>,
 
