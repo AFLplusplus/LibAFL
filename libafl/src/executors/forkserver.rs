@@ -44,9 +44,23 @@ const FORKSRV_FD: i32 = 198;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
+const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
+
+// #[allow(clippy::cast_possible_wrap)]
+// const FS_OPT_MAX_MAPSIZE: i32 = ((0x00fffffe_u32 >> 1) + 1) as i32; // 8388608
+const fn fs_opt_get_mapsize(x: i32) -> i32 {
+    ((x & 0x00fffffe) >> 1) + 1
+}
+/* const fn fs_opt_set_mapsize(x: usize) -> usize {
+    if x <= 1 {
+      if x > FS_OPT_MAX_MAPSIZE { 0 } else { (x - 1) << 1 }
+    } else { 0 }
+} */
+
 /// The length of header bytes which tells shmem size
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
@@ -581,6 +595,8 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     autotokens: Option<&'a mut Tokens>,
     input_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
+    map_size: Option<usize>,
+    real_map_size: i32,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
@@ -648,7 +664,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         // <https://github.com/AFLplusplus/AFLplusplus/blob/147654f8715d237fe45c1657c87b2fe36c4db22a/instrumentation/afl-compiler-rt.o.c#L1026>
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED
             && (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ
-                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT)
+                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT
+                || status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE)
         {
             let mut send_status = FS_OPT_ENABLED;
 
@@ -658,9 +675,22 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 self.uses_shmem_testcase = true;
             }
 
-            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
-                println!("Using AUTODICT feature");
-                send_status |= FS_OPT_AUTODICT;
+            if status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
+                let mut map_size = fs_opt_get_mapsize(status);
+                // When 0, we assume that map_size was filled by the user or const
+                if map_size > 0 {
+                    self.map_size = Some(map_size as usize);
+                }
+
+                self.real_map_size = map_size;
+                if map_size % 64 != 0 {
+                    map_size = ((map_size + 63) >> 6) << 6;
+                }
+
+                assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
+
+                println!("Target MAP SIZE = {:#x}", self.real_map_size);
+                self.map_size = Some(map_size as usize);
             }
 
             let send_len = forkserver.write_ctl(send_status)?;
@@ -777,6 +807,8 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             autotokens: None,
             input_filename: None,
             shmem_provider: None,
+            map_size: None,
+            real_map_size: 0,
         }
     }
 
@@ -878,6 +910,13 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
+    #[must_use]
+    /// Call this to set a defauult const coverage map size
+    pub fn coverage_map_size(mut self, size: usize) -> Self {
+        self.map_size = Some(size);
+        self
+    }
+
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
@@ -895,6 +934,8 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             autotokens: self.autotokens,
             input_filename: self.input_filename,
             shmem_provider: Some(shmem_provider),
+            map_size: self.map_size.clone(),
+            real_map_size: self.real_map_size,
         }
     }
 }
