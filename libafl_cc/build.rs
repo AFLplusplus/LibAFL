@@ -16,10 +16,16 @@ const LLVM_VERSION_MIN: u32 = 6;
 
 /// Get the extension for a shared object
 fn dll_extension<'a>() -> &'a str {
-    match env::var("CARGO_CFG_TARGET_OS").unwrap().as_str() {
+    if let Ok(vendor) = env::var("CARGO_CFG_TARGET_VENDOR") {
+        if vendor == "apple" {
+            return "dylib";
+        }
+    }
+    let family = env::var("CARGO_CFG_TARGET_FAMILY").unwrap();
+    match family.as_str() {
         "windows" => "dll",
-        "macos" | "ios" => "dylib",
-        _ => "so",
+        "unix" => "so",
+        _ => panic!("Unsupported target family: {family}"),
     }
 }
 
