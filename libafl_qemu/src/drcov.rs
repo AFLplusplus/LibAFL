@@ -50,11 +50,11 @@ impl QemuDrCovHelper {
     ) -> Self {
         if full_trace {
             unsafe {
-                DRCOV_IDS.lock().unwrap().insert(vec![]);
+                let _ = DRCOV_IDS.lock().unwrap().insert(vec![]);
             }
         }
         unsafe {
-            DRCOV_MAP.lock().unwrap().insert(HashMap::new());
+            let _ = DRCOV_MAP.lock().unwrap().insert(HashMap::new());
         }
         Self {
             filter,
@@ -92,16 +92,31 @@ where
             if unsafe { DRCOV_IDS.lock().unwrap().as_ref().unwrap().len() } > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
                 for id in unsafe { DRCOV_IDS.lock().unwrap().as_ref().unwrap().iter() } {
-                    for (pc, idm) in unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() } {
-                        if *idm == *id {
-                            let block = pc2basicblock(*pc, emulator);
-                            let mut block_len = 0;
-                            for instr in &block {
-                                block_len += instr.insn_len;
+                    'pcs_full: for (pc, idm) in
+                        unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() }
+                    {
+                        for module in self.module_mapping.iter() {
+                            let (range, (_, _)) = module;
+                            if *pc < range.start.try_into().unwrap()
+                                || *pc > range.end.try_into().unwrap()
+                            {
+                                continue 'pcs_full;
                             }
-                            block_len -= &block.last().unwrap().insn_len;
-                            drcov_vec
-                                .push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
+                        }
+                        if *idm == *id {
+                            match pc2basicblock(*pc, emulator) {
+                                Ok(block) => {
+                                    let mut block_len = 0;
+                                    for instr in &block {
+                                        block_len += instr.insn_len;
+                                    }
+                                    drcov_vec.push(DrCovBasicBlock::new(
+                                        *pc as usize,
+                                        *pc as usize + block_len,
+                                    ));
+                                }
+                                Err(r) => println!("{r:#?}"),
+                            }
                         }
                     }
                 }
@@ -114,14 +129,26 @@ where
         } else {
             if unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().len() > self.drcov_len } {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
-                for (pc, _) in unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() } {
-                    let block = pc2basicblock(*pc, emulator);
-                    let mut block_len = 0;
-                    for instr in &block {
-                        block_len += instr.insn_len;
+                'pcs: for (pc, _) in unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() } {
+                    for module in self.module_mapping.iter() {
+                        let (range, (_, _)) = module;
+                        if *pc < range.start.try_into().unwrap()
+                            || *pc > range.end.try_into().unwrap()
+                        {
+                            continue 'pcs;
+                        }
                     }
-                    block_len -= &block.last().unwrap().insn_len;
-                    drcov_vec.push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
+                    match pc2basicblock(*pc, emulator) {
+                        Ok(block) => {
+                            let mut block_len = 0;
+                            for instr in &block {
+                                block_len += instr.insn_len;
+                            }
+                            drcov_vec
+                                .push(DrCovBasicBlock::new(*pc as usize, *pc as usize + block_len));
+                        }
+                        Err(r) => println!("{r:#?}"),
+                    }
                 }
 
                 DrCovWriter::new(&self.module_mapping)

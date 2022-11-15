@@ -29,6 +29,7 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
+    drcov::QemuDrCovHelper,
     //asan::QemuAsanHelper,
     edges,
     edges::QemuEdgeCoverageHelper,
@@ -37,8 +38,10 @@ use libafl_qemu::{
     MmapPerms,
     QemuExecutor,
     QemuHooks,
+    QemuInstrumentationFilter,
     Regs,
 };
+use rangemap::RangeMap;
 
 pub fn fuzz() {
     // Hardcoded parameters
@@ -151,7 +154,30 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default()));
+        let mut rangemap = RangeMap::<usize, (u16, String)>::new();
+        // Find the end address of the loaded elf
+        let mut max_addr = 0;
+        for sym in elf.goblin().syms.iter() {
+            if sym.st_value + sym.st_size > max_addr {
+                max_addr = sym.st_value + sym.st_size;
+            }
+        }
+        rangemap.insert(
+            (emu.load_addr() as usize)..(max_addr as usize),
+            (0, "libpng_harness".to_string()),
+        );
+        let mut hooks = QemuHooks::new(
+            &emu,
+            tuple_list!(
+                QemuEdgeCoverageHelper::default(),
+                QemuDrCovHelper::new(
+                    QemuInstrumentationFilter::None,
+                    rangemap,
+                    PathBuf::from("drcov.log"),
+                    false,
+                )
+            ),
+        );
 
         // Create a QEMU in-process executor
         let executor = QemuExecutor::new(

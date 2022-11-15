@@ -21,8 +21,7 @@ pub struct Instruction {
  *      - operand string
  *      - instruction length
  */
-#[must_use]
-pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Vec<Instruction> {
+pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Result<Vec<Instruction>, String> {
     #[allow(unused_mut)]
     let mut code = {
         #[cfg(emulation_mode = "usermode")]
@@ -36,6 +35,10 @@ pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Vec<Instruction> {
     unsafe {
         emu.read_mem(pc, code)
     };
+    // TODO better fault handling
+    if code.iter().all(|&x| x == 0) {
+        return Err("Memory region is empty".to_string());
+    }
 
     let mut iaddr = pc;
     let mut block = Vec::<Instruction>::new();
@@ -99,8 +102,12 @@ pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Vec<Instruction> {
         #[cfg(emulation_mode = "systemmode")]
         unsafe {
             emu.read_mem(iaddr, code);
-        } // TODO handle faults
+        }
+        // TODO better fault handling
+        if code.iter().all(|&x| x == 0) {
+            return Err("Memory region is empty".to_string());
+        }
     }
 
-    block
+    Ok(block)
 }
