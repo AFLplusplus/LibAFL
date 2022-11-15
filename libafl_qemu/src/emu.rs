@@ -242,6 +242,7 @@ extern "C" {
         len: i32,
         is_write: i32,
     );
+    fn cpu_physical_memory_rw(addr: GuestAddr, buf: *mut u8, len: i32, iswrite: bool);
 
     static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 
@@ -667,6 +668,19 @@ impl Emulator {
         self.current_cpu()
             .unwrap_or_else(|| self.cpu_from_index(0))
             .read_mem(addr, buf);
+    }
+
+    /// Write a value to a phsical guest address, including ROM areas.
+    #[cfg(emulation_mode = "systemmode")]
+    pub unsafe fn write_phys_mem(&self, addr: GuestAddr, buf: &[u8]) {
+        cpu_physical_memory_rw(addr, buf.as_ptr() as *mut u8, buf.len() as i32, true);
+    }
+
+    /// Read a value from a physical guest address.
+    #[cfg(emulation_mode = "systemmode")]
+    pub unsafe fn read_phys_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
+        #[cfg(emulation_mode = "systemmode")]
+        cpu_physical_memory_rw(addr, buf.as_mut_ptr(), buf.len() as i32, false);
     }
 
     #[must_use]
