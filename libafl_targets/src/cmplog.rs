@@ -5,6 +5,7 @@
 use alloc::string::{String, ToString};
 use core::fmt::{self, Debug, Formatter};
 
+use c2rust_bitfields::BitfieldStruct;
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
@@ -254,4 +255,188 @@ impl<'a> CmpLogObserver<'a> {
     }
 
     // TODO with_size
+}
+
+/* From AFL++ cmplog.h
+
+#define CMP_MAP_W 65536
+#define CMP_MAP_H 32
+#define CMP_MAP_RTN_H (CMP_MAP_H / 4)
+
+struct cmp_header {
+
+  unsigned hits : 24;
+  unsigned id : 24;
+  unsigned shape : 5;
+  unsigned type : 2;
+  unsigned attribute : 4;
+  unsigned overflow : 1;
+  unsigned reserved : 4;
+
+} __attribute__((packed));
+
+struct cmp_operands {
+
+  u64 v0;
+  u64 v1;
+  u64 v0_128;
+  u64 v1_128;
+
+} __attribute__((packed));
+
+struct cmpfn_operands {
+
+  u8 v0[31];
+  u8 v0_len;
+  u8 v1[31];
+  u8 v1_len;
+
+} __attribute__((packed));
+
+typedef struct cmp_operands cmp_map_list[CMP_MAP_H];
+
+struct cmp_map {
+
+  struct cmp_header   headers[CMP_MAP_W];
+  struct cmp_operands log[CMP_MAP_W][CMP_MAP_H];
+
+};
+*/
+
+/// The AFL++ `CMP_MAP_W`
+pub const AFL_CMP_MAP_W: usize = 65536;
+/// The AFL++ `CMP_MAP_H`
+pub const AFL_CMP_MAP_H: usize = 32;
+/// The AFL++ `CMP_MAP_RTN_H`
+pub const AFL_CMP_MAP_RTN_H: usize = AFL_CMP_MAP_H / 4;
+
+/// The AFL++ `CMP_TYPE_INS`
+pub const AFL_CMP_TYPE_INS: u32 = 1;
+/// The AFL++ `CMP_TYPE_RTN`
+pub const AFL_CMP_TYPE_RTN: u32 = 2;
+
+/// The AFL++ `cmp_header` struct
+#[derive(Debug, Copy, Clone, BitfieldStruct)]
+#[repr(C, packed)]
+pub struct AFLCmpHeader {
+    #[bitfield(name = "hits", ty = "u32", bits = "0..=23")]
+    #[bitfield(name = "id", ty = "u32", bits = "24..=47")]
+    #[bitfield(name = "shape", ty = "u32", bits = "48..=52")]
+    #[bitfield(name = "_type", ty = "u32", bits = "53..=54")]
+    #[bitfield(name = "attribute", ty = "u32", bits = "55..=58")]
+    #[bitfield(name = "overflow", ty = "u32", bits = "59..=59")]
+    #[bitfield(name = "reserved", ty = "u32", bits = "60..=63")]
+    data: [u8; 8],
+}
+
+/// The AFL++ `cmp_operands` struct
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(C, packed)]
+pub struct AFLCmpOperands {
+    v0: u64,
+    v1: u64,
+    v0_128: u64,
+    v1_128: u64,
+}
+
+/// The AFL++ `cmpfn_operands` struct
+#[derive(Default, Debug, Clone, Copy)]
+#[repr(C, packed)]
+pub struct AFLCmpFnOperands {
+    v0: [u8; 31],
+    v0_len: u8,
+    v1: [u8; 31],
+    v1_len: u8,
+}
+
+/// A proxy union to avoid casting operands as in AFL++
+#[derive(Clone, Copy)]
+#[repr(C, packed)]
+pub union AFLCmpVals {
+    operands: [[AFLCmpOperands; AFL_CMP_MAP_H]; AFL_CMP_MAP_W],
+    fn_operands: [[AFLCmpFnOperands; AFL_CMP_MAP_RTN_H]; AFL_CMP_MAP_W],
+}
+
+impl Debug for AFLCmpVals {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AFLCmpVals").finish_non_exhaustive()
+    }
+}
+
+/// The AFL++ `cmp_map` struct, use with `libafl::StdCmpObserver`
+#[derive(Debug, Clone, Copy)]
+#[repr(C, packed)]
+pub struct AFLCmpMap {
+    headers: [AFLCmpHeader; AFL_CMP_MAP_W],
+    vals: AFLCmpVals,
+}
+
+impl CmpMap for AFLCmpMap {
+    fn len(&self) -> usize {
+        AFL_CMP_MAP_W
+    }
+
+    fn executions_for(&self, idx: usize) -> usize {
+        self.headers[idx].hits() as usize
+    }
+
+    fn usable_executions_for(&self, idx: usize) -> usize {
+        if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
+            if self.executions_for(idx) < AFL_CMP_MAP_H {
+                self.executions_for(idx)
+            } else {
+                AFL_CMP_MAP_H
+            }
+        } else if self.executions_for(idx) < AFL_CMP_MAP_RTN_H {
+            self.executions_for(idx)
+        } else {
+            AFL_CMP_MAP_RTN_H
+        }
+    }
+
+    fn values_of(&self, idx: usize, execution: usize) -> Option<CmpValues> {
+        if self.headers[idx]._type() == AFL_CMP_TYPE_INS {
+            unsafe {
+                match self.headers[idx].shape() {
+                    0 => Some(CmpValues::U8((
+                        self.vals.operands[idx][execution].v0 as u8,
+                        self.vals.operands[idx][execution].v1 as u8,
+                    ))),
+                    1 => Some(CmpValues::U16((
+                        self.vals.operands[idx][execution].v0 as u16,
+                        self.vals.operands[idx][execution].v1 as u16,
+                    ))),
+                    3 => Some(CmpValues::U32((
+                        self.vals.operands[idx][execution].v0 as u32,
+                        self.vals.operands[idx][execution].v1 as u32,
+                    ))),
+                    7 => Some(CmpValues::U64((
+                        self.vals.operands[idx][execution].v0,
+                        self.vals.operands[idx][execution].v1,
+                    ))),
+                    // TODO handle 128 bits cmps
+                    // other => panic!("Invalid CmpLog shape {}", other),
+                    _ => None,
+                }
+            }
+        } else {
+            unsafe {
+                Some(CmpValues::Bytes((
+                    self.vals.fn_operands[idx][execution].v0
+                        [..self.headers[idx].shape() as usize + 1]
+                        .to_vec(),
+                    self.vals.fn_operands[idx][execution].v1
+                        [..self.headers[idx].shape() as usize + 1]
+                        .to_vec(),
+                )))
+            }
+        }
+    }
+
+    fn reset(&mut self) -> Result<(), Error> {
+        // For performance, we reset just the headers
+        self.headers = unsafe { core::mem::zeroed() };
+        // self.vals.operands = unsafe { core::mem::zeroed() };
+        Ok(())
+    }
 }
