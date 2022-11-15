@@ -21,6 +21,6 @@ Create on and then run the fuzzer:
 # create an image
 qemu-img create -f qcow2 dummy.qcow2 32M
 # run the fuzzer
-KERNEL=./example/example.elf target/release/qemu_launcher -icount shift=auto,align=off,sleep=off -machine mps2-an385 -monitor null -kernel ./example/example.elf -serial null -nographic -snapshot -drive if=none,format=qcow2,file=dummy.qcow2 -S
+KERNEL=./example/example.elf target/release/qemu_systemmode -icount shift=auto,align=off,sleep=off -machine mps2-an385 -monitor null -kernel ./example/example.elf -serial null -nographic -snapshot -drive if=none,format=qcow2,file=dummy.qcow2 -S
 ```
 Currently the ``KERNEL`` variable is needed because the fuzzer does not parse QEMUs arguments to find the binary.

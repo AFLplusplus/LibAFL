@@ -36,20 +36,20 @@ use libafl_qemu::{
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
     emu::Emulator,
+    GuestAddr,
     //snapshot::QemuSnapshotHelper,
     QemuExecutor,
     QemuHooks,
     Regs,
 };
 
-fn virt2phys(vaddr: u32, tab: &EasyElf) -> u32 {
+/// Read ELF program headers to resolve physical load addresses.
+fn virt2phys(vaddr: GuestAddr, tab: &EasyElf) -> GuestAddr {
     let ret;
     for i in &tab.goblin().program_headers {
-        if i.vm_range()
-            .contains(&vaddr.try_into().expect("Can not cast u64 to usize"))
-        {
-            ret = vaddr - TryInto::<u32>::try_into(i.p_vaddr).unwrap()
-                + TryInto::<u32>::try_into(i.p_paddr).unwrap();
+        if i.vm_range().contains(&vaddr.try_into().unwrap()) {
+            ret = vaddr - TryInto::<GuestAddr>::try_into(i.p_vaddr).unwrap()
+                + TryInto::<GuestAddr>::try_into(i.p_paddr).unwrap();
             return ret - (ret % 2);
         }
     }
@@ -113,7 +113,7 @@ pub fn fuzz() {
                     // len = MAX_INPUT_SIZE;
                 }
 
-                emu.write_mem(input_addr, buf);
+                emu.write_phys_mem(input_addr, buf);
 
                 emu.run();
 
