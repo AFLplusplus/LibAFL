@@ -525,6 +525,7 @@ where
     phantom: PhantomData<S>,
     /// Cache that indicates if we have a `ASan` observer registered.
     has_asan_observer: Option<bool>,
+    map_size: Option<usize>,
 }
 
 impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
@@ -556,7 +557,7 @@ impl ForkserverExecutor<(), (), StdShMemProvider> {
 impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: UsesState,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -577,6 +578,11 @@ where
     /// The [`InputFile`] used by this [`Executor`].
     pub fn input_file(&self) -> &InputFile {
         &self.input_file
+    }
+
+    /// The coverage map size if specified by the target
+    pub fn coverage_map_size(&self) -> Option<usize> {
+        self.map_size.clone()
     }
 }
 
@@ -678,9 +684,12 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             if status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
                 let mut map_size = fs_opt_get_mapsize(status);
                 // When 0, we assume that map_size was filled by the user or const
+                /* TODO autofill map size from the observer
+
                 if map_size > 0 {
                     self.map_size = Some(map_size as usize);
                 }
+                */
 
                 self.real_map_size = map_size;
                 if map_size % 64 != 0 {
@@ -745,6 +754,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             map,
             phantom: PhantomData,
             has_asan_observer: None, // initialized on first use
+            map_size: self.map_size,
         })
     }
 

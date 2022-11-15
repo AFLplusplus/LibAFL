@@ -11,19 +11,22 @@ use libafl::{
         current_nanos,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider},
-        tuples::{tuple_list, Merge},
+        tuples::{tuple_list, MatchName, Merge},
         AsMutSlice,
     },
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
+    executors::{
+        forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
+        HasObservers,
+    },
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{scheduled::havoc_mutations, tokens_mutations, StdScheduledMutator, Tokens},
-    observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, MapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
@@ -109,10 +112,7 @@ pub fn main() {
     let shmem_buf = shmem.as_mut_slice();
 
     // Create an observation channel using the signals map
-    let edges_observer = HitcountsMapObserver::new(ConstMapObserver::<_, MAP_SIZE>::new(
-        "shared_mem",
-        shmem_buf,
-    ));
+    let edges_observer = HitcountsMapObserver::new(StdMapObserver::new("shared_mem", shmem_buf));
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
@@ -172,14 +172,23 @@ pub fn main() {
     let args = opt.arguments;
 
     let mut tokens = Tokens::new();
-    let forkserver = ForkserverExecutor::builder()
+    let mut forkserver = ForkserverExecutor::builder()
         .program(opt.executable)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
         .parse_afl_cmdline(args)
+        .coverage_map_size(MAP_SIZE)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
+
+    if let Some(dynamic_map_size) = forkserver.coverage_map_size() {
+        forkserver
+            .observers_mut()
+            .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8>>>("shared_mem")
+            .unwrap()
+            .downsize_map(dynamic_map_size);
+    }
 
     let mut executor = TimeoutForkserverExecutor::with_signal(
         forkserver,
