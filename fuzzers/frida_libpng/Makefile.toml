@@ -67,7 +67,7 @@ cl /c harness_win.cpp && link harness_win.obj /dll
 script_runner="@shell"
 script='''
 cargo build --release
-cp ${CARGO_TARGET_DIR}/release/${FUZZER_NAME} .
+cp ${CARGO_TARGET_DIR}${SEP}release${SEP}${FUZZER_NAME} .
 '''
 
 # Run the fuzzer
