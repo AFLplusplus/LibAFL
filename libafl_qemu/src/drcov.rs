@@ -89,13 +89,18 @@ where
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
                 for id in DRCOV_IDS.lock().unwrap().as_ref().unwrap().iter() {
                     'pcs_full: for (pc, idm) in DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() {
+                        let mut module_found = false;
                         for module in self.module_mapping.iter() {
                             let (range, (_, _)) = module;
-                            if *pc < range.start.try_into().unwrap()
-                                || *pc > range.end.try_into().unwrap()
+                            if *pc >= range.start.try_into().unwrap()
+                                && *pc <= range.end.try_into().unwrap()
                             {
-                                continue 'pcs_full;
+                                module_found = true;
+                                break;
                             }
+                        }
+                        if module_found == false {
+                            continue 'pcs_full;
                         }
                         if *idm == *id {
                             match pc2basicblock(*pc, emulator) {
@@ -124,13 +129,18 @@ where
             if DRCOV_MAP.lock().unwrap().as_ref().unwrap().len() > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
                 'pcs: for (pc, _) in DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() {
+                    let mut module_found = false;
                     for module in self.module_mapping.iter() {
                         let (range, (_, _)) = module;
-                        if *pc < range.start.try_into().unwrap()
-                            || *pc > range.end.try_into().unwrap()
+                        if *pc >= range.start.try_into().unwrap()
+                            && *pc <= range.end.try_into().unwrap()
                         {
-                            continue 'pcs;
+                            module_found = true;
+                            break;
                         }
+                    }
+                    if module_found == false {
+                        continue 'pcs;
                     }
                     match pc2basicblock(*pc, emulator) {
                         Ok(block) => {

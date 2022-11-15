@@ -155,17 +155,17 @@ pub fn fuzz() {
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut rangemap = RangeMap::<usize, (u16, String)>::new();
-        // Find the end address of the loaded elf
-        let mut max_addr = 0;
-        for sym in elf.goblin().syms.iter() {
-            if sym.st_value + sym.st_size > max_addr {
-                max_addr = sym.st_value + sym.st_size;
+        let mappings = emu.mappings();
+        let mut idx = 0;
+        for map in mappings {
+            if map.path().unwrap() != "" {
+                rangemap.insert(
+                    (map.start() as usize)..(map.end() as usize),
+                    (idx, map.path().unwrap().to_string()),
+                );
+                idx += 1;
             }
         }
-        rangemap.insert(
-            (emu.load_addr() as usize)..(max_addr as usize),
-            (0, "libpng_harness".to_string()),
-        );
         let mut hooks = QemuHooks::new(
             &emu,
             tuple_list!(
