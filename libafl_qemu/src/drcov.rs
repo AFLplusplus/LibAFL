@@ -14,8 +14,8 @@ use crate::{
     Emulator,
 };
 
-static mut DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
-static mut DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
+static DRCOV_IDS: Mutex<Option<Vec<u64>>> = Mutex::new(None);
+static DRCOV_MAP: Mutex<Option<HashMap<GuestAddr, u64>>> = Mutex::new(None);
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct QemuDrCovMetadata {
@@ -49,13 +49,9 @@ impl QemuDrCovHelper {
         full_trace: bool,
     ) -> Self {
         if full_trace {
-            unsafe {
-                let _ = DRCOV_IDS.lock().unwrap().insert(vec![]);
-            }
+            let _ = DRCOV_IDS.lock().unwrap().insert(vec![]);
         }
-        unsafe {
-            let _ = DRCOV_MAP.lock().unwrap().insert(HashMap::new());
-        }
+        let _ = DRCOV_MAP.lock().unwrap().insert(HashMap::new());
         Self {
             filter,
             module_mapping,
@@ -89,12 +85,10 @@ where
 
     fn post_exec(&mut self, emulator: &Emulator, _input: &S::Input) {
         if self.full_trace {
-            if unsafe { DRCOV_IDS.lock().unwrap().as_ref().unwrap().len() } > self.drcov_len {
+            if DRCOV_IDS.lock().unwrap().as_ref().unwrap().len() > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
-                for id in unsafe { DRCOV_IDS.lock().unwrap().as_ref().unwrap().iter() } {
-                    'pcs_full: for (pc, idm) in
-                        unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() }
-                    {
+                for id in DRCOV_IDS.lock().unwrap().as_ref().unwrap().iter() {
+                    'pcs_full: for (pc, idm) in DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() {
                         for module in self.module_mapping.iter() {
                             let (range, (_, _)) = module;
                             if *pc < range.start.try_into().unwrap()
@@ -125,11 +119,11 @@ where
                     .write(&self.filename, &drcov_vec)
                     .expect("Failed to write coverage file");
             }
-            self.drcov_len = unsafe { DRCOV_IDS.lock().unwrap().as_ref().unwrap().len() };
+            self.drcov_len = DRCOV_IDS.lock().unwrap().as_ref().unwrap().len();
         } else {
-            if unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().len() > self.drcov_len } {
+            if DRCOV_MAP.lock().unwrap().as_ref().unwrap().len() > self.drcov_len {
                 let mut drcov_vec = Vec::<DrCovBasicBlock>::new();
-                'pcs: for (pc, _) in unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() } {
+                'pcs: for (pc, _) in DRCOV_MAP.lock().unwrap().as_ref().unwrap().iter() {
                     for module in self.module_mapping.iter() {
                         let (range, (_, _)) = module;
                         if *pc < range.start.try_into().unwrap()
@@ -155,7 +149,7 @@ where
                     .write(&self.filename, &drcov_vec)
                     .expect("Failed to write coverage file");
             }
-            self.drcov_len = unsafe { DRCOV_MAP.lock().unwrap().as_ref().unwrap().len() };
+            self.drcov_len = DRCOV_MAP.lock().unwrap().as_ref().unwrap().len();
         }
     }
 }
@@ -188,7 +182,7 @@ where
     }
     let meta = state.metadata_mut().get_mut::<QemuDrCovMetadata>().unwrap();
 
-    match unsafe { DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) } {
+    match DRCOV_MAP.lock().unwrap().as_mut().unwrap().entry(pc) {
         Entry::Occupied(e) => {
             let id = *e.get();
             if drcov_helper.full_trace {
@@ -224,6 +218,6 @@ where
         .unwrap()
         .full_trace
     {
-        unsafe { DRCOV_IDS.lock().unwrap().as_mut().unwrap().push(id) };
+        DRCOV_IDS.lock().unwrap().as_mut().unwrap().push(id);
     }
 }
