@@ -287,6 +287,25 @@ pub trait ObserverWithHashField {
 }
 
 /// A trait for [`Observer`]`s` which observe over differential execution.
+///
+/// Differential observers have the following flow during a single execution:
+///  - `Observer::pre_exec` for the differential observer is invoked.
+///  - `DifferentialObserver::pre_observe_first` for the differential observer is invoked.
+///  - `Observer::pre_exec` for each of the observers for the first executor is invoked.
+///  - The first executor is invoked.
+///  - `Observer::post_exec` for each of the observers for the first executor is invoked.
+///  - `DifferentialObserver::post_observe_first` for the differential observer is invoked.
+///  - `DifferentialObserver::pre_observe_second` for the differential observer is invoked.
+///  - `Observer::pre_exec` for each of the observers for the second executor is invoked.
+///  - The second executor is invoked.
+///  - `Observer::post_exec` for each of the observers for the second executor is invoked.
+///  - `DifferentialObserver::post_observe_second` for the differential observer is invoked.
+///  - `Observer::post_exec` for the differential observer is invoked.
+///
+/// You should perform any preparation for the diff execution in `Observer::pre_exec` and respective
+/// cleanup in `Observer::post_exec`. For individual executions, use
+/// `DifferentialObserver::{pre,post}_observe_{first,second}` as necessary for first and second,
+/// respectively.
 #[allow(unused_variables)]
 pub trait DifferentialObserver<OTA, OTB, S>: Observer<S>
 where

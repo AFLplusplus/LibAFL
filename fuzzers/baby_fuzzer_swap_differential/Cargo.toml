@@ -3,7 +3,7 @@ name = "baby_fuzzer_swap_differential"
 version = "0.7.1"
 authors = ["Addison Crump <research@addisoncrump.info>"]
 edition = "2021"
-default-run = "fuzzer"
+default-run = "fuzzer_sd"
 
 [features]
 default = ["std"]
@@ -33,7 +33,7 @@ mimalloc = { version = "*", default-features = false }
 libafl_cc = { path = "../../libafl_cc/" }
 
 [[bin]]
-name = "fuzzer"
+name = "fuzzer_sd"
 path = "src/main.rs"
 
 [[bin]]
