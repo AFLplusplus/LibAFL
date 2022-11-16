@@ -326,6 +326,7 @@ fn fuzz(
         .autotokens(&mut tokens)
         .parse_afl_cmdline(&arguments)
         .coverage_map_size(MAP_SIZE)
+        .is_persistent(true)
         .build(tuple_list!(time_observer, edges_observer))
         .unwrap();
 
@@ -372,6 +373,7 @@ fn fuzz(
             .debug_child(debug_child)
             .shmem_provider(&mut shmem_provider)
             .parse_afl_cmdline(&arguments)
+            .is_persistent(true)
             .build(tuple_list!(cmplog_observer))
             .unwrap();
 
