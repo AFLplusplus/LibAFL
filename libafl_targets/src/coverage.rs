@@ -106,8 +106,12 @@ mod swap {
     };
     use serde::{Deserialize, Serialize};
 
-    use super::*;
+    use super::{EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE};
 
+    /// Observer to be used with `DiffExecutor`s when executing a differential target that shares
+    /// the AFL map in order to swap out the maps (and thus allow for map observing the two targets
+    /// separately).
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct DifferentialAFLMapSwapObserver<'a, 'b> {
         first_map: OwnedSliceMut<'a, u8>,
@@ -118,6 +122,7 @@ mod swap {
     }
 
     impl<'a, 'b> DifferentialAFLMapSwapObserver<'a, 'b> {
+        /// Create a new `DifferentialAFLMapSwapObserver`.
         pub fn new(
             first: &mut StdMapObserver<'a, u8>,
             second: &mut StdMapObserver<'b, u8>,
@@ -137,18 +142,26 @@ mod swap {
             }
         }
 
+        /// Get the first map
+        #[must_use]
         pub fn first_map(&self) -> &OwnedSliceMut<'a, u8> {
             &self.first_map
         }
 
+        /// Get the second map
+        #[must_use]
         pub fn second_map(&self) -> &OwnedSliceMut<'b, u8> {
             &self.second_map
         }
 
+        /// Get the first name
+        #[must_use]
         pub fn first_name(&self) -> &str {
             &self.first_name
         }
 
+        /// Get the second name
+        #[must_use]
         pub fn second_name(&self) -> &str {
             &self.second_name
         }

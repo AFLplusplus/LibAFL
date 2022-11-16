@@ -294,22 +294,22 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    /// Perform an operation with the first set of observers before they are pre_exec'd.
+    /// Perform an operation with the first set of observers before they are `pre_exec`'d.
     fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Perform an operation with the first set of observers after they are post_exec'd.
+    /// Perform an operation with the first set of observers after they are `post_exec`'d.
     fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Perform an operation with the second set of observers before they are pre_exec'd.
+    /// Perform an operation with the second set of observers before they are `pre_exec`'d.
     fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Perform an operation with the second set of observers after they are post_exec'd.
+    /// Perform an operation with the second set of observers after they are `post_exec`'d.
     fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
         Ok(())
     }
@@ -322,20 +322,20 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    /// Perform an operation with the first set of observers before they are pre_exec'd on all the
+    /// Perform an operation with the first set of observers before they are `pre_exec`'d on all the
     /// differential observers in this tuple.
     fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
 
-    /// Perform an operation with the first set of observers after they are post_exec'd on all the
+    /// Perform an operation with the first set of observers after they are `post_exec`'d on all the
     /// differential observers in this tuple.
     fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
 
-    /// Perform an operation with the second set of observers before they are pre_exec'd on all the
-    /// differential observers in this tuple.
+    /// Perform an operation with the second set of observers before they are `pre_exec`'d on all
+    /// the differential observers in this tuple.
     fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
 
-    /// Perform an operation with the second set of observers after they are post_exec'd on all the
-    /// differential observers in this tuple.
+    /// Perform an operation with the second set of observers after they are `post_exec`'d on all
+    /// the differential observers in this tuple.
     fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
 }
 
