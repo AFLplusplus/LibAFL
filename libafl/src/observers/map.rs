@@ -192,7 +192,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+    T: Default + Copy + 'static + Serialize,
 {
     map: OwnedSliceMut<'a, T>,
     initial: T,
