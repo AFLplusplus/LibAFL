@@ -1,0 +1,37 @@
+use std::{env, path::PathBuf};
+
+fn main() -> anyhow::Result<()> {
+    if env::var("CARGO_BIN_NAME").map_or(true, |v| v != "libafl_cc") {
+        println!("cargo:rerun-if-changed=./first.h");
+        println!("cargo:rerun-if-changed=./second.h");
+
+        // Configure and generate bindings.
+        let bindings = bindgen::builder()
+            .header("first.h")
+            .header("second.h")
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            .generate()?;
+
+        // Write the generated bindings to an output file.
+        let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+        bindings
+            .write_to_file(out_path.join("bindings.rs"))
+            .expect("Couldn't write bindings!");
+
+        let compiler = env::current_dir()?.join("target/release/libafl_cc");
+        println!("cargo:rerun-if-changed={}", compiler.to_str().unwrap());
+        if !compiler.try_exists().unwrap_or(false) {
+            println!("cargo:warning=Can't find libafl_cc; assuming that we're building it.");
+        } else {
+            cc::Build::new()
+                .compiler(compiler)
+                .file("first.c")
+                .file("second.c")
+                .compile("diff-target");
+
+            println!("cargo:rustc-link-lib=diff-target");
+        }
+    }
+
+    Ok(())
+}
