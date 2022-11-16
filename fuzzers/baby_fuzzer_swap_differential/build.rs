@@ -3,7 +3,10 @@ use std::{env, path::PathBuf};
 fn main() -> anyhow::Result<()> {
     if env::var("CARGO_BIN_NAME").map_or(true, |v| v != "libafl_cc") {
         println!("cargo:rerun-if-changed=./first.h");
+        println!("cargo:rerun-if-changed=./first.c");
         println!("cargo:rerun-if-changed=./second.h");
+        println!("cargo:rerun-if-changed=./second.c");
+        println!("cargo:rerun-if-changed=./common.c");
 
         // Configure and generate bindings.
         let bindings = bindgen::builder()
@@ -27,6 +30,7 @@ fn main() -> anyhow::Result<()> {
                 .compiler(compiler)
                 .file("first.c")
                 .file("second.c")
+                .file("common.c")
                 .compile("diff-target");
 
             println!("cargo:rustc-link-lib=diff-target");

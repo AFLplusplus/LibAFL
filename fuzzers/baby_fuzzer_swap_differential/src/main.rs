@@ -8,7 +8,7 @@ use libafl::monitors::tui::TuiMonitor;
 use libafl::monitors::SimpleMonitor;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
-    corpus::{InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
     executors::{inprocess::InProcessExecutor, DiffExecutor, ExitKind},
     feedbacks::{CrashFeedback, MaxMapFeedback},
@@ -20,7 +20,7 @@ use libafl::{
     prelude::{MultiMapObserver, OwnedSliceMut},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
-    state::StdState,
+    state::{HasCorpus, HasSolutions, StdState},
 };
 use libafl_targets::{DifferentialAFLMapSwapObserver, EDGES_MAP_SIZE};
 use mimalloc::MiMalloc;
@@ -153,12 +153,14 @@ pub fn main() {
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
-    fuzzer
-        .fuzz_loop(
-            &mut stages,
-            &mut differential_executor,
-            &mut state,
-            &mut mgr,
-        )
-        .expect("Error in the fuzzing loop");
+    while state.solutions().is_empty() {
+        fuzzer
+            .fuzz_one(
+                &mut stages,
+                &mut differential_executor,
+                &mut state,
+                &mut mgr,
+            )
+            .expect("Error in the fuzzing loop");
+    }
 }
