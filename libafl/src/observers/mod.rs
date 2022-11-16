@@ -287,19 +287,30 @@ pub trait ObserverWithHashField {
 }
 
 /// A trait for [`Observer`]`s` which observe over differential execution.
+#[allow(unused_variables)]
 pub trait DifferentialObserver<OTA, OTB, S>: Observer<S>
 where
     OTA: ObserversTuple<S>,
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    /// Observe the first observer tuple after the first target was executed
-    fn observe_first(&mut self, _observers: &OTA) -> Result<(), Error> {
+    /// Perform an operation with the first set of observers before they are pre_exec'd.
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Observe the second observer tuple after the second target was executed
-    fn observe_second(&mut self, _observers: &OTB) -> Result<(), Error> {
+    /// Perform an operation with the first set of observers after they are post_exec'd.
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the second set of observers before they are pre_exec'd.
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the second set of observers after they are post_exec'd.
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -311,13 +322,21 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    /// Observe the first observer tuple after the first target was executed in all differential
-    /// observers
-    fn observe_first_all(&mut self, observers: &OTA) -> Result<(), Error>;
+    /// Perform an operation with the first set of observers before they are pre_exec'd on all the
+    /// differential observers in this tuple.
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
 
-    /// Observe the second observer tuple after the second target was executed in all differential
-    /// observers
-    fn observe_second_all(&mut self, observers: &OTB) -> Result<(), Error>;
+    /// Perform an operation with the first set of observers after they are post_exec'd on all the
+    /// differential observers in this tuple.
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
+
+    /// Perform an operation with the second set of observers before they are pre_exec'd on all the
+    /// differential observers in this tuple.
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
+
+    /// Perform an operation with the second set of observers after they are post_exec'd on all the
+    /// differential observers in this tuple.
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
 }
 
 impl<OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for ()
@@ -326,11 +345,19 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    fn observe_first_all(&mut self, _: &OTA) -> Result<(), Error> {
+    fn pre_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
         Ok(())
     }
 
-    fn observe_second_all(&mut self, _: &OTB) -> Result<(), Error> {
+    fn post_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn pre_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
         Ok(())
     }
 }
@@ -343,14 +370,24 @@ where
     OTB: ObserversTuple<S>,
     S: UsesInput,
 {
-    fn observe_first_all(&mut self, observers: &OTA) -> Result<(), Error> {
-        self.0.observe_first(observers)?;
-        self.1.observe_first_all(observers)
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.pre_observe_first(observers)?;
+        self.1.pre_observe_first_all(observers)
     }
 
-    fn observe_second_all(&mut self, observers: &OTB) -> Result<(), Error> {
-        self.0.observe_second(observers)?;
-        self.1.observe_second_all(observers)
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.post_observe_first(observers)?;
+        self.1.post_observe_first_all(observers)
+    }
+
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.pre_observe_second(observers)?;
+        self.1.pre_observe_second_all(observers)
+    }
+
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.post_observe_second(observers)?;
+        self.1.post_observe_second_all(observers)
     }
 }
 

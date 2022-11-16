@@ -89,3 +89,102 @@ pub fn edges_max_num() -> usize {
         }
     }
 }
+
+#[cfg(feature = "pointer_maps")]
+pub use swap::*;
+
+#[cfg(feature = "pointer_maps")]
+mod swap {
+    use alloc::string::{String, ToString};
+    use core::fmt::Debug;
+
+    use libafl::{
+        bolts::{ownedref::OwnedSliceMut, tuples::Named, AsMutSlice},
+        inputs::UsesInput,
+        observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
+        Error,
+    };
+    use serde::{Deserialize, Serialize};
+
+    use super::*;
+
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct DifferentialAFLMapSwapObserver<'a, 'b> {
+        first_map: OwnedSliceMut<'a, u8>,
+        second_map: OwnedSliceMut<'b, u8>,
+        first_name: String,
+        second_name: String,
+        name: String,
+    }
+
+    impl<'a, 'b> DifferentialAFLMapSwapObserver<'a, 'b> {
+        pub fn new(
+            first: &mut StdMapObserver<'a, u8>,
+            second: &mut StdMapObserver<'b, u8>,
+        ) -> Self {
+            Self {
+                first_name: first.name().to_string(),
+                second_name: second.name().to_string(),
+                name: format!("differential_{}_{}", first.name(), second.name()),
+                first_map: unsafe {
+                    let slice = first.map_mut().as_mut_slice();
+                    OwnedSliceMut::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
+                },
+                second_map: unsafe {
+                    let slice = second.map_mut().as_mut_slice();
+                    OwnedSliceMut::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
+                },
+            }
+        }
+
+        pub fn first_map(&self) -> &OwnedSliceMut<'a, u8> {
+            &self.first_map
+        }
+
+        pub fn second_map(&self) -> &OwnedSliceMut<'b, u8> {
+            &self.second_map
+        }
+
+        pub fn first_name(&self) -> &str {
+            &self.first_name
+        }
+
+        pub fn second_name(&self) -> &str {
+            &self.second_name
+        }
+    }
+
+    impl<'a, 'b> Named for DifferentialAFLMapSwapObserver<'a, 'b> {
+        fn name(&self) -> &str {
+            &self.name
+        }
+    }
+
+    impl<'a, 'b, S> Observer<S> for DifferentialAFLMapSwapObserver<'a, 'b> where S: UsesInput {}
+
+    impl<'a, 'b, OTA, OTB, S> DifferentialObserver<OTA, OTB, S>
+        for DifferentialAFLMapSwapObserver<'a, 'b>
+    where
+        OTA: ObserversTuple<S>,
+        OTB: ObserversTuple<S>,
+        S: UsesInput,
+    {
+        fn pre_observe_first(&mut self, _: &mut OTA) -> Result<(), Error> {
+            let slice = self.first_map.as_mut_slice();
+            unsafe {
+                EDGES_MAP_PTR = slice.as_mut_ptr();
+                EDGES_MAP_PTR_SIZE = slice.len();
+            }
+            Ok(())
+        }
+
+        fn pre_observe_second(&mut self, _: &mut OTB) -> Result<(), Error> {
+            let slice = self.second_map.as_mut_slice();
+            unsafe {
+                EDGES_MAP_PTR = slice.as_mut_ptr();
+                EDGES_MAP_PTR_SIZE = slice.len();
+            }
+            Ok(())
+        }
+    }
+}

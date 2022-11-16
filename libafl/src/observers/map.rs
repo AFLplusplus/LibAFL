@@ -192,7 +192,7 @@ where
 #[allow(clippy::unsafe_derive_deserialize)]
 pub struct StdMapObserver<'a, T>
 where
-    T: Default + Copy + 'static + Serialize,
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     map: OwnedSliceMut<'a, T>,
     initial: T,
@@ -486,6 +486,16 @@ where
             name: name.into(),
             initial: T::default(),
         }
+    }
+
+    /// Gets the backing for this map
+    pub fn map(&self) -> &OwnedSliceMut<'a, T> {
+        &self.map
+    }
+
+    /// Gets the backing for this map mutably
+    pub fn map_mut(&mut self) -> &mut OwnedSliceMut<'a, T> {
+        &mut self.map
     }
 }
 
@@ -1171,6 +1181,7 @@ where
         self.base.as_slice()
     }
 }
+
 impl<M> AsMutSlice for HitcountsMapObserver<M>
 where
     M: MapObserver + AsMutSlice,
@@ -1894,6 +1905,7 @@ where
         self.map.as_slice()
     }
 }
+
 impl<T> AsMutSlice for OwnedMapObserver<T>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,

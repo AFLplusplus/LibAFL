@@ -6,12 +6,11 @@ use core::{cell::UnsafeCell, fmt::Debug};
 
 use serde::{Deserialize, Serialize};
 
-use crate::observers::DifferentialObserversTuple;
 use crate::{
     bolts::{ownedref::OwnedPtrMut, tuples::MatchName},
     executors::{Executor, ExitKind, HasObservers},
     inputs::UsesInput,
-    observers::{ObserversTuple, UsesObservers},
+    observers::{DifferentialObserversTuple, ObserversTuple, UsesObservers},
     state::UsesState,
     Error,
 };
@@ -73,6 +72,9 @@ where
     ) -> Result<ExitKind, Error> {
         self.observers(); // update in advance
         let observers = self.observers.get_mut();
+        observers
+            .differential
+            .pre_observe_first_all(observers.primary.as_mut())?;
         observers.primary.as_mut().pre_exec_all(state, input)?;
         let ret1 = self.primary.run_target(fuzzer, state, mgr, input)?;
         self.primary.post_run_reset();
@@ -82,7 +84,10 @@ where
             .post_exec_all(state, input, &ret1)?;
         observers
             .differential
-            .observe_first_all(observers.primary.as_ref())?;
+            .post_observe_first_all(observers.primary.as_mut())?;
+        observers
+            .differential
+            .pre_observe_second_all(observers.secondary.as_mut())?;
         observers.secondary.as_mut().pre_exec_all(state, input)?;
         let ret2 = self.secondary.run_target(fuzzer, state, mgr, input)?;
         self.secondary.post_run_reset();
@@ -92,7 +97,7 @@ where
             .post_exec_all(state, input, &ret2)?;
         observers
             .differential
-            .observe_second_all(observers.secondary.as_ref())?;
+            .post_observe_second_all(observers.secondary.as_mut())?;
         if ret1 == ret2 {
             Ok(ret1)
         } else {
