@@ -582,7 +582,7 @@ where
 
     /// The coverage map size if specified by the target
     pub fn coverage_map_size(&self) -> Option<usize> {
-        self.map_size.clone()
+        self.map_size
     }
 }
 
@@ -944,7 +944,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             autotokens: self.autotokens,
             input_filename: self.input_filename,
             shmem_provider: Some(shmem_provider),
-            map_size: self.map_size.clone(),
+            map_size: self.map_size,
             real_map_size: self.real_map_size,
         }
     }

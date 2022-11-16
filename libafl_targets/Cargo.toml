@@ -31,7 +31,6 @@ cc = { version = "1.0", features = ["parallel"] }
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.8.2", default-features = false, features = [] }
-c2rust-bitfields = { version = "0.3", features = ["no_std"] }
 
 rangemap = "1.0"
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
