@@ -42,10 +42,6 @@ use libafl::{
 use nix::sys::signal::Signal;
 
 pub fn main() {
-    // Registry the metadata types used in this fuzzer
-    // Needed only on no_std
-    //RegistryBuilder::register::<Tokens>();
-
     let res = match Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
@@ -238,9 +234,12 @@ fn fuzz(
     // const MAP_SIZE: usize = 65536;
     const MAP_SIZE: usize = 2621440;
 
-    // We need a shared map to store our state before a crash.
-    // This way, we are able to continue fuzzing afterwards.
-    let mut shmem_provider = StdShMemProvider::new()?;
+    // The default, OS-specific privider for shared memory
+    #[cfg(target_vendor = "apple")]
+    let mut shmem_provider = UnixShMemProvider::new().unwrap();
+
+    #[cfg(not(target_vendor = "apple"))]
+    let mut shmem_provider = StdShMemProvider::new().unwrap();
 
     // The coverage map shared between observer and executor
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
