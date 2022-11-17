@@ -101,7 +101,7 @@ pub fn main() {
         let map_swapper =
             DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
 
-        // create a multimap observer, e.g. for calibration
+        // create a combined map observer, e.g. for calibration
         let map_observer = HitcountsIterableMapObserver::new(MultiMapObserver::differential(
             "combined-edges",
             unsafe { &mut COMBINED_EDGES },
@@ -131,7 +131,7 @@ pub fn main() {
         let map_swapper =
             DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
 
-        // create a multimap observer, e.g. for calibration
+        // create a combined map observer, e.g. for calibration
         let map_observer =
             HitcountsMapObserver::new(StdMapObserver::differential("combined-edges", unsafe {
                 EDGES
