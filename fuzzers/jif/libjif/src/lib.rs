@@ -8,6 +8,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 use core::time::Duration;
 use std::{env, fs, io::Read, net::SocketAddr, path::PathBuf};
 
+use clap::{self, Parser};
 use libafl::{
     bolts::{
         current_nanos,
@@ -48,7 +49,6 @@ use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
     MAX_EDGES_NUM,
 };
-use structopt::StructOpt;
 
 mod js;
 mod mutators;
@@ -68,60 +68,47 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
     Ok(Duration::from_millis(time.parse()?))
 }
 
-#[derive(Debug, StructOpt)]
-#[structopt(
+#[derive(Debug, Parser)]
+#[command(
     name = "jif",
     about = "JIF: Javascript Injection Fuzzer",
     author = "jhertz"
 )]
 struct Opt {
-    #[structopt(
+    #[arg(
         short,
         long,
-        parse(try_from_str = Cores::from_cmdline),
+        value_parser = Cores::from_cmdline,
         help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
         name = "CORES"
     )]
     cores: Cores,
 
-    #[structopt(
-        short = "p",
+    #[arg(
+        short = 'p',
         long,
         help = "Choose the broker TCP port, default is 1337",
         name = "PORT"
     )]
     broker_port: u16,
 
-    #[structopt(
-        parse(try_from_str),
-        short = "a",
-        long,
-        help = "Specify a remote broker",
-        name = "REMOTE"
-    )]
+    #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[structopt(
-        parse(try_from_str),
-        short,
-        long,
-        help = "Set an initial corpus directory",
-        name = "INPUT"
-    )]
+    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
     input: PathBuf,
 
-    #[structopt(
+    #[arg(
         short,
         long,
-        parse(try_from_str),
         help = "Set the output directory, default is ./out",
         name = "OUTPUT",
         default_value = "./out"
     )]
     output: PathBuf,
 
-    #[structopt(
-        parse(try_from_str = timeout_from_millis_str),
+    #[arg(
+        value_parser = timeout_from_millis_str,
         short,
         long,
         help = "Set the exeucution timeout in milliseconds, default is 1000",
@@ -130,49 +117,46 @@ struct Opt {
     )]
     timeout: Duration,
 
-    #[structopt(
-        parse(from_os_str),
-        short = "x",
+    #[arg(
+        short = 'x',
         long,
         help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",
-        name = "TOKENS",
-        multiple = true
+        name = "TOKENS"
     )]
     tokens: Vec<PathBuf>,
 
-    #[structopt(
+    #[arg(
         help = "File to run instead of doing fuzzing loop",
         name = "REPRO",
-        long = "repro",
-        parse(from_os_str)
+        long = "repro"
     )]
     repro_file: Option<PathBuf>,
 
     // several new flags, -g for grimoire -b for bytes -t for tags
-    #[structopt(
+    #[arg(
         help = "Use grimoire mutator",
         name = "GRIMOIRE",
         long = "grimoire",
-        short = "g"
+        short = 'g'
     )]
     grimoire: bool,
 
-    #[structopt(
+    #[arg(
         help = "Use bytes mutator",
         name = "BYTES",
         long = "bytes",
-        short = "b"
+        short = 'b'
     )]
     bytes: bool,
 
-    #[structopt(help = "Use tags mutator", name = "TAGS", long = "tags", short = "t")]
+    #[arg(help = "Use tags mutator", name = "TAGS", long = "tags", short = 't')]
     tags: bool,
 
-    #[structopt(
+    #[arg(
         help = "Use cmplog mutator",
         name = "CMPLOG",
         long = "cmplog",
-        short = "c"
+        short = 'c'
     )]
     cmplog: bool,
 }
@@ -183,7 +167,7 @@ struct Opt {
 pub extern "C" fn main() {
     let _args: Vec<String> = env::args().collect();
     let workdir = env::current_dir().unwrap();
-    let opt = Opt::from_args();
+    let opt = Opt::parse();
     let cores = opt.cores;
     let broker_port = opt.broker_port;
     let remote_broker_addr = opt.remote_broker_addr;
