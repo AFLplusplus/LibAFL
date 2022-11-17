@@ -424,7 +424,7 @@ impl Serialize for AFLCmpMap {
         let slice = unsafe {
             core::slice::from_raw_parts(
                 (self as *const Self) as *const u8,
-                std::mem::size_of::<Self>(),
+                core::mem::size_of::<Self>(),
             )
         };
         serializer.serialize_bytes(slice)
