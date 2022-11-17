@@ -1,4 +1,4 @@
-//! A libfuzzer-like fuzzer using qemu for binary-only coverage
+//! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 //!
 use core::time::Duration;
 use std::{env, path::PathBuf, process};
@@ -31,13 +31,11 @@ use libafl::{
     //prelude::{SimpleMonitor, SimpleEventManager},
 };
 use libafl_qemu::{
-    //asan::QemuAsanHelper,
     edges,
     edges::QemuEdgeCoverageHelper,
     elf::EasyElf,
     emu::Emulator,
     GuestAddr,
-    //snapshot::QemuSnapshotHelper,
     QemuExecutor,
     QemuHooks,
     Regs,
@@ -53,7 +51,7 @@ fn virt2phys(vaddr: GuestAddr, tab: &EasyElf) -> GuestAddr {
             return ret - (ret % 2);
         }
     }
-    // unlike the arm-toolcahin goblin produces some off-by one errors when parsing arm
+    // unlike the arm-toolchain goblin produces some off-by one errors when parsing arm
     vaddr - (vaddr % 2)
 }
 
@@ -95,7 +93,6 @@ pub fn fuzz() {
 
     let mut run_client = |state: Option<_>, mut mgr, _core_id| {
         // Initialize QEMU
-        env::remove_var("LD_LIBRARY_PATH");
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
         let emu = Emulator::new(&args, &env);
