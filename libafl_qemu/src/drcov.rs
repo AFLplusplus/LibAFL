@@ -99,7 +99,7 @@ where
                                 break;
                             }
                         }
-                        if module_found == false {
+                        if !module_found {
                             continue 'pcs_full;
                         }
                         if *idm == *id {
@@ -139,7 +139,7 @@ where
                             break;
                         }
                     }
-                    if module_found == false {
+                    if !module_found {
                         continue 'pcs;
                     }
                     match pc2basicblock(*pc, emulator) {
