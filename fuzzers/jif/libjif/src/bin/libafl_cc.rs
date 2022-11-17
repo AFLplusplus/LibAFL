@@ -383,6 +383,10 @@ impl ClangWrapper {
 
 #[cfg(test)]
 mod tests {
+    use libafl_cc::CompilerWrapper;
+
+    use super::ClangWrapper;
+
     #[test]
     fn test_clang_version() {
         if let Err(res) = ClangWrapper::new()
