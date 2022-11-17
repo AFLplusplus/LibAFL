@@ -15,7 +15,7 @@ On unix platforms, you'll need [libc++](https://libcxx.llvm.org/) to build it.
 Alternatively you can run `cargo make run` and this command will automatically build and run the fuzzer
 
 ### Build For Android
-When building for android using a cross-compiler, make sure you have a _standalone toolchain_, and then add the following:
+When building for android using a cross-compiler, make sure you have a [_standalone toolchain_](https://developer.android.com/ndk/guides/standalone_toolchain), and then add the following:
 1. In the ~/.cargo/config file add a target with the correct cross-compiler toolchain name (in this case aarch64-linux-android, but names may vary)
 `[target.aarch64-linux-android]`
 `linker="aarch64-linux-android-clang"`

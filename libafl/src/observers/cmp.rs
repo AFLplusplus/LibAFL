@@ -64,14 +64,16 @@ pub struct CmpValuesMetadata {
 
 crate::impl_serdeany!(CmpValuesMetadata);
 
-impl AsSlice<CmpValues> for CmpValuesMetadata {
+impl AsSlice for CmpValuesMetadata {
+    type Entry = CmpValues;
     /// Convert to a slice
     #[must_use]
     fn as_slice(&self) -> &[CmpValues] {
         self.list.as_slice()
     }
 }
-impl AsMutSlice<CmpValues> for CmpValuesMetadata {
+impl AsMutSlice for CmpValuesMetadata {
+    type Entry = CmpValues;
     /// Convert to a slice
     #[must_use]
     fn as_mut_slice(&mut self) -> &mut [CmpValues] {

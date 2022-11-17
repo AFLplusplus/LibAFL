@@ -1,6 +1,6 @@
 # Metadata
 
-A metadata in LibAFL is a self contained structure that holds associated data to the State or to a Testcase.
+A metadata in LibAFL is a self-contained structure that holds associated data to the State or to a Testcase.
 
 In terms of code, a metadata can be defined as a Rust struct registered in the SerdeAny register.
 

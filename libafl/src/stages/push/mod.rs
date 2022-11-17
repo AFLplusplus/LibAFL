@@ -38,7 +38,9 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasRand,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     /// The [`crate::state::State`]
     pub state: CS::State,
@@ -57,7 +59,9 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasRand,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     /// Create a new `PushStageSharedState` that can be used by all [`PushStage`]s
     #[must_use]
@@ -80,7 +84,9 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasRand,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     /// If this stage has already been initalized.
     /// This gets reset to `false` after one iteration of the stage is done.
@@ -110,7 +116,9 @@ where
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId,
     OT: ObserversTuple<CS::State>,
     CS::State: HasClientPerfMonitor + HasRand,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     /// Create a new [`PushStageHelper`]
     #[must_use]
@@ -178,7 +186,9 @@ where
     CS::State: HasClientPerfMonitor + HasRand + HasExecutions + HasMetadata,
     EM: EventFirer<State = CS::State> + EventRestarter + HasEventManagerId + ProgressReporter,
     OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<OT, State = CS::State> + EvaluatorObservers<OT> + HasScheduler<CS>,
+    Z: ExecutionProcessor<OT, State = CS::State>
+        + EvaluatorObservers<OT>
+        + HasScheduler<Scheduler = CS>,
 {
     /// Gets the [`PushStageHelper`]
     fn push_stage_helper(&self) -> &PushStageHelper<CS, EM, OT, Z>;
