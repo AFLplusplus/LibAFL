@@ -6,9 +6,8 @@ edition = "2021"
 default-run = "fuzzer_sd"
 
 [features]
-default = ["std"]
 tui = []
-std = []
+multimap = []
 
 [profile.dev]
 panic = "abort"

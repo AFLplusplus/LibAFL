@@ -190,7 +190,7 @@ where
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
 #[allow(clippy::unsafe_derive_deserialize)]
-pub struct StdMapObserver<'a, T>
+pub struct StdMapObserver<'a, T, const DIFFERENTIAL: bool>
 where
     T: Default + Copy + 'static + Serialize,
 {
@@ -199,7 +199,7 @@ where
     name: String,
 }
 
-impl<'a, S, T> Observer<S> for StdMapObserver<'a, T>
+impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, false>
 where
     S: UsesInput,
     T: Bounded
@@ -217,7 +217,21 @@ where
     }
 }
 
-impl<'a, T> Named for StdMapObserver<'a, T>
+impl<'a, S, T> Observer<S> for StdMapObserver<'a, T, true>
+where
+    S: UsesInput,
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
+}
+
+impl<'a, T, const DIFFERENTIAL: bool> Named for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -227,7 +241,7 @@ where
     }
 }
 
-impl<'a, T> HasLen for StdMapObserver<'a, T>
+impl<'a, T, const DIFFERENTIAL: bool> HasLen for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
@@ -237,7 +251,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsIter<'it> for StdMapObserver<'a, T>
+impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIter<'it> for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Bounded
         + PartialEq
@@ -257,7 +271,7 @@ where
     }
 }
 
-impl<'a, 'it, T> AsIterMut<'it> for StdMapObserver<'a, T>
+impl<'a, 'it, T, const DIFFERENTIAL: bool> AsIterMut<'it> for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Bounded
         + PartialEq
@@ -277,7 +291,7 @@ where
     }
 }
 
-impl<'a, 'it, T> IntoIterator for &'it StdMapObserver<'a, T>
+impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator for &'it StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Bounded
         + PartialEq
@@ -297,7 +311,8 @@ where
     }
 }
 
-impl<'a, 'it, T> IntoIterator for &'it mut StdMapObserver<'a, T>
+impl<'a, 'it, T, const DIFFERENTIAL: bool> IntoIterator
+    for &'it mut StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Bounded
         + PartialEq
@@ -317,7 +332,7 @@ where
     }
 }
 
-impl<'a, T> MapObserver for StdMapObserver<'a, T>
+impl<'a, T, const DIFFERENTIAL: bool> MapObserver for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Bounded
         + PartialEq
@@ -404,7 +419,7 @@ where
     }
 }
 
-impl<'a, T> AsSlice for StdMapObserver<'a, T>
+impl<'a, T, const DIFFERENTIAL: bool> AsSlice for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
@@ -415,7 +430,7 @@ where
         self.map.as_slice()
     }
 }
-impl<'a, T> AsMutSlice for StdMapObserver<'a, T>
+impl<'a, T, const DIFFERENTIAL: bool> AsMutSlice for StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
 {
@@ -427,13 +442,13 @@ where
     }
 }
 
-impl<'a, T> StdMapObserver<'a, T>
+impl<'a, T, const DIFFERENTIAL: bool> StdMapObserver<'a, T, DIFFERENTIAL>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
     #[must_use]
-    pub fn new<S>(name: S, map: &'a mut [T]) -> Self
+    fn maybe_differential<S>(name: S, map: &'a mut [T]) -> Self
     where
         S: Into<String>,
     {
@@ -446,7 +461,7 @@ where
 
     /// Creates a new [`MapObserver`] with an owned map
     #[must_use]
-    pub fn new_owned<S>(name: S, map: Vec<T>) -> Self
+    fn maybe_differential_owned<S>(name: S, map: Vec<T>) -> Self
     where
         S: Into<String>,
     {
@@ -462,7 +477,7 @@ where
     /// # Safety
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
-    pub fn new_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
+    fn maybe_differential_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
     where
         S: Into<String>,
     {
@@ -477,7 +492,7 @@ where
     ///
     /// # Safety
     /// Will dereference the `map_ptr` with up to len elements.
-    pub unsafe fn new_from_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
+    unsafe fn maybe_differential_from_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
     where
         S: Into<String>,
     {
@@ -497,6 +512,114 @@ where
     pub fn map_mut(&mut self) -> &mut OwnedSliceMut<'a, T> {
         &mut self.map
     }
+}
+
+impl<'a, T> StdMapObserver<'a, T, false>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`MapObserver`]
+    #[must_use]
+    pub fn new<S>(name: S, map: &'a mut [T]) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential(name, map)
+    }
+
+    /// Creates a new [`MapObserver`] with an owned map
+    #[must_use]
+    pub fn new_owned<S>(name: S, map: Vec<T>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_owned(name, map)
+    }
+
+    /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map.
+    ///
+    /// # Safety
+    /// Will dereference the owned slice with up to len elements.
+    #[must_use]
+    pub fn new_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_from_ownedref(name, map)
+    }
+
+    /// Creates a new [`MapObserver`] from a raw pointer
+    ///
+    /// # Safety
+    /// Will dereference the `map_ptr` with up to len elements.
+    pub unsafe fn new_from_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_from_ptr(name, map_ptr, len)
+    }
+}
+
+impl<'a, T> StdMapObserver<'a, T, true>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`MapObserver`] in differential mode
+    #[must_use]
+    pub fn differential<S>(name: S, map: &'a mut [T]) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential(name, map)
+    }
+
+    /// Creates a new [`MapObserver`] with an owned map in differential mode
+    #[must_use]
+    pub fn differential_owned<S>(name: S, map: Vec<T>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_owned(name, map)
+    }
+
+    /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map in differential mode.
+    ///
+    /// # Safety
+    /// Will dereference the owned slice with up to len elements.
+    #[must_use]
+    pub fn differential_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_from_ownedref(name, map)
+    }
+
+    /// Creates a new [`MapObserver`] from a raw pointer in differential mode
+    ///
+    /// # Safety
+    /// Will dereference the `map_ptr` with up to len elements.
+    pub unsafe fn differential_from_ptr<S>(name: S, map_ptr: *mut T, len: usize) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_from_ptr(name, map_ptr, len)
+    }
+}
+
+impl<'a, OTA, OTB, S, T> DifferentialObserver<OTA, OTB, S> for StdMapObserver<'a, T, true>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+    T: Bounded
+        + PartialEq
+        + Default
+        + Copy
+        + 'static
+        + Serialize
+        + serde::de::DeserializeOwned
+        + Debug,
+{
 }
 
 /// Use a const size to speedup `Feedback::is_interesting` when the user can

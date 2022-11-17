@@ -123,9 +123,9 @@ mod swap {
 
     impl<'a, 'b> DifferentialAFLMapSwapObserver<'a, 'b> {
         /// Create a new `DifferentialAFLMapSwapObserver`.
-        pub fn new(
-            first: &mut StdMapObserver<'a, u8>,
-            second: &mut StdMapObserver<'b, u8>,
+        pub fn new<const D1: bool, const D2: bool>(
+            first: &mut StdMapObserver<'a, u8, D1>,
+            second: &mut StdMapObserver<'b, u8, D2>,
         ) -> Self {
             Self {
                 first_name: first.name().to_string(),

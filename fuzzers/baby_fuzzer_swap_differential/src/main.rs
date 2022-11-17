@@ -1,6 +1,9 @@
-use std::path::PathBuf;
 #[cfg(windows)]
 use std::ptr::write_volatile;
+use std::{
+    alloc::{alloc_zeroed, Layout},
+    path::PathBuf,
+};
 
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
@@ -16,24 +19,47 @@ use libafl::{
     generators::RandPrintablesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{HitcountsIterableMapObserver, HitcountsMapObserver, StdMapObserver},
-    prelude::{MultiMapObserver, OwnedSliceMut},
+    observers::StdMapObserver,
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
-    state::{HasCorpus, HasSolutions, StdState},
+    state::{HasSolutions, StdState},
 };
-use libafl_targets::{DifferentialAFLMapSwapObserver, EDGES_MAP_SIZE};
+use libafl_targets::{DifferentialAFLMapSwapObserver, MAX_EDGES_NUM};
 use mimalloc::MiMalloc;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
 // bindings to the functions defined in the target
-include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+mod bindings {
+    #![allow(non_camel_case_types)]
+    #![allow(non_upper_case_globals)]
+    #![allow(unused)]
 
-static mut FIRST_EDGES: [u8; EDGES_MAP_SIZE] = [0u8; EDGES_MAP_SIZE];
-static mut SECOND_EDGES: [u8; EDGES_MAP_SIZE] = [0u8; EDGES_MAP_SIZE];
-static mut COMBINED_EDGES: [&mut [u8]; 2] = unsafe { [&mut FIRST_EDGES, &mut SECOND_EDGES] };
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+}
+
+use bindings::{inspect_first, inspect_second};
+
+#[cfg(feature = "multimap")]
+mod multimap {
+    pub use libafl::observers::{HitcountsIterableMapObserver, MultiMapObserver};
+
+    pub static mut FIRST_EDGES: &'static mut [u8] = &mut [];
+    pub static mut SECOND_EDGES: &'static mut [u8] = &mut [];
+    pub static mut COMBINED_EDGES: [&'static mut [u8]; 2] = [&mut [], &mut []];
+}
+#[cfg(feature = "multimap")]
+use multimap::*;
+
+#[cfg(not(feature = "multimap"))]
+mod slicemap {
+    pub use libafl::observers::HitcountsMapObserver;
+
+    pub static mut EDGES: &'static mut [u8] = &mut [];
+}
+#[cfg(not(feature = "multimap"))]
+use slicemap::*;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -57,19 +83,66 @@ pub fn main() {
         }
     };
 
-    // create the base maps used to observe the different executors
-    let mut first_map_observer = StdMapObserver::new("first-edges", unsafe { &mut FIRST_EDGES });
-    let mut second_map_observer = StdMapObserver::new("second-edges", unsafe { &mut SECOND_EDGES });
+    #[cfg(feature = "multimap")]
+    let (first_map_observer, second_map_observer, map_swapper, map_observer) = {
+        // initialize the maps
+        unsafe {
+            let layout = Layout::from_size_align(MAX_EDGES_NUM, 64).unwrap();
+            FIRST_EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM);
+            SECOND_EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM);
+            COMBINED_EDGES = [&mut FIRST_EDGES, &mut SECOND_EDGES];
+        }
 
-    // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
-    let mut map_swapper =
-        DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
+        // create the base maps used to observe the different executors from two independent maps
+        let mut first_map_observer = StdMapObserver::new("first-edges", unsafe { FIRST_EDGES });
+        let mut second_map_observer = StdMapObserver::new("second-edges", unsafe { SECOND_EDGES });
 
-    // create a multimap observer, e.g. for calibration
-    let map_observer = HitcountsIterableMapObserver::new(MultiMapObserver::differential(
-        "combined-edges",
-        unsafe { &mut COMBINED_EDGES },
-    ));
+        // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
+        let map_swapper =
+            DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
+
+        // create a multimap observer, e.g. for calibration
+        let map_observer = HitcountsIterableMapObserver::new(MultiMapObserver::differential(
+            "combined-edges",
+            unsafe { &mut COMBINED_EDGES },
+        ));
+        (
+            first_map_observer,
+            second_map_observer,
+            map_swapper,
+            map_observer,
+        )
+    };
+    #[cfg(not(feature = "multimap"))]
+    let (first_map_observer, second_map_observer, map_swapper, map_observer) = {
+        // initialize the map
+        unsafe {
+            let layout = Layout::from_size_align(MAX_EDGES_NUM * 2, 64).unwrap();
+            EDGES = core::slice::from_raw_parts_mut(alloc_zeroed(layout), MAX_EDGES_NUM * 2);
+        }
+
+        // create the base maps used to observe the different executors by splitting a slice
+        let mut first_map_observer =
+            StdMapObserver::new("first-edges", unsafe { &mut EDGES[..MAX_EDGES_NUM] });
+        let mut second_map_observer =
+            StdMapObserver::new("second-edges", unsafe { &mut EDGES[MAX_EDGES_NUM..] });
+
+        // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
+        let map_swapper =
+            DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
+
+        // create a multimap observer, e.g. for calibration
+        let map_observer =
+            HitcountsMapObserver::new(StdMapObserver::differential("combined-edges", unsafe {
+                EDGES
+            }));
+        (
+            first_map_observer,
+            second_map_observer,
+            map_swapper,
+            map_observer,
+        )
+    };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&map_observer);
@@ -112,7 +185,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     // Create the executor for an in-process function with just one observer
-    let mut first_executor = InProcessExecutor::new(
+    let first_executor = InProcessExecutor::new(
         &mut first_harness,
         tuple_list!(first_map_observer),
         &mut fuzzer,
@@ -120,7 +193,7 @@ pub fn main() {
         &mut mgr,
     )
     .expect("Failed to create the first executor");
-    let mut second_executor = InProcessExecutor::new(
+    let second_executor = InProcessExecutor::new(
         &mut second_harness,
         tuple_list!(second_map_observer),
         &mut fuzzer,
