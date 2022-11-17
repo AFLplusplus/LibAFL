@@ -102,6 +102,8 @@ pub fn main() {
             DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
 
         // create a combined map observer, e.g. for calibration
+        // we use MultiMapObserver::differential to indicate that we want to use the observer in
+        // differential mode
         let map_observer = HitcountsIterableMapObserver::new(MultiMapObserver::differential(
             "combined-edges",
             unsafe { &mut COMBINED_EDGES },
@@ -132,6 +134,8 @@ pub fn main() {
             DifferentialAFLMapSwapObserver::new(&mut first_map_observer, &mut second_map_observer);
 
         // create a combined map observer, e.g. for calibration
+        // we use StdMapObserver::differential to indicate that we want to use the observer in
+        // differential mode
         let map_observer =
             HitcountsMapObserver::new(StdMapObserver::differential("combined-edges", unsafe {
                 EDGES
@@ -202,6 +206,9 @@ pub fn main() {
     )
     .expect("Failed to create the second executor");
 
+    // create the differential executor, providing both the map swapper (which will ensure the
+    // instrumentation picks the correct map to write to) and the map observer (which provides the
+    // combined feedback)
     let mut differential_executor = DiffExecutor::new(
         first_executor,
         second_executor,

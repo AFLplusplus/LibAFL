@@ -1336,7 +1336,7 @@ mod tests {
         );
         let vec = postcard::to_allocvec(&obv).unwrap();
         println!("{vec:?}");
-        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32>) =
+        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32, false>) =
             postcard::from_bytes(&vec).unwrap();
         assert_eq!(obv.0.name(), obv2.0.name());
     }
