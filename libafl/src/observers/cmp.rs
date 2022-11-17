@@ -494,10 +494,10 @@ impl CmpMap for AFLCmpMap {
             unsafe {
                 Some(CmpValues::Bytes((
                     self.vals.fn_operands[idx][execution].v0
-                        [..self.headers[idx].shape() as usize + 1]
+                        [..=(self.headers[idx].shape() as usize)]
                         .to_vec(),
                     self.vals.fn_operands[idx][execution].v1
-                        [..self.headers[idx].shape() as usize + 1]
+                        [..=(self.headers[idx].shape() as usize)]
                         .to_vec(),
                 )))
             }
