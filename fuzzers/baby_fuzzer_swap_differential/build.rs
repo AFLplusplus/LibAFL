@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, str::FromStr};
 
 fn main() -> anyhow::Result<()> {
     if env::var("CARGO_BIN_NAME").map_or(true, |v| v != "libafl_cc") {
@@ -21,7 +21,11 @@ fn main() -> anyhow::Result<()> {
             .write_to_file(out_path.join("bindings.rs"))
             .expect("Couldn't write bindings!");
 
-        let compiler = env::current_dir()?.join("target/release/libafl_cc");
+        let compiler = env::var("CARGO_TARGET_DIR")
+            .map_or(PathBuf::from_str("target").unwrap(), |v| {
+                PathBuf::from_str(&v).unwrap()
+            })
+            .join("release/libafl_cc");
         println!("cargo:rerun-if-changed={}", compiler.to_str().unwrap());
         if !compiler.try_exists().unwrap_or(false) {
             println!("cargo:warning=Can't find libafl_cc; assuming that we're building it.");
