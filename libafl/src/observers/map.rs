@@ -2217,7 +2217,7 @@ pub mod pybind {
             /// Python class for StdMapObserver
             pub struct $struct_name1 {
                 /// Rust wrapped StdMapObserver object
-                pub inner: StdMapObserver<'static, $datatype>,
+                pub inner: StdMapObserver<'static, $datatype, false>,
             }
 
             #[pymethods]
