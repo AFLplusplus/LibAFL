@@ -230,9 +230,6 @@ extern "C" {
     fn qemu_main_loop();
     fn qemu_cleanup();
 
-    // void libafl_cpu_thread_fn(CPUState *cpu)
-    fn libafl_cpu_thread_fn(cpu: CPUStatePtr);
-
     // int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
     //                     uint8_t *buf, int len, int is_write);
     fn cpu_memory_rw_debug(
@@ -243,8 +240,6 @@ extern "C" {
         is_write: i32,
     );
     fn cpu_physical_memory_rw(addr: GuestAddr, buf: *mut u8, len: i32, iswrite: bool);
-
-    static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
 
     fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
     #[allow(unused)]
@@ -605,13 +600,6 @@ impl Emulator {
         Emulator { _private: () }
     }
 
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn start(&self, cpu: &CPU) {
-        unsafe {
-            libafl_cpu_thread_fn(cpu.ptr);
-        }
-    }
-
     /// This function gets the memory mappings from the emulator.
     #[cfg(emulation_mode = "usermode")]
     #[must_use]
@@ -914,13 +902,6 @@ impl Emulator {
 
     pub fn add_backdoor_hook(&self, exec: extern "C" fn(GuestAddr, u64), data: u64) {
         unsafe { libafl_add_backdoor_hook(exec, data) };
-    }
-
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn set_vcpu_start(&self, hook: extern "C" fn(cpu: CPU)) {
-        unsafe {
-            libafl_start_vcpu = core::mem::transmute(hook);
-        }
     }
 
     #[cfg(emulation_mode = "usermode")]
