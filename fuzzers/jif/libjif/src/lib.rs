@@ -121,14 +121,6 @@ struct Opt {
     output: PathBuf,
 
     #[structopt(
-        help = "Path for the JS file with the harness to run inputs through",
-        name = "HARNESS",
-        long = "harness",
-        parse(from_os_str)
-    )]
-    harness: PathBuf,
-
-    #[structopt(
         parse(try_from_str = timeout_from_millis_str),
         short,
         long,
@@ -219,7 +211,7 @@ pub extern "C" fn main() {
     let iteration_counter = RelaxedCounter::new(0);
 
     let mut run_client = |state: Option<StdState<_, _, _, _>>,
-                          mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                          mut mgr: LlmpRestartingEventManager<_, _>,
                           _core_id| {
         let repro_file = repro_file.clone();
 
@@ -384,7 +376,7 @@ pub extern "C" fn main() {
         // TODO: try without timeout executor
         // Create the executor for an in-process function with one observer for edge coverage and one for the execution time
         let mut executor = TimeoutExecutor::new(
-            InProcessExecutor::new::<LlmpRestartingEventManager<_, _, _, _>, _, _>(
+            InProcessExecutor::new::<LlmpRestartingEventManager<_, _>, _, _>(
                 &mut harness,
                 tuple_list!(edges_observer, time_observer, js_observer),
                 &mut fuzzer,

@@ -5,8 +5,8 @@ use libafl::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::Input,
     observers::{Observer, ObserversTuple},
+    prelude::UsesInput,
     state::{HasClientPerfMonitor, HasMetadata, HasNamedMetadata},
     Error, SerdeAny,
 };
@@ -25,8 +25,11 @@ extern "C" {
     fn get_js_coverage() -> *const c_char;
 }
 
-impl<I, S> Observer<I, S> for JSObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl<S> Observer<S> for JSObserver
+where
+    S: UsesInput,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         // we don't currently do much here?
         Ok(())
     }
@@ -34,7 +37,7 @@ impl<I, S> Observer<I, S> for JSObserver {
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         unsafe {
@@ -69,20 +72,21 @@ pub struct JSFeedback {
     name: String,
 }
 
-impl<I: Input, S: HasClientPerfMonitor + HasMetadata + HasNamedMetadata> Feedback<I, S>
-    for JSFeedback
+impl<S> Feedback<S> for JSFeedback
+where
+    S: UsesInput + HasClientPerfMonitor + HasMetadata + HasNamedMetadata,
 {
     fn is_interesting<EM, OT>(
         &mut self,
         state: &mut S,
         _manager: &mut EM,
-        _input: &I,
+        _input: &S::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer,
+        OT: ObserversTuple<S>,
     {
         let observer = observers.match_name::<JSObserver>(&self.name).unwrap();
         let novel = state

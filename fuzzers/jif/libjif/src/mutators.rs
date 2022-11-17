@@ -5,7 +5,7 @@ use libafl::{
     corpus::Corpus,
     inputs::{HasBytesVec, Input},
     mutators::{MutationResult, Mutator},
-    prelude::Tokens,
+    prelude::{Tokens, UsesInput},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
@@ -14,10 +14,10 @@ use libafl::{
 #[derive(Default, Debug)]
 pub struct TagDeleteMutator;
 
-impl<I, S> Mutator<I, S> for TagDeleteMutator
+impl<I, S> Mutator<S> for TagDeleteMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand,
+    S: HasRand + UsesInput<Input = I>,
 {
     fn mutate(
         &mut self,
@@ -88,10 +88,10 @@ impl TagDeleteMutator {
 #[derive(Default, Debug)]
 pub struct TagCopyMutator;
 
-impl<I, S> Mutator<I, S> for TagCopyMutator
+impl<I, S> Mutator<S> for TagCopyMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand,
+    S: HasRand + UsesInput<Input = I>,
 {
     fn mutate(
         &mut self,
@@ -170,10 +170,10 @@ impl TagCopyMutator {
 #[derive(Default, Debug)]
 pub struct TagCrossoverMutator;
 
-impl<I, S> Mutator<I, S> for TagCrossoverMutator
+impl<I, S> Mutator<S> for TagCrossoverMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I>,
+    S: HasRand + HasCorpus<Input = I>,
 {
     fn mutate(
         &mut self,
@@ -281,10 +281,10 @@ impl TagCrossoverMutator {
 #[derive(Default, Debug)]
 pub struct TagTokenMutator;
 
-impl<I, S> Mutator<I, S> for TagTokenMutator
+impl<I, S> Mutator<S> for TagTokenMutator
 where
     I: Input + HasBytesVec,
-    S: HasRand + HasCorpus<I> + HasMetadata,
+    S: HasRand + HasCorpus<Input = I> + HasMetadata,
 {
     fn mutate(
         &mut self,
