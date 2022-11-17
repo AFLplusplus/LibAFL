@@ -1,11 +1,7 @@
-use libafl::prelude::EventFirer;
-use libafl::prelude::ExitKind;
-use libafl::prelude::Feedback;
-use libafl::prelude::HasClientPerfMonitor;
-use libafl::prelude::Input;
-use libafl::prelude::Named;
-use libafl::prelude::ObserversTuple;
-use libafl::Error;
+use libafl::{
+    prelude::{EventFirer, ExitKind, Feedback, HasClientPerfMonitor, Input, Named, ObserversTuple},
+    Error,
+};
 use serde::{Deserialize, Serialize};
 
 /// A [`ReturnValueFeedback`] reports as interesting if `LLVMTestOneInput == 42`

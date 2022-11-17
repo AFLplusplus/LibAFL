@@ -1,16 +1,16 @@
 //! Uses LLVM compiler Wrapper from `LibAFL`
 
-use libafl_cc::{
-    clang::{CLANGXX_PATH, CLANG_PATH, OUT_DIR},
-    CompilerWrapper, Error, LLVMPasses, LIB_EXT, LIB_PREFIX,
-};
-
 use std::{
     convert::Into,
     env,
     path::{Path, PathBuf},
     string::String,
     vec::Vec,
+};
+
+use libafl_cc::{
+    clang::{CLANGXX_PATH, CLANG_PATH, OUT_DIR},
+    CompilerWrapper, Error, LLVMPasses, LIB_EXT, LIB_PREFIX,
 };
 
 /// Wrap Clang
