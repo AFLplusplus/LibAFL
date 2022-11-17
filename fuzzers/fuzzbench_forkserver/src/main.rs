@@ -13,15 +13,12 @@ use libafl::{
         current_nanos, current_time,
         rands::StdRand,
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
-        tuples::{tuple_list, MatchName, Merge},
+        tuples::{tuple_list, Merge},
         AsMutSlice,
     },
     corpus::{Corpus, OnDiskCorpus},
     events::SimpleEventManager,
-    executors::{
-        forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
-        HasObservers,
-    },
+    executors::forkserver::{ForkserverExecutor, TimeoutForkserverExecutor},
     feedback_and_fast, feedback_or,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -31,9 +28,7 @@ use libafl::{
         scheduled::havoc_mutations, token_mutations::I2SRandReplace, tokens_mutations,
         StdMOptMutator, StdScheduledMutator, Tokens,
     },
-    observers::{
-        AFLCmpMap, HitcountsMapObserver, MapObserver, StdCmpObserver, StdMapObserver, TimeObserver,
-    },
+    observers::{AFLCmpMap, HitcountsMapObserver, StdCmpObserver, StdMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -319,7 +314,7 @@ fn fuzz(
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let mut tokens = Tokens::new();
-    let mut forkserver = ForkserverExecutor::builder()
+    let forkserver = ForkserverExecutor::builder()
         .program(executable)
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
@@ -327,16 +322,8 @@ fn fuzz(
         .parse_afl_cmdline(&arguments)
         .coverage_map_size(MAP_SIZE)
         .is_persistent(true)
-        .build(tuple_list!(time_observer, edges_observer))
+        .build_dynamic_map(edges_observer, tuple_list!(time_observer))
         .unwrap();
-
-    if let Some(dynamic_map_size) = forkserver.coverage_map_size() {
-        forkserver
-            .observers_mut()
-            .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8>>>("shared_mem")
-            .unwrap()
-            .downsize_map(dynamic_map_size);
-    }
 
     let mut executor = TimeoutForkserverExecutor::with_signal(forkserver, timeout, signal)
         .expect("Failed to create the executor.");

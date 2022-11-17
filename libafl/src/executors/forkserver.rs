@@ -28,13 +28,15 @@ use crate::{
         fs::{InputFile, INPUTFILE_STD},
         os::{dup2, pipes::Pipe},
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        tuples::Prepend,
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{
-        get_asan_runtime_flags_with_log_path, AsanBacktraceObserver, ObserversTuple, UsesObservers,
+        get_asan_runtime_flags_with_log_path, AsanBacktraceObserver, MapObserver, Observer,
+        ObserversTuple, UsesObservers,
     },
     state::UsesState,
     Error,
@@ -615,6 +617,80 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         S::Input: Input + HasTargetBytes,
         SP: ShMemProvider,
     {
+        let (forkserver, input_file, map) = self.build_helper()?;
+
+        let target = self.program.take().unwrap();
+        println!(
+            "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
+            target,
+            self.arguments.clone(),
+            self.use_stdin
+        );
+
+        Ok(ForkserverExecutor {
+            target,
+            args: self.arguments.clone(),
+            input_file,
+            uses_shmem_testcase: self.uses_shmem_testcase,
+            forkserver,
+            observers,
+            map,
+            phantom: PhantomData,
+            has_asan_observer: None, // initialized on first use
+            map_size: self.map_size,
+        })
+    }
+
+    /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
+    #[allow(clippy::pedantic)]
+    pub fn build_dynamic_map<MO, OT, S>(
+        &mut self,
+        mut map_observer: MO,
+        other_observers: OT,
+    ) -> Result<ForkserverExecutor<(MO, OT), S, SP>, Error>
+    where
+        MO: Observer<S> + MapObserver, // TODO maybe enforce Entry = u8 for the cov map
+        OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
+        S: UsesInput,
+        S::Input: Input + HasTargetBytes,
+        SP: ShMemProvider,
+    {
+        let (forkserver, input_file, map) = self.build_helper()?;
+
+        let target = self.program.take().unwrap();
+        println!(
+            "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}, map_size: {:?}",
+            target,
+            self.arguments.clone(),
+            self.use_stdin,
+            self.map_size
+        );
+
+        if let Some(dynamic_map_size) = self.map_size {
+            map_observer.downsize_map(dynamic_map_size);
+        }
+
+        let observers: (MO, OT) = other_observers.prepend(map_observer);
+
+        Ok(ForkserverExecutor {
+            target,
+            args: self.arguments.clone(),
+            input_file,
+            uses_shmem_testcase: self.uses_shmem_testcase,
+            forkserver,
+            observers,
+            map,
+            phantom: PhantomData,
+            has_asan_observer: None, // initialized on first use
+            map_size: self.map_size,
+        })
+    }
+
+    #[allow(clippy::pedantic)]
+    fn build_helper(&mut self) -> Result<(Forkserver, InputFile, Option<SP::ShMem>), Error>
+    where
+        SP: ShMemProvider,
+    {
         let input_filename = match &self.input_filename {
             Some(name) => name.clone(),
             None => OsString::from(".cur_input"),
@@ -635,22 +711,18 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             }
         };
 
-        let (target, mut forkserver) = match &self.program {
-            Some(t) => {
-                let forkserver = Forkserver::new(
-                    t.clone(),
-                    self.arguments.clone(),
-                    self.envs.clone(),
-                    input_file.as_raw_fd(),
-                    self.use_stdin,
-                    0,
-                    self.is_persistent,
-                    self.is_deferred_frksrv,
-                    self.debug_child,
-                )?;
-
-                (t.clone(), forkserver)
-            }
+        let mut forkserver = match &self.program {
+            Some(t) => Forkserver::new(
+                t.clone(),
+                self.arguments.clone(),
+                self.envs.clone(),
+                input_file.as_raw_fd(),
+                self.use_stdin,
+                0,
+                self.is_persistent,
+                self.is_deferred_frksrv,
+                self.debug_child,
+            )?,
             None => {
                 return Err(Error::illegal_argument(
                     "ForkserverExecutorBuilder::build: target file not found".to_string(),
@@ -737,25 +809,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             println!("Forkserver Options are not available.");
         }
 
-        println!(
-            "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
-            target,
-            self.arguments.clone(),
-            self.use_stdin
-        );
-
-        Ok(ForkserverExecutor {
-            target,
-            args: self.arguments.clone(),
-            input_file,
-            uses_shmem_testcase: self.uses_shmem_testcase,
-            forkserver,
-            observers,
-            map,
-            phantom: PhantomData,
-            has_asan_observer: None, // initialized on first use
-            map_size: self.map_size,
-        })
+        Ok((forkserver, input_file, map))
     }
 
     /// Use autodict?
@@ -810,7 +864,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             arguments: vec![],
             envs: vec![],
             debug_child: false,
-            use_stdin: true,
+            use_stdin: false,
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
