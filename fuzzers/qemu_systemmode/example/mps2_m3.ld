@@ -26,8 +26,10 @@
 
 MEMORY
 {
-    FLASH (xr) : ORIGIN = 0x00000000, LENGTH = 4M /* to 0x00003FFF = 0x007FFFFF*/
-    RAM (xrw)  : ORIGIN = 0x20000000, LENGTH = 4M /* to 0x21FFFFFF = 0xFFFFFF */
+    RAM (xrw)  : ORIGIN = 0x00000000, LENGTH = 4M
+    /* Originally                                    */
+    /* FLASH (xr) : ORIGIN = 0x00000000, LENGTH = 4M */
+    /* RAM (xrw)  : ORIGIN = 0x20000000, LENGTH = 4M */
 }
 ENTRY(Reset_Handler)
 
@@ -44,7 +46,7 @@ SECTIONS
         __vector_table = .;
         KEEP(*(.isr_vector))
         . = ALIGN(4);
-    } > FLASH
+    } > RAM /* FLASH */
 
     .text :
     {
@@ -56,14 +58,14 @@ SECTIONS
         *(.rodata*)
         . = ALIGN(4);
         _etext = .;
-    } > FLASH
+    } > RAM /* FLASH */
 
     .ARM.extab :
     {
         . = ALIGN(4);
         *(.ARM.extab* .gnu.linkonce.armextab.*)
         . = ALIGN(4);
-    } >FLASH
+    } >RAM /* FLASH */
 
     .ARM :
     {
@@ -72,7 +74,7 @@ SECTIONS
         *(.ARM.exidx* .gnu.linkonce.armexidx.*)
         __exidx_end = .;
         . = ALIGN(4);
-    } >FLASH
+    } >RAM /* FLASH */
 
     .interrupts_ram :
     {
@@ -93,7 +95,7 @@ SECTIONS
         *(.data*)
         . = ALIGN(4);
         _edata = .;
-    } > RAM AT > FLASH
+    } > RAM /* RAM AT > FLASH */
 
     .uninitialized (NOLOAD):
     {
