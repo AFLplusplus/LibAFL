@@ -4,7 +4,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "668fc28b051b78f0b95e051682ddfc884d21fe35";
+const QEMU_REVISION: &str = "e2d34fd5e7a2e7efd3f7d0be8cb320fc62d8334b";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -42,6 +42,7 @@ pub fn build() {
         })
     };
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
+    println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=CROSS_CC");
@@ -71,6 +72,7 @@ pub fn build() {
             "x86_64".to_string()
         })
     };
+    println!("cargo:rerun-if-env-changed=CPU_TARGET");
 
     let jobs = env::var("NUM_JOBS");
 
@@ -78,6 +80,7 @@ pub fn build() {
         println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
         "cc".to_owned()
     });
+    println!("cargo:rerun-if-env-changed=CROSS_CC");
 
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
 
@@ -105,6 +108,8 @@ pub fn build() {
 
     let custum_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
     let custum_qemu_no_build = env::var("CUSTOM_QEMU_NO_BUILD").is_ok();
+    println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_DIR");
+    println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_NO_BUILD");
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
