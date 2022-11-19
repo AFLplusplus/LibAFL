@@ -213,10 +213,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             SymExpr::Trunc { op, bits } => Some(bv!(op).extract(u32::from(bits - 1), 0).into()),
             SymExpr::BoolToBit { op } => Some(
                 bool!(op)
-                    .ite(
-                        &BV::from_u64(&ctx, 1, 1),
-                        &BV::from_u64(&ctx, 0, 1),
-                    )
+                    .ite(&BV::from_u64(&ctx, 1, 1), &BV::from_u64(&ctx, 0, 1))
                     .into(),
             ),
             SymExpr::Concat { a, b } => bv_binop!(a concat b),
