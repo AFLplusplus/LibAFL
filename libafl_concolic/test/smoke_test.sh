@@ -30,11 +30,8 @@ if [ ! -d "symcc_build" ]; then
 fi
 
 
-echo "building runtime"
-cargo build -p runtime_test
-
-echo "building dump_constraints"
-cargo build -p dump_constraints
+echo "building runtime and dump_constraints"
+cargo build -p runtime_test -p dump_constraints
 
 echo "building target"
 SYMCC_RUNTIME_DIR=../../target/debug symcc_build/symcc symcc/test/if.c -o "if"
