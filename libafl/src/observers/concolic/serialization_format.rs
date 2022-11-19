@@ -248,7 +248,10 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         // calculate size of trace
         let end_pos = self.writer.stream_position()?;
         let trace_header_len = 0_u64.to_le_bytes().len() as u64;
-        assert!(end_pos > self.writer_start_position + trace_header_len);
+        assert!(
+            end_pos >= self.writer_start_position + trace_header_len,
+            "our end position can not be before our start position"
+        );
         let trace_length = end_pos - self.writer_start_position - trace_header_len;
 
         // write trace size to beginning of trace
