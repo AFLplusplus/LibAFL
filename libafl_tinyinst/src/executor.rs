@@ -1,7 +1,6 @@
 use core::marker::PhantomData;
 use std::{ffi::CString, os::raw::c_char};
 
-use cxx::UniquePtr;
 use libafl::{
     bolts::fs::{InputFile, INPUTFILE_STD},
     executors::{Executor, ExitKind, HasObservers},
@@ -12,27 +11,22 @@ use libafl::{
     Error,
 };
 
-use crate::tinyinst::litecov::{
-    get_coverage_map, AFLCov, Coverage, RunResult, TinyInstInstrumentation,
-};
+use tinyinst_rs::tinyinst::litecov::RunResult;
+use tinyinst_rs::tinyinst::TinyInst;
 
-pub struct TinyInstExecutor<S, OT> {
-    instrumentation_ptr: UniquePtr<TinyInstInstrumentation>,
-    coverage_ptr: UniquePtr<Coverage>,
+pub struct TinyInstExecutor<'a, S, OT> {
+    tinyinst: TinyInst,
+    coverage: &'a mut Vec<u64>,
     argc: usize,
     argv: Vec<CString>,
     timeout: u32,
     observers: OT,
     phantom: PhantomData<S>,
-    coverage: *mut u8,
-    coverage_size: usize,
     cur_input: InputFile,
     use_stdin: bool,
-    aflcov: UniquePtr<AFLCov>,
-    test: u64,
 }
 
-impl<S, OT> std::fmt::Debug for TinyInstExecutor<S, OT> {
+impl<'a, S, OT> std::fmt::Debug for TinyInstExecutor<'a, S, OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TinyInstExecutor")
             .field("argc", &self.argc)
@@ -42,7 +36,7 @@ impl<S, OT> std::fmt::Debug for TinyInstExecutor<S, OT> {
     }
 }
 
-impl<EM, S, Z, OT> Executor<EM, Z> for TinyInstExecutor<S, OT>
+impl<'a, EM, S, Z, OT> Executor<EM, Z> for TinyInstExecutor<'a, S, OT>
 where
     EM: UsesState<State = S>,
     S: UsesInput,
@@ -71,21 +65,9 @@ where
         #[allow(unused_assignments)]
         let mut status = RunResult::OK;
         unsafe {
-            status = self.instrumentation_ptr.pin_mut().Run(
-                self.argc as i32,
-                argv.as_mut_ptr(),
-                self.timeout,
-                self.timeout,
-            );
-
-            self.instrumentation_ptr
-                .pin_mut()
-                .GetCoverage(self.coverage_ptr.pin_mut(), true);
-            get_coverage_map(
-                self.coverage,
-                self.coverage_size,
-                self.coverage_ptr.pin_mut(),
-            );
+            status = self.tinyinst.run();
+            self.tinyinst.vec_coverage(self.coverage, false);
+            println!("Coverage: {:?}", &self.coverage[100]);
         }
 
         match status {
@@ -99,22 +81,18 @@ where
     }
 }
 
-impl<S, OT> TinyInstExecutor<S, OT>
+impl<'a, S, OT> TinyInstExecutor<'a, S, OT>
 where
     OT: ObserversTuple<S>,
     S: UsesInput,
 {
     pub unsafe fn new(
+        coverage: &'a mut Vec<u64>,
         tinyinst_args: Vec<String>,
         args: Vec<String>,
         timeout: u32,
         observers: OT,
-        coverage: *mut u8,
-        coverage_size: usize,
     ) -> Self {
-        let mut instrumentation_ptr = TinyInstInstrumentation::new();
-        let instrumentation = instrumentation_ptr.pin_mut();
-
         // Convert args into c string vector
         let argc = args.len();
         let mut use_stdin = true;
@@ -154,30 +132,24 @@ where
 
         println!("initing {} {:?}", &argc, &argv);
 
-        instrumentation.Init(tinyinst_argc as i32, tinyinst_argv.as_mut_ptr());
         println!("post init");
-
-        let coverage_ptr = Coverage::new();
+        let tinyinst = TinyInst::new(tinyinst_args, args, timeout);
 
         Self {
-            instrumentation_ptr,
-            coverage_ptr,
+            tinyinst,
+            coverage,
             argc,
             argv: argv_vec_cstr,
             timeout,
             observers,
             phantom: PhantomData,
-            coverage,
-            coverage_size,
             cur_input,
             use_stdin,
-            aflcov: AFLCov::new(coverage, coverage_size),
-            test: 0,
         }
     }
 }
 
-impl<S, OT> HasObservers for TinyInstExecutor<S, OT>
+impl<'a, S, OT> HasObservers for TinyInstExecutor<'a, S, OT>
 where
     S: State,
     OT: ObserversTuple<S>,
@@ -190,13 +162,13 @@ where
         &mut self.observers
     }
 }
-impl<S, OT> UsesState for TinyInstExecutor<S, OT>
+impl<'a, S, OT> UsesState for TinyInstExecutor<'a, S, OT>
 where
     S: UsesInput,
 {
     type State = S;
 }
-impl<S, OT> UsesObservers for TinyInstExecutor<S, OT>
+impl<'a, S, OT> UsesObservers for TinyInstExecutor<'a, S, OT>
 where
     OT: ObserversTuple<S>,
     S: UsesInput,

@@ -7,11 +7,11 @@ use libafl::{
     },
     corpus::{CachedOnDiskCorpus, Corpus, OnDiskCorpus, Testcase},
     events::SimpleEventManager,
-    feedbacks::{CrashFeedback, MaxMapFeedback},
+    feedbacks::{CrashFeedback, ListFeedback},
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
-    observers::StdMapObserver,
+    observers::ListObserver,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
@@ -19,22 +19,28 @@ use libafl::{
 };
 
 use libafl_tinyinst::executor::TinyInstExecutor;
+static mut COVERAGE: Vec<u64> = vec![];
 
-const MAP_SIZE: usize = 8 * 1024 * 1024;
-static mut SIGNALS: [u8; MAP_SIZE] = [0; MAP_SIZE];
 
 fn main() {
     // Tinyinst things
     let tinyinst_args = vec![
         "-instrument_module".to_string(),
         "test.exe".to_string(),
-        "-coverage_file".to_string(),
-        "coverage.txt".to_string(),
     ];
 
-    let args = vec![".\\test\\test.exe".to_string(), "@@".to_string()];
-    let observer =
-        unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
+    // let args = vec![".\\test\\test.exe".to_string(), "@@".to_string()];
+    let args = vec![
+        ".\\test\\test.exe".to_string(),
+        ".\\test\\ok_input.txt".to_string(),
+    ];
+
+
+    // let observer =
+    //     unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
+    let observer = ListObserver::new("cov", unsafe{&mut COVERAGE});
+    let mut feedback = ListFeedback::new_with_observer(&observer);
+
 
     let input = BytesInput::new(b"bad".to_vec());
     let rand = StdRand::new();
@@ -44,7 +50,6 @@ fn main() {
         .expect("error in adding corpus");
     let solutions = OnDiskCorpus::new(PathBuf::from("./crashes")).unwrap();
 
-    let mut feedback = MaxMapFeedback::new(&observer);
     let mut objective = CrashFeedback::new();
     let mut state = StdState::new(rand, corpus, solutions, &mut feedback, &mut objective).unwrap();
     let scheduler = RandScheduler::new();
@@ -56,12 +61,11 @@ fn main() {
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
         TinyInstExecutor::new(
+            &mut COVERAGE,
             tinyinst_args,
             args,
             5000,
             tuple_list!(observer),
-            SIGNALS.as_mut_ptr(),
-            SIGNALS.len(),
         )
     };
     let mutator = StdScheduledMutator::new(havoc_mutations());
