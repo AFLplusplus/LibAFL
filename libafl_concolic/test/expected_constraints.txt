@@ -1,7 +1,7 @@
-1	InputByte { offset: 0 }
-2	InputByte { offset: 1 }
-3	InputByte { offset: 2 }
-4	InputByte { offset: 3 }
+1	InputByte { offset: 0, value: 49 }
+2	InputByte { offset: 1, value: 50 }
+3	InputByte { offset: 2, value: 51 }
+4	InputByte { offset: 3, value: 52 }
 5	Concat { a: 2, b: 1 }
 6	Concat { a: 3, b: 5 }
 7	Concat { a: 4, b: 6 }
