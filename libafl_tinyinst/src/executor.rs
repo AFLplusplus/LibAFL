@@ -1,5 +1,4 @@
 use core::marker::PhantomData;
-use std::{ffi::CString, os::raw::c_char};
 
 use libafl::{
     bolts::fs::{InputFile, INPUTFILE_STD},
@@ -17,9 +16,6 @@ use tinyinst_rs::tinyinst::TinyInst;
 pub struct TinyInstExecutor<'a, S, OT> {
     tinyinst: TinyInst,
     coverage: &'a mut Vec<u64>,
-    // argc: usize,
-    // argv: Vec<CString>,
-    // args: Vec<String>,
     timeout: u32,
     observers: OT,
     phantom: PhantomData<S>,
@@ -30,8 +26,6 @@ pub struct TinyInstExecutor<'a, S, OT> {
 impl<'a, S, OT> std::fmt::Debug for TinyInstExecutor<'a, S, OT> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TinyInstExecutor")
-            // .field("args", &self.args)
-            // .field("argv", &self.argv)
             .field("timeout", &self.timeout)
             .finish_non_exhaustive()
     }
@@ -52,13 +46,6 @@ where
         _mgr: &mut EM,
         input: &Self::Input,
     ) -> Result<ExitKind, Error> {
-        // let mut argv: Vec<*mut c_char> = Vec::with_capacity(self.argc + 1);
-
-        // for arg in &self.argv {
-        //     argv.push(arg.as_ptr() as *mut c_char);
-        // }
-        // argv.push(core::ptr::null_mut());
-
         if !self.use_stdin {
             self.cur_input.write_buf(input.target_bytes().as_slice())?;
         }
@@ -68,7 +55,6 @@ where
         unsafe {
             status = self.tinyinst.run();
             self.tinyinst.vec_coverage(self.coverage, false);
-            // println!("Coverage: {:?}", self.coverage);
         }
 
         match status {
@@ -94,56 +80,8 @@ where
         timeout: u32,
         observers: OT,
     ) -> Self {
-        // Convert args into c string vector
-        // let argc = args.len();
         let mut use_stdin = true;
 
-        // let argv_vec_cstr: Vec<CString> = args
-        //     .iter()
-        //     .map(|arg| {
-        //         if arg == "@@" {
-        //             println!("Not using stdin");
-        //             use_stdin = false;
-        //             CString::new(INPUTFILE_STD).unwrap()
-        //         } else {
-        //             CString::new(arg.as_str()).unwrap()
-        //         }
-        //     })
-        //     .collect();
-
-        // let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
-        // let mut argv: Vec<*mut c_char> = Vec::with_capacity(argc + 1);
-        // for arg in &argv_vec_cstr {
-        //     argv.push(arg.as_ptr() as *mut c_char);
-        // }
-        // argv.push(core::ptr::null_mut()); //Null terminator
-
-        // Get tinyinst argv and argc
-        // let tinyinst_argc = tinyinst_args.len();
-        // let vec_cstr: Vec<CString> = tinyinst_args
-        // .iter()
-        // .map(|arg| CString::new(arg.as_str()).unwrap())
-        // .collect();
-
-        // let mut tinyinst_argv: Vec<*mut c_char> = Vec::with_capacity(tinyinst_argc + 1);
-        // for arg in &vec_cstr {
-        //     tinyinst_argv.push(arg.as_ptr() as *mut c_char);
-        // }
-        // tinyinst_argv.push(core::ptr::null_mut()); //Null terminator
-
-        // println!("initing {} {:?}", &argc, &argv);
-
-        // Check if program args contains @@ and if so replace to use INPUTFILE_STD
-
-        // program_args.into_iter().map(|arg| {
-        //     if arg == "@@" {
-        //         println!("Not using stdin");
-        //         use_stdin = false;
-        //         INPUTFILE_STD.to_string()
-        //     } else {
-        //         arg
-        //     }
-        // });
         let program_args = program_args
             .into_iter()
             .map(|arg| {
@@ -158,20 +96,12 @@ where
             .collect();
 
         let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
-        // if args.contains(&"@@".to_string()) {
-        //     println!("Not using stdin");
-        //     let cur_input = InputFile::create(INPUTFILE_STD).expect("Unable to create cur_file");
-        //     use_stdin = false;
-        // }
-
         println!("post init");
         let tinyinst = TinyInst::new(tinyinst_args, program_args, timeout);
 
         Self {
             tinyinst,
             coverage,
-            // argc,
-            // argv: argv_vec_cstr,
             timeout,
             observers,
             phantom: PhantomData,

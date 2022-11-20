@@ -26,13 +26,7 @@ fn main() {
     let tinyinst_args = vec!["-instrument_module".to_string(), "test.exe".to_string()];
 
     let args = vec![".\\test\\test.exe".to_string(), "@@".to_string()];
-    // let args = vec![
-    //     ".\\test\\test.exe".to_string(),
-    //     ".\\test\\ok_input.txt".to_string(),
-    // ];
 
-    // let observer =
-    //     unsafe { StdMapObserver::new_from_ptr("signals", SIGNALS.as_mut_ptr(), SIGNALS.len()) };
     let observer = ListObserver::new("cov", unsafe { &mut COVERAGE });
     let mut feedback = ListFeedback::new_with_observer(&observer);
 
@@ -50,7 +44,6 @@ fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let monitor = SimpleMonitor::new(|x| -> () { println!("{}", x) });
-    // let monitor = TuiMonitor::new("test_fuzz".to_string(), true);
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
