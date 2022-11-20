@@ -157,7 +157,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
     for (id, msg) in iter {
         let z3_expr: Option<Dynamic> = match msg {
-            SymExpr::InputByte { offset } => {
+            SymExpr::InputByte { offset, .. } => {
                 Some(BV::new_const(&ctx, Symbol::Int(offset as u32), 8).into())
             }
             SymExpr::Integer { value, bits } => {
@@ -211,12 +211,9 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             SymExpr::Sext { op, bits } => Some(bv!(op).sign_ext(u32::from(bits)).into()),
             SymExpr::Zext { op, bits } => Some(bv!(op).zero_ext(u32::from(bits)).into()),
             SymExpr::Trunc { op, bits } => Some(bv!(op).extract(u32::from(bits - 1), 0).into()),
-            SymExpr::BoolToBits { op, bits } => Some(
+            SymExpr::BoolToBit { op } => Some(
                 bool!(op)
-                    .ite(
-                        &BV::from_u64(&ctx, 1, u32::from(bits)),
-                        &BV::from_u64(&ctx, 0, u32::from(bits)),
-                    )
+                    .ite(&BV::from_u64(&ctx, 1, 1), &BV::from_u64(&ctx, 0, 1))
                     .into(),
             ),
             SymExpr::Concat { a, b } => bv_binop!(a concat b),

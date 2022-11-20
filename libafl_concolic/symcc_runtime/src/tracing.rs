@@ -62,7 +62,7 @@ macro_rules! binary_expression_builder {
 }
 
 impl Runtime for TracingRuntime {
-    expression_builder!(get_input_byte(offset: usize) => InputByte);
+    expression_builder!(get_input_byte(offset: usize, value: u8) => InputByte);
 
     expression_builder!(build_integer(value: u64, bits: u8) => Integer);
     expression_builder!(build_integer128(high: u64, low: u64) => Integer128);
@@ -144,7 +144,7 @@ impl Runtime for TracingRuntime {
     expression_builder!(build_float_to_bits(op: RSymExpr) => FloatToBits);
     expression_builder!(build_float_to_signed_integer(op: RSymExpr, bits: u8) => FloatToSignedInteger);
     expression_builder!(build_float_to_unsigned_integer(op: RSymExpr, bits: u8) => FloatToUnsignedInteger);
-    expression_builder!(build_bool_to_bits(op: RSymExpr, bits: u8) => BoolToBits);
+    expression_builder!(build_bool_to_bit(op: RSymExpr) => BoolToBit);
 
     binary_expression_builder!(concat_helper, Concat);
     expression_builder!(extract_helper(op: RSymExpr, first_bit:usize, last_bit:usize) => Extract);
