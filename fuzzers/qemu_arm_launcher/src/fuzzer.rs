@@ -29,6 +29,7 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
+    drcov::QemuDrCovHelper,
     //asan::QemuAsanHelper,
     edges,
     edges::QemuEdgeCoverageHelper,
@@ -37,8 +38,10 @@ use libafl_qemu::{
     MmapPerms,
     QemuExecutor,
     QemuHooks,
+    QemuInstrumentationFilter,
     Regs,
 };
+use rangemap::RangeMap;
 
 pub fn fuzz() {
     // Hardcoded parameters
@@ -151,7 +154,30 @@ pub fn fuzz() {
         // A fuzzer with feedbacks and a corpus scheduler
         let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-        let mut hooks = QemuHooks::new(&emu, tuple_list!(QemuEdgeCoverageHelper::default()));
+        let mut rangemap = RangeMap::<usize, (u16, String)>::new();
+        let mappings = emu.mappings();
+        let mut idx = 0;
+        for map in mappings {
+            if map.path().unwrap() != "" {
+                rangemap.insert(
+                    (map.start() as usize)..(map.end() as usize),
+                    (idx, map.path().unwrap().to_string()),
+                );
+                idx += 1;
+            }
+        }
+        let mut hooks = QemuHooks::new(
+            &emu,
+            tuple_list!(
+                QemuEdgeCoverageHelper::default(),
+                QemuDrCovHelper::new(
+                    QemuInstrumentationFilter::None,
+                    rangemap,
+                    PathBuf::from("drcov.log"),
+                    false,
+                )
+            ),
+        );
 
         // Create a QEMU in-process executor
         let executor = QemuExecutor::new(
