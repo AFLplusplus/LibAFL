@@ -17,3 +17,4 @@ debug = true
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_qemu = { path = "../../libafl_qemu/", features = ["arm", "usermode"] }
+rangemap = "1.0.3"
