@@ -31,29 +31,9 @@ use libafl::{
     //prelude::{SimpleMonitor, SimpleEventManager},
 };
 use libafl_qemu::{
-    edges,
-    edges::QemuEdgeCoverageHelper,
-    elf::EasyElf,
-    emu::Emulator,
-    GuestAddr,
-    QemuExecutor,
-    QemuHooks,
+    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu::Emulator, QemuExecutor, QemuHooks,
     Regs,
 };
-
-/// Read ELF program headers to resolve physical load addresses.
-fn virt2phys(vaddr: GuestAddr, tab: &EasyElf) -> GuestAddr {
-    let ret;
-    for i in &tab.goblin().program_headers {
-        if i.vm_range().contains(&vaddr.try_into().unwrap()) {
-            ret = vaddr - TryInto::<GuestAddr>::try_into(i.p_vaddr).unwrap()
-                + TryInto::<GuestAddr>::try_into(i.p_paddr).unwrap();
-            return ret - (ret % 2);
-        }
-    }
-    // unlike the arm-toolchain goblin produces some off-by one errors when parsing arm
-    vaddr - (vaddr % 2)
-}
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
 
@@ -81,8 +61,13 @@ pub fn fuzz() {
             0,
         )
         .expect("Symbol or env FUZZ_INPUT not found");
-    let input_addr = virt2phys(input_addr, &elf);
     println!("FUZZ_INPUT @ {:#x}", input_addr);
+
+    let main_addr = elf
+        .resolve_symbol("main", 0)
+        .expect("Symbol main not found");
+    println!("main address = {:#x}", main_addr);
+
     let breakpoint = elf
         .resolve_symbol(
             &env::var("BREAKPOINT").unwrap_or_else(|_| "BREAKPOINT".to_owned()),
@@ -96,8 +81,23 @@ pub fn fuzz() {
         let args: Vec<String> = env::args().collect();
         let env: Vec<(String, String)> = env::vars().collect();
         let emu = Emulator::new(&args, &env);
+
+        emu.set_breakpoint(main_addr);
+        unsafe {
+            emu.run();
+        }
+        emu.remove_breakpoint(main_addr);
+
         emu.save_snapshot("start", true);
+
         emu.set_breakpoint(breakpoint); // BREAKPOINT
+
+        //use libafl_qemu::IntoEnumIterator;
+        // Save the GPRs
+        //let mut saved_regs: Vec<u64> = vec![];
+        //for r in Regs::iter() {
+        //    saved_regs.push(emu.cpu_from_index(0).read_reg(r).unwrap());
+        //}
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
@@ -109,6 +109,10 @@ pub fn fuzz() {
                     buf = &buf[0..MAX_INPUT_SIZE];
                     // len = MAX_INPUT_SIZE;
                 }
+
+                //for (r, v) in saved_regs.iter().enumerate() {
+                //    emu.cpu_from_index(0).write_reg(r as i32, *v).unwrap();
+                //}
 
                 emu.write_phys_mem(input_addr, buf);
 
