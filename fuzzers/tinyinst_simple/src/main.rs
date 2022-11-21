@@ -17,7 +17,6 @@ use libafl::{
     state::StdState,
     Fuzzer, StdFuzzer,
 };
-
 use libafl_tinyinst::executor::TinyInstExecutor;
 static mut COVERAGE: Vec<u64> = vec![];
 
