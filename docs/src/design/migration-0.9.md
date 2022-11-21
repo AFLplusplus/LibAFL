@@ -1,6 +1,6 @@
-# Migrating from libafl <0.9 to 0.9
+# Migrating from LibAFL <0.9 to 0.9
 
-Internal APIs of libafl have changed in version 0.9 to prefer associated types in cases where components were "fixed" to
+Internal APIs of LibAFL have changed in version 0.9 to prefer associated types in cases where components were "fixed" to
 particular versions of other components. As a result, many existing custom components will not be compatible between
 versions prior to 0.9 and version 0.9.
 
@@ -11,9 +11,9 @@ result, everywhere where consistency across generic types was required to implem
 and explicitly constrained at every point. This led to `impl`s which were at best difficult to debug and, at worst,
 incorrect and caused confusing bugs for users.
 
-For example, consider the MapCorpusMinimizer implementation (from <0.9) below:
+For example, consider the  `MapCorpusMinimizer` implementation (from <0.9) below:
 
-```rust
+```rust,ignore
 impl<E, I, O, S, TS> CorpusMinimizer<I, S> for MapCorpusMinimizer<E, I, O, S, TS>
 where
     E: Copy + Hash + Eq,
@@ -47,7 +47,7 @@ and that the input will necessarily be the same over every implementation for th
 
 Below is the same code, but with the associated types changes (note that some generic names have changed):
 
-```rust
+```rust,ignore
 impl<E, O, T, TS> CorpusMinimizer<E> for MapCorpusMinimizer<E, O, T, TS>
 where
     E: UsesState,
@@ -82,8 +82,9 @@ are all present as associated types for `E`. Additionally, we don't even need to
 ## Scope
 
 You are affected by this change if:
- - You specified explicit generics for a type (e.g., `MaxMapFeedback::<_, (), _>::new(...)`)
- - You implemented a custom component (e.g., `Mutator`, `Executor`, `State`, `Fuzzer`, `Feedback`, `Observer`, etc.)
+
+- You specified explicit generics for a type (e.g., `MaxMapFeedback::<_, (), _>::new(...)`)
+- You implemented a custom component (e.g., `Mutator`, `Executor`, `State`, `Fuzzer`, `Feedback`, `Observer`, etc.)
 
 If you did neither of these, congrats! You are likely unaffected by these changes.
 
@@ -105,9 +106,9 @@ In many scenarios, Input, Observers, and State generics have been moved into tra
 straightforward to implement. In a majority of cases, you will have generics on your custom implementation or a fixed
 type to implement this with. Thankfully, Rust will let you know when you need to implement this type.
 
-As an example, InMemoryCorpus before 0.9 looked like this:
+As an example, `InMemoryCorpus` before 0.9 looked like this:
 
-```rust
+```rust,ignore
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct InMemoryCorpus<I>
@@ -129,7 +130,7 @@ where
 After 0.9, all `Corpus` implementations are required to implement `UsesInput` and `Corpus` no longer has a generic for
 the input type (as it is now provided by the UsesInput impl). The migrated implementation is shown below:
 
-```rust
+```rust,ignore
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
 pub struct InMemoryCorpus<I>

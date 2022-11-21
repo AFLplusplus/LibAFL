@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["usermode", "fork"]
+default = ["fork"]
 python = ["pyo3", "pyo3-build-config"]
 fork = ["libafl/fork"]
 
@@ -24,6 +24,9 @@ aarch64 = [] # build qemu for aarch64
 be = []
 
 usermode = []
+systemmode = []
+
+slirp = [ "systemmode" ] # build qemu with host libslirp (for user networking)
 
 clippy = [] # special feature for clippy, don't use in normal projects§
 
@@ -40,11 +43,12 @@ libc = "0.2"
 strum = "0.24"
 strum_macros = "0.24"
 syscall-numbers = "3.0"
-meminterval = "0.1"
+meminterval = "0.3"
 thread_local = "1.1.4"
 capstone = "0.11.0"
 #pyo3 = { version = "0.15", features = ["extension-module"], optional = true }
 pyo3 = { version = "0.17", features = ["pyproto"], optional = true }
+rangemap = "1.0"
 
 [build-dependencies]
 cc = { version = "1.0" }

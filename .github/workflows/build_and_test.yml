@@ -30,6 +30,12 @@ jobs:
           crate: mdbook-linkcheck
       - uses: actions/checkout@v3
       - uses: Swatinem/rust-cache@v2
+      - name: Install mimetype
+        if: runner.os == 'Linux'
+        run: sudo apt-get install libfile-mimeinfo-perl
+      - name: Check for binary blobs
+        if: runner.os == 'Linux'
+        run: ./scripts/check_for_blobs.sh
       - name: Build libafl debug
         run: cargo build -p libafl
       - name: Build the book
@@ -59,7 +65,7 @@ jobs:
     - name: Install and cache deps
       uses: awalsh128/cache-apt-pkgs-action@v1.1.0
       with:
-        packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
+        packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -96,7 +102,7 @@ jobs:
       # Skipping `python` as it has to be built with the `maturin` tool
       # `agpl`, `nautilus` require nightly
       # `sancov_pcguard_edges` is tested seperately
-      run: cargo hack check --each-feature --exclude-features=agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386,be
+      run: cargo hack check --each-feature --clean-per-run --exclude-features=prelude,agpl,nautilus,python,sancov_pcguard_edges,arm,aarch64,i386,be,systemmode --no-dev-deps
     - name: Check nightly features
       run: cargo +nightly check --features=agpl && cargo +nightly check --features=nautilus
     - name: Build examples
@@ -153,6 +159,9 @@ jobs:
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain
       run: rustup toolchain install nightly-x86_64-unknown-linux-gnu ; rustup component add rust-src --toolchain nightly-x86_64-unknown-linux-gnu
+    - name: Install python
+      if: runner.os == 'macOS'
+      run: brew install --force-bottle --overwrite python@3.11
     - uses: lyricwulf/abc@v1
       with: 
         # todo: remove afl++-clang when nyx support samcov_pcguard

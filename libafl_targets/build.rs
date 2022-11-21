@@ -9,7 +9,7 @@ fn main() {
     let src_dir = Path::new("src");
 
     let dest_path = Path::new(&out_dir).join("constants.rs");
-    let mut constants_file = File::create(&dest_path).expect("Could not create file");
+    let mut constants_file = File::create(dest_path).expect("Could not create file");
 
     let edges_map_size: usize = option_env!("LIBAFL_EDGES_MAP_SIZE")
         .map_or(Ok(65536), str::parse)
@@ -118,7 +118,7 @@ fn main() {
         .file(src_dir.join("cmplog.c"))
         .compile("cmplog");
 
-    #[cfg(any(target_os = "linux"))]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
         println!("cargo:rerun-if-changed=src/forkserver.c");
 

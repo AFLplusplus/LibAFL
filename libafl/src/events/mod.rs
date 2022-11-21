@@ -466,9 +466,9 @@ type CustomBufHandlerFn<S> =
     dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
 
 /// Supports custom buf handlers to handle `CustomBuf` events.
-pub trait HasCustomBufHandlers<S> {
+pub trait HasCustomBufHandlers: UsesState {
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
-    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<S>>);
+    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<Self::State>>);
 }
 
 /// An eventmgr for tests, and as placeholder if you really don't need an event manager.
@@ -528,10 +528,15 @@ impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
 {
 }
 
-impl<S> HasCustomBufHandlers<S> for NopEventManager<S> {
+impl<S> HasCustomBufHandlers for NopEventManager<S>
+where
+    S: UsesInput,
+{
     fn add_custom_buf_handler(
         &mut self,
-        _handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        _handler: Box<
+            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+        >,
     ) {
     }
 }
@@ -595,7 +600,7 @@ mod tests {
                 time: _,
                 executions: _,
             } => {
-                let o: tuple_list_type!(StdMapObserver::<u32>) =
+                let o: tuple_list_type!(StdMapObserver::<u32, false>) =
                     postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();
                 assert_eq!("test", o.0.name());
             }
