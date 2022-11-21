@@ -9,9 +9,7 @@ use libafl::{
     state::{State, UsesState},
     Error,
 };
-
-use tinyinst_rs::tinyinst::litecov::RunResult;
-use tinyinst_rs::tinyinst::TinyInst;
+use tinyinst_rs::tinyinst::{litecov::RunResult, TinyInst};
 
 pub struct TinyInstExecutor<'a, S, OT> {
     tinyinst: TinyInst,
