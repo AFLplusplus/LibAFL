@@ -73,6 +73,7 @@ where
     OT: ObserversTuple<S>,
     S: UsesInput,
 {
+    ///  # Safety
     pub unsafe fn new(
         coverage: &'a mut Vec<u64>,
         tinyinst_args: Vec<String>,
