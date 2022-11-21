@@ -85,7 +85,7 @@ pub fn build() {
 
         cross_cc
     } else {
-        "".to_owned()
+        String::new()
     };
 
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
