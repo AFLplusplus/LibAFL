@@ -91,11 +91,11 @@ struct Opt {
 
 #[allow(clippy::similar_names)]
 pub fn main() {
+    const MAP_SIZE: usize = 65536;
+
     let opt = Opt::parse();
 
     let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
-
-    const MAP_SIZE: usize = 65536;
 
     // The default, OS-specific privider for shared memory
     #[cfg(target_vendor = "apple")]

@@ -27,7 +27,7 @@ use crate::{
     bolts::{
         fs::{InputFile, INPUTFILE_STD},
         os::{dup2, pipes::Pipe},
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::Prepend,
         AsMutSlice, AsSlice,
     },
@@ -548,10 +548,10 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), StdShMemProvider> {
+impl ForkserverExecutor<(), (), UnixShMemProvider> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
-    pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
+    pub fn builder() -> ForkserverExecutorBuilder<'static, UnixShMemProvider> {
         ForkserverExecutorBuilder::new()
     }
 }
@@ -851,14 +851,14 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     }
 }
 
-impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
     /// Else this forkserver will try to write the input to `.cur_input` file.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
-    pub fn new() -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+    pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         ForkserverExecutorBuilder {
             program: None,
             arguments: vec![],
@@ -1004,7 +1004,7 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
     }
 }
 
-impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> Default for ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
@@ -1216,7 +1216,7 @@ mod tests {
 
     use crate::{
         bolts::{
-            shmem::{ShMem, ShMemProvider, StdShMemProvider},
+            shmem::{ShMem, ShMemProvider, UnixShMemProvider},
             tuples::tuple_list,
             AsMutSlice,
         },
@@ -1232,7 +1232,7 @@ mod tests {
         let bin = OsString::from("echo");
         let args = vec![OsString::from("@@")];
 
-        let mut shmem_provider = StdShMemProvider::new().unwrap();
+        let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
         let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
