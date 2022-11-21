@@ -76,11 +76,17 @@ pub fn build() {
 
     let jobs = env::var("NUM_JOBS");
 
-    let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
-        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
-        "cc".to_owned()
-    });
-    println!("cargo:rerun-if-env-changed=CROSS_CC");
+    let cross_cc = if emulation_mode == "usermode" {
+        let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
+            println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
+            "cc".to_owned()
+        });
+        println!("cargo:rerun-if-env-changed=CROSS_CC");
+
+        cross_cc
+    } else {
+        "".to_owned()
+    };
 
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
 
@@ -218,7 +224,11 @@ pub fn build() {
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .arg(if cfg!(feature = "slirp") {"--enable-slirp"} else {"--disable-slirp"})
+                .arg(if cfg!(feature = "slirp") {
+                    "--enable-slirp"
+                } else {
+                    "--disable-slirp"
+                })
                 .arg("--enable-fdt=internal")
                 .arg("--audio-drv-list=")
                 .arg("--disable-alsa")
