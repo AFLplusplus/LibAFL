@@ -1,6 +1,7 @@
 [package]
 name = "libafl_tinyinst"
 version = "0.1.0"
+version.workspace = true
 edition = "2021"
 authors = ["elbiazo <eric.l.biazo@gmail.com>", "Dongjia Zhang <tokazerkje@outlook.com>"]
 repository = "https://github.com/AFLplusplus/LibAFL/"
@@ -11,12 +12,6 @@ description = "TinyInst backend for libafl"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-
-# memo
-# fixing mbuild in TinyInst to build it on visual studio 2022 first?
-# include xed.lib dbghelp.lib as deps?
-# find a way to stop manually generate bridge files
-# use x64 native tools cmd prompt
 [dependencies]
 cxx = "1.0"
 libafl = { path = "../libafl", version = "0.8.0", features = [
