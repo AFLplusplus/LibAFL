@@ -26,6 +26,8 @@ be = []
 usermode = []
 systemmode = []
 
+slirp = [ "systemmode" ] # build qemu with host libslirp (for user networking)
+
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
