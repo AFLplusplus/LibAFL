@@ -12,7 +12,7 @@ use libafl::{
     bolts::{
         current_nanos, current_time,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::{tuple_list, Merge},
         AsMutSlice,
     },
@@ -177,25 +177,27 @@ pub fn main() {
     )
     .unwrap();
 
-    let cmplog_exec = res.get_one::<String>("cmplog").map(|x| x.to_string());
+    let cmplog_exec = res
+        .get_one::<String>("cmplog")
+        .map(std::string::ToString::to_string);
 
     let arguments = res
         .get_many::<String>("arguments")
-        .map(|v| v.map(|x| x.to_string()).collect())
-        .unwrap_or(vec![]);
+        .map(|v| v.map(std::string::ToString::to_string).collect::<Vec<_>>())
+        .unwrap_or_default();
 
     fuzz(
         out_dir,
         crashes,
-        in_dir,
+        &in_dir,
         tokens,
-        logfile,
+        &logfile,
         timeout,
         executable,
         debug_child,
         signal,
-        cmplog_exec,
-        arguments,
+        &cmplog_exec,
+        &arguments,
     )
     .expect("An error occurred while fuzzing");
 }
@@ -204,21 +206,26 @@ pub fn main() {
 fn fuzz(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
-    seed_dir: PathBuf,
+    seed_dir: &PathBuf,
     tokenfile: Option<PathBuf>,
-    logfile: PathBuf,
+    logfile: &PathBuf,
     timeout: Duration,
     executable: String,
     debug_child: bool,
     signal: Signal,
-    cmplog_exec: Option<String>,
-    arguments: Vec<String>,
+    cmplog_exec: &Option<String>,
+    arguments: &[String],
 ) -> Result<(), Error> {
+    // a large initial map size that should be enough
+    // to house all potential coverage maps for our targets
+    // (we will eventually reduce the used size according to the actual map)
+    const MAP_SIZE: usize = 2_621_440;
+
     let log = RefCell::new(
         OpenOptions::new()
             .append(true)
             .create(true)
-            .open(&logfile)?,
+            .open(logfile)?,
     );
 
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
@@ -231,15 +238,8 @@ fn fuzz(
     // such as the notification of the addition of a new item to the corpus
     let mut mgr = SimpleEventManager::new(monitor);
 
-    // const MAP_SIZE: usize = 65536;
-    const MAP_SIZE: usize = 2621440;
-
-    // The default, OS-specific privider for shared memory
-    #[cfg(target_vendor = "apple")]
+    // The unix shmem provider for shared memory, to match AFL++'s shared memory at the target side
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
-
-    #[cfg(not(target_vendor = "apple"))]
-    let mut shmem_provider = StdShMemProvider::new().unwrap();
 
     // The coverage map shared between observer and executor
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
@@ -318,7 +318,7 @@ fn fuzz(
         .debug_child(debug_child)
         .shmem_provider(&mut shmem_provider)
         .autotokens(&mut tokens)
-        .parse_afl_cmdline(&arguments)
+        .parse_afl_cmdline(arguments)
         .coverage_map_size(MAP_SIZE)
         .is_persistent(true)
         .build_dynamic_map(edges_observer, tuple_list!(time_observer))
@@ -358,7 +358,7 @@ fn fuzz(
             .program(exec)
             .debug_child(debug_child)
             .shmem_provider(&mut shmem_provider)
-            .parse_afl_cmdline(&arguments)
+            .parse_afl_cmdline(arguments)
             .is_persistent(true)
             .build(tuple_list!(cmplog_observer))
             .unwrap();
