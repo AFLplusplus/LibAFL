@@ -286,6 +286,130 @@ pub trait ObserverWithHashField {
     fn clear_hash(&mut self);
 }
 
+/// A trait for [`Observer`]`s` which observe over differential execution.
+///
+/// Differential observers have the following flow during a single execution:
+///  - `Observer::pre_exec` for the differential observer is invoked.
+///  - `DifferentialObserver::pre_observe_first` for the differential observer is invoked.
+///  - `Observer::pre_exec` for each of the observers for the first executor is invoked.
+///  - The first executor is invoked.
+///  - `Observer::post_exec` for each of the observers for the first executor is invoked.
+///  - `DifferentialObserver::post_observe_first` for the differential observer is invoked.
+///  - `DifferentialObserver::pre_observe_second` for the differential observer is invoked.
+///  - `Observer::pre_exec` for each of the observers for the second executor is invoked.
+///  - The second executor is invoked.
+///  - `Observer::post_exec` for each of the observers for the second executor is invoked.
+///  - `DifferentialObserver::post_observe_second` for the differential observer is invoked.
+///  - `Observer::post_exec` for the differential observer is invoked.
+///
+/// You should perform any preparation for the diff execution in `Observer::pre_exec` and respective
+/// cleanup in `Observer::post_exec`. For individual executions, use
+/// `DifferentialObserver::{pre,post}_observe_{first,second}` as necessary for first and second,
+/// respectively.
+#[allow(unused_variables)]
+pub trait DifferentialObserver<OTA, OTB, S>: Observer<S>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    /// Perform an operation with the first set of observers before they are `pre_exec`'d.
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the first set of observers after they are `post_exec`'d.
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the second set of observers before they are `pre_exec`'d.
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the second set of observers after they are `post_exec`'d.
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// Differential observers tuple, for when you're using multiple differential observers.
+pub trait DifferentialObserversTuple<OTA, OTB, S>: ObserversTuple<S>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    /// Perform an operation with the first set of observers before they are `pre_exec`'d on all the
+    /// differential observers in this tuple.
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
+
+    /// Perform an operation with the first set of observers after they are `post_exec`'d on all the
+    /// differential observers in this tuple.
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
+
+    /// Perform an operation with the second set of observers before they are `pre_exec`'d on all
+    /// the differential observers in this tuple.
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
+
+    /// Perform an operation with the second set of observers after they are `post_exec`'d on all
+    /// the differential observers in this tuple.
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
+}
+
+impl<OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for ()
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    fn pre_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn pre_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<Head, Tail, OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for (Head, Tail)
+where
+    Head: DifferentialObserver<OTA, OTB, S>,
+    Tail: DifferentialObserversTuple<OTA, OTB, S>,
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.pre_observe_first(observers)?;
+        self.1.pre_observe_first_all(observers)
+    }
+
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.post_observe_first(observers)?;
+        self.1.post_observe_first_all(observers)
+    }
+
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.pre_observe_second(observers)?;
+        self.1.pre_observe_second_all(observers)
+    }
+
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.post_observe_second(observers)?;
+        self.1.post_observe_second_all(observers)
+    }
+}
+
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
@@ -337,6 +461,14 @@ impl Named for TimeObserver {
     fn name(&self) -> &str {
         &self.name
     }
+}
+
+impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for TimeObserver
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
 }
 
 /// A simple observer with a list of things.
@@ -1204,7 +1336,7 @@ mod tests {
         );
         let vec = postcard::to_allocvec(&obv).unwrap();
         println!("{vec:?}");
-        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32>) =
+        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32, false>) =
             postcard::from_bytes(&vec).unwrap();
         assert_eq!(obv.0.name(), obv2.0.name());
     }
