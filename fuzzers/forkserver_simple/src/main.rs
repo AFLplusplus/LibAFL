@@ -2,15 +2,11 @@ use core::time::Duration;
 use std::path::PathBuf;
 
 use clap::{self, Parser};
-#[cfg(not(target_vendor = "apple"))]
-use libafl::bolts::shmem::StdShMemProvider;
-#[cfg(target_vendor = "apple")]
-use libafl::bolts::shmem::UnixShMemProvider;
 use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider},
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::{tuple_list, MatchName, Merge},
         AsMutSlice,
     },
@@ -97,12 +93,8 @@ pub fn main() {
 
     let corpus_dirs: Vec<PathBuf> = [opt.in_dir].to_vec();
 
-    // The default, OS-specific privider for shared memory
-    #[cfg(target_vendor = "apple")]
+    // The unix shmem provider supported by AFL++ for shared memory
     let mut shmem_provider = UnixShMemProvider::new().unwrap();
-
-    #[cfg(not(target_vendor = "apple"))]
-    let mut shmem_provider = StdShMemProvider::new().unwrap();
 
     // The coverage map shared between observer and executor
     let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
@@ -184,7 +176,7 @@ pub fn main() {
     if let Some(dynamic_map_size) = forkserver.coverage_map_size() {
         forkserver
             .observers_mut()
-            .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8>>>("shared_mem")
+            .match_name_mut::<HitcountsMapObserver<StdMapObserver<'_, u8, false>>>("shared_mem")
             .unwrap()
             .downsize_map(dynamic_map_size);
     }
