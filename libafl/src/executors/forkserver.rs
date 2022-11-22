@@ -27,14 +27,16 @@ use crate::{
     bolts::{
         fs::{InputFile, INPUTFILE_STD},
         os::{dup2, pipes::Pipe},
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+        tuples::Prepend,
         AsMutSlice, AsSlice,
     },
     executors::{Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{
-        get_asan_runtime_flags_with_log_path, AsanBacktraceObserver, ObserversTuple, UsesObservers,
+        get_asan_runtime_flags_with_log_path, AsanBacktraceObserver, MapObserver, Observer,
+        ObserversTuple, UsesObservers,
     },
     state::UsesState,
     Error,
@@ -44,9 +46,23 @@ const FORKSRV_FD: i32 = 198;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_ENABLED: i32 = 0x80000001_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
+const FS_OPT_MAPSIZE: i32 = 0x40000000_u32 as i32;
+#[allow(clippy::cast_possible_wrap)]
 const FS_OPT_SHDMEM_FUZZ: i32 = 0x01000000_u32 as i32;
 #[allow(clippy::cast_possible_wrap)]
 const FS_OPT_AUTODICT: i32 = 0x10000000_u32 as i32;
+
+// #[allow(clippy::cast_possible_wrap)]
+// const FS_OPT_MAX_MAPSIZE: i32 = ((0x00fffffe_u32 >> 1) + 1) as i32; // 8388608
+const fn fs_opt_get_mapsize(x: i32) -> i32 {
+    ((x & 0x00fffffe) >> 1) + 1
+}
+/* const fn fs_opt_set_mapsize(x: usize) -> usize {
+    if x <= 1 {
+      if x > FS_OPT_MAX_MAPSIZE { 0 } else { (x - 1) << 1 }
+    } else { 0 }
+} */
+
 /// The length of header bytes which tells shmem size
 const SHMEM_FUZZ_HDR_SIZE: usize = 4;
 const MAX_FILE: usize = 1024 * 1024;
@@ -511,6 +527,7 @@ where
     phantom: PhantomData<S>,
     /// Cache that indicates if we have a `ASan` observer registered.
     has_asan_observer: Option<bool>,
+    map_size: Option<usize>,
 }
 
 impl<OT, S, SP> Debug for ForkserverExecutor<OT, S, SP>
@@ -531,10 +548,10 @@ where
     }
 }
 
-impl ForkserverExecutor<(), (), StdShMemProvider> {
+impl ForkserverExecutor<(), (), UnixShMemProvider> {
     /// Builder for `ForkserverExecutor`
     #[must_use]
-    pub fn builder() -> ForkserverExecutorBuilder<'static, StdShMemProvider> {
+    pub fn builder() -> ForkserverExecutorBuilder<'static, UnixShMemProvider> {
         ForkserverExecutorBuilder::new()
     }
 }
@@ -542,7 +559,7 @@ impl ForkserverExecutor<(), (), StdShMemProvider> {
 impl<OT, S, SP> ForkserverExecutor<OT, S, SP>
 where
     OT: ObserversTuple<S>,
-    S: UsesState,
+    S: UsesInput,
     SP: ShMemProvider,
 {
     /// The `target` binary that's going to run.
@@ -564,6 +581,11 @@ where
     pub fn input_file(&self) -> &InputFile {
         &self.input_file
     }
+
+    /// The coverage map size if specified by the target
+    pub fn coverage_map_size(&self) -> Option<usize> {
+        self.map_size
+    }
 }
 
 /// The builder for `ForkserverExecutor`
@@ -581,6 +603,8 @@ pub struct ForkserverExecutorBuilder<'a, SP> {
     autotokens: Option<&'a mut Tokens>,
     input_filename: Option<OsString>,
     shmem_provider: Option<&'a mut SP>,
+    map_size: Option<usize>,
+    real_map_size: i32,
 }
 
 impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
@@ -591,6 +615,80 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         OT: ObserversTuple<S>,
         S: UsesInput,
         S::Input: Input + HasTargetBytes,
+        SP: ShMemProvider,
+    {
+        let (forkserver, input_file, map) = self.build_helper()?;
+
+        let target = self.program.take().unwrap();
+        println!(
+            "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
+            target,
+            self.arguments.clone(),
+            self.use_stdin
+        );
+
+        Ok(ForkserverExecutor {
+            target,
+            args: self.arguments.clone(),
+            input_file,
+            uses_shmem_testcase: self.uses_shmem_testcase,
+            forkserver,
+            observers,
+            map,
+            phantom: PhantomData,
+            has_asan_observer: None, // initialized on first use
+            map_size: self.map_size,
+        })
+    }
+
+    /// Builds `ForkserverExecutor` downsizing the coverage map to fit exaclty the AFL++ map size.
+    #[allow(clippy::pedantic)]
+    pub fn build_dynamic_map<MO, OT, S>(
+        &mut self,
+        mut map_observer: MO,
+        other_observers: OT,
+    ) -> Result<ForkserverExecutor<(MO, OT), S, SP>, Error>
+    where
+        MO: Observer<S> + MapObserver, // TODO maybe enforce Entry = u8 for the cov map
+        OT: ObserversTuple<S> + Prepend<MO, PreprendResult = OT>,
+        S: UsesInput,
+        S::Input: Input + HasTargetBytes,
+        SP: ShMemProvider,
+    {
+        let (forkserver, input_file, map) = self.build_helper()?;
+
+        let target = self.program.take().unwrap();
+        println!(
+            "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}, map_size: {:?}",
+            target,
+            self.arguments.clone(),
+            self.use_stdin,
+            self.map_size
+        );
+
+        if let Some(dynamic_map_size) = self.map_size {
+            map_observer.downsize_map(dynamic_map_size);
+        }
+
+        let observers: (MO, OT) = other_observers.prepend(map_observer);
+
+        Ok(ForkserverExecutor {
+            target,
+            args: self.arguments.clone(),
+            input_file,
+            uses_shmem_testcase: self.uses_shmem_testcase,
+            forkserver,
+            observers,
+            map,
+            phantom: PhantomData,
+            has_asan_observer: None, // initialized on first use
+            map_size: self.map_size,
+        })
+    }
+
+    #[allow(clippy::pedantic)]
+    fn build_helper(&mut self) -> Result<(Forkserver, InputFile, Option<SP::ShMem>), Error>
+    where
         SP: ShMemProvider,
     {
         let input_filename = match &self.input_filename {
@@ -613,22 +711,18 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             }
         };
 
-        let (target, mut forkserver) = match &self.program {
-            Some(t) => {
-                let forkserver = Forkserver::new(
-                    t.clone(),
-                    self.arguments.clone(),
-                    self.envs.clone(),
-                    input_file.as_raw_fd(),
-                    self.use_stdin,
-                    0,
-                    self.is_persistent,
-                    self.is_deferred_frksrv,
-                    self.debug_child,
-                )?;
-
-                (t.clone(), forkserver)
-            }
+        let mut forkserver = match &self.program {
+            Some(t) => Forkserver::new(
+                t.clone(),
+                self.arguments.clone(),
+                self.envs.clone(),
+                input_file.as_raw_fd(),
+                self.use_stdin,
+                0,
+                self.is_persistent,
+                self.is_deferred_frksrv,
+                self.debug_child,
+            )?,
             None => {
                 return Err(Error::illegal_argument(
                     "ForkserverExecutorBuilder::build: target file not found".to_string(),
@@ -648,7 +742,8 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
         // <https://github.com/AFLplusplus/AFLplusplus/blob/147654f8715d237fe45c1657c87b2fe36c4db22a/instrumentation/afl-compiler-rt.o.c#L1026>
         if status & FS_OPT_ENABLED == FS_OPT_ENABLED
             && (status & FS_OPT_SHDMEM_FUZZ == FS_OPT_SHDMEM_FUZZ
-                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT)
+                || status & FS_OPT_AUTODICT == FS_OPT_AUTODICT
+                || status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE)
         {
             let mut send_status = FS_OPT_ENABLED;
 
@@ -658,9 +753,25 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
                 self.uses_shmem_testcase = true;
             }
 
-            if (status & FS_OPT_AUTODICT == FS_OPT_AUTODICT) && self.autotokens.is_some() {
-                println!("Using AUTODICT feature");
-                send_status |= FS_OPT_AUTODICT;
+            if status & FS_OPT_MAPSIZE == FS_OPT_MAPSIZE {
+                let mut map_size = fs_opt_get_mapsize(status);
+                // When 0, we assume that map_size was filled by the user or const
+                /* TODO autofill map size from the observer
+
+                if map_size > 0 {
+                    self.map_size = Some(map_size as usize);
+                }
+                */
+
+                self.real_map_size = map_size;
+                if map_size % 64 != 0 {
+                    map_size = ((map_size + 63) >> 6) << 6;
+                }
+
+                assert!(self.map_size.is_none() || map_size as usize <= self.map_size.unwrap());
+
+                println!("Target MAP SIZE = {:#x}", self.real_map_size);
+                self.map_size = Some(map_size as usize);
             }
 
             let send_len = forkserver.write_ctl(send_status)?;
@@ -698,24 +809,7 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
             println!("Forkserver Options are not available.");
         }
 
-        println!(
-            "ForkserverExecutor: program: {:?}, arguments: {:?}, use_stdin: {:?}",
-            target,
-            self.arguments.clone(),
-            self.use_stdin
-        );
-
-        Ok(ForkserverExecutor {
-            target,
-            args: self.arguments.clone(),
-            input_file,
-            uses_shmem_testcase: self.uses_shmem_testcase,
-            forkserver,
-            observers,
-            map,
-            phantom: PhantomData,
-            has_asan_observer: None, // initialized on first use
-        })
+        Ok((forkserver, input_file, map))
     }
 
     /// Use autodict?
@@ -757,26 +851,28 @@ impl<'a, SP> ForkserverExecutorBuilder<'a, SP> {
     }
 }
 
-impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     /// Creates a new `AFL`-style [`ForkserverExecutor`] with the given target, arguments and observers.
     /// This is the builder for `ForkserverExecutor`
     /// This Forkserver will attempt to provide inputs over shared mem when `shmem_provider` is given.
     /// Else this forkserver will try to write the input to `.cur_input` file.
     /// If `debug_child` is set, the child will print to `stdout`/`stderr`.
     #[must_use]
-    pub fn new() -> ForkserverExecutorBuilder<'a, StdShMemProvider> {
+    pub fn new() -> ForkserverExecutorBuilder<'a, UnixShMemProvider> {
         ForkserverExecutorBuilder {
             program: None,
             arguments: vec![],
             envs: vec![],
             debug_child: false,
-            use_stdin: true,
+            use_stdin: false,
             uses_shmem_testcase: false,
             is_persistent: false,
             is_deferred_frksrv: false,
             autotokens: None,
             input_filename: None,
             shmem_provider: None,
+            map_size: None,
+            real_map_size: 0,
         }
     }
 
@@ -878,6 +974,13 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
         self
     }
 
+    #[must_use]
+    /// Call this to set a defauult const coverage map size
+    pub fn coverage_map_size(mut self, size: usize) -> Self {
+        self.map_size = Some(size);
+        self
+    }
+
     /// Shmem provider for forkserver's shared memory testcase feature.
     pub fn shmem_provider<SP: ShMemProvider>(
         self,
@@ -895,11 +998,13 @@ impl<'a> ForkserverExecutorBuilder<'a, StdShMemProvider> {
             autotokens: self.autotokens,
             input_filename: self.input_filename,
             shmem_provider: Some(shmem_provider),
+            map_size: self.map_size,
+            real_map_size: self.real_map_size,
         }
     }
 }
 
-impl<'a> Default for ForkserverExecutorBuilder<'a, StdShMemProvider> {
+impl<'a> Default for ForkserverExecutorBuilder<'a, UnixShMemProvider> {
     fn default() -> Self {
         Self::new()
     }
@@ -1111,7 +1216,7 @@ mod tests {
 
     use crate::{
         bolts::{
-            shmem::{ShMem, ShMemProvider, StdShMemProvider},
+            shmem::{ShMem, ShMemProvider, UnixShMemProvider},
             tuples::tuple_list,
             AsMutSlice,
         },
@@ -1127,7 +1232,7 @@ mod tests {
         let bin = OsString::from("echo");
         let args = vec![OsString::from("@@")];
 
-        let mut shmem_provider = StdShMemProvider::new().unwrap();
+        let mut shmem_provider = UnixShMemProvider::new().unwrap();
 
         let mut shmem = shmem_provider.new_shmem(MAP_SIZE).unwrap();
         shmem.write_to_env("__AFL_SHM_ID").unwrap();
