@@ -221,12 +221,7 @@ fn fuzz(
     // (we will eventually reduce the used size according to the actual map)
     const MAP_SIZE: usize = 2_621_440;
 
-    let log = RefCell::new(
-        OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(logfile)?,
-    );
+    let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
