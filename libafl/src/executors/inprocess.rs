@@ -189,7 +189,7 @@ where
         let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
         #[cfg(windows)]
 
-        /// Some initialization for windows.
+        // Some initialization necessary for windows.
         unsafe {
             /*
                 See https://github.com/AFLplusplus/LibAFL/pull/403
@@ -204,8 +204,12 @@ where
             let mut stack_reserved = 0x20000;
             SetThreadStackGuarantee(&mut stack_reserved);
 
+            // See https://github.com/AFLplusplus/LibAFL/issues/769
             // This is needed to intercept asan error exit
-            // TODO: Add more explanation here.
+            // When we use AddressSanitizer on windows, the crash handler is not called when ASAN detects an error
+            // This is because, on linux, ASAN runtime raises SIGABRT so we can rely on the signal handler
+            // but on windows it simply calls TerminateProcess. 
+            // so we need to the api by asan to register the callback when asan is about to finish the process.
             crate::bolts::os::windows_exceptions::libafl_sanitizer_set_death_callback(windows_exception_handler::asan_death_handler::<Self, EM, OF, Z>);
         }
         Ok(Self {
