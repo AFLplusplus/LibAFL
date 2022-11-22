@@ -188,6 +188,8 @@ where
     {
         let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
         #[cfg(windows)]
+
+        /// Some initialization for windows.
         unsafe {
             /*
                 See https://github.com/AFLplusplus/LibAFL/pull/403
@@ -201,6 +203,10 @@ where
             */
             let mut stack_reserved = 0x20000;
             SetThreadStackGuarantee(&mut stack_reserved);
+
+            // This is needed to intercept asan error exit
+            // TODO: Add more explanation here.
+            crate::bolts::os::windows_exceptions::libafl_sanitizer_set_death_callback(crate::bolts::os::windows_exceptions::dummy_cb);
         }
         Ok(Self {
             harness_fn,

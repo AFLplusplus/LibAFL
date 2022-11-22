@@ -376,8 +376,23 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
     // See https://github.com/AFLplusplus/LibAFL/pull/403
     AddVectoredExceptionHandler(
-        1,
+        0,
         Some(core::mem::transmute(handle_exception as *const c_void)),
     );
     Ok(())
+}
+
+pub type CB = unsafe extern "C" fn() -> ();
+
+pub unsafe extern "C" fn dummy_cb() -> (){
+    println!("Success!");
+}
+
+extern "C" {
+    fn __sanitizer_set_death_callback(cb: CB);
+}
+
+/// Rust interface to call asan death callback
+pub unsafe extern "C" fn libafl_sanitizer_set_death_callback(cb: CB){
+    __sanitizer_set_death_callback(cb);
 }
