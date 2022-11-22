@@ -206,7 +206,7 @@ where
 
             // This is needed to intercept asan error exit
             // TODO: Add more explanation here.
-            crate::bolts::os::windows_exceptions::libafl_sanitizer_set_death_callback(crate::bolts::os::windows_exceptions::dummy_cb);
+            crate::bolts::os::windows_exceptions::libafl_sanitizer_set_death_callback(windows_exception_handler::asan_death_handler::<Self, EM, OF, Z>);
         }
         Ok(Self {
             harness_fn,
@@ -1130,6 +1130,122 @@ mod windows_exception_handler {
         );
         compiler_fence(Ordering::SeqCst);
         // println!("TIMER INVOKED!");
+    }
+
+
+    /// Same as inproc_crash_handler, but this is called when address sanitizer exits, not from the exception handler
+    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>() -> () 
+    where
+        E: Executor<EM, Z> + HasObservers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<Objective = OF, State = E::State>,
+    {
+        let mut data = &mut GLOBAL_STATE;
+        // Have we set a timer_before?
+        if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
+            /*
+                We want to prevent the timeout handler being run while the main thread is executing the crash handler
+                Timeout handler runs if it has access to the critical section or data.in_target == 0
+                Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
+            */
+            compiler_fence(Ordering::SeqCst);
+            EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+            compiler_fence(Ordering::SeqCst);
+            data.in_target = 0;
+            compiler_fence(Ordering::SeqCst);
+            LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+            compiler_fence(Ordering::SeqCst);
+        }
+
+        #[cfg(feature = "std")]
+        eprintln!("ASAN detected crash!");
+        if data.current_input_ptr.is_null() {
+            #[cfg(feature = "std")]
+            {
+                eprintln!("Double crash\n");
+                eprintln!(
+                "ASAN detected crash but we're not in the target... Bug in the fuzzer? Exiting.",
+                );
+            }
+            #[cfg(feature = "std")]
+            {
+                eprintln!("Type QUIT to restart the child");
+                let mut line = String::new();
+                while line.trim() != "QUIT" {
+                    std::io::stdin().read_line(&mut line).unwrap();
+                }
+            }
+
+            // TODO tell the parent to not restart
+        } else {
+            let executor = data.executor_mut::<E>();
+            // reset timer
+            if !data.tp_timer.is_null() {
+                executor.post_run_reset();
+                data.tp_timer = ptr::null_mut();
+            }
+
+            let state = data.state_mut::<E::State>();
+            let fuzzer = data.fuzzer_mut::<Z>();
+            let event_mgr = data.event_mgr_mut::<EM>();
+            let observers = executor.observers_mut();
+
+            #[cfg(feature = "std")]
+            eprintln!("Child crashed!");
+            #[cfg(feature = "std")]
+            drop(stdout().flush());
+
+            // Make sure we don't crash in the crash handler forever.
+            let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+
+            #[cfg(feature = "std")]
+            eprintln!("Child crashed!");
+            #[cfg(feature = "std")]
+            drop(stdout().flush());
+
+            observers
+                .post_exec_all(state, input, &ExitKind::Crash)
+                .expect("Observers post_exec_all failed");
+
+            let interesting = fuzzer
+                .objective_mut()
+                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                .expect("In crash handler objective failure.");
+
+            if interesting {
+                let new_input = input.clone();
+                let mut new_testcase = Testcase::new(new_input);
+                new_testcase.add_metadata(ExitKind::Crash);
+                fuzzer
+                    .objective_mut()
+                    .append_metadata(state, &mut new_testcase)
+                    .expect("Failed adding metadata");
+                state
+                    .solutions_mut()
+                    .add(new_testcase)
+                    .expect("In crash handler solutions failure.");
+                event_mgr
+                    .fire(
+                        state,
+                        Event::Objective {
+                            objective_size: state.solutions().count(),
+                        },
+                    )
+                    .expect("Could not send crashing input");
+            }
+
+            event_mgr.on_restart(state).unwrap();
+
+            #[cfg(feature = "std")]
+            eprintln!("Waiting for broker...");
+            event_mgr.await_restart_safe();
+            #[cfg(feature = "std")]
+            eprintln!("Bye!");
+        }
+        // Don't need to exit, Asan will exit for us
+        // ExitProcess(1);
     }
 
     #[allow(clippy::too_many_lines)]

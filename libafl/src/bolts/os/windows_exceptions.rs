@@ -384,10 +384,6 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
 
 pub type CB = unsafe extern "C" fn() -> ();
 
-pub unsafe extern "C" fn dummy_cb() -> (){
-    println!("Success!");
-}
-
 extern "C" {
     fn __sanitizer_set_death_callback(cb: CB);
 }
