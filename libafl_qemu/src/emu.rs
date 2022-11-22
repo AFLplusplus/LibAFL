@@ -450,6 +450,8 @@ pub struct SavedCPUState {
 }
 
 impl SavedCPUState {
+    #[must_use]
+    #[allow(clippy::uninit_vec)]
     fn uninit() -> Self {
         unsafe {
             let len = libafl_qemu_arch_state_size();
@@ -568,6 +570,7 @@ impl CPU {
         unsafe { cpu_reset(self.ptr) };
     }
 
+    #[must_use]
     pub fn save_state(&self) -> SavedCPUState {
         let mut saved = SavedCPUState::uninit();
         unsafe {
