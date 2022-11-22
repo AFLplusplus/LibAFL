@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 libafl = { version = "0.8.1", path = "../../libafl", features = ["tui"] }
-libafl_tinyinst = { version = "0.1.0", path = "../../libafl_tinyinst" }
+libafl_tinyinst = { version = "0.8.1", path = "../../libafl_tinyinst" }
 [profile.release]
 codegen-units = 1
 opt-level = 3
