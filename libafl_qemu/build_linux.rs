@@ -4,7 +4,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "658565bec0a68a84c733217fa9b7802562096559";
+const QEMU_REVISION: &str = "f26a5ca6137bb5d4d0dcfe5451fb16d4c0551c4e";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -45,7 +45,6 @@ pub fn build() {
     println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-env-changed=CROSS_CC");
 
     // Make sure we have at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
