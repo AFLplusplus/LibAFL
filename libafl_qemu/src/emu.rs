@@ -443,7 +443,7 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 #[repr(C)]
 pub struct SavedCPUState {
     data: Vec<u8>,
