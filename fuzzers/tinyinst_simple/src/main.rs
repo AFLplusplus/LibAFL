@@ -42,7 +42,7 @@ fn main() {
     let scheduler = RandScheduler::new();
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
-    let monitor = SimpleMonitor::new(|x| { println!("{}", x) });
+    let monitor = SimpleMonitor::new(|x| println!("{}", x));
 
     let mut mgr = SimpleEventManager::new(monitor);
     let mut executor = unsafe {
