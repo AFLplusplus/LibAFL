@@ -7,7 +7,9 @@ use core::{
     ffi::c_void,
     ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
 };
-use std::{ffi::CString, slice::from_raw_parts, str::from_utf8_unchecked};
+#[cfg(emulation_mode = "systemmode")]
+use std::ffi::CString;
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -539,7 +541,6 @@ impl CPU {
 
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
-        T: Num + PartialOrd + Copy,
         R: Into<i32>,
     {
         let reg = reg.into();
@@ -553,11 +554,10 @@ impl CPU {
 
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
-        T: Num + PartialOrd + Copy,
         R: Into<i32>,
     {
         let reg = reg.into();
-        let mut val = T::zero();
+        let mut val: T = unsafe { MaybeUninit::uninit().assume_init() };
         let success = unsafe { libafl_qemu_read_reg(self.ptr, reg, addr_of_mut!(val) as *mut u8) };
         if success == 0 {
             Err(format!("Failed to read register {reg}"))
@@ -793,12 +793,6 @@ impl Emulator {
     #[must_use]
     pub fn load_addr(&self) -> GuestAddr {
         unsafe { libafl_load_addr() as GuestAddr }
-    }
-    #[cfg(emulation_mode = "systemmode")]
-    #[must_use]
-    pub fn load_addr(&self) -> GuestAddr {
-        // Only work if the binary is linked to the correct address and not pie
-        return 0x0 as GuestAddr;
     }
 
     #[cfg(emulation_mode = "usermode")]
