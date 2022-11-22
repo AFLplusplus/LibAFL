@@ -188,7 +188,6 @@ where
     {
         let handlers = InProcessHandlers::new::<Self, EM, OF, Z, H>()?;
         #[cfg(windows)]
-
         // Some initialization necessary for windows.
         unsafe {
             /*
@@ -208,9 +207,11 @@ where
             // This is needed to intercept asan error exit
             // When we use AddressSanitizer on windows, the crash handler is not called when ASAN detects an error
             // This is because, on linux, ASAN runtime raises SIGABRT so we can rely on the signal handler
-            // but on windows it simply calls TerminateProcess. 
+            // but on windows it simply calls TerminateProcess.
             // so we need to the api by asan to register the callback when asan is about to finish the process.
-            crate::bolts::os::windows_exceptions::libafl_sanitizer_set_death_callback(windows_exception_handler::asan_death_handler::<Self, EM, OF, Z>);
+            crate::bolts::os::windows_exceptions::libafl_sanitizer_set_death_callback(
+                windows_exception_handler::asan_death_handler::<Self, EM, OF, Z>,
+            );
         }
         Ok(Self {
             harness_fn,
@@ -1136,9 +1137,8 @@ mod windows_exception_handler {
         // println!("TIMER INVOKED!");
     }
 
-
     /// Same as inproc_crash_handler, but this is called when address sanitizer exits, not from the exception handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>() -> () 
+    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>() -> ()
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,

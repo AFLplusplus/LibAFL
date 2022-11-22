@@ -394,6 +394,6 @@ extern "C" {
 }
 
 /// Rust interface to call asan death callback
-pub unsafe extern "C" fn libafl_sanitizer_set_death_callback(cb: CB){
+pub unsafe extern "C" fn libafl_sanitizer_set_death_callback(cb: CB) {
     __sanitizer_set_death_callback(cb);
 }
