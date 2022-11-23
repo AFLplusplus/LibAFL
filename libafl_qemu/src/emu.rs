@@ -552,6 +552,7 @@ impl CPU {
         }
     }
 
+    #[allow(clippy::uninit_assumed_init)]
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
         R: Into<i32>,
