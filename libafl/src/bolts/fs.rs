@@ -124,7 +124,7 @@ impl InputFile {
     /// Rewinds the file to the beginning
     #[inline]
     pub fn rewind(&mut self) -> Result<(), Error> {
-        if let Err(err) = self.file.seek(SeekFrom::Start(0)) {
+        if let Err(err) = self.file.rewind() {
             Err(err.into())
         } else {
             Ok(())
