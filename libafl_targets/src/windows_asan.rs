@@ -15,6 +15,7 @@ extern "C" {
     fn __sanitizer_set_death_callback(cb: CB);
 }
 
+/// # Safety
 /// Setup asan callback on windows
 // See https://github.com/AFLplusplus/LibAFL/issues/769
 // This is needed to intercept asan error exit
