@@ -21,7 +21,7 @@ extern "C" {
 // When we use AddressSanitizer on windows, the crash handler is not called when ASAN detects an error
 // This is because, on linux, ASAN runtime raises SIGABRT so we can rely on the signal handler
 // but on windows it simply calls TerminateProcess.
-// so we need to the api by asan to register the callback when asan is about to finish the process.
+// so we need to call the api by asan to register the callback when asan is about to finish the process.
 pub unsafe fn setup_asan_callback<E, EM, OF, Z>(_executor: &E, _event_mgr: &EM, _fuzzer: &Z)
 where
     E: Executor<EM, Z> + HasObservers,

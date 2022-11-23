@@ -874,7 +874,7 @@ mod unix_signal_handler {
     }
 }
 
-/// Same as inproc_crash_handler, but this is called when address sanitizer exits, not from the exception handler
+/// Same as ``inproc_crash_handler`, but this is called when address sanitizer exits, not from the exception handler
 #[cfg(windows)]
 pub mod windows_asan_handler {
     use alloc::string::String;
@@ -900,8 +900,9 @@ pub mod windows_asan_handler {
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
+    /// # Safety
     /// ASAN deatch handler
-    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>() -> ()
+    pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>()
     where
         E: Executor<EM, Z> + HasObservers,
         EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
