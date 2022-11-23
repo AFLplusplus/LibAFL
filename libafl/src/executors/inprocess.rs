@@ -875,7 +875,7 @@ mod unix_signal_handler {
 }
 
 /// Same as ``inproc_crash_handler`, but this is called when address sanitizer exits, not from the exception handler
-#[cfg(windows)]
+#[cfg(all(windows, feature = "std"))]
 pub mod windows_asan_handler {
     use alloc::string::String;
     use core::{
