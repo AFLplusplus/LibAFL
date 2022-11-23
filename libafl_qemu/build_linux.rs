@@ -4,7 +4,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "ddb71cf43844f8848ae655ca696bdfc3fb7839f1";
+const QEMU_REVISION: &str = "f26a5ca6137bb5d4d0dcfe5451fb16d4c0551c4e";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -42,11 +42,9 @@ pub fn build() {
         })
     };
     println!("cargo:rustc-cfg=emulation_mode=\"{emulation_mode}\"");
+    println!("cargo:rerun-if-env-changed=EMULATION_MODE");
 
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=src/asan-giovese.c");
-    println!("cargo:rerun-if-changed=src/asan-giovese.h");
-    println!("cargo:rerun-if-env-changed=CROSS_CC");
 
     // Make sure we have at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
@@ -73,13 +71,21 @@ pub fn build() {
             "x86_64".to_string()
         })
     };
+    println!("cargo:rerun-if-env-changed=CPU_TARGET");
 
     let jobs = env::var("NUM_JOBS");
 
-    let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
-        println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
-        "cc".to_owned()
-    });
+    let cross_cc = if emulation_mode == "usermode" {
+        let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
+            println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
+            "cc".to_owned()
+        });
+        println!("cargo:rerun-if-env-changed=CROSS_CC");
+
+        cross_cc
+    } else {
+        String::new()
+    };
 
     println!("cargo:rustc-cfg=cpu_target=\"{cpu_target}\"");
 
@@ -107,6 +113,8 @@ pub fn build() {
 
     let custum_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
     let custum_qemu_no_build = env::var("CUSTOM_QEMU_NO_BUILD").is_ok();
+    println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_DIR");
+    println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_NO_BUILD");
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
@@ -215,7 +223,11 @@ pub fn build() {
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
-                .arg("--enable-slirp=internal")
+                .arg(if cfg!(feature = "slirp") {
+                    "--enable-slirp"
+                } else {
+                    "--disable-slirp"
+                })
                 .arg("--enable-fdt=internal")
                 .arg("--audio-drv-list=")
                 .arg("--disable-alsa")
@@ -422,7 +434,6 @@ pub fn build() {
                 build_dir.display()
             ))
             .arg(format!("{}/libfdt.a", build_dir.display()))
-            .arg(format!("{}/libslirp.a", build_dir.display()))
             .arg(format!("{}/libmigration.fa", build_dir.display()))
             .arg(format!("{}/libhwcore.fa", build_dir.display()))
             .arg(format!("{}/libqom.fa", build_dir.display()))
@@ -457,6 +468,8 @@ pub fn build() {
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
     println!("cargo:rustc-link-lib=z");
+    #[cfg(all(feature = "slirp", feature = "systemmode"))]
+    println!("cargo:rustc-link-lib=slirp");
 
     if emulation_mode == "systemmode" {
         println!("cargo:rustc-link-lib=pixman-1");

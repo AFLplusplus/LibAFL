@@ -600,7 +600,7 @@ mod tests {
                 time: _,
                 executions: _,
             } => {
-                let o: tuple_list_type!(StdMapObserver::<u32>) =
+                let o: tuple_list_type!(StdMapObserver::<u32, false>) =
                     postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();
                 assert_eq!("test", o.0.name());
             }

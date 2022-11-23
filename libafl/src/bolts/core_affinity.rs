@@ -642,7 +642,7 @@ mod freebsd {
     use alloc::vec::Vec;
     use std::{mem, thread::available_parallelism};
 
-    use libc::{cpuset_getaffinity, cpuset_setaffinity, cpuset_t, CPU_SET};
+    use libc::{cpuset_setaffinity, cpuset_t, CPU_SET};
 
     use super::CoreId;
     use crate::Error;
@@ -688,7 +688,7 @@ mod freebsd {
 
         // Try to get current core affinity mask.
         let result = unsafe {
-            cpuset_getaffinity(
+            libc::cpuset_getaffinity(
                 CPU_LEVEL_WHICH,
                 CPU_WHICH_PID,
                 -1, // Defaults to current thread
