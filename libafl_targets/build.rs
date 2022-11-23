@@ -127,6 +127,15 @@ fn main() {
             .compile("forkserver");
     }
 
+    #[cfg(windows)]
+    {
+        println!("cargo:rerun-if-changed=src/windows_asan.c");
+
+        cc::Build::new()
+            .file(src_dir.join("windows_asan.c"))
+            .compile("windows_asan");
+    }
+
     println!("cargo:rustc-link-search=native={}", &out_dir);
 
     println!("cargo:rerun-if-changed=build.rs");

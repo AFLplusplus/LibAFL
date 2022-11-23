@@ -101,6 +101,10 @@ pub use cmplog::*;
 #[cfg(feature = "std")]
 pub mod drcov;
 
+#[cfg(all(windows))]
+pub mod windows_asan;
+pub use windows_asan::*;
+
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]
 pub mod forkserver;
 #[cfg(any(target_os = "linux", target_os = "freebsd"))]

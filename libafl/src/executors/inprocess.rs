@@ -202,16 +202,6 @@ where
             */
             let mut stack_reserved = 0x20000;
             SetThreadStackGuarantee(&mut stack_reserved);
-
-            // See https://github.com/AFLplusplus/LibAFL/issues/769
-            // This is needed to intercept asan error exit
-            // When we use AddressSanitizer on windows, the crash handler is not called when ASAN detects an error
-            // This is because, on linux, ASAN runtime raises SIGABRT so we can rely on the signal handler
-            // but on windows it simply calls TerminateProcess.
-            // so we need to the api by asan to register the callback when asan is about to finish the process.
-            crate::bolts::os::windows_exceptions::libafl_sanitizer_set_death_callback(
-                windows_exception_handler::asan_death_handler::<Self, EM, OF, Z>,
-            );
         }
         Ok(Self {
             harness_fn,
@@ -884,260 +874,32 @@ mod unix_signal_handler {
     }
 }
 
-#[cfg(all(windows, feature = "std"))]
-mod windows_exception_handler {
-    #[cfg(feature = "std")]
-    use alloc::boxed::Box;
-    use alloc::{string::String, vec::Vec};
+/// Same as inproc_crash_handler, but this is called when address sanitizer exits, not from the exception handler
+pub mod windows_asan_handler {
+    use alloc::string::String;
     use core::{
-        ffi::c_void,
-        mem::transmute,
         ptr,
         sync::atomic::{compiler_fence, Ordering},
     };
     #[cfg(feature = "std")]
-    use std::{
-        io::{stdout, Write},
-        panic,
-    };
-
-    use windows::Win32::System::Threading::ExitProcess;
-
-    use crate::{
-        bolts::os::windows_exceptions::{
-            ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
-        },
-        corpus::{Corpus, Testcase},
-        events::{Event, EventFirer, EventRestarter},
-        executors::{
-            inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
-            Executor, ExitKind, HasObservers,
-        },
-        feedbacks::Feedback,
-        fuzzer::HasObjective,
-        observers::ObserversTuple,
-        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
-    };
-
-    pub(crate) type HandlerFuncPtr =
-        unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
-
-    /*pub unsafe fn nop_handler(
-        _code: ExceptionCode,
-        _exception_pointers: *mut EXCEPTION_POINTERS,
-        _data: &mut InProcessExecutorHandlerData,
-    ) {
-    }*/
-
-    impl Handler for InProcessExecutorHandlerData {
-        #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
-            unsafe {
-                let data = &mut GLOBAL_STATE;
-                if !data.crash_handler.is_null() {
-                    let func: HandlerFuncPtr = transmute(data.crash_handler);
-                    (func)(exception_pointers, data);
-                }
-            }
-        }
-
-        fn exceptions(&self) -> Vec<ExceptionCode> {
-            CRASH_EXCEPTIONS.to_vec()
-        }
-    }
+    use std::io::{stdout, Write};
 
     use windows::Win32::System::Threading::{
         EnterCriticalSection, LeaveCriticalSection, RTL_CRITICAL_SECTION,
     };
 
-    use crate::inputs::UsesInput;
+    use crate::{
+        corpus::{Corpus, Testcase},
+        events::{Event, EventFirer, EventRestarter},
+        executors::{inprocess::GLOBAL_STATE, Executor, ExitKind, HasObservers},
+        feedbacks::Feedback,
+        fuzzer::HasObjective,
+        inputs::UsesInput,
+        observers::ObserversTuple,
+        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
+    };
 
-    /// invokes the `post_exec` hook on all observer in case of panic
-    #[cfg(feature = "std")]
-    pub fn setup_panic_hook<E, EM, OF, Z>()
-    where
-        E: HasObservers,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = E::State>,
-    {
-        let old_hook = panic::take_hook();
-        panic::set_hook(Box::new(move |panic_info| {
-            let data = unsafe { &mut GLOBAL_STATE };
-            // Have we set a timer_before?
-            unsafe {
-                if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
-                    /*
-                        We want to prevent the timeout handler being run while the main thread is executing the crash handler
-                        Timeout handler runs if it has access to the critical section or data.in_target == 0
-                        Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
-                    */
-                    compiler_fence(Ordering::SeqCst);
-                    EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
-                    compiler_fence(Ordering::SeqCst);
-                    data.in_target = 0;
-                    compiler_fence(Ordering::SeqCst);
-                    LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
-                    compiler_fence(Ordering::SeqCst);
-                }
-            }
-
-            if data.is_valid() {
-                // We are fuzzing!
-                let executor = data.executor_mut::<E>();
-                let observers = executor.observers_mut();
-                let state = data.state_mut::<E::State>();
-                let fuzzer = data.fuzzer_mut::<Z>();
-                let event_mgr = data.event_mgr_mut::<EM>();
-
-                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
-
-                observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
-                    .expect("Observers post_exec_all failed");
-
-                let interesting = fuzzer
-                    .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
-                    .expect("In timeout handler objective failure.");
-
-                if interesting {
-                    let mut new_testcase = Testcase::new(input.clone());
-                    new_testcase.add_metadata(ExitKind::Timeout);
-                    fuzzer
-                        .objective_mut()
-                        .append_metadata(state, &mut new_testcase)
-                        .expect("Failed adding metadata");
-                    state
-                        .solutions_mut()
-                        .add(new_testcase)
-                        .expect("In timeout handler solutions failure.");
-                    event_mgr
-                        .fire(
-                            state,
-                            Event::Objective {
-                                objective_size: state.solutions().count(),
-                            },
-                        )
-                        .expect("Could not send timeouting input");
-                }
-
-                event_mgr.on_restart(state).unwrap();
-
-                #[cfg(feature = "std")]
-                println!("Waiting for broker...");
-                event_mgr.await_restart_safe();
-                #[cfg(feature = "std")]
-                println!("Bye!");
-
-                event_mgr.await_restart_safe();
-
-                unsafe {
-                    ExitProcess(1);
-                }
-            }
-            old_hook(panic_info);
-        }));
-    }
-
-    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, OF, Z>(
-        _p0: *mut u8,
-        global_state: *mut c_void,
-        _p1: *mut u8,
-    ) where
-        E: HasObservers,
-        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
-        OF: Feedback<E::State>,
-        E::State: HasSolutions + HasClientPerfMonitor,
-        Z: HasObjective<Objective = OF, State = E::State>,
-    {
-        let data: &mut InProcessExecutorHandlerData =
-            &mut *(global_state as *mut InProcessExecutorHandlerData);
-        compiler_fence(Ordering::SeqCst);
-        EnterCriticalSection(
-            (data.critical as *mut RTL_CRITICAL_SECTION)
-                .as_mut()
-                .unwrap(),
-        );
-        compiler_fence(Ordering::SeqCst);
-
-        if data.in_target == 1 {
-            let executor = data.executor_mut::<E>();
-            let state = data.state_mut::<E::State>();
-            let fuzzer = data.fuzzer_mut::<Z>();
-            let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers_mut();
-
-            if data.timeout_input_ptr.is_null() {
-                #[cfg(feature = "std")]
-                dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
-            } else {
-                #[cfg(feature = "std")]
-                eprintln!("Timeout in fuzz run.");
-                #[cfg(feature = "std")]
-                let _res = stdout().flush();
-
-                let input = (data.timeout_input_ptr as *const <E::State as UsesInput>::Input)
-                    .as_ref()
-                    .unwrap();
-                data.timeout_input_ptr = ptr::null_mut();
-
-                observers
-                    .post_exec_all(state, input, &ExitKind::Timeout)
-                    .expect("Observers post_exec_all failed");
-
-                let interesting = fuzzer
-                    .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
-                    .expect("In timeout handler objective failure.");
-
-                if interesting {
-                    let mut new_testcase = Testcase::new(input.clone());
-                    new_testcase.add_metadata(ExitKind::Timeout);
-                    fuzzer
-                        .objective_mut()
-                        .append_metadata(state, &mut new_testcase)
-                        .expect("Failed adding metadata");
-                    state
-                        .solutions_mut()
-                        .add(new_testcase)
-                        .expect("In timeout handler solutions failure.");
-                    event_mgr
-                        .fire(
-                            state,
-                            Event::Objective {
-                                objective_size: state.solutions().count(),
-                            },
-                        )
-                        .expect("Could not send timeouting input");
-                }
-
-                event_mgr.on_restart(state).unwrap();
-
-                #[cfg(feature = "std")]
-                eprintln!("Waiting for broker...");
-                event_mgr.await_restart_safe();
-                #[cfg(feature = "std")]
-                eprintln!("Bye!");
-
-                event_mgr.await_restart_safe();
-                compiler_fence(Ordering::SeqCst);
-
-                ExitProcess(1);
-            }
-        }
-        compiler_fence(Ordering::SeqCst);
-        LeaveCriticalSection(
-            (data.critical as *mut RTL_CRITICAL_SECTION)
-                .as_mut()
-                .unwrap(),
-        );
-        compiler_fence(Ordering::SeqCst);
-        // println!("TIMER INVOKED!");
-    }
-
-    /// Same as inproc_crash_handler, but this is called when address sanitizer exits, not from the exception handler
+    /// ASAN deatch handler
     pub unsafe extern "C" fn asan_death_handler<E, EM, OF, Z>() -> ()
     where
         E: Executor<EM, Z> + HasObservers,
@@ -1250,6 +1012,258 @@ mod windows_exception_handler {
         }
         // Don't need to exit, Asan will exit for us
         // ExitProcess(1);
+    }
+}
+
+#[cfg(all(windows, feature = "std"))]
+mod windows_exception_handler {
+    #[cfg(feature = "std")]
+    use alloc::boxed::Box;
+    use alloc::{string::String, vec::Vec};
+    use core::{
+        ffi::c_void,
+        mem::transmute,
+        ptr,
+        sync::atomic::{compiler_fence, Ordering},
+    };
+    #[cfg(feature = "std")]
+    use std::{
+        io::{stdout, Write},
+        panic,
+    };
+
+    use windows::Win32::System::Threading::{
+        EnterCriticalSection, ExitProcess, LeaveCriticalSection, RTL_CRITICAL_SECTION,
+    };
+
+    use crate::{
+        bolts::os::windows_exceptions::{
+            ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
+        },
+        corpus::{Corpus, Testcase},
+        events::{Event, EventFirer, EventRestarter},
+        executors::{
+            inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            Executor, ExitKind, HasObservers,
+        },
+        feedbacks::Feedback,
+        fuzzer::HasObjective,
+        inputs::UsesInput,
+        observers::ObserversTuple,
+        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
+    };
+
+    pub(crate) type HandlerFuncPtr =
+        unsafe fn(*mut EXCEPTION_POINTERS, &mut InProcessExecutorHandlerData);
+
+    /*pub unsafe fn nop_handler(
+        _code: ExceptionCode,
+        _exception_pointers: *mut EXCEPTION_POINTERS,
+        _data: &mut InProcessExecutorHandlerData,
+    ) {
+    }*/
+
+    impl Handler for InProcessExecutorHandlerData {
+        #[allow(clippy::not_unsafe_ptr_arg_deref)]
+        fn handle(&mut self, _code: ExceptionCode, exception_pointers: *mut EXCEPTION_POINTERS) {
+            unsafe {
+                let data = &mut GLOBAL_STATE;
+                if !data.crash_handler.is_null() {
+                    let func: HandlerFuncPtr = transmute(data.crash_handler);
+                    (func)(exception_pointers, data);
+                }
+            }
+        }
+
+        fn exceptions(&self) -> Vec<ExceptionCode> {
+            CRASH_EXCEPTIONS.to_vec()
+        }
+    }
+
+    /// invokes the `post_exec` hook on all observer in case of panic
+    #[cfg(feature = "std")]
+    pub fn setup_panic_hook<E, EM, OF, Z>()
+    where
+        E: HasObservers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<Objective = OF, State = E::State>,
+    {
+        let old_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |panic_info| {
+            let data = unsafe { &mut GLOBAL_STATE };
+            // Have we set a timer_before?
+            unsafe {
+                if !(data.tp_timer as *mut windows::Win32::System::Threading::TP_TIMER).is_null() {
+                    /*
+                        We want to prevent the timeout handler being run while the main thread is executing the crash handler
+                        Timeout handler runs if it has access to the critical section or data.in_target == 0
+                        Writing 0 to the data.in_target makes the timeout handler makes the timeout handler invalid.
+                    */
+                    compiler_fence(Ordering::SeqCst);
+                    EnterCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+                    compiler_fence(Ordering::SeqCst);
+                    data.in_target = 0;
+                    compiler_fence(Ordering::SeqCst);
+                    LeaveCriticalSection(data.critical as *mut RTL_CRITICAL_SECTION);
+                    compiler_fence(Ordering::SeqCst);
+                }
+            }
+
+            if data.is_valid() {
+                // We are fuzzing!
+                let executor = data.executor_mut::<E>();
+                let observers = executor.observers_mut();
+                let state = data.state_mut::<E::State>();
+                let fuzzer = data.fuzzer_mut::<Z>();
+                let event_mgr = data.event_mgr_mut::<EM>();
+
+                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+
+                observers
+                    .post_exec_all(state, input, &ExitKind::Crash)
+                    .expect("Observers post_exec_all failed");
+
+                let interesting = fuzzer
+                    .objective_mut()
+                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                    .expect("In timeout handler objective failure.");
+
+                if interesting {
+                    let mut new_testcase = Testcase::new(input.clone());
+                    new_testcase.add_metadata(ExitKind::Timeout);
+                    fuzzer
+                        .objective_mut()
+                        .append_metadata(state, &mut new_testcase)
+                        .expect("Failed adding metadata");
+                    state
+                        .solutions_mut()
+                        .add(new_testcase)
+                        .expect("In timeout handler solutions failure.");
+                    event_mgr
+                        .fire(
+                            state,
+                            Event::Objective {
+                                objective_size: state.solutions().count(),
+                            },
+                        )
+                        .expect("Could not send timeouting input");
+                }
+
+                event_mgr.on_restart(state).unwrap();
+
+                #[cfg(feature = "std")]
+                println!("Waiting for broker...");
+                event_mgr.await_restart_safe();
+                #[cfg(feature = "std")]
+                println!("Bye!");
+
+                event_mgr.await_restart_safe();
+
+                unsafe {
+                    ExitProcess(1);
+                }
+            }
+            old_hook(panic_info);
+        }));
+    }
+
+    /// Timeout handler for windows
+    pub unsafe extern "system" fn inproc_timeout_handler<E, EM, OF, Z>(
+        _p0: *mut u8,
+        global_state: *mut c_void,
+        _p1: *mut u8,
+    ) where
+        E: HasObservers,
+        EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
+        OF: Feedback<E::State>,
+        E::State: HasSolutions + HasClientPerfMonitor,
+        Z: HasObjective<Objective = OF, State = E::State>,
+    {
+        let data: &mut InProcessExecutorHandlerData =
+            &mut *(global_state as *mut InProcessExecutorHandlerData);
+        compiler_fence(Ordering::SeqCst);
+        EnterCriticalSection(
+            (data.critical as *mut RTL_CRITICAL_SECTION)
+                .as_mut()
+                .unwrap(),
+        );
+        compiler_fence(Ordering::SeqCst);
+
+        if data.in_target == 1 {
+            let executor = data.executor_mut::<E>();
+            let state = data.state_mut::<E::State>();
+            let fuzzer = data.fuzzer_mut::<Z>();
+            let event_mgr = data.event_mgr_mut::<EM>();
+            let observers = executor.observers_mut();
+
+            if data.timeout_input_ptr.is_null() {
+                #[cfg(feature = "std")]
+                dbg!("TIMEOUT or SIGUSR2 happened, but currently not fuzzing. Exiting");
+            } else {
+                #[cfg(feature = "std")]
+                eprintln!("Timeout in fuzz run.");
+                #[cfg(feature = "std")]
+                let _res = stdout().flush();
+
+                let input = (data.timeout_input_ptr as *const <E::State as UsesInput>::Input)
+                    .as_ref()
+                    .unwrap();
+                data.timeout_input_ptr = ptr::null_mut();
+
+                observers
+                    .post_exec_all(state, input, &ExitKind::Timeout)
+                    .expect("Observers post_exec_all failed");
+
+                let interesting = fuzzer
+                    .objective_mut()
+                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+                    .expect("In timeout handler objective failure.");
+
+                if interesting {
+                    let mut new_testcase = Testcase::new(input.clone());
+                    new_testcase.add_metadata(ExitKind::Timeout);
+                    fuzzer
+                        .objective_mut()
+                        .append_metadata(state, &mut new_testcase)
+                        .expect("Failed adding metadata");
+                    state
+                        .solutions_mut()
+                        .add(new_testcase)
+                        .expect("In timeout handler solutions failure.");
+                    event_mgr
+                        .fire(
+                            state,
+                            Event::Objective {
+                                objective_size: state.solutions().count(),
+                            },
+                        )
+                        .expect("Could not send timeouting input");
+                }
+
+                event_mgr.on_restart(state).unwrap();
+
+                #[cfg(feature = "std")]
+                eprintln!("Waiting for broker...");
+                event_mgr.await_restart_safe();
+                #[cfg(feature = "std")]
+                eprintln!("Bye!");
+
+                event_mgr.await_restart_safe();
+                compiler_fence(Ordering::SeqCst);
+
+                ExitProcess(1);
+            }
+        }
+        compiler_fence(Ordering::SeqCst);
+        LeaveCriticalSection(
+            (data.critical as *mut RTL_CRITICAL_SECTION)
+                .as_mut()
+                .unwrap(),
+        );
+        compiler_fence(Ordering::SeqCst);
+        // println!("TIMER INVOKED!");
     }
 
     #[allow(clippy::too_many_lines)]

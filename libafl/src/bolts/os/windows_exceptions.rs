@@ -386,14 +386,3 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     );
     Ok(())
 }
-
-pub type CB = unsafe extern "C" fn() -> ();
-
-extern "C" {
-    fn __sanitizer_set_death_callback(cb: CB);
-}
-
-/// Rust interface to call asan death callback
-pub unsafe extern "C" fn libafl_sanitizer_set_death_callback(cb: CB) {
-    __sanitizer_set_death_callback(cb);
-}
