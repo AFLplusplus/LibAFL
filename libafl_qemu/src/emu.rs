@@ -5,7 +5,7 @@ use core::mem::MaybeUninit;
 use core::{
     convert::Into,
     ffi::c_void,
-    ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
+    ptr::{addr_of, copy_nonoverlapping, null},
 };
 #[cfg(emulation_mode = "systemmode")]
 use std::ffi::CString;
@@ -552,18 +552,19 @@ impl CPU {
         }
     }
 
-    #[allow(clippy::uninit_assumed_init)]
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
         R: Into<i32>,
     {
-        let reg = reg.into();
-        let mut val: T = unsafe { MaybeUninit::uninit().assume_init() };
-        let success = unsafe { libafl_qemu_read_reg(self.ptr, reg, addr_of_mut!(val) as *mut u8) };
-        if success == 0 {
-            Err(format!("Failed to read register {reg}"))
-        } else {
-            Ok(val)
+        unsafe {
+            let reg = reg.into();
+            let mut val = MaybeUninit::uninit();
+            let success = libafl_qemu_read_reg(self.ptr, reg, val.as_mut_ptr() as *mut u8);
+            if success == 0 {
+                Err(format!("Failed to read register {reg}"))
+            } else {
+                Ok(val.assume_init())
+            }
         }
     }
 
