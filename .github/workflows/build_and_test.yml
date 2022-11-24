@@ -195,7 +195,7 @@ jobs:
         profile: minimal
         toolchain: nightly
         override: true
-        components: rustfmt, clippy
+        components: rustfmt, clippy, rust-src
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Build aarch64-unknown-none
