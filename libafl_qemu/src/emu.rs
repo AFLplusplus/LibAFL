@@ -1,13 +1,13 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
+#[cfg(emulation_mode = "usermode")]
+use core::mem::MaybeUninit;
 use core::{
     convert::Into,
     ffi::c_void,
-    ptr::{addr_of, addr_of_mut, null},
+    ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
 };
-#[cfg(emulation_mode = "usermode")]
-use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
-use std::{slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{ffi::CString, slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -30,7 +30,8 @@ use pyo3::{prelude::*, PyIterProtocol};
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
-type CPUStatePtr = *const c_void;
+type CPUStatePtr = *mut c_void;
+type CPUArchStatePtr = *mut c_void;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
@@ -226,11 +227,9 @@ extern "C" {
 extern "C" {
     fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
 
+    fn vm_start();
     fn qemu_main_loop();
     fn qemu_cleanup();
-
-    // void libafl_cpu_thread_fn(CPUState *cpu)
-    fn libafl_cpu_thread_fn(cpu: CPUStatePtr);
 
     // int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
     //                     uint8_t *buf, int len, int is_write);
@@ -241,14 +240,11 @@ extern "C" {
         len: i32,
         is_write: i32,
     );
+    fn cpu_physical_memory_rw(addr: GuestAddr, buf: *mut u8, len: i32, iswrite: bool);
 
-    static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
-
-    /*
-    fn libafl_save_qemu_snapshot(name: *const u8);
+    fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
     #[allow(unused)]
-    fn libafl_load_qemu_snapshot(name: *const u8);
-     */
+    fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -259,6 +255,8 @@ extern "C" fn qemu_cleanup_atexit() {
 }
 
 extern "C" {
+    fn libafl_qemu_arch_state_size() -> usize;
+
     // CPUState* libafl_qemu_get_cpu(int cpu_index);
     fn libafl_qemu_get_cpu(cpu_index: i32) -> CPUStatePtr;
     // int libafl_qemu_num_cpus(void);
@@ -361,6 +359,9 @@ extern "C" {
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 
+    fn libafl_qemu_cpu_arch_state(cpu: CPUStatePtr) -> CPUArchStatePtr;
+    // fn libafl_qemu_arch_state_cpu(env: CPUArchStatePtr) -> CPUStatePtr;
+
     fn cpu_reset(cpu: CPUStatePtr);
 }
 
@@ -439,6 +440,26 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
         let cmd = std::str::from_utf8_unchecked(std::slice::from_raw_parts(buf, len));
         let emu = Emulator::new_empty();
         i32::from(closure(&emu, cmd))
+    }
+}
+
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct SavedCPUState {
+    data: Vec<u8>,
+}
+
+impl SavedCPUState {
+    #[must_use]
+    #[allow(clippy::uninit_vec)]
+    fn uninit() -> Self {
+        unsafe {
+            let len = libafl_qemu_arch_state_size();
+            let mut data = Vec::with_capacity(len);
+            data.set_len(len);
+
+            Self { data }
+        }
     }
 }
 
@@ -545,8 +566,31 @@ impl CPU {
         }
     }
 
-    pub fn cpu_reset(&self) {
+    pub fn reset(&self) {
         unsafe { cpu_reset(self.ptr) };
+    }
+
+    #[must_use]
+    pub fn save_state(&self) -> SavedCPUState {
+        let mut saved = SavedCPUState::uninit();
+        unsafe {
+            copy_nonoverlapping(
+                libafl_qemu_cpu_arch_state(self.ptr) as *mut u8,
+                saved.data.as_mut_ptr(),
+                saved.data.len(),
+            );
+        }
+        saved
+    }
+
+    pub fn restore_state(&self, saved: &SavedCPUState) {
+        unsafe {
+            copy_nonoverlapping(
+                saved.data.as_ptr(),
+                libafl_qemu_cpu_arch_state(self.ptr) as *mut u8,
+                saved.data.len(),
+            );
+        }
     }
 }
 
@@ -605,13 +649,6 @@ impl Emulator {
         Emulator { _private: () }
     }
 
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn start(&self, cpu: &CPU) {
-        unsafe {
-            libafl_cpu_thread_fn(cpu.ptr);
-        }
-    }
-
     /// This function gets the memory mappings from the emulator.
     #[cfg(emulation_mode = "usermode")]
     #[must_use]
@@ -659,11 +696,28 @@ impl Emulator {
     }
 
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        self.current_cpu().unwrap().write_mem(addr, buf);
+        self.current_cpu()
+            .unwrap_or_else(|| self.cpu_from_index(0))
+            .write_mem(addr, buf);
     }
 
     pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
-        self.current_cpu().unwrap().read_mem(addr, buf);
+        self.current_cpu()
+            .unwrap_or_else(|| self.cpu_from_index(0))
+            .read_mem(addr, buf);
+    }
+
+    /// Write a value to a phsical guest address, including ROM areas.
+    #[cfg(emulation_mode = "systemmode")]
+    pub unsafe fn write_phys_mem(&self, addr: GuestAddr, buf: &[u8]) {
+        cpu_physical_memory_rw(addr, buf.as_ptr() as *mut u8, buf.len() as i32, true);
+    }
+
+    /// Read a value from a physical guest address.
+    #[cfg(emulation_mode = "systemmode")]
+    pub unsafe fn read_phys_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
+        #[cfg(emulation_mode = "systemmode")]
+        cpu_physical_memory_rw(addr, buf.as_mut_ptr(), buf.len() as i32, false);
     }
 
     #[must_use]
@@ -723,7 +777,10 @@ impl Emulator {
         #[cfg(emulation_mode = "usermode")]
         libafl_qemu_run();
         #[cfg(emulation_mode = "systemmode")]
-        qemu_main_loop();
+        {
+            vm_start();
+            qemu_main_loop();
+        }
     }
 
     #[cfg(emulation_mode = "usermode")]
@@ -896,13 +953,6 @@ impl Emulator {
         unsafe { libafl_add_backdoor_hook(exec, data) };
     }
 
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn set_vcpu_start(&self, hook: extern "C" fn(cpu: CPU)) {
-        unsafe {
-            libafl_start_vcpu = core::mem::transmute(hook);
-        }
-    }
-
     #[cfg(emulation_mode = "usermode")]
     pub fn set_on_thread_hook(&self, hook: extern "C" fn(tid: u32)) {
         unsafe {
@@ -910,17 +960,17 @@ impl Emulator {
         }
     }
 
-    /*#[cfg(emulation_mode = "systemmode")]
-    pub fn save_snapshot(&self, name: &str) {
+    #[cfg(emulation_mode = "systemmode")]
+    pub fn save_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _) };
+        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _, sync) };
     }
 
     #[cfg(emulation_mode = "systemmode")]
-    pub fn load_snapshot(&self, name: &str) {
+    pub fn load_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _) };
-    }*/
+        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _, sync) };
+    }
 
     #[cfg(emulation_mode = "usermode")]
     pub fn set_pre_syscall_hook(

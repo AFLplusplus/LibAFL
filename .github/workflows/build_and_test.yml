@@ -65,7 +65,7 @@ jobs:
     - name: Install and cache deps
       uses: awalsh128/cache-apt-pkgs-action@v1.1.0
       with:
-        packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi
+        packages: llvm llvm-dev clang ninja-build clang-format-13 shellcheck libgtk-3-dev gcc-arm-linux-gnueabi g++-arm-linux-gnueabi libslirp-dev
     - name: get clang version
       run: command -v llvm-config && clang -v
     - name: Install cargo-hack
@@ -153,8 +153,6 @@ jobs:
     - name: set mold linker as default linker
       if: runner.os == 'Linux' # mold only support linux until now
       uses: rui314/setup-mold@v1
-    - name: enable mult-thread for `make`
-      run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly --component rustfmt --component clippy --allow-downgrade
     - name: Add no_std toolchain
@@ -170,6 +168,9 @@ jobs:
         macos: llvm libpng nasm coreutils z3 bash
     - name: pip install
       run: python3 -m pip install msgpack jinja2
+    # Note that nproc needs to have coreutils installed on macOS, so the order of CI commands matters.
+    - name: enable mult-thread for `make`
+      run: export MAKEFLAGS="-j$(expr $(nproc) \+ 1)"
     - name: install cargo-make
       uses: baptiste0928/cargo-install@v1.3.0
       with:
