@@ -194,6 +194,7 @@ jobs:
       with:
         profile: minimal
         toolchain: nightly
+        override: true
     - name: Add nightly rustfmt and clippy
       run: rustup toolchain install nightly && rustup target add --toolchain nightly aarch64-unknown-none && rustup component add --toolchain nightly rust-src && rustup target add thumbv6m-none-eabi
     - uses: actions/checkout@v3
