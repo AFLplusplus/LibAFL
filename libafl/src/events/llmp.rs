@@ -895,6 +895,7 @@ where
             // Store the information to a map.
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
+            #[cfg(unix)]
             unsafe {
                 let data = &mut SHUTDOWN_SIGHANDLER_DATA;
                 // Write the pointer to staterestorer so we can release its shmem later
