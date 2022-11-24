@@ -8,6 +8,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std"))]
+use core::ffi::c_void;
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 
 use ahash::AHasher;
@@ -17,13 +19,9 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[cfg(all(unix, feature = "std"))]
-use crate::bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
-
-#[cfg(all(unix, feature = "std"))]
-use core::ffi::c_void;
-
-#[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use crate::{
     bolts::current_time,
     executors::ExitKind,
@@ -58,7 +56,7 @@ pub struct ShutdownSignalData {
 pub type ShutdownFuncPtr =
     unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut ShutdownSignalData);
 
-/// Shutdown handler. SigTerm, SigInterrupt, SigQuit call this
+/// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
 #[cfg(all(unix, feature = "std"))]
 pub unsafe fn shutdown_handler<SP>(

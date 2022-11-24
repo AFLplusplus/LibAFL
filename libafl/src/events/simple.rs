@@ -6,13 +6,12 @@ use alloc::{
     vec::Vec,
 };
 #[cfg(all(unix, feature = "std"))]
+use core::ffi::c_void;
+#[cfg(all(unix, feature = "std"))]
 use core::ptr::write_volatile;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{fmt::Debug, marker::PhantomData};
-
-#[cfg(all(unix, feature = "std"))]
-use core::ffi::c_void;
 
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};
@@ -22,13 +21,16 @@ use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, Prog
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
+#[cfg(all(unix, feature = "std"))]
+use crate::{
+    bolts::os::unix_signals::{
+        setup_signal_handler, shmem::ShMemProvider, staterestore::StateRestorer,
+    },
+    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
+};
 #[cfg(feature = "std")]
 use crate::{
-    bolts::{
-        os::unix_signals::setup_signal_handler, shmem::ShMemProvider, staterestore::StateRestorer,
-    },
     corpus::Corpus,
-    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
     monitors::SimplePrintingMonitor,
     state::{HasCorpus, HasSolutions},
 };
@@ -449,6 +451,7 @@ where
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 
+            #[cfg(unix)]
             unsafe {
                 let data = &mut SHUTDOWN_SIGHANDLER_DATA;
                 // Write the pointer to staterestorer so we can release its shmem later
