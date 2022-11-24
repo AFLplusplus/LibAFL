@@ -11,7 +11,7 @@ use libafl::{
     state::{HasClientPerfMonitor, HasSolutions},
 };
 use libafl::{
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    executors::{ExecutionResult, Executor, ExitKind, HasObservers, InProcessExecutor},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
@@ -76,7 +76,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         self.helper.pre_exec(input)?;
         if self.helper.stalker_enabled() {
             if self.followed {

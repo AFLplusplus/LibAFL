@@ -15,7 +15,7 @@ use crate::{
     bolts::current_time,
     corpus::{Corpus, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{ExecutionResult, Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
     mark_feature_time,
@@ -601,7 +601,7 @@ where
         executor: &mut E,
         event_mgr: &mut EM,
         input: &<CS::State as UsesInput>::Input,
-    ) -> Result<ExitKind, Error>
+    ) -> ExecutionResult
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = CS::State>,
         EM: UsesState<State = CS::State>,
@@ -640,7 +640,7 @@ where
         executor: &mut E,
         event_mgr: &mut EM,
         input: &<Self::State as UsesInput>::Input,
-    ) -> Result<ExitKind, Error>;
+    ) -> ExecutionResult;
 }
 
 impl<CS, E, EM, F, OF> ExecutesInput<E, EM> for StdFuzzer<CS, F, OF, E::Observers>
@@ -659,7 +659,7 @@ where
         executor: &mut E,
         event_mgr: &mut EM,
         input: &<CS::State as UsesInput>::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         start_timer!(state);
         executor.observers_mut().pre_exec_all(state, input)?;
         mark_feature_time!(state, PerfFeature::PreExecObservers);

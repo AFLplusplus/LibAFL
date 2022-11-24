@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{ownedref::OwnedPtrMut, tuples::MatchName},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{ExecutionResult, Executor, ExitKind, HasObservers},
     inputs::UsesInput,
     observers::{DifferentialObserversTuple, ObserversTuple, UsesObservers},
     state::UsesState,
@@ -69,7 +69,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         self.observers(); // update in advance
         let observers = self.observers.get_mut();
         observers

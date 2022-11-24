@@ -3,10 +3,9 @@
 use core::fmt::Debug;
 
 use crate::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{ExecutionResult, Executor, HasObservers},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
-    Error,
 };
 
 /// A wrapper for any [`Executor`] to make it implement [`HasObservers`] using a given [`ObserversTuple`].
@@ -29,7 +28,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
 }

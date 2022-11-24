@@ -26,6 +26,7 @@ use crate::{
         tuples::MatchName,
         AsSlice,
     },
+    executors::ExecutionResult,
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
@@ -308,7 +309,7 @@ where
         _state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         use std::os::unix::prelude::ExitStatusExt;
 
         use wait_timeout::ChildExt;

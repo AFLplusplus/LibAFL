@@ -43,7 +43,7 @@ use crate::bolts::os::windows_exceptions::setup_exception_handler;
 use crate::bolts::shmem::ShMemProvider;
 use crate::{
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{ExecutionResult, Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -131,7 +131,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         self.handlers
             .pre_run_target(self, fuzzer, state, mgr, input);
 
@@ -1542,7 +1542,7 @@ where
         state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         unsafe {
             self.shmem_provider.pre_fork()?;
             match fork() {
@@ -1610,7 +1610,7 @@ where
         state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         unsafe {
             self.shmem_provider.pre_fork()?;
             match fork() {

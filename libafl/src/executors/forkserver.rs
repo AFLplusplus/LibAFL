@@ -31,7 +31,7 @@ use crate::{
         tuples::Prepend,
         AsMutSlice, AsSlice,
     },
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{ExecutionResult, Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, Input, UsesInput},
     mutators::Tokens,
     observers::{
@@ -431,7 +431,7 @@ where
         _state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         let mut exit_kind = ExitKind::Ok;
 
         let last_run_timed_out = self.executor.forkserver().last_run_timed_out();
@@ -1026,7 +1026,7 @@ where
         _state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         let mut exit_kind = ExitKind::Ok;
 
         // Write to testcase

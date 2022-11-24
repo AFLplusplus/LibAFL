@@ -12,7 +12,7 @@ edition = "2021"
 categories = ["development-tools::testing", "emulators", "embedded", "os", "no-std"]
 
 [features]
-default = ["std", "derive", "llmp_compression", "rand_trait", "fork", "prelude"]
+default = ["std", "derive", "llmp_compression", "rand_trait", "fork", "prelude", "async"]
 std = ["serde_json", "serde_json/std", "hostname", "nix", "serde/std", "bincode", "wait-timeout", "regex", "byteorder", "once_cell", "uuid", "tui_monitor", "ctor", "backtrace", "uds"] # print, env, launcher ... support
 derive = ["libafl_derive"] # provide derive(SerdeAny) macro.
 fork = [] # uses the fork() syscall to spawn children, instead of launching a new command, if supported by the OS (has no effect on Windows, no_std).
@@ -29,6 +29,7 @@ frida_cli = ["cli"]
 afl_exec_sec = [] # calculate exec/sec like AFL
 errors_backtrace = ["backtrace"]
 cmin = ["z3"] # corpus minimisation
+async = ["async-trait", "std", "tokio"]
 
 # features hiding dependencies licensed under GPL
 gpl = []
@@ -94,6 +95,9 @@ z3 = { version = "0.11", features = ["static-link-z3"], optional = true } # for 
 
 pyo3 = { version = "0.17", optional = true, features = ["serde", "macros"] }
 concat-idents = { version = "1.1.3", optional = true }
+
+async-trait = { version = "0.1", optional = true }
+tokio = { version = "1.22", optional = true, default-features = false, features = ["macros", "sync"] }
 
 # AGPL
 # !!! this create requires nightly

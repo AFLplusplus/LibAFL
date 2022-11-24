@@ -32,10 +32,9 @@ use windows::Win32::{
 #[cfg(all(windows, feature = "std"))]
 use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
 use crate::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{ExecutionResult, Executor, HasObservers},
     observers::UsesObservers,
     state::UsesState,
-    Error,
 };
 
 #[repr(C)]
@@ -277,7 +276,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         unsafe {
             let data = &mut GLOBAL_STATE;
             write_volatile(&mut data.tp_timer, self.tp_timer as *mut _ as *mut c_void);
@@ -347,7 +346,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         unsafe {
             libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
@@ -379,7 +378,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
             let ret = self.executor.run_target(fuzzer, state, mgr, input);

@@ -2,7 +2,7 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use libafl::{
     bolts::AsSlice,
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{ExecutionResult, Executor, ExitKind, HasObservers},
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::{State, UsesState},
@@ -58,7 +58,7 @@ where
         _state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         let input_owned = input.target_bytes();
         let input = input_owned.as_slice();
         self.helper.nyx_process.set_input(input, input.len() as u32);

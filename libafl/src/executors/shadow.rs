@@ -3,10 +3,9 @@
 use core::fmt::{self, Debug, Formatter};
 
 use crate::{
-    executors::{Executor, ExitKind, HasObservers},
+    executors::{ExecutionResult, Executor, HasObservers},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
-    Error,
 };
 
 /// A [`ShadowExecutor`] wraps an executor and a set of shadow observers
@@ -69,7 +68,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         self.executor.run_target(fuzzer, state, mgr, input)
     }
 }

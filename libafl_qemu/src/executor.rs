@@ -8,7 +8,7 @@ use libafl::{
 };
 use libafl::{
     events::{EventFirer, EventRestarter},
-    executors::{Executor, ExitKind, HasObservers, InProcessExecutor},
+    executors::{ExecutionResult, Executor, ExitKind, HasObservers, InProcessExecutor},
     feedbacks::Feedback,
     fuzzer::HasObjective,
     inputs::UsesInput,
@@ -110,7 +110,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         let emu = Emulator::new_empty();
         if self.first_exec {
             self.hooks.helpers().first_exec_all(self.hooks);
@@ -270,7 +270,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         let emu = Emulator::new_empty();
         if self.first_exec {
             self.hooks.helpers().first_exec_all(self.hooks);

@@ -31,10 +31,15 @@ pub use with_observers::WithObservers;
 
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub mod command;
-use core::{fmt::Debug, marker::PhantomData};
-
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub use command::CommandExecutor;
+
+pub mod deferred;
+#[rustfmt::skip]
+pub use deferred::{AsyncExecutor, DeferredExecutionResult};
+
+use core::{fmt::Debug, marker::PhantomData};
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -109,6 +114,9 @@ pub trait HasObservers: UsesObservers {
     fn observers_mut(&mut self) -> &mut Self::Observers;
 }
 
+/// Type returned by an executor immediately after it completes
+pub type ExecutionResult = Result<ExitKind, Error>;
+
 /// An executor takes the given inputs, and runs the harness/target.
 pub trait Executor<EM, Z>: UsesState + Debug
 where
@@ -122,12 +130,16 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error>;
+    ) -> ExecutionResult;
 
     /// Wraps this Executor with the given [`ObserversTuple`] to implement [`HasObservers`].
     ///
     /// If the executor already implements [`HasObservers`], then the original implementation will be overshadowed by
     /// the implementation of this wrapper.
+    ///
+    /// # Note
+    ///
+    /// This almost *certainly* will not work with `AsyncExecutor`!
     fn with_observers<OT>(self, observers: OT) -> WithObservers<Self, OT>
     where
         Self: Sized,
@@ -168,7 +180,7 @@ where
         _state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
-    ) -> Result<ExitKind, Error> {
+    ) -> ExecutionResult {
         if input.target_bytes().as_slice().is_empty() {
             Err(Error::empty("Input Empty"))
         } else {
@@ -224,7 +236,8 @@ pub mod pybind {
     use crate::{
         events::pybind::PythonEventManager,
         executors::{
-            inprocess::pybind::PythonOwnedInProcessExecutor, Executor, ExitKind, HasObservers,
+            inprocess::pybind::PythonOwnedInProcessExecutor, ExecutionResult, Executor, ExitKind,
+            HasObservers,
         },
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
         inputs::HasBytesVec,
@@ -353,7 +366,7 @@ pub mod pybind {
             state: &mut Self::State,
             mgr: &mut PythonEventManager,
             input: &Self::Input,
-        ) -> Result<ExitKind, Error> {
+        ) -> ExecutionResult {
             let ek = Python::with_gil(|py| -> PyResult<_> {
                 let ek: PythonExitKind = self
                     .inner
@@ -476,7 +489,7 @@ pub mod pybind {
             state: &mut Self::State,
             mgr: &mut PythonEventManager,
             input: &Self::Input,
-        ) -> Result<ExitKind, Error> {
+        ) -> ExecutionResult {
             unwrap_me_mut!(self.wrapper, e, { e.run_target(fuzzer, state, mgr, input) })
         }
     }
