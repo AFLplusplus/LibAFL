@@ -31,16 +31,19 @@ use crate::bolts::{
 };
 #[cfg(feature = "std")]
 use crate::bolts::{llmp::LlmpConnection, shmem::StdShMemProvider, staterestore::StateRestorer};
+#[cfg(all(unix, feature = "std"))]
+use crate::{
+    bolts::os::unix_signals::setup_signal_handler,
+    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
+};
 use crate::{
     bolts::{
         llmp::{self, Flags, LlmpClient, LlmpClientDescription, Tag},
-        os::unix_signals::setup_signal_handler,
         shmem::ShMemProvider,
     },
     events::{
-        shutdown_handler, BrokerEventResult, Event, EventConfig, EventFirer, EventManager,
-        EventManagerId, EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId,
-        ProgressReporter, SHUTDOWN_SIGHANDLER_DATA,
+        BrokerEventResult, Event, EventConfig, EventFirer, EventManager, EventManagerId,
+        EventProcessor, EventRestarter, HasCustomBufHandlers, HasEventManagerId, ProgressReporter,
     },
     executors::{Executor, HasObservers},
     fuzzer::{EvaluatorObservers, ExecutionProcessor},

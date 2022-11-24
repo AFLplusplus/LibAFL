@@ -5,10 +5,14 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std"))]
+use core::ptr::write_volatile;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
-use core::{fmt::Debug, marker::PhantomData, ptr::write_volatile};
-use std::ffi::c_void;
+use core::{fmt::Debug, marker::PhantomData};
+
+#[cfg(all(unix, feature = "std"))]
+use core::ffi::c_void;
 
 #[cfg(feature = "std")]
 use serde::{de::DeserializeOwned, Serialize};

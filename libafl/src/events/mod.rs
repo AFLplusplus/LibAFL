@@ -8,7 +8,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
-use core::{ffi::c_void, fmt, hash::Hasher, marker::PhantomData, time::Duration};
+use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 
 use ahash::AHasher;
 pub use llmp::*;
@@ -16,13 +16,16 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::{os::shmem, staterestore::StateRestorer};
+
+#[cfg(all(unix, feature = "std"))]
+use core::ffi::c_void;
+
+#[cfg(all(unix, feature = "std"))]
 use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
 use crate::{
-    bolts::{
-        bolts_prelude::{ShMemProvider, StateRestorer},
-        current_time,
-    },
+    bolts::current_time,
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
@@ -33,7 +36,7 @@ use crate::{
 };
 
 /// Check if ctrl-c is sent with this struct
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData {
     allocator_pid: 0,
     staterestorer_ptr: core::ptr::null_mut(),
@@ -42,7 +45,7 @@ pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData
 
 /// A signal handler for releasing staterestore shmem
 /// This struct holds a pointer to StateRestore and clean up the shmem segment used by it.
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
     allocator_pid: usize,
@@ -51,11 +54,13 @@ pub struct ShutdownSignalData {
 }
 
 /// Type for shutdown handler
+#[cfg(all(unix, feature = "std"))]
 pub type ShutdownFuncPtr =
     unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut ShutdownSignalData);
 
 /// Shutdown handler. SigTerm, SigInterrupt, SigQuit call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
+#[cfg(all(unix, feature = "std"))]
 pub unsafe fn shutdown_handler<SP>(
     signal: Signal,
     _info: siginfo_t,
@@ -83,7 +88,7 @@ pub unsafe fn shutdown_handler<SP>(
     std::process::exit(0);
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "std"))]
 impl Handler for ShutdownSignalData {
     fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
         unsafe {
