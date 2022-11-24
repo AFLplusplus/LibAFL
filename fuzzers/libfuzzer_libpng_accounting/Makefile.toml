@@ -82,7 +82,7 @@ windows_alias = "unsupported"
 [tasks.run_unix]
 script_runner = "@shell"
 script='''
-./${FUZZER_NAME} --cores 0 --input ./corpus &
+./${FUZZER_NAME} --cores 0 --input ./corpus
 '''
 dependencies = [ "fuzzer" ]
 
