@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 #[cfg(all(unix, feature = "std"))]
-use crate::bolts::{os::shmem, staterestore::StateRestorer};
+use crate::bolts::{os::shmem::ShMemProvider, staterestore::StateRestorer};
 
 #[cfg(all(unix, feature = "std"))]
 use core::ffi::c_void;
