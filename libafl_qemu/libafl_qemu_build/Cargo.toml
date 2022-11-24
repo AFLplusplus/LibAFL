@@ -1,0 +1,16 @@
+[package]
+name = "libafl_qemu_build"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+slirp = [] # build qemu with host libslirp (for user networking)
+
+clippy = [] # special feature for clippy, don't use in normal projects§
+
+[dependencies]
+bindgen = "0.60"
+cc = "1.0"
+which = "4.2"
+json = "0.12"
+shell-words = "1.1"
