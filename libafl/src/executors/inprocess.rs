@@ -1294,17 +1294,17 @@ mod windows_exception_handler {
             compiler_fence(Ordering::SeqCst);
         }
 
-        let code = ExceptionCode::try_from(
-            exception_pointers
-                .as_mut()
-                .unwrap()
-                .ExceptionRecord
-                .as_mut()
-                .unwrap()
-                .ExceptionCode
-                .0,
-        )
-        .unwrap();
+        let code =if let Some(exception_pointers) = exception_pointers.as_mut() {
+            ExceptionCode::try_from(
+                exception_pointers
+                    .ExceptionRecord
+                    .as_mut()
+                    .unwrap()
+                    .ExceptionCode
+                    .0).unwrap()
+        } else {
+            ExceptionCode::NotImplemented // Should be changed probably
+        };
 
         #[cfg(feature = "std")]
         eprintln!("Crashed with {}", code);
