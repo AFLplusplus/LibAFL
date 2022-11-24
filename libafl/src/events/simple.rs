@@ -23,7 +23,8 @@ use crate::bolts::os::startable_self;
 use crate::bolts::os::{fork, ForkResult};
 #[cfg(all(unix, feature = "std"))]
 use crate::{
-    bolts::{os::unix_signals::setup_signal_handler, shmem::ShMemProvider, staterestore::StateRestorer,
+    bolts::{
+        os::unix_signals::setup_signal_handler, shmem::ShMemProvider, staterestore::StateRestorer,
     },
     events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
 };
