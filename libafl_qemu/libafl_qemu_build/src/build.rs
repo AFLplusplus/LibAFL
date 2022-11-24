@@ -1,4 +1,8 @@
-use std::{env, fs, path::{PathBuf, Path}, process::Command};
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use which::which;
 
@@ -13,7 +17,12 @@ fn build_dep_check(tools: &[&str]) {
 }
 
 #[allow(clippy::too_many_lines)]
-pub fn build(cpu_target: &str, is_big_endian: bool, is_usermode: bool, jobs: Option<u32>, cross_cc: &str) -> PathBuf {
+pub fn build(
+    cpu_target: &str,
+    is_big_endian: bool,
+    is_usermode: bool,
+    jobs: Option<u32>,
+) -> (PathBuf, PathBuf) {
     let mut cpu_target = cpu_target.to_string();
     // qemu-system-arm supports both big and little endian configurations and so
     // therefore the "be" feature should ignored in this configuration. Also
@@ -21,11 +30,7 @@ pub fn build(cpu_target: &str, is_big_endian: bool, is_usermode: bool, jobs: Opt
     // features at once (disabling the check for mutually exclusive options)
     // resulting in cpu_target being set to 'x86_64' above which obviously
     // doesn't support BE.
-    if is_big_endian
-        && cpu_target == "arm"
-        && is_usermode
-        && !cfg!(feature = "clippy")
-    {
+    if is_big_endian && cpu_target == "arm" && is_usermode && !cfg!(feature = "clippy") {
         // We have told rustc which CPU target to use above (it doesn't need
         // to make any changes for endianness), however, we need QEMU to be
         // built for the right endian-ness, so we update the cpu_target for
@@ -126,8 +131,8 @@ pub fn build(cpu_target: &str, is_big_endian: bool, is_usermode: bool, jobs: Opt
                 .status(),
         );*/
         if is_usermode {
-            let mut cmd = Command::new("./configure")
-                .current_dir(&qemu_path)
+            let mut cmd = Command::new("./configure");
+            cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
@@ -137,14 +142,13 @@ pub fn build(cpu_target: &str, is_big_endian: bool, is_usermode: bool, jobs: Opt
                     "--disable-fdt",
                     "--disable-system",
                 ]);
-                if cfg!(feature = "debug_assertions") {
-                    cmd = cmd.arg("--enable-debug");
-                }
-                cmd.status()
-                .expect("Configure failed");
+            if cfg!(feature = "debug_assertions") {
+                cmd.arg("--enable-debug");
+            }
+            cmd.status().expect("Configure failed");
         } else {
-            let mut cmd = Command::new("./configure")
-                .current_dir(&qemu_path)
+            let mut cmd = Command::new("./configure");
+            cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
                 .arg("--as-shared-lib")
                 .arg(&format!("--target-list={cpu_target}-{target_suffix}"))
@@ -262,17 +266,16 @@ pub fn build(cpu_target: &str, is_big_endian: bool, is_usermode: bool, jobs: Opt
                 .arg("--disable-xen-pci-passthrough")
                 .arg("--disable-xkbcommon")
                 .arg("--disable-zstd");
-                                if cfg!(feature = "debug_assertions") {
-                    cmd = cmd.arg("--enable-debug");
-                }
-                cmd.status()
-                .expect("Configure failed");
+            if cfg!(feature = "debug_assertions") {
+                cmd.arg("--enable-debug");
+            }
+            cmd.status().expect("Configure failed");
         }
         if let Some(j) = jobs {
             Command::new("make")
                 .current_dir(&build_dir)
                 .arg("-j")
-                .arg(&j)
+                .arg(&format!("{}", j))
                 .status()
                 .expect("Make failed");
         } else {
@@ -396,11 +399,12 @@ pub fn build(cpu_target: &str, is_big_endian: bool, is_usermode: bool, jobs: Opt
     println!("cargo:rustc-link-lib=glib-2.0");
     println!("cargo:rustc-link-lib=stdc++");
     println!("cargo:rustc-link-lib=z");
-    #[cfg(all(feature = "slirp", feature = "systemmode"))]
-    println!("cargo:rustc-link-lib=slirp");
 
     if !is_usermode {
         println!("cargo:rustc-link-lib=pixman-1");
+        if env::var("LINK_SLIRP").is_ok() || cfg!(feature = "slirp") {
+            println!("cargo:rustc-link-lib=slirp");
+        }
 
         fs::create_dir_all(target_dir.join("pc-bios")).unwrap();
         for path in fs::read_dir(build_dir.join("pc-bios")).unwrap() {
@@ -438,6 +442,6 @@ pub fn build(cpu_target: &str, is_big_endian: bool, is_usermode: bool, jobs: Opt
             .expect("make failed")
             .success());
     }*/
-    
-    build_dir
+
+    (qemu_path, build_dir)
 }

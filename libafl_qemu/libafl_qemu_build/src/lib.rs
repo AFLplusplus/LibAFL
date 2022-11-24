@@ -1,46 +1,72 @@
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
-mod build;
 mod bindings;
+mod build;
 
 pub use build::build;
 
-const COMPILE_COMMANDS: &str = "compile_commands.json";
-const QEMU_MAIN_FILE: &str = "/softmmu/main.c";
-const QEMU_MAIN_OBJECT: &str = "qemu-system-$ARCH.p/softmmu_main.c.o";
-
-
-pub fn build_with_bindings(cpu_target: &str, is_big_endian: bool, is_usermode: bool, jobs: Option<u32>, cross_cc: &str, bindings_file: &Path) {
+pub fn build_with_bindings(
+    cpu_target: &str,
+    is_big_endian: bool,
+    is_usermode: bool,
+    jobs: Option<u32>,
+    bindings_file: &Path,
+) {
     println!("cargo:rerun-if-changed={}", bindings_file.display());
-    
-    let build_dir = build::build(cpu_target, is_big_endian, is_usermode, jobs, cross_cc);
 
-    let bind = bindings::generate(&build_dir, cpu_target).expect("Failed to generate the bindings");
-    bind.write_to_file(bindings_file).expect("Faield to write to the bindings file");
+    let (qemu_dir, build_dir) = build::build(cpu_target, is_big_endian, is_usermode, jobs);
+    let clang_args = qemu_bindgen_clang_args(&qemu_dir, &build_dir, cpu_target, is_usermode);
+
+    let bind = bindings::generate(&build_dir, cpu_target, clang_args)
+        .expect("Failed to generate the bindings");
+    bind.write_to_file(bindings_file)
+        .expect("Faield to write to the bindings file");
 }
 
-pub(crate) fn qemu_bindgen_clang_args(build_dir: &Path, cpu_target: &str) -> Vec<String> {
+//linux-user_main.c.o libqemu-x86_64-linux-user.fa.p
+
+fn qemu_bindgen_clang_args(
+    qemu_dir: &Path,
+    build_dir: &Path,
+    cpu_target: &str,
+    is_usermode: bool,
+) -> Vec<String> {
     // load compile commands
-    let compile_commands_string = &fs::read_to_string(build_dir.join(COMPILE_COMMANDS))
+    let compile_commands_string = &fs::read_to_string(build_dir.join("compile_commands.json"))
         .expect("failed to read compile commands");
 
     let compile_commands =
-        json::parse(compile_commands_string).expect("failed to parse compile commands");
+        json::parse(compile_commands_string).expect("Failed to parse compile commands");
+
+    let (main_file, main_obj) = if is_usermode {
+        (
+            "/linux-user/main.c",
+            format!("libqemu-{}-linux-user.fa.p/linux-user_main.c.o", cpu_target),
+        )
+    } else {
+        (
+            "/softmmu/main.c",
+            format!("qemu-system-{}.p/softmmu_main.c.o", cpu_target),
+        )
+    };
 
     // find main object
     let entry = compile_commands
         .members()
         .find(|entry| {
-            entry["output"] == QEMU_MAIN_OBJECT.replace(ARCH_PLACEHOLDER, arch.as_str())
+            entry["output"] == main_obj
                 || entry["file"]
                     .as_str()
-                    .map(|file| file.ends_with(QEMU_MAIN_FILE))
+                    .map(|file| file.ends_with(main_file))
                     .unwrap_or(false)
         })
-        .expect("didn't find compile command for qemu-system-arm");
+        .expect("Didn't find compile command for qemu-system-arm");
 
     // get main object build command
-    let command = entry["command"].as_str().expect("command is a string");
+    let command = entry["command"].as_str().expect("Command is a string");
 
     // filter define and include args
     let mut clang_args = vec![];
@@ -64,10 +90,21 @@ pub(crate) fn qemu_bindgen_clang_args(build_dir: &Path, cpu_target: &str) -> Vec
     }
 
     // add include dirs
-    clang_args.push("-Iqemu/include".to_owned());
-    clang_args.push("-iquote".to_owned());
-    clang_args.push(format!("qemu/target/{}", arch.target()));
+    clang_args.push(format!("-I{}", qemu_dir.display()));
+    clang_args.push(format!("-I{}/include", qemu_dir.display()));
+    clang_args.push(format!("-I{}/quote", qemu_dir.display()));
+    clang_args.push(format!("-I{}/target/{}", qemu_dir.display(), cpu_target));
 
     clang_args
 }
 
+fn include_path(build_dir: &Path, path: &str) -> String {
+    let include_path = PathBuf::from(path);
+
+    if include_path.is_absolute() {
+        path.to_string()
+    } else {
+        // make include path absolute
+        build_dir.join(include_path).display().to_string()
+    }
+}

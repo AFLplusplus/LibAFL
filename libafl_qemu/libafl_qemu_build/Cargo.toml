@@ -9,7 +9,7 @@ slirp = [] # build qemu with host libslirp (for user networking)
 clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
-bindgen = "0.60"
+bindgen = "0.63"
 cc = "1.0"
 which = "4.2"
 json = "0.12"
