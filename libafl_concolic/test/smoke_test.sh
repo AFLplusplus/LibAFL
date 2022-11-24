@@ -16,7 +16,7 @@ if [ ! -d "symcc" ]; then
     echo "cloning symcc"
     git clone https://github.com/AFLplusplus/symcc.git symcc
     cd symcc
-    git checkout 5cccc33456c48ad83008eb618e7da5d005c72d89
+    git checkout 2a3229da6101596af220f20fef5085e59537abcb
     cd ..
 fi
 
@@ -30,11 +30,8 @@ if [ ! -d "symcc_build" ]; then
 fi
 
 
-echo "building runtime"
-cargo build -p runtime_test
-
-echo "building dump_constraints"
-cargo build -p dump_constraints
+echo "building runtime and dump_constraints"
+cargo build -p runtime_test -p dump_constraints
 
 echo "building target"
 SYMCC_RUNTIME_DIR=../../target/debug symcc_build/symcc symcc/test/if.c -o "if"

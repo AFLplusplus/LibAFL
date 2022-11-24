@@ -8,7 +8,7 @@ use libafl::{
         current_nanos,
         launcher::Launcher,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::{tuple_list, Merge},
         AsMutSlice,
     },
@@ -108,7 +108,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
         crashes.push("crashes");
         out_dir.push("queue");
 
-        let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+        let shmem_provider = UnixShMemProvider::new().expect("Failed to init shared memory");
         let mut shmem_provider_client = shmem_provider.clone();
 
         let monitor = MultiMonitor::new(|s| println!("{s}"));

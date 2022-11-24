@@ -308,7 +308,7 @@ where
             for handle in &mut handles {
                 let ecode = handle.wait()?;
                 if !ecode.success() {
-                    println!("Client with handle {:?} exited with {:?}", handle, ecode);
+                    println!("Client with handle {handle:?} exited with {ecode:?}");
                 }
             }
         }

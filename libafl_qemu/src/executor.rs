@@ -17,7 +17,6 @@ use libafl::{
     Error,
 };
 
-pub use crate::emu::SyscallHookResult;
 use crate::{emu::Emulator, helper::QemuHelperTuple, hooks::QemuHooks};
 
 pub struct QemuExecutor<'a, H, OT, QT, S>
