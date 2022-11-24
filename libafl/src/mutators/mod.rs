@@ -57,6 +57,9 @@ where
     ) -> Result<MutationResult, Error>;
 
     /// Post-process given the outcome of the execution
+    ///
+    /// You may not assume that the post_exec will be invoked immediately after mutate, nor that
+    /// the results will be provided in-order.
     fn post_exec(
         &mut self,
         _state: &mut S,

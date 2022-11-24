@@ -12,9 +12,9 @@ use crate::{
 /// Combine `Stage` and `AsAny`
 pub trait AnyStage<E, EM, Z>: Stage<E, EM, Z> + AsAny
 where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
 }
 

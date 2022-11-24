@@ -1,6 +1,6 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::string::ToString;
+use alloc::{boxed::Box, string::ToString};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -15,11 +15,11 @@ use crate::{
     bolts::current_time,
     corpus::{Corpus, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
-    executors::{ExecutionResult, Executor, ExitKind, HasObservers},
+    executors::{DeferredExecutionResult, ExecutionResult, Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
     mark_feature_time,
-    observers::ObserversTuple,
+    observers::{ObserversTuple, UsesObservers},
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
@@ -147,6 +147,56 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
     ) -> Result<usize, Error>;
+}
+
+/// Evaluate an input modifying the state of the fuzzer asynchronously
+pub trait AsyncEvaluator<E, EM>: UsesState
+where
+    E: UsesObservers<State = Self::State>,
+    EM: UsesState<State = Self::State>,
+{
+    /// Starts the executor with the input and triggers observers and feedback asynchronously
+    fn start_evaluate_input(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: &<Self::State as UsesInput>::Input,
+    ) -> Result<Box<dyn DeferredExecutionResult<E, EM, Self>>, Error> {
+        self.start_evaluate_input_events(state, executor, manager, input, true)
+    }
+
+    /// Starts the executor with the input and triggers observers and feedback asynchronously
+    fn start_evaluate_input_events(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: &<Self::State as UsesInput>::Input,
+        send_events: bool,
+    ) -> Result<Box<dyn DeferredExecutionResult<E, EM, Self>>, Error>;
+
+    /// Waits for the result and processes feedback to determine if this input will be added to the
+    /// corpus
+    fn complete_evaluation(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        deferred: Box<dyn DeferredExecutionResult<E, EM, Self>>,
+    ) -> Result<(ExecuteInputResult, E::Observers, Option<usize>), Error>;
+
+    /// Waits for the result and processes feedback.
+    /// Adds an input, to the corpus even if it's not considered `interesting` by the `feedback`.
+    fn complete_evaluation_forced(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        deferred: Box<dyn DeferredExecutionResult<E, EM, Self>>,
+    ) -> Result<(usize, E::Observers), Error>;
 }
 
 /// The main fuzzer trait.

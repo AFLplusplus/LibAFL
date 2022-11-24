@@ -34,16 +34,16 @@ use crate::{
 pub trait TMinMutationalStage<CS, E, EM, F1, F2, M, OT, Z>:
     Stage<E, EM, Z> + FeedbackFactory<F2, CS::State, OT>
 where
-    Self::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
-    <Self::State as UsesInput>::Input: HasLen + Hash,
-    CS: Scheduler<State = Self::State>,
-    E: Executor<EM, Z> + HasObservers<Observers = OT, State = Self::State>,
-    EM: EventFirer<State = Self::State>,
-    F1: Feedback<Self::State>,
-    F2: Feedback<Self::State>,
-    M: Mutator<Self::State>,
+    E::State: HasCorpus + HasExecutions + HasMaxSize + HasClientPerfMonitor,
+    <E::State as UsesInput>::Input: HasLen + Hash,
+    CS: Scheduler<State = E::State>,
+    E: Executor<EM, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<State = E::State>,
+    F1: Feedback<E::State>,
+    F2: Feedback<E::State>,
+    M: Mutator<E::State>,
     OT: ObserversTuple<CS::State>,
-    Z: ExecutionProcessor<OT, State = Self::State>
+    Z: ExecutionProcessor<OT, State = E::State>
         + ExecutesInput<E, EM>
         + HasFeedback<Feedback = F1>
         + HasScheduler<Scheduler = CS>,

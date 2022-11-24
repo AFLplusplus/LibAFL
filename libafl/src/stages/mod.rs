@@ -65,11 +65,11 @@ use crate::{
 
 /// A stage is one step in the fuzzing process.
 /// Multiple stages will be scheduled one by one for each input.
-pub trait Stage<E, EM, Z>: UsesState
+pub trait Stage<E, EM, Z>: UsesState<State = E::State>
 where
-    E: UsesState<State = Self::State>,
-    EM: UsesState<State = Self::State>,
-    Z: UsesState<State = Self::State>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     /// Run the stage
     fn perform(
@@ -123,10 +123,10 @@ where
 impl<Head, Tail, E, EM, Z> StagesTuple<E, EM, Head::State, Z> for (Head, Tail)
 where
     Head: Stage<E, EM, Z>,
-    Tail: StagesTuple<E, EM, Head::State, Z>,
-    E: UsesState<State = Head::State>,
-    EM: UsesState<State = Head::State>,
-    Z: UsesState<State = Head::State>,
+    Tail: StagesTuple<E, EM, E::State, Z>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn perform_all(
         &mut self,
@@ -322,11 +322,11 @@ pub struct SkippableStage<CD, E, EM, ST, Z> {
 
 impl<CD, E, EM, ST, Z> SkippableStage<CD, E, EM, ST, Z>
 where
-    CD: FnMut(&mut ST::State) -> SkippableStageDecision,
+    CD: FnMut(&mut E::State) -> SkippableStageDecision,
     ST: Stage<E, EM, Z>,
-    E: UsesState<State = ST::State>,
-    EM: UsesState<State = ST::State>,
-    Z: UsesState<State = ST::State>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     /// Create a new [`SkippableStage`]
     pub fn new(wrapped_stage: ST, condition: CD) -> Self {
@@ -340,22 +340,22 @@ where
 
 impl<CD, E, EM, ST, Z> UsesState for SkippableStage<CD, E, EM, ST, Z>
 where
-    CD: FnMut(&mut ST::State) -> SkippableStageDecision,
+    CD: FnMut(&mut E::State) -> SkippableStageDecision,
     ST: Stage<E, EM, Z>,
-    E: UsesState<State = ST::State>,
-    EM: UsesState<State = ST::State>,
-    Z: UsesState<State = ST::State>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
-    type State = ST::State;
+    type State = E::State;
 }
 
 impl<CD, E, EM, ST, Z> Stage<E, EM, Z> for SkippableStage<CD, E, EM, ST, Z>
 where
-    CD: FnMut(&mut ST::State) -> SkippableStageDecision,
+    CD: FnMut(&mut E::State) -> SkippableStageDecision,
     ST: Stage<E, EM, Z>,
-    E: UsesState<State = ST::State>,
-    EM: UsesState<State = ST::State>,
-    Z: UsesState<State = ST::State>,
+    E: UsesState,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     /// Run the stage
     #[inline]

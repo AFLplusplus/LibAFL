@@ -94,7 +94,7 @@ where
         state: &mut Self::State,
         mgr: &mut EM,
         input: &Self::Input,
-    ) -> Box<dyn DeferredExecutionResult<Self, EM, Z>>;
+    ) -> Result<Box<dyn DeferredExecutionResult<Self, EM, Z>>, Error>;
 }
 
 /// Bridge for interoperability from async => sync executors.
@@ -132,7 +132,7 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> ExecutionResult {
-        let mut deferred = self.inner.start_target(fuzzer, state, mgr, input);
+        let mut deferred = self.inner.start_target(fuzzer, state, mgr, input)?;
         deferred.pump_events(mgr)?;
         match deferred.get(&mut self.inner, fuzzer, state, mgr, input) {
             Ok((exit, obs)) => {
@@ -167,7 +167,7 @@ where
         _: &mut Self::State,
         _: &mut EM,
         _: &Self::Input,
-    ) -> Box<dyn DeferredExecutionResult<Self, EM, Z>> {
-        Box::new(LazyExecutionResult::new())
+    ) -> Result<Box<dyn DeferredExecutionResult<Self, EM, Z>>, Error> {
+        Ok(Box::new(LazyExecutionResult::new()))
     }
 }
