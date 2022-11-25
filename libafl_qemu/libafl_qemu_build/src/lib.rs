@@ -89,11 +89,17 @@ fn qemu_bindgen_clang_args(
         }
     }
 
+    let target_arch_dir = match cpu_target {
+        "x86_64" => format!("-I{}/target/i386", qemu_dir.display()),
+        "aarch64" => format!("-I{}/target/arm", qemu_dir.display()),
+        _ => format!("-I{}/target/{}", qemu_dir.display(), cpu_target),
+    };
+
     // add include dirs
     clang_args.push(format!("-I{}", qemu_dir.display()));
     clang_args.push(format!("-I{}/include", qemu_dir.display()));
     clang_args.push(format!("-I{}/quote", qemu_dir.display()));
-    clang_args.push(format!("-I{}/target/{}", qemu_dir.display(), cpu_target));
+    clang_args.push(target_arch_dir);
 
     clang_args
 }

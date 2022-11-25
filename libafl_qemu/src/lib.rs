@@ -21,7 +21,7 @@
 
 use std::env;
 
-pub use libafl_qemu_sys;
+pub use libafl_qemu_sys as sys;
 pub use strum::IntoEnumIterator;
 
 #[cfg(cpu_target = "aarch64")]

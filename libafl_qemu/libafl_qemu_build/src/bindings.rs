@@ -47,6 +47,8 @@ const WRAPPER_HEADER: &str = r#"
 #include "tcg/tcg-internal.h"
 #include "exec/helper-head.h"
 
+#include "qemu/plugin-memory.h"
+
 "#;
 
 pub fn generate(
@@ -75,6 +77,8 @@ pub fn generate(
         .allowlist_function("cpu_memory_rw_debug")
         .allowlist_function("cpu_physical_memory_rw")
         .allowlist_function("cpu_reset")
+        .allowlist_function("cpu_get_phys_page_attrs_debug")
+        .allowlist_function("tlb_plugin_lookup")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks));
 
