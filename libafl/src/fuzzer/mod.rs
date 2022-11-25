@@ -648,7 +648,7 @@ where
     ) -> Result<(ExecuteInputResult, E::Observers, Option<usize>), Error> {
         let (exit_kind, obs) = deferred.get(executor, self, state, manager, &input)?;
         let (res, corpus_idx) =
-            self.process_execution(state, manager, input, &obs, &exit_kind, send_events)?;
+            self.process_execution(state, manager, input, &obs, exit_kind, send_events)?;
         Ok((res, obs, corpus_idx))
     }
 
@@ -661,7 +661,7 @@ where
         mut deferred: Box<dyn DeferredExecutionResult<E, EM, Self>>,
     ) -> Result<(usize, E::Observers), Error> {
         let (exit_kind, obs) = deferred.get(executor, self, state, manager, &input)?;
-        let idx = self.add_testcase(state, manager, input, &obs, &exit_kind, true)?;
+        let idx = self.add_testcase(state, manager, input, &obs, exit_kind, true)?;
         Ok((idx, obs))
     }
 }
