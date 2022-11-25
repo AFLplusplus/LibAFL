@@ -68,18 +68,6 @@ pub fn build() {
         .ok()
         .map(|x| str::parse::<u32>(&x).expect("The number of jobs is not a valid integer!"));
 
-    /*let cross_cc = if emulation_mode == "usermode" {
-        let cross_cc = env::var("CROSS_CC").unwrap_or_else(|_| {
-            println!("cargo:warning=CROSS_CC is not set, default to cc (things can go wrong if the selected cpu target ({cpu_target}) is not the host arch ({}))", env::consts::ARCH);
-            "cc".to_owned()
-        });
-        println!("cargo:rerun-if-env-changed=CROSS_CC");
-
-        cross_cc
-    } else {
-        String::new()
-    };*/
-
     if std::env::var("DOCS_RS").is_ok() {
         // Only build when we're not generating docs
         // TODO By default provide x86_64 bindings in the repo

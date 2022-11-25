@@ -19,6 +19,8 @@ use std::env;
 
 pub use strum::IntoEnumIterator;
 
+pub use libafl_qemu_sys;
+
 #[cfg(cpu_target = "aarch64")]
 pub mod aarch64;
 #[cfg(all(cpu_target = "aarch64", not(feature = "clippy")))]

@@ -17,22 +17,23 @@ python = ["pyo3", "pyo3-build-config"]
 fork = ["libafl/fork"]
 
 # The following architecture features are mutually exclusive.
-x86_64 = [] # build qemu for x86_64 (default)
-i386 = [] # build qemu for i386
-arm = [] # build qemu for arm
-aarch64 = [] # build qemu for aarch64
-be = []
+x86_64 = ["libafl_qemu_sys/x86_64"] # build qemu for x86_64 (default)
+i386 = ["libafl_qemu_sys/i386"] # build qemu for i386
+arm = ["libafl_qemu_sys/arm"] # build qemu for arm
+aarch64 = ["libafl_qemu_sys/aarch64"] # build qemu for aarch64
+be = ["libafl_qemu_sys/be"]
 
-usermode = []
-systemmode = []
+usermode = ["libafl_qemu_sys/usermode"]
+systemmode = ["libafl_qemu_sys/systemmode"]
 
-slirp = [ "systemmode" ] # build qemu with host libslirp (for user networking)
+slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
 
-clippy = [] # special feature for clippy, don't use in normal projects§
+clippy = ["libafl_qemu_sys/clippy"] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.8.2", default-features = false, features = ["std", "derive", "llmp_compression"] }
 libafl_targets = { path = "../libafl_targets", version = "0.8.2" }
+libafl_qemu_sys = { path = "./libafl_qemu_sys", version = "0.8.2" }
 
 serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 hashbrown =  { version = "0.12", features = ["serde", "ahash-compile-time-rng"] } # A faster hashmap, nostd compatible
@@ -51,8 +52,6 @@ pyo3 = { version = "0.17", features = ["pyproto"], optional = true }
 rangemap = "1.0"
 
 [build-dependencies]
-cc = { version = "1.0" }
-which = "4.2"
 pyo3-build-config = { version = "0.15", optional = true }
 
 [lib]

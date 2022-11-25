@@ -28,6 +28,5 @@ clippy = [ "libafl_qemu_build/clippy" ] # special feature for clippy, don't use 
 
 [dependencies]
 
-
 [build-dependencies]
 libafl_qemu_build = { path = "../libafl_qemu_build", version = "0.8.2" }
