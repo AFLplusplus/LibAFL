@@ -545,7 +545,7 @@ impl CPU {
             copy_nonoverlapping(saved, self.ptr.as_mut().unwrap().env_ptr, 1);
         }
     }
-    
+
     pub fn raw_ptr(&self) -> CPUStatePtr {
         self.ptr
     }
@@ -787,7 +787,9 @@ impl Emulator {
         perms: MmapPerms,
         flags: c_int,
     ) -> Result<GuestAddr, ()> {
-        let res = unsafe { libafl_qemu_sys::target_mmap(addr.into(), size as u64, perms.into(), flags, -1, 0) };
+        let res = unsafe {
+            libafl_qemu_sys::target_mmap(addr.into(), size as u64, perms.into(), flags, -1, 0)
+        };
         if res <= 0 {
             Err(())
         } else {
@@ -826,7 +828,8 @@ impl Emulator {
 
     #[cfg(emulation_mode = "usermode")]
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
-        let res = unsafe { libafl_qemu_sys::target_mprotect(addr.into(), size as u64, perms.into()) };
+        let res =
+            unsafe { libafl_qemu_sys::target_mprotect(addr.into(), size as u64, perms.into()) };
         if res == 0 {
             Ok(())
         } else {
