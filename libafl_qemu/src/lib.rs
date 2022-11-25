@@ -14,12 +14,15 @@
 #![allow(clippy::borrow_deref_ref)]
 // Allow only ATM, it will be evetually removed
 #![allow(clippy::missing_safety_doc)]
+// libafl_qemu_sys export types with mepty struct markers (e.g. struct {} start_init_save)
+// This causes bindgen to generate empty Rust struct that are generally not FFI-safe due to C++ having empty structs with size 1
+// As the QEMU codebase is C, it is FFI-safe and we just ignore the warning
+#![allow(improper_ctypes)]
 
 use std::env;
 
-pub use strum::IntoEnumIterator;
-
 pub use libafl_qemu_sys;
+pub use strum::IntoEnumIterator;
 
 #[cfg(cpu_target = "aarch64")]
 pub mod aarch64;

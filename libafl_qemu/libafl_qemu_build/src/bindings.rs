@@ -11,12 +11,26 @@ const WRAPPER_HEADER: &str = r#"
 #include "hw/qdev-properties.h"
 #include "qemu/error-report.h"
 #include "migration/vmstate.h"
+
 #ifdef CONFIG_USER_ONLY
+
 #include "qemu.h"
+#include "user-internals.h"
+#include "strace.h"
+#include "signal-common.h"
+#include "loader.h"
+#include "user-mmap.h"
+#include "user/safe-syscall.h"
+#include "qemu/selfmap.h"
+#include "cpu_loop-common.h"
+
 #else
+
 #include "hw/core/sysemu-cpu-ops.h"
 #include "exec/address-spaces.h"
+
 #endif
+
 #include "sysemu/tcg.h"
 #include "sysemu/kvm.h"
 #include "sysemu/replay.h"
@@ -28,6 +42,7 @@ const WRAPPER_HEADER: &str = r#"
 #include "trace/trace-root.h"
 #include "qemu/accel.h"
 
+#include "tcg/tcg.h"
 #include "tcg/tcg-op.h"
 #include "tcg/tcg-internal.h"
 #include "exec/helper-head.h"
@@ -52,9 +67,15 @@ pub fn generate(
         .clang_args(clang_args)
         .allowlist_type("CPUState")
         .allowlist_type("CPUArchState")
+        .allowlist_type("RAMBlock")
+        .allowlist_function("qemu_user_init")
+        .allowlist_function("target_mmap")
+        .allowlist_function("target_mprotect")
+        .allowlist_function("target_munmap")
+        .allowlist_function("cpu_memory_rw_debug")
+        .allowlist_function("cpu_physical_memory_rw")
+        .allowlist_function("cpu_reset")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
-        .blocklist_type(".*\\(unnamed_at.*")
-        .blocklist_type(".*\\(anonymous_at.*")
         .parse_callbacks(Box::new(bindgen::CargoCallbacks));
 
     // arch specific functions
