@@ -9,8 +9,6 @@ use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "async")]
 use tokio::runtime::{Builder, Runtime};
 
-#[cfg(feature = "async")]
-use crate::executors::{observers::UsesObservers, AsyncExecutor, DeferredExecutionResult};
 #[cfg(test)]
 use crate::inputs::Input;
 #[cfg(feature = "introspection")]
@@ -31,6 +29,11 @@ use crate::{
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, UsesState},
     Error,
+};
+#[cfg(feature = "async")]
+use crate::{
+    executors::{AsyncExecutor, DeferredExecutionResult},
+    observers::UsesObservers,
 };
 
 /// Send a monitor update all 15 (or more) seconds
