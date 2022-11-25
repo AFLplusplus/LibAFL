@@ -7,7 +7,7 @@ use core::{
     ffi::c_void,
     ptr::{addr_of, addr_of_mut, copy_nonoverlapping, null},
 };
-use std::{ffi::CString, slice::from_raw_parts, str::from_utf8_unchecked};
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
