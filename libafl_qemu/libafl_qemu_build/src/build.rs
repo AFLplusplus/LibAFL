@@ -17,6 +17,7 @@ fn build_dep_check(tools: &[&str]) {
 }
 
 #[allow(clippy::too_many_lines)]
+#[must_use]
 pub fn build(
     cpu_target: &str,
     is_big_endian: bool,
@@ -275,7 +276,7 @@ pub fn build(
             Command::new("make")
                 .current_dir(&build_dir)
                 .arg("-j")
-                .arg(&format!("{}", j))
+                .arg(&format!("{j}"))
                 .status()
                 .expect("Make failed");
         } else {
