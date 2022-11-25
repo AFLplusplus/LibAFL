@@ -76,15 +76,15 @@ fn qemu_bindgen_clang_args(
         .skip(1)
     {
         if arg.starts_with("-D") {
-            clang_args.push(arg)
+            clang_args.push(arg);
         } else if let Some(incpath) = arg.strip_prefix("-I") {
             clang_args.push(format!("-I{}", include_path(build_dir, incpath)));
         } else if arg == "-iquote" || arg == "-isystem" {
             include_arg = true;
-            clang_args.push(arg)
+            clang_args.push(arg);
         } else if include_arg {
             include_arg = false;
-            clang_args.push(include_path(build_dir, &arg))
+            clang_args.push(include_path(build_dir, &arg));
         }
     }
 
