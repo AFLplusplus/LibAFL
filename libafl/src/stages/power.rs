@@ -159,12 +159,12 @@ impl<E, F, EM, M, O, Z> MutationalStage<E, EM, M, Z>
     for PowerMutationalStage<E, F, EM, M, O, Z, true>
 where
     E: AsyncExecutor<EM, Z>,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<E::State>,
+    EM: UsesState,
+    F: TestcaseScore<EM::State>,
+    M: Mutator<EM::State>,
     O: MapObserver,
-    Z: AsyncEvaluator<E, EM, State = E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    Z: AsyncEvaluator<E, EM, State = EM::State>,
+    EM::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
 {
     /// The mutator, added to this stage
     #[inline]
@@ -257,12 +257,12 @@ where
 impl<E, F, EM, M, O, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, M, O, Z, true>
 where
     E: AsyncExecutor<EM, Z>,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<E::State>,
+    EM: UsesState,
+    F: TestcaseScore<EM::State>,
+    M: Mutator<EM::State>,
     O: MapObserver,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: AsyncEvaluator<E, EM, State = E::State>,
+    EM::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    Z: AsyncEvaluator<E, EM, State = EM::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -302,12 +302,12 @@ where
 impl<E, F, EM, M, O, Z> PowerMutationalStage<E, F, EM, M, O, Z, true>
 where
     E: AsyncExecutor<EM, Z>,
-    EM: UsesState<State = E::State>,
-    F: TestcaseScore<E::State>,
-    M: Mutator<E::State>,
+    EM: UsesState,
+    F: TestcaseScore<EM::State>,
+    M: Mutator<EM::State>,
     O: MapObserver,
-    E::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: AsyncEvaluator<E, EM, State = E::State>,
+    EM::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
+    Z: AsyncEvaluator<E, EM, State = EM::State>,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new_async(mutator: M, map_observer_name: &O) -> Self {

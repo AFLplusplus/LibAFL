@@ -26,11 +26,11 @@ use crate::{
 /// being applied to the input one by one, between executions.
 pub trait MutationalStage<E, EM, M, Z>: Stage<E, EM, Z>
 where
-    E: UsesState,
-    M: Mutator<E::State>,
-    EM: UsesState<State = E::State>,
-    Z: UsesState<State = E::State>,
-    E::State: HasClientPerfMonitor + HasCorpus,
+    E: UsesState<State = EM::State>,
+    M: Mutator<EM::State>,
+    EM: UsesState,
+    Z: UsesState<State = EM::State>,
+    EM::State: HasClientPerfMonitor + HasCorpus,
 {
     /// The mutator registered for this stage
     fn mutator(&self) -> &M;
@@ -91,8 +91,8 @@ where
         corpus_idx: usize,
     ) -> Result<(), Error>
     where
-        E: UsesObservers,
-        Z: AsyncEvaluator<E, EM, State = E::State>,
+        E: UsesObservers<State = EM::State>,
+        Z: AsyncEvaluator<E, EM, State = EM::State>,
     {
         let num = self.iterations(state, corpus_idx)?;
         let mut deferred = Vec::with_capacity(num as usize);

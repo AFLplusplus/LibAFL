@@ -34,7 +34,9 @@ pub mod command;
 #[cfg(all(feature = "std", any(unix, doc)))]
 pub use command::CommandExecutor;
 
+#[cfg(feature = "async")]
 pub mod deferred;
+#[cfg(feature = "async")]
 #[rustfmt::skip]
 pub use deferred::{AsyncExecutor, DeferredExecutionResult};
 
