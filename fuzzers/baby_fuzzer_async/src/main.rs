@@ -1,7 +1,9 @@
 #[cfg(windows)]
 use std::ptr::write_volatile;
-use std::{marker::PhantomData, path::PathBuf, time::Duration};
+use std::{path::PathBuf, time::Duration};
 
+#[cfg(feature = "sync")]
+use libafl::executors::deferred::AsyncBridge;
 #[cfg(feature = "tui")]
 use libafl::monitors::tui::TuiMonitor;
 #[cfg(not(feature = "tui"))]
@@ -9,7 +11,7 @@ use libafl::monitors::SimpleMonitor;
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsMutSlice, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
-    events::{Event, LogSeverity, SimpleEventManager},
+    events::SimpleEventManager,
     executors::{
         deferred::{ChannelExecutor, ChannelResult, ChannelTask},
         ExitKind,
@@ -32,6 +34,8 @@ use tokio::{sync::mpsc, time::sleep};
 pub fn main() {
     // Create an observation channel using the signals map
     let observer = StdMapObserver::new_owned("signals", vec![0u8; 32]);
+    #[cfg(feature = "sync")]
+    let observers = tuple_list!(observer.clone());
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
@@ -101,14 +105,14 @@ pub fn main() {
             let mut observer = observer.clone();
             handle.spawn(async move {
                 // the executor is taking a nap :)
-                sleep(Duration::from_secs(1)).await;
-                tx_result
-                    .send(ChannelResult::Event(Event::Log {
-                        severity_level: LogSeverity::Info,
-                        message: "Good morning!".to_string(),
-                        phantom: PhantomData,
-                    }))
-                    .expect("Couldn't say good morning!");
+                sleep(Duration::from_millis(200)).await;
+                // tx_result
+                //     .send(ChannelResult::Event(Event::Log {
+                //         severity_level: LogSeverity::Info,
+                //         message: "Good morning!".to_string(),
+                //         phantom: PhantomData,
+                //     }))
+                //     .expect("Couldn't say good morning!");
                 let exit_kind = (harness)(task.input(), observer.map_mut());
                 tx_result.send(ChannelResult::Result {
                     task_id: task.task_id(),
@@ -119,19 +123,33 @@ pub fn main() {
     });
 
     // Create the executor for an in-process function with just one observer
+    #[cfg(not(feature = "sync"))]
     let mut executor = ChannelExecutor::new(fuzzer.runtime(), tx_input, rx_result);
+    #[cfg(feature = "sync")]
+    let mut executor = AsyncBridge::new(
+        ChannelExecutor::new(fuzzer.runtime(), tx_input, rx_result),
+        observers,
+    );
 
     // Generator of printable bytearrays of max size 32
     let mut generator = RandPrintablesGenerator::new(32);
 
     // Generate 8 initial inputs
+    #[cfg(not(feature = "sync"))]
     state
         .generate_initial_inputs_async(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
+        .expect("Failed to generate the initial corpus");
+    #[cfg(feature = "sync")]
+    state
+        .generate_initial_inputs(&mut fuzzer, &mut executor, &mut generator, &mut mgr, 8)
         .expect("Failed to generate the initial corpus");
 
     // Setup a mutational stage with a basic bytes mutator
     let mutator = StdScheduledMutator::new(havoc_mutations());
+    #[cfg(not(feature = "sync"))]
     let mut stages = tuple_list!(StdMutationalStage::new_async(mutator));
+    #[cfg(feature = "sync")]
+    let mut stages = tuple_list!(StdMutationalStage::new(mutator));
 
     fuzzer
         .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)

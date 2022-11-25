@@ -120,8 +120,22 @@ where
     E: UsesObservers,
 {
     inner: E,
-    observers: Option<E::Observers>,
+    observers: E::Observers,
     phantom: PhantomData<(*const EM, *const Z)>,
+}
+
+impl<E, EM, Z> AsyncBridge<E, EM, Z>
+where
+    E: UsesObservers,
+{
+    /// Create a new async bridge for the provided executor
+    pub fn new(inner: E, base: E::Observers) -> Self {
+        Self {
+            inner,
+            observers: base,
+            phantom: PhantomData,
+        }
+    }
 }
 
 impl<E, EM, Z> UsesState for AsyncBridge<E, EM, Z>
@@ -154,7 +168,7 @@ where
         let mut deferred = self.inner.start_target(fuzzer, state, mgr, input)?;
         match deferred.get(&mut self.inner, fuzzer, state, mgr, input) {
             Ok((exit, obs)) => {
-                self.observers = Some(obs);
+                self.observers = obs;
                 Ok(exit)
             }
             Err(e) => Err(e),
@@ -175,11 +189,11 @@ where
     E: UsesObservers,
 {
     fn observers(&self) -> &Self::Observers {
-        self.observers.as_ref().expect("No observers available.")
+        &self.observers
     }
 
     fn observers_mut(&mut self) -> &mut Self::Observers {
-        self.observers.as_mut().expect("No observers available.")
+        &mut self.observers
     }
 }
 

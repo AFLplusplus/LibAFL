@@ -634,6 +634,8 @@ where
         let job = executor.start_target(self, state, manager, input);
         mark_feature_time!(state, PerfFeature::TargetExecutionStart);
 
+        *state.executions_mut() += 1;
+
         job
     }
 
