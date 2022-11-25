@@ -1,6 +1,5 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
-#[cfg(emulation_mode = "usermode")]
 use core::mem::MaybeUninit;
 use core::{
     convert::Into,
