@@ -576,8 +576,7 @@ where
         }
         for (input, current) in deferred {
             if forced {
-                let _ =
-                    fuzzer.complete_evaluation_forced(self, executor, manager, input, current)?;
+                drop(fuzzer.complete_evaluation_forced(self, executor, manager, input, current)?);
                 added += 1;
             } else {
                 let (res, _, _) =

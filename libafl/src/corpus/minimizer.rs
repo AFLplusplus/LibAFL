@@ -130,7 +130,7 @@ where
             let kind = executor.run_target(fuzzer, state, manager, &input)?;
             executor
                 .observers_mut()
-                .post_exec_all(state, &input, &kind)?;
+                .post_exec_all(state, &input, kind)?;
 
             let seed_expr = Bool::fresh_const(&ctx, "seed");
             let obs: &O = executor

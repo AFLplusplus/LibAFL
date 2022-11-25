@@ -248,7 +248,6 @@ pub mod pybind {
             pybind::{PythonStdState, PythonStdStateWrapper},
             UsesState,
         },
-        Error,
     };
 
     #[pyclass(unsendable, name = "ExitKind")]

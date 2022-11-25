@@ -213,7 +213,7 @@ where
 
             let current = fuzzer.start_evaluate_input(state, executor, manager, &input)?;
 
-            deferred.push((input, current))
+            deferred.push((input, current));
         }
 
         for (i, (input, current)) in deferred.into_iter().enumerate() {

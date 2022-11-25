@@ -52,13 +52,14 @@ where
 }
 
 /// Execution result which is computed lazily rather than now, primarily for sync/async interop.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct LazyExecutionResult<E, EM, Z> {
     phantom: PhantomData<(*const E, *const EM, *const Z)>,
 }
 
 impl<E, EM, Z> LazyExecutionResult<E, EM, Z> {
     /// Create a `LazyExecutionResult`
+    #[must_use]
     pub fn new() -> Self {
         Self {
             phantom: PhantomData,
@@ -318,6 +319,7 @@ where
     task_id: usize,
     tx: MpscSender<ChannelTask<EM::Input>>,
     events: Arc<Mutex<MpscReceiver<Event<EM::Input>>>>,
+    #[allow(clippy::type_complexity)]
     tasks: Arc<Mutex<HashMap<usize, OneshotSender<Result<(ExitKind, OT), Error>>>>>,
     phantom: PhantomData<*const EM>,
 }
