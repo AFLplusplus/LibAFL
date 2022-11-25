@@ -119,7 +119,7 @@ pub fn main() {
                 }
             }
         }
-        (exit_kind).replace(Some(ExitKind::Ok));
+        exit_kind.replace(Some(ExitKind::Ok));
     }
 
     println!("One iteration done.");
