@@ -18,7 +18,7 @@ use crate::{
     },
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
-    AsyncEvaluator, Error,
+    AsyncEvaluator, Error, HasRuntime,
 };
 
 /// The mutational stage using power schedules
@@ -163,7 +163,7 @@ where
     F: TestcaseScore<EM::State>,
     M: Mutator<EM::State>,
     O: MapObserver,
-    Z: AsyncEvaluator<E, EM, State = EM::State>,
+    Z: AsyncEvaluator<E, EM, State = EM::State> + HasRuntime,
     EM::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
 {
     /// The mutator, added to this stage
@@ -217,7 +217,7 @@ where
 
         for (i, (input, current)) in deferred.into_iter().enumerate() {
             let (_, obs, corpus_idx) =
-                fuzzer.complete_evaluation(state, executor, manager, input, current)?;
+                fuzzer.complete_evaluation(state, executor, manager, input, current, true)?;
 
             let observer = obs
                 .match_name::<O>(&self.map_observer_name)
@@ -262,7 +262,7 @@ where
     M: Mutator<EM::State>,
     O: MapObserver,
     EM::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: AsyncEvaluator<E, EM, State = EM::State>,
+    Z: AsyncEvaluator<E, EM, State = EM::State> + HasRuntime,
 {
     #[inline]
     #[allow(clippy::let_and_return)]
@@ -307,7 +307,7 @@ where
     M: Mutator<EM::State>,
     O: MapObserver,
     EM::State: HasClientPerfMonitor + HasCorpus + HasMetadata + HasRand,
-    Z: AsyncEvaluator<E, EM, State = EM::State>,
+    Z: AsyncEvaluator<E, EM, State = EM::State> + HasRuntime,
 {
     /// Creates a new [`PowerMutationalStage`]
     pub fn new_async(mutator: M, map_observer_name: &O) -> Self {

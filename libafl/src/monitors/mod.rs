@@ -537,6 +537,9 @@ pub enum PerfFeature {
     /// Time spent getting the feedback from `is_interesting` from all objectives
     GetObjectivesInterestingAll = 9,
 
+    /// Time spent starting the target in an asynchronous context
+    TargetExecutionStart = 10,
+
     /// Used as a counter to know how many elements are in [`PerfFeature`]. Must be the
     /// last value in the enum.
     Count, // !! No more values here since Count is last! !!
@@ -546,23 +549,7 @@ pub enum PerfFeature {
 // TryFromPrimitive requires `std` so these are implemented manually
 impl From<PerfFeature> for usize {
     fn from(val: PerfFeature) -> usize {
-        match val {
-            PerfFeature::GetInputFromCorpus => PerfFeature::GetInputFromCorpus as usize,
-            PerfFeature::Mutate => PerfFeature::Mutate as usize,
-            PerfFeature::MutatePostExec => PerfFeature::MutatePostExec as usize,
-            PerfFeature::TargetExecution => PerfFeature::TargetExecution as usize,
-            PerfFeature::PreExec => PerfFeature::PreExec as usize,
-            PerfFeature::PostExec => PerfFeature::PostExec as usize,
-            PerfFeature::PreExecObservers => PerfFeature::PreExecObservers as usize,
-            PerfFeature::PostExecObservers => PerfFeature::PostExecObservers as usize,
-            PerfFeature::GetFeedbackInterestingAll => {
-                PerfFeature::GetFeedbackInterestingAll as usize
-            }
-            PerfFeature::GetObjectivesInterestingAll => {
-                PerfFeature::GetObjectivesInterestingAll as usize
-            }
-            PerfFeature::Count => PerfFeature::Count as usize,
-        }
+        val as usize
     }
 }
 

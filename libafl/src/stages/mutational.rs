@@ -118,7 +118,7 @@ where
 
         for (i, (input, current)) in deferred.into_iter().enumerate() {
             let (_, _, corpus_idx) =
-                fuzzer.complete_evaluation(state, executor, manager, input, current)?;
+                fuzzer.complete_evaluation(state, executor, manager, input, current, true)?;
 
             start_timer!(state);
             self.mutator_mut().post_exec(state, i as i32, corpus_idx)?;

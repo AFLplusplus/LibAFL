@@ -26,7 +26,7 @@ use crate::{
     inputs::{Input, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
-    Error,
+    Error, HasRuntime,
 };
 
 /// Execution result which is deferred to when it is available (e.g., if using a remote executor)
@@ -34,7 +34,7 @@ pub trait DeferredExecutionResult<E, EM, Z>
 where
     E: AsyncExecutor<EM, Z>,
     EM: UsesState,
-    Z: UsesState<State = EM::State>,
+    Z: UsesState<State = EM::State> + HasRuntime,
 {
     /// Fetch the result of this execution, pumping events until the result is available
     ///
@@ -43,7 +43,6 @@ where
     /// (for example) using an `Option` to contain the result.
     fn get(
         &mut self,
-        rt: &Runtime,
         executor: &mut E,
         fuzzer: &mut Z,
         state: &mut E::State,
@@ -71,12 +70,11 @@ impl<E, EM, Z> DeferredExecutionResult<E, EM, Z> for LazyExecutionResult<E, EM, 
 where
     E: AsyncExecutor<EM, Z> + Executor<EM, Z> + HasObservers,
     EM: UsesState,
-    Z: UsesState<State = EM::State>,
+    Z: UsesState<State = EM::State> + HasRuntime,
     E::Observers: Clone,
 {
     fn get(
         &mut self,
-        _: &Runtime,
         executor: &mut E,
         fuzzer: &mut Z,
         state: &mut E::State,
@@ -98,12 +96,11 @@ where
 pub trait AsyncExecutor<EM, Z>: UsesObservers<State = EM::State> + Debug
 where
     EM: UsesState,
-    Z: UsesState<State = EM::State>,
+    Z: UsesState<State = EM::State> + HasRuntime,
 {
     /// Start the target and receive a handle to its deferred result
     fn start_target(
         &mut self,
-        rt: &Runtime,
         fuzzer: &mut Z,
         state: &mut Self::State,
         mgr: &mut EM,
@@ -121,7 +118,6 @@ pub struct AsyncBridge<E, EM, Z>
 where
     E: UsesObservers,
 {
-    rt: Runtime,
     inner: E,
     observers: Option<E::Observers>,
     phantom: PhantomData<(*const EM, *const Z)>,
@@ -134,11 +130,18 @@ where
     type State = E::State;
 }
 
+impl<E, EM, Z> UsesObservers for AsyncBridge<E, EM, Z>
+where
+    E: UsesObservers,
+{
+    type Observers = E::Observers;
+}
+
 impl<E, EM, Z> Executor<EM, Z> for AsyncBridge<E, EM, Z>
 where
     E: AsyncExecutor<EM, Z>,
     EM: UsesState + Debug,
-    Z: UsesState<State = EM::State> + Debug,
+    Z: UsesState<State = EM::State> + Debug + HasRuntime,
 {
     fn run_target(
         &mut self,
@@ -147,10 +150,8 @@ where
         mgr: &mut EM,
         input: &Self::Input,
     ) -> ExecutionResult {
-        let mut deferred = self
-            .inner
-            .start_target(&self.rt, fuzzer, state, mgr, input)?;
-        match deferred.get(&self.rt, &mut self.inner, fuzzer, state, mgr, input) {
+        let mut deferred = self.inner.start_target(fuzzer, state, mgr, input)?;
+        match deferred.get(&mut self.inner, fuzzer, state, mgr, input) {
             Ok((exit, obs)) => {
                 self.observers = Some(obs);
                 Ok(exit)
@@ -168,18 +169,30 @@ where
     }
 }
 
+impl<E, EM, Z> HasObservers for AsyncBridge<E, EM, Z>
+where
+    E: UsesObservers,
+{
+    fn observers(&self) -> &Self::Observers {
+        self.observers.as_ref().expect("No observers available.")
+    }
+
+    fn observers_mut(&mut self) -> &mut Self::Observers {
+        self.observers.as_mut().expect("No observers available.")
+    }
+}
+
 // blanket impl to allow all existing executors to be used as async executors by lazily computing
 // their result
 impl<E, EM, Z> AsyncExecutor<EM, Z> for E
 where
     E: Executor<EM, Z> + HasObservers<State = EM::State> + 'static,
     EM: UsesState + Debug + 'static,
-    Z: UsesState<State = EM::State> + Debug + 'static,
+    Z: UsesState<State = EM::State> + Debug + HasRuntime + 'static,
     E::Observers: Clone,
 {
     fn start_target(
         &mut self,
-        _: &Runtime,
         _: &mut Z,
         _: &mut Self::State,
         _: &mut EM,
@@ -243,20 +256,21 @@ impl<E, EM, Z> DeferredExecutionResult<E, EM, Z> for ChannelDeferredResult<EM, E
 where
     E: AsyncExecutor<EM, Z>,
     EM: EventFirer,
-    Z: UsesState<State = EM::State>,
+    Z: UsesState<State = EM::State> + HasRuntime,
 {
     fn get(
         &mut self,
-        rt: &Runtime,
         _: &mut E,
-        _: &mut Z,
+        fuzzer: &mut Z,
         state: &mut EM::State,
         mgr: &mut EM,
         _: &EM::Input,
     ) -> Result<(ExitKind, E::Observers), Error> {
-        let mut events = rt.block_on(async { self.events.lock().await });
+        let mut events = fuzzer
+            .runtime()
+            .block_on(async { self.events.lock().await });
         loop {
-            match rt.block_on(async {
+            match fuzzer.runtime().block_on(async {
                 tokio::select! {
                     biased;
 
@@ -368,13 +382,12 @@ impl<EM, OT, Z> AsyncExecutor<EM, Z> for ChannelExecutor<EM, OT>
 where
     EM: EventFirer + Debug + 'static,
     OT: ObserversTuple<EM::State> + Send + 'static,
-    Z: UsesState<State = EM::State> + Debug,
+    Z: UsesState<State = EM::State> + Debug + HasRuntime,
     EM::Input: Send + 'static,
 {
     fn start_target(
         &mut self,
-        rt: &Runtime,
-        _fuzzer: &mut Z,
+        fuzzer: &mut Z,
         _state: &mut Self::State,
         _mgr: &mut EM,
         input: &Self::Input,
@@ -391,7 +404,7 @@ where
         // drive events in the runtime. The caller is responsible to ensure that tx has a buffer of
         // one so that this block_on will drive their handler to submit the task to whatever
         // execution mechanism they are using
-        rt.block_on(async move {
+        fuzzer.runtime().block_on(async move {
             let not_present = tasks.lock().await.insert(task_id, sender).is_none();
             assert!(not_present, "Tried to create a task which already exists!");
             tx.send(ChannelTask { task_id, input })
@@ -400,7 +413,7 @@ where
         });
 
         // spawn the job in the background
-        let job = rt.spawn(async move {
+        let job = fuzzer.runtime().spawn(async move {
             receiver
                 .await
                 .expect("Couldn't receive the result for a task.")

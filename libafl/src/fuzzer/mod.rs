@@ -4,6 +4,9 @@ use alloc::{boxed::Box, string::ToString};
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use serde::{de::DeserializeOwned, Serialize};
+use tokio::runtime::Builder;
+#[cfg(feature = "async")]
+use tokio::runtime::Runtime;
 
 #[cfg(test)]
 use crate::inputs::Input;
@@ -15,7 +18,9 @@ use crate::{
     bolts::current_time,
     corpus::{Corpus, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
-    executors::{DeferredExecutionResult, ExecutionResult, Executor, ExitKind, HasObservers},
+    executors::{
+        AsyncExecutor, DeferredExecutionResult, ExecutionResult, Executor, ExitKind, HasObservers,
+    },
     feedbacks::Feedback,
     inputs::UsesInput,
     mark_feature_time,
@@ -150,6 +155,7 @@ where
 }
 
 /// Evaluate an input modifying the state of the fuzzer asynchronously
+#[cfg(feature = "async")]
 pub trait AsyncEvaluator<E, EM>: UsesState
 where
     E: UsesObservers<State = Self::State>,
@@ -163,7 +169,7 @@ where
         manager: &mut EM,
         input: &<Self::State as UsesInput>::Input,
     ) -> Result<Box<dyn DeferredExecutionResult<E, EM, Self>>, Error> {
-        self.start_evaluate_input_events(state, executor, manager, input, true)
+        self.start_evaluate_input_events(state, executor, manager, input)
     }
 
     /// Starts the executor with the input and triggers observers and feedback asynchronously
@@ -173,7 +179,6 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: &<Self::State as UsesInput>::Input,
-        send_events: bool,
     ) -> Result<Box<dyn DeferredExecutionResult<E, EM, Self>>, Error>;
 
     /// Waits for the result and processes feedback to determine if this input will be added to the
@@ -185,6 +190,7 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         deferred: Box<dyn DeferredExecutionResult<E, EM, Self>>,
+        send_events: bool,
     ) -> Result<(ExecuteInputResult, E::Observers, Option<usize>), Error>;
 
     /// Waits for the result and processes feedback.
@@ -197,6 +203,13 @@ where
         input: <Self::State as UsesInput>::Input,
         deferred: Box<dyn DeferredExecutionResult<E, EM, Self>>,
     ) -> Result<(usize, E::Observers), Error>;
+}
+
+/// Indicates that a value has a runtime associated with it.
+#[cfg(feature = "async")]
+pub trait HasRuntime {
+    /// Get a reference to the runtime associated with this value.
+    fn runtime(&self) -> &Runtime;
 }
 
 /// The main fuzzer trait.
@@ -304,6 +317,8 @@ where
     scheduler: CS,
     feedback: F,
     objective: OF,
+    #[cfg(feature = "async")]
+    rt: Runtime,
     phantom: PhantomData<OT>,
 }
 
@@ -371,6 +386,18 @@ where
     }
 }
 
+impl<CS, F, OF, ST> HasRuntime for StdFuzzer<CS, F, OF, ST>
+where
+    CS: Scheduler,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
+    CS::State: HasClientPerfMonitor,
+{
+    fn runtime(&self) -> &Runtime {
+        &self.rt
+    }
+}
+
 impl<CS, F, OF, OT> ExecutionProcessor<OT> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
@@ -432,32 +459,8 @@ where
                 // Not a solution
                 self.objective_mut().discard_metadata(state, &input)?;
 
-                // Add the input to the main corpus
-                let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-                self.feedback_mut().append_metadata(state, &mut testcase)?;
-                let idx = state.corpus_mut().add(testcase)?;
-                self.scheduler_mut().on_add(state, idx)?;
-
-                if send_events {
-                    // TODO set None for fast targets
-                    let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
-                        None
-                    } else {
-                        Some(manager.serialize_observers::<OT>(observers)?)
-                    };
-                    manager.fire(
-                        state,
-                        Event::NewTestcase {
-                            input,
-                            observers_buf,
-                            exit_kind: *exit_kind,
-                            corpus_size: state.corpus().count(),
-                            client_config: manager.configuration(),
-                            time: current_time(),
-                            executions: *state.executions(),
-                        },
-                    )?;
-                }
+                let idx =
+                    self.add_testcase(state, manager, input, observers, exit_kind, send_events)?;
                 Ok((res, Some(idx)))
             }
             ExecuteInputResult::Solution => {
@@ -481,6 +484,56 @@ where
                 Ok((res, None))
             }
         }
+    }
+}
+
+impl<CS, F, OF, OT> StdFuzzer<CS, F, OF, OT>
+where
+    CS: Scheduler,
+    CS::State: HasClientPerfMonitor + HasCorpus + HasExecutions + HasSolutions,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
+    OT: DeserializeOwned + ObserversTuple<CS::State> + Serialize,
+{
+    fn add_testcase<EM>(
+        &mut self,
+        state: &mut <CS as UsesState>::State,
+        manager: &mut EM,
+        input: <<CS as UsesState>::State as UsesInput>::Input,
+        observers: &OT,
+        exit_kind: &ExitKind,
+        send_events: bool,
+    ) -> Result<usize, Error>
+    where
+        EM: EventFirer<State = CS::State>,
+    {
+        // Add the input to the main corpus
+        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
+        self.feedback_mut().append_metadata(state, &mut testcase)?;
+        let idx = state.corpus_mut().add(testcase)?;
+        self.scheduler_mut().on_add(state, idx)?;
+
+        if send_events {
+            // TODO set None for fast targets
+            let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
+                None
+            } else {
+                Some(manager.serialize_observers::<OT>(observers)?)
+            };
+            manager.fire(
+                state,
+                Event::NewTestcase {
+                    input,
+                    observers_buf,
+                    exit_kind: *exit_kind,
+                    corpus_size: state.corpus().count(),
+                    client_config: manager.configuration(),
+                    time: current_time(),
+                    executions: *state.executions(),
+                },
+            )?;
+        }
+        Ok(idx)
     }
 }
 
@@ -550,30 +603,60 @@ where
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
 
-        // Add the input to the main corpus
-        let mut testcase = Testcase::with_executions(input.clone(), *state.executions());
-        self.feedback_mut().append_metadata(state, &mut testcase)?;
-        let idx = state.corpus_mut().add(testcase)?;
-        self.scheduler_mut().on_add(state, idx)?;
+        self.add_testcase(state, manager, input, observers, &exit_kind, true)
+    }
+}
 
-        let observers_buf = if manager.configuration() == EventConfig::AlwaysUnique {
-            None
-        } else {
-            Some(manager.serialize_observers::<OT>(observers)?)
-        };
-        manager.fire(
-            state,
-            Event::NewTestcase {
-                input,
-                observers_buf,
-                exit_kind,
-                corpus_size: state.corpus().count(),
-                client_config: manager.configuration(),
-                time: current_time(),
-                executions: *state.executions(),
-            },
-        )?;
-        Ok(idx)
+impl<CS, E, EM, F, OF, OT> AsyncEvaluator<E, EM> for StdFuzzer<CS, F, OF, OT>
+where
+    CS: Scheduler,
+    E: AsyncExecutor<EM, Self, Observers = OT>,
+    EM: EventFirer<State = CS::State>,
+    F: Feedback<CS::State>,
+    OF: Feedback<CS::State>,
+    OT: ObserversTuple<CS::State> + Serialize + DeserializeOwned,
+    CS::State: HasCorpus + HasSolutions + HasClientPerfMonitor + HasExecutions,
+{
+    fn start_evaluate_input_events(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: &<Self::State as UsesInput>::Input,
+    ) -> Result<Box<dyn DeferredExecutionResult<E, EM, Self>>, Error> {
+        start_timer!(state);
+        let job = executor.start_target(self, state, manager, input);
+        mark_feature_time!(state, PerfFeature::TargetExecutionStart);
+
+        job
+    }
+
+    fn complete_evaluation(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        mut deferred: Box<dyn DeferredExecutionResult<E, EM, Self>>,
+        send_events: bool,
+    ) -> Result<(ExecuteInputResult, E::Observers, Option<usize>), Error> {
+        let (exit_kind, obs) = deferred.get(executor, self, state, manager, &input)?;
+        let (res, corpus_idx) =
+            self.process_execution(state, manager, input, &obs, &exit_kind, send_events)?;
+        Ok((res, obs, corpus_idx))
+    }
+
+    fn complete_evaluation_forced(
+        &mut self,
+        state: &mut Self::State,
+        executor: &mut E,
+        manager: &mut EM,
+        input: <Self::State as UsesInput>::Input,
+        mut deferred: Box<dyn DeferredExecutionResult<E, EM, Self>>,
+    ) -> Result<(usize, E::Observers), Error> {
+        let (exit_kind, obs) = deferred.get(executor, self, state, manager, &input)?;
+        let idx = self.add_testcase(state, manager, input, &obs, &exit_kind, true)?;
+        Ok((idx, obs))
     }
 }
 
@@ -640,40 +723,22 @@ where
             scheduler,
             feedback,
             objective,
+            #[cfg(feature = "async")]
+            rt: Builder::new_current_thread().enable_all().build().unwrap(),
             phantom: PhantomData,
         }
     }
 
-    /// Runs the input and triggers observers and feedback
-    pub fn execute_input<E, EM>(
-        &mut self,
-        state: &mut CS::State,
-        executor: &mut E,
-        event_mgr: &mut EM,
-        input: &<CS::State as UsesInput>::Input,
-    ) -> ExecutionResult
-    where
-        E: Executor<EM, Self> + HasObservers<Observers = OT, State = CS::State>,
-        EM: UsesState<State = CS::State>,
-        OT: ObserversTuple<CS::State>,
-    {
-        start_timer!(state);
-        executor.observers_mut().pre_exec_all(state, input)?;
-        mark_feature_time!(state, PerfFeature::PreExecObservers);
-
-        *state.executions_mut() += 1;
-
-        start_timer!(state);
-        let exit_kind = executor.run_target(self, state, event_mgr, input)?;
-        mark_feature_time!(state, PerfFeature::TargetExecution);
-
-        start_timer!(state);
-        executor
-            .observers_mut()
-            .post_exec_all(state, input, &exit_kind)?;
-        mark_feature_time!(state, PerfFeature::PostExecObservers);
-
-        Ok(exit_kind)
+    /// Create a new `StdFuzzer` with standard behavior and the provided runtime.
+    #[cfg(feature = "async")]
+    pub fn new_with_runtime(scheduler: CS, feedback: F, objective: OF, rt: Runtime) -> Self {
+        Self {
+            scheduler,
+            feedback,
+            objective,
+            rt,
+            phantom: PhantomData,
+        }
     }
 }
 
