@@ -44,12 +44,12 @@ fn qemu_bindgen_clang_args(
     let (main_file, main_obj) = if is_usermode {
         (
             "/linux-user/main.c",
-            format!("libqemu-{}-linux-user.fa.p/linux-user_main.c.o", cpu_target),
+            format!("libqemu-{cpu_target}-linux-user.fa.p/linux-user_main.c.o"),
         )
     } else {
         (
             "/softmmu/main.c",
-            format!("qemu-system-{}.p/softmmu_main.c.o", cpu_target),
+            format!("qemu-system-{cpu_target}.p/softmmu_main.c.o"),
         )
     };
 
@@ -60,8 +60,7 @@ fn qemu_bindgen_clang_args(
             entry["output"] == main_obj
                 || entry["file"]
                     .as_str()
-                    .map(|file| file.ends_with(main_file))
-                    .unwrap_or(false)
+                    .map_or(false, |file| file.ends_with(main_file))
         })
         .expect("Didn't find compile command for qemu-system-arm");
 
@@ -92,7 +91,7 @@ fn qemu_bindgen_clang_args(
     let target_arch_dir = match cpu_target {
         "x86_64" => format!("-I{}/target/i386", qemu_dir.display()),
         "aarch64" => format!("-I{}/target/arm", qemu_dir.display()),
-        _ => format!("-I{}/target/{}", qemu_dir.display(), cpu_target),
+        _ => format!("-I{}/target/{cpu_target}", qemu_dir.display()),
     };
 
     // add include dirs
