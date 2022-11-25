@@ -349,15 +349,13 @@ impl Allocator {
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         //println!("freeing address: {:?}", ptr);
-        let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
-            metadata
-        } else {
+        let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
-                AsanErrors::get_mut()
+                 AsanErrors::get_mut()
                     .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
-            }
-            return;
-        };
+          }
+             return;
+       };
 
         if metadata.freed {
             AsanErrors::get_mut().report_error(AsanError::DoubleFree((

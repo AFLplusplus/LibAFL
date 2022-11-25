@@ -20,6 +20,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
+          override: true
       - name: install mdbook
         uses: baptiste0928/cargo-install@v1.3.0
         with:
@@ -193,10 +194,12 @@ jobs:
       with:
         profile: minimal
         toolchain: nightly
-    - name: Add nightly rustfmt and clippy
-      run: rustup toolchain install nightly && rustup target add --toolchain nightly aarch64-unknown-none && rustup component add --toolchain nightly rust-src && rustup target add thumbv6m-none-eabi
+        override: true
+        components: rustfmt, clippy, rust-src
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
+    - name: Add targets
+      run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
     - name: Build aarch64-unknown-none
       run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!

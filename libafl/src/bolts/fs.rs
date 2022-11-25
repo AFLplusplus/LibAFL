@@ -8,7 +8,7 @@ use core::cell::RefCell;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::{
     fs::{self, remove_file, File, OpenOptions},
-    io::{Seek, SeekFrom, Write},
+    io::{Seek, Write},
     path::{Path, PathBuf},
 };
 
@@ -124,7 +124,7 @@ impl InputFile {
     /// Rewinds the file to the beginning
     #[inline]
     pub fn rewind(&mut self) -> Result<(), Error> {
-        if let Err(err) = self.file.seek(SeekFrom::Start(0)) {
+        if let Err(err) = self.file.rewind() {
             Err(err.into())
         } else {
             Ok(())
