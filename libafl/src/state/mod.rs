@@ -1,7 +1,8 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
+#[cfg(feature = "async")]
+use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use std::prelude::v1::Vec;
 #[cfg(feature = "std")]
 use std::{
     fs,
@@ -24,9 +25,10 @@ use crate::{
     generators::Generator,
     inputs::{Input, UsesInput},
     monitors::ClientPerfMonitor,
-    observers::UsesObservers,
-    AsyncEvaluator, Error,
+    Error,
 };
+#[cfg(feature = "async")]
+use crate::{observers::UsesObservers, AsyncEvaluator};
 
 /// The maximum size of a testcase
 pub const DEFAULT_MAX_SIZE: usize = 1_048_576;
@@ -549,6 +551,7 @@ where
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
     }
 
+    #[cfg(feature = "async")]
     fn generate_initial_async_internal<G, E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -596,6 +599,7 @@ where
     }
 
     /// Generate `num` initial inputs, using the passed-in generator and force the addition to corpus.
+    #[cfg(feature = "async")]
     pub fn generate_initial_inputs_async_forced<G, E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,
@@ -614,6 +618,7 @@ where
     }
 
     /// Generate `num` initial inputs, using the passed-in generator.
+    #[cfg(feature = "async")]
     pub fn generate_initial_inputs_async<G, E, EM, Z>(
         &mut self,
         fuzzer: &mut Z,

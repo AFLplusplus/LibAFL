@@ -1,15 +1,13 @@
 //! The power schedules. This stage should be invoked after the calibration stage.
-
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::string::{String, ToString};
+#[cfg(feature = "async")]
+use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     bolts::tuples::MatchName,
     corpus::{Corpus, SchedulerTestcaseMetaData},
-    executors::{AsyncExecutor, Executor, HasObservers},
+    executors::{Executor, HasObservers},
     fuzzer::Evaluator,
     mutators::Mutator,
     observers::MapObserver,
@@ -18,8 +16,10 @@ use crate::{
     },
     stages::{MutationalStage, Stage},
     state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
-    AsyncEvaluator, Error, HasRuntime,
+    Error,
 };
+#[cfg(feature = "async")]
+use crate::{executors::AsyncExecutor, AsyncEvaluator, HasRuntime};
 
 /// The mutational stage using power schedules
 #[derive(Clone, Debug)]
@@ -155,6 +155,7 @@ where
     }
 }
 
+#[cfg(feature = "async")]
 impl<E, F, EM, M, O, Z> MutationalStage<E, EM, M, Z>
     for PowerMutationalStage<E, F, EM, M, O, Z, true>
 where
@@ -254,6 +255,7 @@ where
     }
 }
 
+#[cfg(feature = "async")]
 impl<E, F, EM, M, O, Z> Stage<E, EM, Z> for PowerMutationalStage<E, F, EM, M, O, Z, true>
 where
     E: AsyncExecutor<EM, Z>,
@@ -299,6 +301,7 @@ where
     }
 }
 
+#[cfg(feature = "async")]
 impl<E, F, EM, M, O, Z> PowerMutationalStage<E, F, EM, M, O, Z, true>
 where
     E: AsyncExecutor<EM, Z>,

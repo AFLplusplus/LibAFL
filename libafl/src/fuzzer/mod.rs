@@ -1,13 +1,16 @@
 //! The `Fuzzer` is the main struct for a fuzz campaign.
 
-use alloc::{boxed::Box, string::ToString};
+#[cfg(feature = "async")]
+use alloc::boxed::Box;
+use alloc::string::ToString;
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
 
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::runtime::Builder;
 #[cfg(feature = "async")]
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 
+#[cfg(feature = "async")]
+use crate::executors::{observers::UsesObservers, AsyncExecutor, DeferredExecutionResult};
 #[cfg(test)]
 use crate::inputs::Input;
 #[cfg(feature = "introspection")]
@@ -18,13 +21,11 @@ use crate::{
     bolts::current_time,
     corpus::{Corpus, Testcase},
     events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
-    executors::{
-        AsyncExecutor, DeferredExecutionResult, ExecutionResult, Executor, ExitKind, HasObservers,
-    },
+    executors::{ExecutionResult, Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
     mark_feature_time,
-    observers::{ObserversTuple, UsesObservers},
+    observers::ObserversTuple,
     schedulers::Scheduler,
     stages::StagesTuple,
     start_timer,
@@ -386,6 +387,7 @@ where
     }
 }
 
+#[cfg(feature = "async")]
 impl<CS, F, OF, ST> HasRuntime for StdFuzzer<CS, F, OF, ST>
 where
     CS: Scheduler,
@@ -607,6 +609,7 @@ where
     }
 }
 
+#[cfg(feature = "async")]
 impl<CS, E, EM, F, OF, OT> AsyncEvaluator<E, EM> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,

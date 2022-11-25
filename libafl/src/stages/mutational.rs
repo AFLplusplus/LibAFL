@@ -1,8 +1,9 @@
 //| The [`MutationalStage`] is the default stage used during fuzzing.
 //! For the current input, it will perform a range of random mutations, and then run them in the executor.
 
+#[cfg(feature = "async")]
+use alloc::vec::Vec;
 use core::marker::PhantomData;
-use std::prelude::v1::Vec;
 
 #[cfg(feature = "introspection")]
 use crate::monitors::PerfFeature;
@@ -12,12 +13,13 @@ use crate::{
     fuzzer::Evaluator,
     mark_feature_time,
     mutators::Mutator,
-    observers::UsesObservers,
     stages::Stage,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasRand, UsesState},
-    AsyncEvaluator, Error,
+    Error,
 };
+#[cfg(feature = "async")]
+use crate::{observers::UsesObservers, AsyncEvaluator};
 
 // TODO multi mutators stage
 
@@ -82,6 +84,7 @@ where
 
     /// Runs this (mutational) stage for the given testcase asynchronously
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
+    #[cfg(feature = "async")]
     fn perform_mutational_async(
         &mut self,
         fuzzer: &mut Z,
@@ -206,6 +209,7 @@ where
     }
 }
 
+#[cfg(feature = "async")]
 impl<E, EM, M, Z> Stage<E, EM, Z> for StdMutationalStage<E, EM, M, Z, true>
 where
     E: UsesObservers<State = Z::State>,
@@ -250,6 +254,7 @@ where
     }
 }
 
+#[cfg(feature = "async")]
 impl<E, EM, M, Z> StdMutationalStage<E, EM, M, Z, true>
 where
     E: UsesObservers<State = Z::State>,
