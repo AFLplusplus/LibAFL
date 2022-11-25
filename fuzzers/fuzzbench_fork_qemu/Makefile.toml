@@ -80,6 +80,7 @@ script_runner = "@shell"
 script='''
 rm -rf libafl_unix_shmem_server || true
 timeout 10s cargo run --release -- --libafl-in ../libfuzzer_libpng/corpus --libafl-out ./out ./${FUZZER_NAME} &
+kill -9 $(pidof fuzzbench_fork_qemu)
 '''
 dependencies = [ "harness", "fuzzer" ]
 
