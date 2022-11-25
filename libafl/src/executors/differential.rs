@@ -81,7 +81,7 @@ where
         observers
             .primary
             .as_mut()
-            .post_exec_all(state, input, &ret1)?;
+            .post_exec_all(state, input, ret1)?;
         observers
             .differential
             .post_observe_first_all(observers.primary.as_mut())?;
@@ -94,7 +94,7 @@ where
         observers
             .secondary
             .as_mut()
-            .post_exec_all(state, input, &ret2)?;
+            .post_exec_all(state, input, ret2)?;
         observers
             .differential
             .post_observe_second_all(observers.secondary.as_mut())?;
@@ -136,7 +136,7 @@ where
         &mut self,
         state: &mut S,
         input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         self.differential.post_exec_all(state, input, exit_kind)
     }
@@ -149,7 +149,7 @@ where
         &mut self,
         state: &mut S,
         input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         self.differential
             .post_exec_child_all(state, input, exit_kind)

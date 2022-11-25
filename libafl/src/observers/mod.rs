@@ -69,7 +69,7 @@ where
         &mut self,
         _state: &mut S,
         _input: &S::Input,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -86,7 +86,7 @@ where
         &mut self,
         _state: &mut S,
         _input: &S::Input,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -135,7 +135,7 @@ where
         &mut self,
         state: &mut S,
         input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error>;
 
     /// This is called right before the next execution in the child process, if any.
@@ -146,7 +146,7 @@ where
         &mut self,
         state: &mut S,
         input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error>;
 
     /// Returns true if a `stdout` observer was added to the list
@@ -172,7 +172,7 @@ where
         &mut self,
         _state: &mut S,
         _input: &S::Input,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -185,7 +185,7 @@ where
         &mut self,
         _state: &mut S,
         _input: &S::Input,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -228,7 +228,7 @@ where
         &mut self,
         state: &mut S,
         input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec(state, input, exit_kind)?;
         self.1.post_exec_all(state, input, exit_kind)
@@ -243,7 +243,7 @@ where
         &mut self,
         state: &mut S,
         input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec_child(state, input, exit_kind)?;
         self.1.post_exec_child_all(state, input, exit_kind)
@@ -450,7 +450,7 @@ where
         &mut self,
         _state: &mut S,
         _input: &S::Input,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
         Ok(())
@@ -625,7 +625,7 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &BytesInput,
-            exit_kind: &ExitKind,
+            exit_kind: ExitKind,
         ) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
@@ -662,7 +662,7 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &BytesInput,
-            exit_kind: &ExitKind,
+            exit_kind: ExitKind,
         ) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
@@ -1006,7 +1006,7 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &BytesInput,
-            exit_kind: &ExitKind,
+            exit_kind: ExitKind,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, o, { o.post_exec(state, input, exit_kind) })
         }
@@ -1023,7 +1023,7 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &BytesInput,
-            exit_kind: &ExitKind,
+            exit_kind: ExitKind,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, o, {
                 o.post_exec_child(state, input, exit_kind)
@@ -1080,7 +1080,7 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &BytesInput,
-            exit_kind: &ExitKind,
+            exit_kind: ExitKind,
         ) -> Result<(), Error> {
             for ob in &mut self.list {
                 ob.post_exec(state, input, exit_kind)?;
@@ -1103,7 +1103,7 @@ pub mod pybind {
             &mut self,
             state: &mut PythonStdState,
             input: &BytesInput,
-            exit_kind: &ExitKind,
+            exit_kind: ExitKind,
         ) -> Result<(), Error> {
             for ob in &mut self.list {
                 ob.post_exec_child(state, input, exit_kind)?;

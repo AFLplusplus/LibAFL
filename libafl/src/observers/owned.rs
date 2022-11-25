@@ -77,7 +77,7 @@ impl<I: 'static + Debug, S: 'static + Debug> ObserversTuple<S> for ObserversOwne
         &mut self,
         state: &mut S,
         input: &I,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         self.map
             .for_each_mut(&mut |_, ob| ob.post_exec(state, input, exit_kind))
@@ -92,7 +92,7 @@ impl<I: 'static + Debug, S: 'static + Debug> ObserversTuple<S> for ObserversOwne
         &mut self,
         state: &mut S,
         input: &I,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         self.map
             .for_each_mut(&mut |_, ob| ob.post_exec_child(state, input, exit_kind))

@@ -135,7 +135,7 @@ where
 
         executor
             .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+            .post_exec_all(state, &input, exit_kind)?;
 
         let map_first = &executor
             .observers()
@@ -182,7 +182,7 @@ where
 
             executor
                 .observers_mut()
-                .post_exec_all(state, &input, &exit_kind)?;
+                .post_exec_all(state, &input, exit_kind)?;
 
             if self.track_stability {
                 let map = &executor

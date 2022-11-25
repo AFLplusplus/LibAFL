@@ -131,7 +131,7 @@ where
         _manager: &mut EM,
         _input: &I,
         observers: &OT,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,
@@ -238,7 +238,7 @@ mod tests {
                     },
                     &BytesInput::new(vec![0]),
                     &observers,
-                    &ExitKind::Ok
+                    ExitKind::Ok
                 )
                 .unwrap()
         );

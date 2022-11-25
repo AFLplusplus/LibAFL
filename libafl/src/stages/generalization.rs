@@ -411,7 +411,7 @@ where
         start_timer!(state);
         executor
             .observers_mut()
-            .post_exec_all(state, input, &exit_kind)?;
+            .post_exec_all(state, input, exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         let cnt = executor

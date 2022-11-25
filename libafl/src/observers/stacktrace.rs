@@ -105,10 +105,10 @@ where
         &mut self,
         _state: &mut S,
         _input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::InProcess {
-            if exit_kind == &ExitKind::Crash {
+            if exit_kind == ExitKind::Crash {
                 self.update_hash(collect_backtrace());
             } else {
                 self.clear_hash();
@@ -121,10 +121,10 @@ where
         &mut self,
         _state: &mut S,
         _input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         if self.harness_type == HarnessType::Child {
-            if exit_kind == &ExitKind::Crash {
+            if exit_kind == ExitKind::Crash {
                 self.update_hash(collect_backtrace());
             } else {
                 self.clear_hash();
@@ -257,7 +257,7 @@ where
         &mut self,
         _state: &mut S,
         _input: &S::Input,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }

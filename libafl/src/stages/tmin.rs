@@ -117,11 +117,11 @@ where
                     manager,
                     input.clone(),
                     observers,
-                    &exit_kind,
+                    exit_kind,
                     false,
                 )?;
 
-                if feedback.is_interesting(state, manager, &input, observers, &exit_kind)? {
+                if feedback.is_interesting(state, manager, &input, observers, exit_kind)? {
                     // we found a reduced corpus entry! use the smaller base
                     base = input;
 
@@ -330,7 +330,7 @@ where
         _manager: &mut EM,
         _input: &<S as UsesInput>::Input,
         observers: &OT,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,

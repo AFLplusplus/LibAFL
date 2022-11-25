@@ -403,7 +403,7 @@ where
                 {
                     let observers: E::Observers =
                         postcard::from_bytes(observers_buf.as_ref().unwrap())?;
-                    fuzzer.process_execution(state, self, input, &observers, &exit_kind, false)?
+                    fuzzer.process_execution(state, self, input, &observers, exit_kind, false)?
                 } else {
                     fuzzer.evaluate_input_with_observers::<E, Self>(
                         state, executor, self, input, false,

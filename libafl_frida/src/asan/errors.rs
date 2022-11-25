@@ -627,7 +627,7 @@ where
         _manager: &mut EM,
         _input: &S::Input,
         observers: &OT,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,

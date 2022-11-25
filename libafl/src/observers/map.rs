@@ -1217,7 +1217,7 @@ where
         &mut self,
         state: &mut S,
         input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         let map = self.as_mut_slice();
         let len = map.len();
@@ -1457,7 +1457,7 @@ where
         &mut self,
         state: &mut S,
         input: &S::Input,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
     ) -> Result<(), Error> {
         for item in self.as_iter_mut() {
             *item = unsafe { *COUNT_CLASS_LOOKUP.get_unchecked((*item) as usize) };

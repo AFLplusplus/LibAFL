@@ -90,7 +90,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         observers: &OT,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
@@ -418,7 +418,7 @@ where
         manager: &mut EM,
         input: <CS::State as UsesInput>::Input,
         observers: &OT,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
         send_events: bool,
     ) -> Result<(ExecuteInputResult, Option<usize>), Error>
     where
@@ -506,7 +506,7 @@ where
         manager: &mut EM,
         input: <<CS as UsesState>::State as UsesInput>::Input,
         observers: &OT,
-        exit_kind: &ExitKind,
+        exit_kind: ExitKind,
         send_events: bool,
     ) -> Result<usize, Error>
     where
@@ -530,7 +530,7 @@ where
                 Event::NewTestcase {
                     input,
                     observers_buf,
-                    exit_kind: *exit_kind,
+                    exit_kind,
                     corpus_size: state.corpus().count(),
                     client_config: manager.configuration(),
                     time: current_time(),
@@ -566,7 +566,7 @@ where
     {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
-        self.process_execution(state, manager, input, observers, &exit_kind, send_events)
+        self.process_execution(state, manager, input, observers, exit_kind, send_events)
     }
 }
 
@@ -608,7 +608,7 @@ where
         // Not a solution
         self.objective_mut().discard_metadata(state, &input)?;
 
-        self.add_testcase(state, manager, input, observers, &exit_kind, true)
+        self.add_testcase(state, manager, input, observers, exit_kind, true)
     }
 }
 
@@ -794,7 +794,7 @@ where
         start_timer!(state);
         executor
             .observers_mut()
-            .post_exec_all(state, input, &exit_kind)?;
+            .post_exec_all(state, input, exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(exit_kind)

@@ -52,7 +52,7 @@ where
         _manager: &mut EM,
         input: &PacketData,
         _observers: &OT,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<bool, Error>
     where
         EM: EventFirer<State = S>,

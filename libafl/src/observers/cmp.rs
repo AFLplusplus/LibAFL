@@ -248,7 +248,7 @@ where
         &mut self,
         state: &mut S,
         _input: &S::Input,
-        _exit_kind: &ExitKind,
+        _exit_kind: ExitKind,
     ) -> Result<(), Error> {
         if self.add_meta {
             self.add_cmpvalues_meta(state);

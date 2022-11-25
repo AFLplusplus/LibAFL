@@ -630,12 +630,12 @@ mod unix_signal_handler {
                 let event_mgr = data.event_mgr_mut::<EM>();
 
                 observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
+                    .post_exec_all(state, input, ExitKind::Crash)
                     .expect("Observers post_exec_all failed");
 
                 let interesting = fuzzer
                     .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                    .is_interesting(state, event_mgr, input, observers, ExitKind::Crash)
                     .expect("In timeout handler objective failure.");
 
                 if interesting {
@@ -709,12 +709,12 @@ mod unix_signal_handler {
         let _res = stdout().flush();
 
         observers
-            .post_exec_all(state, input, &ExitKind::Timeout)
+            .post_exec_all(state, input, ExitKind::Timeout)
             .expect("Observers post_exec_all failed");
 
         let interesting = fuzzer
             .objective_mut()
-            .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+            .is_interesting(state, event_mgr, input, observers, ExitKind::Timeout)
             .expect("In timeout handler objective failure.");
 
         if interesting {
@@ -785,7 +785,7 @@ mod unix_signal_handler {
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
             observers
-                .post_exec_all(state, input, &ExitKind::Crash)
+                .post_exec_all(state, input, ExitKind::Crash)
                 .expect("Observers post_exec_all failed");
 
             #[cfg(feature = "std")]
@@ -802,7 +802,7 @@ mod unix_signal_handler {
 
             let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                .is_interesting(state, event_mgr, input, observers, ExitKind::Crash)
                 .expect("In crash handler objective failure.");
 
             if interesting {
@@ -983,12 +983,12 @@ mod windows_exception_handler {
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
                 observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
+                    .post_exec_all(state, input, ExitKind::Crash)
                     .expect("Observers post_exec_all failed");
 
                 let interesting = fuzzer
                     .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                    .is_interesting(state, event_mgr, input, observers, ExitKind::Crash)
                     .expect("In timeout handler objective failure.");
 
                 if interesting {
@@ -1073,12 +1073,12 @@ mod windows_exception_handler {
                 data.timeout_input_ptr = ptr::null_mut();
 
                 observers
-                    .post_exec_all(state, input, &ExitKind::Timeout)
+                    .post_exec_all(state, input, ExitKind::Timeout)
                     .expect("Observers post_exec_all failed");
 
                 let interesting = fuzzer
                     .objective_mut()
-                    .is_interesting(state, event_mgr, input, observers, &ExitKind::Timeout)
+                    .is_interesting(state, event_mgr, input, observers, ExitKind::Timeout)
                     .expect("In timeout handler objective failure.");
 
                 if interesting {
@@ -1221,12 +1221,12 @@ mod windows_exception_handler {
             drop(stdout().flush());
 
             observers
-                .post_exec_all(state, input, &ExitKind::Crash)
+                .post_exec_all(state, input, ExitKind::Crash)
                 .expect("Observers post_exec_all failed");
 
             let interesting = fuzzer
                 .objective_mut()
-                .is_interesting(state, event_mgr, input, observers, &ExitKind::Crash)
+                .is_interesting(state, event_mgr, input, observers, ExitKind::Crash)
                 .expect("In crash handler objective failure.");
 
             if interesting {
@@ -1559,7 +1559,7 @@ where
                     (self.harness_fn)(input);
 
                     self.observers
-                        .post_exec_child_all(state, input, &ExitKind::Ok)
+                        .post_exec_child_all(state, input, ExitKind::Ok)
                         .expect("Failed to run post_exec on observers");
 
                     std::process::exit(0);
@@ -1636,7 +1636,7 @@ where
                     (self.harness_fn)(input);
 
                     self.observers
-                        .post_exec_child_all(state, input, &ExitKind::Ok)
+                        .post_exec_child_all(state, input, ExitKind::Ok)
                         .expect("Failed to run post_exec on observers");
 
                     std::process::exit(0);
@@ -1880,7 +1880,7 @@ pub mod child_signal_handlers {
                 // Invalidate data to not execute again the observer hooks in the crash handler
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
                 observers
-                    .post_exec_child_all(state, input, &ExitKind::Crash)
+                    .post_exec_child_all(state, input, ExitKind::Crash)
                     .expect("Failed to run post_exec on observers");
 
                 // std::process::abort();
@@ -1909,7 +1909,7 @@ pub mod child_signal_handlers {
             let state = data.state_mut::<E::State>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
             observers
-                .post_exec_child_all(state, input, &ExitKind::Crash)
+                .post_exec_child_all(state, input, ExitKind::Crash)
                 .expect("Failed to run post_exec on observers");
         }
 
@@ -1931,7 +1931,7 @@ pub mod child_signal_handlers {
             let state = data.state_mut::<E::State>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
             observers
-                .post_exec_child_all(state, input, &ExitKind::Timeout)
+                .post_exec_child_all(state, input, ExitKind::Timeout)
                 .expect("Failed to run post_exec on observers");
         }
         libc::_exit(128 + (_signal as i32));

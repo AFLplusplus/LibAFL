@@ -73,7 +73,7 @@ where
         start_timer!(state);
         self.tracer_executor
             .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+            .post_exec_all(state, &input, exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(())
@@ -151,10 +151,10 @@ where
         start_timer!(state);
         executor
             .shadow_observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+            .post_exec_all(state, &input, exit_kind)?;
         executor
             .observers_mut()
-            .post_exec_all(state, &input, &exit_kind)?;
+            .post_exec_all(state, &input, exit_kind)?;
         mark_feature_time!(state, PerfFeature::PostExecObservers);
 
         Ok(())
