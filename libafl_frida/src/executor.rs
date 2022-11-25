@@ -15,7 +15,6 @@ use libafl::{
     inputs::{HasTargetBytes, UsesInput},
     observers::{ObserversTuple, UsesObservers},
     state::UsesState,
-    Error,
 };
 
 #[cfg(unix)]
