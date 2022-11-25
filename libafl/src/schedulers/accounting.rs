@@ -264,10 +264,7 @@ where
     /// Cull the `Corpus`
     #[allow(clippy::unused_self)]
     pub fn accounting_cull(&self, state: &mut CS::State) -> Result<(), Error> {
-        let top_rated = match state.metadata().get::<TopAccountingMetadata>() {
-            None => return Ok(()),
-            Some(val) => val,
-        };
+        let Some(top_rated) = state.metadata().get::<TopAccountingMetadata>() else { return Ok(()) };
 
         for (_key, idx) in &top_rated.map {
             let mut entry = state.corpus().get(*idx)?.borrow_mut();

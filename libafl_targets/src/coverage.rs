@@ -37,10 +37,6 @@ pub use __afl_acc_memop_ptr as ACCOUNTING_MEMOP_MAP_PTR;
 pub use __afl_area_ptr as EDGES_MAP_PTR;
 
 /// Return Tokens from the compile-time token section
-///
-/// # Safety
-///
-/// This fn is safe to call, as long as the compilation did not break, previously
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 pub fn autotokens() -> Result<Tokens, Error> {
     unsafe {

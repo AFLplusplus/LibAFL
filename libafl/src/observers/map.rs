@@ -548,7 +548,7 @@ where
 
     /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map.
     ///
-    /// # Safety
+    /// # Note
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
     pub fn new_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
@@ -594,7 +594,7 @@ where
 
     /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map in differential mode.
     ///
-    /// # Safety
+    /// # Note
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
     pub fn differential_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
