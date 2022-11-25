@@ -537,15 +537,6 @@ where
         Self::maybe_differential(name, map)
     }
 
-    /// Creates a new [`MapObserver`] with an owned map
-    #[must_use]
-    pub fn new_owned<S>(name: S, map: Vec<T>) -> Self
-    where
-        S: Into<String>,
-    {
-        Self::maybe_differential_owned(name, map)
-    }
-
     /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map.
     ///
     /// # Safety
@@ -570,6 +561,34 @@ where
     }
 }
 
+impl<T> StdMapObserver<'static, T, false>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`MapObserver`] with an owned map
+    #[must_use]
+    pub fn new_owned<S>(name: S, map: Vec<T>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_owned(name, map)
+    }
+}
+
+impl<T> StdMapObserver<'static, T, true>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
+{
+    /// Creates a new [`MapObserver`] with an owned map
+    #[must_use]
+    pub fn differential_owned<S>(name: S, map: Vec<T>) -> Self
+    where
+        S: Into<String>,
+    {
+        Self::maybe_differential_owned(name, map)
+    }
+}
+
 impl<'a, T> StdMapObserver<'a, T, true>
 where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
@@ -581,15 +600,6 @@ where
         S: Into<String>,
     {
         Self::maybe_differential(name, map)
-    }
-
-    /// Creates a new [`MapObserver`] with an owned map in differential mode
-    #[must_use]
-    pub fn differential_owned<S>(name: S, map: Vec<T>) -> Self
-    where
-        S: Into<String>,
-    {
-        Self::maybe_differential_owned(name, map)
     }
 
     /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map in differential mode.

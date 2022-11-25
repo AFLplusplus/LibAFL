@@ -12,7 +12,7 @@ use tokio::{
     runtime::Runtime,
     sync::{
         mpsc,
-        mpsc::{Receiver as MpscReceiver, Sender as MpscSender},
+        mpsc::{Receiver as MpscReceiver, Sender as MpscSender, UnboundedReceiver},
         oneshot,
         oneshot::{Sender as OneshotSender, Sender},
         Mutex,
@@ -108,7 +108,7 @@ where
     ) -> Result<Box<dyn DeferredExecutionResult<Self, EM, Z>>, Error>;
 }
 
-/// Bridge for interoperability from async => sync executors.
+/// Bridge for interoperability from async => sync executors, while still using async where possible.
 ///
 /// You should *almost always* prefer to use an asynchronous fuzzer pipeline and bridge
 /// sync => async instead. Asynchronous executors will likely prefer batch-oriented workloads than
@@ -181,6 +181,26 @@ where
         self.observers.as_mut().expect("No observers available.")
     }
 }
+
+/*
+ * TODO with specialisation: enable this
+impl<E, EM, Z> AsyncExecutor<EM, Z> for AsyncBridge<E, EM, Z>
+where
+    E: AsyncExecutor<EM, Z>,
+    EM: UsesState + Debug,
+    Z: UsesState<State = EM::State> + Debug + HasRuntime,
+{
+    fn start_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<Box<dyn DeferredExecutionResult<Self, EM, Z>>, Error> {
+        self.inner.start_target(fuzzer, state, mgr, input)
+    }
+}
+ */
 
 // blanket impl to allow all existing executors to be used as async executors by lazily computing
 // their result
@@ -317,7 +337,7 @@ where
     pub fn new(
         rt: &Runtime,
         tx: MpscSender<ChannelTask<EM::Input>>,
-        mut rx: MpscReceiver<ChannelResult<EM::Input, OT>>,
+        mut rx: UnboundedReceiver<ChannelResult<EM::Input, OT>>,
     ) -> Self {
         let tasks = Arc::new(Mutex::new(HashMap::new()));
         let cp = tasks.clone();

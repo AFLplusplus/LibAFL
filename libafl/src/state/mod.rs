@@ -1,6 +1,7 @@
 //! The fuzzer, and state are the core pieces of every good fuzzer
 
 use core::{fmt::Debug, marker::PhantomData, time::Duration};
+use std::prelude::v1::Vec;
 #[cfg(feature = "std")]
 use std::{
     fs,
@@ -23,7 +24,8 @@ use crate::{
     generators::Generator,
     inputs::{Input, UsesInput},
     monitors::ClientPerfMonitor,
-    Error,
+    observers::UsesObservers,
+    AsyncEvaluator, Error,
 };
 
 /// The maximum size of a testcase
@@ -545,6 +547,88 @@ where
         Z: Evaluator<E, EM, State = Self>,
     {
         self.generate_initial_internal(fuzzer, executor, generator, manager, num, false)
+    }
+
+    fn generate_initial_async_internal<G, E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        generator: &mut G,
+        manager: &mut EM,
+        num: usize,
+        forced: bool,
+    ) -> Result<(), Error>
+    where
+        E: UsesObservers<State = Self>,
+        EM: EventFirer<State = Self>,
+        G: Generator<<Self as UsesInput>::Input, Self>,
+        Z: AsyncEvaluator<E, EM, State = Self>,
+    {
+        let mut added = 0;
+        let mut deferred = Vec::with_capacity(num);
+        for _ in 0..num {
+            let input = generator.generate(self)?;
+            let current = fuzzer.start_evaluate_input(self, executor, manager, &input)?;
+            deferred.push((input, current));
+        }
+        for (input, current) in deferred {
+            if forced {
+                let _ =
+                    fuzzer.complete_evaluation_forced(self, executor, manager, input, current)?;
+                added += 1;
+            } else {
+                let (res, _, _) =
+                    fuzzer.complete_evaluation(self, executor, manager, input, current, true)?;
+                if res != ExecuteInputResult::None {
+                    added += 1;
+                }
+            }
+        }
+        manager.fire(
+            self,
+            Event::Log {
+                severity_level: LogSeverity::Debug,
+                message: format!("Loaded {added} over {num} initial testcases"),
+                phantom: PhantomData,
+            },
+        )?;
+        Ok(())
+    }
+
+    /// Generate `num` initial inputs, using the passed-in generator and force the addition to corpus.
+    pub fn generate_initial_inputs_async_forced<G, E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        generator: &mut G,
+        manager: &mut EM,
+        num: usize,
+    ) -> Result<(), Error>
+    where
+        E: UsesObservers<State = Self>,
+        EM: EventFirer<State = Self>,
+        G: Generator<<Self as UsesInput>::Input, Self>,
+        Z: AsyncEvaluator<E, EM, State = Self>,
+    {
+        self.generate_initial_async_internal(fuzzer, executor, generator, manager, num, true)
+    }
+
+    /// Generate `num` initial inputs, using the passed-in generator.
+    pub fn generate_initial_inputs_async<G, E, EM, Z>(
+        &mut self,
+        fuzzer: &mut Z,
+        executor: &mut E,
+        generator: &mut G,
+        manager: &mut EM,
+        num: usize,
+    ) -> Result<(), Error>
+    where
+        E: UsesObservers<State = Self>,
+        EM: EventFirer<State = Self>,
+        G: Generator<<Self as UsesInput>::Input, Self>,
+        Z: AsyncEvaluator<E, EM, State = Self>,
+    {
+        self.generate_initial_async_internal(fuzzer, executor, generator, manager, num, false)
     }
 
     /// Creates a new `State`, taking ownership of all of the individual components during fuzzing.

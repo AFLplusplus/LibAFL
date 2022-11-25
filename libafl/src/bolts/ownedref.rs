@@ -83,6 +83,8 @@ where
     }
 }
 
+unsafe impl<T> Send for OwnedRef<'static, T> where T: Send + 'static {}
+
 impl<'a, T> AsRef<T> for OwnedRef<'a, T>
 where
     T: Sized,
@@ -149,6 +151,8 @@ where
         Deserialize::deserialize(deserializer).map(OwnedRefMut::Owned)
     }
 }
+
+unsafe impl<T> Send for OwnedRefMut<'static, T> where T: Send + 'static {}
 
 impl<'a, T: Sized> AsRef<T> for OwnedRefMut<'a, T> {
     #[must_use]
@@ -228,6 +232,8 @@ where
         Deserialize::deserialize(deserializer).map(OwnedSliceInner::Owned)
     }
 }
+
+unsafe impl<T> Send for OwnedSliceInner<'static, T> where T: Send + 'static {}
 
 /// Wrap a slice and convert to a Vec on serialize.
 /// We use a hidden inner enum so the public API can be safe,
@@ -437,6 +443,8 @@ where
         Deserialize::deserialize(deserializer).map(OwnedSliceMutInner::Owned)
     }
 }
+
+unsafe impl<T> Send for OwnedSliceMutInner<'static, T> where T: Send + 'static {}
 
 /// Wrap a mutable slice and convert to a Vec on serialize
 #[allow(clippy::unsafe_derive_deserialize)]
