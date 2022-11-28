@@ -732,6 +732,7 @@ where
         None
     }
 }
+
 pub fn trace_read1_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,

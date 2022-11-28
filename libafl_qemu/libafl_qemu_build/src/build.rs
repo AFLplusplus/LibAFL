@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "82c6e1cc81a9b195b8327dff2a9039ec8fa5fa8f";
+const QEMU_REVISION: &str = "54e2c6f8bd02417ab102b485f1d0671726a29b1c";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -292,6 +292,7 @@ pub fn build(
     for dir in &[
         build_dir.join("libcommon.fa.p"),
         build_dir.join(format!("libqemu-{cpu_target}-{target_suffix}.fa.p")),
+        build_dir.join("libqemuutil.a")
     ] {
         for path in fs::read_dir(dir).unwrap() {
             let path = path.unwrap().path();
@@ -322,7 +323,7 @@ pub fn build(
             .arg(format!("{}/libqom.fa", build_dir.display()))
             .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
             .arg("--no-whole-archive")
-            .arg(format!("{}/libqemuutil.a", build_dir.display()))
+            //.arg(format!("{}/libqemuutil.a", build_dir.display()))
             .arg(format!("{}/libhwcore.fa", build_dir.display()))
             .arg(format!("{}/libqom.fa", build_dir.display()))
             .arg(format!(
@@ -352,7 +353,7 @@ pub fn build(
             .arg(format!("{}/libchardev.fa", build_dir.display()))
             .arg(format!("{}/libqmp.fa", build_dir.display()))
             .arg("--no-whole-archive")
-            .arg(format!("{}/libqemuutil.a", build_dir.display()))
+            //.arg(format!("{}/libqemuutil.a", build_dir.display()))
             .arg(format!(
                 "{}/subprojects/libvhost-user/libvhost-user-glib.a",
                 build_dir.display()

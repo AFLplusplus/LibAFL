@@ -275,7 +275,7 @@ extern "C" fn qemu_cleanup_atexit() {
 }
 
 extern "C" {
-    static libafl_page_size: GuestUsize;
+    //static libafl_page_size: GuestUsize;
     fn libafl_page_from_addr(addr: GuestAddr) -> GuestAddr;
 
     // CPUState* libafl_qemu_get_cpu(int cpu_index);
@@ -460,7 +460,7 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
 }
 
 #[derive(Debug)]
-#[repr(C)]
+#[repr(transparent)]
 pub struct CPU {
     ptr: CPUStatePtr,
 }
@@ -738,10 +738,10 @@ impl Emulator {
         unsafe { libafl_page_from_addr(addr) }
     }
 
-    #[must_use]
-    pub fn page_size() -> GuestUsize {
+    //#[must_use]
+    /*pub fn page_size() -> GuestUsize {
         unsafe { libafl_page_size }
-    }
+    }*/
 
     #[cfg(emulation_mode = "usermode")]
     #[must_use]
