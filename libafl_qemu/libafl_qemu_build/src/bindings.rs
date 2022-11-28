@@ -64,13 +64,17 @@ pub fn generate(
         .derive_default(true)
         .impl_debug(true)
         .generate_comments(true)
-        //.default_enum_style(bindgen::EnumVariation::NewType { is_bitfield: false })
+        .default_enum_style(bindgen::EnumVariation::NewType { is_global: true, is_bitfield: true })
         .header(wrapper_h.display().to_string())
         .clang_args(clang_args)
         .allowlist_type("CPUState")
         .allowlist_type("CPUArchState")
         .allowlist_type("RAMBlock")
+        .allowlist_type("qemu_plugin_hwaddr")
         .allowlist_type("qemu_plugin_meminfo_t")
+        .allowlist_type("qemu_plugin_mem_rw")
+        .allowlist_type("MemOpIdx")
+        .allowlist_type("MemOp")
         .allowlist_function("qemu_user_init")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
@@ -80,6 +84,7 @@ pub fn generate(
         .allowlist_function("cpu_reset")
         .allowlist_function("cpu_get_phys_page_attrs_debug")
         .allowlist_function("tlb_plugin_lookup")
+        .allowlist_function("qemu_plugin_hwaddr_phys_addr")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks));
 

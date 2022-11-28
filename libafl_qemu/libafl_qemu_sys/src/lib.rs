@@ -7,3 +7,21 @@
 
 #[cfg(not(feature = "clippy"))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+
+use core::ops::BitAnd;
+
+// from include/exec/memop.h
+
+pub fn memop_size(op: MemOp) -> u32 {
+    1 << op.bitand(MemOp_MO_SIZE).0
+}
+
+pub fn memop_big_endian(op: MemOp) -> bool {
+    op.bitand(MemOp_MO_BSWAP) == MemOp_MO_BE
+}
+
+// from include/qemu/plugin.h
+
+pub fn make_plugin_meminfo(oi: MemOpIdx, rw: qemu_plugin_mem_rw) -> qemu_plugin_meminfo_t {
+    oi | (rw.0 << 16)
+}

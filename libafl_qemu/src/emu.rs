@@ -20,6 +20,50 @@ pub type GuestAddr = libafl_qemu_sys::vaddr;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
 pub type GuestPhysAddr = libafl_qemu_sys::hwaddr;
 
+pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
+
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct MemAccessInfo {
+    oi: libafl_qemu_sys::MemOpIdx,
+}
+
+impl MemAccessInfo {
+    pub fn memop(&self) -> libafl_qemu_sys::MemOp {
+        libafl_qemu_sys::MemOp(self.oi >> 4)
+    }
+
+    pub fn memopidx(&self) -> libafl_qemu_sys::MemOpIdx {
+        self.oi
+    }
+
+    pub fn mmu_index(&self) -> u32 {
+        self.oi & 15
+    }
+
+    pub fn size(&self) -> usize {
+        libafl_qemu_sys::memop_size(self.memop()) as usize
+    }
+
+    pub fn is_big_endian(&self) -> bool {
+        libafl_qemu_sys::memop_big_endian(self.memop())
+    }
+
+    pub fn encode_with(&self, other: u32) -> u64 {
+        ((self.oi as u64) << 32) | other as u64
+    }
+
+    pub fn decode_from(encoded: u64) -> (Self, u32) {
+        let low = (encoded & 0xFFFFFFFF) as u32;
+        let high = (encoded >> 32) as u32;
+        (Self { oi: high }, low)
+    }
+
+    pub fn new(oi: libafl_qemu_sys::MemOpIdx) -> Self {
+        Self { oi }
+    }
+}
+
 #[cfg(feature = "python")]
 use pyo3::{prelude::*, PyIterProtocol};
 
@@ -285,7 +329,7 @@ extern "C" {
     //                      void (*exec_n)(uint64_t id, target_ulong addr, size_t size, uint64_t data),
     //                      uint64_t data);
     fn libafl_add_read_hook(
-        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        gen: Option<extern "C" fn(GuestAddr, MemAccessInfo, u64) -> u64>,
         exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
@@ -302,7 +346,7 @@ extern "C" {
     //                      void (*exec_n)(uint64_t id, target_ulong addr, size_t size, uint64_t data),
     //                      uint64_t data);
     fn libafl_add_write_hook(
-        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        gen: Option<extern "C" fn(GuestAddr, MemAccessInfo, u64) -> u64>,
         exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
@@ -468,13 +512,31 @@ impl CPU {
         }
     }
 
-    /*#[cfg(emulation_mode = "systemmode")]
+    #[cfg(emulation_mode = "systemmode")]
     #[must_use]
-    pub fn get_phys_addr_tlb(&self, vaddr: GuestAddr, mmu_idx: i32, is_store: bool) -> Option<GuestPhysAddr> {
+    pub fn get_phys_addr_tlb(
+        &self,
+        vaddr: GuestAddr,
+        info: MemAccessInfo,
+        is_store: bool,
+    ) -> Option<GuestPhysAddr> {
         unsafe {
-            // TODO
+            let pminfo = make_plugin_meminfo(
+                info.oi,
+                if is_store {
+                    libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_W
+                } else {
+                    libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_R
+                },
+            );
+            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr);
+            if phwaddr.is_null() {
+                None
+            } else {
+                Some(libafl_qemu_sys::qemu_plugin_hwaddr_phys_addr(phwaddr) as GuestPhysAddr)
+            }
         }
-    }*/
+    }
 
     // TODO expose tlb_set_dirty and tlb_reset_dirty
 
@@ -915,10 +977,9 @@ impl Emulator {
         unsafe { libafl_add_block_hook(gen, exec, data) }
     }
 
-    // TODO add MemOp info
     pub fn add_read_hooks(
         &self,
-        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        gen: Option<extern "C" fn(GuestAddr, MemAccessInfo, u64) -> u64>,
         exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
@@ -932,7 +993,7 @@ impl Emulator {
     // TODO add MemOp info
     pub fn add_write_hooks(
         &self,
-        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        gen: Option<extern "C" fn(GuestAddr, MemAccessInfo, u64) -> u64>,
         exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
