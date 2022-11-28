@@ -5,4 +5,5 @@
 #![allow(unused_mut)]
 #![allow(clippy::all)]
 
+#[cfg(not(feature = "clippy"))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));

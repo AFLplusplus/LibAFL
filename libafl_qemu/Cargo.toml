@@ -28,7 +28,7 @@ systemmode = ["libafl_qemu_sys/systemmode"]
 
 slirp = [ "systemmode", "libafl_qemu_sys/slirp" ] # build qemu with host libslirp (for user networking)
 
-clippy = ["libafl_qemu_sys/clippy"] # special feature for clippy, don't use in normal projects§
+clippy = [] # special feature for clippy, don't use in normal projects§
 
 [dependencies]
 libafl = { path = "../libafl", version = "0.8.2", default-features = false, features = ["std", "derive", "llmp_compression"] }
