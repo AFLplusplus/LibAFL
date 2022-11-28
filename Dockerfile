@@ -39,6 +39,12 @@ COPY libafl_frida/src/gettls.c libafl_frida/src/gettls.c
 COPY libafl_qemu/Cargo.toml libafl_qemu/build.rs libafl_qemu/
 COPY scripts/dummy.rs libafl_qemu/src/lib.rs
 
+COPY libafl_qemu/libafl_qemu_build/Cargo.toml libafl_qemu/libafl_qemu_build/build.rs libafl_qemu/libafl_qemu_build/
+COPY scripts/dummy.rs libafl_qemu/libafl_qemu_build/src/lib.rs
+
+COPY libafl_qemu/libafl_qemu_sys/Cargo.toml libafl_qemu/libafl_qemu_sys/build.rs libafl_qemu/libafl_qemu_sys/
+COPY scripts/dummy.rs libafl_qemu/libafl_qemu_sys/src/lib.rs
+
 COPY libafl_sugar/Cargo.toml libafl_sugar/
 COPY scripts/dummy.rs libafl_sugar/src/lib.rs
 
@@ -91,6 +97,10 @@ RUN touch libafl/src/lib.rs
 COPY libafl_targets/src libafl_targets/src
 RUN touch libafl_targets/src/lib.rs
 COPY libafl_frida/src libafl_frida/src
+RUN touch libafl_qemu/libafl_qemu_build/src/lib.rs
+COPY libafl_qemu/libafl_qemu_build/src libafl_qemu/libafl_qemu_build/src
+RUN touch libafl_qemu/libafl_qemu_sys/src/lib.rs
+COPY libafl_qemu/libafl_qemu_sys/src libafl_qemu/libafl_qemu_sys/src
 RUN touch libafl_qemu/src/lib.rs
 COPY libafl_qemu/src libafl_qemu/src
 RUN touch libafl_frida/src/lib.rs
