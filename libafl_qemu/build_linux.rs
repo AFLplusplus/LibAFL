@@ -470,6 +470,8 @@ pub fn build() {
     println!("cargo:rustc-link-lib=z");
     #[cfg(all(feature = "slirp", feature = "systemmode"))]
     println!("cargo:rustc-link-lib=slirp");
+    #[cfg(all(feature = "systemmode"))]
+    println!("cargo:rustc-link-lib=sndio");
 
     if emulation_mode == "systemmode" {
         println!("cargo:rustc-link-lib=pixman-1");
