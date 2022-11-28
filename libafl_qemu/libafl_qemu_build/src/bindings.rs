@@ -64,7 +64,10 @@ pub fn generate(
         .derive_default(true)
         .impl_debug(true)
         .generate_comments(true)
-        .default_enum_style(bindgen::EnumVariation::NewType { is_global: true, is_bitfield: true })
+        .default_enum_style(bindgen::EnumVariation::NewType {
+            is_global: true,
+            is_bitfield: true,
+        })
         .header(wrapper_h.display().to_string())
         .clang_args(clang_args)
         .allowlist_type("CPUState")
