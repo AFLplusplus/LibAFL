@@ -292,7 +292,6 @@ pub fn build(
     for dir in &[
         build_dir.join("libcommon.fa.p"),
         build_dir.join(format!("libqemu-{cpu_target}-{target_suffix}.fa.p")),
-        build_dir.join("libqemuutil.a")
     ] {
         for path in fs::read_dir(dir).unwrap() {
             let path = path.unwrap().path();
@@ -323,7 +322,7 @@ pub fn build(
             .arg(format!("{}/libqom.fa", build_dir.display()))
             .arg(format!("{}/libevent-loop-base.a", build_dir.display()))
             .arg("--no-whole-archive")
-            //.arg(format!("{}/libqemuutil.a", build_dir.display()))
+            .arg(format!("{}/libqemuutil.a", build_dir.display()))
             .arg(format!("{}/libhwcore.fa", build_dir.display()))
             .arg(format!("{}/libqom.fa", build_dir.display()))
             .arg(format!(
@@ -353,7 +352,7 @@ pub fn build(
             .arg(format!("{}/libchardev.fa", build_dir.display()))
             .arg(format!("{}/libqmp.fa", build_dir.display()))
             .arg("--no-whole-archive")
-            //.arg(format!("{}/libqemuutil.a", build_dir.display()))
+            .arg(format!("{}/libqemuutil.a", build_dir.display()))
             .arg(format!(
                 "{}/subprojects/libvhost-user/libvhost-user-glib.a",
                 build_dir.display()
