@@ -199,6 +199,7 @@ pub fn build(
                 .arg("--disable-libdaxctl")
                 .arg("--disable-libiscsi")
                 .arg("--disable-libnfs")
+                .arg("--disable-libsndio")
                 .arg("--disable-libpmem")
                 .arg("--disable-libssh")
                 .arg("--disable-libudev")

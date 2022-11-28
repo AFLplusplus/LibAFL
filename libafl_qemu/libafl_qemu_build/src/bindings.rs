@@ -70,6 +70,7 @@ pub fn generate(
         .allowlist_type("CPUState")
         .allowlist_type("CPUArchState")
         .allowlist_type("RAMBlock")
+        .allowlist_type("qemu_plugin_meminfo_t")
         .allowlist_function("qemu_user_init")
         .allowlist_function("target_mmap")
         .allowlist_function("target_mprotect")
