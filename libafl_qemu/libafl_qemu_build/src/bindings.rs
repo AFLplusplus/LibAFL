@@ -101,6 +101,7 @@ pub fn generate(
         .allowlist_function("cpu_get_phys_page_attrs_debug")
         .allowlist_function("tlb_plugin_lookup")
         .allowlist_function("qemu_plugin_hwaddr_phys_addr")
+        .allowlist_function("qemu_plugin_get_hwaddr")
         .blocklist_function("main_loop_wait") // bindgen issue #1313
         .parse_callbacks(Box::new(bindgen::CargoCallbacks));
 

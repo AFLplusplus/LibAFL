@@ -529,7 +529,7 @@ impl CPU {
         is_store: bool,
     ) -> Option<GuestPhysAddr> {
         unsafe {
-            let pminfo = make_plugin_meminfo(
+            let pminfo = libafl_qemu_sys::make_plugin_meminfo(
                 info.oi,
                 if is_store {
                     libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_W
