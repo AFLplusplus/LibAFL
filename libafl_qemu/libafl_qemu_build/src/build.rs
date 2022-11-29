@@ -52,8 +52,6 @@ pub fn build(
     target_dir.pop();
     target_dir.pop();
 
-    println!("cargo:rerun-if-changed=libqasan");
-
     build_dep_check(&["git", "make"]);
 
     let qemu_path = if let Some(qemu_dir) = custum_qemu_dir.as_ref() {
@@ -418,31 +416,6 @@ pub fn build(
             }
         }
     }
-
-    /*if is_usermode {
-        let qasan_dir = Path::new("libqasan");
-        let qasan_dir = fs::canonicalize(qasan_dir).unwrap();
-
-        assert!(Command::new("make")
-            .current_dir(out_dir_path)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .arg("clean")
-            .status()
-            .expect("make failed")
-            .success());
-        assert!(Command::new("make")
-            .current_dir(out_dir_path)
-            .env("CC", &cross_cc)
-            .env("OUT_DIR", &target_dir)
-            .arg("-C")
-            .arg(&qasan_dir)
-            .status()
-            .expect("make failed")
-            .success());
-    }*/
 
     (qemu_path, build_dir)
 }

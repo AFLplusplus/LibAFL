@@ -3,6 +3,20 @@ use std::{fs, path::Path};
 use bindgen::{BindgenError, Bindings};
 
 const WRAPPER_HEADER: &str = r#"
+
+// QEMU_BUILD_BUG* cause an infinite recursion in bindgen when target is arm
+#include "qemu/compiler.h"
+
+#undef QEMU_BUILD_BUG_MSG
+#undef QEMU_BUILD_BUG_ON_STRUCT
+#undef QEMU_BUILD_BUG_ON
+#undef QEMU_BUILD_BUG_ON_ZERO
+
+#define QEMU_BUILD_BUG_MSG(x, msg) 
+#define QEMU_BUILD_BUG_ON_STRUCT(x)
+#define QEMU_BUILD_BUG_ON(x) 
+#define QEMU_BUILD_BUG_ON_ZERO(x) 
+
 #include "qemu/osdep.h"
 #include "qapi/error.h"
 
@@ -10,7 +24,6 @@ const WRAPPER_HEADER: &str = r#"
 #include "hw/qdev-core.h"
 #include "hw/qdev-properties.h"
 #include "qemu/error-report.h"
-#include "migration/vmstate.h"
 
 #ifdef CONFIG_USER_ONLY
 
@@ -26,21 +39,21 @@ const WRAPPER_HEADER: &str = r#"
 
 #else
 
+#include "migration/vmstate.h"
 #include "hw/core/sysemu-cpu-ops.h"
 #include "exec/address-spaces.h"
+#include "sysemu/tcg.h"
+#include "sysemu/replay.h"
 
 #endif
 
-#include "sysemu/tcg.h"
-#include "sysemu/kvm.h"
-#include "sysemu/replay.h"
 #include "exec/cpu-common.h"
 #include "exec/exec-all.h"
 #include "exec/translate-all.h"
 #include "exec/log.h"
-#include "hw/core/accel-cpu.h"
 #include "trace/trace-root.h"
 #include "qemu/accel.h"
+#include "hw/core/accel-cpu.h"
 
 #include "tcg/tcg.h"
 #include "tcg/tcg-op.h"
@@ -96,7 +109,7 @@ pub fn generate(
         bindings
             .allowlist_type("CPUX86State")
             .allowlist_type("X86CPU")
-    } else if cpu_target == "arm" {
+    } else if cpu_target == "arssssm" {
         bindings
             .allowlist_type("ARMCPU")
             .allowlist_type("ARMv7MState")
