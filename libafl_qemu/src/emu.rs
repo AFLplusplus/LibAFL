@@ -29,36 +29,44 @@ pub struct MemAccessInfo {
 }
 
 impl MemAccessInfo {
+    #[must_use]
     pub fn memop(&self) -> libafl_qemu_sys::MemOp {
         libafl_qemu_sys::MemOp(self.oi >> 4)
     }
 
+    #[must_use]
     pub fn memopidx(&self) -> libafl_qemu_sys::MemOpIdx {
         self.oi
     }
 
+    #[must_use]
     pub fn mmu_index(&self) -> u32 {
         self.oi & 15
     }
 
+    #[must_use]
     pub fn size(&self) -> usize {
         libafl_qemu_sys::memop_size(self.memop()) as usize
     }
 
+    #[must_use]
     pub fn is_big_endian(&self) -> bool {
         libafl_qemu_sys::memop_big_endian(self.memop())
     }
 
+    #[must_use]
     pub fn encode_with(&self, other: u32) -> u64 {
-        ((self.oi as u64) << 32) | other as u64
+        (u64::from(self.oi) << 32) | u64::from(other)
     }
 
+    #[must_use]
     pub fn decode_from(encoded: u64) -> (Self, u32) {
         let low = (encoded & 0xFFFFFFFF) as u32;
         let high = (encoded >> 32) as u32;
         (Self { oi: high }, low)
     }
 
+    #[must_use]
     pub fn new(oi: libafl_qemu_sys::MemOpIdx) -> Self {
         Self { oi }
     }
@@ -639,6 +647,7 @@ impl CPU {
         }
     }
 
+    #[must_use]
     pub fn raw_ptr(&self) -> CPUStatePtr {
         self.ptr
     }
@@ -887,6 +896,7 @@ impl Emulator {
     }
 
     #[cfg(emulation_mode = "usermode")]
+    #[allow(clippy::cast_sign_loss)]
     fn mmap(
         &self,
         addr: GuestAddr,
