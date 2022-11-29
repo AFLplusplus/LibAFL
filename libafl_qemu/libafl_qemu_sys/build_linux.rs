@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{env, fs::copy, path::PathBuf};
 
 use libafl_qemu_build::build_with_bindings;
 
@@ -68,15 +68,15 @@ pub fn build() {
         .ok()
         .map(|x| str::parse::<u32>(&x).expect("The number of jobs is not a valid integer!"));
 
-    if std::env::var("DOCS_RS").is_ok() {
-        // Only build when we're not generating docs
-        // TODO By default provide x86_64 bindings in the repo
-        return;
-    }
-
     let out_dir = env::var("OUT_DIR").unwrap();
     let out_dir = PathBuf::from(out_dir);
     let bindings_file = out_dir.join("bindings.rs");
+
+    if std::env::var("DOCS_RS").is_ok() || cfg!(feature = "clippy") {
+        // Only build when we're not generating docs and not in clippy
+        copy("src/x86_64_stub_bindings.rs", bindings_file).expect("Failed to copy the bindings stub");
+        return;
+    }
 
     build_with_bindings(
         &cpu_target,
