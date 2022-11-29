@@ -6,15 +6,16 @@
 #![allow(clippy::all)]
 #![allow(clippy::pedantic)]
 
-#[cfg(not(feature = "clippy"))]
+#[cfg(all(not(feature = "clippy"), target_os = "linux"))]
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-#[cfg(feature = "clippy")]
+#[cfg(all(feature = "clippy", target_os = "linux"))]
 mod x86_64_stub_bindings;
+
 #[cfg(target_os = "linux")]
 use core::ops::BitAnd;
 
-#[cfg(feature = "clippy")]
+#[cfg(all(feature = "clippy", target_os = "linux"))]
 pub use x86_64_stub_bindings::*;
 
 // from include/exec/memop.h
