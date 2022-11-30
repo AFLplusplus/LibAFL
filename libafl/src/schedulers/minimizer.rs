@@ -94,6 +94,7 @@ where
         idx: usize,
         testcase: &Testcase<<CS::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
+        self.update_score(state, idx)?;
         self.base.on_replace(state, idx, testcase)
     }
 
