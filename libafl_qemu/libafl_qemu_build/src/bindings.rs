@@ -83,6 +83,8 @@ pub fn generate(
         })
         .header(wrapper_h.display().to_string())
         .clang_args(clang_args)
+        .allowlist_type("target_ulong")
+        .allowlist_type("target_long")
         .allowlist_type("CPUState")
         .allowlist_type("CPUArchState")
         .allowlist_type("RAMBlock")

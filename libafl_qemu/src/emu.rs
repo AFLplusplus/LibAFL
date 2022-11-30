@@ -16,8 +16,10 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
 use strum_macros::EnumIter;
 
-pub type GuestAddr = libafl_qemu_sys::vaddr;
+pub type GuestAddr = libafl_qemu_sys::target_ulong;
 pub type GuestUsize = libafl_qemu_sys::target_ulong;
+pub type GuestIsize = libafl_qemu_sys::target_long;
+pub type GuestVirtAddr = libafl_qemu_sys::hwaddr;
 pub type GuestPhysAddr = libafl_qemu_sys::hwaddr;
 
 pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
@@ -510,8 +512,11 @@ impl CPU {
         unsafe {
             let page = libafl_page_from_addr(vaddr);
             let mut attrs = MaybeUninit::<libafl_qemu_sys::MemTxAttrs>::uninit();
-            let paddr =
-                libafl_qemu_sys::cpu_get_phys_page_attrs_debug(self.ptr, page, attrs.as_mut_ptr());
+            let paddr = libafl_qemu_sys::cpu_get_phys_page_attrs_debug(
+                self.ptr,
+                page as GuestVirtAddr,
+                attrs.as_mut_ptr(),
+            );
             if paddr == (-1i64 as GuestPhysAddr) {
                 None
             } else {
@@ -537,7 +542,7 @@ impl CPU {
                     libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_R
                 },
             );
-            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr);
+            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr as GuestVirtAddr);
             if phwaddr.is_null() {
                 None
             } else {
@@ -564,7 +569,7 @@ impl CPU {
         #[cfg(emulation_mode = "systemmode")]
         libafl_qemu_sys::cpu_memory_rw_debug(
             self.ptr,
-            addr,
+            addr as GuestVirtAddr,
             buf.as_ptr() as *mut _,
             buf.len(),
             true,
@@ -587,7 +592,7 @@ impl CPU {
         #[cfg(emulation_mode = "systemmode")]
         libafl_qemu_sys::cpu_memory_rw_debug(
             self.ptr,
-            addr,
+            addr as GuestVirtAddr,
             buf.as_mut_ptr() as *mut _,
             buf.len(),
             false,
@@ -905,7 +910,7 @@ impl Emulator {
         flags: c_int,
     ) -> Result<GuestAddr, ()> {
         let res = unsafe {
-            libafl_qemu_sys::target_mmap(addr.into(), size as u64, perms.into(), flags, -1, 0)
+            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, -1, 0)
         };
         if res <= 0 {
             Err(())
@@ -945,8 +950,9 @@ impl Emulator {
 
     #[cfg(emulation_mode = "usermode")]
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
-        let res =
-            unsafe { libafl_qemu_sys::target_mprotect(addr.into(), size as u64, perms.into()) };
+        let res = unsafe {
+            libafl_qemu_sys::target_mprotect(addr.into(), size as GuestUsize, perms.into())
+        };
         if res == 0 {
             Ok(())
         } else {
@@ -956,7 +962,7 @@ impl Emulator {
 
     #[cfg(emulation_mode = "usermode")]
     pub fn unmap(&self, addr: GuestAddr, size: usize) -> Result<(), String> {
-        if unsafe { libafl_qemu_sys::target_munmap(addr.into(), size as u64) } == 0 {
+        if unsafe { libafl_qemu_sys::target_munmap(addr.into(), size as GuestUsize) } == 0 {
             Ok(())
         } else {
             Err(format!("Failed to unmap {addr}"))
