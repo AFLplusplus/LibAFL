@@ -2111,7 +2111,7 @@ where
                                 );
                                 continue;
                             }
-        
+
                             #[cfg(all(feature = "llmp_debug", feature = "std"))]
                             println!(
                                 "Fowarding message ({} bytes) via broker2broker connection",
@@ -2135,7 +2135,7 @@ where
                             println!("Local broker is shutting down, exiting thread");
                             return;
                         }
-                        Err(e) => panic!("Error reading from local page! {}", e)
+                        Err(e) => panic!("Error reading from local page! {}", e),
                     }
                 }
 
@@ -2160,13 +2160,20 @@ where
                         // TODO: Could probably optimize this somehow to forward all queued messages between locks... oh well.
                         // Todo: somehow mangle in the other broker id? ClientId?
                         new_sender
-                            .send_buf_with_flags(msg.tag, msg.flags | LLMP_FLAG_FROM_B2B, &msg.payload)
+                            .send_buf_with_flags(
+                                msg.tag,
+                                msg.flags | LLMP_FLAG_FROM_B2B,
+                                &msg.payload,
+                            )
                             .expect("B2B: Error forwarding message. Exiting.");
                     }
                     Err(e) => {
                         if let Error::File(e, _) = e {
                             if e.kind() == ErrorKind::UnexpectedEof {
-                                println!("Broker {} seems to have disconnected, exiting", peer_address);
+                                println!(
+                                    "Broker {} seems to have disconnected, exiting",
+                                    peer_address
+                                );
                                 return;
                             }
                         }
