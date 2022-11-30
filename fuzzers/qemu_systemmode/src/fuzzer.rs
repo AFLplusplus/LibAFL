@@ -31,8 +31,8 @@ use libafl::{
     //prelude::{SimpleMonitor, SimpleEventManager},
 };
 use libafl_qemu::{
-    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu::Emulator, QemuExecutor, QemuHooks,
-    Regs,
+    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu::Emulator, GuestPhysAddr, QemuExecutor,
+    QemuHooks, Regs,
 };
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
@@ -60,7 +60,7 @@ pub fn fuzz() {
             &env::var("FUZZ_INPUT").unwrap_or_else(|_| "FUZZ_INPUT".to_owned()),
             0,
         )
-        .expect("Symbol or env FUZZ_INPUT not found");
+        .expect("Symbol or env FUZZ_INPUT not found") as GuestPhysAddr;
     println!("FUZZ_INPUT @ {:#x}", input_addr);
 
     let main_addr = elf
