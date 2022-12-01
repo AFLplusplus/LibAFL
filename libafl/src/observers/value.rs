@@ -49,10 +49,10 @@ where
     /// ```
     /// # use libafl::observers::value::ValueObserver;
     /// let mut obs = ValueObserver::new("example", &2);
-    /// assert_eq!(&2, obs.borrow());
+    /// assert_eq!(&2, obs.get_ref());
     /// ```
     #[must_use]
-    pub fn borrow(&self) -> &T {
+    pub fn get_ref(&self) -> &T {
         self.value.as_ref()
     }
 
@@ -75,6 +75,7 @@ where
     /// let mut obs = ValueObserver::new("example", &2);
     /// assert_eq!(2, obs.take());
     /// ```
+    #[must_use]
     pub fn take(self) -> T
     where
         T: Clone,
