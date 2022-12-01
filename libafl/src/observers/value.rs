@@ -45,17 +45,36 @@ where
     }
 
     /// Get a reference to the underlying value.
+    ///
+    /// ```
+    /// # use libafl::observers::value::ValueObserver;
+    /// let mut obs = ValueObserver::new("example", &2);
+    /// assert_eq!(&2, obs.borrow());
+    /// ```
     #[must_use]
     pub fn borrow(&self) -> &T {
         self.value.as_ref()
     }
 
     /// Set the value.
+    ///
+    /// ```
+    /// # use libafl::observers::value::ValueObserver;
+    /// let mut obs = ValueObserver::new("example", &2);
+    /// obs.set(3);
+    /// assert_eq!(3, obs.take());
+    /// ```
     pub fn set(&mut self, new_value: T) {
         self.value = OwnedRef::Owned(Box::new(new_value));
     }
 
     /// Clone or move the current value out of this object.
+    ///
+    /// ```
+    /// # use libafl::observers::value::ValueObserver;
+    /// let mut obs = ValueObserver::new("example", &2);
+    /// assert_eq!(2, obs.take());
+    /// ```
     pub fn take(self) -> T
     where
         T: Clone,
