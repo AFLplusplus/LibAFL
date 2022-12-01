@@ -1,83 +1,85 @@
 //! A simple observer with a single value.
 
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use core::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::tuples::Named, inputs::UsesInput, Error};
+use crate::{
+    bolts::{ownedref::OwnedRef, tuples::Named},
+    inputs::UsesInput,
+    Error,
+};
 
 use super::Observer;
 
 /// A simple observer with a single value.
 ///
 /// The intent is that the value is something with interior mutability (e.g., a
-/// `RefCell`), which the target could write to even though this observer owns
-/// it.
+/// `RefCell`), which the target could write to even though this observer has a
+/// reference to it.
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(bound = "T: serde::de::DeserializeOwned")]
-pub struct ValueObserver<T>
+pub struct ValueObserver<'a, T>
 where
     T: Debug + Serialize,
 {
     /// The name of this observer.
     name: String,
     /// The value.
-    pub value: T,
+    pub value: OwnedRef<'a, T>,
 }
 
-impl<T> ValueObserver<T>
+impl<'a, T> ValueObserver<'a, T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`ValueObserver`] with the given name.
     #[must_use]
-    pub fn new(name: &'static str, value: T) -> Self {
+    pub fn new(name: &'static str, value: &'a T) -> Self {
         Self {
             name: name.to_string(),
-            value,
+            value: OwnedRef::Ref(value),
         }
     }
 
     /// Get a reference to the underlying value.
     #[must_use]
-    pub fn get_ref(&self) -> &T {
-        &self.value
+    pub fn borrow(&self) -> &T {
+        self.value.as_ref()
     }
 
-    /// Get a mutable reference to the underlying value.
-    #[must_use]
-    pub fn get_ref_mut(&mut self) -> &mut T {
-        &mut self.value
+    /// Set the value.
+    pub fn set(&mut self, new_value: T) {
+        self.value = OwnedRef::Owned(Box::new(new_value));
     }
 
-    /// Replace the value, return the old one.
-    pub fn replace(&mut self, new_value: T) -> T {
-        core::mem::replace(&mut self.value, new_value)
-    }
-
-    /// Replace the value with a default, return the old one.
-    pub fn take(&mut self) -> T
+    /// Clone or move the current value out of this object.
+    pub fn take(self) -> T
     where
-        T: core::default::Default,
+        T: Clone,
     {
-        self.replace(<T as Default>::default())
+        match self.value {
+            OwnedRef::Ref(r) => r.clone(),
+            OwnedRef::Owned(v) => *v,
+        }
     }
 }
 
 /// Resets the value to its default before each execution.
-impl<'a, S, T> Observer<S> for ValueObserver<T>
+impl<'a, S, T> Observer<S> for ValueObserver<'a, T>
 where
     S: UsesInput,
     T: Debug + Default + Serialize + serde::de::DeserializeOwned,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        self.value = <T as Default>::default();
+        self.set(<T as Default>::default());
         Ok(())
     }
 }
 
-impl<'a, T> Named for ValueObserver<T>
+impl<'a, T> Named for ValueObserver<'a, T>
 where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
