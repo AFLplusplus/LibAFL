@@ -67,14 +67,13 @@ where
     }
 }
 
-/// Resets the value to its default before each execution.
+/// This *does not* reset the value inside the observer.
 impl<'a, S, T> Observer<S> for ValueObserver<'a, T>
 where
     S: UsesInput,
-    T: Debug + Default + Serialize + serde::de::DeserializeOwned,
+    T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        self.set(<T as Default>::default());
         Ok(())
     }
 }
