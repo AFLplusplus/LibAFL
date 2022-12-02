@@ -99,6 +99,10 @@ pub fn fuzz() {
         //    saved_regs.push(emu.cpu_from_index(0).read_reg(r).unwrap());
         //}
 
+        let saved_cpu_states: Vec<_> = (0..emu.num_cpus())
+            .map(|i| emu.cpu_from_index(i).save_state())
+            .collect();
+
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
             let target = input.target_bytes();
@@ -129,7 +133,11 @@ pub fn fuzz() {
                     None => ExitKind::Crash,
                 };
 
-                emu.load_snapshot("start", true);
+                for (i, s) in saved_cpu_states.iter().enumerate() {
+                    emu.cpu_from_index(i).restore_state(s);
+                }
+
+                // emu.load_snapshot("start", true);
 
                 ret
             }

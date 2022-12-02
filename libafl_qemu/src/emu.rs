@@ -1,13 +1,14 @@
 //! Expose QEMU user `LibAFL` C api to Rust
 
+use core::mem::MaybeUninit;
 use core::{
     convert::Into,
     ffi::c_void,
-    ptr::{addr_of, addr_of_mut, null},
+    ptr::{addr_of, copy_nonoverlapping, null},
 };
-#[cfg(emulation_mode = "usermode")]
-use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
-use std::{ffi::CString, slice::from_raw_parts, str::from_utf8_unchecked};
+#[cfg(emulation_mode = "systemmode")]
+use std::ffi::CString;
+use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
 use libc::c_int;
@@ -30,7 +31,8 @@ use pyo3::{prelude::*, PyIterProtocol};
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
-type CPUStatePtr = *const c_void;
+type CPUStatePtr = *mut c_void;
+type CPUArchStatePtr = *mut c_void;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
@@ -254,6 +256,8 @@ extern "C" fn qemu_cleanup_atexit() {
 }
 
 extern "C" {
+    fn libafl_qemu_arch_state_size() -> usize;
+
     // CPUState* libafl_qemu_get_cpu(int cpu_index);
     fn libafl_qemu_get_cpu(cpu_index: i32) -> CPUStatePtr;
     // int libafl_qemu_num_cpus(void);
@@ -356,6 +360,9 @@ extern "C" {
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
 
+    fn libafl_qemu_cpu_arch_state(cpu: CPUStatePtr) -> CPUArchStatePtr;
+    // fn libafl_qemu_arch_state_cpu(env: CPUArchStatePtr) -> CPUStatePtr;
+
     fn cpu_reset(cpu: CPUStatePtr);
 }
 
@@ -437,6 +444,26 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
     }
 }
 
+#[derive(Clone, Debug)]
+#[repr(C)]
+pub struct SavedCPUState {
+    data: Vec<u8>,
+}
+
+impl SavedCPUState {
+    #[must_use]
+    #[allow(clippy::uninit_vec)]
+    fn uninit() -> Self {
+        unsafe {
+            let len = libafl_qemu_arch_state_size();
+            let mut data = Vec::with_capacity(len);
+            data.set_len(len);
+
+            Self { data }
+        }
+    }
+}
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct CPU {
@@ -513,7 +540,6 @@ impl CPU {
 
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
-        T: Num + PartialOrd + Copy,
         R: Into<i32>,
     {
         let reg = reg.into();
@@ -527,21 +553,45 @@ impl CPU {
 
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
-        T: Num + PartialOrd + Copy,
         R: Into<i32>,
     {
-        let reg = reg.into();
-        let mut val = T::zero();
-        let success = unsafe { libafl_qemu_read_reg(self.ptr, reg, addr_of_mut!(val) as *mut u8) };
-        if success == 0 {
-            Err(format!("Failed to read register {reg}"))
-        } else {
-            Ok(val)
+        unsafe {
+            let reg = reg.into();
+            let mut val = MaybeUninit::uninit();
+            let success = libafl_qemu_read_reg(self.ptr, reg, val.as_mut_ptr() as *mut u8);
+            if success == 0 {
+                Err(format!("Failed to read register {reg}"))
+            } else {
+                Ok(val.assume_init())
+            }
         }
     }
 
-    pub fn cpu_reset(&self) {
+    pub fn reset(&self) {
         unsafe { cpu_reset(self.ptr) };
+    }
+
+    #[must_use]
+    pub fn save_state(&self) -> SavedCPUState {
+        let mut saved = SavedCPUState::uninit();
+        unsafe {
+            copy_nonoverlapping(
+                libafl_qemu_cpu_arch_state(self.ptr) as *mut u8,
+                saved.data.as_mut_ptr(),
+                saved.data.len(),
+            );
+        }
+        saved
+    }
+
+    pub fn restore_state(&self, saved: &SavedCPUState) {
+        unsafe {
+            copy_nonoverlapping(
+                saved.data.as_ptr(),
+                libafl_qemu_cpu_arch_state(self.ptr) as *mut u8,
+                saved.data.len(),
+            );
+        }
     }
 }
 
@@ -744,12 +794,6 @@ impl Emulator {
     #[must_use]
     pub fn load_addr(&self) -> GuestAddr {
         unsafe { libafl_load_addr() as GuestAddr }
-    }
-    #[cfg(emulation_mode = "systemmode")]
-    #[must_use]
-    pub fn load_addr(&self) -> GuestAddr {
-        // Only work if the binary is linked to the correct address and not pie
-        return 0x0 as GuestAddr;
     }
 
     #[cfg(emulation_mode = "usermode")]

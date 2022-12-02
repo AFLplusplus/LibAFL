@@ -23,6 +23,26 @@ pub trait IntoOwned {
     fn into_owned(self) -> Self;
 }
 
+/// Trait to downsize slice references
+pub trait DownsizeSlice {
+    /// Reduce the size of the slice
+    fn downsize(&mut self, len: usize);
+}
+
+impl<'a, T> DownsizeSlice for &'a [T] {
+    fn downsize(&mut self, len: usize) {
+        *self = &self[..len];
+    }
+}
+
+impl<'a, T> DownsizeSlice for &'a mut [T] {
+    fn downsize(&mut self, len: usize) {
+        let mut value = core::mem::take(self);
+        value = unsafe { value.get_unchecked_mut(..len) };
+        let _ = core::mem::replace(self, value);
+    }
+}
+
 /// Wrap a reference and convert to a [`Box`] on serialize
 #[derive(Clone, Debug)]
 pub enum OwnedRef<'a, T>
@@ -239,6 +259,39 @@ impl<'a, T> OwnedSlice<'a, T> {
             inner: OwnedSliceInner::RefRaw(ptr, len),
         }
     }
+
+    /// Downsize the inner slice or vec returning the old size on success or `None` on failure
+    pub fn downsize(&mut self, new_len: usize) -> Option<usize> {
+        match &mut self.inner {
+            OwnedSliceInner::RefRaw(_rr, len) => {
+                let tmp = *len;
+                if new_len <= tmp {
+                    *len = new_len;
+                    Some(tmp)
+                } else {
+                    None
+                }
+            }
+            OwnedSliceInner::Ref(r) => {
+                let tmp = r.len();
+                if new_len <= tmp {
+                    r.downsize(new_len);
+                    Some(tmp)
+                } else {
+                    None
+                }
+            }
+            OwnedSliceInner::Owned(v) => {
+                let tmp = v.len();
+                if new_len <= tmp {
+                    v.truncate(new_len);
+                    Some(tmp)
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 impl<'a, 'it, T> IntoIterator for &'it OwnedSlice<'a, T> {
@@ -426,6 +479,39 @@ impl<'a, T: 'a + Sized> OwnedSliceMut<'a, T> {
         } else {
             Self {
                 inner: OwnedSliceMutInner::RefRaw(ptr, len),
+            }
+        }
+    }
+
+    /// Downsize the inner slice or vec returning the old size on success or `None` on failure
+    pub fn downsize(&mut self, new_len: usize) -> Option<usize> {
+        match &mut self.inner {
+            OwnedSliceMutInner::RefRaw(_rr, len) => {
+                let tmp = *len;
+                if new_len <= tmp {
+                    *len = new_len;
+                    Some(tmp)
+                } else {
+                    None
+                }
+            }
+            OwnedSliceMutInner::Ref(r) => {
+                let tmp = r.len();
+                if new_len <= tmp {
+                    r.downsize(new_len);
+                    Some(tmp)
+                } else {
+                    None
+                }
+            }
+            OwnedSliceMutInner::Owned(v) => {
+                let tmp = v.len();
+                if new_len <= tmp {
+                    v.truncate(new_len);
+                    Some(tmp)
+                } else {
+                    None
+                }
             }
         }
     }
