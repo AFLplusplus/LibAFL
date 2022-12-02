@@ -22,6 +22,7 @@ use crate::{SYS_fstatat64, SYS_mmap2};
 #[cfg(not(any(cpu_target = "arm", cpu_target = "i386")))]
 use crate::{SYS_mmap, SYS_newfstatat};
 
+// TODO use the functions provided by Emulator
 pub const SNAPSHOT_PAGE_SIZE: usize = 4096;
 pub const SNAPSHOT_PAGE_MASK: GuestAddr = !(SNAPSHOT_PAGE_SIZE as GuestAddr - 1);
 

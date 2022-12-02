@@ -14,7 +14,7 @@ use meminterval::{Interval, IntervalTree};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 
 use crate::{
-    emu::{Emulator, SyscallHookResult},
+    emu::{Emulator, MemAccessInfo, SyscallHookResult},
     helper::{QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
     GuestAddr,
@@ -185,6 +185,7 @@ impl AsanGiovese {
 
     #[inline]
     #[must_use]
+    #[allow(clippy::cast_sign_loss)]
     pub fn is_invalid_access(emu: &Emulator, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             if n == 0 {
@@ -236,6 +237,7 @@ impl AsanGiovese {
     }
 
     #[inline]
+    #[allow(clippy::cast_sign_loss)]
     pub fn poison(&mut self, emu: &Emulator, addr: GuestAddr, n: usize, poison_byte: i8) -> bool {
         unsafe {
             if n == 0 {
@@ -281,6 +283,7 @@ impl AsanGiovese {
 
     #[inline]
     #[allow(clippy::must_use_candidate)]
+    #[allow(clippy::cast_sign_loss)]
     pub fn unpoison(emu: &Emulator, addr: GuestAddr, n: usize) -> bool {
         unsafe {
             let n = n as isize;
@@ -719,7 +722,7 @@ pub fn gen_readwrite_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
     pc: GuestAddr,
-    _size: usize,
+    _info: MemAccessInfo,
 ) -> Option<u64>
 where
     S: UsesInput,
@@ -732,6 +735,7 @@ where
         None
     }
 }
+
 pub fn trace_read1_asan<QT, S>(
     hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
