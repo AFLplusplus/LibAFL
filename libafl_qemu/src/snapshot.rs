@@ -15,12 +15,10 @@ use crate::{
     GuestAddr, SYS_fstat, SYS_fstatfs, SYS_futex, SYS_getrandom, SYS_mprotect, SYS_mremap,
     SYS_munmap, SYS_pread64, SYS_read, SYS_readlinkat, SYS_statfs,
 };
-#[cfg(cpu_target = "arm")]
-use crate::{SYS_fstatat64, SYS_mmap2};
-
 #[cfg(cpu_target = "i386")]
 use crate::{SYS_fstatat64, SYS_mmap};
-
+#[cfg(cpu_target = "arm")]
+use crate::{SYS_fstatat64, SYS_mmap2};
 #[cfg(not(any(cpu_target = "arm", cpu_target = "i386")))]
 use crate::{SYS_mmap, SYS_newfstatat};
 
