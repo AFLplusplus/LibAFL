@@ -25,6 +25,7 @@ pub use nautilus::*;
 use crate::{
     bolts::tuples::{HasConstLen, Named},
     inputs::UsesInput,
+    state::MetadataChangedHandler,
     Error,
 };
 
@@ -44,7 +45,7 @@ pub enum MutationResult {
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<S>
+pub trait Mutator<S>: MetadataChangedHandler<S>
 where
     S: UsesInput,
 {

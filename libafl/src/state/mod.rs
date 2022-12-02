@@ -97,8 +97,25 @@ pub trait HasClientPerfMonitor {
     fn introspection_monitor_mut(&mut self) -> &mut ClientPerfMonitor;
 }
 
+/// A trait to indicate that the metadata got changed and individual components should act upon it.
+pub trait HasMetadataChangedIndicator {
+    /// Set the flag that metadata was changed.
+    /// This indicates that a `metadata_changed` event should be propagated, if applicable.
+    /// A fuzzer check if [`get_and_reset_metadata_changed()`] is `true`
+    /// and call all [`MetadataChangedHandler`]s if it is.
+    fn set_metadata_changed_indicator(&mut self);
+
+    /// Read if metadata was changed (and [`set_metadata_changed`] got called).
+    /// If true, it indicates that a `metadata_changed` event should be propagated, if applicable.
+    /// A fuzzer should check if [`get_and_reset_metadata_changed()`] is `true`
+    /// and call all [`MetadataChangedHandler`]s if it is.
+    /// After calling this method, the state will be reset to `false` and remain `false`
+    /// until [`set_metadata_changed`] got called again.
+    fn get_and_reset_metadata_changed_indicator(&mut self) -> bool;
+}
+
 /// Trait for elements offering metadata
-pub trait HasMetadata {
+pub trait HasMetadata: HasMetadataChangedIndicator {
     /// A map, storing all metadata
     fn metadata(&self) -> &SerdeAnyMap;
     /// A map, storing all metadata (mutable)
@@ -124,7 +141,7 @@ pub trait HasMetadata {
 }
 
 /// Trait for elements offering named metadata
-pub trait HasNamedMetadata {
+pub trait HasNamedMetadata: HasMetadataChangedIndicator {
     /// A map, storing all metadata
     fn named_metadata(&self) -> &NamedSerdeAnyMap;
     /// A map, storing all metadata (mutable)
@@ -167,6 +184,17 @@ pub trait HasStartTime {
     fn start_time_mut(&mut self) -> &mut Duration;
 }
 
+/// Indicates that a component can react to changed metadata.
+/// It's a common trait that most fuzzer elements will implement.
+/// The [`metadata_changed`] method of all components should be called whenever
+/// [`HasMetadataChangedIndicator::get_and_reset_metadata_changed_indicator`] is `true`.
+pub trait MetadataChangedHandler<S> {
+    /// Callback indicating that shared metadata has changed.
+    #[inline]
+    #[allow(unused_variables)]
+    fn metadata_changed(&mut self, state: &mut S) {}
+}
+
 /// The state a fuzz run.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "
@@ -183,8 +211,11 @@ pub struct StdState<I, C, R, SC> {
     start_time: Duration,
     /// The corpus
     corpus: C,
-    // Solutions corpus
+    /// Solutions corpus
     solutions: SC,
+    /// Indicates if the metadata recently changed.
+    /// In this case, a fuzzer should propagate `metadata_changed` events.
+    metadata_changed_indicator: bool,
     /// Metadata stored for this state by one of the components
     metadata: SerdeAnyMap,
     /// Metadata stored with names
@@ -298,6 +329,28 @@ impl<I, C, R, SC> HasNamedMetadata for StdState<I, C, R, SC> {
     #[inline]
     fn named_metadata_mut(&mut self) -> &mut NamedSerdeAnyMap {
         &mut self.named_metadata
+    }
+}
+
+impl<I, C, R, SC> HasMetadataChangedIndicator for StdState<I, C, R, SC> {
+    /// Set the flag that metadata was changed.
+    /// This indicates that a `metadata_changed` event should be propagated, if applicable.
+    /// A fuzzer check if [`get_and_reset_metadata_changed()`] is `true`
+    /// and call all [`MetadataChangedHandler`]s if it is.
+    fn set_metadata_changed_indicator(&mut self) {
+        self.metadata_changed_indicator = true;
+    }
+
+    /// Read if metadata was changed (and [`set_metadata_changed`] got called).
+    /// If true, it indicates that a `metadata_changed` event should be propagated, if applicable.
+    /// A fuzzer should check if [`get_and_reset_metadata_changed()`] is `true`
+    /// and call all [`MetadataChangedHandler`]s if it is.
+    /// After calling this method, the state will be reset to `false` and remain `false`
+    /// until [`set_metadata_changed`] got called again.
+    fn get_and_reset_metadata_changed_indicator(&mut self) -> bool {
+        let ret = self.metadata_changed_indicator;
+        self.metadata_changed_indicator = false;
+        ret
     }
 }
 
@@ -563,6 +616,7 @@ where
             rand,
             executions: 0,
             start_time: Duration::from_millis(0),
+            metadata_changed_indicator: false,
             metadata: SerdeAnyMap::default(),
             named_metadata: NamedSerdeAnyMap::default(),
             corpus,
@@ -649,6 +703,17 @@ impl<I> HasMetadata for NopState<I> {
 
     fn metadata_mut(&mut self) -> &mut SerdeAnyMap {
         &mut self.metadata
+    }
+}
+
+#[cfg(test)]
+impl<I> HasMetadataChangedIndicator for NopState<I> {
+    fn set_metadata_changed_indicator(&mut self) {
+        unimplemented!();
+    }
+
+    fn get_and_reset_metadata_changed_indicator(&mut self) -> bool {
+        unimplemented!();
     }
 }
 

@@ -26,7 +26,7 @@ use crate::{
     executors::ExitKind,
     inputs::UsesInput,
     observers::{DifferentialObserver, Observer, ObserversTuple},
-    Error,
+    Error, prelude::MetadataChangedHandler,
 };
 
 /// Hitcounts class lookup
@@ -1457,6 +1457,8 @@ where
     }
 }
 
+impl<S, M> MetadataChangedHandler<S> for HitcountsIterableMapObserver<M> {}
+
 impl<M> Named for HitcountsIterableMapObserver<M>
 where
     M: Named + Serialize + serde::de::DeserializeOwned,
@@ -1679,6 +1681,11 @@ where
 {
     // in differential mode, we are *not* responsible for resetting the map!
 }
+
+impl<'a, S, T, const DIFFERENTIAL: bool> MetadataChangedHandler<S> for MultiMapObserver<'a, T, DIFFERENTIAL>
+where
+    T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+{}
 
 impl<'a, T, const DIFFERENTIAL: bool> Named for MultiMapObserver<'a, T, DIFFERENTIAL>
 where
@@ -1970,6 +1977,8 @@ where
         self.reset_map()
     }
 }
+
+impl<S, T> MetadataChangedHandler<S> for OwnedMapObserver<T> {}
 
 impl<T> Named for OwnedMapObserver<T>
 where

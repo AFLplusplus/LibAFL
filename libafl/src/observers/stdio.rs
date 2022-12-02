@@ -7,7 +7,7 @@ use std::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{bolts::tuples::Named, inputs::UsesInput, observers::Observer};
+use crate::{bolts::tuples::Named, inputs::UsesInput, observers::Observer, prelude::MetadataChangedHandler};
 
 /// An observer that captures stdout of a target.
 /// Only works for supported executors.
@@ -82,6 +82,8 @@ where
         self.stderr = Some(stderr.into());
     }
 }
+
+impl<S> MetadataChangedHandler<S> for StdErrObserver {}
 
 impl Named for StdErrObserver {
     fn name(&self) -> &str {

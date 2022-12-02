@@ -12,7 +12,7 @@ use crate::{
     inputs::{HasBytesVec, UsesInput},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},
-    Error,
+    Error, prelude::MetadataChangedHandler,
 };
 
 /// Mem move in the own vec
@@ -592,6 +592,8 @@ impl Named for BytesInsertMutator {
     }
 }
 
+impl<S> MetadataChangedHandler<S> for BytesInsertMutator {}
+
 impl BytesInsertMutator {
     /// Creates a new [`BytesInsertMutator`].
     #[must_use]
@@ -643,6 +645,8 @@ impl Named for BytesRandInsertMutator {
         "BytesRandInsertMutator"
     }
 }
+
+impl<S> MetadataChangedHandler<S> for BytesRandInsertMutator {}
 
 impl BytesRandInsertMutator {
     /// Create a new [`BytesRandInsertMutator`]

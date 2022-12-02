@@ -8,7 +8,7 @@ use crate::{
     observers::{
         concolic::{serialization_format::MessageFileReader, ConcolicMetadata},
         Observer,
-    },
+    }, prelude::MetadataChangedHandler,
 };
 
 /// A standard [`ConcolicObserver`] observer, observing constraints written into a memory buffer.
@@ -30,6 +30,8 @@ impl<'map> ConcolicObserver<'map> {
         ConcolicMetadata::from_buffer(reader.get_buffer().to_vec())
     }
 }
+
+impl<'map, S> MetadataChangedHandler<S> for ConcolicObserver<'map> {}
 
 impl<'map> Named for ConcolicObserver<'map> {
     fn name(&self) -> &str {

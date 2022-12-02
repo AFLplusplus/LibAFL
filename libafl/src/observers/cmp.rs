@@ -5,6 +5,7 @@ use alloc::{
     vec::Vec,
 };
 use core::{fmt::Debug, marker::PhantomData};
+use std::fs::Metadata;
 
 use c2rust_bitfields::BitfieldStruct;
 use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
@@ -15,7 +16,7 @@ use crate::{
     inputs::UsesInput,
     observers::Observer,
     state::HasMetadata,
-    Error,
+    Error, prelude::MetadataChangedHandler,
 };
 
 /// Compare values collected during a run
@@ -234,6 +235,8 @@ where
     }
 }
 
+impl<'a, CM, S> MetadataChangedHandler<S> for StdCmpObserver<'a, CM, S> {}
+
 impl<'a, CM, S> Observer<S> for StdCmpObserver<'a, CM, S>
 where
     CM: CmpMap + Serialize + DeserializeOwned,
@@ -266,6 +269,8 @@ where
         &self.name
     }
 }
+
+impl<'a, CM, S> MetadataChangedHandler<S> for StdCmpObserver<'a, CM, S>
 
 impl<'a, CM, S> StdCmpObserver<'a, CM, S>
 where

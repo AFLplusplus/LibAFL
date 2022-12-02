@@ -24,7 +24,7 @@ use crate::{
     stages::StagesTuple,
     start_timer,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata, HasSolutions, UsesState},
-    Error,
+    Error, prelude::HasMetadataChangedIndicator,
 };
 
 /// Send a monitor update all 15 (or more) seconds
@@ -217,7 +217,7 @@ where
         let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
 
-        for _ in 0..iters {
+        for _ in 0..iters { 
             ret = self.fuzz_one(stages, executor, state, manager)?;
             last = manager.maybe_report_progress(state, last, monitor_timeout)?;
         }
@@ -530,7 +530,7 @@ where
 impl<CS, E, EM, F, OF, OT, ST> Fuzzer<E, EM, ST> for StdFuzzer<CS, F, OF, OT>
 where
     CS: Scheduler,
-    E: UsesState<State = CS::State>,
+    E: UsesState<State = CS::State> + HasObservers,
     EM: ProgressReporter + EventProcessor<E, Self, State = CS::State>,
     F: Feedback<CS::State>,
     OF: Feedback<CS::State>,
@@ -544,6 +544,11 @@ where
         state: &mut CS::State,
         manager: &mut EM,
     ) -> Result<usize, Error> {
+        // TODO: introspection
+        if state.get_and_reset_metadata_changed_indicator() {
+            executor.observers_mut().metadata_changed(&state);
+        }
+
         // Init timer for scheduler
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().start_timer();

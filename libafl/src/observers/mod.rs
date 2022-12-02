@@ -40,13 +40,13 @@ use crate::{
     },
     executors::ExitKind,
     inputs::UsesInput,
-    state::UsesState,
+    state::{MetadataChangedHandler, UsesState},
     Error,
 };
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer<S>: Named + Debug
+pub trait Observer<S>: MetadataChangedHandler<S> + Named + Debug
 where
     S: UsesInput,
 {
@@ -123,7 +123,7 @@ pub trait UsesObservers: UsesState {
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple<S>: MatchName + Debug
+pub trait ObserversTuple<S>: MetadataChangedHandler<S> + MatchName + Debug
 where
     S: UsesInput,
 {
@@ -213,6 +213,8 @@ where
     fn observe_stderr(&mut self, stderr: &[u8]) {}
 }
 
+impl<S> MetadataChangedHandler<S> for () {}
+
 impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
 where
     Head: Observer<S>,
@@ -273,6 +275,17 @@ where
     fn observe_stderr(&mut self, stderr: &[u8]) {
         self.0.observe_stderr(stderr);
         self.1.observe_stderr(stderr);
+    }
+}
+
+impl<Head, Tail, S> MetadataChangedHandler<S> for (Head, Tail)
+where
+    Head: Observer<S>,
+    Tail: ObserversTuple<S>,
+{
+    fn metadata_changed(&mut self, state: &mut S) {
+        self.0.metadata_changed(state);
+        self.1.metadata_changed(state);
     }
 }
 
@@ -378,35 +391,6 @@ where
 
     fn post_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
         Ok(())
-    }
-}
-
-impl<Head, Tail, OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for (Head, Tail)
-where
-    Head: DifferentialObserver<OTA, OTB, S>,
-    Tail: DifferentialObserversTuple<OTA, OTB, S>,
-    OTA: ObserversTuple<S>,
-    OTB: ObserversTuple<S>,
-    S: UsesInput,
-{
-    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
-        self.0.pre_observe_first(observers)?;
-        self.1.pre_observe_first_all(observers)
-    }
-
-    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
-        self.0.post_observe_first(observers)?;
-        self.1.post_observe_first_all(observers)
-    }
-
-    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
-        self.0.pre_observe_second(observers)?;
-        self.1.pre_observe_second_all(observers)
-    }
-
-    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
-        self.0.post_observe_second(observers)?;
-        self.1.post_observe_second_all(observers)
     }
 }
 

@@ -19,7 +19,7 @@ use crate::{
     executors::ExitKind,
     inputs::UsesInput,
     observers::Observer,
-    Error,
+    Error, prelude::MetadataChangedHandler,
 };
 
 /// Collects the backtrace via [`Backtrace`] and [`Debug`]
@@ -133,6 +133,8 @@ where
         Ok(())
     }
 }
+
+impl<'a, S> MetadataChangedHandler<S> for BacktraceObserver<'a>
 
 impl<'a> Named for BacktraceObserver<'a> {
     fn name(&self) -> &str {
@@ -273,6 +275,9 @@ where
         self.parse_asan_output(&String::from_utf8_lossy(stderr));
     }
 }
+
+impl<S> Observer<S> for AsanBacktraceObserver {}
+
 
 impl Named for AsanBacktraceObserver {
     fn name(&self) -> &str {
