@@ -394,6 +394,35 @@ where
     }
 }
 
+impl<Head, Tail, OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for (Head, Tail)
+where
+    Head: DifferentialObserver<OTA, OTB, S>,
+    Tail: DifferentialObserversTuple<OTA, OTB, S>,
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.pre_observe_first(observers)?;
+        self.1.pre_observe_first_all(observers)
+    }
+
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.post_observe_first(observers)?;
+        self.1.post_observe_first_all(observers)
+    }
+
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.pre_observe_second(observers)?;
+        self.1.pre_observe_second_all(observers)
+    }
+
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.post_observe_second(observers)?;
+        self.1.post_observe_second_all(observers)
+    }
+}
+
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
