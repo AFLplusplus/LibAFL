@@ -31,8 +31,8 @@ use libafl::{
     //prelude::{SimpleMonitor, SimpleEventManager},
 };
 use libafl_qemu::{
-    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu::Emulator, QemuExecutor, QemuHooks,
-    Regs,
+    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu::Emulator, GuestPhysAddr, QemuExecutor,
+    QemuHooks, Regs,
 };
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
@@ -60,7 +60,7 @@ pub fn fuzz() {
             &env::var("FUZZ_INPUT").unwrap_or_else(|_| "FUZZ_INPUT".to_owned()),
             0,
         )
-        .expect("Symbol or env FUZZ_INPUT not found");
+        .expect("Symbol or env FUZZ_INPUT not found") as GuestPhysAddr;
     println!("FUZZ_INPUT @ {:#x}", input_addr);
 
     let main_addr = elf
@@ -88,7 +88,7 @@ pub fn fuzz() {
         }
         emu.remove_breakpoint(main_addr);
 
-        emu.save_snapshot("start", true);
+        // emu.save_snapshot("start", true);
 
         emu.set_breakpoint(breakpoint); // BREAKPOINT
 
@@ -98,6 +98,10 @@ pub fn fuzz() {
         //for r in Regs::iter() {
         //    saved_regs.push(emu.cpu_from_index(0).read_reg(r).unwrap());
         //}
+
+        let mut saved_cpu_states: Vec<_> = (0..emu.num_cpus())
+            .map(|i| emu.cpu_from_index(i).save_state())
+            .collect();
 
         // The wrapped harness function, calling out to the LLVM-style harness
         let mut harness = |input: &BytesInput| {
@@ -129,7 +133,11 @@ pub fn fuzz() {
                     None => ExitKind::Crash,
                 };
 
-                emu.load_snapshot("start", true);
+                for (i, s) in saved_cpu_states.iter().enumerate() {
+                    emu.cpu_from_index(i).restore_state(s);
+                }
+
+                // emu.load_snapshot("start", true);
 
                 ret
             }
@@ -153,7 +161,7 @@ pub fn fuzz() {
         );
 
         // A feedback to choose if an input is a solution or not
-        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = CrashFeedback::new(); //feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {

@@ -124,6 +124,12 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
 
     /// Get the number of set entries with the specified indexes
     fn how_many_set(&self, indexes: &[usize]) -> usize;
+
+    /// Resize the inner map to be smaller (and thus faster to process)
+    /// It returns Some(old size) on success, None on failure
+    fn downsize_map(&mut self, _new_len: usize) -> Option<usize> {
+        None
+    }
 }
 
 /// A Simple iterator calling `MapObserver::get`
@@ -417,6 +423,10 @@ where
         }
         res
     }
+
+    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
+        self.map.downsize(new_len)
+    }
 }
 
 impl<'a, T, const DIFFERENTIAL: bool> AsSlice for StdMapObserver<'a, T, DIFFERENTIAL>
@@ -538,7 +548,7 @@ where
 
     /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map.
     ///
-    /// # Safety
+    /// # Note
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
     pub fn new_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
@@ -584,7 +594,7 @@ where
 
     /// Creates a new [`MapObserver`] from an [`OwnedSliceMut`] map in differential mode.
     ///
-    /// # Safety
+    /// # Note
     /// Will dereference the owned slice with up to len elements.
     #[must_use]
     pub fn differential_from_ownedref<S>(name: S, map: OwnedSliceMut<'a, T>) -> Self
@@ -1292,6 +1302,10 @@ where
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         self.base.how_many_set(indexes)
     }
+
+    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
+        self.base.downsize_map(new_len)
+    }
 }
 
 impl<M> AsSlice for HitcountsMapObserver<M>
@@ -1515,6 +1529,10 @@ where
 
     fn how_many_set(&self, indexes: &[usize]) -> usize {
         self.base.how_many_set(indexes)
+    }
+
+    fn downsize_map(&mut self, new_len: usize) -> Option<usize> {
+        self.base.downsize_map(new_len)
     }
 }
 

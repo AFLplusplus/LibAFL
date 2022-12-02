@@ -94,6 +94,7 @@ where
         idx: usize,
         testcase: &Testcase<<CS::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
+        self.update_score(state, idx)?;
         self.base.on_replace(state, idx, testcase)
     }
 
@@ -273,10 +274,7 @@ where
     /// Cull the `Corpus` using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &mut CS::State) -> Result<(), Error> {
-        let top_rated = match state.metadata().get::<TopRatedsMetadata>() {
-            None => return Ok(()),
-            Some(val) => val,
-        };
+        let Some(top_rated) = state.metadata().get::<TopRatedsMetadata>() else { return Ok(()) };
 
         let mut acc = HashSet::new();
 

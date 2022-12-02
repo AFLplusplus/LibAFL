@@ -13,7 +13,7 @@ use libafl::{executors::inprocess::inprocess_get_state, inputs::UsesInput};
 
 pub use crate::emu::SyscallHookResult;
 use crate::{
-    emu::{Emulator, FatPtr, SKIP_EXEC_HOOK},
+    emu::{Emulator, FatPtr, MemAccessInfo, SKIP_EXEC_HOOK},
     helper::QemuHelperTuple,
     GuestAddr,
 };
@@ -189,7 +189,7 @@ where
 static mut READ_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook, Hook)> = vec![];
 static mut WRITE_HOOKS: Vec<(Hook, Hook, Hook, Hook, Hook, Hook)> = vec![];
 
-extern "C" fn gen_read_hook_wrapper<QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
+extern "C" fn gen_read_hook_wrapper<QT, S>(pc: GuestAddr, info: MemAccessInfo, index: u64) -> u64
 where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
@@ -203,9 +203,9 @@ where
                     &mut QemuHooks<'_, QT, S>,
                     Option<&mut S>,
                     GuestAddr,
-                    usize,
+                    MemAccessInfo,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -213,17 +213,17 @@ where
                         &mut QemuHooks<'_, QT, S>,
                         Option<&mut S>,
                         GuestAddr,
-                        usize,
+                        MemAccessInfo,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
     }
 }
 
-extern "C" fn gen_write_hook_wrapper<QT, S>(pc: GuestAddr, size: usize, index: u64) -> u64
+extern "C" fn gen_write_hook_wrapper<QT, S>(pc: GuestAddr, info: MemAccessInfo, index: u64) -> u64
 where
     S: UsesInput,
     QT: QemuHelperTuple<S>,
@@ -237,9 +237,9 @@ where
                     &mut QemuHooks<'_, QT, S>,
                     Option<&mut S>,
                     GuestAddr,
-                    usize,
+                    MemAccessInfo,
                 ) -> Option<u64> = transmute(*ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             Hook::Closure(ptr) => {
                 let func: &mut Box<
@@ -247,10 +247,10 @@ where
                         &mut QemuHooks<'_, QT, S>,
                         Option<&mut S>,
                         GuestAddr,
-                        usize,
+                        MemAccessInfo,
                     ) -> Option<u64>,
                 > = transmute(ptr);
-                (func)(hooks, inprocess_get_state::<S>(), pc, size).map_or(SKIP_EXEC_HOOK, |id| id)
+                (func)(hooks, inprocess_get_state::<S>(), pc, info).map_or(SKIP_EXEC_HOOK, |id| id)
             }
             _ => 0,
         }
@@ -942,7 +942,7 @@ where
     pub fn reads(
         &self,
         generation_hook: Option<
-            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, info: MemAccessInfo) -> Option<u64>,
         >,
         execution_hook1: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
         execution_hook2: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
@@ -1013,7 +1013,9 @@ where
     pub unsafe fn reads_closures(
         &self,
         generation_hook: Option<
-            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
+            Box<
+                dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, MemAccessInfo) -> Option<u64>,
+            >,
         >,
         execution_hook1: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
         execution_hook2: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
@@ -1070,7 +1072,7 @@ where
     pub fn reads_raw(
         &self,
         generation_hook: Option<
-            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, info: MemAccessInfo) -> Option<u64>,
         >,
         execution_hook1: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
         execution_hook2: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
@@ -1109,7 +1111,7 @@ where
     pub fn writes(
         &self,
         generation_hook: Option<
-            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, info: MemAccessInfo) -> Option<u64>,
         >,
         execution_hook1: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
         execution_hook2: Option<fn(&mut Self, Option<&mut S>, id: u64, addr: GuestAddr)>,
@@ -1180,7 +1182,9 @@ where
     pub unsafe fn writes_closures(
         &self,
         generation_hook: Option<
-            Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, usize) -> Option<u64>>,
+            Box<
+                dyn FnMut(&'a mut Self, Option<&'a mut S>, GuestAddr, MemAccessInfo) -> Option<u64>,
+            >,
         >,
         execution_hook1: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
         execution_hook2: Option<Box<dyn FnMut(&'a mut Self, Option<&'a mut S>, u64, GuestAddr)>>,
@@ -1237,7 +1241,7 @@ where
     pub fn writes_raw(
         &self,
         generation_hook: Option<
-            fn(&mut Self, Option<&mut S>, pc: GuestAddr, size: usize) -> Option<u64>,
+            fn(&mut Self, Option<&mut S>, pc: GuestAddr, info: MemAccessInfo) -> Option<u64>,
         >,
         execution_hook1: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
         execution_hook2: Option<extern "C" fn(id: u64, addr: GuestAddr, data: u64)>,
