@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "0403edc7286357967babdc214e264a78a23e0d43";
+const QEMU_REVISION: &str = "9707dd2d211221367915d5da21fe8693d6842eaf";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -41,8 +41,10 @@ pub fn build(
 
     let custum_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
     let custum_qemu_no_build = env::var("CUSTOM_QEMU_NO_BUILD").is_ok();
+    let custum_qemu_no_configure = env::var("CUSTOM_QEMU_NO_CONFIGURE").is_ok();
     println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_DIR");
     println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_NO_BUILD");
+    println!("cargo:rerun-if-env-changed=CUSTOM_QEMU_NO_CONFIGURE");
 
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
@@ -129,7 +131,7 @@ pub fn build(
                 .arg("distclean")
                 .status(),
         );*/
-        if is_usermode {
+        if is_usermode && !custum_qemu_no_configure {
             let mut cmd = Command::new("./configure");
             cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")
@@ -145,7 +147,7 @@ pub fn build(
                 cmd.arg("--enable-debug");
             }
             cmd.status().expect("Configure failed");
-        } else {
+        } else if !custum_qemu_no_configure {
             let mut cmd = Command::new("./configure");
             cmd.current_dir(&qemu_path)
                 //.arg("--as-static-lib")

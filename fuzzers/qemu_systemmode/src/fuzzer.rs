@@ -88,7 +88,7 @@ pub fn fuzz() {
         }
         emu.remove_breakpoint(main_addr);
 
-        emu.save_snapshot("start", true);
+        // emu.save_snapshot("start", true);
 
         emu.set_breakpoint(breakpoint); // BREAKPOINT
 
@@ -99,7 +99,7 @@ pub fn fuzz() {
         //    saved_regs.push(emu.cpu_from_index(0).read_reg(r).unwrap());
         //}
 
-        let saved_cpu_states: Vec<_> = (0..emu.num_cpus())
+        let mut saved_cpu_states: Vec<_> = (0..emu.num_cpus())
             .map(|i| emu.cpu_from_index(i).save_state())
             .collect();
 
@@ -161,7 +161,7 @@ pub fn fuzz() {
         );
 
         // A feedback to choose if an input is a solution or not
-        let mut objective = feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
+        let mut objective = CrashFeedback::new(); //feedback_or_fast!(CrashFeedback::new(), TimeoutFeedback::new());
 
         // If not restarting, create a State from scratch
         let mut state = state.unwrap_or_else(|| {

@@ -74,6 +74,12 @@ impl MemAccessInfo {
     }
 }
 
+impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
+    fn from(oi: libafl_qemu_sys::MemOpIdx) -> Self {
+        Self { oi }
+    }
+}
+
 #[cfg(feature = "python")]
 use pyo3::{prelude::*, PyIterProtocol};
 

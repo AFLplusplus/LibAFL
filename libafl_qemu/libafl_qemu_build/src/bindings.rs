@@ -100,6 +100,7 @@ pub fn generate(
         .allowlist_function("cpu_memory_rw_debug")
         .allowlist_function("cpu_physical_memory_rw")
         .allowlist_function("cpu_reset")
+        .allowlist_function("cpu_synchronize_state")
         .allowlist_function("cpu_get_phys_page_attrs_debug")
         .allowlist_function("tlb_plugin_lookup")
         .allowlist_function("qemu_plugin_hwaddr_phys_addr")
