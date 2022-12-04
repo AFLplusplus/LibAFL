@@ -2,6 +2,7 @@
 
 use std::{env, fs::File, io::Write, path::Path};
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let out_dir = out_dir.to_string_lossy().to_string();
@@ -125,6 +126,15 @@ fn main() {
         cc::Build::new()
             .file(src_dir.join("forkserver.c"))
             .compile("forkserver");
+    }
+
+    #[cfg(windows)]
+    {
+        println!("cargo:rerun-if-changed=src/windows_asan.c");
+
+        cc::Build::new()
+            .file(src_dir.join("windows_asan.c"))
+            .compile("windows_asan");
     }
 
     println!("cargo:rustc-link-search=native={}", &out_dir);
