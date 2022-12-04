@@ -50,6 +50,15 @@ pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Result<Vec<Instruction>, 
         .detail(true)
         .build()
         .unwrap();
+
+    #[cfg(cpu_target = "i386")]
+    let cs = Capstone::new()
+        .x86()
+        .mode(capstone::arch::x86::ArchMode::Mode32)
+        .detail(true)
+        .build()
+        .unwrap();
+
     #[cfg(cpu_target = "arm")]
     let cs = Capstone::new()
         .arm()
