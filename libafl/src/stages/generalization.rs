@@ -127,8 +127,7 @@ where
             let original = input.clone();
             let meta = entry.metadata().get::<MapNoveltiesMetadata>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{} (check the arguments of MapFeedback::new(...))",
-                        corpus_idx
+                        "MapNoveltiesMetadata needed for GeneralizationStage not found in testcase #{corpus_idx} (check the arguments of MapFeedback::new(...))"
                     ))
                 })?;
             (payload, original, meta.as_slice().to_vec())

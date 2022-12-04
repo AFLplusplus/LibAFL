@@ -466,9 +466,7 @@ unsafe fn _llmp_page_init<SHM: ShMem>(shmem: &mut SHM, sender_id: ClientId, allo
     if !allow_reinit {
         assert!(
             (*page).magic != PAGE_INITIALIZED_MAGIC,
-            "Tried to initialize page {:?} twice (for shmem {:?})",
-            page,
-            shmem
+            "Tried to initialize page {page:?} twice (for shmem {shmem:?})"
         );
     }
 
@@ -641,10 +639,7 @@ where
             }
             Err(Error::File(e, _)) if e.kind() == ErrorKind::AddrInUse => {
                 // We are the client :)
-                println!(
-                    "We're the client (internal port already bound by broker, {:#?})",
-                    e
-                );
+                println!("We're the client (internal port already bound by broker, {e:#?})");
                 Ok(LlmpConnection::IsClient {
                     client: LlmpClient::create_attach_to_tcp(shmem_provider, port)?,
                 })
@@ -1082,8 +1077,7 @@ where
         let page = self.out_shmems.last_mut().unwrap().page_mut();
         if msg.is_null() || !llmp_msg_in_page(page, msg) {
             return Err(Error::unknown(format!(
-                "Llmp Message {:?} is null or not in current page",
-                msg
+                "Llmp Message {msg:?} is null or not in current page"
             )));
         }
 
@@ -1189,8 +1183,7 @@ where
         match unsafe { self.alloc_next_if_space(buf_len) } {
             Some(msg) => Ok(msg),
             None => Err(Error::unknown(format!(
-                "Error allocating {} bytes in shmap",
-                buf_len
+                "Error allocating {buf_len} bytes in shmap"
             ))),
         }
     }
@@ -1258,8 +1251,7 @@ where
             || tag == LLMP_TAG_UNSET
         {
             return Err(Error::unknown(format!(
-                "Reserved tag supplied to send_buf ({:#X})",
-                tag
+                "Reserved tag supplied to send_buf ({tag:#X})"
             )));
         }
 
@@ -1282,8 +1274,7 @@ where
             || tag == LLMP_TAG_UNSET
         {
             return Err(Error::unknown(format!(
-                "Reserved tag supplied to send_buf ({:#X})",
-                tag
+                "Reserved tag supplied to send_buf ({tag:#X})"
             )));
         }
 
@@ -1742,8 +1733,7 @@ where
         let page_size = self.shmem.as_slice().len() - size_of::<LlmpPage>();
         if offset > page_size {
             Err(Error::illegal_argument(format!(
-                "Msg offset out of bounds (size: {}, requested offset: {})",
-                page_size, offset
+                "Msg offset out of bounds (size: {page_size}, requested offset: {offset})"
             )))
         } else {
             unsafe { Ok(((*page).messages.as_mut_ptr() as *mut u8).add(offset) as *mut LlmpMsg) }
@@ -2048,7 +2038,7 @@ where
     /// This function returns the [`ShMemDescription`] the client uses to place incoming messages.
     /// The thread exits, when the remote broker disconnects.
     #[cfg(feature = "std")]
-    #[allow(clippy::let_and_return)]
+    #[allow(clippy::let_and_return, clippy::too_many_lines)]
     fn b2b_thread_on(
         mut stream: TcpStream,
         b2b_client_id: ClientId,
@@ -2106,8 +2096,7 @@ where
                         Ok(Some((client_id, tag, flags, payload))) => {
                             if client_id == b2b_client_id {
                                 println!(
-                                    "Ignored message we probably sent earlier (same id), TAG: {:x}",
-                                    tag
+                                    "Ignored message we probably sent earlier (same id), TAG: {tag:x}"
                                 );
                                 continue;
                             }
@@ -2127,7 +2116,7 @@ where
                                     payload: payload.to_vec(),
                                 },
                             ) {
-                                println!("Got error {} while trying to forward a message to broker {}, exiting thread", e, peer_address);
+                                println!("Got error {e} while trying to forward a message to broker {peer_address}, exiting thread");
                                 return;
                             }
                         }
@@ -2135,7 +2124,7 @@ where
                             println!("Local broker is shutting down, exiting thread");
                             return;
                         }
-                        Err(e) => panic!("Error reading from local page! {}", e),
+                        Err(e) => panic!("Error reading from local page! {e}"),
                     }
                 }
 
@@ -2171,8 +2160,7 @@ where
                         if let Error::File(e, _) = e {
                             if e.kind() == ErrorKind::UnexpectedEof {
                                 println!(
-                                    "Broker {} seems to have disconnected, exiting",
-                                    peer_address
+                                    "Broker {peer_address} seems to have disconnected, exiting"
                                 );
                                 return;
                             }

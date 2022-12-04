@@ -210,8 +210,7 @@ where
                         let must_remove = {
                             let old_meta = old.metadata_mut().get_mut::<AccountingIndexesMetadata>().ok_or_else(|| {
                                 Error::key_not_found(format!(
-                                    "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{}",
-                                    old_idx
+                                    "AccountingIndexesMetadata, needed by CoverageAccountingScheduler, not found in testcase #{old_idx}"
                                 ))
                             })?;
                             *old_meta.refcnt_mut() -= 1;

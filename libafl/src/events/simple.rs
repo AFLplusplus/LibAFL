@@ -292,8 +292,7 @@ where
             Ok(())
         } else {
             Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived: {:?}.",
-                event
+                "Received illegal message that message should not have arrived: {event:?}."
             )))
         }
     }

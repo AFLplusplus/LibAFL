@@ -398,10 +398,7 @@ where
                 executions: _,
             } => {
                 #[cfg(feature = "std")]
-                println!(
-                    "Received new Testcase from {} ({:?})",
-                    _client_id, client_config
-                );
+                println!("Received new Testcase from {_client_id} ({client_config:?})");
 
                 let _res = if client_config.match_with(&self.configuration)
                     && observers_buf.is_some()

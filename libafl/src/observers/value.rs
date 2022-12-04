@@ -1,18 +1,19 @@
 //! A simple observer with a single value.
 
-use alloc::boxed::Box;
-use alloc::string::{String, ToString};
+use alloc::{
+    boxed::Box,
+    string::{String, ToString},
+};
 use core::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 
+use super::Observer;
 use crate::{
     bolts::{ownedref::OwnedRef, tuples::Named},
     inputs::UsesInput,
     Error,
 };
-
-use super::Observer;
 
 /// A simple observer with a single value.
 ///

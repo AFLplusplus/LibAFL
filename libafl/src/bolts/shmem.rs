@@ -468,8 +468,7 @@ where
                     Ok(())
                 } else {
                     Err(Error::unknown(format!(
-                        "Wrong result read from pipe! Expected 0, got {:?}",
-                        ret
+                        "Wrong result read from pipe! Expected 0, got {ret:?}"
                     )))
                 }
             }
@@ -630,8 +629,7 @@ pub mod unix_shmem {
                     if shm_fd == -1 {
                         perror(b"shm_open\0".as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "Failed to shm_open map with id {:?}",
-                            shmem_ctr
+                            "Failed to shm_open map with id {shmem_ctr:?}"
                         )));
                     }
 
@@ -640,8 +638,7 @@ pub mod unix_shmem {
                         perror(b"ftruncate\0".as_ptr() as *const _);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "setup_shm(): ftruncate() failed for map with id {:?}",
-                            shmem_ctr
+                            "setup_shm(): ftruncate() failed for map with id {shmem_ctr:?}"
                         )));
                     }
 
@@ -659,8 +656,7 @@ pub mod unix_shmem {
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "mmap() failed for map with id {:?}",
-                            shmem_ctr
+                            "mmap() failed for map with id {shmem_ctr:?}"
                         )));
                     }
 
@@ -691,8 +687,7 @@ pub mod unix_shmem {
                         perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         return Err(Error::unknown(format!(
-                            "mmap() failed for map with fd {:?}",
-                            shm_fd
+                            "mmap() failed for map with fd {shm_fd:?}"
                         )));
                     }
 
@@ -997,8 +992,7 @@ pub mod unix_shmem {
                     let fd = open(device_path.as_ptr(), O_RDWR);
                     if fd == -1 {
                         return Err(Error::unknown(format!(
-                            "Failed to open the ashmem device at {:?}",
-                            device_path
+                            "Failed to open the ashmem device at {device_path:?}"
                         )));
                     }
 
