@@ -1,0 +1,8 @@
+[tasks.build_test]
+command = "cl"
+args = ["./test/test.c", "-o", "./test/test.exe"]
+
+[tasks.run]
+dependencies = ["build_test"]
+command = "cargo"
+args = ["run", "--release"]
