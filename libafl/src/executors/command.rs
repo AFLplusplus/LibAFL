@@ -536,13 +536,12 @@ impl CommandExecutorBuilder {
         OT: Debug + MatchName + ObserversTuple<S>,
         S: UsesInput,
     {
-        let program = if let Some(program) = &self.program {
-            program
-        } else {
-            return Err(Error::illegal_argument(
+        let Some(program) = &self.program else {
+             return Err(Error::illegal_argument(
                 "ComandExecutor::builder: no program set!",
-            ));
+           ));
         };
+
         let mut command = Command::new(program);
         match &self.input_location {
             InputLocation::StdIn => {

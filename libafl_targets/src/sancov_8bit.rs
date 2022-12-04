@@ -7,9 +7,6 @@ use core::slice::from_raw_parts_mut;
 pub static mut COUNTERS_MAPS: Vec<&'static mut [u8]> = Vec::new();
 
 /// Initialize the sancov `8-bit-counters` - usually called by `llvm`.
-///
-/// # Safety
-/// Set up our coverage maps.
 #[no_mangle]
 #[allow(clippy::cast_sign_loss)]
 #[allow(clippy::not_unsafe_ptr_arg_deref)]

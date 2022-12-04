@@ -31,10 +31,7 @@ fn adder_loop(port: u16) -> ! {
     loop {
         let mut msg_counter = 0;
         loop {
-            let (sender, tag, buf) = match client.recv_buf().unwrap() {
-                None => break,
-                Some(msg) => msg,
-            };
+            let Some((sender, tag, buf)) = client.recv_buf().unwrap() else { break };
             msg_counter += 1;
             match tag {
                 _TAG_SIMPLE_U32_V1 => {

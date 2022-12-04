@@ -41,7 +41,7 @@ macro_rules! impl_asany {
 /// Get a `type_id` from its previously unpacked `u64`.
 /// Opposite of [`unpack_type_id(id)`].
 ///
-/// # Safety
+/// # Note
 /// Probably not safe for future compilers, fine for now.
 #[must_use]
 pub fn pack_type_id(id: u64) -> TypeId {
@@ -52,7 +52,7 @@ pub fn pack_type_id(id: u64) -> TypeId {
 /// Unpack a `type_id` to an `u64`
 /// Opposite of [`pack_type_id(id)`].
 ///
-/// # Safety
+/// # Note
 /// Probably not safe for future compilers, fine for now.
 #[must_use]
 pub fn unpack_type_id(id: TypeId) -> u64 {

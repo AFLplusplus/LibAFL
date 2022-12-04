@@ -328,15 +328,13 @@ impl Forkserver {
     /// Read a message from the child process.
     pub fn read_st_timed(&mut self, timeout: &TimeSpec) -> Result<Option<i32>, Error> {
         let mut buf: [u8; 4] = [0_u8; 4];
-        let st_read = match self.st_pipe.read_end() {
-            Some(fd) => fd,
-            None => {
-                return Err(Error::file(io::Error::new(
-                    ErrorKind::BrokenPipe,
+        let Some(st_read) = self.st_pipe.read_end() else {
+                 return Err(Error::file(io::Error::new(
+                     ErrorKind::BrokenPipe,
                     "Read pipe end was already closed",
                 )));
-            }
-        };
+            };
+
         let mut readfds = FdSet::new();
         readfds.insert(st_read);
         // We'll pass a copied timeout to keep the original timeout intact, because select updates timeout to indicate how much time was left. See select(2)

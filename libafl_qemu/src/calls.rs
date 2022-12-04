@@ -50,7 +50,7 @@ impl<S> QemuHelper<S> for QemuCallTracerHelper
 where
     S: UsesInput,
 {
-    fn init_hooks<'a, QT>(&self, hooks: &QemuHooks<'a, QT, S>)
+    fn init_hooks<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
         QT: QemuHelperTuple<S>,
     {
