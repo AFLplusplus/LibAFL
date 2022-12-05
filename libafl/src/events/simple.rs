@@ -292,8 +292,7 @@ where
             Ok(())
         } else {
             Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived: {:?}.",
-                event
+                "Received illegal message that message should not have arrived: {event:?}."
             )))
         }
     }
@@ -445,8 +444,13 @@ where
         // We start ourself as child process to actually fuzz
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a place to store state in, for restarts.
+            #[cfg(unix)]
+            let mut staterestorer: StateRestorer<SP> =
+                StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
+            #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
+
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
 

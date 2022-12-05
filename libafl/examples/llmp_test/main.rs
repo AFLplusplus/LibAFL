@@ -48,10 +48,7 @@ fn adder_loop(port: u16) -> ! {
         }
 
         if current_result != last_result {
-            println!(
-                "Adder handled {} messages, reporting {} to broker",
-                msg_counter, current_result
-            );
+            println!("Adder handled {msg_counter} messages, reporting {current_result} to broker");
 
             client
                 .send_buf(_TAG_MATH_RESULT_V1, &current_result.to_le_bytes())

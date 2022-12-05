@@ -312,8 +312,7 @@ impl AsanErrors {
             | AsanError::BadFuncArgWrite((name, _pc, address, size, backtrace)) => {
                 writeln!(
                     output,
-                    " in call to {}, argument {:#016x}, size: {:#x}",
-                    name, address, size
+                    " in call to {name}, argument {address:#016x}, size: {size:#x}"
                 )
                 .unwrap();
                 output.reset().unwrap();
@@ -432,12 +431,7 @@ impl AsanErrors {
                     )
                     .unwrap();
                 } else {
-                    writeln!(
-                        output,
-                        " at 0x{:x}, faulting address 0x{:x}",
-                        pc, fault_address
-                    )
-                    .unwrap();
+                    writeln!(output, " at 0x{pc:x}, faulting address 0x{fault_address:x}").unwrap();
                 }
                 output.reset().unwrap();
 

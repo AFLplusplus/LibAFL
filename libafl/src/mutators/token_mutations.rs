@@ -113,8 +113,7 @@ impl Tokens {
         }
         if token_stop < token_start {
             return Err(Error::illegal_argument(format!(
-                "Tried to create tokens from illegal section: stop < start ({:?} < {:?})",
-                token_stop, token_start
+                "Tried to create tokens from illegal section: stop < start ({token_stop:?} < {token_start:?})"
             )));
         }
         let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
@@ -185,8 +184,7 @@ impl Tokens {
                 Ok(val) => val,
                 Err(_) => {
                     return Err(Error::illegal_argument(format!(
-                        "Illegal line (hex decoding): {}",
-                        line
+                        "Illegal line (hex decoding): {line}"
                     )))
                 }
             };
