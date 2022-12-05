@@ -134,8 +134,7 @@ pub fn fuzz() {
                 // OPTION 3: restore a fast devices+mem snapshot
                 emu.restore_fast_snapshot(snap);
 
-                //ret
-                ExitKind::Ok
+                ret
             }
         };
 

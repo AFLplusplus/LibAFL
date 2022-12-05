@@ -69,10 +69,7 @@ pub fn build(
         }
 
         if !qemu_path.is_dir() {
-            println!(
-                "cargo:warning=Qemu not found, cloning with git ({})...",
-                QEMU_REVISION
-            );
+            println!("cargo:warning=Qemu not found, cloning with git ({QEMU_REVISION})...");
             fs::create_dir_all(&qemu_path).unwrap();
             Command::new("git")
                 .current_dir(&qemu_path)
