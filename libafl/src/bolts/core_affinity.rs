@@ -590,8 +590,7 @@ mod apple {
                 Ok(())
             } else {
                 Err(Error::unknown(format!(
-                    "Failed to set_for_current {:?}",
-                    result
+                    "Failed to set_for_current {result:?}"
                 )))
             }
         }
