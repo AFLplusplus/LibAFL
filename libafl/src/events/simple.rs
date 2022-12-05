@@ -447,7 +447,7 @@ where
             #[cfg(unix)]
             let mut staterestorer: StateRestorer<SP> =
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
-            #[cfg(windows)]
+            #[cfg(not(windows))]
             let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
 
