@@ -2405,8 +2405,7 @@ where
                             println!("Error adding client! Ignoring: {e:?}");
                             #[cfg(not(feature = "std"))]
                             return Err(Error::unknown(format!(
-                                "Error adding client! PANIC! {:?}",
-                                e
+                                "Error adding client! PANIC! {e:?}"
                             )));
                         }
                     };
