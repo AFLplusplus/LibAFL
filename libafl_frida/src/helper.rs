@@ -243,9 +243,7 @@ where
             }
 
             // make sure we aren't in the instrumented list, as it would cause recursions
-            if helper.ranges.contains_key(&(Self::new as usize)) {
-                panic!("instrumented libraries must not include the fuzzer");
-            }
+            assert!(!helper.ranges.contains_key(&(Self::new as usize)), "instrumented libraries must not include the fuzzer");
 
             helper
                 .runtimes
