@@ -391,8 +391,7 @@ pub unsafe fn setup_signal_handler<T: 'static + Handler>(handler: &mut T) -> Res
         // Rust always panics on OOM, so we will, too.
         assert!(
             !SIGNAL_STACK_PTR.is_null(),
-            "Failed to allocate signal stack with {} bytes!",
-            SIGNAL_STACK_SIZE
+            "Failed to allocate signal stack with {SIGNAL_STACK_SIZE} bytes!"
         );
     }
     let mut ss: stack_t = mem::zeroed();

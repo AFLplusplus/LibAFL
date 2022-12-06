@@ -209,8 +209,7 @@ where
             let factor = F::compute(&mut *entry, state)?;
             let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
                 Error::key_not_found(format!(
-                    "Metadata needed for MinimizerScheduler not found in testcase #{}",
-                    idx
+                    "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
                 ))
             })?;
             for elem in meta.as_slice() {
@@ -229,8 +228,7 @@ where
                     let must_remove = {
                         let old_meta = old.metadata_mut().get_mut::<M>().ok_or_else(|| {
                             Error::key_not_found(format!(
-                                "Metadata needed for MinimizerScheduler not found in testcase #{}",
-                                old_idx
+                                "Metadata needed for MinimizerScheduler not found in testcase #{old_idx}"
                             ))
                         })?;
                         *old_meta.refcnt_mut() -= 1;
@@ -283,8 +281,7 @@ where
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
                 let meta = entry.metadata().get::<M>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "Metadata needed for MinimizerScheduler not found in testcase #{}",
-                        idx
+                        "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
                     ))
                 })?;
                 for elem in meta.as_slice() {

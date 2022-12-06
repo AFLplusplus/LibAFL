@@ -399,8 +399,7 @@ impl AsanRuntime {
         self.allocator
             .map_shadow_for_region(tls_start, tls_end, true);
         println!(
-            "registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
-            stack_start, stack_end, tls_start, tls_end
+            "registering thread with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}"
         );
     }
 
@@ -1547,7 +1546,8 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[allow(clippy::unused_self, clippy::identity_op)] // identity_op appears to be a false positive in ubfx
+    // identity_op appears to be a false positive in ubfx
+    #[allow(clippy::unused_self, clippy::identity_op, clippy::too_many_lines)]
     fn generate_shadow_check_function(&mut self) {
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
@@ -1657,8 +1657,9 @@ impl AsanRuntime {
         let mut map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
 
         // apple aarch64 requires MAP_JIT to allocates WX pages
-        #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
-        map_flags |= MapFlags::MAP_JIT;
+        if cfg!(all(target_vendor = "apple", target_arch = "aarch64")) {
+            map_flags |= MapFlags::MAP_JIT;
+        }
 
         unsafe {
             let mapping = mmap(
@@ -1678,7 +1679,7 @@ impl AsanRuntime {
 
             blob.as_ptr()
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
-                
+
             #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
             libc::pthread_jit_write_protect_np(1);
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
@@ -2047,19 +2048,19 @@ impl AsanRuntime {
             ; .qword addr_of_mut!(self.eh_frame) as i64
         );
         self.eh_frame = [
-            0x14, 0, 0x00527a01, 0x011e7c01, 0x001f0c1b,
+            0x14, 0, 0x00527a01, 0x011e7c01, 0x001f0c1b, //
             // eh_frame_fde
-            0x14, 0x18,
+            0x14, 0x18, //
             // fde_address
             0, // <-- address offset goes here
-            0x104, 
+            0x104,
             // advance_loc 12
             // def_cfa r29 (x29) at offset 16
             // offset r30 (x30) at cfa-8
             // offset r29 (x29) at cfa-16
-            0x1d0c4c00, 0x9d029e10, 0x4,
+            0x1d0c4c00, 0x9d029e10, 0x4, //
             // empty next FDE:
-            0, 0
+            0, 0,
         ];
 
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());

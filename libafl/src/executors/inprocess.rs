@@ -845,8 +845,7 @@ mod unix_signal_handler {
                 let si_addr = { _info.si_addr() as usize };
 
                 eprintln!(
-                "We crashed at addr 0x{:x}, but are not in the target... Bug in the fuzzer? Exiting.",
-                si_addr
+                "We crashed at addr 0x{si_addr:x}, but are not in the target... Bug in the fuzzer? Exiting."
                 );
 
                 #[cfg(all(feature = "std", unix))]

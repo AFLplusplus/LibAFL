@@ -19,14 +19,11 @@ pub use stacktrace::*;
 pub mod concolic;
 
 pub mod value;
-pub use value::*;
-
 // Rust is breaking this with 'error: intrinsic safety mismatch between list of intrinsics within the compiler and core library intrinsics for intrinsic `type_id`' and so we disable this component for the moment
 //#[cfg(unstable_feature)]
 //pub mod owned;
 //#[cfg(unstable_feature)]
 //pub use owned::*;
-
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -34,6 +31,7 @@ use alloc::{
 use core::{fmt::Debug, time::Duration};
 
 use serde::{Deserialize, Serialize};
+pub use value::*;
 
 use crate::{
     bolts::{

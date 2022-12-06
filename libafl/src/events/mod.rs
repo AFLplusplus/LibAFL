@@ -41,8 +41,8 @@ pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData
     shutdown_handler: core::ptr::null(),
 };
 
-/// A signal handler for releasing staterestore shmem
-/// This struct holds a pointer to StateRestore and clean up the shmem segment used by it.
+/// A signal handler for releasing `StateRestore` `ShMem`
+/// This struct holds a pointer to `StateRestore` and clean up the `ShMem` segment used by it.
 #[cfg(all(unix, feature = "std"))]
 #[derive(Debug, Clone)]
 pub struct ShutdownSignalData {
@@ -58,6 +58,10 @@ pub type ShutdownFuncPtr =
 
 /// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
 /// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
+///
+/// # Safety
+///
+/// This will acceess `data` and write to the global `data.staterestorer_ptr` if it's not null.
 #[cfg(all(unix, feature = "std"))]
 pub unsafe fn shutdown_handler<SP>(
     signal: Signal,
