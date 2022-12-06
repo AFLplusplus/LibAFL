@@ -5,7 +5,7 @@ use std::{
     marker::PhantomPinned,
     ops::Deref,
     pin::Pin,
-    sync::Arc,
+    rc::Rc,
 };
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
@@ -33,7 +33,7 @@ struct CoverageRuntimeInner {
 
 /// Frida binary-only coverage
 #[derive(Debug)]
-pub struct CoverageRuntime(Pin<Arc<RefCell<CoverageRuntimeInner>>>);
+pub struct CoverageRuntime(Pin<Rc<RefCell<CoverageRuntimeInner>>>);
 
 impl Default for CoverageRuntime {
     fn default() -> Self {
@@ -72,7 +72,7 @@ impl CoverageRuntime {
     /// Create a new coverage runtime
     #[must_use]
     pub fn new() -> Self {
-        Self(Arc::pin(RefCell::new(CoverageRuntimeInner {
+        Self(Rc::pin(RefCell::new(CoverageRuntimeInner {
             map: [0_u8; MAP_SIZE],
             previous_pc: 0,
             current_log_impl: 0,
