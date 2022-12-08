@@ -108,14 +108,6 @@ pub trait MapObserver: HasLen + Named + Serialize + serde::de::DeserializeOwned 
     /// Get the initial value for reset()
     fn initial(&self) -> Self::Entry;
 
-    /// Get the initial value for reset() (mutable)
-    fn initial_mut(&mut self) -> &mut Self::Entry;
-
-    /// Set the initial value for reset()
-    fn set_initial(&mut self, initial: Self::Entry) {
-        *self.initial_mut() = initial;
-    }
-
     /// Reset the map
     fn reset_map(&mut self) -> Result<(), Error>;
 
@@ -387,11 +379,6 @@ where
     #[inline]
     fn initial(&self) -> T {
         self.initial
-    }
-
-    #[inline]
-    fn initial_mut(&mut self) -> &mut T {
-        &mut self.initial
     }
 
     fn to_vec(&self) -> Vec<T> {
@@ -777,11 +764,6 @@ where
     }
 
     #[inline]
-    fn initial_mut(&mut self) -> &mut T {
-        &mut self.initial
-    }
-
-    #[inline]
     fn get(&self, idx: usize) -> &T {
         &self.as_slice()[idx]
     }
@@ -1051,11 +1033,6 @@ where
     }
 
     #[inline]
-    fn initial_mut(&mut self) -> &mut T {
-        &mut self.initial
-    }
-
-    #[inline]
     fn usable_count(&self) -> usize {
         *self.size.as_ref()
     }
@@ -1259,11 +1236,6 @@ where
     #[inline]
     fn initial(&self) -> u8 {
         self.base.initial()
-    }
-
-    #[inline]
-    fn initial_mut(&mut self) -> &mut u8 {
-        self.base.initial_mut()
     }
 
     #[inline]
@@ -1487,11 +1459,6 @@ where
     #[inline]
     fn initial(&self) -> u8 {
         self.base.initial()
-    }
-
-    #[inline]
-    fn initial_mut(&mut self) -> &mut u8 {
-        self.base.initial_mut()
     }
 
     #[inline]
@@ -1732,11 +1699,6 @@ where
     #[inline]
     fn initial(&self) -> T {
         self.initial
-    }
-
-    #[inline]
-    fn initial_mut(&mut self) -> &mut T {
-        &mut self.initial
     }
 
     fn count_bytes(&self) -> u64 {
@@ -2088,16 +2050,6 @@ where
     #[inline]
     fn initial(&self) -> T {
         self.initial
-    }
-
-    #[inline]
-    fn initial_mut(&mut self) -> &mut T {
-        &mut self.initial
-    }
-
-    #[inline]
-    fn set_initial(&mut self, initial: T) {
-        self.initial = initial;
     }
 
     /// Reset the map
@@ -2476,17 +2428,6 @@ pub mod pybind {
                 #[inline]
                 fn initial(&self) -> $datatype {
                     mapob_unwrap_me!($wrapper_name, self.wrapper, m, { m.initial() })
-                }
-
-                #[inline]
-                fn initial_mut(&mut self) -> &mut $datatype {
-                    let ptr = mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.initial_mut() as *mut $datatype });
-                    unsafe { ptr.as_mut().unwrap() }
-                }
-
-                #[inline]
-                fn set_initial(&mut self, initial: $datatype) {
-                    mapob_unwrap_me_mut!($wrapper_name, self.wrapper, m, { m.set_initial(initial) });
                 }
 
                 #[inline]
