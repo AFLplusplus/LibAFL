@@ -297,10 +297,12 @@ impl CompilerWrapper for ClangWrapper {
             return Ok(args);
         }
 
-        if self.use_new_pm {
-            args.push("-fexperimental-new-pass-manager".into());
-        } else {
-            args.push("-flegacy-pass-manager".into());
+        if !self.passes.is_empty() {
+            if self.use_new_pm {
+                args.push("-fexperimental-new-pass-manager".into());
+            } else {
+                args.push("-flegacy-pass-manager".into());
+            }
         }
         for pass in &self.passes {
             if self.use_new_pm {

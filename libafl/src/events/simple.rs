@@ -5,6 +5,10 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std"))]
+use core::ffi::c_void;
+#[cfg(all(unix, feature = "std"))]
+use core::ptr::write_volatile;
 #[cfg(feature = "std")]
 use core::sync::atomic::{compiler_fence, Ordering};
 use core::{fmt::Debug, marker::PhantomData};
@@ -17,6 +21,11 @@ use super::{CustomBufEventResult, CustomBufHandlerFn, HasCustomBufHandlers, Prog
 use crate::bolts::os::startable_self;
 #[cfg(all(feature = "std", feature = "fork", unix))]
 use crate::bolts::os::{fork, ForkResult};
+#[cfg(all(unix, feature = "std"))]
+use crate::{
+    bolts::os::unix_signals::setup_signal_handler,
+    events::{shutdown_handler, SHUTDOWN_SIGHANDLER_DATA},
+};
 #[cfg(feature = "std")]
 use crate::{
     bolts::{shmem::ShMemProvider, staterestore::StateRestorer},
@@ -128,7 +137,7 @@ where
 {
 }
 
-impl<MT, S> HasCustomBufHandlers<S> for SimpleEventManager<MT, S>
+impl<MT, S> HasCustomBufHandlers for SimpleEventManager<MT, S>
 where
     MT: Monitor, //CE: CustomEvent<I, OT>,
     S: UsesInput,
@@ -136,7 +145,9 @@ where
     /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
     fn add_custom_buf_handler(
         &mut self,
-        handler: Box<dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>>,
+        handler: Box<
+            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+        >,
     ) {
         self.custom_buf_handlers.push(handler);
     }
@@ -281,8 +292,7 @@ where
             Ok(())
         } else {
             Err(Error::unknown(format!(
-                "Received illegal message that message should not have arrived: {:?}.",
-                event
+                "Received illegal message that message should not have arrived: {event:?}."
             )))
         }
     }
@@ -371,7 +381,7 @@ where
 }
 
 #[cfg(feature = "std")]
-impl<MT, S, SP> HasCustomBufHandlers<S> for SimpleRestartingEventManager<MT, S, SP>
+impl<MT, S, SP> HasCustomBufHandlers for SimpleRestartingEventManager<MT, S, SP>
 where
     MT: Monitor,
     S: UsesInput,
@@ -434,10 +444,35 @@ where
         // We start ourself as child process to actually fuzz
         let mut staterestorer = if std::env::var(_ENV_FUZZER_SENDER).is_err() {
             // First, create a place to store state in, for restarts.
+            #[cfg(unix)]
+            let mut staterestorer: StateRestorer<SP> =
+                StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
+            #[cfg(not(unix))]
             let staterestorer: StateRestorer<SP> =
                 StateRestorer::new(shmem_provider.new_shmem(256 * 1024 * 1024)?);
+
             //let staterestorer = { LlmpSender::new(shmem_provider.clone(), 0, false)? };
             staterestorer.write_to_env(_ENV_FUZZER_SENDER)?;
+
+            #[cfg(unix)]
+            unsafe {
+                let data = &mut SHUTDOWN_SIGHANDLER_DATA;
+                // Write the pointer to staterestorer so we can release its shmem later
+                write_volatile(
+                    &mut data.staterestorer_ptr,
+                    &mut staterestorer as *mut _ as *mut c_void,
+                );
+                data.allocator_pid = std::process::id() as usize;
+                data.shutdown_handler = shutdown_handler::<SP> as *const c_void;
+            }
+
+            // We setup signal handlers to clean up shmem segments used by state restorer
+            #[cfg(unix)]
+            if let Err(_e) = unsafe { setup_signal_handler(&mut SHUTDOWN_SIGHANDLER_DATA) } {
+                // We can live without a proper ctrl+c signal handler. Print and ignore.
+                #[cfg(feature = "std")]
+                println!("Failed to setup signal handlers: {_e}");
+            }
 
             let mut ctr: u64 = 0;
             // Client->parent loop

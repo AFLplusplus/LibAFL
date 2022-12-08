@@ -832,8 +832,7 @@ impl core::fmt::Display for ClientPerfMonitor {
         // Create the formatted string
         writeln!(
             f,
-            "  {:6.4}: Scheduler\n  {:6.4}: Manager",
-            scheduler_percent, manager_percent
+            "  {scheduler_percent:6.4}: Scheduler\n  {manager_percent:6.4}: Manager"
         )?;
 
         // Calculate each stage

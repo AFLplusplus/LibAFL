@@ -43,7 +43,7 @@ where
         E: Executor<EM, Z> + HasObservers,
         CS: Scheduler<State = E::State>,
         EM: UsesState<State = E::State>,
-        Z: HasScheduler<CS, State = E::State>;
+        Z: HasScheduler<Scheduler = CS, State = E::State>;
 }
 
 /// Minimizes a corpus according to coverage maps, weighting by the specified `TestcaseScore`.
@@ -102,7 +102,7 @@ where
         E: Executor<EM, Z> + HasObservers,
         CS: Scheduler<State = E::State>,
         EM: UsesState<State = E::State>,
-        Z: HasScheduler<CS, State = E::State>,
+        Z: HasScheduler<Scheduler = CS, State = E::State>,
     {
         let cfg = Config::default();
         let ctx = Context::new(&cfg);

@@ -47,8 +47,8 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{
-        calibrate::CalibrationStage, power::StdPowerMutationalStage, GeneralizationStage,
-        StdMutationalStage, TracingStage,
+        calibrate::CalibrationStage, dump::DumpToDiskStage, power::StdPowerMutationalStage,
+        GeneralizationStage, StdMutationalStage, TracingStage,
     },
     state::{HasCorpus, HasMetadata, StdState},
     Error,
@@ -64,6 +64,7 @@ use nix::{self, unistd::dup};
 
 /// The fuzzer main (as `no_mangle` C function)
 #[no_mangle]
+#[allow(clippy::too_many_lines)]
 pub fn libafl_main() {
     // Registry the metadata types used in this fuzzer
     // Needed only on no_std
@@ -127,7 +128,7 @@ pub fn libafl_main() {
     );
 
     if let Some(filenames) = res.get_many::<String>("remaining") {
-        let filenames: Vec<&str> = filenames.map(|v| v.as_str()).collect();
+        let filenames: Vec<&str> = filenames.map(std::string::String::as_str).collect();
         if !filenames.is_empty() {
             run_testcases(&filenames);
             return;
@@ -148,8 +149,11 @@ pub fn libafl_main() {
         }
     }
     let mut crashes = out_dir.clone();
+    let mut report = out_dir.clone();
     crashes.push("crashes");
+    report.push("report");
     out_dir.push("queue");
+    drop(fs::create_dir(&report));
 
     let in_dir = PathBuf::from(
         res.get_one::<String>("in")
@@ -174,10 +178,12 @@ pub fn libafl_main() {
     );
 
     if check_if_textual(&in_dir, &tokens) {
-        fuzz_text(out_dir, crashes, in_dir, tokens, logfile, timeout)
-            .expect("An error occurred while fuzzing");
+        fuzz_text(
+            out_dir, crashes, &report, &in_dir, tokens, &logfile, timeout,
+        )
+        .expect("An error occurred while fuzzing");
     } else {
-        fuzz_binary(out_dir, crashes, in_dir, tokens, logfile, timeout)
+        fuzz_binary(out_dir, crashes, &in_dir, tokens, &logfile, timeout)
             .expect("An error occurred while fuzzing");
     }
 }
@@ -215,7 +221,7 @@ fn count_textual_inputs(dir: &Path) -> (usize, usize) {
 }
 
 fn check_if_textual(seeds_dir: &Path, tokenfile: &Option<PathBuf>) -> bool {
-    let (found, tot) = count_textual_inputs(&seeds_dir);
+    let (found, tot) = count_textual_inputs(seeds_dir);
     let is_text = found * 100 / tot > 90; // 90% of text inputs
     if let Some(tokenfile) = tokenfile {
         let toks = Tokens::from_file(tokenfile).unwrap();
@@ -237,7 +243,7 @@ fn run_testcases(filenames: &[&str]) {
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
-        println!("Warning: LLVMFuzzerInitialize failed with -1")
+        println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
     println!(
@@ -256,20 +262,16 @@ fn run_testcases(filenames: &[&str]) {
 }
 
 /// The actual fuzzer
+#[allow(clippy::too_many_lines)]
 fn fuzz_binary(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
-    seed_dir: PathBuf,
+    seed_dir: &PathBuf,
     tokenfile: Option<PathBuf>,
-    logfile: PathBuf,
+    logfile: &PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
-    let log = RefCell::new(
-        OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&logfile)?,
-    );
+    let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
     let mut stdout_cpy = unsafe {
@@ -357,7 +359,7 @@ fn fuzz_binary(
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
-        println!("Warning: LLVMFuzzerInitialize failed with -1")
+        println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
     // Setup a randomic Input2State stage
@@ -454,12 +456,7 @@ fn fuzz_binary(
         dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
-    log.replace(
-        OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&logfile)?,
-    );
+    log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 
@@ -467,21 +464,18 @@ fn fuzz_binary(
     Ok(())
 }
 
-/// The actual fuzzer based on Grimoire
+/// The actual fuzzer based on `Grimoire`
+#[allow(clippy::too_many_lines)]
 fn fuzz_text(
     corpus_dir: PathBuf,
     objective_dir: PathBuf,
-    seed_dir: PathBuf,
+    report_dir: &Path,
+    seed_dir: &PathBuf,
     tokenfile: Option<PathBuf>,
-    logfile: PathBuf,
+    logfile: &PathBuf,
     timeout: Duration,
 ) -> Result<(), Error> {
-    let log = RefCell::new(
-        OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&logfile)?,
-    );
+    let log = RefCell::new(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     #[cfg(unix)]
     let mut stdout_cpy = unsafe {
@@ -570,7 +564,7 @@ fn fuzz_text(
     // Call LLVMFUzzerInitialize() if present.
     let args: Vec<String> = env::args().collect();
     if libfuzzer_initialize(&args) == -1 {
-        println!("Warning: LLVMFuzzerInitialize failed with -1")
+        println!("Warning: LLVMFuzzerInitialize failed with -1");
     }
 
     // Setup a randomic Input2State stage
@@ -644,8 +638,23 @@ fn fuzz_text(
         timeout * 10,
     ));
 
+    let fuzzbench = DumpToDiskStage::new(
+        |input: &GeneralizedInput| input.target_bytes().into(),
+        &report_dir.join("queue"),
+        &report_dir.join("crashes"),
+    )
+    .unwrap();
+
     // The order of the stages matter!
-    let mut stages = tuple_list!(generalization, calibration, tracing, i2s, power, grimoire);
+    let mut stages = tuple_list!(
+        fuzzbench,
+        generalization,
+        calibration,
+        tracing,
+        i2s,
+        power,
+        grimoire
+    );
 
     // Read tokens
     if state.metadata().get::<Tokens>().is_none() {
@@ -682,12 +691,7 @@ fn fuzz_text(
         dup2(null_fd, io::stderr().as_raw_fd())?;
     }
     // reopen file to make sure we're at the end
-    log.replace(
-        OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(&logfile)?,
-    );
+    log.replace(OpenOptions::new().append(true).create(true).open(logfile)?);
 
     fuzzer.fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)?;
 

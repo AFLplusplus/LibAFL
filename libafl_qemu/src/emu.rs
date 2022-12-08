@@ -3,10 +3,11 @@
 use core::{
     convert::Into,
     ffi::c_void,
-    ptr::{addr_of, addr_of_mut, null},
+    mem::MaybeUninit,
+    ptr::{addr_of, copy_nonoverlapping, null},
 };
-#[cfg(emulation_mode = "usermode")]
-use core::{mem::MaybeUninit, ptr::copy_nonoverlapping};
+#[cfg(emulation_mode = "systemmode")]
+use std::ffi::CString;
 use std::{slice::from_raw_parts, str::from_utf8_unchecked};
 
 #[cfg(emulation_mode = "usermode")]
@@ -15,22 +16,79 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use num_traits::Num;
 use strum_macros::EnumIter;
 
-#[cfg(not(any(cpu_target = "x86_64", cpu_target = "aarch64")))]
-/// `GuestAddr` is u32 for 32-bit targets
-pub type GuestAddr = u32;
+pub type GuestAddr = libafl_qemu_sys::target_ulong;
+pub type GuestUsize = libafl_qemu_sys::target_ulong;
+pub type GuestIsize = libafl_qemu_sys::target_long;
+pub type GuestVirtAddr = libafl_qemu_sys::hwaddr;
+pub type GuestPhysAddr = libafl_qemu_sys::hwaddr;
 
-#[cfg(any(cpu_target = "x86_64", cpu_target = "aarch64"))]
-/// `GuestAddr` is u64 for 64-bit targets
-pub type GuestAddr = u64;
+pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
 
-pub type GuestUsize = GuestAddr;
+#[repr(transparent)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub struct MemAccessInfo {
+    oi: libafl_qemu_sys::MemOpIdx,
+}
+
+impl MemAccessInfo {
+    #[must_use]
+    pub fn memop(&self) -> libafl_qemu_sys::MemOp {
+        libafl_qemu_sys::MemOp(self.oi >> 4)
+    }
+
+    #[must_use]
+    pub fn memopidx(&self) -> libafl_qemu_sys::MemOpIdx {
+        self.oi
+    }
+
+    #[must_use]
+    pub fn mmu_index(&self) -> u32 {
+        self.oi & 15
+    }
+
+    #[must_use]
+    pub fn size(&self) -> usize {
+        libafl_qemu_sys::memop_size(self.memop()) as usize
+    }
+
+    #[must_use]
+    pub fn is_big_endian(&self) -> bool {
+        libafl_qemu_sys::memop_big_endian(self.memop())
+    }
+
+    #[must_use]
+    pub fn encode_with(&self, other: u32) -> u64 {
+        (u64::from(self.oi) << 32) | u64::from(other)
+    }
+
+    #[must_use]
+    pub fn decode_from(encoded: u64) -> (Self, u32) {
+        let low = (encoded & 0xFFFFFFFF) as u32;
+        let high = (encoded >> 32) as u32;
+        (Self { oi: high }, low)
+    }
+
+    #[must_use]
+    pub fn new(oi: libafl_qemu_sys::MemOpIdx) -> Self {
+        Self { oi }
+    }
+}
+
+impl From<libafl_qemu_sys::MemOpIdx> for MemAccessInfo {
+    fn from(oi: libafl_qemu_sys::MemOpIdx) -> Self {
+        Self { oi }
+    }
+}
 
 #[cfg(feature = "python")]
 use pyo3::{prelude::*, PyIterProtocol};
 
 pub const SKIP_EXEC_HOOK: u64 = u64::MAX;
 
-type CPUStatePtr = *const c_void;
+pub use libafl_qemu_sys::{CPUArchState, CPUState};
+
+pub type CPUStatePtr = *mut libafl_qemu_sys::CPUState;
+pub type CPUArchStatePtr = *mut libafl_qemu_sys::CPUArchState;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter, PartialEq, Eq)]
 #[repr(i32)]
@@ -195,16 +253,6 @@ extern "C" {
     fn libafl_get_brk() -> u64;
     fn libafl_set_brk(brk: u64) -> u64;
 
-    /// abi_long target_mmap(abi_ulong start, abi_ulong len, int target_prot, int flags, int fd, abi_ulong offset)
-    fn target_mmap(start: u64, len: u64, target_prot: i32, flags: i32, fd: i32, offset: u64)
-        -> u64;
-
-    /// int target_mprotect(abi_ulong start, abi_ulong len, int prot)
-    fn target_mprotect(start: u64, len: u64, target_prot: i32) -> i32;
-
-    /// int target_munmap(abi_ulong start, abi_ulong len)
-    fn target_munmap(start: u64, len: u64) -> i32;
-
     fn read_self_maps() -> *const c_void;
     fn free_self_maps(map_info: *const c_void);
 
@@ -226,29 +274,13 @@ extern "C" {
 extern "C" {
     fn qemu_init(argc: i32, argv: *const *const u8, envp: *const *const u8);
 
+    fn vm_start();
     fn qemu_main_loop();
     fn qemu_cleanup();
 
-    // void libafl_cpu_thread_fn(CPUState *cpu)
-    fn libafl_cpu_thread_fn(cpu: CPUStatePtr);
-
-    // int cpu_memory_rw_debug(CPUState *cpu, target_ulong addr,
-    //                     uint8_t *buf, int len, int is_write);
-    fn cpu_memory_rw_debug(
-        cpu: CPUStatePtr,
-        addr: GuestAddr,
-        buf: *mut u8,
-        len: i32,
-        is_write: i32,
-    );
-
-    static mut libafl_start_vcpu: extern "C" fn(cpu: CPUStatePtr);
-
-    /*
-    fn libafl_save_qemu_snapshot(name: *const u8);
+    fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
     #[allow(unused)]
-    fn libafl_load_qemu_snapshot(name: *const u8);
-     */
+    fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
 }
 
 #[cfg(emulation_mode = "systemmode")]
@@ -259,6 +291,9 @@ extern "C" fn qemu_cleanup_atexit() {
 }
 
 extern "C" {
+    //static libafl_page_size: GuestUsize;
+    fn libafl_page_from_addr(addr: GuestAddr) -> GuestAddr;
+
     // CPUState* libafl_qemu_get_cpu(int cpu_index);
     fn libafl_qemu_get_cpu(cpu_index: i32) -> CPUStatePtr;
     // int libafl_qemu_num_cpus(void);
@@ -310,7 +345,7 @@ extern "C" {
     //                      void (*exec_n)(uint64_t id, target_ulong addr, size_t size, uint64_t data),
     //                      uint64_t data);
     fn libafl_add_read_hook(
-        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        gen: Option<extern "C" fn(GuestAddr, MemAccessInfo, u64) -> u64>,
         exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
@@ -327,7 +362,7 @@ extern "C" {
     //                      void (*exec_n)(uint64_t id, target_ulong addr, size_t size, uint64_t data),
     //                      uint64_t data);
     fn libafl_add_write_hook(
-        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        gen: Option<extern "C" fn(GuestAddr, MemAccessInfo, u64) -> u64>,
         exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
@@ -360,8 +395,6 @@ extern "C" {
         data: *const (),
     );
     fn libafl_qemu_gdb_reply(buf: *const u8, len: usize);
-
-    fn cpu_reset(cpu: CPUStatePtr);
 }
 
 #[cfg(emulation_mode = "usermode")]
@@ -443,7 +476,7 @@ extern "C" fn gdb_cmd(buf: *const u8, len: usize, data: *const ()) -> i32 {
 }
 
 #[derive(Debug)]
-#[repr(C)]
+#[repr(transparent)]
 pub struct CPU {
     ptr: CPUStatePtr,
 }
@@ -479,6 +512,53 @@ impl CPU {
         unsafe { (addr as usize - guest_base) as GuestAddr }
     }
 
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    pub fn get_phys_addr(&self, vaddr: GuestAddr) -> Option<GuestPhysAddr> {
+        unsafe {
+            let page = libafl_page_from_addr(vaddr);
+            let mut attrs = MaybeUninit::<libafl_qemu_sys::MemTxAttrs>::uninit();
+            let paddr = libafl_qemu_sys::cpu_get_phys_page_attrs_debug(
+                self.ptr,
+                page as GuestVirtAddr,
+                attrs.as_mut_ptr(),
+            );
+            if paddr == (-1i64 as GuestPhysAddr) {
+                None
+            } else {
+                Some(paddr)
+            }
+        }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    pub fn get_phys_addr_tlb(
+        &self,
+        vaddr: GuestAddr,
+        info: MemAccessInfo,
+        is_store: bool,
+    ) -> Option<GuestPhysAddr> {
+        unsafe {
+            let pminfo = libafl_qemu_sys::make_plugin_meminfo(
+                info.oi,
+                if is_store {
+                    libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_W
+                } else {
+                    libafl_qemu_sys::qemu_plugin_mem_rw_QEMU_PLUGIN_MEM_R
+                },
+            );
+            let phwaddr = libafl_qemu_sys::qemu_plugin_get_hwaddr(pminfo, vaddr as GuestVirtAddr);
+            if phwaddr.is_null() {
+                None
+            } else {
+                Some(libafl_qemu_sys::qemu_plugin_hwaddr_phys_addr(phwaddr) as GuestPhysAddr)
+            }
+        }
+    }
+
+    // TODO expose tlb_set_dirty and tlb_reset_dirty
+
     /// Write a value to a guest address.
     ///
     /// # Safety
@@ -491,8 +571,15 @@ impl CPU {
             let host_addr = Emulator::new_empty().g2h(addr);
             copy_nonoverlapping(buf.as_ptr(), host_addr, buf.len());
         }
+        // TODO use gdbstub's target_cpu_memory_rw_debug
         #[cfg(emulation_mode = "systemmode")]
-        cpu_memory_rw_debug(self.ptr, addr, buf.as_ptr() as *mut u8, buf.len() as i32, 1);
+        libafl_qemu_sys::cpu_memory_rw_debug(
+            self.ptr,
+            addr as GuestVirtAddr,
+            buf.as_ptr() as *mut _,
+            buf.len(),
+            true,
+        );
     }
 
     /// Read a value from a guest address.
@@ -507,8 +594,15 @@ impl CPU {
             let host_addr = Emulator::new_empty().g2h(addr);
             copy_nonoverlapping(host_addr, buf.as_mut_ptr(), buf.len());
         }
+        // TODO use gdbstub's target_cpu_memory_rw_debug
         #[cfg(emulation_mode = "systemmode")]
-        cpu_memory_rw_debug(self.ptr, addr, buf.as_mut_ptr(), buf.len() as i32, 0);
+        libafl_qemu_sys::cpu_memory_rw_debug(
+            self.ptr,
+            addr as GuestVirtAddr,
+            buf.as_mut_ptr() as *mut _,
+            buf.len(),
+            false,
+        );
     }
 
     #[must_use]
@@ -518,7 +612,6 @@ impl CPU {
 
     pub fn write_reg<R, T>(&self, reg: R, val: T) -> Result<(), String>
     where
-        T: Num + PartialOrd + Copy,
         R: Into<i32>,
     {
         let reg = reg.into();
@@ -532,21 +625,42 @@ impl CPU {
 
     pub fn read_reg<R, T>(&self, reg: R) -> Result<T, String>
     where
-        T: Num + PartialOrd + Copy,
         R: Into<i32>,
     {
-        let reg = reg.into();
-        let mut val = T::zero();
-        let success = unsafe { libafl_qemu_read_reg(self.ptr, reg, addr_of_mut!(val) as *mut u8) };
-        if success == 0 {
-            Err(format!("Failed to read register {reg}"))
-        } else {
-            Ok(val)
+        unsafe {
+            let reg = reg.into();
+            let mut val = MaybeUninit::uninit();
+            let success = libafl_qemu_read_reg(self.ptr, reg, val.as_mut_ptr() as *mut u8);
+            if success == 0 {
+                Err(format!("Failed to read register {reg}"))
+            } else {
+                Ok(val.assume_init())
+            }
         }
     }
 
-    pub fn cpu_reset(&self) {
-        unsafe { cpu_reset(self.ptr) };
+    pub fn reset(&self) {
+        unsafe { libafl_qemu_sys::cpu_reset(self.ptr) };
+    }
+
+    #[must_use]
+    pub fn save_state(&self) -> CPUArchState {
+        unsafe {
+            let mut saved = MaybeUninit::<CPUArchState>::uninit();
+            copy_nonoverlapping(self.ptr.as_mut().unwrap().env_ptr, saved.as_mut_ptr(), 1);
+            saved.assume_init()
+        }
+    }
+
+    pub fn restore_state(&self, saved: &CPUArchState) {
+        unsafe {
+            copy_nonoverlapping(saved, self.ptr.as_mut().unwrap().env_ptr, 1);
+        }
+    }
+
+    #[must_use]
+    pub fn raw_ptr(&self) -> CPUStatePtr {
+        self.ptr
     }
 }
 
@@ -605,13 +719,6 @@ impl Emulator {
         Emulator { _private: () }
     }
 
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn start(&self, cpu: &CPU) {
-        unsafe {
-            libafl_cpu_thread_fn(cpu.ptr);
-        }
-    }
-
     /// This function gets the memory mappings from the emulator.
     #[cfg(emulation_mode = "usermode")]
     #[must_use]
@@ -646,6 +753,16 @@ impl Emulator {
         }
     }
 
+    #[must_use]
+    pub fn page_from_addr(addr: GuestAddr) -> GuestAddr {
+        unsafe { libafl_page_from_addr(addr) }
+    }
+
+    //#[must_use]
+    /*pub fn page_size() -> GuestUsize {
+        unsafe { libafl_page_size }
+    }*/
+
     #[cfg(emulation_mode = "usermode")]
     #[must_use]
     pub fn g2h<T>(&self, addr: GuestAddr) -> *mut T {
@@ -659,11 +776,37 @@ impl Emulator {
     }
 
     pub unsafe fn write_mem(&self, addr: GuestAddr, buf: &[u8]) {
-        self.current_cpu().unwrap().write_mem(addr, buf);
+        self.current_cpu()
+            .unwrap_or_else(|| self.cpu_from_index(0))
+            .write_mem(addr, buf);
     }
 
     pub unsafe fn read_mem(&self, addr: GuestAddr, buf: &mut [u8]) {
-        self.current_cpu().unwrap().read_mem(addr, buf);
+        self.current_cpu()
+            .unwrap_or_else(|| self.cpu_from_index(0))
+            .read_mem(addr, buf);
+    }
+
+    /// Write a value to a phsical guest address, including ROM areas.
+    #[cfg(emulation_mode = "systemmode")]
+    pub unsafe fn write_phys_mem(&self, paddr: GuestPhysAddr, buf: &[u8]) {
+        libafl_qemu_sys::cpu_physical_memory_rw(
+            paddr,
+            buf.as_ptr() as *mut _,
+            buf.len() as u64,
+            true,
+        );
+    }
+
+    /// Read a value from a physical guest address.
+    #[cfg(emulation_mode = "systemmode")]
+    pub unsafe fn read_phys_mem(&self, paddr: GuestPhysAddr, buf: &mut [u8]) {
+        libafl_qemu_sys::cpu_physical_memory_rw(
+            paddr,
+            buf.as_mut_ptr() as *mut _,
+            buf.len() as u64,
+            false,
+        );
     }
 
     #[must_use]
@@ -723,7 +866,10 @@ impl Emulator {
         #[cfg(emulation_mode = "usermode")]
         libafl_qemu_run();
         #[cfg(emulation_mode = "systemmode")]
-        qemu_main_loop();
+        {
+            vm_start();
+            qemu_main_loop();
+        }
     }
 
     #[cfg(emulation_mode = "usermode")]
@@ -736,12 +882,6 @@ impl Emulator {
     #[must_use]
     pub fn load_addr(&self) -> GuestAddr {
         unsafe { libafl_load_addr() as GuestAddr }
-    }
-    #[cfg(emulation_mode = "systemmode")]
-    #[must_use]
-    pub fn load_addr(&self) -> GuestAddr {
-        // Only work if the binary is linked to the correct address and not pie
-        return 0x0 as GuestAddr;
     }
 
     #[cfg(emulation_mode = "usermode")]
@@ -767,18 +907,21 @@ impl Emulator {
     }
 
     #[cfg(emulation_mode = "usermode")]
+    #[allow(clippy::cast_sign_loss)]
     fn mmap(
         &self,
         addr: GuestAddr,
         size: usize,
         perms: MmapPerms,
         flags: c_int,
-    ) -> Result<u64, ()> {
-        let res = unsafe { target_mmap(addr.into(), size as u64, perms.into(), flags, -1, 0) };
-        if res == 0 {
+    ) -> Result<GuestAddr, ()> {
+        let res = unsafe {
+            libafl_qemu_sys::target_mmap(addr, size as GuestUsize, perms.into(), flags, -1, 0)
+        };
+        if res <= 0 {
             Err(())
         } else {
-            Ok(res)
+            Ok(res as GuestAddr)
         }
     }
 
@@ -813,7 +956,9 @@ impl Emulator {
 
     #[cfg(emulation_mode = "usermode")]
     pub fn mprotect(&self, addr: GuestAddr, size: usize, perms: MmapPerms) -> Result<(), String> {
-        let res = unsafe { target_mprotect(addr.into(), size as u64, perms.into()) };
+        let res = unsafe {
+            libafl_qemu_sys::target_mprotect(addr.into(), size as GuestUsize, perms.into())
+        };
         if res == 0 {
             Ok(())
         } else {
@@ -823,7 +968,7 @@ impl Emulator {
 
     #[cfg(emulation_mode = "usermode")]
     pub fn unmap(&self, addr: GuestAddr, size: usize) -> Result<(), String> {
-        if unsafe { target_munmap(addr.into(), size as u64) } == 0 {
+        if unsafe { libafl_qemu_sys::target_munmap(addr.into(), size as GuestUsize) } == 0 {
             Ok(())
         } else {
             Err(format!("Failed to unmap {addr}"))
@@ -856,7 +1001,7 @@ impl Emulator {
 
     pub fn add_read_hooks(
         &self,
-        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        gen: Option<extern "C" fn(GuestAddr, MemAccessInfo, u64) -> u64>,
         exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
@@ -867,9 +1012,10 @@ impl Emulator {
         unsafe { libafl_add_read_hook(gen, exec1, exec2, exec4, exec8, exec_n, data) }
     }
 
+    // TODO add MemOp info
     pub fn add_write_hooks(
         &self,
-        gen: Option<extern "C" fn(GuestAddr, usize, u64) -> u64>,
+        gen: Option<extern "C" fn(GuestAddr, MemAccessInfo, u64) -> u64>,
         exec1: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec2: Option<extern "C" fn(u64, GuestAddr, u64)>,
         exec4: Option<extern "C" fn(u64, GuestAddr, u64)>,
@@ -896,13 +1042,6 @@ impl Emulator {
         unsafe { libafl_add_backdoor_hook(exec, data) };
     }
 
-    #[cfg(emulation_mode = "systemmode")]
-    pub fn set_vcpu_start(&self, hook: extern "C" fn(cpu: CPU)) {
-        unsafe {
-            libafl_start_vcpu = core::mem::transmute(hook);
-        }
-    }
-
     #[cfg(emulation_mode = "usermode")]
     pub fn set_on_thread_hook(&self, hook: extern "C" fn(tid: u32)) {
         unsafe {
@@ -910,17 +1049,17 @@ impl Emulator {
         }
     }
 
-    /*#[cfg(emulation_mode = "systemmode")]
-    pub fn save_snapshot(&self, name: &str) {
+    #[cfg(emulation_mode = "systemmode")]
+    pub fn save_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _) };
+        unsafe { libafl_save_qemu_snapshot(s.as_ptr() as *const _, sync) };
     }
 
     #[cfg(emulation_mode = "systemmode")]
-    pub fn load_snapshot(&self, name: &str) {
+    pub fn load_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
-        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _) };
-    }*/
+        unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _, sync) };
+    }
 
     #[cfg(emulation_mode = "usermode")]
     pub fn set_pre_syscall_hook(

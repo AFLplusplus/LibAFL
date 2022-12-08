@@ -78,7 +78,7 @@ impl<CS, F, M> Scheduler for MinimizerScheduler<CS, F, M>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
-    M: AsSlice<usize> + SerdeAny + HasRefCnt,
+    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
@@ -94,6 +94,7 @@ where
         idx: usize,
         testcase: &Testcase<<CS::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
+        self.update_score(state, idx)?;
         self.base.on_replace(state, idx, testcase)
     }
 
@@ -190,7 +191,7 @@ impl<CS, F, M> MinimizerScheduler<CS, F, M>
 where
     CS: Scheduler,
     F: TestcaseScore<CS::State>,
-    M: AsSlice<usize> + SerdeAny + HasRefCnt,
+    M: AsSlice<Entry = usize> + SerdeAny + HasRefCnt,
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Update the `Corpus` score using the `MinimizerScheduler`
@@ -208,8 +209,7 @@ where
             let factor = F::compute(&mut *entry, state)?;
             let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
                 Error::key_not_found(format!(
-                    "Metadata needed for MinimizerScheduler not found in testcase #{}",
-                    idx
+                    "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
                 ))
             })?;
             for elem in meta.as_slice() {
@@ -228,8 +228,7 @@ where
                     let must_remove = {
                         let old_meta = old.metadata_mut().get_mut::<M>().ok_or_else(|| {
                             Error::key_not_found(format!(
-                                "Metadata needed for MinimizerScheduler not found in testcase #{}",
-                                old_idx
+                                "Metadata needed for MinimizerScheduler not found in testcase #{old_idx}"
                             ))
                         })?;
                         *old_meta.refcnt_mut() -= 1;
@@ -273,10 +272,7 @@ where
     /// Cull the `Corpus` using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     pub fn cull(&self, state: &mut CS::State) -> Result<(), Error> {
-        let top_rated = match state.metadata().get::<TopRatedsMetadata>() {
-            None => return Ok(()),
-            Some(val) => val,
-        };
+        let Some(top_rated) = state.metadata().get::<TopRatedsMetadata>() else { return Ok(()) };
 
         let mut acc = HashSet::new();
 
@@ -285,8 +281,7 @@ where
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
                 let meta = entry.metadata().get::<M>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "Metadata needed for MinimizerScheduler not found in testcase #{}",
-                        idx
+                        "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
                     ))
                 })?;
                 for elem in meta.as_slice() {

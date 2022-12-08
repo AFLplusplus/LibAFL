@@ -234,7 +234,7 @@ where
 
 /// Match for a name and return the value
 ///
-/// # Safety
+/// # Note
 /// This operation is unsafe with Rust stable, wait for [specialization](https://stackoverflow.com/a/60138532/7658998).
 pub trait MatchName {
     /// Match for a name and return the borrowed value

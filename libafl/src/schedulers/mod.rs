@@ -27,6 +27,9 @@ use alloc::borrow::ToOwned;
 
 pub use powersched::PowerQueueScheduler;
 
+pub mod tuneable;
+pub use tuneable::*;
+
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, Testcase},

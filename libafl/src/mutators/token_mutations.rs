@@ -113,8 +113,7 @@ impl Tokens {
         }
         if token_stop < token_start {
             return Err(Error::illegal_argument(format!(
-                "Tried to create tokens from illegal section: stop < start ({:?} < {:?})",
-                token_stop, token_start
+                "Tried to create tokens from illegal section: stop < start ({token_stop:?} < {token_start:?})"
             )));
         }
         let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
@@ -169,19 +168,13 @@ impl Tokens {
             if line.is_empty() || start == Some('#') {
                 continue;
             }
-            let pos_quote = match line.find('\"') {
-                Some(x) => x,
-                None => return Err(Error::illegal_argument(format!("Illegal line: {line}"))),
-            };
+            let Some(pos_quote) = line.find('\"') else { return Err(Error::illegal_argument(format!("Illegal line: {line}"))) };
             if line.chars().nth(line.len() - 1) != Some('"') {
                 return Err(Error::illegal_argument(format!("Illegal line: {line}")));
             }
 
             // extract item
-            let item = match line.get(pos_quote + 1..line.len() - 1) {
-                Some(x) => x,
-                None => return Err(Error::illegal_argument(format!("Illegal line: {line}"))),
-            };
+            let Some(item) = line.get(pos_quote + 1..line.len() - 1) else { return Err(Error::illegal_argument(format!("Illegal line: {line}"))) };
             if item.is_empty() {
                 continue;
             }
@@ -191,8 +184,7 @@ impl Tokens {
                 Ok(val) => val,
                 Err(_) => {
                     return Err(Error::illegal_argument(format!(
-                        "Illegal line (hex decoding): {}",
-                        line
+                        "Illegal line (hex decoding): {line}"
                     )))
                 }
             };
@@ -266,7 +258,8 @@ where
     }
 }
 
-impl AsSlice<Vec<u8>> for Tokens {
+impl AsSlice for Tokens {
+    type Entry = Vec<u8>;
     fn as_slice(&self) -> &[Vec<u8>] {
         self.tokens()
     }

@@ -1,6 +1,8 @@
 /*!
 The frida executor is a binary-only mode for `LibAFL`.
 It can report coverage and, on supported architecutres, even reports memory access errors.
+
+Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
 */
 
 #![deny(rustdoc::broken_intra_doc_links)]
@@ -73,6 +75,10 @@ pub mod asan;
 pub mod windows_hooks;
 
 pub mod coverage_rt;
+
+/// Hooking thread lifecycle events. Seems like this is apple-only for now.
+#[cfg(any(target_vendor = "apple"))]
+pub mod pthread_hook;
 
 #[cfg(feature = "cmplog")]
 /// The frida cmplog runtime

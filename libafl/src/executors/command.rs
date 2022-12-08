@@ -1,5 +1,5 @@
 //! The command executor executes a sub program for each run
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -35,10 +35,10 @@ use crate::{
 use crate::{inputs::Input, Error};
 
 /// How to deliver input to an external program
-/// `StdIn`: The traget reads from stdin
+/// `StdIn`: The target reads from stdin
 /// `File`: The target reads from the specified [`InputFile`]
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum InputLocation {
+pub enum InputLocation {
     /// Mutate a commandline argument to deliver an input
     Arg {
         /// The offset of the argument to mutate
@@ -335,21 +335,21 @@ where
         };
 
         if self.observers.observes_stderr() {
-            let mut stderr = String::new();
+            let mut stderr = Vec::new();
             child.stderr.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
                 )
-            })?.read_to_string(&mut stderr)?;
+            })?.read_to_end(&mut stderr)?;
             self.observers.observe_stderr(&stderr);
         }
         if self.observers.observes_stdout() {
-            let mut stdout = String::new();
+            let mut stdout = Vec::new();
             child.stdout.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor",
                 )
-            })?.read_to_string(&mut stdout)?;
+            })?.read_to_end(&mut stdout)?;
             self.observers.observe_stdout(&stdout);
         }
 
@@ -535,13 +535,12 @@ impl CommandExecutorBuilder {
         OT: Debug + MatchName + ObserversTuple<S>,
         S: UsesInput,
     {
-        let program = if let Some(program) = &self.program {
-            program
-        } else {
-            return Err(Error::illegal_argument(
+        let Some(program) = &self.program else {
+             return Err(Error::illegal_argument(
                 "ComandExecutor::builder: no program set!",
-            ));
+           ));
         };
+
         let mut command = Command::new(program);
         match &self.input_location {
             InputLocation::StdIn => {

@@ -30,6 +30,9 @@ pub use generalization::GeneralizationStage;
 pub mod owned;
 pub use owned::StagesOwnedList;
 
+pub mod tuneable;
+pub use tuneable::*;
+
 #[cfg(feature = "std")]
 pub mod concolic;
 #[cfg(feature = "std")]
@@ -39,10 +42,15 @@ pub use concolic::SimpleConcolicMutationalStage;
 
 #[cfg(feature = "std")]
 pub mod sync;
+#[cfg(feature = "std")]
+pub use sync::*;
+
+#[cfg(feature = "std")]
+pub mod dump;
 use core::{convert::From, marker::PhantomData};
 
 #[cfg(feature = "std")]
-pub use sync::*;
+pub use dump::*;
 
 use self::push::PushStage;
 use crate::{
@@ -244,7 +252,7 @@ where
     Z: ExecutesInput<E, EM, State = CS::State>
         + ExecutionProcessor<OT, State = CS::State>
         + EvaluatorObservers<OT>
-        + HasScheduler<CS>,
+        + HasScheduler<Scheduler = CS>,
 {
     fn perform(
         &mut self,
