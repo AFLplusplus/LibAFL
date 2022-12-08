@@ -133,7 +133,7 @@ impl SchedulerMetadata {
 /// The power schedule to use
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PowerSchedule {
-    /// The `explore" power schedule
+    /// The `explore` power schedule
     EXPLORE,
     /// The `exploit` power schedule
     EXPLOIT,
