@@ -1294,14 +1294,16 @@ mod windows_exception_handler {
             compiler_fence(Ordering::SeqCst);
         }
 
-        let code =if let Some(exception_pointers) = exception_pointers.as_mut() {
+        let code = if let Some(exception_pointers) = exception_pointers.as_mut() {
             ExceptionCode::try_from(
                 exception_pointers
                     .ExceptionRecord
                     .as_mut()
                     .unwrap()
                     .ExceptionCode
-                    .0).unwrap()
+                    .0,
+            )
+            .unwrap()
         } else {
             ExceptionCode::NotImplemented // Should be changed probably
         };
