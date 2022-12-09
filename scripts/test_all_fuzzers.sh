@@ -42,6 +42,11 @@ do
         continue
     fi
 
+    # Skip windows fuzzers
+    if [[ $fuzzer == *"windows"* ]]; then
+        continue
+    fi
+
     cd "$fuzzer" || exit 1
     start=$(date +%s)
     # Clippy checks
