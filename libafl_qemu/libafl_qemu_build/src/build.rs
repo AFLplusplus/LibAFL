@@ -39,6 +39,10 @@ pub fn build(
         cpu_target += "eb";
     }
 
+    if !is_big_endian && cpu_target == "mips" && !cfg!(feature = "clippy") {
+        cpu_target += "el";
+    }
+
     let custum_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
     let custum_qemu_no_build = env::var("CUSTOM_QEMU_NO_BUILD").is_ok();
     let custum_qemu_no_configure = env::var("CUSTOM_QEMU_NO_CONFIGURE").is_ok();

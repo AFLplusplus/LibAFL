@@ -26,6 +26,8 @@ pub fn build() {
         "aarch64".to_string()
     } else if cfg!(feature = "i386") {
         "i386".to_string()
+    } else if cfg!(feature = "mips") {
+        "mips".to_string()
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             "x86_64".to_string()
