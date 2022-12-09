@@ -1294,8 +1294,9 @@ mod windows_exception_handler {
             compiler_fence(Ordering::SeqCst);
         }
 
-        let code = if let Some(exception_pointers) = exception_pointers.as_mut() {
-            ExceptionCode::try_from(
+        #[cfg(feature = "std")]
+        if let Some(exception_pointers) = exception_pointers.as_mut() {
+            let code = ExceptionCode::try_from(
                 exception_pointers
                     .ExceptionRecord
                     .as_mut()
@@ -1303,13 +1304,12 @@ mod windows_exception_handler {
                     .ExceptionCode
                     .0,
             )
-            .unwrap()
+            .unwrap();
+            eprintln!("Crashed with {}", code);
         } else {
-            ExceptionCode::NotImplemented // Should be changed probably
+            eprintln!("Crashed without exception (probably due to SIGABRT)");
         };
 
-        #[cfg(feature = "std")]
-        eprintln!("Crashed with {}", code);
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
             {
