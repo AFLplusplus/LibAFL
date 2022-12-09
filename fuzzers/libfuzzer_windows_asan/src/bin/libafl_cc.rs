@@ -6,7 +6,12 @@ pub fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let mut dir = env::current_exe().unwrap();
-        let wrapper_name = dir.file_name().unwrap().to_str().unwrap().replace(".exe", "");
+        let wrapper_name = dir
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace(".exe", "");
 
         let is_cpp = match wrapper_name[wrapper_name.len()-2..].to_lowercase().as_str() {
             "cc" => false,
