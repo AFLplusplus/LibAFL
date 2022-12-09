@@ -44,6 +44,6 @@ The MSVC compiler (`cl.exe`) will work in the future. Currently, it is blocked b
 
 ### Note on ASAN
 
-Using ASAN on Windows with MSVC is not trivial as of 2022. Depending on the harness and fuzzing target, the required compilation flags differ. Most notably, the usage of `/MT` and `/MD` for the CRT is important. All compilation artifacts should use the same config for the CRT (either all `/MT` or all `/MD`). Rust uses as of 2022 `/MD` as default. So compile everything with `/MD`.
+Using ASAN on Windows with MSVC is not trivial as of 2022. Depending on the harness and fuzzing target, the required compilation flags differ. Most notably, the usage of `/MT` and `/MD` for the CRT is important. All compilation artifacts should use the same config for the CRT (either all `/MT` or all `/MD`). [Rust uses as of 2022](https://rust-lang.github.io/rfcs/1721-crt-static.html) `/MD` as default. So compile everything with `/MD`.
 
 Depending on the linking mode different ASAN libraries get linked. Definitely read [this](https://devblogs.microsoft.com/cppblog/addresssanitizer-asan-for-windows-with-msvc/) blog post by Microsoft.
