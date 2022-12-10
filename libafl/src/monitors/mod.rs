@@ -116,7 +116,7 @@ impl ClientStats {
     }
 
     /// Get the calculated executions per second for this client
-    #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)]
     #[cfg(feature = "afl_exec_sec")]
     pub fn execs_per_sec_f64(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
@@ -147,7 +147,7 @@ impl ClientStats {
     }
 
     /// Get the calculated executions per second for this client
-    #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
+    #[allow(clippy::cast_precision_loss)]
     #[cfg(not(feature = "afl_exec_sec"))]
     pub fn execs_per_sec_f64(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
@@ -164,6 +164,7 @@ impl ClientStats {
         (self.executions as f64) / elapsed
     }
 
+    #[allow(clippy::cast_sign_loss)]
     /// Get the calculated executions per second for this client
     pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
         self.execs_per_sec_f64(cur_time) as u64
