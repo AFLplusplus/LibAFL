@@ -118,22 +118,22 @@ impl ClientStats {
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
     #[cfg(feature = "afl_exec_sec")]
-    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
+    pub fn execs_per_sec_f64(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
-            return 0;
+            return 0.0;
         }
 
         let elapsed = cur_time
             .checked_sub(self.last_window_time)
             .map_or(0.0, |d| d.as_secs_f64());
         if elapsed as u64 == 0 {
-            return self.last_execs_per_sec as u64;
+            return self.last_execs_per_sec;
         }
 
         let cur_avg = ((self.executions - self.last_window_executions) as f64) / elapsed;
         if self.last_window_executions == 0 {
             self.last_execs_per_sec = cur_avg;
-            return self.last_execs_per_sec as u64;
+            return self.last_execs_per_sec;
         }
 
         // If there is a dramatic (5x+) jump in speed, reset the indicator more quickly
@@ -143,7 +143,7 @@ impl ClientStats {
 
         self.last_execs_per_sec =
             self.last_execs_per_sec * (1.0 - 1.0 / 16.0) + cur_avg * (1.0 / 16.0);
-        self.last_execs_per_sec as u64
+        self.last_execs_per_sec
     }
 
     /// Get the calculated executions per second for this client
