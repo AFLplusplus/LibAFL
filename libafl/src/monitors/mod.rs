@@ -149,19 +149,24 @@ impl ClientStats {
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_sign_loss, clippy::cast_precision_loss)]
     #[cfg(not(feature = "afl_exec_sec"))]
-    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
+    pub fn execs_per_sec_f64(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
-            return 0;
+            return 0.0;
         }
 
         let elapsed = cur_time
             .checked_sub(self.last_window_time)
             .map_or(0.0, |d| d.as_secs_f64());
         if elapsed as u64 == 0 {
-            return 0;
+            return 0.0;
         }
 
-        ((self.executions as f64) / elapsed) as u64
+        (self.executions as f64) / elapsed
+    }
+
+    /// Get the calculated executions per second for this client
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
+        self.execs_per_sec_f64(cur_time) as u64
     }
 
     /// Update the user-defined stat with name and value
@@ -223,7 +228,7 @@ pub trait Monitor {
         let cur_time = current_time();
         self.client_stats_mut()
             .iter_mut()
-            .fold(0_u64, |acc, x| acc + x.execs_per_sec(cur_time))
+            .fold(0.0, |acc, x| acc + x.execs_per_sec_f64(cur_time)) as u64
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
