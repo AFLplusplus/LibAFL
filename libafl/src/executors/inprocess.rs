@@ -1294,20 +1294,22 @@ mod windows_exception_handler {
             compiler_fence(Ordering::SeqCst);
         }
 
-        let code = ExceptionCode::try_from(
-            exception_pointers
-                .as_mut()
-                .unwrap()
-                .ExceptionRecord
-                .as_mut()
-                .unwrap()
-                .ExceptionCode
-                .0,
-        )
-        .unwrap();
-
         #[cfg(feature = "std")]
-        eprintln!("Crashed with {}", code);
+        if let Some(exception_pointers) = exception_pointers.as_mut() {
+            let code = ExceptionCode::try_from(
+                exception_pointers
+                    .ExceptionRecord
+                    .as_mut()
+                    .unwrap()
+                    .ExceptionCode
+                    .0,
+            )
+            .unwrap();
+            eprintln!("Crashed with {}", code);
+        } else {
+            eprintln!("Crashed without exception (probably due to SIGABRT)");
+        };
+
         if data.current_input_ptr.is_null() {
             #[cfg(feature = "std")]
             {
