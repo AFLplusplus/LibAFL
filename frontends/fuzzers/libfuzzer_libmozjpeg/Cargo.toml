@@ -1,0 +1,23 @@
+[package]
+name = "libfuzzer_libmozjpeg"
+version.workspace = true
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+libafl = { path = "../../../framework/libafl/" }
+libafl_targets = { path = "../../../framework/libafl_targets/", features = ["sancov_pcguard_edges", "sancov_value_profile", "libfuzzer"] }
+# TODO Include it only when building cc
+libafl_cc = { path = "../../../framework/libafl_cc/" }
+mimalloc = { version = "*", default-features = false }
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+
+[lib]
+name = "libfuzzer_libmozjpeg"
+crate-type = ["staticlib"]

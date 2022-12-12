@@ -4,6 +4,9 @@ out
 Cargo.lock
 vendor
 
+framework/libafl_nyx/QEMU-Nyx/
+framework/libafl_nyx/packer/
+
 .DS_Store
 .env
 
@@ -51,6 +54,3 @@ __pycache__
 **/libxml2
 **/corpus_discovered
 **/libxml2-*.tar.gz
-
-libafl_nyx/QEMU-Nyx
-libafl_nyx/packer

@@ -1,0 +1,27 @@
+[package]
+name = "libfuzzer_libpng_cmin"
+version.workspace = true
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>", "Addison Crump <research@addisoncrump.info>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+# Forces a crash
+crash = []
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+which = { version = "4.0.2" }
+
+[dependencies]
+libafl = { path = "../../../framework/libafl/", features = ["default", "cmin"] }
+# libafl = { path = "../../libafl/", features = ["default"] }
+libafl_targets = { path = "../../../framework/libafl_targets/", features = ["sancov_pcguard_hitcounts", "libfuzzer", "sancov_cmplog"] }
+# TODO Include it only when building cc
+libafl_cc = { path = "../../../framework/libafl_cc/" }
+mimalloc = { version = "*", default-features = false }
+
+[lib]
+name = "libfuzzer_libpng_cmin"
+crate-type = ["staticlib"]

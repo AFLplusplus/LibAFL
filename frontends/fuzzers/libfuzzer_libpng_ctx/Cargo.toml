@@ -1,0 +1,25 @@
+[package]
+name = "libfuzzer_libpng_ctx"
+version.workspace = true
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }
+which = { version = "4.0.2" }
+
+[dependencies]
+libafl = { path = "../../../framework/libafl/", features = ["std", "derive", "llmp_compression", "introspection"] }
+libafl_targets = { path = "../../../framework/libafl_targets/", features = ["libfuzzer"] }
+# TODO Include it only when building cc
+libafl_cc = { path = "../../../framework/libafl_cc/" }
+clap = { version = "4.0", features = ["derive"] }
+mimalloc = { version = "*", default-features = false }
+
+[lib]
+name = "libfuzzer_libpng_ctx"
+crate-type = ["staticlib"]

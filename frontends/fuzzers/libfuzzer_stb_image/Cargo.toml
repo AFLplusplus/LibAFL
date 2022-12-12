@@ -1,0 +1,18 @@
+[package]
+name = "libfuzzer_stb_image"
+version.workspace = true
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2021"
+build = "build.rs"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+libafl = { path = "../../../framework/libafl/" }
+libafl_targets = { path = "../../../framework/libafl_targets/", features = ["sancov_pcguard_edges", "sancov_cmplog", "libfuzzer"] }
+mimalloc = { version = "*", default-features = false }
+
+[build-dependencies]
+cc = { version = "1.0", features = ["parallel"] }

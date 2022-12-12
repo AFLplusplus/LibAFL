@@ -1,0 +1,17 @@
+[package]
+name = "command_executor"
+version.workspace = true
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[build-dependencies]
+cc = "*"
+
+[dependencies]
+libafl = { path = "../../../../framework/libafl/" }
+ahash = "0.7" # another hash
+spawn-ptrace = "0.1.2"
+

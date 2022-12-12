@@ -1,0 +1,13 @@
+[package]
+name = "baby_no_std"
+version.workspace = true
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+libafl = { default-features = false, path = "../../../framework/libafl/" }
+static-alloc = "0.2.3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
