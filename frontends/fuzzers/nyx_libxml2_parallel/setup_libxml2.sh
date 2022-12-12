@@ -12,7 +12,7 @@ cd ./libxml2/ || exit
 ./autogen.sh --enable-shared=no || exit
 make -j || exit
 cd - || exit
-python3 "../../libafl_nyx/packer/packer/nyx_packer.py" \
+python3 "../../../framework/libafl_nyx/packer/packer/nyx_packer.py" \
     ./libxml2/xmllint \
     /tmp/nyx_libxml2 \
     afl \
@@ -22,4 +22,4 @@ python3 "../../libafl_nyx/packer/packer/nyx_packer.py" \
     --fast_reload_mode \
     --purge || exit
 
-python3 ../../libafl_nyx/packer/packer/nyx_config_gen.py /tmp/nyx_libxml2/ Kernel || exit
+python3 ../../../framework/libafl_nyx/packer/packer/nyx_config_gen.py /tmp/nyx_libxml2/ Kernel || exit
