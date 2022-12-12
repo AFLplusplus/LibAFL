@@ -1,0 +1,10 @@
+[package]
+name = "build_and_test_fuzzers"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cargo_toml = "0.13"
+walkdir = "2"
