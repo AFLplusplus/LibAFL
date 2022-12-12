@@ -79,7 +79,7 @@ cp ${CARGO_TARGET_DIR}${SEP}release${SEP}${FUZZER_NAME} .
 script_runner="@shell"
 script='''
 cargo build --release
-cp ./target/release/${FUZZER_NAME} .
+cp ./../../target/release/${FUZZER_NAME} .
 '''
 
 # Run the fuzzer

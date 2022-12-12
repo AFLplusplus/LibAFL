@@ -91,7 +91,7 @@ pub fn main() {
     let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
     let mut executor = ForkserverExecutor::builder()
-        .program("./target/release/program")
+        .program("./program")
         .arg_input_file_std()
         .shmem_provider(&mut shmem_provider)
         .build(tuple_list!(bt_observer, edges_observer))

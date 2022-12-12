@@ -1,8 +1,8 @@
 FUZZER_NAME="fuzzer"
 PROJECT_DIR=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 UNAME :="$(shell uname)"
-LIB_DIR :="$(PROJECT_DIR)/target/release/libafl_atheris.a"
-DEEXIT_PATH = "$(PROJECT_DIR)/../../target/release/libdeexit.dylib"
+LIB_DIR :="$(PROJECT_DIR)/../../../target/release/libafl_atheris.a"
+DEEXIT_PATH = "$(PROJECT_DIR)/../../../target/release/libdeexit.dylib"
 
 PHONY: all
 
