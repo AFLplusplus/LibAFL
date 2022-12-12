@@ -1,0 +1,12 @@
+[package]
+name = "baby_fuzzer_nautilus"
+version.workspace = true
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2018"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+libafl = { path = "../../../framework/libafl/", features = ["default", "nautilus"] }

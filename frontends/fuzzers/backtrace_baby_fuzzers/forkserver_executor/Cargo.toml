@@ -1,0 +1,8 @@
+[package]
+name = "forkserver_executor"
+version.workspace = true
+edition = "2021"
+
+[dependencies]
+libafl = { path = "../../../../framework/libafl/" }
+clap = { version = "3.2", features = ["default"] }

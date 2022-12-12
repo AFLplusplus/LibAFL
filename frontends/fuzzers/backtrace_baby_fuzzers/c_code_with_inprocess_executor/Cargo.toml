@@ -1,0 +1,15 @@
+[package]
+name = "c_code_with_inprocess_executor"
+version.workspace = true
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+libafl = { path = "../../../../framework/libafl/" }
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"

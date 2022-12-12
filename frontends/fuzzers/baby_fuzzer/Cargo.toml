@@ -1,0 +1,13 @@
+[package]
+name = "baby_fuzzer"
+version.workspace = true
+authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
+edition = "2021"
+
+[features]
+default = ["std"]
+tui = []
+std = []
+
+[dependencies]
+libafl = { path = "../../../framework/libafl/" }

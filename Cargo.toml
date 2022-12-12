@@ -1,40 +1,89 @@
 [workspace]
 members = [
-    "libafl",
-    "libafl_derive",
-    "libafl_cc",
-    "libafl_targets",
-    "libafl_frida",
-    "libafl_qemu",
-    "libafl_tinyinst",
-    "libafl_sugar",
-    "libafl_nyx",
-    "libafl_concolic/symcc_runtime",
-    "libafl_concolic/symcc_libafl",
-    "libafl_concolic/test/dump_constraints",
-    "libafl_concolic/test/runtime_test",
+    "framework/libafl",
+    "framework/libafl_derive",
+    "framework/libafl_cc",
+    "framework/libafl_targets",
+    "framework/libafl_frida",
+    "framework/libafl_qemu",
+    "framework/libafl_tinyinst",
+    "framework/libafl_sugar",
+    "framework/libafl_nyx",
+    "framework/libafl_concolic/symcc_runtime",
+    "framework/libafl_concolic/symcc_libafl",
+    "framework/libafl_concolic/test/dump_constraints",
+    "framework/libafl_concolic/test/runtime_test",
     "utils/deexit",
     "utils/gramatron/construct_automata",
     "utils/libafl_benches",
+    
+    # Add frontend fuzzers here
+    "frontends/fuzzers/baby_fuzzer",
+    "frontends/fuzzers/baby_fuzzer_gramatron",
+    "frontends/fuzzers/baby_fuzzer_grimoire",
+    "frontends/fuzzers/baby_fuzzer_minimizing",
+    "frontends/fuzzers/baby_fuzzer_nautilus",
+    "frontends/fuzzers/baby_fuzzer_swap_differential",
+    "frontends/fuzzers/baby_fuzzer_tokens",
+    "frontends/fuzzers/baby_fuzzer_with_forkexecutor",
+    "frontends/fuzzers/baby_no_std",
+    "frontends/fuzzers/backtrace_baby_fuzzers/c_code_with_fork_executor",
+    "frontends/fuzzers/backtrace_baby_fuzzers/c_code_with_inprocess_executor",
+    "frontends/fuzzers/backtrace_baby_fuzzers/command_executor",
+    "frontends/fuzzers/backtrace_baby_fuzzers/forkserver_executor",
+    "frontends/fuzzers/backtrace_baby_fuzzers/rust_code_with_fork_executor",
+    "frontends/fuzzers/backtrace_baby_fuzzers/rust_code_with_inprocess_executor",
+    "frontends/fuzzers/forkserver_simple",
+    "frontends/fuzzers/frida_gdiplus",
+    "frontends/fuzzers/frida_libpng",
+    "frontends/fuzzers/fuzzbench",
+    "frontends/fuzzers/fuzzbench_fork_qemu",
+    "frontends/fuzzers/fuzzbench_forkserver",
+    "frontends/fuzzers/fuzzbench_qemu",
+    "frontends/fuzzers/fuzzbench_text",
+    "frontends/fuzzers/libafl_atheris",
+    "frontends/fuzzers/libfuzzer_libmozjpeg",
+    "frontends/fuzzers/libfuzzer_libpng",
+    "frontends/fuzzers/libfuzzer_libpng_accounting",
+    "frontends/fuzzers/libfuzzer_libpng_cmin",
+    "frontends/fuzzers/libfuzzer_libpng_ctx",
+    "frontends/fuzzers/libfuzzer_libpng_launcher",
+    "frontends/fuzzers/libfuzzer_reachability",
+    "frontends/fuzzers/libfuzzer_stb_image",
+    "frontends/fuzzers/libfuzzer_stb_image_concolic/fuzzer",
+    "frontends/fuzzers/libfuzzer_stb_image_concolic/runtime",
+    "frontends/fuzzers/libfuzzer_stb_image_sugar",
+    "frontends/fuzzers/nyx_libxml2_parallel",
+    "frontends/fuzzers/nyx_libxml2_standalone",
+    "frontends/fuzzers/push_harness",
+    "frontends/fuzzers/push_stage_harness",
+    "frontends/fuzzers/qemu_arm_launcher",
+    "frontends/fuzzers/qemu_launcher",
+    "frontends/fuzzers/qemu_systemmode",
+    "frontends/fuzzers/tinyinst_simple",
+    "frontends/fuzzers/tutorial",
 ]
 default-members = [
-    "libafl",
-    "libafl_derive",
-    "libafl_cc",
-    "libafl_targets",
+    "framework/libafl",
+    "framework/libafl_derive",
+    "framework/libafl_cc",
+    "framework/libafl_targets",
 ]
 exclude = [
-    "fuzzers",
     "bindings",
     "scripts",
-    "libafl_qemu/libafl_qemu_build",
-    "libafl_qemu/libafl_qemu_sys"
+    "framework/libafl_qemu/libafl_qemu_build",
+    "framework/libafl_qemu/libafl_qemu_sys"
 ]
 
 [workspace.package]
 version = "0.8.2"
 
+[profile.dev]
+panic = "abort"
+
 [profile.release]
+panic = "abort"
 lto = true
 codegen-units = 1
 opt-level = 3

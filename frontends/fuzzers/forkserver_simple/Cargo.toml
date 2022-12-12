@@ -1,0 +1,10 @@
+[package]
+name = "forkserver_simple"
+version.workspace = true
+authors = ["tokatoka <tokazerkje@outlook.com>"]
+edition = "2021"
+
+[dependencies]
+libafl = { path = "../../../framework/libafl/", features = ["std", "derive"] }
+clap = { version = "4.0", features = ["derive"] }
+nix = "0.25"

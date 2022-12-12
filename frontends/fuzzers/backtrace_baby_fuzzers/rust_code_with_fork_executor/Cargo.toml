@@ -1,0 +1,11 @@
+[package]
+name = "rust_code_with_fork_executor"
+version.workspace = true
+edition = "2021"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
+libafl = { path = "../../../../framework/libafl/" }
