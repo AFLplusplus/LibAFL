@@ -182,10 +182,10 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
-      run: ./scripts/test_all_fuzzers.sh
+      run: RUN_ON_CI=1 ./scripts/test_all_fuzzers.sh
     - name: Build and run example fuzzers (macOS)
       if: runner.os == 'macOS' # use bash v4
-      run: /usr/local/bin/bash ./scripts/test_all_fuzzers.sh
+      run: /usr/local/bin/bash -c 'RUN_ON_CI=1 ./scripts/test_all_fuzzers.sh'
 
   nostd-build:
     runs-on: ubuntu-latest
