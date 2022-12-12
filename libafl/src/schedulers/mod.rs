@@ -32,7 +32,7 @@ pub use tuneable::*;
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{id_manager::random_corpus_entry, Corpus, CorpusID, Testcase},
+    corpus::{id_manager::random_corpus_entry, Corpus, CorpusId, Testcase},
     inputs::{Input, UsesInput},
     state::{HasCorpus, HasRand, UsesState},
     Error,
@@ -42,7 +42,7 @@ use crate::{
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
 pub trait Scheduler: UsesState {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, _state: &mut Self::State, _idx: CorpusID) -> Result<(), Error> {
+    fn on_add(&self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error> {
         Ok(())
     }
 
@@ -50,7 +50,7 @@ pub trait Scheduler: UsesState {
     fn on_replace(
         &self,
         _state: &mut Self::State,
-        _idx: CorpusID,
+        _idx: CorpusId,
         _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
@@ -60,14 +60,14 @@ pub trait Scheduler: UsesState {
     fn on_remove(
         &self,
         _state: &mut Self::State,
-        _idx: CorpusID,
+        _idx: CorpusId,
         _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut Self::State) -> Result<CorpusID, Error>;
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error>;
 }
 
 /// Feed the fuzzer simply with a random testcase on request
@@ -88,9 +88,8 @@ where
     S: HasCorpus + HasRand,
 {
     /// Gets the next entry at random
-    fn next(&self, state: &mut Self::State) -> Result<CorpusID, Error> {
-        let (_, corpus_id) = random_corpus_entry(state)
-            .ok_or_else(|| Error::empty("No entries in corpus".to_owned()))?;
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
+        let corpus_id = random_corpus_entry(state)?;
 
         *state.corpus_mut().current_mut() = Some(corpus_id);
 
@@ -98,7 +97,7 @@ where
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
             let len = state.corpus().count();
-            Ok(random_corpus_entry(state).map(|x| x.1).unwrap())
+            random_corpus_entry(state)
         }
     }
 }

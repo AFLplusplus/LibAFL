@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub use testcase::{SchedulerTestcaseMetaData, Testcase};
 
 pub mod id_manager;
-pub use id_manager::{CorpusID, CorpusIDManager};
+pub use id_manager::{CorpusId, CorpusIdManager};
 
 pub mod inmemory;
 pub use inmemory::InMemoryCorpus;
@@ -36,14 +36,14 @@ pub trait Corpus: UsesInput + serde::Serialize + for<'de> serde::Deserialize<'de
         self.id_manager().active_ids().len()
     }
 
-    /// Returns a slice of all currently active [`CorpusID`]s.
-    fn ids(&self) -> &[CorpusID] {
+    /// Returns a slice of all currently active [`CorpusId`]s.
+    fn ids(&self) -> &[CorpusId] {
         self.id_manager().active_ids()
     }
 
-    /// Returns an immutable reference to the [`CorpusIDManager`]. This should be used to manage the traversal of the
+    /// Returns an immutable reference to the [`CorpusIdManager`]. This should be used to manage the traversal of the
     /// corpus, e.g. in a Scheduler.
-    fn id_manager(&self) -> &CorpusIDManager;
+    fn id_manager(&self) -> &CorpusIdManager;
 
     /// Returns true, if no elements are in this corpus yet
     fn is_empty(&self) -> bool {
@@ -51,26 +51,26 @@ pub trait Corpus: UsesInput + serde::Serialize + for<'de> serde::Deserialize<'de
     }
 
     /// Add an entry to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusID, Error>;
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
     /// Replaces the testcase at the given idx, returning the existing.
     fn replace(
         &mut self,
-        idx: CorpusID,
+        idx: CorpusId,
         testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<Self::Input>>, Error>;
+    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<Self::Input>>, Error>;
 
     /// Get by id
-    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
+    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
-    fn current(&self) -> &Option<CorpusID>;
+    fn current(&self) -> &Option<CorpusId>;
 
     /// Current testcase scheduled (mutable)
-    fn current_mut(&mut self) -> &mut Option<CorpusID>;
+    fn current_mut(&mut self) -> &mut Option<CorpusId>;
 }
 
 /// `Corpus` Python bindings

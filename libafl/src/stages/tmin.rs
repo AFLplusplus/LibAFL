@@ -13,7 +13,7 @@ use ahash::AHasher;
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::{tuples::Named, HasLen},
-    corpus::{Corpus, CorpusID, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     events::EventFirer,
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{Feedback, FeedbackFactory, HasObserverName},
@@ -55,7 +55,7 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut CS::State, corpus_idx: CorpusID) -> Result<usize, Error>;
+    fn iterations(&self, state: &mut CS::State, corpus_idx: CorpusId) -> Result<usize, Error>;
 
     /// Runs this (mutational) stage for new objectives
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
@@ -65,7 +65,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-        base_corpus_idx: CorpusID,
+        base_corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let orig_max_size = state.max_size();
         // basically copy-pasted from mutational.rs
@@ -207,7 +207,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         self.perform_minification(fuzzer, executor, state, manager, corpus_idx)?;
 
@@ -262,7 +262,7 @@ where
     }
 
     /// Gets the number of iterations from a fixed number of runs
-    fn iterations(&self, _state: &mut CS::State, _corpus_idx: CorpusID) -> Result<usize, Error> {
+    fn iterations(&self, _state: &mut CS::State, _corpus_idx: CorpusId) -> Result<usize, Error> {
         Ok(self.runs)
     }
 }

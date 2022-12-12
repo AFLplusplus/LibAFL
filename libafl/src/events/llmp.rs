@@ -413,7 +413,7 @@ where
                 };
                 #[cfg(feature = "std")]
                 if let Some(item) = _res.1 {
-                    println!("Added received Testcase as item #{item}");
+                    println!("Added received Testcase as item #{item:?}");
                 }
                 Ok(())
             }

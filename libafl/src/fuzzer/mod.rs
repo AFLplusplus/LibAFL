@@ -13,7 +13,7 @@ use crate::monitors::PerfFeature;
 use crate::state::NopState;
 use crate::{
     bolts::current_time,
-    corpus::{Corpus, CorpusID, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     events::{Event, EventConfig, EventFirer, EventManager, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
@@ -83,7 +83,7 @@ pub trait ExecutionProcessor<OT>: UsesState {
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusID>), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>;
 }
@@ -100,7 +100,7 @@ pub trait EvaluatorObservers<OT>: UsesState + Sized {
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusID>), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
         EM: EventFirer<State = Self::State>;
@@ -120,7 +120,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
-    ) -> Result<(ExecuteInputResult, Option<CorpusID>), Error> {
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_events(state, executor, manager, input, true)
     }
 
@@ -134,7 +134,7 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusID>), Error>;
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>;
 
     /// Runs the input and triggers observers and feedback.
     /// Adds an input, to the corpus even if it's not considered `interesting` by the `feedback`.
@@ -146,7 +146,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
-    ) -> Result<CorpusID, Error>;
+    ) -> Result<CorpusId, Error>;
 }
 
 /// The main fuzzer trait.
@@ -172,7 +172,7 @@ where
         executor: &mut E,
         state: &mut EM::State,
         manager: &mut EM,
-    ) -> Result<CorpusID, Error>;
+    ) -> Result<CorpusId, Error>;
 
     /// Fuzz forever (or until stopped)
     fn fuzz_loop(
@@ -181,7 +181,7 @@ where
         executor: &mut E,
         state: &mut EM::State,
         manager: &mut EM,
-    ) -> Result<CorpusID, Error> {
+    ) -> Result<CorpusId, Error> {
         let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
         loop {
@@ -206,7 +206,7 @@ where
         state: &mut EM::State,
         manager: &mut EM,
         iters: u64,
-    ) -> Result<CorpusID, Error> {
+    ) -> Result<CorpusId, Error> {
         let mut ret = None;
         let mut last = current_time();
         let monitor_timeout = STATS_TIMEOUT_DEFAULT;
@@ -332,7 +332,7 @@ where
         observers: &OT,
         exit_kind: &ExitKind,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusID>), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         EM: EventFirer<State = Self::State>,
     {
@@ -445,7 +445,7 @@ where
         manager: &mut EM,
         input: <Self::State as UsesInput>::Input,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusID>), Error>
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error>
     where
         E: Executor<EM, Self> + HasObservers<Observers = OT, State = Self::State>,
         EM: EventFirer<State = Self::State>,
@@ -475,7 +475,7 @@ where
         manager: &mut EM,
         input: <CS::State as UsesInput>::Input,
         send_events: bool,
-    ) -> Result<(ExecuteInputResult, Option<CorpusID>), Error> {
+    ) -> Result<(ExecuteInputResult, Option<CorpusId>), Error> {
         self.evaluate_input_with_observers(state, executor, manager, input, send_events)
     }
 
@@ -486,7 +486,7 @@ where
         executor: &mut E,
         manager: &mut EM,
         input: <CS::State as UsesInput>::Input,
-    ) -> Result<CorpusID, Error> {
+    ) -> Result<CorpusId, Error> {
         let exit_kind = self.execute_input(state, executor, manager, &input)?;
         let observers = executor.observers();
         // Always consider this to be "interesting"
@@ -537,7 +537,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         manager: &mut EM,
-    ) -> Result<CorpusID, Error> {
+    ) -> Result<CorpusId, Error> {
         // Init timer for scheduler
         #[cfg(feature = "introspection")]
         state.introspection_monitor_mut().start_timer();
@@ -789,7 +789,7 @@ pub mod pybind {
             py_executor: &mut PythonExecutor,
             py_mgr: &mut PythonEventManager,
             input: Vec<u8>,
-        ) -> CorpusID {
+        ) -> CorpusId {
             self.inner
                 .as_mut()
                 .add_input(

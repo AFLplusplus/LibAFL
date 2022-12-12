@@ -12,7 +12,7 @@ use super::{PushStage, PushStageHelper, PushStageSharedState};
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusID},
+    corpus::{Corpus, CorpusId},
     events::{EventFirer, EventRestarter, HasEventManagerId, ProgressReporter},
     executors::ExitKind,
     inputs::UsesInput,
@@ -48,7 +48,7 @@ where
         + EvaluatorObservers<OT>
         + HasScheduler<Scheduler = CS>,
 {
-    current_corpus_idx: Option<CorpusID>,
+    current_corpus_idx: Option<CorpusId>,
     testcases_to_do: usize,
     testcases_done: usize,
 
@@ -72,12 +72,12 @@ where
 {
     /// Gets the number of iterations as a random number
     #[allow(clippy::unused_self, clippy::unnecessary_wraps)] // TODO: we should put this function into a trait later
-    fn iterations(&self, state: &mut CS::State, _corpus_idx: CorpusID) -> Result<usize, Error> {
+    fn iterations(&self, state: &mut CS::State, _corpus_idx: CorpusId) -> Result<usize, Error> {
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS) as usize)
     }
 
     /// Sets the current corpus index
-    pub fn set_current_corpus_idx(&mut self, current_corpus_idx: CorpusID) {
+    pub fn set_current_corpus_idx(&mut self, current_corpus_idx: CorpusId) {
         self.current_corpus_idx = Some(current_corpus_idx);
     }
 }

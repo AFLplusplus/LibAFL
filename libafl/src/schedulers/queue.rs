@@ -4,7 +4,7 @@ use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::{Corpus, CorpusID},
+    corpus::{Corpus, CorpusId},
     inputs::{Input, UsesInput},
     schedulers::Scheduler,
     state::{HasCorpus, UsesState},
@@ -29,7 +29,7 @@ where
     S: HasCorpus,
 {
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut Self::State) -> Result<CorpusID, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
         let id_manager = state.corpus().id_manager();
         let first_id = id_manager
             .first_id()

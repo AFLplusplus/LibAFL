@@ -7,7 +7,7 @@ use std::{fs, fs::File, io::Write, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusID},
+    corpus::{Corpus, CorpusId},
     inputs::UsesInput,
     stages::Stage,
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions, UsesState},
@@ -54,7 +54,7 @@ where
         _executor: &mut E,
         state: &mut Z::State,
         _manager: &mut EM,
-        _corpus_idx: CorpusID,
+        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let meta = state
             .metadata()
@@ -72,7 +72,7 @@ where
             let input = testcase.load_input()?;
             let bytes = (self.to_bytes)(input);
 
-            let fname = self.corpus_dir.join(format!("id_{i}"));
+            let fname = self.corpus_dir.join(format!("id_{i:?}"));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
         }
@@ -84,7 +84,7 @@ where
             let input = testcase.load_input()?;
             let bytes = (self.to_bytes)(input);
 
-            let fname = self.solutions_dir.join(format!("id_{i}"));
+            let fname = self.solutions_dir.join(format!("id_{i:?}"));
             let mut f = File::create(fname)?;
             drop(f.write_all(&bytes));
         }

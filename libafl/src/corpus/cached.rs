@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::{id_manager::CorpusIDManager, CorpusID};
+use super::{id_manager::CorpusIdManager, CorpusId};
 use crate::{
     corpus::{
         ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
@@ -25,7 +25,7 @@ where
     I: Input,
 {
     inner: OnDiskCorpus<I>,
-    cached_ids: RefCell<VecDeque<CorpusID>>,
+    cached_ids: RefCell<VecDeque<CorpusId>>,
     cache_max_len: usize,
 }
 
@@ -48,20 +48,20 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusID, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self.inner.add(testcase)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         // TODO finish
         self.inner.replace(idx, testcase)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
         let testcase = self.inner.remove(idx)?;
         if testcase.is_some() {
             self.cached_ids.borrow_mut().retain(|e| *e != idx);
@@ -71,7 +71,7 @@ where
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let testcase = { self.inner.get(idx)? };
         if testcase.borrow().input().is_none() {
             let _ = testcase.borrow_mut().load_input()?;
@@ -95,17 +95,17 @@ where
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<CorpusID> {
+    fn current(&self) -> &Option<CorpusId> {
         self.inner.current()
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<CorpusID> {
+    fn current_mut(&mut self) -> &mut Option<CorpusId> {
         self.inner.current_mut()
     }
 
-    fn id_manager(&self) -> &CorpusIDManager {
+    fn id_manager(&self) -> &CorpusIdManager {
         self.inner.id_manager()
     }
 }

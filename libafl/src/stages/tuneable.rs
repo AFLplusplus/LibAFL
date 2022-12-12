@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::CorpusID,
+    corpus::CorpusId,
     impl_serdeany,
     mutators::Mutator,
     stages::{mutational::DEFAULT_MUTATIONAL_MAX_ITERATIONS, MutationalStage, Stage},
@@ -79,7 +79,7 @@ where
 
     /// Gets the number of iterations as a random number
     #[allow(clippy::cast_possible_truncation)]
-    fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusID) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
         Ok(if let Some(iters) = get_iters(state)? {
             iters
         } else {
@@ -116,7 +116,7 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
 

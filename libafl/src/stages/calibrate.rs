@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{current_time, tuples::Named, AsIter},
-    corpus::{Corpus, CorpusID, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::{
@@ -99,7 +99,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         mgr: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         // Run this stage only once for each corpus entry
         if state.corpus().get(corpus_idx)?.borrow_mut().fuzz_level() > 0 {

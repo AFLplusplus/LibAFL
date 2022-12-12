@@ -5,7 +5,7 @@ use core::cell::RefCell;
 
 use serde::{Deserialize, Serialize};
 
-use super::{id_manager::CorpusIDManager, CorpusID};
+use super::{id_manager::CorpusIdManager, CorpusId};
 use crate::{
     corpus::{Corpus, Testcase},
     inputs::{Input, UsesInput},
@@ -20,8 +20,8 @@ where
     I: Input,
 {
     entries: Vec<RefCell<Testcase<I>>>,
-    current: Option<CorpusID>,
-    id_manager: CorpusIDManager,
+    current: Option<CorpusId>,
+    id_manager: CorpusIdManager,
 }
 
 impl<I> UsesInput for InMemoryCorpus<I>
@@ -43,7 +43,7 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusID, Error> {
+    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         debug_assert!(self.entries.len() == self.id_manager.active_ids().len());
         let new_id = self.id_manager.provide_next()?;
         self.entries.push(RefCell::new(testcase));
@@ -52,7 +52,7 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let old_idx = self
             .id_manager
             .remove_id(idx)
@@ -62,7 +62,7 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, id: CorpusID) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, id: CorpusId) -> Result<Option<Testcase<I>>, Error> {
         if let Some(old_idx) = self.id_manager.remove_id(id) {
             Ok(Some(self.entries.remove(old_idx).into_inner()))
         } else {
@@ -72,7 +72,7 @@ where
 
     /// Get by id
     #[inline]
-    fn get(&self, id: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let idx = self
             .id_manager
             .active_index_for(id)
@@ -82,17 +82,17 @@ where
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<CorpusID> {
+    fn current(&self) -> &Option<CorpusId> {
         &self.current
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<CorpusID> {
+    fn current_mut(&mut self) -> &mut Option<CorpusId> {
         &mut self.current
     }
 
-    fn id_manager(&self) -> &CorpusIDManager {
+    fn id_manager(&self) -> &CorpusIdManager {
         &self.id_manager
     }
 }
@@ -108,7 +108,7 @@ where
         Self {
             entries: vec![],
             current: None,
-            id_manager: CorpusIDManager::new(),
+            id_manager: CorpusIdManager::new(),
         }
     }
 }

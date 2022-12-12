@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::{rands::Rand, serdeany::SerdeAny, AsSlice, HasRefCnt},
-    corpus::{Corpus, CorpusID, Testcase},
+    corpus::{Corpus, CorpusId, Testcase},
     feedbacks::MapIndexesMetadata,
     inputs::UsesInput,
     schedulers::{LenTimeMulTestcaseScore, Scheduler, TestcaseScore},
@@ -30,7 +30,7 @@ crate::impl_serdeany!(IsFavoredMetadata);
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopRatedsMetadata {
     /// map index -> corpus index
-    pub map: HashMap<usize, CorpusID>,
+    pub map: HashMap<usize, CorpusId>,
 }
 
 crate::impl_serdeany!(TopRatedsMetadata);
@@ -46,7 +46,7 @@ impl TopRatedsMetadata {
 
     /// Getter for map
     #[must_use]
-    pub fn map(&self) -> &HashMap<usize, CorpusID> {
+    pub fn map(&self) -> &HashMap<usize, CorpusId> {
         &self.map
     }
 }
@@ -82,7 +82,7 @@ where
     CS::State: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut CS::State, idx: CorpusID) -> Result<(), Error> {
+    fn on_add(&self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
         self.update_score(state, idx)?;
         self.base.on_add(state, idx)
     }
@@ -91,7 +91,7 @@ where
     fn on_replace(
         &self,
         state: &mut CS::State,
-        idx: CorpusID,
+        idx: CorpusId,
         testcase: &Testcase<<CS::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         self.update_score(state, idx)?;
@@ -102,7 +102,7 @@ where
     fn on_remove(
         &self,
         state: &mut CS::State,
-        idx: CorpusID,
+        idx: CorpusId,
         testcase: &Option<Testcase<<CS::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         self.base.on_remove(state, idx, testcase)?;
@@ -173,7 +173,7 @@ where
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut CS::State) -> Result<CorpusID, Error> {
+    fn next(&self, state: &mut CS::State) -> Result<CorpusId, Error> {
         self.cull(state)?;
         let mut id = self.base.next(state)?;
         while {
@@ -201,7 +201,7 @@ where
     /// Update the `Corpus` score using the `MinimizerScheduler`
     #[allow(clippy::unused_self)]
     #[allow(clippy::cast_possible_wrap)]
-    pub fn update_score(&self, state: &mut CS::State, idx: CorpusID) -> Result<(), Error> {
+    pub fn update_score(&self, state: &mut CS::State, idx: CorpusId) -> Result<(), Error> {
         // Create a new top rated meta if not existing
         if state.metadata().get::<TopRatedsMetadata>().is_none() {
             state.add_metadata(TopRatedsMetadata::new());
@@ -213,7 +213,7 @@ where
             let factor = F::compute(&mut *entry, state)?;
             let meta = entry.metadata_mut().get_mut::<M>().ok_or_else(|| {
                 Error::key_not_found(format!(
-                    "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
+                    "Metadata needed for MinimizerScheduler not found in testcase #{idx:?}"
                 ))
             })?;
             for elem in meta.as_slice() {
@@ -232,7 +232,7 @@ where
                     let must_remove = {
                         let old_meta = old.metadata_mut().get_mut::<M>().ok_or_else(|| {
                             Error::key_not_found(format!(
-                                "Metadata needed for MinimizerScheduler not found in testcase #{old_idx}"
+                                "Metadata needed for MinimizerScheduler not found in testcase #{old_idx:?}"
                             ))
                         })?;
                         *old_meta.refcnt_mut() -= 1;
@@ -285,7 +285,7 @@ where
                 let mut entry = state.corpus().get(*idx)?.borrow_mut();
                 let meta = entry.metadata().get::<M>().ok_or_else(|| {
                     Error::key_not_found(format!(
-                        "Metadata needed for MinimizerScheduler not found in testcase #{idx}"
+                        "Metadata needed for MinimizerScheduler not found in testcase #{idx:?}"
                     ))
                 })?;
                 for elem in meta.as_slice() {

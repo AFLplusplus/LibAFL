@@ -11,7 +11,7 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 
-use super::{id_manager::CorpusIDManager, CorpusID};
+use super::{id_manager::CorpusIdManager, CorpusId};
 use crate::{
     bolts::serdeany::SerdeAnyMap,
     corpus::{Corpus, Testcase},
@@ -50,10 +50,10 @@ where
     I: Input,
 {
     entries: Vec<RefCell<Testcase<I>>>,
-    current: Option<CorpusID>,
+    current: Option<CorpusId>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
-    id_manager: CorpusIDManager,
+    id_manager: CorpusIdManager,
 }
 
 impl<I> UsesInput for OnDiskCorpus<I>
@@ -67,7 +67,7 @@ impl<I> Corpus for OnDiskCorpus<I>
 where
     I: Input,
 {
-    fn add(&mut self, mut testcase: Testcase<Self::Input>) -> Result<CorpusID, Error> {
+    fn add(&mut self, mut testcase: Testcase<Self::Input>) -> Result<CorpusId, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase
@@ -137,7 +137,7 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn replace(&mut self, idx: CorpusID, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    fn replace(&mut self, idx: CorpusId, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let old_idx = self
             .id_manager
             .remove_id(idx)
@@ -151,7 +151,7 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
         if let Some(idx) = self.id_manager.active_index_for(idx) {
             let prev = self.entries.remove(idx).into_inner();
             self.remove_testcase(&prev)?;
@@ -163,7 +163,7 @@ where
 
     /// Get by id
     #[inline]
-    fn get(&self, id: CorpusID) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, id: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         let idx = self
             .id_manager
             .active_index_for(id)
@@ -173,17 +173,17 @@ where
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<CorpusID> {
+    fn current(&self) -> &Option<CorpusId> {
         &self.current
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<CorpusID> {
+    fn current_mut(&mut self) -> &mut Option<CorpusId> {
         &mut self.current
     }
 
-    fn id_manager(&self) -> &CorpusIDManager {
+    fn id_manager(&self) -> &CorpusIdManager {
         &self.id_manager
     }
 }
@@ -205,7 +205,7 @@ where
                 current: None,
                 dir_path,
                 meta_format: None,
-                id_manager: CorpusIDManager::new(),
+                id_manager: CorpusIdManager::new(),
             })
         }
         new(dir_path.as_ref().to_path_buf())
@@ -223,7 +223,7 @@ where
             current: None,
             dir_path,
             meta_format,
-            id_manager: CorpusIDManager::new(),
+            id_manager: CorpusIdManager::new(),
         })
     }
 

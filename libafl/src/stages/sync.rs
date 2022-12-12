@@ -10,7 +10,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::CorpusID,
+    corpus::CorpusId,
     fuzzer::Evaluator,
     inputs::{Input, UsesInput},
     stages::Stage,
@@ -65,7 +65,7 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        _corpus_idx: CorpusID,
+        _corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let last = state
             .metadata()

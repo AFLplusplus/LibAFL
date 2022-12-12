@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use crate::monitors::PerfFeature;
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, CorpusID},
+    corpus::{Corpus, CorpusId},
     fuzzer::Evaluator,
     mark_feature_time,
     mutators::Mutator,
@@ -37,7 +37,7 @@ where
     fn mutator_mut(&mut self) -> &mut M;
 
     /// Gets the number of iterations this mutator should run for.
-    fn iterations(&self, state: &mut Z::State, corpus_idx: CorpusID) -> Result<u64, Error>;
+    fn iterations(&self, state: &mut Z::State, corpus_idx: CorpusId) -> Result<u64, Error>;
 
     /// Runs this (mutational) stage for the given testcase
     #[allow(clippy::cast_possible_wrap)] // more than i32 stages on 32 bit system - highly unlikely...
@@ -47,7 +47,7 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let num = self.iterations(state, corpus_idx)?;
 
@@ -109,7 +109,7 @@ where
     }
 
     /// Gets the number of iterations as a random number
-    fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusID) -> Result<u64, Error> {
+    fn iterations(&self, state: &mut Z::State, _corpus_idx: CorpusId) -> Result<u64, Error> {
         Ok(1 + state.rand_mut().below(DEFAULT_MUTATIONAL_MAX_ITERATIONS))
     }
 }
@@ -141,7 +141,7 @@ where
         executor: &mut E,
         state: &mut Z::State,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let ret = self.perform_mutational(fuzzer, executor, state, manager, corpus_idx);
 

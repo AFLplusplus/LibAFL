@@ -9,7 +9,7 @@ use core::{marker::PhantomData, time::Duration};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, CorpusID, SchedulerTestcaseMetaData},
+    corpus::{Corpus, CorpusId, SchedulerTestcaseMetaData},
     inputs::{Input, UsesInput},
     schedulers::Scheduler,
     state::{HasCorpus, HasMetadata, UsesState},
@@ -166,7 +166,7 @@ where
     S: HasCorpus + HasMetadata,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut Self::State, idx: CorpusID) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: CorpusId) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(self.strat)));
         }
@@ -197,7 +197,7 @@ where
         Ok(())
     }
 
-    fn next(&self, state: &mut Self::State) -> Result<CorpusID, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
         let first_id = state
             .corpus()
             .id_manager()
@@ -207,7 +207,7 @@ where
         let next_id = state
             .corpus()
             .current()
-            .map(|cur| -> Result<CorpusID, Error> {
+            .map(|cur| -> Result<CorpusId, Error> {
                 if let Some(next_id) = state.corpus().id_manager().find_next(cur) {
                     Ok(next_id)
                 } else {

@@ -911,11 +911,8 @@ where
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
 
-        let (_, chosen_id) = random_corpus_entry(state).ok_or_else(|| {
-            Error::empty(String::from(
-                "Cannot CrossoverInsert mutate on an empty corpus",
-            ))
-        })?;
+        let chosen_id = random_corpus_entry(state)
+            .map_err(|err| Error::empty(String::from("CrossoverInsert failed: ({err:?})")))?;
 
         // We don't want to use the testcase we're already using for splicing
         if let Some(cur) = state.corpus().current() {
@@ -993,11 +990,7 @@ where
             return Ok(MutationResult::Skipped);
         }
 
-        let (_, chosen_id) = random_corpus_entry(state).ok_or_else(|| {
-            Error::empty(String::from(
-                "Cannot CrossoverReplace mutate on an empty corpus",
-            ))
-        })?;
+        let chosen_id = random_corpus_entry(state)?;
 
         // We don't want to use the testcase we're already using for splicing
         if let Some(cur) = state.corpus().current() {
@@ -1077,8 +1070,7 @@ where
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         // We don't want to use the testcase we're already using for splicing
-        let (_, chosen_id) = random_corpus_entry(state)
-            .ok_or_else(|| Error::empty("Cannot mutate on an empty corpus!".to_owned()))?;
+        let chosen_id = random_corpus_entry(state)?;
         if let Some(cur) = state.corpus().current() {
             if chosen_id == *cur {
                 return Ok(MutationResult::Skipped);

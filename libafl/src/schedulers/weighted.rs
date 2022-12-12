@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::{
-        id_manager::random_corpus_entry, Corpus, CorpusID, SchedulerTestcaseMetaData, Testcase,
+        id_manager::random_corpus_entry, Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase,
     },
     inputs::{Input, UsesInput},
     schedulers::{
@@ -238,7 +238,7 @@ where
     S: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
+    fn on_add(&self, state: &mut S, idx: CorpusId) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata(SchedulerMetadata::new(self.strat));
         }
@@ -279,7 +279,7 @@ where
     fn on_replace(
         &self,
         state: &mut S,
-        idx: CorpusID,
+        idx: CorpusId,
         _testcase: &Testcase<S::Input>,
     ) -> Result<(), Error> {
         // Recreate the alias table
@@ -289,7 +289,7 @@ where
     fn on_remove(
         &self,
         state: &mut S,
-        _idx: CorpusID,
+        _idx: CorpusId,
         _testcase: &Option<Testcase<S::Input>>,
     ) -> Result<(), Error> {
         // Recreate the alias table
@@ -298,9 +298,10 @@ where
     }
 
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
-    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
-        let (chosen_idx, _chosen_id) = random_corpus_entry(state)
-            .ok_or_else(|| Error::empty("No entries in corpus".to_string()))?;
+    fn next(&self, state: &mut S) -> Result<CorpusId, Error> {
+        let chosen_id = random_corpus_entry(state)?;
+        let chosen_idx = { state.corpus().id_manager().lookup(chosen_id).unwrap() };
+
         let corpus_count = state.corpus().count();
         // Choose a random value between 0.000000000 and 1.000000000
         let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;

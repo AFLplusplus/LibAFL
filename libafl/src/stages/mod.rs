@@ -45,7 +45,7 @@ pub mod sync;
 #[cfg(feature = "std")]
 pub use sync::*;
 
-use crate::corpus::CorpusID;
+use crate::corpus::CorpusId;
 #[cfg(feature = "std")]
 pub mod dump;
 use core::{convert::From, marker::PhantomData};
@@ -79,7 +79,7 @@ where
         executor: &mut E,
         state: &mut Self::State,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error>;
 }
 
@@ -98,7 +98,7 @@ where
         executor: &mut E,
         state: &mut S,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error>;
 }
 
@@ -115,7 +115,7 @@ where
         _: &mut E,
         _: &mut S,
         _: &mut EM,
-        _: CorpusID,
+        _: CorpusId,
     ) -> Result<(), Error> {
         Ok(())
     }
@@ -135,7 +135,7 @@ where
         executor: &mut E,
         state: &mut Head::State,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         // Perform the current stage
         self.0
@@ -151,7 +151,7 @@ where
 #[derive(Debug)]
 pub struct ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusID) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
     E: UsesState,
 {
     closure: CB,
@@ -160,7 +160,7 @@ where
 
 impl<CB, E, EM, Z> UsesState for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusID) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
     E: UsesState,
 {
     type State = E::State;
@@ -168,7 +168,7 @@ where
 
 impl<CB, E, EM, Z> Stage<E, EM, Z> for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusID) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
     E: UsesState,
     EM: UsesState<State = E::State>,
     Z: UsesState<State = E::State>,
@@ -179,7 +179,7 @@ where
         executor: &mut E,
         state: &mut E::State,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         (self.closure)(fuzzer, executor, state, manager, corpus_idx)
     }
@@ -188,7 +188,7 @@ where
 /// A stage that takes a closure
 impl<CB, E, EM, Z> ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusID) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
     E: UsesState,
 {
     /// Create a new [`ClosureStage`]
@@ -203,7 +203,7 @@ where
 
 impl<CB, E, EM, Z> From<CB> for ClosureStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusID) -> Result<(), Error>,
+    CB: FnMut(&mut Z, &mut E, &mut E::State, &mut EM, CorpusId) -> Result<(), Error>,
     E: UsesState,
 {
     #[must_use]
@@ -261,7 +261,7 @@ where
         executor: &mut E,
         state: &mut CS::State,
         event_mgr: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let push_stage = &mut self.push_stage;
 
@@ -366,7 +366,7 @@ where
         executor: &mut E,
         state: &mut ST::State,
         manager: &mut EM,
-        corpus_idx: CorpusID,
+        corpus_idx: CorpusId,
     ) -> Result<(), Error> {
         let condition = &mut self.condition;
         if condition(state) == SkippableStageDecision::Perform {
@@ -422,7 +422,7 @@ pub mod pybind {
             executor: &mut PythonExecutor,
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
-            corpus_idx: CorpusID,
+            corpus_idx: CorpusId,
         ) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method1(
@@ -511,7 +511,7 @@ pub mod pybind {
             executor: &mut PythonExecutor,
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
-            corpus_idx: CorpusID,
+            corpus_idx: CorpusId,
         ) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, s, {
                 s.perform(fuzzer, executor, state, manager, corpus_idx)
@@ -550,7 +550,7 @@ pub mod pybind {
             executor: &mut PythonExecutor,
             state: &mut PythonStdState,
             manager: &mut PythonEventManager,
-            corpus_idx: CorpusID,
+            corpus_idx: CorpusId,
         ) -> Result<(), Error> {
             for s in &mut self.list {
                 s.perform(fuzzer, executor, state, manager, corpus_idx)?;
