@@ -79,9 +79,6 @@ exclude = [
 [workspace.package]
 version = "0.8.2"
 
-[profile.dev]
-panic = "abort"
-
 [profile.release]
 panic = "abort"
 lto = true
