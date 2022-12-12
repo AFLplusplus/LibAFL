@@ -48,9 +48,9 @@ jobs:
       - name: Run tests
         run: cargo test
       - name: Test libafl no_std
-        run: cd libafl && cargo test --no-default-features
+        run: cd framework/libafl && cargo test --no-default-features
       - name: Test libafl_targets no_std
-        run: cd libafl_targets && cargo test --no-default-features
+        run: cd framework/libafl_targets && cargo test --no-default-features
      
   ubuntu:
     runs-on: ubuntu-22.04
@@ -119,9 +119,9 @@ jobs:
     - uses: actions/checkout@v3
     - uses: Swatinem/rust-cache@v2
     - name: Install smoke test deps
-      run: sudo ./libafl_concolic/test/smoke_test_ubuntu_deps.sh 
+      run: sudo ./framework/libafl_concolic/test/smoke_test_ubuntu_deps.sh 
     - name: Run smoke test
-      run: ./libafl_concolic/test/smoke_test.sh 
+      run: ./framework/libafl_concolic/test/smoke_test.sh 
 
   bindings:
     runs-on: ubuntu-latest
@@ -201,13 +201,13 @@ jobs:
     - name: Add targets
       run: rustup target add arm-linux-androideabi && rustup target add thumbv6m-none-eabi
     - name: Build aarch64-unknown-none
-      run: cd ./fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
+      run: cd ./frontends/fuzzers/baby_no_std && cargo +nightly build -Zbuild-std=core,alloc --target aarch64-unknown-none -v --release && cd ../..
     - name: run x86_64 until panic!
-      run: cd ./fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
+      run: cd ./frontends/fuzzers/baby_no_std && cargo +nightly run || test $? -ne 0 || exit 1
     - name: no_std tests
-      run: cd ./libafl && cargo test --no-default-features 
+      run: cd ./framework/libafl && cargo test --no-default-features 
     - name: libafl armv6m-none-eabi (32 bit no_std) clippy
-      run: cd ./libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
+      run: cd ./framework/libafl && cargo clippy --target thumbv6m-none-eabi --no-default-features
 
   build-docker:
     runs-on: ubuntu-latest
@@ -239,9 +239,9 @@ jobs:
       run: cargo install --force cargo-make
     - uses: ilammy/msvc-dev-cmd@v1
     - name: Build fuzzers/frida_libpng
-      run: cd fuzzers/frida_libpng/ && cargo make test
+      run: cd frontends/fuzzers/frida_libpng/ && cargo make test
     - name: Build fuzzers/frida_gdiplus
-      run: cd fuzzers/frida_gdiplus/ && cargo make test
+      run: cd frontends/fuzzers/frida_gdiplus/ && cargo make test
       
   macos:
     runs-on: macOS-latest
