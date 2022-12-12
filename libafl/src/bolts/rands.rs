@@ -1,13 +1,13 @@
 //! The random number generators of `LibAFL`
 use core::{debug_assert, fmt::Debug};
+
+#[cfg(feature = "rand_trait")]
+use rand_core::{self, impls::fill_bytes_via_next, RngCore};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use xxhash_rust::xxh3::xxh3_64_with_seed;
 
 #[cfg(feature = "std")]
 use crate::bolts::current_nanos;
-
-#[cfg(feature = "rand_trait")]
-use rand_core::{self, impls::fill_bytes_via_next, RngCore};
 
 const HASH_CONST: u64 = 0xa5b35705;
 
@@ -26,7 +26,7 @@ pub trait Rand: Debug + Serialize + DeserializeOwned {
     /// Gets the next 64 bit value
     fn next(&mut self) -> u64;
 
-    /// Gets a value below the given 64 bit val (inclusive)
+    /// Gets a value below the given 64 bit val (exclusive)
     fn below(&mut self, upper_bound_excl: u64) -> u64 {
         if upper_bound_excl <= 1 {
             return 0;
@@ -417,8 +417,9 @@ mod tests {
     #[test]
     #[cfg(feature = "rand_trait")]
     fn test_rgn_core_support() {
-        use crate::bolts::rands::StdRand;
         use rand_core::RngCore;
+
+        use crate::bolts::rands::StdRand;
         pub struct Mutator<R: RngCore> {
             rng: R,
         }
@@ -435,12 +436,14 @@ mod tests {
 #[allow(missing_docs)]
 /// `Rand` Python bindings
 pub mod pybind {
-    use super::Rand;
-    use crate::bolts::{current_nanos, rands::StdRand};
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
 
+    use super::Rand;
+    use crate::bolts::{current_nanos, rands::StdRand};
+
     #[pyclass(unsendable, name = "StdRand")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for StdRand
     pub struct PythonStdRand {
@@ -476,6 +479,7 @@ pub mod pybind {
 
     /// Rand Trait binding
     #[pyclass(unsendable, name = "Rand")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct PythonRand {
         wrapper: PythonRandWrapper,

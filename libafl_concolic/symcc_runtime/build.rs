@@ -182,12 +182,11 @@ fn write_symcc_runtime_bindings_file(out_path: &Path, cpp_bindings: &bindgen::Bi
             let function_name = &captures[1];
             writeln!(
                 bindings_file,
-                "#[link_name=\"{}{}\"]",
-                SYMCC_RUNTIME_FUNCTION_NAME_PREFIX, function_name
+                "#[link_name=\"{SYMCC_RUNTIME_FUNCTION_NAME_PREFIX}{function_name}\"]"
             )
             .unwrap();
         }
-        writeln!(bindings_file, "{}", l).unwrap();
+        writeln!(bindings_file, "{l}").unwrap();
     });
 }
 
@@ -208,8 +207,8 @@ fn write_symcc_rename_header(rename_header_path: &Path, cpp_bindings: &bindgen::
         .for_each(|val| {
             writeln!(
                 rename_header_file,
-                "#define {} {}{}",
-                &val, SYMCC_RUNTIME_FUNCTION_NAME_PREFIX, &val
+                "#define {} {SYMCC_RUNTIME_FUNCTION_NAME_PREFIX}{}",
+                &val, &val
             )
             .unwrap();
         });
@@ -245,12 +244,12 @@ fn link_with_cpp_stdlib() {
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
-        println!("Checking for build tool {}...", tool);
+        println!("Checking for build tool {tool}...");
 
         if let Ok(path) = which::which(tool) {
             println!("Found build tool {}", path.to_str().unwrap());
         } else {
-            println!("ERROR: missing build tool {}", tool);
+            println!("ERROR: missing build tool {tool}");
             exit(1);
         };
     }

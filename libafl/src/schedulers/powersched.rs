@@ -4,16 +4,18 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+use core::{marker::PhantomData, time::Duration};
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
     corpus::{Corpus, CorpusID, SchedulerTestcaseMetaData},
-    inputs::Input,
+    inputs::{Input, UsesInput},
     schedulers::Scheduler,
-    state::{HasCorpus, HasMetadata},
+    state::{HasCorpus, HasMetadata, UsesState},
     Error,
 };
-use core::time::Duration;
-use serde::{Deserialize, Serialize};
+
 /// The n fuzz size
 pub const N_FUZZ_SIZE: usize = 1 << 21;
 
@@ -131,7 +133,7 @@ impl SchedulerMetadata {
 /// The power schedule to use
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PowerSchedule {
-    /// The `explore" power schedule
+    /// The `explore` power schedule
     EXPLORE,
     /// The `exploit` power schedule
     EXPLOIT,
@@ -147,17 +149,24 @@ pub enum PowerSchedule {
 
 /// A corpus scheduler using power schedules
 #[derive(Clone, Debug)]
-pub struct PowerQueueScheduler {
+pub struct PowerQueueScheduler<S> {
     strat: PowerSchedule,
+    phantom: PhantomData<S>,
 }
 
-impl<I, S> Scheduler<I, S> for PowerQueueScheduler
+impl<S> UsesState for PowerQueueScheduler<S>
 where
-    S: HasCorpus<I> + HasMetadata,
-    I: Input,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<S> Scheduler for PowerQueueScheduler<S>
+where
+    S: HasCorpus + HasMetadata,
 {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
+    fn on_add(&self, state: &mut Self::State, idx: CorpusID) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
             state.add_metadata::<SchedulerMetadata>(SchedulerMetadata::new(Some(self.strat)));
         }
@@ -188,7 +197,7 @@ where
         Ok(())
     }
 
-    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusID, Error> {
         let first_id = state
             .corpus()
             .id_manager()
@@ -235,10 +244,13 @@ where
     }
 }
 
-impl PowerQueueScheduler {
+impl<S> PowerQueueScheduler<S> {
     /// Create a new [`PowerQueueScheduler`]
     #[must_use]
     pub fn new(strat: PowerSchedule) -> Self {
-        PowerQueueScheduler { strat }
+        PowerQueueScheduler {
+            strat,
+            phantom: PhantomData,
+        }
     }
 }

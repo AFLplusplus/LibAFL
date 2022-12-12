@@ -5,24 +5,15 @@ Hence, the `unix_shmem_server` keeps track of existing maps, creates new maps fo
 and forwards them over unix domain sockets.
 */
 
-use crate::{
-    bolts::{
-        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
-        AsMutSlice, AsSlice,
-    },
-    Error,
-};
-
 #[cfg(feature = "std")]
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{mem::ManuallyDrop, ptr::addr_of};
-use hashbrown::HashMap;
-use serde::{Deserialize, Serialize};
+#[cfg(target_vendor = "apple")]
+use std::fs;
 use std::{
-    borrow::BorrowMut,
     cell::RefCell,
     env,
     io::{Read, Write},
@@ -31,13 +22,6 @@ use std::{
     sync::{Arc, Condvar, Mutex},
     thread::JoinHandle,
 };
-
-#[cfg(target_vendor = "apple")]
-use std::fs;
-
-#[cfg(all(feature = "std", unix))]
-use nix::poll::{poll, PollFd, PollFlags};
-
 #[cfg(all(feature = "std", unix))]
 use std::{
     os::unix::{
@@ -47,8 +31,20 @@ use std::{
     thread,
 };
 
+use hashbrown::HashMap;
+#[cfg(all(feature = "std", unix))]
+use nix::poll::{poll, PollFd, PollFlags};
+use serde::{Deserialize, Serialize};
 #[cfg(all(unix, feature = "std"))]
 use uds::{UnixListenerExt, UnixSocketAddr, UnixStreamExt};
+
+use crate::{
+    bolts::{
+        shmem::{ShMem, ShMemDescription, ShMemId, ShMemProvider},
+        AsMutSlice, AsSlice,
+    },
+    Error,
+};
 
 /// The default server name for our abstract shmem server
 #[cfg(all(unix, not(target_vendor = "apple")))]
@@ -91,7 +87,7 @@ where
 {
     fn id(&self) -> ShMemId {
         let client_id = self.inner.id();
-        ShMemId::from_string(&format!("{}:{}", self.server_fd, client_id))
+        ShMemId::from_string(&format!("{}:{client_id}", self.server_fd))
     }
 
     fn len(&self) -> usize {
@@ -99,18 +95,20 @@ where
     }
 }
 
-impl<SH> AsSlice<u8> for ServedShMem<SH>
+impl<SH> AsSlice for ServedShMem<SH>
 where
     SH: ShMem,
 {
+    type Entry = u8;
     fn as_slice(&self) -> &[u8] {
         self.inner.as_slice()
     }
 }
-impl<SH> AsMutSlice<u8> for ServedShMem<SH>
+impl<SH> AsMutSlice for ServedShMem<SH>
 where
     SH: ShMem,
 {
+    type Entry = u8;
     fn as_mut_slice(&mut self) -> &mut [u8] {
         self.inner.as_mut_slice()
     }
@@ -190,30 +188,31 @@ where
         res.id = id;
         Ok(res)
     }
+
     fn new_shmem(&mut self, map_size: usize) -> Result<Self::ShMem, Error> {
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::NewMap(map_size))?;
 
         Ok(ServedShMem {
-            inner: ManuallyDrop::new(self.inner.shmem_from_id_and_size(
-                ShMemId::from_string(&format!("{}", client_fd)),
-                map_size,
-            )?),
+            inner: ManuallyDrop::new(
+                self.inner.shmem_from_id_and_size(
+                    ShMemId::from_string(&format!("{client_fd}")),
+                    map_size,
+                )?,
+            ),
             server_fd,
         })
     }
 
     fn shmem_from_id_and_size(&mut self, id: ShMemId, size: usize) -> Result<Self::ShMem, Error> {
         let parts = id.as_str().split(':').collect::<Vec<&str>>();
-        let server_id_str = parts.get(0).unwrap();
+        let server_id_str = parts.first().unwrap();
         let (server_fd, client_fd) = self.send_receive(ServedShMemRequest::ExistingMap(
             ShMemDescription::from_string_and_size(server_id_str, size),
         ))?;
         Ok(ServedShMem {
             inner: ManuallyDrop::new(
-                self.inner.shmem_from_id_and_size(
-                    ShMemId::from_string(&format!("{}", client_fd)),
-                    size,
-                )?,
+                self.inner
+                    .shmem_from_id_and_size(ShMemId::from_string(&format!("{client_fd}")), size)?,
             ),
             server_fd,
         })
@@ -227,8 +226,8 @@ where
     fn post_fork(&mut self, is_child: bool) -> Result<(), Error> {
         if is_child {
             // After fork, only the parent keeps the join handle.
-            if let ShMemService::Started { bg_thread, .. } = &mut self.service {
-                bg_thread.borrow_mut().lock().unwrap().join_handle = None;
+            if let ShMemService::Started { bg_thread, .. } = &self.service {
+                bg_thread.lock().unwrap().join_handle = None;
             }
             //fn connect(&mut self) -> Result<Self, Error> {
             //self.stream = UnixStream::connect_to_unix_addr(&UnixSocketAddr::new(UNIX_SERVER_NAME)?)?,
@@ -349,12 +348,9 @@ impl Drop for ShMemServiceThread {
     fn drop(&mut self) {
         if self.join_handle.is_some() {
             println!("Stopping ShMemService");
-            let mut stream = match UnixStream::connect_to_unix_addr(
+            let Ok(mut stream) = UnixStream::connect_to_unix_addr(
                 &UnixSocketAddr::new(UNIX_SERVER_NAME).unwrap(),
-            ) {
-                Ok(stream) => stream,
-                Err(_) => return, // ignoring non-started server
-            };
+            ) else { return };
 
             let body = postcard::to_allocvec(&ServedShMemRequest::Exit).unwrap();
 
@@ -373,7 +369,7 @@ impl Drop for ShMemServiceThread {
                 .expect("Error in ShMemService background thread!");
             // try to remove the file from fs, and ignore errors.
             #[cfg(target_vendor = "apple")]
-            fs::remove_file(&UNIX_SERVER_NAME).unwrap();
+            fs::remove_file(UNIX_SERVER_NAME).unwrap();
 
             env::remove_var(AFL_SHMEM_SERVICE_STARTED);
         }
@@ -408,12 +404,12 @@ where
                     *lock.lock().unwrap() = ShMemServiceStatus::Failed;
                     cvar.notify_one();
 
-                    println!("Error creating ShMemService: {:?}", e);
+                    println!("Error creating ShMemService: {e:?}");
                     return Err(e);
                 }
             };
             if let Err(e) = worker.listen(UNIX_SERVER_NAME, &childsyncpair) {
-                println!("Error spawning ShMemService: {:?}", e);
+                println!("Error spawning ShMemService: {e:?}");
                 Err(e)
             } else {
                 Ok(())
@@ -430,7 +426,8 @@ where
         // It's either running at this point, or we won't be able to spawn it anyway.
         env::set_var(AFL_SHMEM_SERVICE_STARTED, "true");
 
-        match *success {
+        let status = *success;
+        match status {
             ShMemServiceStatus::Starting => panic!("Unreachable"),
             ShMemServiceStatus::Started => {
                 println!("Started ShMem Service");
@@ -449,7 +446,7 @@ where
                 let err = err.expect_err("Expected service start to have failed, but it didn't?");
 
                 Self::Failed {
-                    err_msg: format!("{}", err),
+                    err_msg: format!("{err}"),
                     phantom: PhantomData,
                 }
             }
@@ -644,7 +641,7 @@ where
                 cvar.notify_one();
 
                 return Err(Error::unknown(format!(
-                    "The ShMem server appears to already be running. We are probably a client. Error: {:?}", err)));
+                    "The ShMem server appears to already be running. We are probably a client. Error: {err:?}")));
             }
         };
 
@@ -662,7 +659,7 @@ where
                 Ok(num_fds) if num_fds > 0 => (),
                 Ok(_) => continue,
                 Err(e) => {
-                    println!("Error polling for activity: {:?}", e);
+                    println!("Error polling for activity: {e:?}");
                     continue;
                 }
             };
@@ -686,12 +683,12 @@ where
                         let (stream, _addr) = match listener.accept_unix_addr() {
                             Ok(stream_val) => stream_val,
                             Err(e) => {
-                                println!("Error accepting client: {:?}", e);
+                                println!("Error accepting client: {e:?}");
                                 continue;
                             }
                         };
 
-                        println!("Recieved connection from {:?}", _addr);
+                        println!("Recieved connection from {_addr:?}");
                         let pollfd = PollFd::new(
                             stream.as_raw_fd(),
                             PollFlags::POLLIN | PollFlags::POLLRDNORM | PollFlags::POLLRDBAND,
@@ -718,3 +715,25 @@ where
         }
     }
 }
+
+/*
+TODO: Fix test
+
+#[cfg(test)]
+mod tests {
+    use serial_test::serial;
+
+    use crate::bolts::{
+        os::unix_shmem_server::ServedShMemProvider,
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
+    };
+
+    #[test]
+    #[serial]
+    fn test_shmem_server_connection() {
+        let mut sp = ServedShMemProvider::<UnixShMemProvider>::new().unwrap();
+        let map = sp.new_shmem(2 << 14).unwrap();
+        assert!(map.is_empty());
+    }
+}
+*/

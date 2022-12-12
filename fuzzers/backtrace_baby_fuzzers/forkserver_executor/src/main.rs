@@ -1,3 +1,9 @@
+use std::path::PathBuf;
+
+#[cfg(not(target_vendor = "apple"))]
+use libafl::bolts::shmem::StdShMemProvider;
+#[cfg(target_vendor = "apple")]
+use libafl::bolts::shmem::UnixShMemProvider;
 use libafl::{
     bolts::{
         current_nanos,
@@ -16,17 +22,11 @@ use libafl::{
     inputs::BytesInput,
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::{ASANBacktraceObserver, ConstMapObserver, HitcountsMapObserver},
+    observers::{AsanBacktraceObserver, ConstMapObserver, HitcountsMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use std::path::PathBuf;
-
-#[cfg(not(target_vendor = "apple"))]
-use libafl::bolts::shmem::StdShMemProvider;
-#[cfg(target_vendor = "apple")]
-use libafl::bolts::shmem::UnixShMemProvider;
 
 #[allow(clippy::similar_names)]
 pub fn main() {
@@ -50,7 +50,7 @@ pub fn main() {
         shmem_map,
     ));
 
-    let bt_observer = ASANBacktraceObserver::new("ASANBacktraceObserver");
+    let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 
     // Feedback to rate the interestingness of an input
     // This one is composed by two Feedbacks in OR

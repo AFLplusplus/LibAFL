@@ -1,5 +1,5 @@
 [package]
-name = "c_code_with_fork_executor"
+name = "c_code_with_inprocess_executor"
 version = "0.0.1"
 edition = "2021"
 

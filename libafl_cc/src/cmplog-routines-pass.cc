@@ -17,12 +17,14 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#ifndef _WIN32
+  #include <unistd.h>
+  #include <sys/time.h>
+#endif
 
 #include <list>
 #include <string>
 #include <fstream>
-#include <sys/time.h>
 #include "llvm/Config/llvm-config.h"
 
 #if USE_NEW_PM

@@ -6,17 +6,18 @@ even if the target would not have crashed under normal conditions.
 this helps finding mem errors early.
 */
 
-use backtrace::Backtrace;
 use core::{
     fmt::{self, Debug, Formatter},
     ptr::addr_of_mut,
 };
-use frida_gum::{ModuleDetails, NativePointer, RangeDetails};
-use hashbrown::HashMap;
-use libafl::bolts::{cli::FuzzerOptions, AsSlice};
-use nix::sys::mman::{mmap, MapFlags, ProtFlags};
-use rangemap::RangeMap;
+use std::{ffi::c_void, ptr::write_volatile};
 
+use backtrace::Backtrace;
+#[cfg(target_arch = "x86_64")]
+use capstone::{
+    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
+    Capstone, Insn, RegAccessType, RegId,
+};
 #[cfg(target_arch = "aarch64")]
 use capstone::{
     arch::{
@@ -26,24 +27,17 @@ use capstone::{
     },
     Capstone, Insn,
 };
-
-#[cfg(target_arch = "aarch64")]
-use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
-
-#[cfg(target_arch = "x86_64")]
-use capstone::{
-    arch::{self, x86::X86OperandType, ArchOperand::X86Operand, BuildsCapstone},
-    Capstone, Insn, RegAccessType, RegId,
-};
-
+use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
 use frida_gum::instruction_writer::X86Register;
-
-use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
-use frida_gum::interceptor::Interceptor;
+#[cfg(target_arch = "aarch64")]
+use frida_gum::instruction_writer::{Aarch64Register, IndexMode};
 use frida_gum::{
-    instruction_writer::InstructionWriter, stalker::StalkerOutput, Gum, Module, ModuleMap,
+    instruction_writer::InstructionWriter, interceptor::Interceptor, stalker::StalkerOutput, Gum,
+    Module, ModuleDetails, ModuleMap, NativePointer, RangeDetails,
 };
+use hashbrown::HashMap;
+use libafl::bolts::{cli::FuzzerOptions, AsSlice};
 #[cfg(unix)]
 use libc::RLIMIT_STACK;
 use libc::{c_char, wchar_t};
@@ -51,17 +45,17 @@ use libc::{c_char, wchar_t};
 use libc::{getrlimit, rlimit};
 #[cfg(all(unix, not(target_vendor = "apple")))]
 use libc::{getrlimit64, rlimit64};
-use std::{ffi::c_void, ptr::write_volatile};
+use nix::sys::mman::{mmap, MapFlags, ProtFlags};
+use rangemap::RangeMap;
 
+#[cfg(target_arch = "aarch64")]
+use crate::utils::instruction_width;
 use crate::{
     alloc::Allocator,
     asan::errors::{AsanError, AsanErrors, AsanReadWriteError, ASAN_ERRORS},
     helper::FridaRuntime,
     utils::writer_register,
 };
-
-#[cfg(target_arch = "aarch64")]
-use crate::utils::instruction_width;
 
 extern "C" {
     fn __register_frame(begin: *mut c_void);
@@ -109,6 +103,13 @@ pub const ASAN_SAVE_REGISTER_NAMES: [&str; ASAN_SAVE_REGISTER_COUNT] = [
 #[cfg(target_arch = "aarch64")]
 pub const ASAN_SAVE_REGISTER_COUNT: usize = 32;
 
+#[cfg(target_arch = "aarch64")]
+const ASAN_EH_FRAME_DWORD_COUNT: usize = 14;
+#[cfg(target_arch = "aarch64")]
+const ASAN_EH_FRAME_FDE_OFFSET: u32 = 20;
+#[cfg(target_arch = "aarch64")]
+const ASAN_EH_FRAME_FDE_ADDRESS_OFFSET: u32 = 28;
+
 /// The frida address sanitizer runtime, providing address sanitization.
 /// When executing in `ASAN`, each memory access will get checked, using frida stalker under the hood.
 /// The runtime can report memory errors that occurred during execution,
@@ -137,6 +138,9 @@ pub struct AsanRuntime {
     module_map: Option<ModuleMap>,
     suppressed_addresses: Vec<usize>,
     shadow_check_func: Option<extern "C" fn(*const c_void, usize) -> bool>,
+
+    #[cfg(target_arch = "aarch64")]
+    eh_frame: [u32; ASAN_EH_FRAME_DWORD_COUNT],
 }
 
 impl Debug for AsanRuntime {
@@ -169,7 +173,7 @@ impl FridaRuntime for AsanRuntime {
         self.generate_shadow_check_function();
         self.unpoison_all_existing_memory();
 
-        self.module_map = Some(ModuleMap::new_from_names(modules_to_instrument));
+        self.module_map = Some(ModuleMap::new_from_names(gum, modules_to_instrument));
         if !self.options.dont_instrument.is_empty() {
             for (module_name, offset) in self.options.dont_instrument.clone() {
                 let module_details = ModuleDetails::with_name(module_name).unwrap();
@@ -310,6 +314,9 @@ impl AsanRuntime {
             module_map: None,
             suppressed_addresses: Vec::new(),
             shadow_check_func: None,
+
+            #[cfg(target_arch = "aarch64")]
+            eh_frame: [0; ASAN_EH_FRAME_DWORD_COUNT],
         }
     }
 
@@ -392,8 +399,7 @@ impl AsanRuntime {
         self.allocator
             .map_shadow_for_region(tls_start, tls_end, true);
         println!(
-            "registering thread with stack {:x}:{:x} and tls {:x}:{:x}",
-            stack_start, stack_end, tls_start, tls_end
+            "registering thread with stack {stack_start:x}:{stack_end:x} and tls {tls_start:x}:{tls_end:x}"
         );
     }
 
@@ -871,6 +877,27 @@ impl AsanRuntime {
             *mut wchar_t
         );
         hook_func!(None, wcscmp, (s1: *const wchar_t, s2: *const wchar_t), i32);
+        #[cfg(target_vendor = "apple")]
+        hook_func!(
+            None,
+            memset_pattern4,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
+        #[cfg(target_vendor = "apple")]
+        hook_func!(
+            None,
+            memset_pattern8,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
+        #[cfg(target_vendor = "apple")]
+        hook_func!(
+            None,
+            memset_pattern16,
+            (s: *mut c_void, c: *const c_void, n: usize),
+            ()
+        );
     }
 
     #[cfg(target_arch = "x86_64")]
@@ -898,7 +925,7 @@ impl AsanRuntime {
             .expect("Failed to disassmeble");
 
         let insn = instructions.as_ref().first().unwrap(); // This is the very instruction that has triggered fault
-        println!("{:#?}", insn);
+        println!("{insn:#?}");
         let operands = cs.insn_detail(insn).unwrap().arch_detail().operands();
 
         let mut access_type: Option<RegAccessType> = None;
@@ -1519,7 +1546,8 @@ impl AsanRuntime {
     }
 
     #[cfg(target_arch = "aarch64")]
-    #[allow(clippy::unused_self, clippy::identity_op)] // identity_op appears to be a false positive in ubfx
+    // identity_op appears to be a false positive in ubfx
+    #[allow(clippy::unused_self, clippy::identity_op, clippy::too_many_lines)]
     fn generate_shadow_check_function(&mut self) {
         let shadow_bit = self.allocator.shadow_bit();
         let mut ops = dynasmrt::VecAssembler::<dynasmrt::aarch64::Aarch64Relocation>::new(0);
@@ -1626,18 +1654,34 @@ impl AsanRuntime {
         );
 
         let blob = ops.finalize().unwrap();
+        let mut map_flags = MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE;
+
+        // apple aarch64 requires MAP_JIT to allocates WX pages
+        if cfg!(all(target_vendor = "apple", target_arch = "aarch64")) {
+            map_flags |= MapFlags::MAP_JIT;
+        }
+
         unsafe {
             let mapping = mmap(
                 std::ptr::null_mut(),
                 0x1000,
                 ProtFlags::all(),
-                MapFlags::MAP_ANON | MapFlags::MAP_PRIVATE,
+                map_flags,
                 -1,
                 0,
             )
             .unwrap();
+
+            // on apple aarch64, WX pages can't be both writable and executable at the same time.
+            // pthread_jit_write_protect_np flips them from executable (1) to writable (0)
+            #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+            libc::pthread_jit_write_protect_np(0);
+
             blob.as_ptr()
                 .copy_to_nonoverlapping(mapping as *mut u8, blob.len());
+
+            #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
+            libc::pthread_jit_write_protect_np(1);
             self.shadow_check_func = Some(std::mem::transmute(mapping as *mut u8));
         }
     }
@@ -1952,8 +1996,10 @@ impl AsanRuntime {
             ; stp x0, x1, [x28]
 
             ; adr x25, <report
-            ; adr x0, >eh_frame_fde
-            ; adr x27, >fde_address
+            ; adr x15, >eh_frame_cie_addr
+            ; ldr x15, [x15]
+            ; add x0, x15, ASAN_EH_FRAME_FDE_OFFSET // eh_frame_fde
+            ; add x27, x15, ASAN_EH_FRAME_FDE_ADDRESS_OFFSET // fde_address
             ; ldr w26, [x27]
             ; cmp w26, #0x0
             ; b.ne >skip_register
@@ -1998,29 +2044,25 @@ impl AsanRuntime {
             ; .qword AsanRuntime::handle_trap as *mut c_void as i64
             ; register_frame_func:
             ; .qword __register_frame as *mut c_void as i64
-            ; eh_frame_cie:
-            ; .dword 0x14
-            ; .dword 0x00
-            ; .dword 0x00527a01
-            ; .dword 0x011e7c01
-            ; .dword 0x001f0c1b
-            ; eh_frame_fde:
-            ; .dword 0x14
-            ; .dword 0x18
-            ; fde_address:
-            ; .dword 0x0 // <-- address offset goes here
-            ; .dword 0x104
-                //advance_loc 12
-                //def_cfa r29 (x29) at offset 16
-                //offset r30 (x30) at cfa-8
-                //offset r29 (x29) at cfa-16
-            ; .dword 0x1d0c4c00
-            ; .dword 0x9d029e10u32 as i32
-            ; .dword 0x04
-            // empty next FDE:
-            ; .dword 0x0
-            ; .dword 0x0
+            ; eh_frame_cie_addr:
+            ; .qword addr_of_mut!(self.eh_frame) as i64
         );
+        self.eh_frame = [
+            0x14, 0, 0x00527a01, 0x011e7c01, 0x001f0c1b, //
+            // eh_frame_fde
+            0x14, 0x18, //
+            // fde_address
+            0, // <-- address offset goes here
+            0x104,
+            // advance_loc 12
+            // def_cfa r29 (x29) at offset 16
+            // offset r30 (x30) at cfa-8
+            // offset r29 (x29) at cfa-16
+            0x1d0c4c00, 0x9d029e10, 0x4, //
+            // empty next FDE:
+            0, 0,
+        ];
+
         self.blob_report = Some(ops_report.finalize().unwrap().into_boxed_slice());
 
         self.blob_check_mem_byte = Some(self.generate_shadow_check_blob(0));
@@ -2549,7 +2591,7 @@ impl AsanRuntime {
                             .to_le_bytes(),
                     );
                 } else {
-                    panic!("extender: {:?}, shift: {:?}", extender, shift);
+                    panic!("extender: {extender:?}, shift: {shift:?}");
                 }
             };
         }

@@ -6,10 +6,10 @@ use mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
-use clap::{self, StructOpt};
 use core::time::Duration;
 use std::{env, net::SocketAddr, path::PathBuf};
 
+use clap::Parser;
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -28,15 +28,16 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{CoverageAccountingScheduler, QueueScheduler},
     stages::mutational::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-
 use libafl_targets::{
     libfuzzer_initialize, libfuzzer_test_one_input, ACCOUNTING_MEMOP_MAP, EDGES_MAP, MAX_EDGES_NUM,
 };
@@ -47,23 +48,23 @@ fn timeout_from_millis_str(time: &str) -> Result<Duration, Error> {
 }
 
 /// The commandline args this fuzzer accepts
-#[derive(Debug, StructOpt)]
-#[clap(
+#[derive(Debug, Parser)]
+#[command(
     name = "libfuzzer_libpng_launcher",
     about = "A libfuzzer-like fuzzer for libpng with llmp-multithreading support and a launcher",
     author = "Andrea Fioraldi <andreafioraldi@gmail.com>, Dominik Maier <domenukk@gmail.com>"
 )]
 struct Opt {
-    #[clap(
+    #[arg(
         short,
         long,
-        parse(try_from_str = Cores::from_cmdline),
+        value_parser = Cores::from_cmdline,
         help = "Spawn a client in each of the provided cores. Broker runs in the 0th core. 'all' to select all available cores. 'none' to run a client without binding to any core. eg: '1,2-4,6' selects the cores 1,2,3,4,6.",
         name = "CORES"
     )]
     cores: Cores,
 
-    #[clap(
+    #[arg(
         short = 'p',
         long,
         help = "Choose the broker TCP port, default is 1337",
@@ -72,47 +73,34 @@ struct Opt {
     )]
     broker_port: u16,
 
-    #[clap(
-        parse(try_from_str),
-        short = 'a',
-        long,
-        help = "Specify a remote broker",
-        name = "REMOTE"
-    )]
+    #[arg(short = 'a', long, help = "Specify a remote broker", name = "REMOTE")]
     remote_broker_addr: Option<SocketAddr>,
 
-    #[clap(
-        parse(try_from_str),
-        short,
-        long,
-        help = "Set an initial corpus directory",
-        name = "INPUT"
-    )]
+    #[arg(short, long, help = "Set an initial corpus directory", name = "INPUT")]
     input: Vec<PathBuf>,
 
-    #[clap(
+    #[arg(
         short,
         long,
-        parse(try_from_str),
         help = "Set the output directory, default is ./out",
         name = "OUTPUT",
         default_value = "./out"
     )]
     output: PathBuf,
 
-    #[clap(
-        parse(try_from_str = timeout_from_millis_str),
+    #[arg(
+        value_parser = timeout_from_millis_str,
         short,
         long,
-        help = "Set the exeucution timeout in milliseconds, default is 10000",
+        help = "Set the execution timeout in milliseconds, default is 10000",
         name = "TIMEOUT",
         default_value = "10000"
     )]
     timeout: Duration,
     /*
     /// This fuzzer has hard-coded tokens
-    #[clap(
-        parse(from_os_str),
+    #[arg(
+
         short = "x",
         long,
         help = "Feed the fuzzer with an user-specified list of tokens (often called \"dictionary\"",

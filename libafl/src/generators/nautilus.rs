@@ -1,14 +1,15 @@
 //! Generators for the [`Nautilus`](https://github.com/RUB-SysSec/nautilus) grammar fuzzer
-use crate::{generators::Generator, inputs::nautilus::NautilusInput, Error};
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::fmt::Debug;
-use grammartec::context::Context;
 use std::{fs, io::BufReader, path::Path};
 
+use grammartec::context::Context;
 pub use grammartec::newtypes::NTermID;
+
+use crate::{generators::Generator, inputs::nautilus::NautilusInput, Error};
 
 /// The nautilus context for a generator
 pub struct NautilusContext {

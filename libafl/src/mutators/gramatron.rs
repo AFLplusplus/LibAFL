@@ -2,6 +2,7 @@
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
 use alloc::{string::String, vec::Vec};
 use core::cmp::max;
+
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -9,11 +10,13 @@ use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::{id_manager::random_corpus_entry, Corpus},
     generators::GramatronGenerator,
-    inputs::{GramatronInput, Terminal},
+    inputs::{GramatronInput, Terminal, UsesInput},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMetadata, HasRand},
     Error,
 };
+
+const RECUR_THRESHOLD: u64 = 5;
 
 /// A random mutator for grammar fuzzing
 #[derive(Debug)]
@@ -24,9 +27,9 @@ where
     generator: &'a GramatronGenerator<'a, S>,
 }
 
-impl<'a, S> Mutator<GramatronInput, S> for GramatronRandomMutator<'a, S>
+impl<'a, S> Mutator<S> for GramatronRandomMutator<'a, S>
 where
-    S: HasRand + HasMetadata,
+    S: UsesInput<Input = GramatronInput> + HasRand + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -78,6 +81,7 @@ crate::impl_serdeany!(GramatronIdxMapMetadata);
 impl GramatronIdxMapMetadata {
     /// Creates a new [`struct@GramatronIdxMapMetadata`].
     #[must_use]
+    #[allow(clippy::or_fun_call)]
     pub fn new(input: &GramatronInput) -> Self {
         let mut map = HashMap::default();
         for i in 0..input.terminals().len() {
@@ -92,9 +96,9 @@ impl GramatronIdxMapMetadata {
 #[derive(Default, Debug)]
 pub struct GramatronSpliceMutator;
 
-impl<S> Mutator<GramatronInput, S> for GramatronSpliceMutator
+impl<S> Mutator<S> for GramatronSpliceMutator
 where
-    S: HasRand + HasCorpus<GramatronInput> + HasMetadata,
+    S: UsesInput<Input = GramatronInput> + HasRand + HasCorpus + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -162,12 +166,13 @@ impl GramatronSpliceMutator {
 pub struct GramatronRecursionMutator {
     counters: HashMap<usize, (usize, usize, usize)>,
     states: Vec<usize>,
-    temp: Vec<Terminal>,
+    suffix: Vec<Terminal>,
+    feature: Vec<Terminal>,
 }
 
-impl<S> Mutator<GramatronInput, S> for GramatronRecursionMutator
+impl<S> Mutator<S> for GramatronRecursionMutator
 where
-    S: HasRand + HasMetadata,
+    S: UsesInput<Input = GramatronInput> + HasRand + HasMetadata,
 {
     fn mutate(
         &mut self,
@@ -226,11 +231,20 @@ where
         }
         debug_assert!(idx_1 < idx_2);
 
-        self.temp.clear();
-        self.temp.extend_from_slice(&input.terminals()[idx_2..]);
+        self.suffix.clear();
+        self.suffix.extend_from_slice(&input.terminals()[idx_2..]);
 
-        input.terminals_mut().truncate(idx_2);
-        input.terminals_mut().extend_from_slice(&self.temp);
+        self.feature.clear();
+        self.feature
+            .extend_from_slice(&input.terminals()[idx_1..idx_2]);
+
+        input.terminals_mut().truncate(idx_1);
+
+        for _ in 0..state.rand_mut().below(RECUR_THRESHOLD) {
+            input.terminals_mut().extend_from_slice(&self.feature);
+        }
+
+        input.terminals_mut().extend_from_slice(&self.suffix);
 
         Ok(MutationResult::Mutated)
     }

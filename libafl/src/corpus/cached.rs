@@ -2,19 +2,19 @@
 
 use alloc::collections::vec_deque::VecDeque;
 use core::cell::RefCell;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
+
+use super::{id_manager::CorpusIDManager, CorpusID};
 use crate::{
     corpus::{
         ondisk::{OnDiskCorpus, OnDiskMetadataFormat},
         Corpus, Testcase,
     },
-    inputs::Input,
+    inputs::{Input, UsesInput},
     Error,
 };
-
-use super::{id_manager::CorpusIDManager, CorpusID};
 
 /// A corpus that keep in memory a maximun number of testcases. The eviction policy is FIFO.
 #[cfg(feature = "std")]
@@ -29,7 +29,14 @@ where
     cache_max_len: usize,
 }
 
-impl<I> Corpus<I> for CachedOnDiskCorpus<I>
+impl<I> UsesInput for CachedOnDiskCorpus<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> Corpus for CachedOnDiskCorpus<I>
 where
     I: Input,
 {
@@ -47,7 +54,7 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
+    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         // TODO finish
         self.inner.replace(idx, testcase)
     }
@@ -143,15 +150,19 @@ where
 /// ``CachedOnDiskCorpus`` Python bindings
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::corpus::pybind::PythonCorpus;
-    use crate::corpus::CachedOnDiskCorpus;
-    use crate::inputs::BytesInput;
     use alloc::string::String;
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
     use std::path::PathBuf;
 
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        corpus::{pybind::PythonCorpus, CachedOnDiskCorpus},
+        inputs::BytesInput,
+    };
+
     #[pyclass(unsendable, name = "CachedOnDiskCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for CachedOnDiskCorpus
     pub struct PythonCachedOnDiskCorpus {

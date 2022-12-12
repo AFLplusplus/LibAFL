@@ -1,6 +1,6 @@
 [package]
 name = "libfuzzer_libmozjpeg"
-version = "0.7.1"
+version = "0.8.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 
@@ -23,7 +23,6 @@ mimalloc = { version = "*", default-features = false }
 
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
-num_cpus = "1.0"
 
 [lib]
 name = "libfuzzer_libmozjpeg"

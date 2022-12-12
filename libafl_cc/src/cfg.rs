@@ -1,9 +1,12 @@
 //! LLVM style control flow graph with information of AFL-style index of the each
 //! edges, use together with ``AFLCoverage`` pass having --dump-afl-cfg flag enabled.
 use core::borrow::Borrow;
+use std::{
+    collections::{BinaryHeap, HashMap, HashSet},
+    marker::PhantomData,
+};
+
 use serde::{Deserialize, Serialize};
-use std::collections::{BinaryHeap, HashMap, HashSet};
-use std::marker::PhantomData;
 
 /// Compute the weight of a [`CfgEdge`]. Lower means shorter distance in the graph.
 pub trait HasWeight<T> {
@@ -381,7 +384,7 @@ mod tests {
         edge = cfg.get_edge((41864 >> 1) ^ 26911).unwrap();
         assert_eq!(edge.calling_func, "main");
         assert_eq!(edge.successor_edges.len(), 2);
-        assert_eq!(*edge.successor_edges.get(0).unwrap(), (26911 >> 1) ^ 52706);
+        assert_eq!(*edge.successor_edges.first().unwrap(), (26911 >> 1) ^ 52706);
 
         assert!(cfg.get_edge(26911).is_none());
         assert!(cfg.get_edge(41864).is_some());

@@ -1,20 +1,20 @@
-//| The [`MutationalStage`] is the default stage used during fuzzing.
-//! For the current input, it will perform a range of random mutations, and then run them in the executor.
+//! The [`SyncFromDiskStage`] is a stage that imports inputs from disk for e.g. sync with AFL
 
 use core::marker::PhantomData;
-use serde::{Deserialize, Serialize};
 use std::{
     fs,
     path::{Path, PathBuf},
     time::SystemTime,
 };
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     corpus::CorpusID,
     fuzzer::Evaluator,
-    inputs::Input,
+    inputs::{Input, UsesInput},
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
 
@@ -37,32 +37,33 @@ impl SyncFromDiskMetadata {
 
 /// A stage that loads testcases from disk to sync with other fuzzers such as AFL++
 #[derive(Debug)]
-pub struct SyncFromDiskStage<CB, E, EM, I, S, Z>
-where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
-    I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
-{
+pub struct SyncFromDiskStage<CB, E, EM, Z> {
     sync_dir: PathBuf,
     load_callback: CB,
-    #[allow(clippy::type_complexity)]
-    phantom: PhantomData<(E, EM, I, S, Z)>,
+    phantom: PhantomData<(E, EM, Z)>,
 }
 
-impl<CB, E, EM, I, S, Z> Stage<E, EM, S, Z> for SyncFromDiskStage<CB, E, EM, I, S, Z>
+impl<CB, E, EM, Z> UsesState for SyncFromDiskStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
-    I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    E: UsesState,
+{
+    type State = E::State;
+}
+
+impl<CB, E, EM, Z> Stage<E, EM, Z> for SyncFromDiskStage<CB, E, EM, Z>
+where
+    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as UsesInput>::Input, Error>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Z::State,
         manager: &mut EM,
         _corpus_idx: CorpusID,
     ) -> Result<(), Error> {
@@ -94,12 +95,13 @@ where
     }
 }
 
-impl<CB, E, EM, I, S, Z> SyncFromDiskStage<CB, E, EM, I, S, Z>
+impl<CB, E, EM, Z> SyncFromDiskStage<CB, E, EM, Z>
 where
-    CB: FnMut(&mut Z, &mut S, &Path) -> Result<I, Error>,
-    I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    CB: FnMut(&mut Z, &mut Z::State, &Path) -> Result<<Z::State as UsesInput>::Input, Error>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`]
     #[must_use]
@@ -117,7 +119,7 @@ where
         last: &Option<SystemTime>,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Z::State,
         manager: &mut EM,
     ) -> Result<Option<SystemTime>, Error> {
         let mut max_time = None;
@@ -156,22 +158,30 @@ where
     }
 }
 
-impl<E, EM, I, S, Z>
-    SyncFromDiskStage<fn(&mut Z, &mut S, &Path) -> Result<I, Error>, E, EM, I, S, Z>
+/// Function type when the callback in `SyncFromDiskStage` is not a lambda
+pub type SyncFromDiskFunction<S, Z> =
+    fn(&mut Z, &mut S, &Path) -> Result<<S as UsesInput>::Input, Error>;
+
+impl<E, EM, Z> SyncFromDiskStage<SyncFromDiskFunction<Z::State, Z>, E, EM, Z>
 where
-    I: Input,
-    S: HasClientPerfMonitor + HasCorpus<I> + HasRand + HasMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::State: HasClientPerfMonitor + HasCorpus + HasRand + HasMetadata,
 {
     /// Creates a new [`SyncFromDiskStage`] invoking `Input::from_file` to load inputs
     #[must_use]
     pub fn with_from_file(sync_dir: PathBuf) -> Self {
-        fn load_callback<Z, S, I: Input>(_: &mut Z, _: &mut S, p: &Path) -> Result<I, Error> {
-            I::from_file(p)
+        fn load_callback<S: UsesInput, Z>(
+            _: &mut Z,
+            _: &mut S,
+            p: &Path,
+        ) -> Result<S::Input, Error> {
+            Input::from_file(p)
         }
         Self {
             sync_dir,
-            load_callback: load_callback::<_, _, I>,
+            load_callback: load_callback::<_, _>,
             phantom: PhantomData,
         }
     }

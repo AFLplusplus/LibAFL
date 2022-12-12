@@ -1,6 +1,6 @@
 [package]
-name = "fuzzbench"
-version = "0.7.1"
+name = "fuzzbench_text"
+version = "0.8.2"
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 edition = "2021"
 
@@ -17,17 +17,17 @@ debug = true
 [build-dependencies]
 cc = { version = "1.0", features = ["parallel"] }
 which = { version = "4.0.2" }
-num_cpus = "1.0"
 
 [dependencies]
 libafl = { path = "../../libafl/" }
 libafl_targets = { path = "../../libafl_targets/", features = ["sancov_pcguard_hitcounts", "sancov_cmplog", "libfuzzer"] }
 # TODO Include it only when building cc
 libafl_cc = { path = "../../libafl_cc/" }
-clap = { version = "3.1", features = ["default"] }
-nix = "0.23"
+clap = { version = "4.0", features = ["default"] }
+nix = "0.25"
 mimalloc = { version = "*", default-features = false }
 content_inspector = "0.2.4"
+serde = { version = "1.0", default-features = false, features = ["alloc"] } # serialization lib
 
 [lib]
 name = "fuzzbench"

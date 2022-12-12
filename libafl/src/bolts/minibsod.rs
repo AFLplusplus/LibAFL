@@ -3,8 +3,9 @@
 //! You may use the [`crate::bolts::os::unix_signals::ucontext`]
 //! function to get a [`ucontext_t`].
 
-use libc::siginfo_t;
 use std::io::{BufWriter, Write};
+
+use libc::siginfo_t;
 
 use crate::bolts::os::unix_signals::{ucontext_t, Signal};
 
@@ -97,13 +98,37 @@ pub fn dump_registers<W: Write>(
 }
 
 /// Write the content of all important registers
+#[cfg(all(target_vendor = "freebsd", target_arch = "aarch64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    let mcontext = unsafe { &*ucontext.uc_mcontext };
+    for reg in 0..29_u8 {
+        writeln!(
+            writer,
+            "x{:02}: 0x{:016x} ",
+            reg, mcontext.mc_gpregs.gp_x[reg as usize]
+        )?;
+        if reg % 4 == 3 {
+            writeln!(writer)?;
+        }
+    }
+    write!(writer, "lr: 0x{:016x} ", mcontext.mc_gpregs.gp_lr)?;
+    write!(writer, "sp: 0x{:016x} ", mcontext.mc_gpregs.gp_sp)?;
+
+    Ok(())
+}
+
+/// Write the content of all important registers
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
 pub fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    let mcontext = unsafe { *ucontext.uc_mcontext };
+    let mcontext = unsafe { &*ucontext.uc_mcontext };
     for reg in 0..29_u8 {
         writeln!(
             writer,
@@ -153,8 +178,183 @@ pub fn dump_registers<W: Write>(
     Ok(())
 }
 
+/// Write the content of all important registers
+#[cfg(all(target_os = "freebsd", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(writer, "r8 : {:#016x}, ", mcontext.mc_r8)?;
+    write!(writer, "r9 : {:#016x}, ", mcontext.mc_r9)?;
+    write!(writer, "r10 : {:#016x}, ", mcontext.mc_r10)?;
+    write!(writer, "r11 : {:#016x}, ", mcontext.mc_r11)?;
+    write!(writer, "r12 : {:#016x}, ", mcontext.mc_r12)?;
+    write!(writer, "r13 : {:#016x}, ", mcontext.mc_r13)?;
+    write!(writer, "r14 : {:#016x}, ", mcontext.mc_r14)?;
+    write!(writer, "r15 : {:#016x}, ", mcontext.mc_r15)?;
+    write!(writer, "rdi : {:#016x}, ", mcontext.mc_rdi)?;
+    write!(writer, "rsi : {:#016x}, ", mcontext.mc_rsi)?;
+    write!(writer, "rbp : {:#016x}, ", mcontext.mc_rbp)?;
+    write!(writer, "rbx : {:#016x}, ", mcontext.mc_rbx)?;
+    write!(writer, "rdx : {:#016x}, ", mcontext.mc_rdx)?;
+    write!(writer, "rax : {:#016x}, ", mcontext.mc_rax)?;
+    write!(writer, "rcx : {:#016x}, ", mcontext.mc_rcx)?;
+    write!(writer, "rsp : {:#016x}, ", mcontext.mc_rsp)?;
+    write!(writer, "rflags : {:#016x}, ", mcontext.mc_rflags)?;
+    write!(writer, "cs : {:#016x}, ", mcontext.mc_cs)?;
+    Ok(())
+}
+
+/// Write the content of all important registers
+#[cfg(all(target_os = "netbsd", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    use libc::{
+        _REG_CS, _REG_R10, _REG_R11, _REG_R12, _REG_R13, _REG_R14, _REG_R15, _REG_R8, _REG_R9,
+        _REG_RAX, _REG_RBP, _REG_RBX, _REG_RCX, _REG_RDI, _REG_RDX, _REG_RFLAGS, _REG_RIP,
+        _REG_RSI, _REG_RSP,
+    };
+
+    let mcontext = &ucontext.uc_mcontext;
+
+    write!(
+        writer,
+        "r8 : {:#016x}, ",
+        mcontext.__gregs[_REG_R8 as usize]
+    )?;
+    write!(
+        writer,
+        "r9 : {:#016x}, ",
+        mcontext.__gregs[_REG_R9 as usize]
+    )?;
+    write!(
+        writer,
+        "r10: {:#016x}, ",
+        mcontext.__gregs[_REG_R10 as usize]
+    )?;
+    writeln!(
+        writer,
+        "r11: {:#016x}, ",
+        mcontext.__gregs[_REG_R11 as usize]
+    )?;
+    write!(
+        writer,
+        "r12: {:#016x}, ",
+        mcontext.__gregs[_REG_R12 as usize]
+    )?;
+    write!(
+        writer,
+        "r13: {:#016x}, ",
+        mcontext.__gregs[_REG_R13 as usize]
+    )?;
+    write!(
+        writer,
+        "r14: {:#016x}, ",
+        mcontext.__gregs[_REG_R14 as usize]
+    )?;
+    writeln!(
+        writer,
+        "r15: {:#016x}, ",
+        mcontext.__gregs[_REG_R15 as usize]
+    )?;
+    write!(
+        writer,
+        "rdi: {:#016x}, ",
+        mcontext.__gregs[_REG_RDI as usize]
+    )?;
+    write!(
+        writer,
+        "rsi: {:#016x}, ",
+        mcontext.__gregs[_REG_RSI as usize]
+    )?;
+    write!(
+        writer,
+        "rbp: {:#016x}, ",
+        mcontext.__gregs[_REG_RBP as usize]
+    )?;
+    writeln!(
+        writer,
+        "rbx: {:#016x}, ",
+        mcontext.__gregs[_REG_RBX as usize]
+    )?;
+    write!(
+        writer,
+        "rdx: {:#016x}, ",
+        mcontext.__gregs[_REG_RDX as usize]
+    )?;
+    write!(
+        writer,
+        "rax: {:#016x}, ",
+        mcontext.__gregs[_REG_RAX as usize]
+    )?;
+    write!(
+        writer,
+        "rcx: {:#016x}, ",
+        mcontext.__gregs[_REG_RCX as usize]
+    )?;
+    writeln!(
+        writer,
+        "rsp: {:#016x}, ",
+        mcontext.__gregs[_REG_RSP as usize]
+    )?;
+    write!(
+        writer,
+        "rip: {:#016x}, ",
+        mcontext.__gregs[_REG_RIP as usize]
+    )?;
+    write!(writer, "cs: {:#016x}, ", mcontext.__gregs[_REG_CS as usize])?;
+    writeln!(
+        writer,
+        "rflags: {:#016x}, ",
+        mcontext.__gregs[_REG_RFLAGS as usize]
+    )?;
+
+    Ok(())
+}
+
+/// Write the content of all important registers
+#[cfg(all(target_os = "openbsd", target_arch = "x86_64"))]
+#[allow(clippy::similar_names)]
+pub fn dump_registers<W: Write>(
+    writer: &mut BufWriter<W>,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    write!(writer, "r8 : {:#016x}, ", ucontext.sc_r8)?;
+    write!(writer, "r9 : {:#016x}, ", ucontext.sc_r9)?;
+    write!(writer, "r10 : {:#016x}, ", ucontext.sc_r10)?;
+    write!(writer, "r11 : {:#016x}, ", ucontext.sc_r11)?;
+    write!(writer, "r12 : {:#016x}, ", ucontext.sc_r12)?;
+    write!(writer, "r13 : {:#016x}, ", ucontext.sc_r13)?;
+    write!(writer, "r14 : {:#016x}, ", ucontext.sc_r14)?;
+    write!(writer, "r15 : {:#016x}, ", ucontext.sc_r15)?;
+    write!(writer, "rdi : {:#016x}, ", ucontext.sc_rdi)?;
+    write!(writer, "rsi : {:#016x}, ", ucontext.sc_rsi)?;
+    write!(writer, "rbp : {:#016x}, ", ucontext.sc_rbp)?;
+    write!(writer, "rbx : {:#016x}, ", ucontext.sc_rbx)?;
+    write!(writer, "rdx : {:#016x}, ", ucontext.sc_rdx)?;
+    write!(writer, "rax : {:#016x}, ", ucontext.sc_rax)?;
+    write!(writer, "rcx : {:#016x}, ", ucontext.sc_rcx)?;
+    write!(writer, "rsp : {:#016x}, ", ucontext.sc_rsp)?;
+    write!(writer, "rflags : {:#016x}, ", ucontext.sc_rflags)?;
+    write!(writer, "cs : {:#016x}, ", ucontext.sc_cs)?;
+    Ok(())
+}
+
 #[allow(clippy::unnecessary_wraps)]
-#[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
+#[cfg(not(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "netbsd",
+    target_os = "openbsd"
+)))]
 fn dump_registers<W: Write>(
     writer: &mut BufWriter<W>,
     _ucontext: &ucontext_t,
@@ -218,6 +418,21 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
+#[cfg(all(target_os = "freebsd", target_arch = "aarch64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at 0x{:016x}",
+        signal, ucontext.uc_mcontext.mc_gpregs.gp_elr
+    )?;
+
+    Ok(())
+}
+
 #[cfg(all(target_vendor = "apple", target_arch = "aarch64"))]
 #[allow(clippy::similar_names)]
 fn write_crash<W: Write>(
@@ -225,7 +440,7 @@ fn write_crash<W: Write>(
     signal: Signal,
     ucontext: &ucontext_t,
 ) -> Result<(), std::io::Error> {
-    let mcontext = unsafe { *ucontext.uc_mcontext };
+    let mcontext = unsafe { &*ucontext.uc_mcontext };
     writeln!(
         writer,
         "Received signal {} at 0x{:016x}, fault address: 0x{:016x}",
@@ -257,7 +472,61 @@ fn write_crash<W: Write>(
     Ok(())
 }
 
-#[cfg(not(any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
+#[cfg(target_os = "freebsd")]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        signal, ucontext.uc_mcontext.mc_rip, ucontext.uc_mcontext.mc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(target_os = "openbsd")]
+#[allow(clippy::similar_names)]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at{:016x}, fault address: 0x{:016x}",
+        signal, ucontext.sc_rip, ucontext.sc_fs
+    )?;
+
+    Ok(())
+}
+
+#[cfg(all(target_os = "netbsd", target_arch = "x86_64"))]
+fn write_crash<W: Write>(
+    writer: &mut BufWriter<W>,
+    signal: Signal,
+    ucontext: &ucontext_t,
+) -> Result<(), std::io::Error> {
+    writeln!(
+        writer,
+        "Received signal {} at {:#016x}, fault address: {:#016x}",
+        signal, ucontext.uc_mcontext.__gregs[21], ucontext.uc_mcontext.__gregs[16]
+    )?;
+
+    Ok(())
+}
+
+#[cfg(not(any(
+    target_vendor = "apple",
+    target_os = "linux",
+    target_os = "android",
+    target_os = "freebsd",
+    target_os = "openbsd",
+    target_os = "netbsd"
+)))]
 fn write_crash<W: Write>(
     writer: &mut BufWriter<W>,
     signal: Signal,
@@ -290,7 +559,7 @@ pub fn generate_minibsod<W: Write>(
 
         match std::fs::read_to_string("/proc/self/maps") {
             Ok(maps) => writer.write_all(maps.as_bytes())?,
-            Err(e) => writeln!(writer, "Couldn't load mappings: {:?}", e)?,
+            Err(e) => writeln!(writer, "Couldn't load mappings: {e:?}")?,
         };
     }
 

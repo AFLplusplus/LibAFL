@@ -1,20 +1,3 @@
-use frida_gum::{PageProtection, RangeDetails};
-use hashbrown::HashMap;
-use libafl::bolts::cli::FuzzerOptions;
-use nix::{
-    libc::memset,
-    sys::mman::{mmap, MapFlags, ProtFlags},
-};
-
-use backtrace::Backtrace;
-#[cfg(any(
-    target_os = "linux",
-    target_vendor = "apple",
-    all(target_arch = "aarch64", target_os = "android")
-))]
-use libc::{sysconf, _SC_PAGESIZE};
-use rangemap::RangeSet;
-use serde::{Deserialize, Serialize};
 #[cfg(any(
     target_os = "linux",
     target_vendor = "apple",
@@ -22,6 +5,23 @@ use serde::{Deserialize, Serialize};
 ))]
 use std::io;
 use std::{collections::BTreeMap, ffi::c_void};
+
+use backtrace::Backtrace;
+use frida_gum::{PageProtection, RangeDetails};
+use hashbrown::HashMap;
+use libafl::bolts::cli::FuzzerOptions;
+#[cfg(any(
+    target_os = "linux",
+    target_vendor = "apple",
+    all(target_arch = "aarch64", target_os = "android")
+))]
+use libc::{sysconf, _SC_PAGESIZE};
+use nix::{
+    libc::memset,
+    sys::mman::{mmap, MapFlags, ProtFlags},
+};
+use rangemap::RangeSet;
+use serde::{Deserialize, Serialize};
 
 use crate::asan::errors::{AsanError, AsanErrors};
 
@@ -169,7 +169,7 @@ impl Allocator {
                 for (start, end) in &occupied_ranges {
                     if (shadow_start <= *end) && (*start <= shadow_end) {
                         // println!("{:x} {:x}, {:x} {:x}",shadow_start,shadow_end,start,end);
-                        println!("shadow_bit {:x} is not suitable", try_shadow_bit);
+                        println!("shadow_bit {try_shadow_bit:x} is not suitable");
                         break;
                     }
                 }
@@ -195,7 +195,7 @@ impl Allocator {
             }
         }
 
-        println!("shadow_bit {:x} is suitable", shadow_bit);
+        println!("shadow_bit {shadow_bit:x} is suitable");
         assert!(shadow_bit != 0);
         // attempt to pre-map the entire shadow-memory space
 
@@ -275,7 +275,7 @@ impl Allocator {
         if size > self.options.max_allocation {
             #[allow(clippy::manual_assert)]
             if self.options.max_allocation_panics {
-                panic!("ASAN: Allocation is too large: 0x{:x}", size);
+                panic!("ASAN: Allocation is too large: 0x{size:x}");
             }
 
             return std::ptr::null_mut();
@@ -310,7 +310,7 @@ impl Allocator {
             ) {
                 Ok(mapping) => mapping as usize,
                 Err(err) => {
-                    println!("An error occurred while mapping memory: {:?}", err);
+                    println!("An error occurred while mapping memory: {err:?}");
                     return std::ptr::null_mut();
                 }
             };
@@ -349,15 +349,13 @@ impl Allocator {
     #[allow(clippy::missing_safety_doc)]
     pub unsafe fn release(&mut self, ptr: *mut c_void) {
         //println!("freeing address: {:?}", ptr);
-        let mut metadata = if let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) {
-            metadata
-        } else {
+        let Some(metadata) = self.allocations.get_mut(&(ptr as usize)) else {
             if !ptr.is_null() {
-                AsanErrors::get_mut()
+                 AsanErrors::get_mut()
                     .report_error(AsanError::UnallocatedFree((ptr as usize, Backtrace::new())));
-            }
-            return;
-        };
+          }
+             return;
+       };
 
         if metadata.freed {
             AsanErrors::get_mut().report_error(AsanError::DoubleFree((
@@ -442,8 +440,7 @@ impl Allocator {
             Some(metadata) => metadata.size,
             None => {
                 panic!(
-                    "Attempted to get_usable_size on a pointer ({:?}) which was not allocated!",
-                    ptr
+                    "Attempted to get_usable_size on a pointer ({ptr:?}) which was not allocated!"
                 );
             }
         }

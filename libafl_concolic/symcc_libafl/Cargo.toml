@@ -1,6 +1,6 @@
 [package]
 name = "symcc_libafl"
-version = "0.7.1"
+version.workspace = true
 edition = "2021"
 authors = ["Julius Hohnerlein <julihoh@users.noreply.github.com>", "Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 description = "Meta package for symcc_runtime"
@@ -19,5 +19,5 @@ build = ["which", "cmake"] # common functionality to build symcc
 clone = ["which"] # common functionality to check out the symcc repo using git
 
 [dependencies]
-which = { version = "4.1", optional = true }
+which = { version = "4.2", optional = true }
 cmake = { version = "0.1", optional = true }

@@ -41,6 +41,11 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 
+// Without this, Can't build with llvm-14 & old PM
+#if LLVM_VERSION_MAJOR >= 14 && !defined(USE_NEW_PM)
+  #include "llvm/Pass.h"
+#endif
+
 #if LLVM_VERSION_MAJOR > 3 || \
     (LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 4)
   #include "llvm/IR/DebugInfo.h"

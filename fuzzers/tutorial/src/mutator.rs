@@ -1,8 +1,10 @@
+use lain::traits::Mutatable;
 use libafl::{
     bolts::{
         rands::{Rand, StdRand},
         tuples::Named,
     },
+    inputs::UsesInput,
     mutators::{MutationResult, Mutator},
     state::HasRand,
     Error,
@@ -10,13 +12,14 @@ use libafl::{
 
 use crate::input::PacketData;
 
-use lain::traits::Mutatable;
-
 pub struct LainMutator {
     inner: lain::mutator::Mutator<StdRand>,
 }
 
-impl<S: HasRand> Mutator<PacketData, S> for LainMutator {
+impl<S> Mutator<S> for LainMutator
+where
+    S: UsesInput<Input = PacketData> + HasRand,
+{
     fn mutate(
         &mut self,
         state: &mut S,

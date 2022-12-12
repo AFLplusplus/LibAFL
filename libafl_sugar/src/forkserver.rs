@@ -1,7 +1,6 @@
 //! An `afl`-style forkserver fuzzer.
 //! Use this if your target has complex state that needs to be reset.
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
-use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
@@ -9,7 +8,7 @@ use libafl::{
         current_nanos,
         launcher::Launcher,
         rands::StdRand,
-        shmem::{ShMem, ShMemProvider, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider, UnixShMemProvider},
         tuples::{tuple_list, Merge},
         AsMutSlice,
     },
@@ -21,14 +20,17 @@ use libafl::{
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandBytesGenerator,
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::Tokens,
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::Tokens,
+    },
     observers::{ConstMapObserver, HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
+use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
@@ -106,13 +108,13 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
         crashes.push("crashes");
         out_dir.push("queue");
 
-        let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
+        let shmem_provider = UnixShMemProvider::new().expect("Failed to init shared memory");
         let mut shmem_provider_client = shmem_provider.clone();
 
-        let monitor = MultiMonitor::new(|s| println!("{}", s));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _>,
                               _core_id| {
             // Coverage map shared between target and fuzzer
             let mut shmem = shmem_provider_client.new_shmem(MAP_SIZE).unwrap();
@@ -285,7 +287,7 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
         match launcher.build().launch() {
             Ok(()) => (),
             Err(Error::ShuttingDown) => println!("\nFuzzing stopped by user. Good Bye."),
-            Err(err) => panic!("Fuzzingg failed {:?}", err),
+            Err(err) => panic!("Fuzzingg failed {err:?}"),
         }
     }
 }
@@ -293,10 +295,12 @@ impl<'a, const MAP_SIZE: usize> ForkserverBytesCoverageSugar<'a, MAP_SIZE> {
 /// The python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::forkserver;
+    use std::path::PathBuf;
+
     use libafl::bolts::core_affinity::Cores;
     use pyo3::prelude::*;
-    use std::path::PathBuf;
+
+    use crate::forkserver;
 
     /// Python bindings for the `LibAFL` forkserver sugar
     #[pyclass(unsendable)]

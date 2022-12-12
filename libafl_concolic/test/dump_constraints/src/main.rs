@@ -2,7 +2,6 @@
 //! It achieves this by running an instrumented target program with the necessary environment variables set.
 //! When the program has finished executing, it dumps the traced constraints to a file.
 
-use clap::{self, StructOpt};
 use std::{
     ffi::OsString,
     fs::File,
@@ -12,6 +11,7 @@ use std::{
     string::ToString,
 };
 
+use clap::{self, Parser};
 use libafl::{
     bolts::{
         shmem::{ShMem, ShMemProvider, StdShMemProvider},
@@ -23,38 +23,38 @@ use libafl::{
     },
 };
 
-#[derive(Debug, StructOpt)]
-#[clap(
+#[derive(Debug, Parser)]
+#[command(
     name = "dump_constraints",
     about = "Dump tool for concolic constraints."
 )]
 struct Opt {
     /// Outputs plain text instead of binary
-    #[clap(short, long)]
+    #[arg(short, long)]
     plain_text: bool,
 
     /// Outputs coverage information to the given file
-    #[clap(short, long)]
+    #[arg(short, long)]
     coverage_file: Option<PathBuf>,
 
     /// Symbolizes only the given input file offsets.
-    #[clap(short, long)]
+    #[arg(short, long)]
     symbolize_offsets: Option<Vec<usize>>,
 
     /// Concretize all floating point operations.
-    #[clap(long)]
+    #[arg(long)]
     no_float: bool,
 
     /// Prune expressions from high-frequency code locations.
-    #[clap(long)]
+    #[arg(long)]
     prune: bool,
 
     /// Trace file path, "trace" by default.
-    #[clap(parse(from_os_str), short, long)]
+    #[arg(short, long)]
     output: Option<PathBuf>,
 
     /// Target program and arguments
-    #[clap(last = true)]
+    #[arg(last = true)]
     program: Vec<OsString>,
 }
 
@@ -97,7 +97,7 @@ fn main() {
         std::env::set_var(EXPRESSION_PRUNING, "1");
     }
 
-    let res = Command::new(&opt.program.first().expect("no program argument given"))
+    let res = Command::new(opt.program.first().expect("no program argument given"))
         .args(opt.program.iter().skip(1))
         .status()
         .expect("failed to spawn program");
@@ -112,7 +112,7 @@ fn main() {
                 .enumerate()
                 .filter(|(_, &v)| v != 0)
             {
-                writeln!(f, "{}\t{}", index, count).expect("failed to write coverage file");
+                writeln!(f, "{index}\t{count}").expect("failed to write coverage file");
             }
         }
 
@@ -125,7 +125,7 @@ fn main() {
         if opt.plain_text {
             while let Some(message) = reader.next_message() {
                 if let Ok((id, message)) = message {
-                    writeln!(output_file, "{}\t{:?}", id, message)
+                    writeln!(output_file, "{id}\t{message:?}")
                         .expect("failed to write to output file");
                 } else {
                     break;

@@ -1,15 +1,15 @@
 //! The command executor executes a sub program for each run
+use alloc::vec::Vec;
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
 };
-
-#[cfg(feature = "std")]
-use alloc::{borrow::ToOwned, string::String, vec::Vec};
 #[cfg(unix)]
 use std::os::unix::ffi::OsStrExt;
 #[cfg(feature = "std")]
 use std::process::Child;
+#[cfg(all(feature = "std", unix))]
+use std::time::Duration;
 use std::{
     ffi::{OsStr, OsString},
     io::{Read, Write},
@@ -17,31 +17,28 @@ use std::{
     process::{Command, Stdio},
 };
 
+use super::HasObservers;
+#[cfg(all(feature = "std", unix))]
+use crate::executors::{Executor, ExitKind};
 use crate::{
     bolts::{
         fs::{InputFile, INPUTFILE_STD},
         tuples::MatchName,
         AsSlice,
     },
-    inputs::HasTargetBytes,
-    observers::{ASANBacktraceObserver, ObserversTuple, StdErrObserver, StdOutObserver},
+    inputs::{HasTargetBytes, UsesInput},
+    observers::{ObserversTuple, UsesObservers},
+    state::UsesState,
+    std::borrow::ToOwned,
 };
 #[cfg(feature = "std")]
 use crate::{inputs::Input, Error};
 
-#[cfg(all(feature = "std", unix))]
-use crate::executors::{Executor, ExitKind};
-
-#[cfg(all(feature = "std", unix))]
-use std::time::Duration;
-
-use super::HasObservers;
-
 /// How to deliver input to an external program
-/// `StdIn`: The traget reads from stdin
+/// `StdIn`: The target reads from stdin
 /// `File`: The target reads from the specified [`InputFile`]
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum InputLocation {
+pub enum InputLocation {
     /// Mutate a commandline argument to deliver an input
     Arg {
         /// The offset of the argument to mutate
@@ -53,7 +50,7 @@ enum InputLocation {
     /// You can use specify [`InputFile::create(INPUTFILE_STD)`] to use a default filename.
     File {
         /// The file to write input to. The target should read input from this location.
-        input_file: InputFile,
+        out_file: InputFile,
     },
 }
 
@@ -75,11 +72,14 @@ fn clone_command(cmd: &Command) -> Command {
 /// A simple Configurator that takes the most common parameters
 /// Writes the input either to stdio or to a file
 /// Use [`CommandExecutor::builder()`] to use this configurator.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug)]
 pub struct StdCommandConfigurator {
     /// If set to true, the child output will remain visible
     /// By default, the child output is hidden to increase execution speed
     debug_child: bool,
+    has_stdout_observer: bool,
+    has_stderr_observer: bool,
     /// true: input gets delivered via stdink
     input_location: InputLocation,
     /// The Command to execute
@@ -99,6 +99,13 @@ impl CommandConfigurator for StdCommandConfigurator {
                 if !self.debug_child {
                     cmd.stdout(Stdio::null());
                     cmd.stderr(Stdio::null());
+                }
+
+                if self.has_stdout_observer {
+                    cmd.stdout(Stdio::piped());
+                }
+                if self.has_stderr_observer {
+                    cmd.stderr(Stdio::piped());
                 }
 
                 for (i, arg) in args.enumerate() {
@@ -133,8 +140,8 @@ impl CommandConfigurator for StdCommandConfigurator {
                 drop(stdin);
                 Ok(handle)
             }
-            InputLocation::File { input_file } => {
-                input_file.write_buf(input.target_bytes().as_slice())?;
+            InputLocation::File { out_file } => {
+                out_file.write_buf(input.target_bytes().as_slice())?;
                 Ok(self.command.spawn()?)
             }
         }
@@ -144,26 +151,15 @@ impl CommandConfigurator for StdCommandConfigurator {
 /// A `CommandExecutor` is a wrapper around [`std::process::Command`] to execute a target as a child process.
 /// Construct a `CommandExecutor` by implementing [`CommandConfigurator`] for a type of your choice and calling [`CommandConfigurator::into_executor`] on it.
 /// Instead, you can use [`CommandExecutor::builder()`] to construct a [`CommandExecutor`] backed by a [`StdCommandConfigurator`].
-pub struct CommandExecutor<EM, I, OT, S, T, Z>
-where
-    T: Debug,
-    OT: Debug,
-{
-    /// The wrapped comand configurer
+pub struct CommandExecutor<EM, OT, S, T, Z> {
+    /// The wrapped command configurer
     configurer: T,
+    /// The observers used by this executor
     observers: OT,
-    /// cache if the AsanBacktraceObserver is present
-    has_asan_observer: bool,
-    /// If set, we found a [`StdErrObserver`] in the observer list.
-    /// Pipe the child's `stderr` instead of closing it.
-    has_stdout_observer: bool,
-    /// If set, we found a [`StdOutObserver`] in the observer list
-    /// Pipe the child's `stdout` instead of closing it.
-    has_stderr_observer: bool,
-    phantom: PhantomData<(EM, I, S, Z)>,
+    phantom: PhantomData<(EM, S, Z)>,
 }
 
-impl CommandExecutor<(), (), (), (), (), ()> {
+impl CommandExecutor<(), (), (), (), ()> {
     /// Creates a builder for a new [`CommandExecutor`],
     /// backed by a [`StdCommandConfigurator`]
     /// This is usually the easiest way to construct a [`CommandExecutor`].
@@ -182,7 +178,7 @@ impl CommandExecutor<(), (), (), (), (), ()> {
     }
 }
 
-impl<EM, I, OT, S, T, Z> Debug for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, OT, S, T, Z> Debug for CommandExecutor<EM, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
@@ -195,7 +191,7 @@ where
     }
 }
 
-impl<EM, I, OT, S, T, Z> CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, OT, S, T, Z> CommandExecutor<EM, OT, S, T, Z>
 where
     T: Debug,
     OT: Debug,
@@ -206,9 +202,10 @@ where
     }
 }
 
-impl<EM, I, OT, S, Z> CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>
+impl<EM, OT, S, Z> CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>
 where
-    OT: MatchName + Debug,
+    OT: MatchName + Debug + ObserversTuple<S>,
+    S: UsesInput,
 {
     /// Creates a new `CommandExecutor`.
     /// Instead of parsing the Command for `@@`, it will
@@ -228,40 +225,31 @@ where
         }
         command.stdin(Stdio::null());
 
-        let has_stdout_observer = observers
-            .match_name::<StdOutObserver>("StdOutObserver")
-            .is_some();
+        let has_stdout_observer = observers.observes_stdout();
         if has_stdout_observer {
-            command.stderr(Stdio::piped());
+            command.stdout(Stdio::piped());
         }
-
-        let has_stderr_observer = observers
-            .match_name::<StdErrObserver>("StdErrObserver")
-            .is_some();
-        let has_asan_observer = observers
-            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
-            .is_some();
-        if has_stderr_observer || has_asan_observer {
+        let has_stderr_observer = observers.observes_stderr();
+        if has_stderr_observer {
             command.stderr(Stdio::piped());
         }
 
         Ok(Self {
             observers,
-            has_asan_observer,
             configurer: StdCommandConfigurator {
                 input_location: InputLocation::File {
-                    input_file: InputFile::create(path)?,
+                    out_file: InputFile::create(path)?,
                 },
                 command,
                 debug_child,
+                has_stdout_observer,
+                has_stderr_observer,
             },
-            has_stdout_observer,
-            has_stderr_observer,
             phantom: PhantomData,
         })
     }
 
-    /// Parses an AFL-like comandline, replacing `@@` with the input file.
+    /// Parses an AFL-like commandline, replacing `@@` with the input file.
     /// If no `@@` was found, will use stdin for input.
     /// The arg 0 is the program.
     pub fn parse_afl_cmdline<IT, O>(
@@ -305,21 +293,24 @@ where
 
 // this only works on unix because of the reliance on checking the process signal for detecting OOM
 #[cfg(all(feature = "std", unix))]
-impl<EM, I, OT, S, T, Z> Executor<EM, I, S, Z> for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, OT, S, T, Z> Executor<EM, Z> for CommandExecutor<EM, OT, S, T, Z>
 where
-    I: Input + HasTargetBytes,
-    T: CommandConfigurator,
-    OT: Debug + MatchName,
-    T: Debug,
+    EM: UsesState<State = S>,
+    S: UsesInput,
+    S::Input: HasTargetBytes,
+    T: CommandConfigurator + Debug,
+    OT: Debug + MatchName + ObserversTuple<S>,
+    Z: UsesState<State = S>,
 {
     fn run_target(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         use std::os::unix::prelude::ExitStatusExt;
+
         use wait_timeout::ChildExt;
 
         let mut child = self.configurer.spawn_child(input)?;
@@ -343,45 +334,49 @@ where
             }
         };
 
-        if self.has_asan_observer || self.has_stderr_observer {
-            let mut stderr = String::new();
+        if self.observers.observes_stderr() {
+            let mut stderr = Vec::new();
             child.stderr.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stderr, but stderr was not `Stdio::pipe` in CommandExecutor",
                 )
-            })?.read_to_string(&mut stderr)?;
-            if self.has_asan_observer {
-                self.observers
-                    .match_name_mut::<ASANBacktraceObserver>("ASANBacktraceObserver")
-                    .unwrap()
-                    .parse_asan_output(&stderr);
-            }
-            if self.has_stderr_observer {
-                self.observers
-                    .match_name_mut::<StdErrObserver>("StdErrObserver")
-                    .unwrap()
-                    .stderr = Some(stderr);
-            }
+            })?.read_to_end(&mut stderr)?;
+            self.observers.observe_stderr(&stderr);
         }
-        if self.has_stdout_observer {
-            let mut stdout = String::new();
+        if self.observers.observes_stdout() {
+            let mut stdout = Vec::new();
             child.stdout.as_mut().ok_or_else(|| {
                 Error::illegal_state(
                     "Observer tries to read stdout, but stdout was not `Stdio::pipe` in CommandExecutor",
                 )
-            })?.read_to_string(&mut stdout)?;
-            self.observers
-                .match_name_mut::<StdOutObserver>("StdOutObserver")
-                .unwrap()
-                .stdout = Some(stdout);
+            })?.read_to_end(&mut stdout)?;
+            self.observers.observe_stdout(&stdout);
         }
 
         res
     }
 }
 
-impl<EM, I, OT: ObserversTuple<I, S>, S, T: Debug, Z> HasObservers<I, OT, S>
-    for CommandExecutor<EM, I, OT, S, T, Z>
+impl<EM, OT, S, T, Z> UsesState for CommandExecutor<EM, OT, S, T, Z>
+where
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<EM, OT, S, T, Z> UsesObservers for CommandExecutor<EM, OT, S, T, Z>
+where
+    OT: ObserversTuple<S>,
+    S: UsesInput,
+{
+    type Observers = OT;
+}
+
+impl<EM, OT, S, T, Z> HasObservers for CommandExecutor<EM, OT, S, T, Z>
+where
+    S: UsesInput,
+    T: Debug,
+    OT: ObserversTuple<S>,
 {
     fn observers(&self) -> &OT {
         &self.observers
@@ -469,9 +464,9 @@ impl CommandExecutorBuilder {
     /// and adds the filename as arg to at the current position.
     pub fn arg_input_file<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
         self.arg(path.as_ref());
-        let input_file_std = InputFile::create(path.as_ref()).unwrap();
+        let out_file_std = InputFile::create(path.as_ref()).unwrap();
         self.input(InputLocation::File {
-            input_file: input_file_std,
+            out_file: out_file_std,
         });
         self
     }
@@ -531,21 +526,21 @@ impl CommandExecutorBuilder {
         self
     }
 
-    /// Builds the `ComandExecutor`
-    pub fn build<EM, I, OT, S, Z>(
+    /// Builds the `CommandExecutor`
+    pub fn build<EM, OT, S, Z>(
         &self,
         observers: OT,
-    ) -> Result<CommandExecutor<EM, I, OT, S, StdCommandConfigurator, Z>, Error>
+    ) -> Result<CommandExecutor<EM, OT, S, StdCommandConfigurator, Z>, Error>
     where
-        OT: Debug + MatchName,
+        OT: Debug + MatchName + ObserversTuple<S>,
+        S: UsesInput,
     {
-        let program = if let Some(program) = &self.program {
-            program
-        } else {
-            return Err(Error::illegal_argument(
-                "ComandExecutor::builder: no program set!",
-            ));
+        let Some(program) = &self.program else {
+             return Err(Error::illegal_argument(
+                "CommandExecutor::builder: no program set!",
+           ));
         };
+
         let mut command = Command::new(program);
         match &self.input_location {
             InputLocation::StdIn => {
@@ -568,37 +563,31 @@ impl CommandExecutorBuilder {
             command.stdout(Stdio::null());
             command.stderr(Stdio::null());
         }
-        if observers
-            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
-            .is_some()
-            || observers
-                .match_name::<StdErrObserver>("StdErrObserver")
-                .is_some()
-        {
-            // we need stderr for ASANBackt
-            command.stderr(Stdio::piped());
-        }
-        if observers
-            .match_name::<StdOutObserver>("StdOutObserver")
-            .is_some()
-        {
+        if observers.observes_stdout() {
             command.stdout(Stdio::piped());
+        }
+        if observers.observes_stderr() {
+            // we need stderr for `AsanBacktaceObserver`, and others
+            command.stderr(Stdio::piped());
         }
 
         let configurator = StdCommandConfigurator {
             debug_child: self.debug_child,
+            has_stdout_observer: observers.observes_stdout(),
+            has_stderr_observer: observers.observes_stderr(),
             input_location: self.input_location.clone(),
             command,
         };
-        Ok(configurator.into_executor(observers))
+        Ok(configurator.into_executor::<EM, OT, S, Z>(observers))
     }
 }
 
 /// A `CommandConfigurator` takes care of creating and spawning a [`std::process::Command`] for the [`CommandExecutor`].
 /// # Example
-/// ```
+#[cfg_attr(all(feature = "std", unix), doc = " ```")]
+#[cfg_attr(not(all(feature = "std", unix)), doc = " ```ignore")]
 /// use std::{io::Write, process::{Stdio, Command, Child}};
-/// use libafl::{Error, bolts::AsSlice, inputs::{Input, HasTargetBytes}, executors::{Executor, command::CommandConfigurator}};
+/// use libafl::{Error, bolts::AsSlice, inputs::{HasTargetBytes, Input, UsesInput}, executors::{Executor, command::CommandConfigurator}, state::UsesState};
 /// #[derive(Debug)]
 /// struct MyExecutor;
 ///
@@ -620,11 +609,18 @@ impl CommandExecutorBuilder {
 ///     }
 /// }
 ///
-/// fn make_executor<EM, I: Input + HasTargetBytes, S, Z>() -> impl Executor<EM, I, S, Z> {
+/// fn make_executor<EM, Z>() -> impl Executor<EM, Z>
+/// where
+///     EM: UsesState,
+///     Z: UsesState<State = EM::State>,
+///     EM::State: UsesInput,
+///     EM::Input: HasTargetBytes
+/// {
 ///     MyExecutor.into_executor(())
 /// }
 /// ```
-#[cfg(all(feature = "std", unix))]
+
+#[cfg(all(feature = "std", any(unix, doc)))]
 pub trait CommandConfigurator: Sized + Debug {
     /// Spawns a new process with the given configuration.
     fn spawn_child<I>(&mut self, input: &I) -> Result<Child, Error>
@@ -632,27 +628,12 @@ pub trait CommandConfigurator: Sized + Debug {
         I: Input + HasTargetBytes;
 
     /// Create an `Executor` from this `CommandConfigurator`.
-    fn into_executor<EM, I, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, I, OT, S, Self, Z>
+    fn into_executor<EM, OT, S, Z>(self, observers: OT) -> CommandExecutor<EM, OT, S, Self, Z>
     where
         OT: Debug + MatchName,
     {
-        let has_asan_observer = observers
-            .match_name::<ASANBacktraceObserver>("ASANBacktraceObserver")
-            .is_some();
-
-        let has_stdout_observer = observers
-            .match_name::<StdOutObserver>("StdOutObserver")
-            .is_some();
-
-        let has_stderr_observer = observers
-            .match_name::<StdErrObserver>("StdErrObserver")
-            .is_some();
-
         CommandExecutor {
             observers,
-            has_asan_observer,
-            has_stdout_observer,
-            has_stderr_observer,
             configurer: self,
             phantom: PhantomData,
         }
@@ -669,13 +650,15 @@ mod tests {
         },
         inputs::BytesInput,
         monitors::SimpleMonitor,
+        state::NopState,
+        NopFuzzer,
     };
 
     #[test]
     #[cfg(unix)]
     fn test_builder() {
-        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
-            println!("{}", status);
+        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
+            println!("{status}");
         }));
 
         let mut executor = CommandExecutor::builder();
@@ -687,8 +670,8 @@ mod tests {
 
         executor
             .run_target(
-                &mut (),
-                &mut (),
+                &mut NopFuzzer::new(),
+                &mut NopState::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )
@@ -700,17 +683,17 @@ mod tests {
     fn test_parse_afl_cmdline() {
         use alloc::string::ToString;
 
-        let mut mgr = SimpleEventManager::<BytesInput, _>::new(SimpleMonitor::new(|status| {
-            println!("{}", status);
+        let mut mgr = SimpleEventManager::new(SimpleMonitor::new(|status| {
+            println!("{status}");
         }));
 
         let mut executor =
-            CommandExecutor::parse_afl_cmdline(&["file".to_string(), "@@".to_string()], (), true)
+            CommandExecutor::parse_afl_cmdline(["file".to_string(), "@@".to_string()], (), true)
                 .unwrap();
         executor
             .run_target(
-                &mut (),
-                &mut (),
+                &mut NopFuzzer::new(),
+                &mut NopState::new(),
                 &mut mgr,
                 &BytesInput::new(b"test".to_vec()),
             )

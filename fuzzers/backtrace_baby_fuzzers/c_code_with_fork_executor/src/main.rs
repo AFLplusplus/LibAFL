@@ -1,14 +1,12 @@
 use std::path::PathBuf;
 
-use libafl::bolts::shmem::ShMemProvider;
-use libafl::bolts::AsSlice;
-use libafl::observers::ConstMapObserver;
 use libafl::{
     bolts::{
         current_nanos,
         rands::StdRand,
-        shmem::{ShMem, StdShMemProvider},
+        shmem::{ShMem, ShMemProvider, StdShMemProvider},
         tuples::tuple_list,
+        AsSlice,
     },
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
@@ -20,13 +18,12 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::BacktraceObserver,
+    observers::{BacktraceObserver, ConstMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use libc::c_int;
-use libc::c_uchar;
+use libc::{c_int, c_uchar};
 extern crate libc;
 
 extern "C" {
@@ -61,10 +58,7 @@ pub fn main() {
     let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_and!(
-        CrashFeedback::new(),
-        NewHashFeedback::<BacktraceObserver>::new(&bt_observer)
-    );
+    let mut objective = feedback_and!(CrashFeedback::new(), NewHashFeedback::new(&bt_observer));
 
     // create a State from scratch
     let mut state = StdState::new(

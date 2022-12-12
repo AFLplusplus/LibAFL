@@ -1,5 +1,6 @@
 //! Generates `DrCov` traces
-use crate::helper::FridaRuntime;
+use std::{collections::HashMap, hash::Hasher};
+
 use ahash::AHasher;
 use libafl::{
     bolts::AsSlice,
@@ -8,8 +9,8 @@ use libafl::{
 };
 use libafl_targets::drcov::{DrCovBasicBlock, DrCovWriter};
 use rangemap::RangeMap;
-use std::collections::HashMap;
-use std::hash::Hasher;
+
+use crate::helper::FridaRuntime;
 
 /// Generates `DrCov` traces
 #[derive(Debug, Clone)]

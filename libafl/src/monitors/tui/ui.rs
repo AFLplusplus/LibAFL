@@ -1,6 +1,9 @@
-use super::{current_time, format_duration_hms, Duration, String, TimedStats, TuiContext};
-
 use alloc::vec::Vec;
+use std::{
+    cmp::{max, min},
+    sync::{Arc, RwLock},
+};
+
 use tui::{
     backend::Backend,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -13,10 +16,7 @@ use tui::{
     Frame,
 };
 
-use std::{
-    cmp::{max, min},
-    sync::{Arc, RwLock},
-};
+use super::{current_time, format_duration_hms, Duration, String, TimedStats, TuiContext};
 
 #[derive(Default)]
 pub struct TuiUI {
@@ -62,16 +62,24 @@ impl TuiUI {
     //pub fn on_down(&mut self) {}
 
     pub fn on_right(&mut self) {
-        // never 0
-        self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
+        if self.clients != 0 {
+            // clients_idx never 0
+            if self.clients - 1 != 0 {
+                // except for when it is ;)
+                self.clients_idx = 1 + self.clients_idx % (self.clients - 1);
+            }
+        }
     }
 
     pub fn on_left(&mut self) {
-        // never 0
-        if self.clients_idx == 1 {
-            self.clients_idx = self.clients - 1;
-        } else {
-            self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
+        if self.clients != 0 {
+            // clients_idx never 0
+            if self.clients_idx == 1 {
+                self.clients_idx = self.clients - 1;
+            } else if self.clients - 1 != 0 {
+                // don't wanna be dividing by 0
+                self.clients_idx = 1 + (self.clients_idx - 2) % (self.clients - 1);
+            }
         }
     }
 
@@ -297,12 +305,12 @@ impl TuiUI {
                     .bounds([min_y as f64, max_y as f64])
                     .labels(vec![
                         Span::styled(
-                            format!("{}", min_y),
+                            format!("{min_y}"),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
                         Span::raw(format!("{}", (max_y - min_y) / 2)),
                         Span::styled(
-                            format!("{}", max_y),
+                            format!("{max_y}"),
                             Style::default().add_modifier(Modifier::BOLD),
                         ),
                     ]),
@@ -444,7 +452,7 @@ impl TuiUI {
                     ]));
                     for i in 0..client.stages.len() {
                         items.push(Row::new(vec![
-                            Cell::from(Span::raw(format!("stage {}", i))),
+                            Cell::from(Span::raw(format!("stage {i}"))),
                             Cell::from(Span::raw("")),
                         ]));
 

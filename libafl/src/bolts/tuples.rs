@@ -1,12 +1,11 @@
 //! Compiletime lists/tuples used throughout the `LibAFL` universe
 
-pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
-
 use core::{
     any::TypeId,
     ptr::{addr_of, addr_of_mut},
 };
 
+pub use tuple_list::{tuple_list, tuple_list_type, TupleList};
 use xxhash_rust::xxh3::xxh3_64;
 
 /// Returns if the type `T` is equal to `U`
@@ -235,7 +234,7 @@ where
 
 /// Match for a name and return the value
 ///
-/// # Safety
+/// # Note
 /// This operation is unsafe with Rust stable, wait for [specialization](https://stackoverflow.com/a/60138532/7658998).
 pub trait MatchName {
     /// Match for a name and return the borrowed value
@@ -478,11 +477,11 @@ pub fn test_macros() {
     let mut t = tuple_list!(1, "a");
 
     tuple_for_each!(f1, std::fmt::Display, t, |x| {
-        println!("{}", x);
+        println!("{x}");
     });
 
     tuple_for_each_mut!(f2, std::fmt::Display, t, |x| {
-        println!("{}", x);
+        println!("{x}");
     });
 }
 

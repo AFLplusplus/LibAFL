@@ -3,28 +3,109 @@
 pub mod simple;
 pub use simple::*;
 pub mod llmp;
-pub use llmp::*;
-
-use ahash::AHasher;
 use alloc::{
+    boxed::Box,
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std"))]
+use core::ffi::c_void;
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
-use serde::{Deserialize, Serialize};
 
+use ahash::AHasher;
+pub use llmp::*;
+use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use crate::{
     bolts::current_time,
     executors::ExitKind,
     inputs::Input,
     monitors::UserStats,
     observers::ObserversTuple,
-    state::{HasClientPerfMonitor, HasExecutions},
+    stages::calibrate::UnstableEntriesMetadata,
+    state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
+
+/// Check if ctrl-c is sent with this struct
+#[cfg(all(unix, feature = "std"))]
+pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData {
+    allocator_pid: 0,
+    staterestorer_ptr: core::ptr::null_mut(),
+    shutdown_handler: core::ptr::null(),
+};
+
+/// A signal handler for releasing `StateRestore` `ShMem`
+/// This struct holds a pointer to `StateRestore` and clean up the `ShMem` segment used by it.
+#[cfg(all(unix, feature = "std"))]
+#[derive(Debug, Clone)]
+pub struct ShutdownSignalData {
+    allocator_pid: usize,
+    staterestorer_ptr: *mut c_void,
+    shutdown_handler: *const c_void,
+}
+
+/// Type for shutdown handler
+#[cfg(all(unix, feature = "std"))]
+pub type ShutdownFuncPtr =
+    unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut ShutdownSignalData);
+
+/// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
+/// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
+///
+/// # Safety
+///
+/// This will acceess `data` and write to the global `data.staterestorer_ptr` if it's not null.
+#[cfg(all(unix, feature = "std"))]
+pub unsafe fn shutdown_handler<SP>(
+    signal: Signal,
+    _info: siginfo_t,
+    _context: &mut ucontext_t,
+    data: &mut ShutdownSignalData,
+) where
+    SP: ShMemProvider,
+{
+    println!(
+        "Fuzzer shutdown by Signal: {} Pid: {}",
+        signal,
+        std::process::id()
+    );
+
+    let ptr = data.staterestorer_ptr;
+    if ptr.is_null() || data.allocator_pid != std::process::id() as usize {
+        // Do nothing
+    } else {
+        // The process allocated the staterestorer map must take care of it
+        let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
+        // println!("{:#?}", sr);
+        std::ptr::drop_in_place(sr);
+    }
+    println!("Bye!");
+    std::process::exit(0);
+}
+
+#[cfg(all(unix, feature = "std"))]
+impl Handler for ShutdownSignalData {
+    fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
+        unsafe {
+            let data = &mut SHUTDOWN_SIGHANDLER_DATA;
+            if !data.shutdown_handler.is_null() {
+                let func: ShutdownFuncPtr = std::mem::transmute(data.shutdown_handler);
+                (func)(signal, info, context, data);
+            }
+        }
+    }
+
+    fn signals(&self) -> Vec<Signal> {
+        vec![Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit]
+    }
+}
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].
@@ -36,8 +117,7 @@ pub struct EventManagerId {
 
 #[cfg(feature = "introspection")]
 use crate::monitors::ClientPerfMonitor;
-#[cfg(feature = "introspection")]
-use alloc::boxed::Box;
+use crate::{inputs::UsesInput, state::UsesState};
 
 /// The log event severity
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -61,6 +141,15 @@ impl fmt::Display for LogSeverity {
             LogSeverity::Error => write!(f, "Error"),
         }
     }
+}
+
+/// The result of a custom buf handler added using [`HasCustomBufHandlers::add_custom_buf_handler`]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CustomBufEventResult {
+    /// Exit early from event handling
+    Handled,
+    /// Call the next handler, if available
+    Next,
 }
 
 /// Indicate if an event worked or not
@@ -118,14 +207,14 @@ impl EventConfig {
             EventConfig::FromName { name_hash: a } => match other {
                 #[cfg(not(feature = "std"))]
                 EventConfig::AlwaysUnique => false,
-                EventConfig::FromName { name_hash: b } => (a == b),
+                EventConfig::FromName { name_hash: b } => a == b,
                 #[cfg(feature = "std")]
                 EventConfig::AlwaysUnique | EventConfig::BuildID { id: _ } => false,
             },
             #[cfg(feature = "std")]
             EventConfig::BuildID { id: a } => match other {
                 EventConfig::AlwaysUnique | EventConfig::FromName { name_hash: _ } => false,
-                EventConfig::BuildID { id: b } => (a == b),
+                EventConfig::BuildID { id: b } => a == b,
             },
         }
     }
@@ -231,6 +320,13 @@ where
         /// `PhantomData`
         phantom: PhantomData<I>,
     },
+    /// Sends a custom buffer to other clients
+    CustomBuf {
+        /// The buffer
+        buf: Vec<u8>,
+        /// Tag of this buffer
+        tag: String,
+    },
     /*/// A custom type
     Custom {
         // TODO: Allow custom events
@@ -270,12 +366,13 @@ where
                 introspection_monitor: _,
                 phantom: _,
             } => "PerfMonitor",
-            Event::Objective { objective_size: _ } => "Objective",
+            Event::Objective { .. } => "Objective",
             Event::Log {
                 severity_level: _,
                 message: _,
                 phantom: _,
             } => "Log",
+            Event::CustomBuf { .. } => "CustomBuf",
             /*Event::Custom {
                 sender_id: _, /*custom_event} => custom_event.name()*/
             } => "todo",*/
@@ -284,10 +381,7 @@ where
 }
 
 /// [`EventFirer`] fire an event.
-pub trait EventFirer<I>
-where
-    I: Input,
-{
+pub trait EventFirer: UsesState {
     /// Send off an [`Event`] to the broker
     ///
     /// For multi-processed managers, such as [`llmp::LlmpEventManager`],
@@ -296,13 +390,17 @@ where
     /// (for example for each [`Input`], on multiple cores)
     /// the [`llmp`] shared map may fill up and the client will eventually OOM or [`panic`].
     /// This should not happen for a normal use-case.
-    fn fire<S>(&mut self, state: &mut S, event: Event<I>) -> Result<(), Error>;
+    fn fire(
+        &mut self,
+        state: &mut Self::State,
+        event: Event<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error>;
 
     /// Send off an [`Event::Log`] event to the broker.
     /// This is a shortcut for [`EventFirer::fire`] with [`Event::Log`] as argument.
-    fn log<S>(
+    fn log(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         severity_level: LogSeverity,
         message: String,
     ) -> Result<(), Error> {
@@ -317,9 +415,9 @@ where
     }
 
     /// Serialize all observers for this type and manager
-    fn serialize_observers<OT, S>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
+    fn serialize_observers<OT>(&mut self, observers: &OT) -> Result<Vec<u8>, Error>
     where
-        OT: ObserversTuple<I, S> + Serialize,
+        OT: ObserversTuple<Self::State> + Serialize,
     {
         Ok(postcard::to_allocvec(observers)?)
     }
@@ -331,22 +429,19 @@ where
 }
 
 /// [`ProgressReporter`] report progress to the broker.
-pub trait ProgressReporter<I>: EventFirer<I>
+pub trait ProgressReporter: EventFirer
 where
-    I: Input,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
 {
     /// Given the last time, if `monitor_timeout` seconds passed, send off an info/monitor/heartbeat message to the broker.
     /// Returns the new `last` time (so the old one, unless `monitor_timeout` time has passed and monitor have been sent)
     /// Will return an [`crate::Error`], if the stats could not be sent.
-    fn maybe_report_progress<S>(
+    fn maybe_report_progress(
         &mut self,
-        state: &mut S,
+        state: &mut Self::State,
         last_report_time: Duration,
         monitor_timeout: Duration,
-    ) -> Result<Duration, Error>
-    where
-        S: HasExecutions + HasClientPerfMonitor,
-    {
+    ) -> Result<Duration, Error> {
         let executions = *state.executions();
         let cur = current_time();
         // default to 0 here to avoid crashes on clock skew
@@ -362,13 +457,15 @@ where
                 },
             )?;
 
-            if let Some(x) = state.stability() {
-                let stability = f64::from(*x);
+            // Send the stability event to the broker
+            if let Some(meta) = state.metadata().get::<UnstableEntriesMetadata>() {
+                let unstable_entries = meta.unstable_entries().len();
+                let map_len = meta.map_len();
                 self.fire(
                     state,
                     Event::UpdateUserStats {
                         name: "stability".to_string(),
-                        value: UserStats::Float(stability),
+                        value: UserStats::Ratio(unstable_entries as u64, map_len as u64),
                         phantom: PhantomData,
                     },
                 )?;
@@ -403,10 +500,10 @@ where
 }
 
 /// Restartable trait
-pub trait EventRestarter<S> {
+pub trait EventRestarter: UsesState {
     /// For restarting event managers, implement a way to forward state to their next peers.
     #[inline]
-    fn on_restart(&mut self, _state: &mut S) -> Result<(), Error> {
+    fn on_restart(&mut self, _state: &mut Self::State) -> Result<(), Error> {
         Ok(())
     }
 
@@ -416,18 +513,15 @@ pub trait EventRestarter<S> {
 }
 
 /// [`EventProcessor`] process all the incoming messages
-pub trait EventProcessor<E, I, S, Z> {
+pub trait EventProcessor<E, Z>: UsesState {
     /// Lookup for incoming events and process them.
     /// Return the number of processes events or an error
-    fn process(&mut self, fuzzer: &mut Z, state: &mut S, executor: &mut E) -> Result<usize, Error>;
-
-    /// Deserialize all observers for this type and manager
-    fn deserialize_observers<OT>(&mut self, observers_buf: &[u8]) -> Result<OT, Error>
-    where
-        OT: ObserversTuple<I, S> + serde::de::DeserializeOwned,
-    {
-        Ok(postcard::from_bytes(observers_buf)?)
-    }
+    fn process(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        executor: &mut E,
+    ) -> Result<usize, Error>;
 }
 /// The id of this [`EventManager`].
 /// For multi processed [`EventManager`]s,
@@ -440,48 +534,99 @@ pub trait HasEventManagerId {
 
 /// [`EventManager`] is the main communications hub.
 /// For the "normal" multi-processed mode, you may want to look into [`LlmpRestartingEventManager`]
-pub trait EventManager<E, I, S, Z>:
-    EventFirer<I>
-    + EventProcessor<E, I, S, Z>
-    + EventRestarter<S>
-    + HasEventManagerId
-    + ProgressReporter<I>
+pub trait EventManager<E, Z>:
+    EventFirer + EventProcessor<E, Z> + EventRestarter + HasEventManagerId + ProgressReporter
 where
-    I: Input,
+    Self::State: HasClientPerfMonitor + HasMetadata + HasExecutions,
 {
 }
 
-/// An eventmgr for tests, and as placeholder if you really don't need an event manager.
-#[derive(Copy, Clone, Debug)]
-pub struct NopEventManager {}
+/// The handler function for custom buffers exchanged via [`EventManager`]
+type CustomBufHandlerFn<S> =
+    dyn FnMut(&mut S, &String, &[u8]) -> Result<CustomBufEventResult, Error>;
 
-impl<I> EventFirer<I> for NopEventManager
+/// Supports custom buf handlers to handle `CustomBuf` events.
+pub trait HasCustomBufHandlers: UsesState {
+    /// Adds a custom buffer handler that will run for each incoming `CustomBuf` event.
+    fn add_custom_buf_handler(&mut self, handler: Box<CustomBufHandlerFn<Self::State>>);
+}
+
+/// An eventmgr for tests, and as placeholder if you really don't need an event manager.
+#[derive(Copy, Clone, Debug, Default)]
+pub struct NopEventManager<S> {
+    phantom: PhantomData<S>,
+}
+
+impl<S> NopEventManager<S> {
+    /// Creates a new [`NopEventManager`]
+    #[must_use]
+    pub fn new() -> Self {
+        NopEventManager {
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<S> UsesState for NopEventManager<S>
 where
-    I: Input,
+    S: UsesInput,
 {
-    fn fire<S>(&mut self, _state: &mut S, _event: Event<I>) -> Result<(), Error> {
+    type State = S;
+}
+
+impl<S> EventFirer for NopEventManager<S>
+where
+    S: UsesInput,
+{
+    fn fire(
+        &mut self,
+        _state: &mut Self::State,
+        _event: Event<<Self::State as UsesInput>::Input>,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }
 
-impl<S> EventRestarter<S> for NopEventManager {}
+impl<S> EventRestarter for NopEventManager<S> where S: UsesInput {}
 
-impl<E, I, S, Z> EventProcessor<E, I, S, Z> for NopEventManager {
+impl<E, S, Z> EventProcessor<E, Z> for NopEventManager<S>
+where
+    S: UsesInput + HasClientPerfMonitor + HasExecutions,
+{
     fn process(
         &mut self,
         _fuzzer: &mut Z,
-        _state: &mut S,
+        _state: &mut Self::State,
         _executor: &mut E,
     ) -> Result<usize, Error> {
         Ok(0)
     }
 }
 
-impl<E, I, S, Z> EventManager<E, I, S, Z> for NopEventManager where I: Input {}
+impl<E, S, Z> EventManager<E, Z> for NopEventManager<S> where
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
+{
+}
 
-impl<I> ProgressReporter<I> for NopEventManager where I: Input {}
+impl<S> HasCustomBufHandlers for NopEventManager<S>
+where
+    S: UsesInput,
+{
+    fn add_custom_buf_handler(
+        &mut self,
+        _handler: Box<
+            dyn FnMut(&mut Self::State, &String, &[u8]) -> Result<CustomBufEventResult, Error>,
+        >,
+    ) {
+    }
+}
 
-impl HasEventManagerId for NopEventManager {
+impl<S> ProgressReporter for NopEventManager<S> where
+    S: UsesInput + HasClientPerfMonitor + HasExecutions + HasMetadata
+{
+}
+
+impl<S> HasEventManagerId for NopEventManager<S> {
     fn mgr_id(&self) -> EventManagerId {
         EventManagerId { id: 0 }
     }
@@ -535,7 +680,7 @@ mod tests {
                 time: _,
                 executions: _,
             } => {
-                let o: tuple_list_type!(StdMapObserver::<u32>) =
+                let o: tuple_list_type!(StdMapObserver::<u32, false>) =
                     postcard::from_bytes(observers_buf.as_ref().unwrap()).unwrap();
                 assert_eq!("test", o.0.name());
             }
@@ -548,17 +693,19 @@ mod tests {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::events::simple::pybind::PythonSimpleEventManager;
-    use crate::events::{
-        Event, EventFirer, EventManager, EventManagerId, EventProcessor, EventRestarter,
-        HasEventManagerId, ProgressReporter,
-    };
-    use crate::executors::pybind::PythonExecutor;
-    use crate::fuzzer::pybind::PythonStdFuzzer;
-    use crate::inputs::BytesInput;
-    use crate::state::pybind::PythonStdState;
-    use crate::Error;
     use pyo3::prelude::*;
+
+    use crate::{
+        events::{
+            simple::pybind::PythonSimpleEventManager, Event, EventFirer, EventManager,
+            EventManagerId, EventProcessor, EventRestarter, HasEventManagerId, ProgressReporter,
+        },
+        executors::pybind::PythonExecutor,
+        fuzzer::pybind::PythonStdFuzzer,
+        inputs::BytesInput,
+        state::{pybind::PythonStdState, UsesState},
+        Error,
+    };
 
     #[derive(Debug, Clone)]
     pub enum PythonEventManagerWrapper {
@@ -599,17 +746,19 @@ pub mod pybind {
         }
     }
 
-    impl EventFirer<BytesInput> for PythonEventManager {
-        fn fire<S>(&mut self, state: &mut S, event: Event<BytesInput>) -> Result<(), Error> {
+    impl UsesState for PythonEventManager {
+        type State = PythonStdState;
+    }
+
+    impl EventFirer for PythonEventManager {
+        fn fire(&mut self, state: &mut Self::State, event: Event<BytesInput>) -> Result<(), Error> {
             unwrap_me_mut!(self.wrapper, e, { e.fire(state, event) })
         }
     }
 
-    impl<S> EventRestarter<S> for PythonEventManager {}
+    impl EventRestarter for PythonEventManager {}
 
-    impl EventProcessor<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
-        for PythonEventManager
-    {
+    impl EventProcessor<PythonExecutor, PythonStdFuzzer> for PythonEventManager {
         fn process(
             &mut self,
             fuzzer: &mut PythonStdFuzzer,
@@ -620,7 +769,7 @@ pub mod pybind {
         }
     }
 
-    impl ProgressReporter<BytesInput> for PythonEventManager {}
+    impl ProgressReporter for PythonEventManager {}
 
     impl HasEventManagerId for PythonEventManager {
         fn mgr_id(&self) -> EventManagerId {
@@ -628,10 +777,7 @@ pub mod pybind {
         }
     }
 
-    impl EventManager<PythonExecutor, BytesInput, PythonStdState, PythonStdFuzzer>
-        for PythonEventManager
-    {
-    }
+    impl EventManager<PythonExecutor, PythonStdFuzzer> for PythonEventManager {}
 
     /// Register the classes to the python module
     pub fn register(_py: Python, m: &PyModule) -> PyResult<()> {

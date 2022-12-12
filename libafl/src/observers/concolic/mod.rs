@@ -1,11 +1,11 @@
 //! # Concolic Tracing
+#[cfg(feature = "std")]
+use alloc::vec::Vec;
 use core::{
     fmt::{Debug, Display, Error, Formatter},
     num::NonZeroUsize,
 };
 
-#[cfg(feature = "std")]
-use alloc::vec::Vec;
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 
@@ -58,6 +58,7 @@ impl From<usize> for Location {
 pub enum SymExpr {
     InputByte {
         offset: usize,
+        value: u8,
     },
 
     Integer {
@@ -312,9 +313,8 @@ pub enum SymExpr {
         op: SymExprRef,
         bits: u8,
     },
-    BoolToBits {
+    BoolToBit {
         op: SymExprRef,
-        bits: u8,
     },
 
     Concat {

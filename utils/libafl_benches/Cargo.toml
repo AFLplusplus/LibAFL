@@ -1,7 +1,7 @@
 [package]
 authors = ["Andrea Fioraldi <andreafioraldi@gmail.com>", "Dominik Maier <domenukk@gmail.com>"]
 name = "libafl_benches"
-version = "0.7.1"
+version.workspace = true
 edition = "2021"
 description = "LibAFL Benchmarks"
 documentation = "https://docs.rs/libafl"
@@ -13,9 +13,9 @@ categories = ["development-tools::testing", "emulators", "embedded", "os", "no-s
 
 [dev-dependencies]
 criterion = "0.3" # Benchmarking
-ahash = { version = "0.7", default-features=false, features=["compile-time-rng"] } # The hash function already used in hashbrown
-rustc-hash = { version = "1.0", default-features=false } # yet another hash
-xxhash-rust = { version = "0.8.2", features = ["xxh3"] } # xxh3 hashing for rust
+ahash = { version = "0.7", default-features=false } # The hash function already used in hashbrown
+rustc-hash = { version = "1.1", default-features=false } # yet another hash
+xxhash-rust = { version = "0.8.5", features = ["xxh3"] } # xxh3 hashing for rust
 libafl = { path = "../../libafl", default-features=false } # libafl
 
 [[bench]]

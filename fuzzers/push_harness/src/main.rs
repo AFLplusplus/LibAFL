@@ -1,7 +1,8 @@
 //! [`Klo-routines`](https://github.com/andreafioraldi/klo-routines/) based fuzzer.
 //! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
+use std::path::PathBuf;
+
 use klo_routines::*;
-use libafl::inputs::{BytesInput, HasTargetBytes};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
@@ -10,6 +11,7 @@ use libafl::{
     feedbacks::{CrashFeedback, MaxMapFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     generators::RandPrintablesGenerator,
+    inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
     observers::StdMapObserver,
@@ -17,7 +19,6 @@ use libafl::{
     stages::mutational::StdMutationalStage,
     state::StdState,
 };
-use std::path::PathBuf;
 
 /// Coverage map with explicit assignments due to the lack of instrumentation
 static mut SIGNALS: [u8; 16] = [0; 16];

@@ -1,20 +1,22 @@
 //! Mutators for the `Nautilus` grammmar fuzzer
 
+use core::fmt::Debug;
+
+use grammartec::{
+    context::Context,
+    mutator::Mutator as BackingMutator,
+    tree::{Tree, TreeMutation},
+};
+
 use crate::{
     bolts::tuples::Named,
     feedbacks::NautilusChunksMetadata,
     generators::nautilus::NautilusContext,
     inputs::nautilus::NautilusInput,
     mutators::{MutationResult, Mutator},
+    prelude::UsesInput,
     state::{HasCorpus, HasMetadata},
     Error,
-};
-
-use core::fmt::Debug;
-use grammartec::mutator::Mutator as BackingMutator;
-use grammartec::{
-    context::Context,
-    tree::{Tree, TreeMutation},
 };
 
 /// The randomic mutator for `Nautilus` grammar.
@@ -29,7 +31,10 @@ impl Debug for NautilusRandomMutator<'_> {
     }
 }
 
-impl<S> Mutator<NautilusInput, S> for NautilusRandomMutator<'_> {
+impl<S> Mutator<S> for NautilusRandomMutator<'_>
+where
+    S: UsesInput<Input = NautilusInput>,
+{
     fn mutate(
         &mut self,
         _state: &mut S,
@@ -90,7 +95,10 @@ impl Debug for NautilusRecursionMutator<'_> {
     }
 }
 
-impl<S> Mutator<NautilusInput, S> for NautilusRecursionMutator<'_> {
+impl<S> Mutator<S> for NautilusRecursionMutator<'_>
+where
+    S: UsesInput<Input = NautilusInput>,
+{
     fn mutate(
         &mut self,
         _state: &mut S,
@@ -153,9 +161,9 @@ impl Debug for NautilusSpliceMutator<'_> {
     }
 }
 
-impl<S> Mutator<NautilusInput, S> for NautilusSpliceMutator<'_>
+impl<S> Mutator<S> for NautilusSpliceMutator<'_>
 where
-    S: HasCorpus<NautilusInput> + HasMetadata,
+    S: HasCorpus + HasMetadata + UsesInput<Input = NautilusInput>,
 {
     fn mutate(
         &mut self,

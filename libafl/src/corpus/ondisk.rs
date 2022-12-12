@@ -2,21 +2,23 @@
 
 use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "std")]
+use std::{fs, fs::File, io::Write};
 use std::{
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
 
-#[cfg(feature = "std")]
-use std::{fs, fs::File, io::Write};
-
-use crate::{
-    bolts::serdeany::SerdeAnyMap, corpus::Corpus, corpus::Testcase, inputs::Input,
-    state::HasMetadata, Error,
-};
+use serde::{Deserialize, Serialize};
 
 use super::{id_manager::CorpusIDManager, CorpusID};
+use crate::{
+    bolts::serdeany::SerdeAnyMap,
+    corpus::{Corpus, Testcase},
+    inputs::{Input, UsesInput},
+    state::HasMetadata,
+    Error,
+};
 
 /// Options for the the format of the on-disk metadata
 #[cfg(feature = "std")]
@@ -54,20 +56,18 @@ where
     id_manager: CorpusIDManager,
 }
 
-impl<I> Corpus<I> for OnDiskCorpus<I>
+impl<I> UsesInput for OnDiskCorpus<I>
 where
     I: Input,
 {
-    /// Returns the number of elements
-    #[inline]
-    fn count(&self) -> usize {
-        debug_assert!(self.entries.len() == self.id_manager.active_ids().len());
-        self.entries.len()
-    }
+    type Input = I;
+}
 
-    /// Add an entry to the corpus and return its index
-    #[inline]
-    fn add(&mut self, mut testcase: Testcase<I>) -> Result<CorpusID, Error> {
+impl<I> Corpus for OnDiskCorpus<I>
+where
+    I: Input,
+{
+    fn add(&mut self, mut testcase: Testcase<Self::Input>) -> Result<CorpusID, Error> {
         if testcase.filename().is_none() {
             // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
             let file_orig = testcase
@@ -76,12 +76,10 @@ where
                 .unwrap()
                 .generate_name(self.entries.len());
             let mut file = file_orig.clone();
-
             let mut ctr = 2;
             let filename = loop {
                 let lockfile = format!(".{}.lafl_lock", file);
                 // try to create lockfile.
-
                 if OpenOptions::new()
                     .write(true)
                     .create_new(true)
@@ -90,11 +88,9 @@ where
                 {
                     break self.dir_path.join(file);
                 }
-
                 file = format!("{}-{}", &file_orig, ctr);
                 ctr += 1;
             };
-
             let filename_str = filename.to_str().expect("Invalid Path");
             testcase.set_filename(filename_str.into());
         };
@@ -109,15 +105,12 @@ where
                 ".{}.tmp",
                 tmpfile_name.file_name().unwrap().to_string_lossy()
             ));
-
             let ondisk_meta = OnDiskMetadata {
                 metadata: testcase.metadata(),
                 exec_time: testcase.exec_time(),
                 executions: testcase.executions(),
             };
-
             let mut tmpfile = File::create(&tmpfile_name)?;
-
             let serialized = match self.meta_format.as_ref().unwrap() {
                 OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
                 OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
@@ -135,22 +128,34 @@ where
         Ok(id)
     }
 
-    /// Replaces the testcase at the given idx
+    /// Returns the number of elements
     #[inline]
-    fn replace(&mut self, id: CorpusID, testcase: Testcase<I>) -> Result<(), Error> {
+    fn count(&self) -> usize {
+        debug_assert!(self.entries.len() == self.id_manager.active_ids().len());
+        self.entries.len()
+    }
+
+    /// Add an entry to the corpus and return its index
+    #[inline]
+    fn replace(&mut self, idx: CorpusID, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         let old_idx = self
             .id_manager
-            .remove_id(id)
-            .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
-        self.entries[old_idx] = RefCell::new(testcase);
-        Ok(())
+            .remove_id(idx)
+            .ok_or_else(|| Error::key_not_found(format!("ID {idx:?} is stale")))?;
+
+        self.save_testcase(&mut testcase)?;
+        let previous = self.entries[old_idx].replace(testcase);
+        self.remove_testcase(&previous)?;
+        Ok(previous)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, id: CorpusID) -> Result<Option<Testcase<I>>, Error> {
-        if let Some(idx) = self.id_manager.active_index_for(id) {
-            Ok(Some(self.entries.remove(idx).into_inner()))
+    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error> {
+        if let Some(idx) = self.id_manager.active_index_for(idx) {
+            let prev = self.entries.remove(idx).into_inner();
+            self.remove_testcase(&prev)?;
+            Ok(Some(prev))
         } else {
             Ok(None)
         }
@@ -221,19 +226,103 @@ where
             id_manager: CorpusIDManager::new(),
         })
     }
+
+    fn save_testcase(&mut self, testcase: &mut Testcase<I>) -> Result<(), Error> {
+        if testcase.filename().is_none() {
+            // TODO walk entry metadata to ask for pieces of filename (e.g. :havoc in AFL)
+            let file_orig = testcase
+                .input()
+                .as_ref()
+                .unwrap()
+                .generate_name(self.entries.len());
+            let mut file = file_orig.clone();
+
+            let mut ctr = 2;
+            let filename = loop {
+                let lockfile = format!(".{file}.lafl_lock");
+                // try to create lockfile.
+
+                if OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(self.dir_path.join(lockfile))
+                    .is_ok()
+                {
+                    break self.dir_path.join(file);
+                }
+
+                file = format!("{}-{ctr}", &file_orig);
+                ctr += 1;
+            };
+
+            let filename_str = filename.to_str().expect("Invalid Path");
+            testcase.set_filename(filename_str.into());
+        };
+        if self.meta_format.is_some() {
+            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
+            filename.set_file_name(format!(
+                ".{}.metadata",
+                filename.file_name().unwrap().to_string_lossy()
+            ));
+            let mut tmpfile_name = PathBuf::from(&filename);
+            tmpfile_name.set_file_name(format!(
+                ".{}.tmp",
+                tmpfile_name.file_name().unwrap().to_string_lossy()
+            ));
+
+            let ondisk_meta = OnDiskMetadata {
+                metadata: testcase.metadata(),
+                exec_time: testcase.exec_time(),
+                executions: testcase.executions(),
+            };
+
+            let mut tmpfile = File::create(&tmpfile_name)?;
+
+            let serialized = match self.meta_format.as_ref().unwrap() {
+                OnDiskMetadataFormat::Postcard => postcard::to_allocvec(&ondisk_meta)?,
+                OnDiskMetadataFormat::Json => serde_json::to_vec(&ondisk_meta)?,
+                OnDiskMetadataFormat::JsonPretty => serde_json::to_vec_pretty(&ondisk_meta)?,
+            };
+            tmpfile.write_all(&serialized)?;
+            fs::rename(&tmpfile_name, &filename)?;
+        }
+        testcase
+            .store_input()
+            .expect("Could not save testcase to disk");
+        Ok(())
+    }
+
+    fn remove_testcase(&mut self, testcase: &Testcase<I>) -> Result<(), Error> {
+        if let Some(filename) = testcase.filename() {
+            fs::remove_file(filename)?;
+        }
+        if self.meta_format.is_some() {
+            let mut filename = PathBuf::from(testcase.filename().as_ref().unwrap());
+            filename.set_file_name(format!(
+                ".{}.metadata",
+                filename.file_name().unwrap().to_string_lossy()
+            ));
+            fs::remove_file(filename)?;
+        }
+        Ok(())
+    }
 }
 #[cfg(feature = "python")]
 /// `OnDiskCorpus` Python bindings
 pub mod pybind {
-    use crate::corpus::pybind::PythonCorpus;
-    use crate::corpus::OnDiskCorpus;
-    use crate::inputs::BytesInput;
     use alloc::string::String;
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
     use std::path::PathBuf;
 
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        corpus::{pybind::PythonCorpus, OnDiskCorpus},
+        inputs::BytesInput,
+    };
+
     #[pyclass(unsendable, name = "OnDiskCorpus")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Debug, Clone)]
     /// Python class for OnDiskCorpus
     pub struct PythonOnDiskCorpus {

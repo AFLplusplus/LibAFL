@@ -1,17 +1,11 @@
 //! Monitor based on tui-rs
 
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use hashbrown::HashMap;
-use tui::{backend::CrosstermBackend, Terminal};
-
+use alloc::boxed::Box;
 use std::{
     collections::VecDeque,
     fmt::Write,
     io::{self, BufRead},
+    panic,
     string::String,
     sync::{Arc, RwLock},
     thread,
@@ -19,9 +13,17 @@ use std::{
     vec::Vec,
 };
 
+use crossterm::{
+    cursor::{EnableBlinking, Show},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use hashbrown::HashMap;
+use tui::{backend::CrosstermBackend, Terminal};
+
 #[cfg(feature = "introspection")]
 use super::{ClientPerfMonitor, PerfFeature};
-
 use crate::{
     bolts::{current_time, format_duration_hms},
     monitors::{ClientStats, Monitor, UserStats},
@@ -134,7 +136,7 @@ impl PerfTuiContext {
 
                 // Get the actual feature from the feature index for printing its name
                 let feature: PerfFeature = feature_index.into();
-                features_percentages.push((format!("{:?}", feature), feature_percent));
+                features_percentages.push((format!("{feature:?}"), feature_percent));
             }
 
             self.stages.push(features_percentages);
@@ -274,19 +276,19 @@ impl Monitor for TuiMonitor {
         let client = self.client_stats_mut_for(sender_id);
         let exec_sec = client.execs_per_sec(cur_time);
 
-        let sender = format!("#{}", sender_id);
+        let sender = format!("#{sender_id}");
         let pad = if event_msg.len() + sender.len() < 13 {
             " ".repeat(13 - event_msg.len() - sender.len())
         } else {
             String::new()
         };
-        let head = format!("{}{} {}", event_msg, pad, sender);
+        let head = format!("{event_msg}{pad} {sender}");
         let mut fmt = format!(
             "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {
-            write!(fmt, ", {}: {}", key, val).unwrap();
+            write!(fmt, ", {key}: {val}").unwrap();
         }
 
         {
@@ -361,6 +363,22 @@ fn run_tui_thread(
 
         let mut last_tick = Instant::now();
         let mut cnt = 0;
+
+        // Catching panics when the main thread dies
+        let old_hook = panic::take_hook();
+        panic::set_hook(Box::new(move |panic_info| {
+            disable_raw_mode().unwrap();
+            execute!(
+                io::stdout(),
+                LeaveAlternateScreen,
+                DisableMouseCapture,
+                Show,
+                EnableBlinking,
+            )
+            .unwrap();
+            old_hook(panic_info);
+        }));
+
         loop {
             // to avoid initial ui glitches
             if cnt < 8 {

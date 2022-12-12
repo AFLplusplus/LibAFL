@@ -1,17 +1,13 @@
 //! Tokens are what AFL calls extras or dictionaries.
 //! They may be inserted as part of mutations during fuzzing.
-#[cfg(feature = "std")]
-use crate::mutators::str_decode;
 use alloc::vec::Vec;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use core::slice::from_raw_parts;
-use core::slice::Iter;
 use core::{
     mem::size_of,
     ops::{Add, AddAssign},
+    slice::Iter,
 };
-use hashbrown::HashSet;
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{
     fs::File,
@@ -19,9 +15,14 @@ use std::{
     path::Path,
 };
 
+use hashbrown::HashSet;
+use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "std")]
+use crate::mutators::str_decode;
 use crate::{
     bolts::{rands::Rand, AsSlice},
-    inputs::{HasBytesVec, Input},
+    inputs::{HasBytesVec, UsesInput},
     mutators::{buffer_self_copy, mutations::buffer_copy, MutationResult, Mutator, Named},
     observers::cmp::{CmpValues, CmpValuesMetadata},
     state::{HasMaxSize, HasMetadata, HasRand},
@@ -104,7 +105,7 @@ impl Tokens {
     /// # Safety
     /// The caller must ensure that the region between `token_start` and `token_stop`
     /// is a valid region, containing autotokens in the exepcted format.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_vendor = "apple"))]
     pub unsafe fn from_ptrs(token_start: *const u8, token_stop: *const u8) -> Result<Self, Error> {
         let mut ret = Self::default();
         if token_start.is_null() || token_stop.is_null() {
@@ -112,8 +113,7 @@ impl Tokens {
         }
         if token_stop < token_start {
             return Err(Error::illegal_argument(format!(
-                "Tried to create tokens from illegal section: stop < start ({:?} < {:?})",
-                token_stop, token_start
+                "Tried to create tokens from illegal section: stop < start ({token_stop:?} < {token_start:?})"
             )));
         }
         let section_size: usize = token_stop.offset_from(token_start).try_into().unwrap();
@@ -168,19 +168,13 @@ impl Tokens {
             if line.is_empty() || start == Some('#') {
                 continue;
             }
-            let pos_quote = match line.find('\"') {
-                Some(x) => x,
-                None => return Err(Error::illegal_argument(format!("Illegal line: {}", line))),
-            };
+            let Some(pos_quote) = line.find('\"') else { return Err(Error::illegal_argument(format!("Illegal line: {line}"))) };
             if line.chars().nth(line.len() - 1) != Some('"') {
-                return Err(Error::illegal_argument(format!("Illegal line: {}", line)));
+                return Err(Error::illegal_argument(format!("Illegal line: {line}")));
             }
 
             // extract item
-            let item = match line.get(pos_quote + 1..line.len() - 1) {
-                Some(x) => x,
-                None => return Err(Error::illegal_argument(format!("Illegal line: {}", line))),
-            };
+            let Some(item) = line.get(pos_quote + 1..line.len() - 1) else { return Err(Error::illegal_argument(format!("Illegal line: {line}"))) };
             if item.is_empty() {
                 continue;
             }
@@ -190,8 +184,7 @@ impl Tokens {
                 Ok(val) => val,
                 Err(_) => {
                     return Err(Error::illegal_argument(format!(
-                        "Illegal line (hex decoding): {}",
-                        line
+                        "Illegal line (hex decoding): {line}"
                     )))
                 }
             };
@@ -265,7 +258,8 @@ where
     }
 }
 
-impl AsSlice<Vec<u8>> for Tokens {
+impl AsSlice for Tokens {
+    type Entry = Vec<u8>;
     fn as_slice(&self) -> &[Vec<u8>] {
         self.tokens()
     }
@@ -294,15 +288,15 @@ impl<'it> IntoIterator for &'it Tokens {
 #[derive(Debug, Default)]
 pub struct TokenInsert;
 
-impl<I, S> Mutator<I, S> for TokenInsert
+impl<S> Mutator<S> for TokenInsert
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let max_size = state.max_size();
@@ -360,15 +354,15 @@ impl TokenInsert {
 #[derive(Debug, Default)]
 pub struct TokenReplace;
 
-impl<I, S> Mutator<I, S> for TokenReplace
+impl<S> Mutator<S> for TokenReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -422,16 +416,16 @@ impl TokenReplace {
 #[derive(Debug, Default)]
 pub struct I2SRandReplace;
 
-impl<I, S> Mutator<I, S> for I2SRandReplace
+impl<S> Mutator<S> for I2SRandReplace
 where
-    I: Input + HasBytesVec,
-    S: HasMetadata + HasRand + HasMaxSize,
+    S: UsesInput + HasMetadata + HasRand + HasMaxSize,
+    S::Input: HasBytesVec,
 {
     #[allow(clippy::too_many_lines)]
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
@@ -566,6 +560,7 @@ where
                     while size != 0 {
                         if v.0[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.1, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -574,6 +569,7 @@ where
                     while size != 0 {
                         if v.1[0..size] == input.bytes()[i..i + size] {
                             buffer_copy(input.bytes_mut(), &v.0, 0, i, size);
+                            result = MutationResult::Mutated;
                             break 'outer;
                         }
                         size -= 1;
@@ -581,8 +577,6 @@ where
                 }
             }
         }
-
-        //println!("{:?}", result);
 
         Ok(result)
     }
@@ -622,7 +616,7 @@ token1="A\x41A"
 token2="B"
         "###;
         fs::write("test.tkns", data).expect("Unable to write test.tkns");
-        let tokens = Tokens::from_file(&"test.tkns").unwrap();
+        let tokens = Tokens::from_file("test.tkns").unwrap();
         #[cfg(feature = "std")]
         println!("Token file entries: {:?}", tokens.tokens());
         assert_eq!(tokens.tokens().len(), 2);

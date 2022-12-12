@@ -2,12 +2,13 @@
 //! The values will then be used in subsequent mutations.
 //!
 
+use alloc::string::{String, ToString};
 use core::fmt::{self, Debug, Formatter};
 
-use alloc::string::{String, ToString};
 use libafl::{
     bolts::{ownedref::OwnedRefMut, tuples::Named},
     executors::ExitKind,
+    inputs::UsesInput,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
     state::HasMetadata,
     Error,
@@ -155,6 +156,7 @@ impl CmpMap for CmpLogMap {
 
 /// The global `CmpLog` map for the current `LibAFL` run.
 #[no_mangle]
+#[allow(clippy::large_stack_arrays)]
 pub static mut libafl_cmplog_map: CmpLogMap = CmpLogMap {
     headers: [CmpLogHeader {
         hits: 0,
@@ -183,9 +185,9 @@ pub struct CmpLogObserver<'a> {
     name: String,
 }
 
-impl<'a, I, S> CmpObserver<CmpLogMap, I, S> for CmpLogObserver<'a>
+impl<'a, S> CmpObserver<CmpLogMap, S> for CmpLogObserver<'a>
 where
-    S: HasMetadata,
+    S: UsesInput + HasMetadata,
 {
     /// Get the number of usable cmps (all by default)
     fn usable_count(&self) -> usize {
@@ -204,12 +206,12 @@ where
     }
 }
 
-impl<'a, I, S> Observer<I, S> for CmpLogObserver<'a>
+impl<'a, S> Observer<S> for CmpLogObserver<'a>
 where
-    S: HasMetadata,
-    Self: CmpObserver<CmpLogMap, I, S>,
+    S: UsesInput + HasMetadata,
+    Self: CmpObserver<CmpLogMap, S>,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.map.as_mut().reset()?;
         unsafe {
             CMPLOG_ENABLED = 1;
@@ -217,7 +219,12 @@ where
         Ok(())
     }
 
-    fn post_exec(&mut self, state: &mut S, _input: &I, _exit_kind: &ExitKind) -> Result<(), Error> {
+    fn post_exec(
+        &mut self,
+        state: &mut S,
+        _input: &S::Input,
+        _exit_kind: &ExitKind,
+    ) -> Result<(), Error> {
         unsafe {
             CMPLOG_ENABLED = 0;
         }

@@ -7,9 +7,21 @@
     allow(clippy::useless_conversion)
 )]
 #![allow(clippy::needless_pass_by_value)]
+#![allow(clippy::transmute_ptr_to_ptr)]
+#![allow(clippy::too_many_arguments)]
+// Till they fix this buggy lint in clippy
+#![allow(clippy::borrow_as_ptr)]
+#![allow(clippy::borrow_deref_ref)]
+// Allow only ATM, it will be evetually removed
+#![allow(clippy::missing_safety_doc)]
+// libafl_qemu_sys export types with empty struct markers (e.g. struct {} start_init_save)
+// This causes bindgen to generate empty Rust struct that are generally not FFI-safe due to C++ having empty structs with size 1
+// As the QEMU codebase is C, it is FFI-safe and we just ignore the warning
+#![allow(improper_ctypes)]
 
 use std::env;
 
+pub use libafl_qemu_sys as sys;
 pub use strum::IntoEnumIterator;
 
 #[cfg(cpu_target = "aarch64")]
@@ -42,14 +54,24 @@ pub use hooks::*;
 pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
 pub mod cmplog;
+pub mod drcov;
 pub use cmplog::QemuCmpLogHelper;
+#[cfg(emulation_mode = "usermode")]
 pub mod snapshot;
+#[cfg(emulation_mode = "usermode")]
 pub use snapshot::QemuSnapshotHelper;
+#[cfg(emulation_mode = "usermode")]
 pub mod asan;
+#[cfg(emulation_mode = "usermode")]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
+pub mod blocks;
+pub mod calls;
+
 pub mod executor;
-pub use executor::{QemuExecutor, QemuForkExecutor};
+pub use executor::QemuExecutor;
+#[cfg(feature = "fork")]
+pub use executor::QemuForkExecutor;
 
 pub mod emu;
 pub use emu::*;
@@ -82,14 +104,14 @@ pub fn python_module(py: Python, m: &PyModule) -> PyResult<()> {
     let regsm = PyModule::new(py, "regs")?;
     for r in Regs::iter() {
         let v: i32 = r.into();
-        regsm.add(&format!("{:?}", r), v)?;
+        regsm.add(&format!("{r:?}"), v)?;
     }
     m.add_submodule(regsm)?;
 
     let mmapm = PyModule::new(py, "mmap")?;
     for r in emu::MmapPerms::iter() {
         let v: i32 = r.into();
-        mmapm.add(&format!("{:?}", r), v)?;
+        mmapm.add(&format!("{r:?}"), v)?;
     }
     m.add_submodule(mmapm)?;
 

@@ -3,15 +3,15 @@
 //! This allows the fuzzer to potentially solve the compares, if a compare value is directly
 //! related to the input.
 //! Read the [`RedQueen`](https://www.ndss-symposium.org/ndss-paper/redqueen-fuzzing-with-input-to-state-correspondence/) paper for the general concepts.
+use std::ffi::c_void;
+
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 use libafl::{
     inputs::{HasTargetBytes, Input},
     Error,
 };
-use libafl_targets;
-use libafl_targets::CMPLOG_MAP_W;
+use libafl_targets::{self, CMPLOG_MAP_W};
 use rangemap::RangeMap;
-use std::ffi::c_void;
 
 use crate::helper::FridaRuntime;
 extern "C" {
@@ -187,23 +187,23 @@ impl CmpLogRuntime {
         macro_rules! tbz_masking {
             ($ops:ident) => {dynasm!($ops
                 ; .arch aarch64
-                ; stp x5, x5, [sp, #-0x10]!
+                ; stp x5, xzr, [sp, #-0x10]!
                 ; mov x5, #1
                 ; lsl x5, x5, x1
                 ; eor x5, x5, #255
                 ; orr x1, x0, x5
-                ; ldp x5, x5, [sp], #0x10
+                ; ldp x5, xzr, [sp], #0x10
             );};
         }
 
         macro_rules! tbnz_masking {
             ($ops:ident) => {dynasm!($ops
                 ; .arch aarch64
-                ; stp x5, x5, [sp, #-0x10]!
+                ; stp x5, xzr, [sp, #-0x10]!
                 ; mov x5, #1
                 ; lsl x5, x5, x1
                 ; orr x1, x0, x5
-                ; ldp x5, x5, [sp], #0x10
+                ; ldp x5, xzr, [sp], #0x10
             );};
 
         }
@@ -358,16 +358,15 @@ impl CmpLogRuntime {
         match op2 {
             CmplogOperandType::Imm(value) | CmplogOperandType::Cimm(value) => {
                 writer.put_ldr_reg_u64(Aarch64Register::X1, *value);
-                match special_case {
-                    Some(inst) => match inst {
+                if let Some(inst) = special_case {
+                    match inst {
                         SpecialCmpLogCase::Tbz => {
                             writer.put_bytes(self.ops_handle_tbz_masking());
                         }
                         SpecialCmpLogCase::Tbnz => {
                             writer.put_bytes(self.ops_handle_tbnz_masking());
                         }
-                    },
-                    None => (),
+                    }
                 }
             }
             CmplogOperandType::Regid(reg) => {

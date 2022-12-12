@@ -2,49 +2,48 @@
 //! and use the results for fuzzer input and mutations.
 //!
 
-use core::marker::PhantomData;
-
 use alloc::string::String;
 #[cfg(feature = "concolic_mutation")]
 use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
+use core::marker::PhantomData;
 
+use super::{Stage, TracingStage};
 use crate::{
     corpus::{Corpus, CorpusID},
     executors::{Executor, HasObservers},
-    inputs::Input,
-    observers::{concolic::ConcolicObserver, ObserversTuple},
+    observers::concolic::ConcolicObserver,
     state::{HasClientPerfMonitor, HasCorpus, HasExecutions, HasMetadata},
     Error,
 };
 
-use super::{Stage, TracingStage};
-
 /// Wraps a [`TracingStage`] to add concolic observing.
 #[derive(Clone, Debug)]
-pub struct ConcolicTracingStage<EM, I, OT, S, TE, Z>
-where
-    I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
-{
-    inner: TracingStage<EM, I, OT, S, TE, Z>,
+pub struct ConcolicTracingStage<EM, TE, Z> {
+    inner: TracingStage<EM, TE, Z>,
     observer_name: String,
 }
 
-impl<E, EM, I, OT, S, TE, Z> Stage<E, EM, S, Z> for ConcolicTracingStage<EM, I, OT, S, TE, Z>
+impl<EM, TE, Z> UsesState for ConcolicTracingStage<EM, TE, Z>
 where
-    I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
+    TE: UsesState,
+{
+    type State = TE::State;
+}
+
+impl<E, EM, TE, Z> Stage<E, EM, Z> for ConcolicTracingStage<EM, TE, Z>
+where
+    E: UsesState<State = TE::State>,
+    EM: UsesState<State = TE::State>,
+    TE: Executor<EM, Z> + HasObservers,
+    TE::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
+    Z: UsesState<State = TE::State>,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut TE::State,
         manager: &mut EM,
         corpus_idx: CorpusID,
     ) -> Result<(), Error> {
@@ -69,15 +68,9 @@ where
     }
 }
 
-impl<EM, I, OT, S, TE, Z> ConcolicTracingStage<EM, I, OT, S, TE, Z>
-where
-    I: Input,
-    TE: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
-{
+impl<EM, TE, Z> ConcolicTracingStage<EM, TE, Z> {
     /// Creates a new default tracing stage using the given [`Executor`], observing traces from a [`ConcolicObserver`] with the given name.
-    pub fn new(inner: TracingStage<EM, I, OT, S, TE, Z>, observer_name: String) -> Self {
+    pub fn new(inner: TracingStage<EM, TE, Z>, observer_name: String) -> Self {
         Self {
             inner,
             observer_name,
@@ -85,6 +78,9 @@ where
     }
 }
 
+#[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
+use crate::monitors::PerfFeature;
+use crate::{bolts::tuples::MatchName, state::UsesState};
 #[cfg(feature = "concolic_mutation")]
 use crate::{
     inputs::HasBytesVec,
@@ -92,9 +88,6 @@ use crate::{
     observers::concolic::{ConcolicMetadata, SymExpr, SymExprRef},
     start_timer, Evaluator,
 };
-
-#[cfg(all(feature = "concolic_mutation", feature = "introspection"))]
-use crate::monitors::PerfFeature;
 
 #[cfg(feature = "concolic_mutation")]
 #[allow(clippy::too_many_lines)]
@@ -164,7 +157,7 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
     for (id, msg) in iter {
         let z3_expr: Option<Dynamic> = match msg {
-            SymExpr::InputByte { offset } => {
+            SymExpr::InputByte { offset, .. } => {
                 Some(BV::new_const(&ctx, Symbol::Int(offset as u32), 8).into())
             }
             SymExpr::Integer { value, bits } => {
@@ -218,12 +211,9 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
             SymExpr::Sext { op, bits } => Some(bv!(op).sign_ext(u32::from(bits)).into()),
             SymExpr::Zext { op, bits } => Some(bv!(op).zero_ext(u32::from(bits)).into()),
             SymExpr::Trunc { op, bits } => Some(bv!(op).extract(u32::from(bits - 1), 0).into()),
-            SymExpr::BoolToBits { op, bits } => Some(
+            SymExpr::BoolToBit { op } => Some(
                 bool!(op)
-                    .ite(
-                        &BV::from_u64(&ctx, 1, u32::from(bits)),
-                        &BV::from_u64(&ctx, 0, u32::from(bits)),
-                    )
+                    .ite(&BV::from_u64(&ctx, 1, 1), &BV::from_u64(&ctx, 0, 1))
                     .into(),
             ),
             SymExpr::Concat { a, b } => bv_binop!(a concat b),
@@ -343,27 +333,33 @@ fn generate_mutations(iter: impl Iterator<Item = (SymExprRef, SymExpr)>) -> Vec<
 
 /// A mutational stage that uses Z3 to solve concolic constraints attached to the [`crate::corpus::Testcase`] by the [`ConcolicTracingStage`].
 #[derive(Clone, Debug)]
-pub struct SimpleConcolicMutationalStage<EM, I, S, Z>
-where
-    I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
-{
-    _phantom: PhantomData<(EM, I, S, Z)>,
+pub struct SimpleConcolicMutationalStage<Z> {
+    _phantom: PhantomData<Z>,
 }
 
 #[cfg(feature = "concolic_mutation")]
-impl<E, EM, I, S, Z> Stage<E, EM, S, Z> for SimpleConcolicMutationalStage<EM, I, S, Z>
+impl<Z> UsesState for SimpleConcolicMutationalStage<Z>
 where
-    I: Input + HasBytesVec,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
-    Z: Evaluator<E, EM, I, S>,
+    Z: UsesState,
+{
+    type State = Z::State;
+}
+
+#[cfg(feature = "concolic_mutation")]
+impl<E, EM, Z> Stage<E, EM, Z> for SimpleConcolicMutationalStage<Z>
+where
+    E: UsesState<State = Z::State>,
+    EM: UsesState<State = Z::State>,
+    Z: Evaluator<E, EM>,
+    Z::Input: HasBytesVec,
+    Z::State: HasClientPerfMonitor + HasExecutions + HasCorpus,
 {
     #[inline]
     fn perform(
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut Z::State,
         manager: &mut EM,
         corpus_idx: CorpusID,
     ) -> Result<(), Error> {
@@ -395,11 +391,7 @@ where
     }
 }
 
-impl<EM, I, S, Z> Default for SimpleConcolicMutationalStage<EM, I, S, Z>
-where
-    I: Input,
-    S: HasClientPerfMonitor + HasExecutions + HasCorpus<I>,
-{
+impl<Z> Default for SimpleConcolicMutationalStage<Z> {
     fn default() -> Self {
         Self {
             _phantom: PhantomData,

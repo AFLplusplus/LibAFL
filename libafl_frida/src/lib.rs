@@ -1,6 +1,8 @@
 /*!
 The frida executor is a binary-only mode for `LibAFL`.
 It can report coverage and, on supported architecutres, even reports memory access errors.
+
+Additional documentation is available in [the `LibAFL` book](https://aflplus.plus/libafl-book/advanced_features/frida.html).
 */
 
 #![deny(rustdoc::broken_intra_doc_links)]
@@ -18,7 +20,7 @@ It can report coverage and, on supported architecutres, even reports memory acce
     clippy::module_name_repetitions,
     clippy::unreadable_literal
 )]
-#![cfg_attr(debug_assertions, warn(
+#![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -28,7 +30,7 @@ It can report coverage and, on supported architecutres, even reports memory acce
     unused_qualifications,
     //unused_results
 ))]
-#![cfg_attr(not(debug_assertions), deny(
+#![cfg_attr(test, deny(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -36,13 +38,14 @@ It can report coverage and, on supported architecutres, even reports memory acce
     unused_extern_crates,
     unused_import_braces,
     unused_qualifications,
+    unused_must_use,
+    missing_docs,
     //unused_results
 ))]
 #![cfg_attr(
-    not(debug_assertions),
+    test,
     deny(
         bad_style,
-        const_err,
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
@@ -67,7 +70,15 @@ pub mod alloc;
 #[cfg(unix)]
 pub mod asan;
 
+#[cfg(windows)]
+/// Windows specific hooks to catch __fastfail like exceptions with Frida, see https://github.com/AFLplusplus/LibAFL/issues/395 for more details
+pub mod windows_hooks;
+
 pub mod coverage_rt;
+
+/// Hooking thread lifecycle events. Seems like this is apple-only for now.
+#[cfg(any(target_vendor = "apple"))]
+pub mod pthread_hook;
 
 #[cfg(feature = "cmplog")]
 /// The frida cmplog runtime
@@ -197,7 +208,7 @@ impl FridaOptions {
                         cmplog_cores = Cores::from_cmdline(value).ok();
                     }
                     _ => {
-                        panic!("unknown FRIDA option: '{}'", option);
+                        panic!("unknown FRIDA option: '{option}'");
                     }
                 }
             } // end of for loop

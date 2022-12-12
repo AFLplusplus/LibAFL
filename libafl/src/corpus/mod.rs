@@ -20,15 +20,17 @@ pub mod cached;
 #[cfg(feature = "std")]
 pub use cached::CachedOnDiskCorpus;
 
+#[cfg(feature = "cmin")]
+pub mod minimizer;
 use core::cell::RefCell;
 
-use crate::{inputs::Input, Error};
+#[cfg(feature = "cmin")]
+pub use minimizer::*;
+
+use crate::{inputs::UsesInput, Error};
 
 /// Corpus with all current testcases
-pub trait Corpus<I>: Serialize + for<'de> Deserialize<'de>
-where
-    I: Input,
-{
+pub trait Corpus: UsesInput + serde::Serialize + for<'de> serde::Deserialize<'de> {
     /// Returns the number of elements
     fn count(&self) -> usize {
         self.id_manager().active_ids().len()
@@ -49,16 +51,20 @@ where
     }
 
     /// Add an entry to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusID, Error>;
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusID, Error>;
 
-    /// Replaces the testcase at the given idx
-    fn replace(&mut self, idx: CorpusID, testcase: Testcase<I>) -> Result<(), Error>;
+    /// Replaces the testcase at the given idx, returning the existing.
+    fn replace(
+        &mut self,
+        idx: CorpusID,
+        testcase: Testcase<Self::Input>,
+    ) -> Result<Testcase<Self::Input>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<I>>, Error>;
+    fn remove(&mut self, idx: CorpusID) -> Result<Option<Testcase<Self::Input>>, Error>;
 
     /// Get by id
-    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<I>>, Error>;
+    fn get(&self, idx: CorpusID) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
     fn current(&self) -> &Option<CorpusID>;
@@ -71,17 +77,20 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::corpus::inmemory::pybind::PythonInMemoryCorpus;
-    use crate::corpus::testcase::pybind::PythonTestcaseWrapper;
-    use crate::corpus::{Corpus, Testcase};
-    use crate::inputs::BytesInput;
-    use crate::Error;
-    use pyo3::prelude::*;
-    use serde::{Deserialize, Serialize};
     use std::cell::RefCell;
 
-    use super::cached::pybind::PythonCachedOnDiskCorpus;
-    use super::ondisk::pybind::PythonOnDiskCorpus;
+    use pyo3::prelude::*;
+    use serde::{Deserialize, Serialize};
+
+    use crate::{
+        corpus::{
+            cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
+            ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
+            Testcase,
+        },
+        inputs::{BytesInput, UsesInput},
+        Error,
+    };
 
     #[derive(Serialize, Deserialize, Debug, Clone)]
     enum PythonCorpusWrapper {
@@ -177,7 +186,11 @@ pub mod pybind {
         }
     }
 
-    impl Corpus<BytesInput> for PythonCorpus {
+    impl UsesInput for PythonCorpus {
+        type Input = BytesInput;
+    }
+
+    impl Corpus for PythonCorpus {
         #[inline]
         fn count(&self) -> usize {
             unwrap_me!(self.wrapper, c, { c.count() })
@@ -189,7 +202,11 @@ pub mod pybind {
         }
 
         #[inline]
-        fn replace(&mut self, idx: usize, testcase: Testcase<BytesInput>) -> Result<(), Error> {
+        fn replace(
+            &mut self,
+            idx: usize,
+            testcase: Testcase<BytesInput>,
+        ) -> Result<Testcase<BytesInput>, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.replace(idx, testcase) })
         }
 

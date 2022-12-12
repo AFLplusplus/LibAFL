@@ -3,7 +3,6 @@
 
 use core::fmt::{self, Debug, Formatter};
 use std::{fs, net::SocketAddr, path::PathBuf, time::Duration};
-use typed_builder::TypedBuilder;
 
 use libafl::{
     bolts::{
@@ -24,16 +23,18 @@ use libafl::{
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::{I2SRandReplace, Tokens},
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::{I2SRandReplace, Tokens},
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{ShadowTracingStage, StdMutationalStage},
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-
 use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP, MAX_EDGES_NUM};
+use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
 
@@ -136,10 +137,10 @@ where
 
         let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-        let monitor = MultiMonitor::new(|s| println!("{}", s));
+        let monitor = MultiMonitor::new(|s| println!("{s}"));
 
         let mut run_client = |state: Option<_>,
-                              mut mgr: LlmpRestartingEventManager<_, _, _, _>,
+                              mut mgr: LlmpRestartingEventManager<_, _>,
                               _core_id| {
             // Create an observation channel using the coverage map
             let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
@@ -347,7 +348,7 @@ where
         match launcher.build().launch() {
             Ok(()) => (),
             Err(Error::ShuttingDown) => println!("\nFuzzing stopped by user. Good Bye."),
-            Err(err) => panic!("Fuzzingg failed {:?}", err),
+            Err(err) => panic!("Fuzzingg failed {err:?}"),
         }
     }
 }
@@ -355,11 +356,12 @@ where
 /// Python bindings for this sugar
 #[cfg(feature = "python")]
 pub mod pybind {
-    use crate::inmemory;
-    use libafl::bolts::core_affinity::Cores;
-    use pyo3::prelude::*;
-    use pyo3::types::PyBytes;
     use std::path::PathBuf;
+
+    use libafl::bolts::core_affinity::Cores;
+    use pyo3::{prelude::*, types::PyBytes};
+
+    use crate::inmemory;
 
     /// In-Memory fuzzing made easy.
     /// Use this sugar for scaling `libfuzzer`-style fuzzers.

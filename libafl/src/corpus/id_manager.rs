@@ -2,17 +2,17 @@
 //! [`CorpusID`] to its corresponding corpus index to allow for a vector-based corpus storage. It is the only component
 //! that should be able to create new [`CorpusID`]s.
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use core::fmt::{Display, Error as FormatError, Formatter};
+
 use serde::{Deserialize, Serialize};
 
-use crate::bolts::rands::Rand;
-use crate::inputs::Input;
-use crate::state::{HasCorpus, HasRand};
-use crate::Error;
-
 use super::Corpus;
+use crate::{
+    bolts::rands::Rand,
+    state::{HasCorpus, HasRand},
+    Error,
+};
 
 /// Creates a new [`CorpusID`]. [`CorpusID`]s are globally unique for a corpus and monotonically increasing.
 /// They should only ever be created by a [`CorpusIDManager`], everything else must acquire them from one.
@@ -106,10 +106,9 @@ impl CorpusIDManager {
 
 /// Return a random entry from the corpus of a given state. This function is mainly for encapsulation to make the borrow
 /// checker happy and keep the random index creation confined to one spot.
-pub(crate) fn random_corpus_entry<I, S>(state: &mut S) -> Option<(usize, CorpusID)>
+pub(crate) fn random_corpus_entry<S>(state: &mut S) -> Option<(usize, CorpusID)>
 where
-    S: HasCorpus<I> + HasRand,
-    I: Input,
+    S: HasCorpus + HasRand,
 {
     let num = state.corpus().count();
     if num == 0 {

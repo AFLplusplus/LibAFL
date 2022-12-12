@@ -14,17 +14,17 @@ pub use generalized::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
-#[cfg(feature = "nautilus")]
-pub use nautilus::*;
-
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{clone::Clone, fmt::Debug};
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::{fs::File, hash::Hash, io::Read, path::Path};
+
+#[cfg(feature = "nautilus")]
+pub use nautilus::*;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "std")]
 use crate::bolts::fs::write_file_atomic;
@@ -52,7 +52,7 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
 
 /// An input for the target
 #[cfg(feature = "std")]
-pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash {
+pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug {
     /// Write this input to the file
     fn to_file<P>(&self, path: P) -> Result<(), Error>
     where
@@ -62,7 +62,6 @@ pub trait Input: Clone + Serialize + serde::de::DeserializeOwned + Debug + Hash 
     }
 
     /// Load the content of this input from a file
-    #[cfg(feature = "std")]
     fn from_file<P>(path: P) -> Result<Self, Error>
     where
         P: AsRef<Path>,
@@ -109,4 +108,11 @@ pub trait HasBytesVec {
     fn bytes(&self) -> &[u8];
     /// The internal bytes map (as mutable borrow)
     fn bytes_mut(&mut self) -> &mut Vec<u8>;
+}
+
+/// Defines the input type shared across traits of the type.
+/// Needed for consistency across HasCorpus/HasSolutions and friends.
+pub trait UsesInput {
+    /// Type which will be used throughout this state.
+    type Input: Input;
 }

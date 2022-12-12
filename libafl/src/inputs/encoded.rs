@@ -2,15 +2,14 @@
 //! (As opposed to other, more abstract, inputs, like an Grammar-Based AST Input)
 //! See also [the paper on token-level fuzzing](https://www.usenix.org/system/files/sec21-salls.pdf)
 
-use ahash::AHasher;
-use core::hash::Hasher;
-
 #[cfg(feature = "std")]
 use alloc::string::ToString;
 use alloc::{borrow::ToOwned, rc::Rc, string::String, vec::Vec};
 #[cfg(feature = "std")]
 use core::str::from_utf8;
-use core::{cell::RefCell, convert::From};
+use core::{cell::RefCell, convert::From, hash::Hasher};
+
+use ahash::AHasher;
 use hashbrown::HashMap;
 #[cfg(feature = "std")]
 use regex::Regex;
@@ -75,9 +74,10 @@ where
 impl InputDecoder for TokenInputEncoderDecoder {
     fn decode(&self, input: &EncodedInput, bytes: &mut Vec<u8>) -> Result<(), Error> {
         for id in input.codes() {
-            let tok = self.id_table.get(&(id % self.next_id)).ok_or_else(|| {
-                Error::illegal_state(format!("Id {} not in the decoder table", id))
-            })?;
+            let tok = self
+                .id_table
+                .get(&(id % self.next_id))
+                .ok_or_else(|| Error::illegal_state(format!("Id {id} not in the decoder table")))?;
             bytes.extend_from_slice(tok.as_bytes());
             bytes.push(b' ');
         }
@@ -259,11 +259,11 @@ impl EncodedInput {
 #[cfg(test)]
 mod tests {
     use alloc::borrow::ToOwned;
+    use core::str::from_utf8;
 
     use crate::inputs::encoded::{
         InputDecoder, InputEncoder, NaiveTokenizer, TokenInputEncoderDecoder,
     };
-    use core::str::from_utf8;
 
     #[test]
     fn test_input() {

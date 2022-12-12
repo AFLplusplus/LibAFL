@@ -1,8 +1,8 @@
 //! The ``NewHashFeedback`` uses the backtrace hash and a hashset to only keep novel cases
 
+use alloc::string::{String, ToString};
 use std::{fmt::Debug, marker::PhantomData};
 
-use alloc::string::{String, ToString};
 use hashbrown::HashSet;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +11,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::{Feedback, HasObserverName},
-    inputs::Input,
+    inputs::UsesInput,
     observers::{ObserverWithHashField, ObserversTuple},
     state::{HasClientPerfMonitor, HasNamedMetadata},
     Error,
@@ -68,17 +68,16 @@ impl HashSetState<u64> for NewHashFeedbackMetadata {
 
 /// A [`NewHashFeedback`] maintains a hashset of already seen stacktraces and considers interesting unseen ones
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct NewHashFeedback<O> {
+pub struct NewHashFeedback<O, S> {
     name: String,
     observer_name: String,
-    o_type: PhantomData<O>,
+    o_type: PhantomData<(O, S)>,
 }
 
-impl<I, S, O> Feedback<I, S> for NewHashFeedback<O>
+impl<O, S> Feedback<S> for NewHashFeedback<O, S>
 where
-    I: Input,
-    S: HasClientPerfMonitor + HasNamedMetadata,
     O: ObserverWithHashField + Named + Debug,
+    S: UsesInput + Debug + HasNamedMetadata + HasClientPerfMonitor,
 {
     fn init_state(&mut self, state: &mut S) -> Result<(), Error> {
         state.add_named_metadata(NewHashFeedbackMetadata::default(), &self.name);
@@ -90,13 +89,13 @@ where
         &mut self,
         state: &mut S,
         _manager: &mut EM,
-        _input: &I,
+        _input: &<S as UsesInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         let observer = observers
             .match_name::<O>(&self.observer_name)
@@ -122,21 +121,21 @@ where
     }
 }
 
-impl<O> Named for NewHashFeedback<O> {
+impl<O, S> Named for NewHashFeedback<O, S> {
     #[inline]
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<O> HasObserverName for NewHashFeedback<O> {
+impl<O, S> HasObserverName for NewHashFeedback<O, S> {
     #[inline]
     fn observer_name(&self) -> &str {
         &self.observer_name
     }
 }
 
-impl<O> NewHashFeedback<O>
+impl<O, S> NewHashFeedback<O, S>
 where
     O: ObserverWithHashField + Named + Debug,
 {

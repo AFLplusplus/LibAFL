@@ -1,5 +1,6 @@
-use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 use std::env;
+
+use libafl_cc::{ClangWrapper, CompilerWrapper, LLVMPasses};
 
 pub fn main() {
     let args: Vec<String> = env::args().collect();
@@ -17,7 +18,7 @@ pub fn main() {
 
         let mut cc = ClangWrapper::new();
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_vendor = "apple"))]
         cc.add_pass(LLVMPasses::AutoTokens);
 
         if let Some(code) = cc

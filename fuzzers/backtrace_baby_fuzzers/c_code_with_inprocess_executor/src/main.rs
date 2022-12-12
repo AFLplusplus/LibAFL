@@ -1,12 +1,10 @@
 use std::path::PathBuf;
 
-use libafl::bolts::AsSlice;
-use libafl::executors::InProcessExecutor;
-use libafl::observers::ConstMapObserver;
 use libafl::{
-    bolts::{current_nanos, rands::StdRand, tuples::tuple_list},
+    bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},
     events::SimpleEventManager,
+    executors::InProcessExecutor,
     feedback_and,
     feedbacks::{CrashFeedback, MaxMapFeedback, NewHashFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
@@ -14,7 +12,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::SimpleMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::BacktraceObserver,
+    observers::{BacktraceObserver, ConstMapObserver},
     schedulers::QueueScheduler,
     stages::mutational::StdMutationalStage,
     state::StdState,
@@ -50,10 +48,7 @@ pub fn main() {
     let mut feedback = MaxMapFeedback::new(&observer);
 
     // A feedback to choose if an input is a solution or not
-    let mut objective = feedback_and!(
-        CrashFeedback::new(),
-        NewHashFeedback::<BacktraceObserver>::new(&bt_observer)
-    );
+    let mut objective = feedback_and!(CrashFeedback::new(), NewHashFeedback::new(&bt_observer));
 
     // create a State from scratch
     let mut state = StdState::new(

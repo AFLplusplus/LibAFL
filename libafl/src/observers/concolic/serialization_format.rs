@@ -49,10 +49,9 @@ use std::{
 };
 
 use bincode::{DefaultOptions, Options};
+pub use bincode::{ErrorKind, Result};
 
 use super::{SymExpr, SymExprRef};
-
-pub use bincode::{ErrorKind, Result};
 
 fn serialization_options() -> DefaultOptions {
     DefaultOptions::new()
@@ -136,7 +135,7 @@ impl<R: Read> MessageFileReader<R> {
             | SymExpr::FloatToBits { op }
             | SymExpr::FloatToSignedInteger { op, .. }
             | SymExpr::FloatToUnsignedInteger { op, .. }
-            | SymExpr::BoolToBits { op, .. }
+            | SymExpr::BoolToBit { op, .. }
             | SymExpr::Extract { op, .. } => {
                 *op = self.make_absolute(*op);
                 self.current_id += 1;
@@ -249,7 +248,10 @@ impl<W: Write + Seek> MessageFileWriter<W> {
         // calculate size of trace
         let end_pos = self.writer.stream_position()?;
         let trace_header_len = 0_u64.to_le_bytes().len() as u64;
-        assert!(end_pos > self.writer_start_position + trace_header_len);
+        assert!(
+            end_pos >= self.writer_start_position + trace_header_len,
+            "our end position can not be before our start position"
+        );
         let trace_length = end_pos - self.writer_start_position - trace_header_len;
 
         // write trace size to beginning of trace
@@ -299,7 +301,7 @@ impl<W: Write + Seek> MessageFileWriter<W> {
             | SymExpr::FloatToBits { op }
             | SymExpr::FloatToSignedInteger { op, .. }
             | SymExpr::FloatToUnsignedInteger { op, .. }
-            | SymExpr::BoolToBits { op, .. }
+            | SymExpr::BoolToBit { op, .. }
             | SymExpr::Extract { op, .. } => {
                 *op = self.make_relative(*op);
                 self.id_counter += 1;
@@ -381,9 +383,8 @@ impl<W: Write + Seek> MessageFileWriter<W> {
 
 #[cfg(test)]
 mod serialization_tests {
-    use std::io::Cursor;
-
     use alloc::vec::Vec;
+    use std::io::Cursor;
 
     use super::{MessageFileReader, MessageFileWriter, SymExpr};
 
@@ -468,7 +469,7 @@ impl<'buffer> MessageFileReader<Cursor<&'buffer [u8]>> {
         let mut len_buf = 0_u64.to_le_bytes();
         buffer.read_exact(&mut len_buf)?;
         let buffer_len = u64::from_le_bytes(len_buf);
-        assert!(usize::try_from(buffer_len).is_ok());
+        usize::try_from(buffer_len).unwrap();
         let buffer_len = buffer_len as usize;
         let (buffer, _) = buffer.split_at(buffer_len);
         Ok(Self::from_buffer(buffer))

@@ -1,9 +1,7 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-pub use strum_macros::EnumIter;
-
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-
+pub use strum_macros::EnumIter;
 pub use syscall_numbers::aarch64::*;
 
 #[derive(IntoPrimitive, TryFromPrimitive, Debug, Clone, Copy, EnumIter)]
@@ -58,4 +56,9 @@ impl IntoPy<PyObject> for Regs {
         let n: i32 = self.into();
         n.into_py(py)
     }
+}
+
+/// Return an ARM64 ArchCapstoneBuilder
+pub fn capstone() -> capstone::arch::arm64::ArchCapstoneBuilder {
+    capstone::Capstone::new().arm64()
 }

@@ -1,9 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use clap::{Arg, Command};
 use core::cell::RefCell;
-#[cfg(unix)]
-use nix::{self, unistd::dup};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -14,6 +11,7 @@ use std::{
     process,
 };
 
+use clap::{Arg, Command};
 use libafl::{
     bolts::{
         current_nanos, current_time,
@@ -55,6 +53,8 @@ use libafl_qemu::{
     hooks::QemuHooks,
     MmapPerms, QemuForkExecutor, Regs,
 };
+#[cfg(unix)]
+use nix::{self, unistd::dup};
 
 /// The fuzzer main
 pub fn main() {
@@ -62,8 +62,8 @@ pub fn main() {
     // Needed only on no_std
     //RegistryBuilder::register::<Tokens>();
 
-    let res = match Command::new("libafl_qemu_fuzzbench")
-        .version("0.4.0")
+    let res = match Command::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
         .author("AFLplusplus team")
         .about("LibAFL-based fuzzer with QEMU for Fuzzbench")
         .arg(
@@ -113,7 +113,7 @@ pub fn main() {
     );
 
     // For fuzzbench, crashes and finds are inside the same `corpus` directory, in the "queue" and "crashes" subdir.
-    let mut out_dir = PathBuf::from(res.value_of("out").unwrap().to_string());
+    let mut out_dir = PathBuf::from(res.get_one::<String>("out").unwrap().to_string());
     if fs::create_dir(&out_dir).is_err() {
         println!("Out dir at {:?} already exists.", &out_dir);
         if !out_dir.is_dir() {
@@ -125,15 +125,15 @@ pub fn main() {
     crashes.push("crashes");
     out_dir.push("queue");
 
-    let in_dir = PathBuf::from(res.value_of("in").unwrap().to_string());
+    let in_dir = PathBuf::from(res.get_one::<String>("in").unwrap().to_string());
     if !in_dir.is_dir() {
         println!("In dir at {:?} is not a valid directory!", &in_dir);
         return;
     }
 
-    let tokens = res.value_of("tokens").map(PathBuf::from);
+    let tokens = res.get_one::<String>("tokens").map(PathBuf::from);
 
-    let logfile = PathBuf::from(res.value_of("logfile").unwrap().to_string());
+    let logfile = PathBuf::from(res.get_one::<String>("logfile").unwrap().to_string());
 
     fuzz(out_dir, crashes, in_dir, tokens, logfile).expect("An error occurred while fuzzing");
 }
@@ -319,7 +319,7 @@ fn fuzz(
         ExitKind::Ok
     };
 
-    let hooks = QemuHooks::new(
+    let mut hooks = QemuHooks::new(
         &emu,
         tuple_list!(
             QemuEdgeCoverageChildHelper::default(),
@@ -328,7 +328,7 @@ fn fuzz(
     );
 
     let executor = QemuForkExecutor::new(
-        hooks,
+        &mut hooks,
         &mut harness,
         tuple_list!(edges_observer, time_observer),
         &mut fuzzer,

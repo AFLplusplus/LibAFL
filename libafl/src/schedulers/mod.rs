@@ -1,6 +1,8 @@
 //! Schedule the access to the Corpus.
 
 pub mod queue;
+use core::marker::PhantomData;
+
 pub use queue::QueueScheduler;
 
 pub mod probabilistic_sampling;
@@ -21,80 +23,97 @@ pub mod weighted;
 pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod powersched;
-pub use powersched::PowerQueueScheduler;
-
 use alloc::borrow::ToOwned;
 
+pub use powersched::PowerQueueScheduler;
+
+pub mod tuneable;
+pub use tuneable::*;
+
 use crate::{
+    bolts::rands::Rand,
     corpus::{id_manager::random_corpus_entry, Corpus, CorpusID, Testcase},
-    inputs::Input,
-    state::{HasCorpus, HasRand},
+    inputs::{Input, UsesInput},
+    state::{HasCorpus, HasRand, UsesState},
     Error,
 };
 
 /// The scheduler define how the fuzzer requests a testcase from the corpus.
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
-pub trait Scheduler<I, S>
-where
-    I: Input,
-{
+pub trait Scheduler: UsesState {
     /// Add an entry to the corpus and return its index
-    fn on_add(&self, _state: &mut S, _id: CorpusID) -> Result<(), Error> {
+    fn on_add(&self, _state: &mut Self::State, _idx: CorpusID) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Replaces the testcase at the given idx
+    /// Replaced the given testcase at the given idx
     fn on_replace(
         &self,
-        _state: &mut S,
-        _id: CorpusID,
-        _testcase: &Testcase<I>,
+        _state: &mut Self::State,
+        _idx: CorpusID,
+        _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
-    /// Removes an entry from the corpus, returning it if it was present.
+    /// Removed the given entry from the corpus at the given index
     fn on_remove(
         &self,
-        _state: &mut S,
-        _id: CorpusID,
-        _testcase: &Option<Testcase<I>>,
+        _state: &mut Self::State,
+        _idx: CorpusID,
+        _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut S) -> Result<CorpusID, Error>;
+    fn next(&self, state: &mut Self::State) -> Result<CorpusID, Error>;
 }
 
-/// Feed the fuzzer simpply with a random testcase on request
+/// Feed the fuzzer simply with a random testcase on request
 #[derive(Debug, Clone)]
-pub struct RandScheduler;
+pub struct RandScheduler<S> {
+    phantom: PhantomData<S>,
+}
 
-impl<I, S> Scheduler<I, S> for RandScheduler
+impl<S> UsesState for RandScheduler<S>
 where
-    S: HasCorpus<I> + HasRand,
-    I: Input,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<S> Scheduler for RandScheduler<S>
+where
+    S: HasCorpus + HasRand,
 {
     /// Gets the next entry at random
-    fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusID, Error> {
         let (_, corpus_id) = random_corpus_entry(state)
             .ok_or_else(|| Error::empty("No entries in corpus".to_owned()))?;
 
         *state.corpus_mut().current_mut() = Some(corpus_id);
-        Ok(corpus_id)
+
+        if state.corpus().count() == 0 {
+            Err(Error::empty("No entries in corpus".to_owned()))
+        } else {
+            let len = state.corpus().count();
+            Ok(random_corpus_entry(state).map(|x| x.1).unwrap())
+        }
     }
 }
 
-impl RandScheduler {
+impl<S> RandScheduler<S> {
     /// Create a new [`RandScheduler`] that just schedules randomly.
     #[must_use]
     pub fn new() -> Self {
-        Self
+        Self {
+            phantom: PhantomData,
+        }
     }
 }
 
-impl Default for RandScheduler {
+impl<S> Default for RandScheduler<S> {
     fn default() -> Self {
         Self::new()
     }
@@ -102,4 +121,4 @@ impl Default for RandScheduler {
 
 /// A [`StdScheduler`] uses the default scheduler in `LibAFL` to schedule [`Testcase`]s.
 /// The current `Std` is a [`RandScheduler`], although this may change in the future, if another [`Scheduler`] delivers better results.
-pub type StdScheduler = RandScheduler;
+pub type StdScheduler<S> = RandScheduler<S>;

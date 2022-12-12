@@ -16,7 +16,7 @@
 //! let handles = core_ids.into_iter().map(|id| {
 //!     thread::spawn(move || {
 //!         // Pin this thread to a single CPU core.
-//!         core_affinity::set_for_current(id);
+//!         id.set_affinity();
 //!         // Do more work after this.
 //!     })
 //! }).collect::<Vec<_>>();
@@ -33,6 +33,7 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+
 use serde::{Deserialize, Serialize};
 
 use crate::Error;
@@ -41,16 +42,6 @@ use crate::Error;
 /// on all the "cores" active on this system.
 pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
     get_core_ids_helper()
-}
-
-/// This function tries to pin the current
-/// thread to the specified core.
-///
-/// # Arguments
-///
-/// * `core_id` - `ID` of the core to pin
-pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
-    set_for_current_helper(core_id)
 }
 
 /// This represents a CPU core.
@@ -62,8 +53,21 @@ pub struct CoreId {
 
 impl CoreId {
     /// Set the affinity of the current process to this [`CoreId`]
+    ///
+    /// Note: This will *_not_* fail if the target platform does not support core affinity.
+    /// (only on error cases for supported platforms)
+    /// If you really need to fail for unsupported platforms (like `aarch64` on `macOS`), use [`CoreId::set_affinity_forced`] instead.
+    ///
     pub fn set_affinity(&self) -> Result<(), Error> {
-        set_for_current(*self)
+        match set_for_current_helper(*self) {
+            Ok(_) | Err(Error::Unsupported(_, _)) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Set the affinity of the current process to this [`CoreId`]
+    pub fn set_affinity_forced(&self) -> Result<(), Error> {
+        set_for_current_helper(*self)
     }
 }
 
@@ -128,8 +132,7 @@ impl Cores {
 
         if cores.is_empty() {
             return Err(Error::illegal_argument(format!(
-                "No cores specified! parsed: {}",
-                args
+                "No cores specified! parsed: {args}"
             )));
         }
 
@@ -178,7 +181,7 @@ impl TryFrom<&str> for Cores {
 /// * `./fuzzer --cores 1,2-4,6`: clients run in cores 1,2,3,4,6
 /// * `./fuzzer --cores all`: one client runs on each available core
 #[cfg(feature = "std")]
-#[deprecated(since = "0.7.1", note = "Use Cores::from_cmdline instead")]
+#[deprecated(since = "0.8.1", note = "Use Cores::from_cmdline instead")]
 pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
     Ok(Cores::from_cmdline(args)?
         .ids
@@ -189,25 +192,31 @@ pub fn parse_core_bind_arg(args: &str) -> Result<Vec<usize>, Error> {
 
 // Linux Section
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 #[inline]
 fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
     linux::get_core_ids()
 }
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 #[inline]
 fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
     linux::set_for_current(core_id)
 }
 
-#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(any(target_os = "android", target_os = "linux", target_os = "dragonfly"))]
 mod linux {
-    use super::CoreId;
     use alloc::{string::ToString, vec::Vec};
-    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
     use std::mem;
 
+    #[cfg(target_os = "dragonfly")]
+    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET};
+    #[cfg(not(target_os = "dragonfly"))]
+    use libc::{cpu_set_t, sched_getaffinity, sched_setaffinity, CPU_ISSET, CPU_SET, CPU_SETSIZE};
+    #[cfg(target_os = "dragonfly")]
+    const CPU_SETSIZE: libc::c_int = 256;
+
+    use super::CoreId;
     use crate::Error;
 
     #[allow(trivial_numeric_casts)]
@@ -274,8 +283,6 @@ mod linux {
 
     #[cfg(test)]
     mod tests {
-        use num_cpus;
-
         use super::*;
 
         #[test]
@@ -284,18 +291,12 @@ mod linux {
         }
 
         #[test]
-        fn test_linux_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
-        }
-
-        #[test]
         fn test_linux_set_for_current() {
             let ids = get_core_ids().unwrap();
 
             assert!(!ids.is_empty());
 
-            set_for_current(ids[0]).unwrap();
+            ids[0].set_affinity().unwrap();
 
             // Ensure that the system pinned the current thread
             // to the specified core.
@@ -336,29 +337,26 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(target_os = "windows")]
 mod windows {
-    use core::ptr::addr_of_mut;
+    use alloc::vec::Vec;
 
-    use crate::bolts::core_affinity::{CoreId, Error};
-    use alloc::{string::ToString, vec::Vec};
-    use windows::Win32::System::SystemInformation::GROUP_AFFINITY;
-    use windows::Win32::System::Threading::{
-        GetCurrentProcess, GetCurrentThread, GetProcessAffinityMask, SetThreadGroupAffinity,
+    use windows::Win32::System::{
+        SystemInformation::GROUP_AFFINITY,
+        Threading::{GetCurrentThread, SetThreadGroupAffinity},
     };
 
+    use crate::bolts::core_affinity::{CoreId, Error};
+
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
-        let mask = get_affinity_mask()?;
-        // Find all active cores in the bitmask.
         let mut core_ids: Vec<CoreId> = Vec::new();
-
-        for i in 0..64 {
-            let test_mask = 1 << i;
-
-            if (mask & test_mask) == test_mask {
-                core_ids.push(CoreId { id: i });
+        match get_num_logical_cpus_ex_windows() {
+            Some(total_cores) => {
+                for i in 0..total_cores {
+                    core_ids.push(CoreId { id: i });
+                }
+                Ok(core_ids)
             }
+            None => Err(Error::unknown("Unable to get logical CPUs count!")),
         }
-
-        Ok(core_ids)
     }
 
     pub fn set_for_current(id: CoreId) -> Result<(), Error> {
@@ -385,7 +383,7 @@ mod windows {
 
             let mut outga = GROUP_AFFINITY::default();
 
-            let result = SetThreadGroupAffinity(GetCurrentThread(), &ga, &mut outga);
+            let result = SetThreadGroupAffinity(GetCurrentThread(), &ga, Some(&mut outga));
             if result.0 == 0 {
                 Err(Error::unknown("Failed to set_for_current"))
             } else {
@@ -394,43 +392,11 @@ mod windows {
         }
     }
 
-    fn get_affinity_mask() -> Result<u64, Error> {
-        #[cfg(target_pointer_width = "64")]
-        let mut process_mask: u64 = 0;
-        #[cfg(target_pointer_width = "32")]
-        let mut process_mask: u32 = 0;
-        #[cfg(target_pointer_width = "64")]
-        let mut system_mask: u64 = 0;
-        #[cfg(target_pointer_width = "32")]
-        let mut system_mask: u32 = 0;
-
-        let res = unsafe {
-            GetProcessAffinityMask(
-                GetCurrentProcess(),
-                addr_of_mut!(process_mask) as _,
-                addr_of_mut!(system_mask) as _,
-            )
-        };
-
-        // Successfully retrieved affinity mask
-        if res.as_bool() {
-            #[allow(trivial_numeric_casts)]
-            Ok(process_mask as _)
-        }
-        // Failed to retrieve affinity mask
-        else {
-            Err(Error::unknown(
-                "Could not get affinity mask, GetProcessAffinityMask failed.".to_string(),
-            ))
-        }
-    }
-
     #[allow(trivial_numeric_casts)]
     #[allow(clippy::cast_ptr_alignment)]
     #[allow(clippy::cast_possible_wrap)]
     pub fn get_num_logical_cpus_ex_windows() -> Option<usize> {
-        use std::ptr;
-        use std::slice;
+        use std::{ptr, slice};
 
         #[allow(non_upper_case_globals)]
         const RelationProcessorCore: u32 = 0;
@@ -542,28 +508,6 @@ mod windows {
 
         Some(n_logical_procs)
     }
-
-    #[cfg(test)]
-    mod tests {
-        use num_cpus;
-
-        use super::*;
-
-        #[test]
-        fn test_apple_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
-        }
-
-        #[test]
-        fn test_apple_set_for_current() {
-            let ids = get_core_ids().unwrap();
-
-            assert!(!ids.is_empty());
-
-            set_for_current(ids[0]).unwrap();
-        }
-    }
 }
 
 // Apple Section
@@ -582,24 +526,33 @@ fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
 
 #[cfg(target_vendor = "apple")]
 mod apple {
-    use core::ptr::addr_of_mut;
-
-    use crate::Error;
-
-    use super::CoreId;
     use alloc::vec::Vec;
+    #[cfg(target_arch = "x86_64")]
+    use core::ptr::addr_of_mut;
+    use std::thread::available_parallelism;
+
+    #[cfg(target_arch = "x86_64")]
     use libc::{
         integer_t, kern_return_t, mach_msg_type_number_t, pthread_mach_thread_np, pthread_self,
-        thread_policy_flavor_t, thread_policy_t, thread_t, THREAD_AFFINITY_POLICY,
+        thread_policy_flavor_t, thread_policy_t, thread_t, KERN_SUCCESS, THREAD_AFFINITY_POLICY,
         THREAD_AFFINITY_POLICY_COUNT,
     };
-    use num_cpus;
+    #[cfg(target_arch = "aarch64")]
+    use libc::{
+        pthread_set_qos_class_self_np, qos_class_t::QOS_CLASS_BACKGROUND,
+        qos_class_t::QOS_CLASS_USER_INITIATED,
+    };
 
+    use super::CoreId;
+    use crate::Error;
+
+    #[cfg(target_arch = "x86_64")]
     #[repr(C)]
     struct thread_affinity_policy_data_t {
         affinity_tag: integer_t,
     }
 
+    #[cfg(target_arch = "x86_64")]
     #[link(name = "System", kind = "framework")]
     extern "C" {
         fn thread_policy_set(
@@ -612,12 +565,13 @@ mod apple {
 
     #[allow(clippy::unnecessary_wraps)]
     pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
-        Ok((0..(num_cpus::get()))
+        Ok((0..(usize::from(available_parallelism()?)))
             .into_iter()
             .map(|n| CoreId { id: n })
             .collect::<Vec<_>>())
     }
 
+    #[cfg(target_arch = "x86_64")]
     pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
         let mut info = thread_affinity_policy_data_t {
             affinity_tag: core_id.id.try_into().unwrap(),
@@ -632,63 +586,323 @@ mod apple {
             );
 
             // 0 == KERN_SUCCESS
-
-            if result == 0 {
+            if result == KERN_SUCCESS {
                 Ok(())
             } else {
                 Err(Error::unknown(format!(
-                    "Failed to set_for_current {:?}",
-                    result
+                    "Failed to set_for_current {result:?}"
                 )))
             }
         }
     }
 
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+        unsafe {
+            // This is the best we can do, unlike on intel architecture
+            // the system does not allow to pin a process/thread to specific cpu
+            // but instead choosing at best between the two available groups
+            // energy consumption's efficient one and the other focusing more on performance.
+            let mut qos_class = QOS_CLASS_USER_INITIATED;
+            if core_id.id % 2 != 0 {
+                qos_class = QOS_CLASS_BACKGROUND;
+            }
+            let result = pthread_set_qos_class_self_np(qos_class, 0);
+
+            if result == 0 {
+                Ok(())
+            } else {
+                Err(Error::unknown(format!(
+                    "Failed to set_for_current {result:?}"
+                )))
+            }
+        }
+    }
+}
+
+// FreeBSD Section
+
+#[cfg(target_os = "freebsd")]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    freebsd::get_core_ids()
+}
+
+#[cfg(target_os = "freebsd")]
+#[inline]
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    freebsd::set_for_current(core_id)
+}
+
+#[cfg(target_os = "freebsd")]
+mod freebsd {
+    use alloc::vec::Vec;
+    use std::{mem, thread::available_parallelism};
+
+    use libc::{cpuset_setaffinity, cpuset_t, CPU_SET};
+
+    use super::CoreId;
+    use crate::Error;
+
+    const CPU_LEVEL_WHICH: libc::c_int = 3;
+    const CPU_WHICH_PID: libc::c_int = 2;
+
+    #[allow(trivial_numeric_casts)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+        // Turn `core_id` into a `libc::cpuset_t` with only
+        let mut set = new_cpuset();
+
+        unsafe { CPU_SET(core_id.id, &mut set) };
+
+        // Set the current thread's core affinity.
+        let result = unsafe {
+            cpuset_setaffinity(
+                CPU_LEVEL_WHICH,
+                CPU_WHICH_PID,
+                -1, // Defaults to current thread
+                mem::size_of::<cpuset_t>(),
+                &set,
+            )
+        };
+
+        if result < 0 {
+            Err(Error::unknown("Failed to set_for_current"))
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg(test)]
+    fn get_affinity_mask() -> Result<cpuset_t, Error> {
+        let mut set = new_cpuset();
+
+        // Try to get current core affinity mask.
+        let result = unsafe {
+            libc::cpuset_getaffinity(
+                CPU_LEVEL_WHICH,
+                CPU_WHICH_PID,
+                -1, // Defaults to current thread
+                mem::size_of::<cpuset_t>(),
+                &mut set,
+            )
+        };
+
+        if result == 0 {
+            Ok(set)
+        } else {
+            Err(Error::unknown(
+                "Failed to retrieve affinity using cpuset_getaffinity",
+            ))
+        }
+    }
+
+    fn new_cpuset() -> cpuset_t {
+        unsafe { mem::zeroed::<cpuset_t>() }
+    }
+
     #[cfg(test)]
     mod tests {
-        use num_cpus;
+        use libc::CPU_ISSET;
 
         use super::*;
 
         #[test]
-        fn test_windows_get_core_ids() {
-            let set = get_core_ids().unwrap();
-            assert_eq!(set.len(), num_cpus::get());
+        fn test_freebsd_get_affinity_mask() {
+            get_affinity_mask().unwrap();
         }
 
         #[test]
-        fn test_windows_set_for_current() {
+        fn test_freebsd_set_for_current() {
             let ids = get_core_ids().unwrap();
 
             assert!(!ids.is_empty());
 
-            set_for_current(ids[0]).unwrap();
+            ids[0].set_affinity().unwrap();
+
+            // Ensure that the system pinned the current thread
+            // to the specified core.
+            let mut core_mask = new_cpuset();
+            unsafe { CPU_SET(ids[0].id, &mut core_mask) };
+
+            let new_mask = get_affinity_mask().unwrap();
+
+            let mut is_equal = true;
+
+            for i in 0..256 {
+                let is_set1 = unsafe { CPU_ISSET(i, &core_mask) };
+                let is_set2 = unsafe { CPU_ISSET(i, &new_mask) };
+
+                if is_set1 != is_set2 {
+                    is_equal = false;
+                }
+            }
+
+            assert!(is_equal);
+        }
+    }
+}
+
+// NetBSD Section
+
+#[cfg(target_os = "netbsd")]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    netbsd::get_core_ids()
+}
+
+#[cfg(target_os = "netbsd")]
+#[inline]
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    netbsd::set_for_current(core_id)
+}
+
+#[cfg(target_os = "netbsd")]
+mod netbsd {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use libc::{
+        _cpuset, _cpuset_create, _cpuset_destroy, _cpuset_set, _cpuset_size, pthread_self,
+        pthread_setaffinity_np,
+    };
+
+    use super::CoreId;
+    use crate::Error;
+
+    #[allow(trivial_numeric_casts)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+        let set = new_cpuset();
+
+        unsafe { _cpuset_set(core_id.id as u64, set) };
+        // Set the current thread's core affinity.
+        let result = unsafe {
+            pthread_setaffinity_np(
+                pthread_self(), // Defaults to current thread
+                _cpuset_size(set),
+                set,
+            )
+        };
+
+        unsafe { _cpuset_destroy(set) };
+
+        if result < 0 {
+            Err(Error::unknown("Failed to set_for_current"))
+        } else {
+            Ok(())
+        }
+    }
+
+    fn new_cpuset() -> *mut _cpuset {
+        unsafe { _cpuset_create() }
+    }
+}
+
+#[cfg(target_os = "openbsd")]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    openbsd::get_core_ids()
+}
+
+#[cfg(target_os = "openbsd")]
+#[inline]
+fn set_for_current_helper(_: CoreId) -> Result<(), Error> {
+    Ok(()) // There is no notion of cpu affinity on this platform
+}
+
+#[cfg(target_os = "openbsd")]
+mod openbsd {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use super::CoreId;
+    use crate::Error;
+
+    #[allow(trivial_numeric_casts)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+}
+
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+#[inline]
+fn get_core_ids_helper() -> Result<Vec<CoreId>, Error> {
+    solaris::get_core_ids()
+}
+
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+#[inline]
+fn set_for_current_helper(core_id: CoreId) -> Result<(), Error> {
+    solaris::set_for_current(core_id)
+}
+
+#[cfg(any(target_os = "solaris", target_os = "illumos"))]
+mod solaris {
+    use alloc::vec::Vec;
+    use std::thread::available_parallelism;
+
+    use super::CoreId;
+    use crate::Error;
+
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn get_core_ids() -> Result<Vec<CoreId>, Error> {
+        Ok((0..(usize::from(available_parallelism()?)))
+            .into_iter()
+            .map(|n| CoreId { id: n })
+            .collect::<Vec<_>>())
+    }
+
+    pub fn set_for_current(core_id: CoreId) -> Result<(), Error> {
+        let result = unsafe {
+            libc::processor_bind(
+                libc::P_PID,
+                libc::PS_MYID,
+                core_id.id as i32,
+                std::ptr::null_mut(),
+            )
+        };
+        if result < 0 {
+            Err(Error::unknown("Failed to processor_bind"))
+        } else {
+            Ok(())
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::thread::available_parallelism;
 
-    // #[test]
-    // fn test_num_cpus() {
-    //     println!("Num CPUs: {}", num_cpus::get());
-    //     println!("Num Physical CPUs: {}", num_cpus::get_physical());
-    // }
+    use super::*;
 
     #[test]
     fn test_get_core_ids() {
         let set = get_core_ids().unwrap();
-        assert_eq!(set.len(), num_cpus::get());
+        assert_eq!(set.len(), usize::from(available_parallelism().unwrap()));
     }
 
     #[test]
-    fn test_set_for_current() {
+    fn test_set_affinity() {
         let ids = get_core_ids().unwrap();
 
         assert!(!ids.is_empty());
 
-        set_for_current(ids[0]).unwrap();
+        ids[0].set_affinity().unwrap();
     }
 }

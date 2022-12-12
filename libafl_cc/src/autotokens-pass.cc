@@ -18,9 +18,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#ifndef _WIN32
+  #include <unistd.h>
+  #include <sys/time.h>
+#else
+  #include <io.h>
+#endif
 #include <string.h>
-#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -213,7 +217,9 @@ void dict2file(int fd, uint8_t *mem, uint32_t len) {
   if (write(fd, line, strlen(line)) <= 0) {
     FATAL("Could not write to the dictionary file");
   }
+#ifndef _WIN32
   fsync(fd);
+#endif
 }
 
 #if USE_NEW_PM
@@ -242,7 +248,11 @@ bool AutoTokensPass::runOnModule(Module &M) {
   }
 
   if (use_file) {
+#ifndef _WIN32
     if ((fd = open(ptr, O_WRONLY | O_APPEND | O_CREAT | O_DSYNC, 0644)) < 0)
+#else
+    if ((fd = open(ptr, O_WRONLY | O_APPEND | O_CREAT, 0644)) < 0)
+#endif
       FATAL("Could not open/create %s.", ptr);
   }
 
@@ -619,40 +629,50 @@ bool AutoTokensPass::runOnModule(Module &M) {
 
   LLVMContext &Ctx = M.getContext();
 
-  size_t memlen = 0, count = 0, offset = 0;
+  if (dictionary.size()) {
+    size_t memlen = 0, count = 0, offset = 0;
 
-  // sort and unique the dictionary
-  std::sort(dictionary.begin(), dictionary.end());
-  auto last = std::unique(dictionary.begin(), dictionary.end());
-  dictionary.erase(last, dictionary.end());
+    // sort and unique the dictionary
+    std::sort(dictionary.begin(), dictionary.end());
+    auto last = std::unique(dictionary.begin(), dictionary.end());
+    dictionary.erase(last, dictionary.end());
 
-  for (auto token : dictionary) {
-    memlen += token.length();
-    count++;
-  }
-
-  auto ptrhld = std::unique_ptr<char[]>(new char[memlen + count]);
-
-  count = 0;
-
-  for (auto token : dictionary) {
-    if (offset + token.length() < 0xfffff0 && count < MAX_AUTO_EXTRAS) {
-      // This lenght is guranteed to be < MAX_AUTO_EXTRA
-      ptrhld.get()[offset++] = (uint8_t)token.length();
-      memcpy(ptrhld.get() + offset, token.c_str(), token.length());
-      offset += token.length();
+    for (auto token : dictionary) {
+      memlen += token.length();
       count++;
     }
-  }
 
-  // Type
-  ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
-  // The actual dict
-  GlobalVariable *dict = new GlobalVariable(
-      M, arrayTy, true, GlobalVariable::ExternalLinkage,
-      ConstantDataArray::get(Ctx, *(new ArrayRef<char>(ptrhld.get(), offset))),
-      "libafl_dictionary_" + M.getName());
-  dict->setSection("libafl_token");
+    if (count) {
+      auto ptrhld = std::unique_ptr<char[]>(new char[memlen + count]);
+
+      count = 0;
+
+      for (auto token : dictionary) {
+        if (offset + token.length() < 0xfffff0 && count < MAX_AUTO_EXTRAS) {
+          // This lenght is guranteed to be < MAX_AUTO_EXTRA
+          ptrhld.get()[offset++] = (uint8_t)token.length();
+          memcpy(ptrhld.get() + offset, token.c_str(), token.length());
+          offset += token.length();
+          count++;
+        }
+      }
+
+      // Type
+      ArrayType *arrayTy = ArrayType::get(IntegerType::get(Ctx, 8), offset);
+      // The actual dict
+      GlobalVariable *dict = new GlobalVariable(
+          M, arrayTy, true, GlobalVariable::ExternalLinkage,
+          ConstantDataArray::get(Ctx,
+                                 *(new ArrayRef<char>(ptrhld.get(), offset))),
+          "libafl_dictionary_" + M.getName());
+#if defined(__linux__) || defined(__FreeBSD__) || defined(__NetBSD__) || \
+    defined(__OpenBSD__) || defined(__DragonFly__)
+      dict->setSection("libafl_token");
+#elif defined(__APPLE__)
+      dict->setSection("__DATA,__libafl_token");
+#endif
+    }
+  }
 
 #if USE_NEW_PM
   auto PA = PreservedAnalyses::all();

@@ -1,7 +1,6 @@
 //! Based on <https://github.com/alecmocatta/build_id>
 //! (C) Alec Mocatta <alec@mocatta.net> under license MIT or Apache 2
 
-use once_cell::sync::Lazy;
 use std::{
     any::TypeId,
     env,
@@ -9,6 +8,8 @@ use std::{
     hash::{Hash, Hasher},
     io,
 };
+
+use once_cell::sync::Lazy;
 use uuid::Uuid;
 
 static BUILD_ID: Lazy<Uuid> = Lazy::new(calculate);
@@ -90,10 +91,10 @@ fn calculate() -> Uuid {
     hasher.write_u8(0);
     <byteorder::NativeEndian as byteorder::ByteOrder>::write_u64(&mut bytes[8..], hasher.finish());
 
-    uuid::Builder::from_bytes(bytes)
+    *uuid::Builder::from_bytes(bytes)
         .set_variant(uuid::Variant::RFC4122)
         .set_version(uuid::Version::Random)
-        .build()
+        .as_uuid()
 }
 
 struct HashWriter<T: Hasher>(T);

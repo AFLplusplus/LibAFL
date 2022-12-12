@@ -18,17 +18,20 @@ pub use stacktrace::*;
 
 pub mod concolic;
 
-#[cfg(unstable_feature)]
-pub mod owned;
-#[cfg(unstable_feature)]
-pub use owned::*;
-
+pub mod value;
+// Rust is breaking this with 'error: intrinsic safety mismatch between list of intrinsics within the compiler and core library intrinsics for intrinsic `type_id`' and so we disable this component for the moment
+//#[cfg(unstable_feature)]
+//pub mod owned;
+//#[cfg(unstable_feature)]
+//pub use owned::*;
 use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
 use core::{fmt::Debug, time::Duration};
+
 use serde::{Deserialize, Serialize};
+pub use value::*;
 
 use crate::{
     bolts::{
@@ -37,12 +40,17 @@ use crate::{
         tuples::{MatchName, Named},
     },
     executors::ExitKind,
+    inputs::UsesInput,
+    state::UsesState,
     Error,
 };
 
 /// Observers observe different information about the target.
 /// They can then be used by various sorts of feedback.
-pub trait Observer<I, S>: Named + Debug {
+pub trait Observer<S>: Named + Debug
+where
+    S: UsesInput,
+{
     /// The testcase finished execution, calculate any changes.
     /// Reserved for future use.
     #[inline]
@@ -52,7 +60,7 @@ pub trait Observer<I, S>: Named + Debug {
 
     /// Called right before execution starts.
     #[inline]
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
 
@@ -61,7 +69,7 @@ pub trait Observer<I, S>: Named + Debug {
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
@@ -69,7 +77,7 @@ pub trait Observer<I, S>: Named + Debug {
 
     /// Called right before execution starts in the child process, if any.
     #[inline]
-    fn pre_exec_child(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec_child(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
 
@@ -78,72 +86,141 @@ pub trait Observer<I, S>: Named + Debug {
     fn post_exec_child(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    /// If this observer observes `stdout`
+    #[inline]
+    fn observes_stdout(&self) -> bool {
+        false
+    }
+    /// If this observer observes `stderr`
+    #[inline]
+    fn observes_stderr(&self) -> bool {
+        false
+    }
+
+    /// React to new `stdout`
+    /// To use this, always return `true` from `observes_stdout`
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_stdout(&mut self, stdout: &[u8]) {}
+
+    /// React to new `stderr`
+    /// To use this, always return `true` from `observes_stderr`
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_stderr(&mut self, stderr: &[u8]) {}
+}
+
+/// Defines the observer type shared across traits of the type.
+/// Needed for consistency across HasCorpus/HasSolutions and friends.
+pub trait UsesObservers: UsesState {
+    /// The observers type
+    type Observers: ObserversTuple<Self::State>;
 }
 
 /// A haskell-style tuple of observers
-pub trait ObserversTuple<I, S>: MatchName + Debug {
+pub trait ObserversTuple<S>: MatchName + Debug
+where
+    S: UsesInput,
+{
     /// This is called right before the next execution.
-    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
 
     /// This is called right after the last execution
     fn post_exec_all(
         &mut self,
         state: &mut S,
-        input: &I,
+        input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
 
     /// This is called right before the next execution in the child process, if any.
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error>;
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error>;
 
     /// This is called right after the last execution in the child process, if any.
     fn post_exec_child_all(
         &mut self,
         state: &mut S,
-        input: &I,
+        input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error>;
+
+    /// Returns true if a `stdout` observer was added to the list
+    fn observes_stdout(&self) -> bool;
+    /// Returns true if a `stderr` observer was added to the list
+    fn observes_stderr(&self) -> bool;
+
+    /// Runs `observe_stdout` for all stdout observers in the list
+    fn observe_stdout(&mut self, stdout: &[u8]);
+    /// Runs `observe_stderr` for all stderr observers in the list
+    fn observe_stderr(&mut self, stderr: &[u8]);
 }
 
-impl<I, S> ObserversTuple<I, S> for () {
-    fn pre_exec_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl<S> ObserversTuple<S> for ()
+where
+    S: UsesInput,
+{
+    fn pre_exec_all(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec_all(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
 
-    fn pre_exec_child_all(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec_child_all(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         Ok(())
     }
 
     fn post_exec_child_all(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         Ok(())
     }
+
+    /// Returns true if a `stdout` observer was added to the list
+    #[inline]
+    fn observes_stdout(&self) -> bool {
+        false
+    }
+
+    /// Returns true if a `stderr` observer was added to the list
+    #[inline]
+    fn observes_stderr(&self) -> bool {
+        false
+    }
+
+    /// Runs `observe_stdout` for all stdout observers in the list
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_stdout(&mut self, stdout: &[u8]) {}
+
+    /// Runs `observe_stderr` for all stderr observers in the list
+    #[inline]
+    #[allow(unused_variables)]
+    fn observe_stderr(&mut self, stderr: &[u8]) {}
 }
 
-impl<Head, Tail, I, S> ObserversTuple<I, S> for (Head, Tail)
+impl<Head, Tail, S> ObserversTuple<S> for (Head, Tail)
 where
-    Head: Observer<I, S>,
-    Tail: ObserversTuple<I, S>,
+    Head: Observer<S>,
+    Tail: ObserversTuple<S>,
+    S: UsesInput,
 {
-    fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.0.pre_exec(state, input)?;
         self.1.pre_exec_all(state, input)
     }
@@ -151,14 +228,14 @@ where
     fn post_exec_all(
         &mut self,
         state: &mut S,
-        input: &I,
+        input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec(state, input, exit_kind)?;
         self.1.post_exec_all(state, input, exit_kind)
     }
 
-    fn pre_exec_child_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
+    fn pre_exec_child_all(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
         self.0.pre_exec_child(state, input)?;
         self.1.pre_exec_child_all(state, input)
     }
@@ -166,15 +243,41 @@ where
     fn post_exec_child_all(
         &mut self,
         state: &mut S,
-        input: &I,
+        input: &S::Input,
         exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.0.post_exec_child(state, input, exit_kind)?;
         self.1.post_exec_child_all(state, input, exit_kind)
     }
+
+    /// Returns true if a `stdout` observer was added to the list
+    #[inline]
+    fn observes_stdout(&self) -> bool {
+        self.0.observes_stdout() || self.1.observes_stdout()
+    }
+
+    /// Returns true if a `stderr` observer was added to the list
+    #[inline]
+    fn observes_stderr(&self) -> bool {
+        self.0.observes_stderr() || self.1.observes_stderr()
+    }
+
+    /// Runs `observe_stdout` for all stdout observers in the list
+    #[inline]
+    fn observe_stdout(&mut self, stdout: &[u8]) {
+        self.0.observe_stdout(stdout);
+        self.1.observe_stdout(stdout);
+    }
+
+    /// Runs `observe_stderr` for all stderr observers in the list
+    #[inline]
+    fn observe_stderr(&mut self, stderr: &[u8]) {
+        self.0.observe_stderr(stderr);
+        self.1.observe_stderr(stderr);
+    }
 }
 
-/// A trait for obervers with a hash field
+/// A trait for [`Observer`]`s` with a hash field
 pub trait ObserverWithHashField {
     /// get the value of the hash field
     fn hash(&self) -> &Option<u64>;
@@ -183,6 +286,131 @@ pub trait ObserverWithHashField {
     /// clears the current value of the hash and sets it to None
     fn clear_hash(&mut self);
 }
+
+/// A trait for [`Observer`]`s` which observe over differential execution.
+///
+/// Differential observers have the following flow during a single execution:
+///  - `Observer::pre_exec` for the differential observer is invoked.
+///  - `DifferentialObserver::pre_observe_first` for the differential observer is invoked.
+///  - `Observer::pre_exec` for each of the observers for the first executor is invoked.
+///  - The first executor is invoked.
+///  - `Observer::post_exec` for each of the observers for the first executor is invoked.
+///  - `DifferentialObserver::post_observe_first` for the differential observer is invoked.
+///  - `DifferentialObserver::pre_observe_second` for the differential observer is invoked.
+///  - `Observer::pre_exec` for each of the observers for the second executor is invoked.
+///  - The second executor is invoked.
+///  - `Observer::post_exec` for each of the observers for the second executor is invoked.
+///  - `DifferentialObserver::post_observe_second` for the differential observer is invoked.
+///  - `Observer::post_exec` for the differential observer is invoked.
+///
+/// You should perform any preparation for the diff execution in `Observer::pre_exec` and respective
+/// cleanup in `Observer::post_exec`. For individual executions, use
+/// `DifferentialObserver::{pre,post}_observe_{first,second}` as necessary for first and second,
+/// respectively.
+#[allow(unused_variables)]
+pub trait DifferentialObserver<OTA, OTB, S>: Observer<S>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    /// Perform an operation with the first set of observers before they are `pre_exec`'d.
+    fn pre_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the first set of observers after they are `post_exec`'d.
+    fn post_observe_first(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the second set of observers before they are `pre_exec`'d.
+    fn pre_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+
+    /// Perform an operation with the second set of observers after they are `post_exec`'d.
+    fn post_observe_second(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+/// Differential observers tuple, for when you're using multiple differential observers.
+pub trait DifferentialObserversTuple<OTA, OTB, S>: ObserversTuple<S>
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    /// Perform an operation with the first set of observers before they are `pre_exec`'d on all the
+    /// differential observers in this tuple.
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
+
+    /// Perform an operation with the first set of observers after they are `post_exec`'d on all the
+    /// differential observers in this tuple.
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error>;
+
+    /// Perform an operation with the second set of observers before they are `pre_exec`'d on all
+    /// the differential observers in this tuple.
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
+
+    /// Perform an operation with the second set of observers after they are `post_exec`'d on all
+    /// the differential observers in this tuple.
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error>;
+}
+
+impl<OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for ()
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    fn pre_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_observe_first_all(&mut self, _: &mut OTA) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn pre_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn post_observe_second_all(&mut self, _: &mut OTB) -> Result<(), Error> {
+        Ok(())
+    }
+}
+
+impl<Head, Tail, OTA, OTB, S> DifferentialObserversTuple<OTA, OTB, S> for (Head, Tail)
+where
+    Head: DifferentialObserver<OTA, OTB, S>,
+    Tail: DifferentialObserversTuple<OTA, OTB, S>,
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
+    fn pre_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.pre_observe_first(observers)?;
+        self.1.pre_observe_first_all(observers)
+    }
+
+    fn post_observe_first_all(&mut self, observers: &mut OTA) -> Result<(), Error> {
+        self.0.post_observe_first(observers)?;
+        self.1.post_observe_first_all(observers)
+    }
+
+    fn pre_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.pre_observe_second(observers)?;
+        self.1.pre_observe_second_all(observers)
+    }
+
+    fn post_observe_second_all(&mut self, observers: &mut OTB) -> Result<(), Error> {
+        self.0.post_observe_second(observers)?;
+        self.1.post_observe_second_all(observers)
+    }
+}
+
 /// A simple observer, just overlooking the runtime of the target.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimeObserver {
@@ -209,8 +437,11 @@ impl TimeObserver {
     }
 }
 
-impl<I, S> Observer<I, S> for TimeObserver {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+impl<S> Observer<S> for TimeObserver
+where
+    S: UsesInput,
+{
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.last_runtime = None;
         self.start_time = current_time();
         Ok(())
@@ -219,7 +450,7 @@ impl<I, S> Observer<I, S> for TimeObserver {
     fn post_exec(
         &mut self,
         _state: &mut S,
-        _input: &I,
+        _input: &S::Input,
         _exit_kind: &ExitKind,
     ) -> Result<(), Error> {
         self.last_runtime = current_time().checked_sub(self.start_time);
@@ -231,6 +462,14 @@ impl Named for TimeObserver {
     fn name(&self) -> &str {
         &self.name
     }
+}
+
+impl<OTA, OTB, S> DifferentialObserver<OTA, OTB, S> for TimeObserver
+where
+    OTA: ObserversTuple<S>,
+    OTB: ObserversTuple<S>,
+    S: UsesInput,
+{
 }
 
 /// A simple observer with a list of things.
@@ -271,11 +510,12 @@ where
     }
 }
 
-impl<'a, I, S, T> Observer<I, S> for ListObserver<'a, T>
+impl<'a, S, T> Observer<S> for ListObserver<'a, T>
 where
+    S: UsesInput,
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
-    fn pre_exec(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn pre_exec(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
         self.list.as_mut().clear();
         Ok(())
     }
@@ -294,24 +534,26 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{Debug, Observer, ObserversTuple, String, Vec};
-    use crate::bolts::tuples::{type_eq, MatchName, Named};
-    use crate::executors::pybind::PythonExitKind;
-    use crate::executors::ExitKind;
-    use crate::inputs::BytesInput;
-    use crate::inputs::HasBytesVec;
-    use crate::observers::map::pybind::{
-        PythonMapObserverI16, PythonMapObserverI32, PythonMapObserverI64, PythonMapObserverI8,
-        PythonMapObserverU16, PythonMapObserverU32, PythonMapObserverU64, PythonMapObserverU8,
-        PythonMapObserverWrapperI16, PythonMapObserverWrapperI32, PythonMapObserverWrapperI64,
-        PythonMapObserverWrapperI8, PythonMapObserverWrapperU16, PythonMapObserverWrapperU32,
-        PythonMapObserverWrapperU64, PythonMapObserverWrapperU8,
-    };
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
-    use crate::Error;
+    use std::cell::UnsafeCell;
+
     use pyo3::prelude::*;
     use serde::{Deserialize, Serialize};
-    use std::cell::UnsafeCell;
+
+    use super::{Debug, Observer, ObserversTuple, String, Vec};
+    use crate::{
+        bolts::tuples::{type_eq, MatchName, Named},
+        executors::{pybind::PythonExitKind, ExitKind},
+        inputs::{BytesInput, HasBytesVec},
+        observers::map::pybind::{
+            PythonMapObserverI16, PythonMapObserverI32, PythonMapObserverI64, PythonMapObserverI8,
+            PythonMapObserverU16, PythonMapObserverU32, PythonMapObserverU64, PythonMapObserverU8,
+            PythonMapObserverWrapperI16, PythonMapObserverWrapperI32, PythonMapObserverWrapperI64,
+            PythonMapObserverWrapperI8, PythonMapObserverWrapperU16, PythonMapObserverWrapperU32,
+            PythonMapObserverWrapperU64, PythonMapObserverWrapperU8,
+        },
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
 
     #[derive(Debug)]
     pub struct PyObjectObserver {
@@ -354,7 +596,7 @@ pub mod pybind {
         }
     }
 
-    impl Observer<BytesInput, PythonStdState> for PyObjectObserver {
+    impl Observer<PythonStdState> for PyObjectObserver {
         fn flush(&mut self) -> Result<(), Error> {
             Python::with_gil(|py| -> PyResult<()> {
                 self.inner.call_method0(py, "flush")?;
@@ -453,6 +695,7 @@ pub mod pybind {
     }
 
     #[pyclass(unsendable, name = "Observer")]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Serialize, Deserialize, Clone, Debug)]
     /// Observer Trait binding
     pub struct PythonObserver {
@@ -747,11 +990,9 @@ pub mod pybind {
         }
     }
 
-    impl Observer<BytesInput, PythonStdState> for PythonObserver {
+    impl Observer<PythonStdState> for PythonObserver {
         fn flush(&mut self) -> Result<(), Error> {
-            unwrap_me_mut!(self.wrapper, o, {
-                Observer::<BytesInput, PythonStdState>::flush(o)
-            })
+            unwrap_me_mut!(self.wrapper, o, { Observer::<PythonStdState>::flush(o) })
         }
 
         fn pre_exec(
@@ -792,6 +1033,7 @@ pub mod pybind {
     }
 
     #[derive(Serialize, Deserialize, Clone, Debug)]
+    #[allow(clippy::unsafe_derive_deserialize)]
     #[pyclass(unsendable, name = "ObserversTuple")]
     pub struct PythonObserversTuple {
         list: Vec<PythonObserver>,
@@ -815,7 +1057,7 @@ pub mod pybind {
         #[pyo3(name = "match_name")]
         fn pymatch_name(&self, name: &str) -> Option<PythonObserver> {
             for ob in &self.list {
-                if ob.name() == name {
+                if *ob.name() == *name {
                     return Some(ob.clone());
                 }
             }
@@ -823,7 +1065,7 @@ pub mod pybind {
         }
     }
 
-    impl ObserversTuple<BytesInput, PythonStdState> for PythonObserversTuple {
+    impl ObserversTuple<PythonStdState> for PythonObserversTuple {
         fn pre_exec_all(
             &mut self,
             state: &mut PythonStdState,
@@ -869,6 +1111,23 @@ pub mod pybind {
             }
             Ok(())
         }
+
+        // TODO: expose stdout/stderr to python
+        #[inline]
+        fn observes_stdout(&self) -> bool {
+            false
+        }
+
+        #[inline]
+        fn observes_stderr(&self) -> bool {
+            false
+        }
+
+        #[inline]
+        fn observe_stderr(&mut self, _: &[u8]) {}
+
+        #[inline]
+        fn observe_stdout(&mut self, _: &[u8]) {}
     }
 
     impl MatchName for PythonObserversTuple {
@@ -1077,8 +1336,8 @@ mod tests {
             StdMapObserver::new("map", unsafe { &mut MAP })
         );
         let vec = postcard::to_allocvec(&obv).unwrap();
-        println!("{:?}", vec);
-        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32>) =
+        println!("{vec:?}");
+        let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32, false>) =
             postcard::from_bytes(&vec).unwrap();
         assert_eq!(obv.0.name(), obv2.0.name());
     }

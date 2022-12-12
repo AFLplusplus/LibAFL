@@ -31,8 +31,12 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/time.h>
+#ifndef _WIN32
+  #include <unistd.h>
+  #include <sys/time.h>
+#else
+  #include <io.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -50,6 +54,11 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/FormatVariadic.h"
+
+// Without this, Can't build with llvm-14 & old PM
+#if LLVM_VERSION_MAJOR >= 14 && !defined(USE_NEW_PM)
+  #include "llvm/Pass.h"
+#endif
 
 #if LLVM_VERSION_MAJOR > 3 || \
     (LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR > 4)
@@ -593,11 +602,21 @@ bool AFLCoverage::runOnModule(Module &M) {
 
       /* Load prev_loc */
 
-      LoadInst *PrevLoc = IRB.CreateLoad(
+      LoadInst *PrevLoc;
+
+      if (Ngram) {
+        PrevLoc = IRB.CreateLoad(
 #if LLVM_VERSION_MAJOR >= 14
-          PrevLocTy,
+            PrevLocTy,
 #endif
-          AFLPrevLoc);
+            AFLPrevLoc);
+      } else {
+        PrevLoc = IRB.CreateLoad(
+#if LLVM_VERSION_MAJOR >= 14
+            IRB.getInt32Ty(),
+#endif
+            AFLPrevLoc);
+      }
       PrevLoc->setMetadata(M.getMDKindID("nosanitize"), MDNode::get(C, None));
       Value *PrevLocTrans;
 
@@ -766,8 +785,13 @@ bool AFLCoverage::runOnModule(Module &M) {
   }
   if (DumpCFG) {
     int fd;
+#ifndef _WIN32
     if ((fd = open(DumpCFGPath.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644)) <
         0)
+#else
+    if ((fd = _open(DumpCFGPath.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644)) <
+        0)
+#endif
       FATAL("Could not open/create CFG dump file.");
     std::string cfg = "";
     for (auto record = entry_bb.begin(); record != entry_bb.end(); record++) {

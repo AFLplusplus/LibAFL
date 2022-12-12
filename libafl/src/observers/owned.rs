@@ -1,6 +1,7 @@
 //! A dynamic collection of owned observers, working only with unstable rust
 
 use core::{any::Any, fmt::Debug};
+
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{
@@ -66,7 +67,7 @@ impl<'de, I: 'static + Debug, S: 'static + Debug> Deserialize<'de> for Observers
     }
 }
 
-impl<I: 'static + Debug, S: 'static + Debug> ObserversTuple<I, S> for ObserversOwnedMap<I, S> {
+impl<I: 'static + Debug, S: 'static + Debug> ObserversTuple<S> for ObserversOwnedMap<I, S> {
     fn pre_exec_all(&mut self, state: &mut S, input: &I) -> Result<(), Error> {
         self.map
             .for_each_mut(&mut |_, ob| ob.pre_exec(state, input))

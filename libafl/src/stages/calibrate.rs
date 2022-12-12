@@ -1,7 +1,17 @@
 //! The calibration stage. The fuzzer measures the average exec time and the bitmap size.
 
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::{fmt::Debug, marker::PhantomData, time::Duration};
+
+use hashbrown::HashSet;
+use num_traits::Bounded;
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    bolts::{current_time, tuples::Named, AsRefIterator},
+    bolts::{current_time, tuples::Named, AsIter},
     corpus::{Corpus, CorpusID, SchedulerTestcaseMetaData},
     events::{EventFirer, LogSeverity},
     executors::{Executor, ExitKind, HasObservers},
@@ -10,46 +20,76 @@ use crate::{
         HasObserverName,
     },
     fuzzer::Evaluator,
-    inputs::Input,
+    inputs::UsesInput,
     observers::{MapObserver, ObserversTuple},
     schedulers::powersched::SchedulerMetadata,
     stages::Stage,
-    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata},
+    state::{HasClientPerfMonitor, HasCorpus, HasMetadata, HasNamedMetadata, UsesState},
     Error,
 };
-use alloc::string::{String, ToString};
-use core::{fmt::Debug, marker::PhantomData, time::Duration};
-use num_traits::Bounded;
-use serde::{Deserialize, Serialize};
+
+crate::impl_serdeany!(UnstableEntriesMetadata);
+/// The metadata to keep unstable entries
+/// In libafl, the stability is the number of the unstable entries divided by the size of the map
+/// This is different from AFL++, which shows the number of the unstable entries divided by the number of filled entries.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UnstableEntriesMetadata {
+    unstable_entries: HashSet<usize>,
+    map_len: usize,
+}
+
+impl UnstableEntriesMetadata {
+    #[must_use]
+    /// Create a new [`struct@UnstableEntriesMetadata`]
+    pub fn new(entries: HashSet<usize>, map_len: usize) -> Self {
+        Self {
+            unstable_entries: entries,
+            map_len,
+        }
+    }
+
+    /// Getter
+    #[must_use]
+    pub fn unstable_entries(&self) -> &HashSet<usize> {
+        &self.unstable_entries
+    }
+
+    /// Getter
+    #[must_use]
+    pub fn map_len(&self) -> usize {
+        self.map_len
+    }
+}
 
 /// The calibration stage will measure the average exec time and the target's stability for this input.
 #[derive(Clone, Debug)]
-pub struct CalibrationStage<I, O, OT, S>
-where
-    I: Input,
-    O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
-{
+pub struct CalibrationStage<O, OT, S> {
     map_observer_name: String,
     map_name: String,
     stage_max: usize,
-    phantom: PhantomData<(I, O, OT, S)>,
+    track_stability: bool,
+    phantom: PhantomData<(O, OT, S)>,
 }
 
-const CAL_STAGE_START: usize = 4;
-const CAL_STAGE_MAX: usize = 16;
+const CAL_STAGE_START: usize = 4; // AFL++'s CAL_CYCLES_FAST + 1
+const CAL_STAGE_MAX: usize = 8; // AFL++'s CAL_CYCLES + 1
 
-impl<E, EM, I, O, OT, S, Z> Stage<E, EM, S, Z> for CalibrationStage<I, O, OT, S>
+impl<O, OT, S> UsesState for CalibrationStage<O, OT, S>
 where
-    E: Executor<EM, I, S, Z> + HasObservers<I, OT, S>,
-    EM: EventFirer<I>,
-    I: Input,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<E, EM, O, OT, Z> Stage<E, EM, Z> for CalibrationStage<O, OT, E::State>
+where
+    E: Executor<EM, Z> + HasObservers<Observers = OT>,
+    EM: EventFirer<State = E::State>,
     O: MapObserver,
     for<'de> <O as MapObserver>::Entry: Serialize + Deserialize<'de> + 'static,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
-    Z: Evaluator<E, EM, I, S>,
+    OT: ObserversTuple<E::State>,
+    E::State: HasCorpus + HasMetadata + HasClientPerfMonitor + HasNamedMetadata,
+    Z: Evaluator<E, EM, State = E::State>,
 {
     #[inline]
     #[allow(clippy::let_and_return, clippy::too_many_lines)]
@@ -57,7 +97,7 @@ where
         &mut self,
         fuzzer: &mut Z,
         executor: &mut E,
-        state: &mut S,
+        state: &mut E::State,
         mgr: &mut EM,
         corpus_idx: CorpusID,
     ) -> Result<(), Error> {
@@ -103,12 +143,13 @@ where
             .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
             .to_vec();
 
+        let mut unstable_entries: Vec<usize> = vec![];
+        let map_len: usize = map_first.len();
         // Run CAL_STAGE_START - 1 times, increase by 2 for every time a new
         // run is found to be unstable, with CAL_STAGE_MAX total runs.
         let mut i = 1;
         let mut has_errors = false;
-        let mut unstable_entries: usize = 0;
-        let map_len: usize = map_first.len();
+
         while i < iter {
             let input = state
                 .corpus()
@@ -143,34 +184,58 @@ where
                 .observers_mut()
                 .post_exec_all(state, &input, &exit_kind)?;
 
-            let map = &executor
-                .observers()
-                .match_name::<O>(&self.map_observer_name)
-                .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
-                .to_vec();
+            if self.track_stability {
+                let map = &executor
+                    .observers()
+                    .match_name::<O>(&self.map_observer_name)
+                    .ok_or_else(|| Error::key_not_found("MapObserver not found".to_string()))?
+                    .to_vec();
 
-            let history_map = &mut state
-                .named_metadata_mut()
-                .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
-                .unwrap()
-                .history_map;
+                let history_map = &mut state
+                    .named_metadata_mut()
+                    .get_mut::<MapFeedbackMetadata<O::Entry>>(&self.map_name)
+                    .unwrap()
+                    .history_map;
 
-            for j in 0..map_len {
-                if map_first[j] != map[j] && history_map[j] != O::Entry::max_value() {
-                    history_map[j] = O::Entry::max_value();
-                    unstable_entries += 1;
-                };
+                if history_map.len() < map_len {
+                    history_map.resize(map_len, O::Entry::default());
+                }
+
+                for (idx, (first, (cur, history))) in map_first
+                    .iter()
+                    .zip(map.iter().zip(history_map.iter_mut()))
+                    .enumerate()
+                {
+                    if *first != *cur && *history != O::Entry::max_value() {
+                        *history = O::Entry::max_value();
+                        unstable_entries.push(idx);
+                    };
+                }
+
+                if !unstable_entries.is_empty() && iter < CAL_STAGE_MAX {
+                    iter += 2;
+                }
             }
-
             i += 1;
         }
 
         #[allow(clippy::cast_precision_loss)]
-        if unstable_entries != 0 {
-            *state.stability_mut() = Some((map_len - unstable_entries) as f32 / (map_len as f32));
-
-            if iter < CAL_STAGE_MAX {
-                iter += 2;
+        if !unstable_entries.is_empty() {
+            // If we see new stable entries executing this new corpus entries, then merge with the existing one
+            if state.has_metadata::<UnstableEntriesMetadata>() {
+                let existing = state
+                    .metadata_mut()
+                    .get_mut::<UnstableEntriesMetadata>()
+                    .unwrap();
+                for item in unstable_entries {
+                    existing.unstable_entries.insert(item); // Insert newly found items
+                }
+                existing.map_len = map_len;
+            } else {
+                state.add_metadata::<UnstableEntriesMetadata>(UnstableEntriesMetadata::new(
+                    HashSet::from_iter(unstable_entries),
+                    map_len,
+                ));
             }
         };
 
@@ -220,27 +285,46 @@ where
     }
 }
 
-impl<I, O, OT, S> CalibrationStage<I, O, OT, S>
+impl<O, OT, S> CalibrationStage<O, OT, S>
 where
-    I: Input,
     O: MapObserver,
-    OT: ObserversTuple<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasNamedMetadata,
+    OT: ObserversTuple<S>,
+    S: HasCorpus + HasMetadata + HasNamedMetadata,
 {
     /// Create a new [`CalibrationStage`].
     #[must_use]
-    pub fn new<N, R>(map_feedback: &MapFeedback<I, N, O, R, S, O::Entry>) -> Self
+    pub fn new<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
     where
         O::Entry:
             PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
         R: Reducer<O::Entry>,
-        for<'it> O: AsRefIterator<'it, Item = O::Entry>,
+        for<'it> O: AsIter<'it, Item = O::Entry>,
         N: IsNovel<O::Entry>,
     {
         Self {
             map_observer_name: map_feedback.observer_name().to_string(),
             map_name: map_feedback.name().to_string(),
             stage_max: CAL_STAGE_START,
+            track_stability: true,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create a new [`CalibrationStage`], but without checking stability.
+    #[must_use]
+    pub fn ignore_stability<N, R>(map_feedback: &MapFeedback<N, O, R, S, O::Entry>) -> Self
+    where
+        O::Entry:
+            PartialEq + Default + Copy + 'static + Serialize + serde::de::DeserializeOwned + Debug,
+        R: Reducer<O::Entry>,
+        for<'it> O: AsIter<'it, Item = O::Entry>,
+        N: IsNovel<O::Entry>,
+    {
+        Self {
+            map_observer_name: map_feedback.observer_name().to_string(),
+            map_name: map_feedback.name().to_string(),
+            stage_max: CAL_STAGE_START,
+            track_stability: false,
             phantom: PhantomData,
         }
     }

@@ -4,13 +4,14 @@
 
 use alloc::{string::String, vec::Vec};
 use core::ptr::addr_of;
-use libafl::Error;
-use rangemap::RangeMap;
 use std::{
     fs::File,
     io::{BufWriter, Write},
     path::Path,
 };
+
+use libafl::Error;
+use rangemap::RangeMap;
 
 /// A basic block struct
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -4,6 +4,7 @@
 //! to be not interesting.
 //! Requires a [`ConcolicObserver`] to observe the concolic trace.
 use alloc::{borrow::ToOwned, string::String};
+use core::{fmt::Debug, marker::PhantomData};
 
 use crate::{
     bolts::tuples::Named,
@@ -11,7 +12,7 @@ use crate::{
     events::EventFirer,
     executors::ExitKind,
     feedbacks::Feedback,
-    inputs::Input,
+    inputs::UsesInput,
     observers::{
         concolic::{ConcolicMetadata, ConcolicObserver},
         ObserversTuple,
@@ -25,12 +26,13 @@ use crate::{
 /// to be not interesting.
 /// Requires a [`ConcolicObserver`] to observe the concolic trace.
 #[derive(Debug)]
-pub struct ConcolicFeedback {
+pub struct ConcolicFeedback<S> {
     name: String,
     metadata: Option<ConcolicMetadata>,
+    phantom: PhantomData<S>,
 }
 
-impl ConcolicFeedback {
+impl<S> ConcolicFeedback<S> {
     /// Creates a concolic feedback from an observer
     #[allow(unused)]
     #[must_use]
@@ -38,33 +40,33 @@ impl ConcolicFeedback {
         Self {
             name: observer.name().to_owned(),
             metadata: None,
+            phantom: PhantomData,
         }
     }
 }
 
-impl Named for ConcolicFeedback {
+impl<S> Named for ConcolicFeedback<S> {
     fn name(&self) -> &str {
         &self.name
     }
 }
 
-impl<I, S> Feedback<I, S> for ConcolicFeedback
+impl<S> Feedback<S> for ConcolicFeedback<S>
 where
-    I: Input,
-    S: HasClientPerfMonitor,
+    S: UsesInput + Debug + HasClientPerfMonitor,
 {
     #[allow(clippy::wrong_self_convention)]
     fn is_interesting<EM, OT>(
         &mut self,
         _state: &mut S,
         _manager: &mut EM,
-        _input: &I,
+        _input: &<S as UsesInput>::Input,
         observers: &OT,
         _exit_kind: &ExitKind,
     ) -> Result<bool, Error>
     where
-        EM: EventFirer<I>,
-        OT: ObserversTuple<I, S>,
+        EM: EventFirer<State = S>,
+        OT: ObserversTuple<S>,
     {
         self.metadata = observers
             .match_name::<ConcolicObserver>(&self.name)
@@ -75,7 +77,7 @@ where
     fn append_metadata(
         &mut self,
         _state: &mut S,
-        _testcase: &mut Testcase<I>,
+        _testcase: &mut Testcase<<S as UsesInput>::Input>,
     ) -> Result<(), Error> {
         if let Some(metadata) = self.metadata.take() {
             _testcase.metadata_mut().insert(metadata);
@@ -83,7 +85,11 @@ where
         Ok(())
     }
 
-    fn discard_metadata(&mut self, _state: &mut S, _input: &I) -> Result<(), Error> {
+    fn discard_metadata(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as UsesInput>::Input,
+    ) -> Result<(), Error> {
         Ok(())
     }
 }

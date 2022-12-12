@@ -34,6 +34,7 @@ LibAFL offers integrations with popular instrumentation frameworks. At the momen
 + SanitizerCoverage, in [libafl_targets](./libafl_targets)
 + Frida, in [libafl_frida](./libafl_frida)
 + QEMU user-mode, in [libafl_qemu](./libafl_qemu)
++ TinyInst, in [libafl_tinyinst](./libafl_tinyinst) by [elbiazo](https://github.com/elbiazo)
 
 ## Getting started
 
@@ -79,6 +80,12 @@ cd docs && mdbook serve
 We collect all example fuzzers in [`./fuzzers`](./fuzzers/).
 Be sure to read their documentation (and source), this is *the natural way to get started!*
 
+You can run each example fuzzer with
+```
+cargo make run
+```
+as long as the fuzzer directory has `Makefile.toml` file.
+
 The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_libpng), a multicore libfuzzer-like fuzzer using LibAFL for a libpng harness.
 
 ## Resources
@@ -89,11 +96,15 @@ The best-tested fuzzer is [`./fuzzers/libfuzzer_libpng`](./fuzzers/libfuzzer_lib
 
 + The LibAFL book (WIP) [online](https://aflplus.plus/libafl-book) or in the [repo](./docs/src/)
 
++ Our research [paper](https://www.s3.eurecom.fr/docs/ccs22_fioraldi.pdf)
+
 + Our RC3 [talk](http://www.youtube.com/watch?v=3RWkT1Q5IV0 "Fuzzers Like LEGO") explaining the core concepts
 
 + Our Fuzzcon Europe [talk](https://www.youtube.com/watch?v=PWB8GIhFAaI "LibAFL: The Advanced Fuzzing Library") with a (a bit but not so much outdated) step-by-step discussion on how to build some example fuzzers
 
 + The Fuzzing101 [solutions](https://github.com/epi052/fuzzing-101-solutions) & series of [blog posts](https://epi052.gitlab.io/notes-to-self/blog/2021-11-01-fuzzing-101-with-libafl/) by [epi](https://github.com/epi052)
+
++ Blogpost on binary-only fuzzing lib libaf_qemu, [Hacking TMNF - Fuzzing the game server](https://blog.bricked.tech/posts/tmnf/part1/), by [RickdeJager](https://github.com/RickdeJager).
 
 ## Contributing
 
@@ -106,6 +117,23 @@ Even though we will gladly assist you in finishing up your PR, try to
 - run `cargo build --no-default-features` to check for `no_std` compatibility (and possibly add `#[cfg(feature = "std")]`) to hide parts of your code.
 
 Some of the parts in this list may be hard, don't be afraid to open a PR if you cannot fix them by yourself, so we can help.
+
+## Cite
+
+If you use LibAFL for your academic work, please cite the following paper:
+
+```bibtex
+@inproceedings{libafl,
+ author       = {Andrea Fioraldi and Dominik Maier and Dongjia Zhang and Davide Balzarotti},
+ title        = {{LibAFL: A Framework to Build Modular and Reusable Fuzzers}},
+ booktitle    = {Proceedings of the 29th ACM conference on Computer and communications security (CCS)},
+ series       = {CCS '22},
+ year         = {2022},
+ month        = {November},
+ location     = {Los Angeles, U.S.A.},
+ publisher    = {ACM},
+}
+```
 
 #### License
 

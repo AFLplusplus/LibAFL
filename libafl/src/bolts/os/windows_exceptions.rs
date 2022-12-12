@@ -1,14 +1,5 @@
 //! Exception handling for Windows
 
-pub use windows::Win32::System::Diagnostics::Debug::{
-    AddVectoredExceptionHandler, EXCEPTION_POINTERS,
-};
-
-pub use windows::Win32::Foundation::NTSTATUS;
-
-use crate::Error;
-use std::os::raw::{c_long, c_void};
-
 use alloc::vec::Vec;
 use core::{
     cell::UnsafeCell,
@@ -17,12 +8,29 @@ use core::{
     ptr::write_volatile,
     sync::atomic::{compiler_fence, Ordering},
 };
+use std::os::raw::{c_long, c_void};
 
 use num_enum::TryFromPrimitive;
+pub use windows::Win32::{
+    Foundation::NTSTATUS,
+    System::{
+        Diagnostics::Debug::{
+            AddVectoredExceptionHandler, UnhandledExceptionFilter, EXCEPTION_POINTERS,
+        },
+        Threading::{IsProcessorFeaturePresent, PROCESSOR_FEATURE_ID},
+    },
+};
 
-//const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
+use crate::Error;
+
+// For VEH
+const EXCEPTION_CONTINUE_EXECUTION: c_long = -1;
+
+// For VEH
 //const EXCEPTION_CONTINUE_SEARCH: c_long = 0;
-const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
+
+// For SEH
+//const EXCEPTION_EXECUTE_HANDLER: c_long = 1;
 
 // From https://github.com/Alexpux/mingw-w64/blob/master/mingw-w64-headers/crt/signal.h
 pub const SIGINT: i32 = 2;
@@ -82,6 +90,7 @@ pub const STATUS_INVALID_CRUNTIME_PARAMETER: i32 = 0xC0000417;
 pub const STATUS_ASSERTION_FAILURE: i32 = 0xC0000420;
 pub const STATUS_SXS_EARLY_DEACTIVATION: i32 = 0xC015000F;
 pub const STATUS_SXS_INVALID_DEACTIVATION: i32 = 0xC0150010;
+pub const STATUS_NOT_IMPLEMENTED: i32 = 0xC0000002;
 
 #[derive(Debug, TryFromPrimitive, Clone, Copy)]
 #[repr(i32)]
@@ -133,6 +142,7 @@ pub enum ExceptionCode {
     AssertionFailure = STATUS_ASSERTION_FAILURE,
     SXSEarlyDeactivation = STATUS_SXS_EARLY_DEACTIVATION,
     SXSInvalidDeactivation = STATUS_SXS_INVALID_DEACTIVATION,
+    NotImplemented = STATUS_NOT_IMPLEMENTED,
     #[num_enum(default)]
     Other,
 }
@@ -152,7 +162,6 @@ pub static CRASH_EXCEPTIONS: &[ExceptionCode] = &[
     ExceptionCode::HeapCorruption,
     ExceptionCode::StackBufferOverrun,
     ExceptionCode::AssertionFailure,
-    ExceptionCode::Other,
 ];
 
 impl PartialEq for ExceptionCode {
@@ -215,6 +224,7 @@ impl Display for ExceptionCode {
             ExceptionCode::AssertionFailure => write!(f, "STATUS_ASSERTION_FAILURE")?,
             ExceptionCode::SXSEarlyDeactivation => write!(f, "STATUS_SXS_EARLY_DEACTIVATION")?,
             ExceptionCode::SXSInvalidDeactivation => write!(f, "STATUS_SXS_INVALID_DEACTIVATION")?,
+            ExceptionCode::NotImplemented => write!(f, "STATUS_NOT_IMPLEMENTED")?,
             ExceptionCode::Other => write!(f, "Other/User defined exception")?,
         };
 
@@ -222,7 +232,7 @@ impl Display for ExceptionCode {
     }
 }
 
-pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 46] = [
+pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 47] = [
     ExceptionCode::AccessViolation,
     ExceptionCode::ArrayBoundsExceeded,
     ExceptionCode::Breakpoint,
@@ -268,6 +278,7 @@ pub static EXCEPTION_CODES_MAPPING: [ExceptionCode; 46] = [
     ExceptionCode::AssertionFailure,
     ExceptionCode::SXSEarlyDeactivation,
     ExceptionCode::SXSInvalidDeactivation,
+    ExceptionCode::NotImplemented,
     ExceptionCode::Other,
 ];
 
@@ -308,14 +319,18 @@ unsafe fn internal_handle_exception(
         Some(handler_holder) => {
             let handler = &mut **handler_holder.handler.get();
             handler.handle(exception_code, exception_pointers);
-            EXCEPTION_EXECUTE_HANDLER
+            EXCEPTION_CONTINUE_EXECUTION
         }
-        None => EXCEPTION_EXECUTE_HANDLER,
+        None => EXCEPTION_CONTINUE_EXECUTION,
     }
 }
 
-/// Internal function that is being called whenever an exception arrives (stdcall).
-unsafe extern "system" fn handle_exception(exception_pointers: *mut EXCEPTION_POINTERS) -> c_long {
+/// Function that is being called whenever an exception arrives (stdcall).
+/// # Safety
+/// This function is unsafe because it is called by the OS
+pub unsafe extern "system" fn handle_exception(
+    exception_pointers: *mut EXCEPTION_POINTERS,
+) -> c_long {
     let code = exception_pointers
         .as_mut()
         .unwrap()
@@ -366,7 +381,7 @@ pub unsafe fn setup_exception_handler<T: 'static + Handler>(handler: &mut T) -> 
     // SetUnhandledFilter does not work with frida since the stack is changed and exception handler is lost with Stalker enabled.
     // See https://github.com/AFLplusplus/LibAFL/pull/403
     AddVectoredExceptionHandler(
-        1,
+        0,
         Some(core::mem::transmute(handle_exception as *const c_void)),
     );
     Ok(())

@@ -7,12 +7,19 @@ pub use multi::MultiMonitor;
 #[allow(missing_docs)]
 pub mod tui;
 
-use alloc::{string::String, vec::Vec};
+#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+#[allow(missing_docs)]
+pub mod prometheus;
+#[cfg(all(feature = "prometheus_monitor", feature = "std"))]
+pub use prometheus::PrometheusMonitor;
 
-#[cfg(feature = "introspection")]
-use alloc::string::ToString;
-
+#[cfg(feature = "std")]
+pub mod disk;
+use alloc::{fmt::Debug, string::String, vec::Vec};
 use core::{fmt, time::Duration};
+
+#[cfg(feature = "std")]
+pub use disk::{OnDiskJSONMonitor, OnDiskTOMLMonitor};
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -38,14 +45,14 @@ pub enum UserStats {
 impl fmt::Display for UserStats {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            UserStats::Number(n) => write!(f, "{}", n),
-            UserStats::Float(n) => write!(f, "{}", n),
-            UserStats::String(s) => write!(f, "{}", s),
+            UserStats::Number(n) => write!(f, "{n}"),
+            UserStats::Float(n) => write!(f, "{n}"),
+            UserStats::String(s) => write!(f, "{s}"),
             UserStats::Ratio(a, b) => {
                 if *b == 0 {
-                    write!(f, "{}/{}", a, b)
+                    write!(f, "{a}/{b}")
                 } else {
-                    write!(f, "{}/{} ({}%)", a, b, a * 100 / b)
+                    write!(f, "{a}/{b} ({}%)", a * 100 / b)
                 }
             }
         }
@@ -53,7 +60,7 @@ impl fmt::Display for UserStats {
 }
 
 /// A simple struct to keep track of client monitor
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct ClientStats {
     // monitor (maybe we need a separated struct?)
     /// The corpus size for this client
@@ -234,7 +241,7 @@ pub trait Monitor {
 
 /// Monitor that print exactly nothing.
 /// Not good for debuging, very good for speed.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NopMonitor {
     start_time: Duration,
     client_stats: Vec<ClientStats>,
@@ -276,8 +283,69 @@ impl Default for NopMonitor {
     }
 }
 
+#[cfg(feature = "std")]
+/// Tracking monitor during fuzzing that just prints to `stdout`.
+#[derive(Debug, Clone, Default)]
+pub struct SimplePrintingMonitor {
+    start_time: Duration,
+    client_stats: Vec<ClientStats>,
+}
+
+#[cfg(feature = "std")]
+impl SimplePrintingMonitor {
+    /// Create a new [`SimplePrintingMonitor`]
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[cfg(feature = "std")]
+impl Monitor for SimplePrintingMonitor {
+    /// the client monitor, mutable
+    fn client_stats_mut(&mut self) -> &mut Vec<ClientStats> {
+        &mut self.client_stats
+    }
+
+    /// the client monitor
+    fn client_stats(&self) -> &[ClientStats] {
+        &self.client_stats
+    }
+
+    /// Time this fuzzing run stated
+    fn start_time(&mut self) -> Duration {
+        self.start_time
+    }
+
+    fn display(&mut self, event_msg: String, sender_id: u32) {
+        println!(
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            event_msg,
+            sender_id,
+            format_duration_hms(&(current_time() - self.start_time)),
+            self.client_stats().len(),
+            self.corpus_size(),
+            self.objective_size(),
+            self.total_execs(),
+            self.execs_per_sec()
+        );
+
+        // Only print perf monitor if the feature is enabled
+        #[cfg(feature = "introspection")]
+        {
+            // Print the client performance monitor.
+            println!(
+                "Client {:03}:\n{}",
+                sender_id, self.client_stats[sender_id as usize].introspection_monitor
+            );
+            // Separate the spacing just a bit
+            println!();
+        }
+    }
+}
+
 /// Tracking monitor during fuzzing.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct SimpleMonitor<F>
 where
     F: FnMut(String),
@@ -285,6 +353,18 @@ where
     print_fn: F,
     start_time: Duration,
     client_stats: Vec<ClientStats>,
+}
+
+impl<F> Debug for SimpleMonitor<F>
+where
+    F: FnMut(String),
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SimpleMonitor")
+            .field("start_time", &self.start_time)
+            .field("client_stats", &self.client_stats)
+            .finish()
+    }
 }
 
 impl<F> Monitor for SimpleMonitor<F>
@@ -331,7 +411,7 @@ where
             (self.print_fn)(fmt);
 
             // Separate the spacing just a bit
-            (self.print_fn)("".to_string());
+            (self.print_fn)(String::new());
         }
     }
 }
@@ -500,7 +580,7 @@ impl From<usize> for PerfFeature {
             7 => PerfFeature::PostExecObservers,
             8 => PerfFeature::GetFeedbackInterestingAll,
             9 => PerfFeature::GetObjectivesInterestingAll,
-            _ => panic!("Unknown PerfFeature: {}", val),
+            _ => panic!("Unknown PerfFeature: {val}"),
         }
     }
 }
@@ -752,15 +832,14 @@ impl core::fmt::Display for ClientPerfMonitor {
         // Create the formatted string
         writeln!(
             f,
-            "  {:6.4}: Scheduler\n  {:6.4}: Manager",
-            scheduler_percent, manager_percent
+            "  {scheduler_percent:6.4}: Scheduler\n  {manager_percent:6.4}: Manager"
         )?;
 
         // Calculate each stage
         // Make sure we only iterate over used stages
         for (stage_index, features) in self.used_stages() {
             // Write the stage header
-            writeln!(f, "  Stage {}:", stage_index)?;
+            writeln!(f, "  Stage {stage_index}:")?;
 
             for (feature_index, feature) in features.iter().enumerate() {
                 // Calculate this current stage's percentage
@@ -778,7 +857,7 @@ impl core::fmt::Display for ClientPerfMonitor {
                 let feature: PerfFeature = feature_index.into();
 
                 // Write the percentage for this feature
-                writeln!(f, "    {:6.4}: {:?}", feature_percent, feature)?;
+                writeln!(f, "    {feature_percent:6.4}: {feature:?}")?;
             }
         }
 
@@ -797,10 +876,10 @@ impl core::fmt::Display for ClientPerfMonitor {
             other_percent -= feedback_percent;
 
             // Write the percentage for this feedback
-            writeln!(f, "    {:6.4}: {}", feedback_percent, feedback_name)?;
+            writeln!(f, "    {feedback_percent:6.4}: {feedback_name}")?;
         }
 
-        write!(f, "  {:6.4}: Not Measured", other_percent)?;
+        write!(f, "  {other_percent:6.4}: Not Measured")?;
 
         Ok(())
     }
@@ -817,13 +896,13 @@ impl Default for ClientPerfMonitor {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use crate::monitors::{Monitor, SimpleMonitor};
-    use pyo3::prelude::*;
-    use pyo3::types::PyUnicode;
-
-    use super::ClientStats;
     use alloc::{boxed::Box, string::String, vec::Vec};
     use core::time::Duration;
+
+    use pyo3::{prelude::*, types::PyUnicode};
+
+    use super::ClientStats;
+    use crate::monitors::{Monitor, SimpleMonitor};
 
     // TODO create a PyObjectFnMut to pass, track stabilization of https://github.com/rust-lang/rust/issues/29625
 

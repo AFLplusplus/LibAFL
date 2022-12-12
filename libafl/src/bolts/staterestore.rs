@@ -1,9 +1,7 @@
 //! Stores and restores state when a client needs to relaunch.
 //! Uses a [`ShMem`] up to a threshold, then write to disk.
-use ahash::AHasher;
 use alloc::string::{String, ToString};
 use core::{hash::Hasher, marker::PhantomData, mem::size_of, ptr, slice};
-use serde::{de::DeserializeOwned, Serialize};
 use std::{
     env::temp_dir,
     fs::{self, File},
@@ -11,6 +9,9 @@ use std::{
     path::PathBuf,
     ptr::read_volatile,
 };
+
+use ahash::AHasher;
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
     bolts::{
@@ -36,7 +37,7 @@ impl StateShMemContent {
                 slice::from_raw_parts(self.buf.as_ptr(), self.buf_len_checked(shmem_size)?)
             };
             let filename = postcard::from_bytes::<String>(bytes)?;
-            Some(temp_dir().join(&filename))
+            Some(temp_dir().join(filename))
         } else {
             None
         })
@@ -46,7 +47,7 @@ impl StateShMemContent {
     pub fn buf_len_checked(&self, shmem_size: usize) -> Result<usize, Error> {
         let buf_len = unsafe { read_volatile(&self.buf_len) };
         if size_of::<StateShMemContent>() + buf_len > shmem_size {
-            Err(Error::illegal_state(format!("Stored buf_len is larger than the shared map! Shared data corrupted? Expected {} bytes max, but got {} (buf_len {})", shmem_size, size_of::<StateShMemContent>() + buf_len, buf_len)))
+            Err(Error::illegal_state(format!("Stored buf_len is larger than the shared map! Shared data corrupted? Expected {shmem_size} bytes max, but got {} (buf_len {buf_len})", size_of::<StateShMemContent>() + buf_len)))
         } else {
             Ok(buf_len)
         }
@@ -246,6 +247,7 @@ mod tests {
         string::{String, ToString},
         vec::Vec,
     };
+
     use serial_test::serial;
 
     use crate::bolts::{
@@ -268,7 +270,7 @@ mod tests {
 
         assert!(state_restorer.has_content());
         let restored = state_restorer.restore::<String>().unwrap().unwrap();
-        println!("Restored {}", restored);
+        println!("Restored {restored}");
         assert_eq!(restored, "hello world");
         assert!(!state_restorer.content().is_disk);
 

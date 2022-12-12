@@ -1,6 +1,5 @@
-use core::pin::Pin;
 use hashbrown::HashMap;
-use libafl::{inputs::Input, state::HasMetadata};
+use libafl::{inputs::UsesInput, state::HasMetadata};
 pub use libafl_targets::{
     cmplog::__libafl_targets_cmplog_instructions, CmpLogMap, CmpLogObserver, CMPLOG_MAP,
     CMPLOG_MAP_H, CMPLOG_MAP_PTR, CMPLOG_MAP_SIZE, CMPLOG_MAP_W,
@@ -8,9 +7,9 @@ pub use libafl_targets::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    emu::Emulator,
     helper::{hash_me, QemuHelper, QemuHelperTuple, QemuInstrumentationFilter},
     hooks::QemuHooks,
+    GuestAddr,
 };
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -54,20 +53,21 @@ impl Default for QemuCmpLogHelper {
     }
 }
 
-impl<I, S> QemuHelper<I, S> for QemuCmpLogHelper
+impl<S> QemuHelper<S> for QemuCmpLogHelper
 where
-    I: Input,
-    S: HasMetadata,
+    S: UsesInput + HasMetadata,
 {
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
-        QT: QemuHelperTuple<I, S>,
+        QT: QemuHelperTuple<S>,
     {
-        hooks.cmp_generation(gen_unique_cmp_ids::<I, QT, S>);
-        hooks.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
-        hooks.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
-        hooks.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
-        hooks.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
+        hooks.cmps_raw(
+            Some(gen_unique_cmp_ids::<QT, S>),
+            Some(trace_cmp1_cmplog),
+            Some(trace_cmp2_cmplog),
+            Some(trace_cmp4_cmplog),
+            Some(trace_cmp8_cmplog),
+        );
     }
 }
 
@@ -94,39 +94,40 @@ impl Default for QemuCmpLogChildHelper {
     }
 }
 
-impl<I, S> QemuHelper<I, S> for QemuCmpLogChildHelper
+impl<S> QemuHelper<S> for QemuCmpLogChildHelper
 where
-    I: Input,
+    S: UsesInput,
     S: HasMetadata,
 {
     const HOOKS_DO_SIDE_EFFECTS: bool = false;
 
-    fn init_hooks<'a, QT>(&self, hooks: Pin<&QemuHooks<'a, I, QT, S>>)
+    fn first_exec<QT>(&self, hooks: &QemuHooks<'_, QT, S>)
     where
-        QT: QemuHelperTuple<I, S>,
+        QT: QemuHelperTuple<S>,
     {
-        hooks.cmp_generation(gen_hashed_cmp_ids::<I, QT, S>);
-        hooks.emulator().set_exec_cmp8_hook(trace_cmp8_cmplog);
-        hooks.emulator().set_exec_cmp4_hook(trace_cmp4_cmplog);
-        hooks.emulator().set_exec_cmp2_hook(trace_cmp2_cmplog);
-        hooks.emulator().set_exec_cmp1_hook(trace_cmp1_cmplog);
+        hooks.cmps_raw(
+            Some(gen_hashed_cmp_ids::<QT, S>),
+            Some(trace_cmp1_cmplog),
+            Some(trace_cmp2_cmplog),
+            Some(trace_cmp4_cmplog),
+            Some(trace_cmp8_cmplog),
+        );
     }
 }
 
-pub fn gen_unique_cmp_ids<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+pub fn gen_unique_cmp_ids<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     state: Option<&mut S>,
-    pc: u64,
+    pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
     S: HasMetadata,
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuCmpLogHelper>() {
-        if !h.must_instrument(pc) {
+    if let Some(h) = hooks.match_helper_mut::<QemuCmpLogHelper>() {
+        if !h.must_instrument(pc.into()) {
             return None;
         }
     }
@@ -140,51 +141,50 @@ where
         .unwrap();
     let id = meta.current_id as usize;
 
-    Some(*meta.map.entry(pc).or_insert_with(|| {
+    Some(*meta.map.entry(pc.into()).or_insert_with(|| {
         meta.current_id = ((id + 1) & (CMPLOG_MAP_W - 1)) as u64;
         id as u64
     }))
 }
 
-pub fn gen_hashed_cmp_ids<I, QT, S>(
-    _emulator: &Emulator,
-    helpers: &mut QT,
+pub fn gen_hashed_cmp_ids<QT, S>(
+    hooks: &mut QemuHooks<'_, QT, S>,
     _state: Option<&mut S>,
-    pc: u64,
+    pc: GuestAddr,
     _size: usize,
 ) -> Option<u64>
 where
     S: HasMetadata,
-    I: Input,
-    QT: QemuHelperTuple<I, S>,
+    S: UsesInput,
+    QT: QemuHelperTuple<S>,
 {
-    if let Some(h) = helpers.match_first_type::<QemuCmpLogChildHelper>() {
-        if !h.must_instrument(pc) {
+    if let Some(h) = hooks.match_helper_mut::<QemuCmpLogChildHelper>() {
+        if !h.must_instrument(pc.into()) {
             return None;
         }
     }
-    Some(hash_me(pc) & (CMPLOG_MAP_W as u64 - 1))
+    Some(hash_me(pc.into()) & (CMPLOG_MAP_W as u64 - 1))
 }
 
-pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8) {
+pub extern "C" fn trace_cmp1_cmplog(id: u64, v0: u8, v1: u8, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 1, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16) {
+pub extern "C" fn trace_cmp2_cmplog(id: u64, v0: u16, v1: u16, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 2, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32) {
+pub extern "C" fn trace_cmp4_cmplog(id: u64, v0: u32, v1: u32, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 4, u64::from(v0), u64::from(v1));
     }
 }
 
-pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64) {
+pub extern "C" fn trace_cmp8_cmplog(id: u64, v0: u64, v1: u64, _data: u64) {
     unsafe {
         __libafl_targets_cmplog_instructions(id as usize, 8, v0, v1);
     }

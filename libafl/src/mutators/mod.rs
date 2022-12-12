@@ -14,6 +14,8 @@ pub mod gramatron;
 pub use gramatron::*;
 pub mod grimoire;
 pub use grimoire::*;
+pub mod tuneable;
+pub use tuneable::*;
 
 #[cfg(feature = "nautilus")]
 pub mod nautilus;
@@ -23,7 +25,7 @@ pub use nautilus::*;
 use crate::{
     bolts::tuples::{HasConstLen, Named},
     corpus::CorpusID,
-    inputs::Input,
+    inputs::UsesInput,
     Error,
 };
 
@@ -43,15 +45,15 @@ pub enum MutationResult {
 
 /// A mutator takes input, and mutates it.
 /// Simple as that.
-pub trait Mutator<I, S>
+pub trait Mutator<S>
 where
-    I: Input,
+    S: UsesInput,
 {
     /// Mutate a given input
     fn mutate(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -67,15 +69,15 @@ where
 }
 
 /// A `Tuple` of `Mutators` that can execute multiple `Mutators` in a row.
-pub trait MutatorsTuple<I, S>: HasConstLen
+pub trait MutatorsTuple<S>: HasConstLen
 where
-    I: Input,
+    S: UsesInput,
 {
     /// Runs the `mutate` function on all `Mutators` in this `Tuple`.
     fn mutate_all(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -92,7 +94,7 @@ where
         &mut self,
         index: usize,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error>;
 
@@ -106,14 +108,14 @@ where
     ) -> Result<(), Error>;
 }
 
-impl<I, S> MutatorsTuple<I, S> for ()
+impl<S> MutatorsTuple<S> for ()
 where
-    I: Input,
+    S: UsesInput,
 {
     fn mutate_all(
         &mut self,
         _state: &mut S,
-        _input: &mut I,
+        _input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         Ok(MutationResult::Skipped)
@@ -132,7 +134,7 @@ where
         &mut self,
         _index: usize,
         _state: &mut S,
-        _input: &mut I,
+        _input: &mut S::Input,
         _stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         Ok(MutationResult::Skipped)
@@ -149,16 +151,16 @@ where
     }
 }
 
-impl<Head, Tail, I, S> MutatorsTuple<I, S> for (Head, Tail)
+impl<Head, Tail, S> MutatorsTuple<S> for (Head, Tail)
 where
-    Head: Mutator<I, S> + Named,
-    Tail: MutatorsTuple<I, S>,
-    I: Input,
+    Head: Mutator<S> + Named,
+    Tail: MutatorsTuple<S>,
+    S: UsesInput,
 {
     fn mutate_all(
         &mut self,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         let r = self.0.mutate(state, input, stage_idx)?;
@@ -183,7 +185,7 @@ where
         &mut self,
         index: usize,
         state: &mut S,
-        input: &mut I,
+        input: &mut S::Input,
         stage_idx: i32,
     ) -> Result<MutationResult, Error> {
         if index == 0 {
@@ -213,12 +215,15 @@ where
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
-    use super::{MutationResult, Mutator};
-    use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::mutators::scheduled::pybind::PythonStdHavocMutator;
-    use crate::state::pybind::{PythonStdState, PythonStdStateWrapper};
-    use crate::Error;
     use pyo3::prelude::*;
+
+    use super::{MutationResult, Mutator};
+    use crate::{
+        inputs::{BytesInput, HasBytesVec},
+        mutators::scheduled::pybind::PythonStdHavocMutator,
+        state::pybind::{PythonStdState, PythonStdStateWrapper},
+        Error,
+    };
 
     #[derive(Clone, Debug)]
     pub struct PyObjectMutator {
@@ -232,7 +237,7 @@ pub mod pybind {
         }
     }
 
-    impl Mutator<BytesInput, PythonStdState> for PyObjectMutator {
+    impl Mutator<PythonStdState> for PyObjectMutator {
         fn mutate(
             &mut self,
             state: &mut PythonStdState,
@@ -327,7 +332,7 @@ pub mod pybind {
         }
     }
 
-    impl Mutator<BytesInput, PythonStdState> for PythonMutator {
+    impl Mutator<PythonStdState> for PythonMutator {
         fn mutate(
             &mut self,
             state: &mut PythonStdState,

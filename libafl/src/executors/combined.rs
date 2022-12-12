@@ -1,28 +1,30 @@
 //! A `CombinedExecutor` wraps a primary executor and a secondary one
 //! In comparison to the [`crate::executors::DiffExecutor`] it does not run the secondary executor in `run_target`.
 
+use core::fmt::Debug;
+
 use crate::{
     executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
-    observers::ObserversTuple,
+    observers::UsesObservers,
+    state::UsesState,
     Error,
 };
-use core::fmt::Debug;
 
 /// A [`CombinedExecutor`] wraps a primary executor, forwarding its methods, and a secondary one
 #[derive(Debug)]
-pub struct CombinedExecutor<A: Debug, B: Debug> {
+pub struct CombinedExecutor<A, B> {
     primary: A,
     secondary: B,
 }
 
-impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
+impl<A, B> CombinedExecutor<A, B> {
     /// Create a new `CombinedExecutor`, wrapping the given `executor`s.
-    pub fn new<EM, I, S, Z>(primary: A, secondary: B) -> Self
+    pub fn new<EM, Z>(primary: A, secondary: B) -> Self
     where
-        A: Executor<EM, I, S, Z>,
-        B: Executor<EM, I, S, Z>,
-        I: Input,
+        A: Executor<EM, Z>,
+        B: Executor<EM, Z, State = A::State>,
+        EM: UsesState<State = A::State>,
+        Z: UsesState<State = A::State>,
     {
         Self { primary, secondary }
     }
@@ -38,18 +40,19 @@ impl<A: Debug, B: Debug> CombinedExecutor<A, B> {
     }
 }
 
-impl<A, B, EM, I, S, Z> Executor<EM, I, S, Z> for CombinedExecutor<A, B>
+impl<A, B, EM, Z> Executor<EM, Z> for CombinedExecutor<A, B>
 where
-    A: Executor<EM, I, S, Z>,
-    B: Executor<EM, I, S, Z>,
-    I: Input,
+    A: Executor<EM, Z>,
+    B: Executor<EM, Z, State = A::State>,
+    EM: UsesState<State = A::State>,
+    Z: UsesState<State = A::State>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         let ret = self.primary.run_target(fuzzer, state, mgr, input);
         self.primary.post_run_reset();
@@ -58,19 +61,31 @@ where
     }
 }
 
-impl<A, B, I, OT, S> HasObservers<I, OT, S> for CombinedExecutor<A, B>
+impl<A, B> UsesState for CombinedExecutor<A, B>
 where
-    A: HasObservers<I, OT, S>,
-    B: Debug,
-    OT: ObserversTuple<I, S>,
+    A: UsesState,
+{
+    type State = A::State;
+}
+
+impl<A, B> UsesObservers for CombinedExecutor<A, B>
+where
+    A: UsesObservers,
+{
+    type Observers = A::Observers;
+}
+
+impl<A, B> HasObservers for CombinedExecutor<A, B>
+where
+    A: HasObservers,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.primary.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.primary.observers_mut()
     }
 }

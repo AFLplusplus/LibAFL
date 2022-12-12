@@ -1,9 +1,7 @@
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-pub use strum_macros::EnumIter;
-
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
-
+pub use strum_macros::EnumIter;
 pub use syscall_numbers::arm::*;
 
 /// Registers for the ARM instruction set.
@@ -26,6 +24,7 @@ pub enum Regs {
     R13 = 13,
     R14 = 14,
     R15 = 15,
+    R25 = 25,
 }
 
 /// alias registers
@@ -38,6 +37,7 @@ impl Regs {
     pub const Sl: Regs = Regs::R10;
     pub const Fp: Regs = Regs::R11;
     pub const Ip: Regs = Regs::R12;
+    pub const Cpsr: Regs = Regs::R25;
 }
 
 #[cfg(feature = "python")]
@@ -46,4 +46,9 @@ impl IntoPy<PyObject> for Regs {
         let n: i32 = self.into();
         n.into_py(py)
     }
+}
+
+/// Return an ARM ArchCapstoneBuilder
+pub fn capstone() -> capstone::arch::arm::ArchCapstoneBuilder {
+    capstone::Capstone::new().arm()
 }

@@ -3,7 +3,6 @@
 //! This is the drop-in replacement for libfuzzer, to be used together with [`Atheris`](https://github.com/google/atheris)
 //! for python instrumentation and fuzzing.
 
-use clap::{AppSettings, Arg, Command};
 use core::{convert::TryInto, ffi::c_void, slice, time::Duration};
 use std::{
     env,
@@ -11,6 +10,7 @@ use std::{
     path::PathBuf,
 };
 
+use clap::{AppSettings, Arg, Command};
 use libafl::{
     bolts::{
         core_affinity::Cores,
@@ -30,8 +30,10 @@ use libafl::{
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
-    mutators::scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
-    mutators::token_mutations::{I2SRandReplace, Tokens},
+    mutators::{
+        scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
+        token_mutations::{I2SRandReplace, Tokens},
+    },
     observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{StdMutationalStage, TracingStage},
@@ -178,21 +180,21 @@ pub fn LLVMFuzzerRunDriver(
         env::current_dir().unwrap().to_string_lossy().to_string()
     );
 
-    let cores = Cores::from_cmdline(matches.value_of("cores").unwrap())
+    let cores = Cores::from_cmdline(matches.get_one::<String>("cores").unwrap())
         .expect("No valid core count given!");
     let broker_port = matches
-        .value_of("broker_port")
+        .get_one::<String>("broker_port")
         .map(|s| s.parse().expect("Invalid broker port"))
         .unwrap_or(1337);
     let remote_broker_addr = matches
-        .value_of("remote_broker_addr")
+        .get_one::<String>("remote_broker_addr")
         .map(|s| s.parse().expect("Invalid broker address"));
     let input_dirs: Vec<PathBuf> = matches
         .values_of("input")
         .map(|v| v.map(PathBuf::from).collect())
         .unwrap_or_default();
     let output_dir = matches
-        .value_of("output")
+        .get_one::<String>("output")
         .map(PathBuf::from)
         .unwrap_or_else(|| workdir.clone());
     let token_files: Vec<&str> = matches
@@ -200,7 +202,7 @@ pub fn LLVMFuzzerRunDriver(
         .map(|v| v.collect())
         .unwrap_or_default();
     let timeout_ms = matches
-        .value_of("timeout")
+        .get_one::<String>("timeout")
         .map(|s| s.parse().expect("Invalid timeout"))
         .unwrap_or(10000);
     // let cmplog_enabled = matches.is_present("cmplog");

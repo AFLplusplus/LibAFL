@@ -1,30 +1,24 @@
 //! A `TimeoutExecutor` sets a timeout before each target run
 
+#[cfg(target_os = "linux")]
+use core::ptr::{addr_of, addr_of_mut};
+#[cfg(all(windows, feature = "std"))]
+use core::{ffi::c_void, ptr::write_volatile};
 #[cfg(any(windows, unix))]
 use core::{
     fmt::{self, Debug, Formatter},
     time::Duration,
 };
-
-use crate::{
-    executors::{Executor, ExitKind, HasObservers},
-    inputs::Input,
-    observers::ObserversTuple,
-    Error,
-};
-
-#[cfg(all(windows, feature = "std"))]
-use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
-
 #[cfg(unix)]
 use core::{mem::zeroed, ptr::null_mut};
-
-#[cfg(target_os = "linux")]
-use core::ptr::{addr_of, addr_of_mut};
+#[cfg(windows)]
+use core::{
+    ptr::addr_of_mut,
+    sync::atomic::{compiler_fence, Ordering},
+};
 
 #[cfg(all(unix, not(target_os = "linux")))]
 use libc::c_int;
-
 #[cfg(all(windows, feature = "std"))]
 use windows::Win32::{
     Foundation::FILETIME,
@@ -36,12 +30,12 @@ use windows::Win32::{
 };
 
 #[cfg(all(windows, feature = "std"))]
-use core::{ffi::c_void, ptr::write_volatile};
-
-#[cfg(windows)]
-use core::{
-    ptr::addr_of_mut,
-    sync::atomic::{compiler_fence, Ordering},
+use crate::executors::inprocess::{HasInProcessHandlers, GLOBAL_STATE};
+use crate::{
+    executors::{Executor, ExitKind, HasObservers},
+    observers::UsesObservers,
+    state::UsesState,
+    Error,
 };
 
 #[repr(C)]
@@ -83,6 +77,7 @@ const ITIMER_REAL: c_int = 0;
 
 /// The timeout executor is a wrapper that sets a timeout before each run
 pub struct TimeoutExecutor<E> {
+    /// The wrapped [`Executor`]
     executor: E,
     #[cfg(target_os = "linux")]
     itimerspec: libc::itimerspec,
@@ -238,8 +233,8 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
         let tp_timer = unsafe {
             CreateThreadpoolTimer(
                 Some(timeout_handler),
-                addr_of_mut!(GLOBAL_STATE) as *mut c_void,
-                &TP_CALLBACK_ENVIRON_V3::default(),
+                Some(addr_of_mut!(GLOBAL_STATE) as *mut c_void),
+                Some(&TP_CALLBACK_ENVIRON_V3::default()),
             )
         };
         let mut critical = RTL_CRITICAL_SECTION::default();
@@ -269,18 +264,19 @@ impl<E: HasInProcessHandlers> TimeoutExecutor<E> {
 }
 
 #[cfg(windows)]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z> + HasInProcessHandlers,
-    I: Input,
+    E: Executor<EM, Z> + HasInProcessHandlers,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     #[allow(clippy::cast_sign_loss)]
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             let data = &mut GLOBAL_STATE;
@@ -291,7 +287,7 @@ where
             );
             write_volatile(
                 &mut data.timeout_input_ptr,
-                data.current_input_ptr as *mut c_void,
+                addr_of_mut!(data.current_input_ptr) as *mut c_void,
             );
             let tm: i64 = -self.milli_sec * 10 * 1000;
             let ft = FILETIME {
@@ -307,7 +303,7 @@ where
             LeaveCriticalSection(&mut self.critical);
             compiler_fence(Ordering::SeqCst);
 
-            SetThreadpoolTimer(self.tp_timer, &ft, 0, 0);
+            SetThreadpoolTimer(self.tp_timer, Some(&ft), 0, 0);
 
             let ret = self.executor.run_target(fuzzer, state, mgr, input);
 
@@ -332,24 +328,25 @@ where
     /// Will dereference the given `tp_timer` pointer, unchecked.
     fn post_run_reset(&mut self) {
         unsafe {
-            SetThreadpoolTimer(self.tp_timer, core::ptr::null(), 0, 0);
+            SetThreadpoolTimer(self.tp_timer, None, 0, 0);
         }
         self.executor.post_run_reset();
     }
 }
 
 #[cfg(target_os = "linux")]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
-    I: Input,
+    E: Executor<EM, Z>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             libc::timer_settime(self.timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
@@ -370,17 +367,18 @@ where
 }
 
 #[cfg(all(unix, not(target_os = "linux")))]
-impl<E, EM, I, S, Z> Executor<EM, I, S, Z> for TimeoutExecutor<E>
+impl<E, EM, Z> Executor<EM, Z> for TimeoutExecutor<E>
 where
-    E: Executor<EM, I, S, Z>,
-    I: Input,
+    E: Executor<EM, Z>,
+    EM: UsesState<State = E::State>,
+    Z: UsesState<State = E::State>,
 {
     fn run_target(
         &mut self,
         fuzzer: &mut Z,
-        state: &mut S,
+        state: &mut Self::State,
         mgr: &mut EM,
-        input: &I,
+        input: &Self::Input,
     ) -> Result<ExitKind, Error> {
         unsafe {
             setitimer(ITIMER_REAL, &mut self.itimerval, null_mut());
@@ -399,18 +397,31 @@ where
     }
 }
 
-impl<E, I, OT, S> HasObservers<I, OT, S> for TimeoutExecutor<E>
+impl<E> UsesState for TimeoutExecutor<E>
 where
-    E: HasObservers<I, OT, S>,
-    OT: ObserversTuple<I, S>,
+    E: UsesState,
+{
+    type State = E::State;
+}
+
+impl<E> UsesObservers for TimeoutExecutor<E>
+where
+    E: UsesObservers,
+{
+    type Observers = E::Observers;
+}
+
+impl<E> HasObservers for TimeoutExecutor<E>
+where
+    E: HasObservers,
 {
     #[inline]
-    fn observers(&self) -> &OT {
+    fn observers(&self) -> &Self::Observers {
         self.executor.observers()
     }
 
     #[inline]
-    fn observers_mut(&mut self) -> &mut OT {
+    fn observers_mut(&mut self) -> &mut Self::Observers {
         self.executor.observers_mut()
     }
 }

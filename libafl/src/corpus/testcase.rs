@@ -2,7 +2,8 @@
 //! It will contain a respective input, and metadata.
 
 use alloc::string::String;
-use core::{convert::Into, default::Default, option::Option, time::Duration};
+use core::{default::Default, option::Option, time::Duration};
+
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -180,14 +181,11 @@ where
         self.fuzzed = fuzzed;
     }
 
-    /// Create a new Testcase instace given an input
+    /// Create a new Testcase instance given an input
     #[inline]
-    pub fn new<T>(input: T) -> Self
-    where
-        T: Into<I>,
-    {
+    pub fn new(input: I) -> Self {
         let mut slf = Testcase {
-            input: Some(input.into()),
+            input: Some(input),
             ..Testcase::default()
         };
         slf.input.as_mut().unwrap().wrapped_as_testcase();
@@ -350,13 +348,16 @@ crate::impl_serdeany!(SchedulerTestcaseMetaData);
 #[allow(missing_docs)]
 /// `Testcase` Python bindings
 pub mod pybind {
-    use super::{HasMetadata, Testcase};
-    use crate::bolts::ownedref::OwnedPtrMut;
-    use crate::inputs::{BytesInput, HasBytesVec};
-    use crate::pybind::PythonMetadata;
     use alloc::{boxed::Box, vec::Vec};
-    use pyo3::prelude::*;
-    use pyo3::types::PyDict;
+
+    use pyo3::{prelude::*, types::PyDict};
+
+    use super::{HasMetadata, Testcase};
+    use crate::{
+        bolts::ownedref::OwnedPtrMut,
+        inputs::{BytesInput, HasBytesVec},
+        pybind::PythonMetadata,
+    };
 
     /// `PythonTestcase` with fixed generics
     pub type PythonTestcase = Testcase<BytesInput>;

@@ -1,9 +1,8 @@
 //! The gramatron grammar fuzzer
-use ahash::AHasher;
-use core::hash::Hasher;
-
 use alloc::{rc::Rc, string::String, vec::Vec};
-use core::{cell::RefCell, convert::From};
+use core::{cell::RefCell, convert::From, hash::Hasher};
+
+use ahash::AHasher;
 use serde::{Deserialize, Serialize};
 
 use crate::{bolts::HasLen, inputs::Input, Error};

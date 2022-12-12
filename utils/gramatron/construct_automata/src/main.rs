@@ -1,27 +1,25 @@
-use clap::{self, StructOpt};
-use lazy_static::lazy_static;
-use regex::Regex;
-use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     fs,
     io::{BufReader, Write},
-    path::Path,
-    path::PathBuf,
+    path::{Path, PathBuf},
     rc::Rc,
 };
 
+use clap::{self, Parser};
+use lazy_static::lazy_static;
 use libafl::generators::gramatron::{Automaton, Trigger};
+use regex::Regex;
+use serde_json::Value;
 
-#[derive(Debug, StructOpt)]
-#[clap(
+#[derive(Debug, Parser)]
+#[command(
     name = "construct_automata",
     about = "Generate a serialized Automaton using a json GNF grammar",
     author = "Andrea Fioraldi <andreafioraldi@gmail.com>"
 )]
 struct Opt {
-    #[clap(
-        parse(try_from_str),
+    #[arg(
         short,
         long = "grammar-file",
         name = "GRAMMAR",
@@ -29,8 +27,7 @@ struct Opt {
     )]
     grammar: PathBuf,
 
-    #[clap(
-        parse(try_from_str),
+    #[arg(
         short,
         long,
         name = "LIMIT",
@@ -39,13 +36,7 @@ struct Opt {
     )]
     limit: usize,
 
-    #[clap(
-        parse(try_from_str),
-        short,
-        long,
-        help = "Set the output file",
-        name = "OUTPUT"
-    )]
+    #[arg(short, long, help = "Set the output file", name = "OUTPUT")]
     output: PathBuf,
 }
 

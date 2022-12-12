@@ -8,6 +8,8 @@ Welcome to `LibAFL`
 #![cfg_attr(unstable_feature, feature(specialization))]
 // For `type_id` and owned things
 #![cfg_attr(unstable_feature, feature(intrinsics))]
+// For `std::simd`
+#![cfg_attr(unstable_feature, feature(portable_simd))]
 #![warn(clippy::cargo)]
 #![deny(clippy::cargo_common_metadata)]
 #![deny(rustdoc::broken_intra_doc_links)]
@@ -25,7 +27,7 @@ Welcome to `LibAFL`
     clippy::module_name_repetitions,
     clippy::unreadable_literal
 )]
-#![cfg_attr(debug_assertions, warn(
+#![cfg_attr(not(test), warn(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -35,7 +37,7 @@ Welcome to `LibAFL`
     unused_qualifications,
     //unused_results
 ))]
-#![cfg_attr(not(debug_assertions), deny(
+#![cfg_attr(test, deny(
     missing_debug_implementations,
     missing_docs,
     //trivial_casts,
@@ -48,10 +50,9 @@ Welcome to `LibAFL`
     //unused_results
 ))]
 #![cfg_attr(
-    not(debug_assertions),
+    test,
     deny(
         bad_style,
-        const_err,
         dead_code,
         improper_ctypes,
         non_shorthand_field_patterns,
@@ -68,6 +69,9 @@ Welcome to `LibAFL`
         while_true
     )
 )]
+// Till they fix this buggy lint in clippy
+#![allow(clippy::borrow_as_ptr)]
+#![allow(clippy::borrow_deref_ref)]
 
 #[cfg(feature = "std")]
 #[macro_use]
@@ -104,11 +108,15 @@ pub mod state;
 
 pub mod fuzzer;
 use alloc::string::{FromUtf8Error, String};
-use core::{array::TryFromSliceError, fmt, num::ParseIntError, num::TryFromIntError};
-pub use fuzzer::*;
-
+use core::{
+    array::TryFromSliceError,
+    fmt,
+    num::{ParseIntError, TryFromIntError},
+};
 #[cfg(feature = "std")]
 use std::{env::VarError, io};
+
+pub use fuzzer::*;
 
 #[cfg(feature = "errors_backtrace")]
 /// Error Backtrace type when `errors_backtrace` feature is enabled (== [`backtrace::Backtrace`])
@@ -129,9 +137,10 @@ impl ErrorBacktrace {
 
 #[cfg(feature = "errors_backtrace")]
 fn display_error_backtrace(f: &mut fmt::Formatter, err: &ErrorBacktrace) -> fmt::Result {
-    write!(f, "\nBacktrace: {:?}", err)
+    write!(f, "\nBacktrace: {err:?}")
 }
 #[cfg(not(feature = "errors_backtrace"))]
+#[allow(clippy::unnecessary_wraps)]
 fn display_error_backtrace(_f: &mut fmt::Formatter, _err: &ErrorBacktrace) -> fmt::Result {
     fmt::Result::Ok(())
 }
@@ -161,6 +170,8 @@ pub enum Error {
     IllegalState(String, ErrorBacktrace),
     /// The argument passed to this method or function is not valid
     IllegalArgument(String, ErrorBacktrace),
+    /// The performed action is not supported on the current platform
+    Unsupported(String, ErrorBacktrace),
     /// Shutting down, not really an error.
     ShuttingDown,
     /// Something else happened
@@ -249,6 +260,14 @@ impl Error {
     pub fn shutting_down() -> Self {
         Error::ShuttingDown
     }
+    /// This operation is not supported on the current architecture or platform
+    #[must_use]
+    pub fn unsupported<S>(arg: S) -> Self
+    where
+        S: Into<String>,
+    {
+        Error::Unsupported(arg.into(), ErrorBacktrace::new())
+    }
     /// Something else happened
     #[must_use]
     pub fn unknown<S>(arg: S) -> Self
@@ -304,6 +323,14 @@ impl fmt::Display for Error {
                 write!(f, "Illegal argument: {0}", &s)?;
                 display_error_backtrace(f, b)
             }
+            Self::Unsupported(s, b) => {
+                write!(
+                    f,
+                    "The operation is not supported on the current platform: {0}",
+                    &s
+                )?;
+                display_error_backtrace(f, b)
+            }
             Self::ShuttingDown => write!(f, "Shutting down!"),
             Self::Unknown(s, b) => {
                 write!(f, "Unknown error: {0}", &s)?;
@@ -316,7 +343,7 @@ impl fmt::Display for Error {
 /// Stringify the postcard serializer error
 impl From<postcard::Error> for Error {
     fn from(err: postcard::Error) -> Self {
-        Self::serialize(format!("{:?}", err))
+        Self::serialize(format!("{err:?}"))
     }
 }
 
@@ -324,14 +351,14 @@ impl From<postcard::Error> for Error {
 #[cfg(feature = "std")]
 impl From<serde_json::Error> for Error {
     fn from(err: serde_json::Error) -> Self {
-        Self::serialize(format!("{:?}", err))
+        Self::serialize(format!("{err:?}"))
     }
 }
 
 #[cfg(all(unix, feature = "std"))]
 impl From<nix::Error> for Error {
     fn from(err: nix::Error) -> Self {
-        Self::unknown(format!("Unix error: {:?}", err))
+        Self::unknown(format!("Unix error: {err:?}"))
     }
 }
 
@@ -345,32 +372,32 @@ impl From<io::Error> for Error {
 
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Self {
-        Self::unknown(format!("Could not convert byte / utf-8: {:?}", err))
+        Self::unknown(format!("Could not convert byte / utf-8: {err:?}"))
     }
 }
 
 #[cfg(feature = "std")]
 impl From<VarError> for Error {
     fn from(err: VarError) -> Self {
-        Self::empty(format!("Could not get env var: {:?}", err))
+        Self::empty(format!("Could not get env var: {err:?}"))
     }
 }
 
 impl From<ParseIntError> for Error {
     fn from(err: ParseIntError) -> Self {
-        Self::unknown(format!("Failed to parse Int: {:?}", err))
+        Self::unknown(format!("Failed to parse Int: {err:?}"))
     }
 }
 
 impl From<TryFromIntError> for Error {
     fn from(err: TryFromIntError) -> Self {
-        Self::illegal_state(format!("Expected conversion failed: {:?}", err))
+        Self::illegal_state(format!("Expected conversion failed: {err:?}"))
     }
 }
 
 impl From<TryFromSliceError> for Error {
     fn from(err: TryFromSliceError) -> Self {
-        Self::illegal_argument(format!("Could not convert slice: {:?}", err))
+        Self::illegal_argument(format!("Could not convert slice: {err:?}"))
     }
 }
 
@@ -391,7 +418,7 @@ impl From<pyo3::PyErr> for Error {
             ) {
                 Self::shutting_down()
             } else {
-                Self::illegal_state(format!("Python exception: {:?}", err))
+                Self::illegal_state(format!("Python exception: {err:?}"))
             }
         })
     }
@@ -400,25 +427,48 @@ impl From<pyo3::PyErr> for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
+/// The purpose of this module is to alleviate imports of many components by adding a glob import.
+#[cfg(feature = "prelude")]
+pub mod prelude {
+    pub use super::{
+        bolts::{bolts_prelude::*, *},
+        corpus::*,
+        events::*,
+        executors::*,
+        feedbacks::*,
+        fuzzer::*,
+        generators::*,
+        inputs::*,
+        monitors::*,
+        mutators::*,
+        observers::*,
+        schedulers::*,
+        stages::*,
+        state::*,
+        *,
+    };
+}
+
 // TODO: no_std test
 #[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
+
     use crate::{
         bolts::{rands::StdRand, tuples::tuple_list},
         corpus::{Corpus, InMemoryCorpus, Testcase},
+        events::NopEventManager,
         executors::{ExitKind, InProcessExecutor},
+        feedbacks::ConstFeedback,
+        fuzzer::Fuzzer,
         inputs::BytesInput,
         monitors::SimpleMonitor,
         mutators::{mutations::BitFlipMutator, StdScheduledMutator},
         schedulers::RandScheduler,
         stages::StdMutationalStage,
         state::{HasCorpus, StdState},
-        Fuzzer, StdFuzzer,
+        StdFuzzer,
     };
-
-    #[cfg(feature = "std")]
-    use crate::events::SimpleEventManager;
 
     #[test]
     #[allow(clippy::similar_names)]
@@ -426,25 +476,31 @@ mod tests {
         let rand = StdRand::with_seed(0);
 
         let mut corpus = InMemoryCorpus::<BytesInput>::new();
-        let testcase = Testcase::new(vec![0; 4]);
+        let testcase = Testcase::new(vec![0; 4].into());
         corpus.add(testcase).unwrap();
+
+        let mut feedback = ConstFeedback::new(false);
+        let mut objective = ConstFeedback::new(false);
 
         let mut state = StdState::new(
             rand,
             corpus,
             InMemoryCorpus::<BytesInput>::new(),
-            &mut (),
-            &mut (),
+            &mut feedback,
+            &mut objective,
         )
         .unwrap();
 
-        let monitor = SimpleMonitor::new(|s| {
-            println!("{}", s);
+        let _monitor = SimpleMonitor::new(|s| {
+            println!("{s}");
         });
-        let mut event_manager = SimpleEventManager::new(monitor);
+        let mut event_manager = NopEventManager::new();
+
+        let feedback = ConstFeedback::new(false);
+        let objective = ConstFeedback::new(false);
 
         let scheduler = RandScheduler::new();
-        let mut fuzzer = StdFuzzer::new(scheduler, (), ());
+        let mut fuzzer = StdFuzzer::new(scheduler, feedback, objective);
 
         let mut harness = |_buf: &BytesInput| ExitKind::Ok;
         let mut executor = InProcessExecutor::new(
@@ -462,13 +518,13 @@ mod tests {
         for i in 0..1000 {
             fuzzer
                 .fuzz_one(&mut stages, &mut executor, &mut state, &mut event_manager)
-                .unwrap_or_else(|_| panic!("Error in iter {}", i));
+                .unwrap_or_else(|_| panic!("Error in iter {i}"));
         }
 
         let state_serialized = postcard::to_allocvec(&state).unwrap();
         let state_deserialized: StdState<
+            _,
             InMemoryCorpus<BytesInput>,
-            BytesInput,
             StdRand,
             InMemoryCorpus<BytesInput>,
         > = postcard::from_bytes(state_serialized.as_slice()).unwrap();
@@ -492,11 +548,12 @@ pub extern "C" fn external_current_millis() -> u64 {
 #[cfg(feature = "python")]
 #[allow(missing_docs)]
 pub mod pybind {
+    use pyo3::prelude::*;
+
     use super::{
         bolts, corpus, events, executors, feedbacks, fuzzer, generators, monitors, mutators,
         observers, stages, state,
     };
-    use pyo3::prelude::*;
 
     #[derive(Debug, Clone)]
     pub struct PythonMetadata {
@@ -584,6 +641,7 @@ pub mod pybind {
         ($struct_name:ident, $inner:tt) => {
             const _: () = {
                 use alloc::vec::Vec;
+
                 use pyo3::prelude::*;
                 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

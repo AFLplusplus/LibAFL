@@ -4,7 +4,7 @@
 /// The URL of the `LibAFL` `SymCC` fork.
 pub const SYMCC_REPO_URL: &str = "https://github.com/AFLplusplus/symcc.git";
 /// The commit of the `LibAFL` `SymCC` fork.
-pub const SYMCC_REPO_COMMIT: &str = "5cccc33456c48ad83008eb618e7da5d005c72d89";
+pub const SYMCC_REPO_COMMIT: &str = "2a3229da6101596af220f20fef5085e59537abcb";
 
 #[cfg(feature = "clone")]
 mod clone {
@@ -27,11 +27,11 @@ mod clone {
         );
 
         let mut cmd = Command::new("git");
-        cmd.arg("clone").arg(url).arg(&path);
+        cmd.arg("clone").arg(url).arg(path);
         let output = cmd.output().expect("failed to execute git clone");
         if output.status.success() {
             let mut cmd = Command::new("git");
-            cmd.arg("checkout").arg(commit).current_dir(&path);
+            cmd.arg("checkout").arg(commit).current_dir(path);
             let output = cmd.output().expect("failed to execute git checkout");
             if !output.status.success() {
                 println!("failed to checkout symcc git repository commit:");

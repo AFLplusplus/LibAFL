@@ -8,7 +8,7 @@ use core::cell::RefCell;
 use std::os::unix::prelude::{AsRawFd, RawFd};
 use std::{
     fs::{self, remove_file, File, OpenOptions},
-    io::{Seek, SeekFrom, Write},
+    io::{Seek, Write},
     path::{Path, PathBuf},
 };
 
@@ -124,7 +124,7 @@ impl InputFile {
     /// Rewinds the file to the beginning
     #[inline]
     pub fn rewind(&mut self) -> Result<(), Error> {
-        if let Err(err) = self.file.seek(SeekFrom::Start(0)) {
+        if let Err(err) = self.file.rewind() {
             Err(err.into())
         } else {
             Ok(())
@@ -147,15 +147,16 @@ impl Drop for InputFile {
 
 #[cfg(test)]
 mod test {
-    use crate::bolts::fs::{write_file_atomic, InputFile};
     use std::fs;
+
+    use crate::bolts::fs::{write_file_atomic, InputFile};
 
     #[test]
     fn test_atomic_file_write() {
         let path = "test_atomic_file_write.tmp";
-        write_file_atomic(&path, b"test").unwrap();
-        let content = fs::read_to_string(&path).unwrap();
-        fs::remove_file(&path).unwrap();
+        write_file_atomic(path, b"test").unwrap();
+        let content = fs::read_to_string(path).unwrap();
+        fs::remove_file(path).unwrap();
         assert_eq!(content, "test");
     }
 
@@ -165,6 +166,6 @@ mod test {
         let two = one.clone();
         one.write_buf("Welp".as_bytes()).unwrap();
         drop(one);
-        assert_eq!("Welp", fs::read_to_string(&two.path).unwrap());
+        assert_eq!("Welp", fs::read_to_string(two.path.as_path()).unwrap());
     }
 }

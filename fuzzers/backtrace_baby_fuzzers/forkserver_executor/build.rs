@@ -1,6 +1,8 @@
-use std::env;
-use std::path::Path;
-use std::process::{exit, Command};
+use std::{
+    env,
+    path::Path,
+    process::{exit, Command},
+};
 
 const AFL_URL: &str = "https://github.com/AFLplusplus/AFLplusplus";
 
@@ -30,13 +32,13 @@ fn main() {
     if !afl_gcc_path.is_file() {
         Command::new("make")
             .arg("all")
-            .current_dir(&afl_path)
+            .current_dir(afl_path)
             .status()
             .unwrap();
     }
 
     Command::new(afl_gcc_path)
-        .args(&["src/program.c", "-o"])
+        .args(["src/program.c", "-o"])
         .arg(&format!("{}/target/release/program", &cwd))
         .arg("-fsanitize=address")
         .status()

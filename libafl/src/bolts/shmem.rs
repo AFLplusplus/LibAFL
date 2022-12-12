@@ -1,19 +1,12 @@
 //! A generic shared memory region to be used by any functions (queues or feedbacks
 //! too.)
 
-#[cfg(all(unix, feature = "std"))]
-use crate::bolts::os::pipes::Pipe;
-use crate::{
-    bolts::{AsMutSlice, AsSlice},
-    Error,
-};
 use alloc::{rc::Rc, string::ToString};
 use core::{
     cell::RefCell,
     fmt::{self, Debug, Display},
     mem::ManuallyDrop,
 };
-use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::env;
 #[cfg(all(unix, feature = "std"))]
@@ -21,17 +14,22 @@ use std::io::Read;
 #[cfg(feature = "std")]
 use std::io::Write;
 
+use serde::{Deserialize, Serialize};
 #[cfg(all(feature = "std", unix, not(target_os = "android")))]
 pub use unix_shmem::{MmapShMem, MmapShMemProvider};
-
 #[cfg(all(feature = "std", unix))]
 pub use unix_shmem::{UnixShMem, UnixShMemProvider};
-
 #[cfg(all(windows, feature = "std"))]
 pub use win32_shmem::{Win32ShMem, Win32ShMemProvider};
 
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::os::pipes::Pipe;
 #[cfg(all(feature = "std", unix))]
 pub use crate::bolts::os::unix_shmem_server::{ServedShMemProvider, ShMemService};
+use crate::{
+    bolts::{AsMutSlice, AsSlice},
+    Error,
+};
 
 /// The standard sharedmem provider
 #[cfg(all(windows, feature = "std"))]
@@ -139,7 +137,8 @@ impl ShMemId {
         alloc::str::from_utf8(&self.id[..self.null_pos()]).unwrap()
     }
 }
-impl AsSlice<u8> for ShMemId {
+impl AsSlice for ShMemId {
+    type Entry = u8;
     fn as_slice(&self) -> &[u8] {
         &self.id
     }
@@ -160,7 +159,7 @@ impl Display for ShMemId {
 /// A [`ShMem`] is an interface to shared maps.
 /// They are the backbone of [`crate::bolts::llmp`] for inter-process communication.
 /// All you need for scaling on a new target is to implement this interface, as well as the respective [`ShMemProvider`].
-pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
+pub trait ShMem: Sized + Debug + Clone + AsSlice<Entry = u8> + AsMutSlice<Entry = u8> {
     /// Get the id of this shared memory mapping
     fn id(&self) -> ShMemId;
 
@@ -210,9 +209,9 @@ pub trait ShMem: Sized + Debug + Clone + AsSlice<u8> + AsMutSlice<u8> {
     #[cfg(feature = "std")]
     fn write_to_env(&self, env_name: &str) -> Result<(), Error> {
         let map_size = self.len();
-        let map_size_env = format!("{}_SIZE", env_name);
+        let map_size_env = format!("{env_name}_SIZE");
         env::set_var(env_name, self.id().to_string());
-        env::set_var(map_size_env, format!("{}", map_size));
+        env::set_var(map_size_env, format!("{map_size}"));
         Ok(())
     }
 }
@@ -263,7 +262,7 @@ pub trait ShMemProvider: Clone + Default + Debug {
     #[cfg(feature = "std")]
     fn existing_from_env(&mut self, env_name: &str) -> Result<Self::ShMem, Error> {
         let map_shm_str = env::var(env_name)?;
-        let map_size = str::parse::<usize>(&env::var(format!("{}_SIZE", env_name))?)?;
+        let map_size = str::parse::<usize>(&env::var(format!("{env_name}_SIZE"))?)?;
         self.shmem_from_description(ShMemDescription::from_string_and_size(
             &map_shm_str,
             map_size,
@@ -314,19 +313,21 @@ where
     }
 }
 
-impl<T> AsSlice<u8> for RcShMem<T>
+impl<T> AsSlice for RcShMem<T>
 where
     T: ShMemProvider + Debug,
 {
+    type Entry = u8;
     fn as_slice(&self) -> &[u8] {
         self.internal.as_slice()
     }
 }
 
-impl<T> AsMutSlice<u8> for RcShMem<T>
+impl<T> AsMutSlice for RcShMem<T>
 where
     T: ShMemProvider + Debug,
 {
+    type Entry = u8;
     fn as_mut_slice(&mut self) -> &mut [u8] {
         self.internal.as_mut_slice()
     }
@@ -467,8 +468,7 @@ where
                     Ok(())
                 } else {
                     Err(Error::unknown(format!(
-                        "Wrong result read from pipe! Expected 0, got {:?}",
-                        ret
+                        "Wrong result read from pipe! Expected 0, got {ret:?}"
                     )))
                 }
             }
@@ -541,11 +541,12 @@ pub mod unix_shmem {
 
         use alloc::string::ToString;
         use core::{ptr, slice};
+        use std::{io::Write, process};
+
         use libc::{
             c_int, c_long, c_uchar, c_uint, c_ulong, c_ushort, close, ftruncate, mmap, munmap,
             perror, shm_open, shm_unlink, shmat, shmctl, shmget,
         };
-        use std::{io::Write, process};
 
         use crate::{
             bolts::{
@@ -628,8 +629,7 @@ pub mod unix_shmem {
                     if shm_fd == -1 {
                         perror(b"shm_open\0".as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "Failed to shm_open map with id {:?}",
-                            shmem_ctr
+                            "Failed to shm_open map with id {shmem_ctr:?}"
                         )));
                     }
 
@@ -638,8 +638,7 @@ pub mod unix_shmem {
                         perror(b"ftruncate\0".as_ptr() as *const _);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "setup_shm(): ftruncate() failed for map with id {:?}",
-                            shmem_ctr
+                            "setup_shm(): ftruncate() failed for map with id {shmem_ctr:?}"
                         )));
                     }
 
@@ -657,8 +656,7 @@ pub mod unix_shmem {
                         close(shm_fd);
                         shm_unlink(filename_path.as_ptr() as *const _);
                         return Err(Error::unknown(format!(
-                            "mmap() failed for map with id {:?}",
-                            shmem_ctr
+                            "mmap() failed for map with id {shmem_ctr:?}"
                         )));
                     }
 
@@ -667,7 +665,7 @@ pub mod unix_shmem {
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{}", shm_fd)),
+                        id: ShMemId::from_string(&format!("{shm_fd}")),
                     })
                 }
             }
@@ -689,8 +687,7 @@ pub mod unix_shmem {
                         perror(b"mmap\0".as_ptr() as *const _);
                         close(shm_fd);
                         return Err(Error::unknown(format!(
-                            "mmap() failed for map with fd {:?}",
-                            shm_fd
+                            "mmap() failed for map with fd {shm_fd:?}"
                         )));
                     }
 
@@ -699,7 +696,7 @@ pub mod unix_shmem {
                         map: map as *mut u8,
                         map_size,
                         shm_fd,
-                        id: ShMemId::from_string(&format!("{}", shm_fd)),
+                        id: ShMemId::from_string(&format!("{shm_fd}")),
                     })
                 }
             }
@@ -755,13 +752,15 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsSlice<u8> for MmapShMem {
+        impl AsSlice for MmapShMem {
+            type Entry = u8;
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
         }
 
-        impl AsMutSlice<u8> for MmapShMem {
+        impl AsMutSlice for MmapShMem {
+            type Entry = u8;
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -801,16 +800,26 @@ pub mod unix_shmem {
 
         impl CommonUnixShMem {
             /// Create a new shared memory mapping, using shmget/shmat
+            #[allow(unused_qualifications)]
             pub fn new(map_size: usize) -> Result<Self, Error> {
+                #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+                const SHM_R: libc::c_int = 0o400;
+                #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
+                const SHM_R: libc::c_int = libc::SHM_R;
+                #[cfg(any(target_os = "solaris", target_os = "illumos"))]
+                const SHM_W: libc::c_int = 0o200;
+                #[cfg(not(any(target_os = "solaris", target_os = "illumos")))]
+                const SHM_W: libc::c_int = libc::SHM_W;
+
                 unsafe {
                     let os_id = shmget(
                         libc::IPC_PRIVATE,
                         map_size,
-                        libc::IPC_CREAT | libc::IPC_EXCL | libc::SHM_R | libc::SHM_W,
+                        libc::IPC_CREAT | libc::IPC_EXCL | SHM_R | SHM_W,
                     );
 
                     if os_id < 0_i32 {
-                        return Err(Error::unknown(format!("Failed to allocate a shared mapping of size {} - check OS limits (i.e shmall, shmmax)", map_size)));
+                        return Err(Error::unknown(format!("Failed to allocate a shared mapping of size {map_size} - check OS limits (i.e shmall, shmmax)")));
                     }
 
                     let map = shmat(os_id, ptr::null(), 0) as *mut c_uchar;
@@ -858,13 +867,15 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsSlice<u8> for CommonUnixShMem {
+        impl AsSlice for CommonUnixShMem {
+            type Entry = u8;
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
         }
 
-        impl AsMutSlice<u8> for CommonUnixShMem {
+        impl AsMutSlice for CommonUnixShMem {
+            type Entry = u8;
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -922,11 +933,12 @@ pub mod unix_shmem {
     pub mod ashmem {
         use alloc::string::ToString;
         use core::{ptr, slice};
+        use std::ffi::CString;
+
         use libc::{
             c_uint, c_ulong, c_void, close, ioctl, mmap, open, MAP_SHARED, O_RDWR, PROT_READ,
             PROT_WRITE,
         };
-        use std::ffi::CString;
 
         use crate::{
             bolts::{
@@ -965,8 +977,7 @@ pub mod unix_shmem {
                         if let Ok(boot_id) =
                             std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
                         {
-                            let path_str =
-                                format!("{}{}", "/dev/ashmem", boot_id).trim().to_string();
+                            let path_str = format!("/dev/ashmem{boot_id}").trim().to_string();
                             if std::path::Path::new(&path_str).exists() {
                                 path_str
                             } else {
@@ -981,8 +992,7 @@ pub mod unix_shmem {
                     let fd = open(device_path.as_ptr(), O_RDWR);
                     if fd == -1 {
                         return Err(Error::unknown(format!(
-                            "Failed to open the ashmem device at {:?}",
-                            device_path
+                            "Failed to open the ashmem device at {device_path:?}"
                         )));
                     }
 
@@ -1015,7 +1025,7 @@ pub mod unix_shmem {
                     }
 
                     Ok(Self {
-                        id: ShMemId::from_string(&format!("{}", fd)),
+                        id: ShMemId::from_string(&format!("{fd}")),
                         map: map as *mut u8,
                         map_size,
                     })
@@ -1068,13 +1078,16 @@ pub mod unix_shmem {
             }
         }
 
-        impl AsSlice<u8> for AshmemShMem {
+        impl AsSlice for AshmemShMem {
+            type Entry = u8;
             fn as_slice(&self) -> &[u8] {
                 unsafe { slice::from_raw_parts(self.map, self.map_size) }
             }
         }
 
-        impl AsMutSlice<u8> for AshmemShMem {
+        impl AsMutSlice for AshmemShMem {
+            type Entry = u8;
+
             fn as_mut_slice(&mut self) -> &mut [u8] {
                 unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
             }
@@ -1146,6 +1159,15 @@ pub mod unix_shmem {
 #[cfg(all(feature = "std", windows))]
 pub mod win32_shmem {
 
+    use alloc::string::String;
+    use core::{
+        ffi::c_void,
+        fmt::{self, Debug, Formatter},
+        slice,
+    };
+
+    use uuid::Uuid;
+
     use crate::{
         bolts::{
             shmem::{ShMem, ShMemId, ShMemProvider},
@@ -1154,22 +1176,16 @@ pub mod win32_shmem {
         Error,
     };
 
-    use alloc::string::String;
-    use core::{
-        ffi::c_void,
-        fmt::{self, Debug, Formatter},
-        ptr, slice,
-    };
-    use uuid::Uuid;
-
     const INVALID_HANDLE_VALUE: isize = -1;
 
     use windows::{
         core::PCSTR,
-        Win32::Foundation::{CloseHandle, BOOL, HANDLE},
-        Win32::System::Memory::{
-            CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
-            FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+        Win32::{
+            Foundation::{CloseHandle, BOOL, HANDLE},
+            System::Memory::{
+                CreateFileMappingA, MapViewOfFile, OpenFileMappingA, UnmapViewOfFile,
+                FILE_MAP_ALL_ACCESS, PAGE_READWRITE,
+            },
         },
     };
 
@@ -1197,12 +1213,12 @@ pub mod win32_shmem {
         fn new_shmem(map_size: usize) -> Result<Self, Error> {
             unsafe {
                 let uuid = Uuid::new_v4();
-                let mut map_str = format!("libafl_{}", uuid.to_simple());
+                let mut map_str = format!("libafl_{}", uuid.simple());
                 let map_str_bytes = map_str.as_mut_vec();
                 map_str_bytes[19] = 0; // Trucate to size 20
                 let handle = CreateFileMappingA(
                     HANDLE(INVALID_HANDLE_VALUE),
-                    ptr::null_mut(),
+                    None,
                     PAGE_READWRITE,
                     0,
                     map_size as u32,
@@ -1263,12 +1279,14 @@ pub mod win32_shmem {
         }
     }
 
-    impl AsSlice<u8> for Win32ShMem {
+    impl AsSlice for Win32ShMem {
+        type Entry = u8;
         fn as_slice(&self) -> &[u8] {
             unsafe { slice::from_raw_parts(self.map, self.map_size) }
         }
     }
-    impl AsMutSlice<u8> for Win32ShMem {
+    impl AsMutSlice for Win32ShMem {
+        type Entry = u8;
         fn as_mut_slice(&mut self) -> &mut [u8] {
             unsafe { slice::from_raw_parts_mut(self.map, self.map_size) }
         }
@@ -1397,7 +1415,7 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             std::io::SeekFrom::Start(s) => s,
             std::io::SeekFrom::End(offset) => {
                 let map_len = self.inner.as_slice().len();
-                assert!(i64::try_from(map_len).is_ok());
+                i64::try_from(map_len).unwrap();
                 let signed_pos = map_len as i64;
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
@@ -1405,14 +1423,14 @@ impl<T: ShMem> std::io::Seek for ShMemCursor<T> {
             }
             std::io::SeekFrom::Current(offset) => {
                 let current_pos = self.pos;
-                assert!(i64::try_from(current_pos).is_ok());
+                i64::try_from(current_pos).unwrap();
                 let signed_pos = current_pos as i64;
                 let effective = signed_pos.checked_add(offset).unwrap();
                 assert!(effective >= 0);
                 effective.try_into().unwrap()
             }
         };
-        assert!(usize::try_from(effective_new_pos).is_ok());
+        usize::try_from(effective_new_pos).unwrap();
         self.pos = effective_new_pos as usize;
         Ok(effective_new_pos)
     }

@@ -1,22 +1,28 @@
 //! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
 //! This queue corpus scheduler needs calibration stage.
 
-use alloc::{string::ToString, vec::Vec};
+use alloc::{
+    string::{String, ToString},
+    vec::Vec,
+};
+use core::marker::PhantomData;
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::rands::Rand,
-    corpus::{id_manager::random_corpus_entry, Corpus, CorpusID, SchedulerTestcaseMetaData},
-    inputs::Input,
+    corpus::{
+        id_manager::random_corpus_entry, Corpus, CorpusID, SchedulerTestcaseMetaData, Testcase,
+    },
+    inputs::{Input, UsesInput},
     schedulers::{
-        powersched::SchedulerMetadata,
+        powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},
         Scheduler,
     },
-    state::{HasCorpus, HasMetadata, HasRand},
+    state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,
 };
-use core::marker::PhantomData;
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 
@@ -85,31 +91,40 @@ crate::impl_serdeany!(WeightedScheduleMetadata);
 
 /// A corpus scheduler using power schedules with weighted queue item selection algo.
 #[derive(Clone, Debug)]
-pub struct WeightedScheduler<F, I, S> {
-    phantom: PhantomData<(F, I, S)>,
+pub struct WeightedScheduler<F, S> {
+    strat: Option<PowerSchedule>,
+    phantom: PhantomData<(F, S)>,
 }
 
-impl<F, I, S> Default for WeightedScheduler<F, I, S>
+impl<F, S> Default for WeightedScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<F, I, S> WeightedScheduler<F, I, S>
+impl<F, S> WeightedScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    I: Input,
-    S: HasCorpus<I> + HasMetadata + HasRand,
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
-    /// Create a new [`WeightedScheduler`]
+    /// Create a new [`WeightedScheduler`] without any scheduling strategy
     #[must_use]
     pub fn new() -> Self {
         Self {
+            strat: None,
+            phantom: PhantomData,
+        }
+    }
+
+    /// Create a new [`WeightedScheduler`]
+    #[must_use]
+    pub fn with_schedule(strat: PowerSchedule) -> Self {
+        Self {
+            strat: Some(strat),
             phantom: PhantomData,
         }
     }
@@ -210,16 +225,22 @@ where
     }
 }
 
-impl<F, I, S> Scheduler<I, S> for WeightedScheduler<F, I, S>
+impl<F, S> UsesState for WeightedScheduler<F, S>
 where
-    F: TestcaseScore<I, S>,
-    S: HasCorpus<I> + HasMetadata + HasRand,
-    I: Input,
+    S: UsesInput,
+{
+    type State = S;
+}
+
+impl<F, S> Scheduler for WeightedScheduler<F, S>
+where
+    F: TestcaseScore<S>,
+    S: HasCorpus + HasMetadata + HasRand,
 {
     /// Add an entry to the corpus and return its index
     fn on_add(&self, state: &mut S, idx: CorpusID) -> Result<(), Error> {
         if !state.has_metadata::<SchedulerMetadata>() {
-            state.add_metadata(SchedulerMetadata::new(None));
+            state.add_metadata(SchedulerMetadata::new(self.strat));
         }
 
         if !state.has_metadata::<WeightedScheduleMetadata>() {
@@ -255,16 +276,34 @@ where
         Ok(())
     }
 
+    fn on_replace(
+        &self,
+        state: &mut S,
+        idx: CorpusID,
+        _testcase: &Testcase<S::Input>,
+    ) -> Result<(), Error> {
+        // Recreate the alias table
+        self.on_add(state, idx)
+    }
+
+    fn on_remove(
+        &self,
+        state: &mut S,
+        _idx: CorpusID,
+        _testcase: &Option<Testcase<S::Input>>,
+    ) -> Result<(), Error> {
+        // Recreate the alias table
+        self.create_alias_table(state)?;
+        Ok(())
+    }
+
     #[allow(clippy::similar_names, clippy::cast_precision_loss)]
     fn next(&self, state: &mut S) -> Result<CorpusID, Error> {
         let (chosen_idx, _chosen_id) = random_corpus_entry(state)
             .ok_or_else(|| Error::empty("No entries in corpus".to_string()))?;
-
         let corpus_count = state.corpus().count();
-
         // Choose a random value between 0.000000000 and 1.000000000
         let probability = state.rand_mut().between(0, 1000000000) as f64 / 1000000000_f64;
-
         let wsmeta = state
             .metadata_mut()
             .get_mut::<WeightedScheduleMetadata>()
@@ -301,4 +340,4 @@ where
 }
 
 /// The standard corpus weight, same as aflpp
-pub type StdWeightedScheduler<I, S> = WeightedScheduler<CorpusWeightTestcaseScore<I, S>, I, S>;
+pub type StdWeightedScheduler<S> = WeightedScheduler<CorpusWeightTestcaseScore<S>, S>;
