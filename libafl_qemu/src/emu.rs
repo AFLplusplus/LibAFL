@@ -24,6 +24,9 @@ pub type GuestPhysAddr = libafl_qemu_sys::hwaddr;
 
 pub type GuestHwAddrInfo = libafl_qemu_sys::qemu_plugin_hwaddr;
 
+#[cfg(emulation_mode = "systemmode")]
+pub type FastSnapshot = *mut libafl_qemu_sys::syx_snapshot_t;
+
 #[repr(transparent)]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub struct MemAccessInfo {
@@ -279,7 +282,6 @@ extern "C" {
     fn qemu_cleanup();
 
     fn libafl_save_qemu_snapshot(name: *const u8, sync: bool);
-    #[allow(unused)]
     fn libafl_load_qemu_snapshot(name: *const u8, sync: bool);
 }
 
@@ -462,7 +464,7 @@ impl Drop for GuestMaps {
 
 #[repr(C)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub(crate) struct FatPtr(*const c_void, *const c_void);
+pub(crate) struct FatPtr(pub *const c_void, pub *const c_void);
 
 static mut GDB_COMMANDS: Vec<FatPtr> = vec![];
 
@@ -708,6 +710,7 @@ impl Emulator {
                     envp.as_ptr() as *const *const u8,
                 );
                 libc::atexit(qemu_cleanup_atexit);
+                libafl_qemu_sys::syx_snapshot_init();
             }
             EMULATOR_IS_INITIALIZED = true;
         }
@@ -1059,6 +1062,17 @@ impl Emulator {
     pub fn load_snapshot(&self, name: &str, sync: bool) {
         let s = CString::new(name).expect("Invalid snapshot name");
         unsafe { libafl_load_qemu_snapshot(s.as_ptr() as *const _, sync) };
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    #[must_use]
+    pub fn create_fast_snapshot(&self, track: bool) -> FastSnapshot {
+        unsafe { libafl_qemu_sys::syx_snapshot_create(track) }
+    }
+
+    #[cfg(emulation_mode = "systemmode")]
+    pub fn restore_fast_snapshot(&self, snapshot: FastSnapshot) {
+        unsafe { libafl_qemu_sys::syx_snapshot_root_restore(snapshot) }
     }
 
     #[cfg(emulation_mode = "usermode")]

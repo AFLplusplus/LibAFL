@@ -44,6 +44,11 @@ pub mod x86_64;
 #[cfg(cpu_target = "x86_64")]
 pub use x86_64::*;
 
+#[cfg(cpu_target = "mips")]
+pub mod mips;
+#[cfg(cpu_target = "mips")]
+pub use mips::*;
+
 pub mod elf;
 
 pub mod helper;
@@ -53,20 +58,27 @@ pub use hooks::*;
 
 pub mod edges;
 pub use edges::QemuEdgeCoverageHelper;
+
+#[cfg(not(cpu_target = "mips"))]
 pub mod cmplog;
-pub mod drcov;
+#[cfg(not(cpu_target = "mips"))]
 pub use cmplog::QemuCmpLogHelper;
+
 #[cfg(emulation_mode = "usermode")]
 pub mod snapshot;
 #[cfg(emulation_mode = "usermode")]
 pub use snapshot::QemuSnapshotHelper;
+
 #[cfg(emulation_mode = "usermode")]
 pub mod asan;
 #[cfg(emulation_mode = "usermode")]
 pub use asan::{init_with_asan, QemuAsanHelper};
 
 pub mod blocks;
+
+#[cfg(not(cpu_target = "mips"))]
 pub mod calls;
+pub mod drcov;
 
 pub mod executor;
 pub use executor::QemuExecutor;

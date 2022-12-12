@@ -38,9 +38,9 @@ pub fn build() {
 
     // Make sure we have at most one architecutre feature set
     // Else, we default to `x86_64` - having a default makes CI easier :)
-    assert_unique_feature!("arm", "aarch64", "i386", "i86_64");
+    assert_unique_feature!("arm", "aarch64", "i386", "i86_64", "mips");
 
-    // Make sure that we don't have BE set for any architecture other than arm
+    // Make sure that we don't have BE set for any architecture other than arm and mips
     // Sure aarch64 may support BE, but its not in common usage and we don't
     // need it yet and so haven't tested it
     assert_unique_feature!("be", "aarch64", "i386", "i86_64");
@@ -53,6 +53,8 @@ pub fn build() {
         "aarch64".to_string()
     } else if cfg!(feature = "i386") {
         "i386".to_string()
+    } else if cfg!(feature = "mips") {
+        "mips".to_string()
     } else {
         env::var("CPU_TARGET").unwrap_or_else(|_| {
             println!(
