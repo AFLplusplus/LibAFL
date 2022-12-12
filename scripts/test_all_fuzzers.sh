@@ -6,7 +6,7 @@ cd "$SCRIPT_DIR/.." || exit 1
 # TODO: This should be rewritten in rust, a Makefile, or some platform-independent language
 
 fuzzers=$(find ./frontends/fuzzers -mindepth 1 -maxdepth 1 -type d)
-backtrace_fuzzers=$(find /frontends/fuzzers/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d)
+backtrace_fuzzers=$(find ./frontends/fuzzers/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d)
 
 libafl=$(pwd)
 
