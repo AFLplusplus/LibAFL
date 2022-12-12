@@ -6,6 +6,7 @@ use std::{
 
 use walkdir::WalkDir;
 
+#[must_use]
 pub fn run_git_diff(args: &[&str]) -> String {
     let output = Command::new("git")
         .stdout(Stdio::piped())
@@ -17,15 +18,17 @@ pub fn run_git_diff(args: &[&str]) -> String {
     String::from_utf8(output.stdout).unwrap()
 }
 
+#[must_use]
 pub fn get_diffing_files(commit_name: &str) -> Vec<PathBuf> {
     let args = vec!["--name-only", commit_name];
     let diff = run_git_diff(&args);
     diff.lines()
-        .map(|x| PathBuf::from(x))
+        .map(PathBuf::from)
         .filter(|x| x.is_file())
         .collect()
 }
 
+#[must_use]
 pub fn get_diffing_crates(diffing_files: &[PathBuf]) -> HashSet<PathBuf> {
     let mut crates = HashSet::default();
     for file in diffing_files {
@@ -38,6 +41,7 @@ pub fn get_diffing_crates(diffing_files: &[PathBuf]) -> HashSet<PathBuf> {
     crates
 }
 
+#[must_use]
 pub fn find_all_crates() -> HashSet<PathBuf> {
     let mut crates = HashSet::default();
     for entry in WalkDir::new(".")
@@ -53,6 +57,7 @@ pub fn find_all_crates() -> HashSet<PathBuf> {
     crates
 }
 
+#[allow(clippy::implicit_hasher)]
 pub fn extend_diffing_crates_with_deps(
     diffing_crates: &mut HashSet<PathBuf>,
     all_crates: &HashSet<PathBuf>,
