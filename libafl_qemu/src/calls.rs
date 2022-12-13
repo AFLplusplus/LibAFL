@@ -99,7 +99,7 @@ where
         ret_addr
     };
 
-    #[cfg(any(cpu_target = "mips", cpu_target = "mips"))]
+    #[cfg(cpu_target = "mips")]
     let ret_addr = {
         let emu = hooks.emulator();
         let ret_addr: GuestAddr = emu.read_reg(Regs::Ra).unwrap();
