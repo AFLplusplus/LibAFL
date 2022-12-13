@@ -16,8 +16,7 @@ use libafl::{
     corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
     events::EventConfig,
     executors::{ExitKind, TimeoutExecutor},
-    feedback_or,
-    feedback_or_fast,
+    feedback_or, feedback_or_fast,
     feedbacks::{CrashFeedback, MaxMapFeedback, TimeFeedback, TimeoutFeedback},
     fuzzer::{Fuzzer, StdFuzzer},
     inputs::{BytesInput, HasTargetBytes},
@@ -116,7 +115,7 @@ pub fn fuzz() {
                 let mut pcs = (0..emu.num_cpus())
                     .map(|i| emu.cpu_from_index(i))
                     .map(|cpu| -> Result<u32, String> { cpu.read_reg(Regs::Pc) });
-                let _ret = match pcs
+                let ret = match pcs
                     .find(|pc| (breakpoint..breakpoint + 5).contains(pc.as_ref().unwrap_or(&0)))
                 {
                     Some(_) => ExitKind::Ok,
