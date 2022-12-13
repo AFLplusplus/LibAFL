@@ -5,7 +5,7 @@ pub use diffing::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let commit = if args.len() > 1 { &args[1] } else { "HEAD^" };
+    let commit = if args.len() > 1 { &args[1] } else { "origin..main" };
 
     let files = get_diffing_files(commit);
     let mut diff_crates = get_diffing_crates(&files);
