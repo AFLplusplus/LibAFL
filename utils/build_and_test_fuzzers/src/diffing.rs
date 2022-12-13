@@ -31,6 +31,7 @@ pub fn get_diffing_files(commit_name: &str) -> Vec<PathBuf> {
 
 #[must_use]
 pub fn get_diffing_crates(diffing_files: &[PathBuf]) -> HashSet<PathBuf> {
+    // TODO maybe consider using a combination of this and https://docs.rs/cargo/0.28.0/cargo/sources/path/struct.PathSource.html
     let mut crates = HashSet::default();
     for file in diffing_files {
         if let Some(dir) = file.parent() {
