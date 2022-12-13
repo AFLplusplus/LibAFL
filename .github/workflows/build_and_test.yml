@@ -201,6 +201,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true # recursively checkout submodules
+        fetch-depth: 2 # to diff with origin/master
     - uses: Swatinem/rust-cache@v2
     - name: sasdasdas
       run: git branch -a && git diff --name-only main && git diff --name-only origin/main
