@@ -203,8 +203,6 @@ jobs:
         submodules: true # recursively checkout submodules
         fetch-depth: 0 # to diff with origin/main
     - uses: Swatinem/rust-cache@v2
-    - name: sasdasdas
-      run: git branch -a ; git diff --name-only remotes/origin/main ; git diff --name-only origin/main
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
       run: RUN_ON_CI=1 ./scripts/test_all_fuzzers.sh
