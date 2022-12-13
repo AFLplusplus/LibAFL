@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    ffi::OsStr,
+    path::{Component, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -33,8 +34,34 @@ pub fn get_diffing_crates(diffing_files: &[PathBuf]) -> HashSet<PathBuf> {
     let mut crates = HashSet::default();
     for file in diffing_files {
         if let Some(dir) = file.parent() {
-            if dir.join("Cargo.toml").is_file() {
-                crates.insert(dir.join("Cargo.toml"));
+            let manifest = dir.join("Cargo.toml");
+            if manifest.is_file()
+                && cargo_toml::Manifest::from_path(&manifest)
+                    .expect("cannot read manifest")
+                    .package
+                    .is_some()
+            {
+                crates.insert(manifest);
+            } else if let Some(dir1) = dir.parent() {
+                let manifest = dir1.join("Cargo.toml");
+                if manifest.is_file()
+                    && cargo_toml::Manifest::from_path(&manifest)
+                        .expect("cannot read manifest")
+                        .package
+                        .is_some()
+                {
+                    crates.insert(manifest);
+                } else if let Some(dir2) = dir1.parent() {
+                    let manifest = dir2.join("Cargo.toml");
+                    if manifest.is_file()
+                        && cargo_toml::Manifest::from_path(&manifest)
+                            .expect("cannot read manifest")
+                            .package
+                            .is_some()
+                    {
+                        crates.insert(manifest);
+                    }
+                }
             }
         }
     }
@@ -47,7 +74,14 @@ pub fn find_all_crates() -> HashSet<PathBuf> {
     for entry in WalkDir::new(".")
         .into_iter()
         .filter_map(Result::ok)
-        .filter(|e| !e.file_type().is_dir())
+        .filter(|e| {
+            !e.file_type().is_dir()
+                && e.path()
+                    .components()
+                    .filter(|c| *c == Component::Normal(OsStr::new("target")))
+                    .count()
+                    == 0
+        })
     {
         let file_name = String::from(entry.file_name().to_string_lossy());
         if file_name == "Cargo.toml" {
