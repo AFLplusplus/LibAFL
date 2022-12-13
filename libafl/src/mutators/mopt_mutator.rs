@@ -8,12 +8,8 @@ use core::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bolts::{
-        current_nanos,
-        rands::{Rand, StdRand},
-    },
+    bolts::rands::{Rand, StdRand},
     corpus::{Corpus, CorpusId},
-    inputs::Input,
     mutators::{ComposedByMutations, MutationResult, Mutator, MutatorsTuple, ScheduledMutator},
     state::{HasCorpus, HasMetadata, HasRand, HasSolutions},
     Error,

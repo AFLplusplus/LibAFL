@@ -1,6 +1,6 @@
 //! Gramatron is the rewritten gramatron fuzzer in rust.
 //! See the original gramatron repo [`Gramatron`](https://github.com/HexHive/Gramatron) for more details.
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::cmp::max;
 
 use hashbrown::HashMap;

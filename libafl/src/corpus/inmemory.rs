@@ -45,7 +45,7 @@ where
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<CorpusId, Error> {
         debug_assert!(self.entries.len() == self.id_manager.active_ids().len());
-        let new_id = self.id_manager.provide_next()?;
+        let new_id = self.id_manager.provide_next();
         self.entries.push(RefCell::new(testcase));
         Ok(new_id)
     }
@@ -76,7 +76,7 @@ where
         let idx = self
             .id_manager
             .active_index_for(id)
-            .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
+            .ok_or_else(|| Error::key_not_found(format!("ID {id:?} is stale")))?;
         Ok(&self.entries[idx])
     }
 

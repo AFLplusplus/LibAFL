@@ -1,6 +1,6 @@
 //! Mutations for [`EncodedInput`]s
 //!
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use core::cmp::{max, min};
 
 use crate::{

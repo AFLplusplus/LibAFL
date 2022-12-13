@@ -1,6 +1,6 @@
 //! A wide variety of mutations used during fuzzing.
 
-use alloc::{borrow::ToOwned, string::String, vec::Vec};
+use alloc::{borrow::ToOwned, vec::Vec};
 use core::{
     cmp::{max, min},
     mem::size_of,
@@ -9,7 +9,7 @@ use core::{
 use crate::{
     bolts::{rands::Rand, tuples::Named},
     corpus::{id_manager::random_corpus_entry, Corpus},
-    inputs::{HasBytesVec, Input, UsesInput},
+    inputs::{HasBytesVec, UsesInput},
     mutators::{MutationResult, Mutator},
     state::{HasCorpus, HasMaxSize, HasRand},
     Error,
@@ -911,8 +911,7 @@ where
     ) -> Result<MutationResult, Error> {
         let size = input.bytes().len();
 
-        let chosen_id = random_corpus_entry(state)
-            .map_err(|err| Error::empty(String::from("CrossoverInsert failed: ({err:?})")))?;
+        let chosen_id = random_corpus_entry(state)?;
 
         // We don't want to use the testcase we're already using for splicing
         if let Some(cur) = state.corpus().current() {

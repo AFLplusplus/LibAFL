@@ -14,7 +14,7 @@ use crate::state::NopState;
 use crate::{
     bolts::current_time,
     corpus::{Corpus, CorpusId, Testcase},
-    events::{Event, EventConfig, EventFirer, EventManager, EventProcessor, ProgressReporter},
+    events::{Event, EventConfig, EventFirer, EventProcessor, ProgressReporter},
     executors::{Executor, ExitKind, HasObservers},
     feedbacks::Feedback,
     inputs::UsesInput,
@@ -711,7 +711,7 @@ where
         _executor: &mut E,
         _state: &mut EM::State,
         _manager: &mut EM,
-    ) -> Result<usize, Error> {
+    ) -> Result<CorpusId, Error> {
         unimplemented!()
     }
 }
@@ -726,6 +726,7 @@ pub mod pybind {
 
     use crate::{
         bolts::ownedref::OwnedPtrMut,
+        corpus::CorpusId,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         feedbacks::pybind::PythonFeedback,

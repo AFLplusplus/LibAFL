@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use crate::{
     corpus::{Corpus, CorpusId},
-    inputs::{Input, UsesInput},
+    inputs::UsesInput,
     schedulers::Scheduler,
     state::{HasCorpus, UsesState},
     Error,

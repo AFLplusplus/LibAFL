@@ -31,9 +31,8 @@ pub mod tuneable;
 pub use tuneable::*;
 
 use crate::{
-    bolts::rands::Rand,
     corpus::{id_manager::random_corpus_entry, Corpus, CorpusId, Testcase},
-    inputs::{Input, UsesInput},
+    inputs::UsesInput,
     state::{HasCorpus, HasRand, UsesState},
     Error,
 };

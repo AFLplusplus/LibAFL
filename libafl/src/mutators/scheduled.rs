@@ -16,7 +16,7 @@ use crate::{
         AsMutSlice, AsSlice,
     },
     corpus::{Corpus, CorpusId},
-    inputs::{Input, UsesInput},
+    inputs::UsesInput,
     mutators::{MutationResult, Mutator, MutatorsTuple},
     state::{HasCorpus, HasMetadata, HasRand, State},
     Error,
@@ -434,12 +434,10 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let mut rand = XkcdRand::with_seed(5);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        let id_0 = corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
-        let _id_1 = corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
-        corpus
+        let id_0 = corpus
             .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
             .unwrap();
-        corpus
+        let _id_1 = corpus
             .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
             .unwrap();
 
@@ -476,12 +474,10 @@ mod tests {
         // With the current impl, seed of 1 will result in a split at pos 2.
         let rand = StdRand::with_seed(0x1337);
         let mut corpus: InMemoryCorpus<BytesInput> = InMemoryCorpus::new();
-        let id_0 = corpus.add(Testcase::new(vec![b'a', b'b', b'c'])).unwrap();
-        let _id_1 = corpus.add(Testcase::new(vec![b'd', b'e', b'f'])).unwrap();
-        corpus
+        let id_0 = corpus
             .add(Testcase::new(vec![b'a', b'b', b'c'].into()))
             .unwrap();
-        corpus
+        let _id_1 = corpus
             .add(Testcase::new(vec![b'd', b'e', b'f'].into()))
             .unwrap();
 

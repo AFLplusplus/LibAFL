@@ -1,10 +1,7 @@
 //! The queue corpus scheduler with weighted queue item selection from aflpp (`https://github.com/AFLplusplus/AFLplusplus/blob/1d4f1e48797c064ee71441ba555b29fc3f467983/src/afl-fuzz-queue.c#L32`)
 //! This queue corpus scheduler needs calibration stage.
 
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{string::ToString, vec::Vec};
 use core::marker::PhantomData;
 
 use serde::{Deserialize, Serialize};
@@ -14,7 +11,7 @@ use crate::{
     corpus::{
         id_manager::random_corpus_entry, Corpus, CorpusId, SchedulerTestcaseMetaData, Testcase,
     },
-    inputs::{Input, UsesInput},
+    inputs::UsesInput,
     schedulers::{
         powersched::{PowerSchedule, SchedulerMetadata},
         testcase_score::{CorpusWeightTestcaseScore, TestcaseScore},

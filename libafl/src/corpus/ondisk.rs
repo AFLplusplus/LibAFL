@@ -78,7 +78,7 @@ where
             let mut file = file_orig.clone();
             let mut ctr = 2;
             let filename = loop {
-                let lockfile = format!(".{}.lafl_lock", file);
+                let lockfile = format!(".{file}.lafl_lock");
                 // try to create lockfile.
                 if OpenOptions::new()
                     .write(true)
@@ -124,7 +124,7 @@ where
             .expect("Could not save testcase to disk");
         debug_assert!(self.entries.len() == self.id_manager().active_ids().len());
         self.entries.push(RefCell::new(testcase));
-        let id = self.id_manager.provide_next()?;
+        let id = self.id_manager.provide_next();
         Ok(id)
     }
 
@@ -167,7 +167,7 @@ where
         let idx = self
             .id_manager
             .active_index_for(id)
-            .ok_or_else(|| Error::key_not_found(format!("ID {:?} is stale", id)))?;
+            .ok_or_else(|| Error::key_not_found(format!("ID {id:?} is stale")))?;
         Ok(&self.entries[idx])
     }
 

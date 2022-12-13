@@ -112,6 +112,7 @@ where
         let mut cov_map = HashMap::new();
 
         for idx in 0..state.corpus().count() {
+            let idx = state.corpus().id_manager().get(idx)?;
             let (weight, input) = {
                 let mut testcase = state.corpus().get(idx)?.borrow_mut();
                 let weight = TS::compute(&mut *testcase, state)?

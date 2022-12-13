@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bolts::rands::Rand,
     corpus::{Corpus, CorpusId},
-    inputs::{Input, UsesInput},
+    inputs::UsesInput,
     schedulers::{Scheduler, TestcaseScore},
     state::{HasCorpus, HasMetadata, HasRand, UsesState},
     Error,

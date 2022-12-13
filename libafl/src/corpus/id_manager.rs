@@ -4,6 +4,8 @@
 
 use alloc::vec::Vec;
 
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::Corpus;
@@ -17,14 +19,28 @@ use crate::{
 /// They should only ever be created by a [`CorpusIdManager`], everything else must acquire them from one.
 /// [`CorpusId`]s allow us to track a testcase uniquely even when corpora can have testcases be removed or replaced.
 /// Two different testcases should never have the same [`CorpusId`].
+#[cfg_attr(feature = "python", pyclass)]
+#[allow(clippy::unsafe_derive_deserialize)]
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct CorpusId {
     /// Corpus-unique identifier
     id: usize,
 }
 
+#[cfg(feature = "python")]
+#[pymethods]
+impl CorpusId {
+    #[inline]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[getter(id)]
+    fn id(&self) -> usize {
+        self.id
+    }
+}
+
 /// A [`CorpusIdManager`] is responsible for keeping track of active [`CorpusId`]s. It creates new ones, ensures that
 /// they are unique, and maps them to their corresponding indices in the corpus. The `active_ids` field
+#[cfg_attr(feature = "python", pyclass)]
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CorpusIdManager {
     /// Maps a CorpusId to an actual id, or returns false if it was removed
@@ -51,13 +67,13 @@ impl CorpusIdManager {
 
     /// Allocate the next [`CorpusId`] and return it. This returns a [`CorpusId`] with an identifier larger than all
     /// previously issued [`CorpusId`]s. This new [`CorpusId`] is immediately added to the `active_ids`.
-    pub(super) fn provide_next(&mut self) -> Result<CorpusId, Error> {
+    pub(super) fn provide_next(&mut self) -> CorpusId {
         let id = CorpusId {
             id: self.id_mappings.len(),
         };
         self.active_ids.push(id);
         self.id_mappings.push(Some(self.active_ids.len()));
-        Ok(id)
+        id
     }
 
     /// Invalidate the given [`CorpusId`]. This will cause any future operations and lookups for this [`CorpusId`] to
@@ -79,7 +95,6 @@ impl CorpusIdManager {
     }
 
     /// Get the [`CorpusId`] at the given index. If the index is out of bounds, returns `Err`.
-    #[must_use]
     pub fn get(&self, idx: usize) -> Result<CorpusId, Error> {
         self.assert_has_active()?;
         self.active_ids.get(idx).copied().ok_or_else(|| {
@@ -122,6 +137,7 @@ impl CorpusIdManager {
     }
 
     /// Returns the current idx for the given corpus id
+    #[must_use]
     pub fn lookup(&self, corpus_id: CorpusId) -> Option<usize> {
         self.id_mappings[corpus_id.id]
     }
@@ -140,8 +156,8 @@ where
     let idx = state.rand_mut().below(num.try_into().unwrap()) as usize;
     let id = state
         .corpus()
-        .id_manager()
+        .ids()
         .get(idx)
         .expect("this should never fail, our random value should always be inbounds");
-    Ok(id)
+    Ok(*id)
 }

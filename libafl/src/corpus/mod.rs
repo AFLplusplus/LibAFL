@@ -1,7 +1,6 @@
 //! Corpuses contain the testcases, either in memory, on disk, or somewhere else.
 
 pub mod testcase;
-use serde::{Deserialize, Serialize};
 pub use testcase::{SchedulerTestcaseMetaData, Testcase};
 
 pub mod id_manager;
@@ -84,9 +83,11 @@ pub mod pybind {
 
     use crate::{
         corpus::{
-            cached::pybind::PythonCachedOnDiskCorpus, inmemory::pybind::PythonInMemoryCorpus,
-            ondisk::pybind::PythonOnDiskCorpus, testcase::pybind::PythonTestcaseWrapper, Corpus,
-            Testcase,
+            cached::pybind::PythonCachedOnDiskCorpus,
+            inmemory::pybind::PythonInMemoryCorpus,
+            ondisk::pybind::PythonOnDiskCorpus,
+            testcase::{pybind::PythonTestcaseWrapper, Testcase},
+            Corpus, CorpusId, CorpusIdManager,
         },
         inputs::{BytesInput, UsesInput},
         Error,
@@ -105,6 +106,7 @@ pub mod pybind {
     #[derive(Serialize, Deserialize, Debug, Clone)]
     pub struct PythonCorpus {
         wrapper: PythonCorpusWrapper,
+        id_manager: CorpusIdManager,
     }
 
     macro_rules! unwrap_me {
@@ -146,6 +148,7 @@ pub mod pybind {
         pub fn new_in_memory(py_in_memory_corpus: Py<PythonInMemoryCorpus>) -> Self {
             Self {
                 wrapper: PythonCorpusWrapper::InMemory(py_in_memory_corpus),
+                id_manager: CorpusIdManager::default(),
             }
         }
 
@@ -154,6 +157,7 @@ pub mod pybind {
         pub fn new_cached_on_disk(py_cached_on_disk_corpus: Py<PythonCachedOnDiskCorpus>) -> Self {
             Self {
                 wrapper: PythonCorpusWrapper::CachedOnDisk(py_cached_on_disk_corpus),
+                id_manager: CorpusIdManager::default(),
             }
         }
 
@@ -162,6 +166,7 @@ pub mod pybind {
         pub fn new_on_disk(py_on_disk_corpus: Py<PythonOnDiskCorpus>) -> Self {
             Self {
                 wrapper: PythonCorpusWrapper::OnDisk(py_on_disk_corpus),
+                id_manager: CorpusIdManager::default(),
             }
         }
 
@@ -171,12 +176,12 @@ pub mod pybind {
         }
 
         #[pyo3(name = "current")]
-        fn pycurrent(&self) -> Option<usize> {
+        fn pycurrent(&self) -> Option<CorpusId> {
             *self.current()
         }
 
         #[pyo3(name = "get")]
-        fn pyget(&self, idx: usize) -> PythonTestcaseWrapper {
+        fn pyget(&self, idx: CorpusId) -> PythonTestcaseWrapper {
             let t: &mut Testcase<BytesInput> = unwrap_me!(self.wrapper, c, {
                 c.get(idx)
                     .map(|v| unsafe { v.as_ptr().as_mut().unwrap() })
@@ -197,26 +202,26 @@ pub mod pybind {
         }
 
         #[inline]
-        fn add(&mut self, testcase: Testcase<BytesInput>) -> Result<usize, Error> {
+        fn add(&mut self, testcase: Testcase<BytesInput>) -> Result<CorpusId, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.add(testcase) })
         }
 
         #[inline]
         fn replace(
             &mut self,
-            idx: usize,
+            idx: CorpusId,
             testcase: Testcase<BytesInput>,
         ) -> Result<Testcase<BytesInput>, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.replace(idx, testcase) })
         }
 
         #[inline]
-        fn remove(&mut self, idx: usize) -> Result<Option<Testcase<BytesInput>>, Error> {
+        fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<BytesInput>>, Error> {
             unwrap_me_mut!(self.wrapper, c, { c.remove(idx) })
         }
 
         #[inline]
-        fn get(&self, idx: usize) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
+        fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<BytesInput>>, Error> {
             let ptr = unwrap_me!(self.wrapper, c, {
                 c.get(idx)
                     .map(|v| v as *const RefCell<Testcase<BytesInput>>)
@@ -225,15 +230,21 @@ pub mod pybind {
         }
 
         #[inline]
-        fn current(&self) -> &Option<usize> {
-            let ptr = unwrap_me!(self.wrapper, c, { c.current() as *const Option<usize> });
+        fn current(&self) -> &Option<CorpusId> {
+            let ptr = unwrap_me!(self.wrapper, c, { c.current() as *const Option<CorpusId> });
             unsafe { ptr.as_ref().unwrap() }
         }
 
         #[inline]
-        fn current_mut(&mut self) -> &mut Option<usize> {
-            let ptr = unwrap_me_mut!(self.wrapper, c, { c.current_mut() as *mut Option<usize> });
+        fn current_mut(&mut self) -> &mut Option<CorpusId> {
+            let ptr = unwrap_me_mut!(self.wrapper, c, {
+                c.current_mut() as *mut Option<CorpusId>
+            });
             unsafe { ptr.as_mut().unwrap() }
+        }
+
+        fn id_manager(&self) -> &CorpusIdManager {
+            &self.id_manager
         }
     }
 

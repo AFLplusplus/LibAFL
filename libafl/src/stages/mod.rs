@@ -387,6 +387,7 @@ pub mod pybind {
     use pyo3::prelude::*;
 
     use crate::{
+        corpus::CorpusId,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
         fuzzer::pybind::{PythonStdFuzzer, PythonStdFuzzerWrapper},
