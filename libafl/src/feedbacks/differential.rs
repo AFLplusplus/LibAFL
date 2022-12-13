@@ -75,8 +75,7 @@ where
         let o2_name = o2.name().to_string();
         if o1_name == o2_name {
             Err(Error::illegal_argument(format!(
-                "DiffFeedback: observer names must be different (both were {})",
-                o1_name
+                "DiffFeedback: observer names must be different (both were {o1_name})"
             )))
         } else {
             Ok(Self {

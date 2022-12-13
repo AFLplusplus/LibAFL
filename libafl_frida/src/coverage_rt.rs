@@ -1,5 +1,12 @@
 //! Functionality regarding binary-only coverage collection.
 use core::ptr::addr_of_mut;
+use std::{
+    cell::{Ref, RefCell},
+    marker::PhantomPinned,
+    ops::Deref,
+    pin::Pin,
+    rc::Rc,
+};
 
 use dynasmrt::{dynasm, DynasmApi, DynasmLabelApi};
 #[cfg(target_arch = "x86_64")]
@@ -15,14 +22,18 @@ use crate::helper::FridaRuntime;
 /// (Default) map size for frida coverage reporting
 pub const MAP_SIZE: usize = 64 * 1024;
 
-/// Frida binary-only coverage
 #[derive(Debug)]
-pub struct CoverageRuntime {
+struct CoverageRuntimeInner {
     map: [u8; MAP_SIZE],
     previous_pc: u64,
     current_log_impl: u64,
     blob_maybe_log: Option<Box<[u8]>>,
+    _pinned: PhantomPinned,
 }
+
+/// Frida binary-only coverage
+#[derive(Debug)]
+pub struct CoverageRuntime(Pin<Rc<RefCell<CoverageRuntimeInner>>>);
 
 impl Default for CoverageRuntime {
     fn default() -> Self {
@@ -32,6 +43,7 @@ impl Default for CoverageRuntime {
 
 impl FridaRuntime for CoverageRuntime {
     /// Initialize the coverage runtime
+    /// The struct MUST NOT be moved after this function is called, as the generated assembly references it
     fn init(
         &mut self,
         _gum: &frida_gum::Gum,
@@ -60,23 +72,24 @@ impl CoverageRuntime {
     /// Create a new coverage runtime
     #[must_use]
     pub fn new() -> Self {
-        Self {
+        Self(Rc::pin(RefCell::new(CoverageRuntimeInner {
             map: [0_u8; MAP_SIZE],
             previous_pc: 0,
             current_log_impl: 0,
             blob_maybe_log: None,
-        }
+            _pinned: PhantomPinned,
+        })))
     }
 
     /// Retrieve the coverage map pointer
     pub fn map_ptr_mut(&mut self) -> *mut u8 {
-        self.map.as_mut_ptr()
+        self.0.borrow_mut().map.as_mut_ptr()
     }
 
     /// Retrieve the `maybe_log` code blob, that will write coverage into the map
     #[must_use]
-    pub fn blob_maybe_log(&self) -> &[u8] {
-        self.blob_maybe_log.as_ref().unwrap()
+    pub fn blob_maybe_log(&self) -> impl Deref<Target = Box<[u8]>> + '_ {
+        Ref::map(self.0.borrow(), |s| s.blob_maybe_log.as_ref().unwrap())
     }
 
     /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
@@ -104,12 +117,13 @@ impl CoverageRuntime {
             ;   ldp x1, x2, [sp], #0x10
             ;   ret
             ;map_addr:
-            ;.qword addr_of_mut!(self.map) as i64
+            ;.qword addr_of_mut!(self.0.borrow_mut().map) as i64
             ;previous_loc:
             ;.qword 0
         );
         let ops_vec = ops.finalize().unwrap();
-        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
+        self.0.borrow_mut().blob_maybe_log =
+            Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
     /// A minimal `maybe_log` implementation. We insert this into the transformed instruction stream
@@ -140,12 +154,13 @@ impl CoverageRuntime {
             ;   popfq
             ;   ret
             ;map_addr:
-            ;.qword addr_of_mut!(self.map) as i64
+            ;.qword addr_of_mut!(self.0.borrow_mut().map) as i64
             ;previous_loc:
             ;.qword 0
         );
         let ops_vec = ops.finalize().unwrap();
-        self.blob_maybe_log = Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
+        self.0.borrow_mut().blob_maybe_log =
+            Some(ops_vec[..ops_vec.len() - 8].to_vec().into_boxed_slice());
     }
 
     /// Emits coverage mapping into the current basic block.
@@ -156,9 +171,10 @@ impl CoverageRuntime {
         let writer = output.writer();
         #[allow(clippy::cast_possible_wrap)] // gum redzone size is u32, we need an offset as i32.
         let redzone_size = i64::from(frida_gum_sys::GUM_RED_ZONE_SIZE);
-        if self.current_log_impl == 0
-            || !writer.can_branch_directly_to(self.current_log_impl)
-            || !writer.can_branch_directly_between(writer.pc() + 128, self.current_log_impl)
+        if self.0.borrow().current_log_impl == 0
+            || !writer.can_branch_directly_to(self.0.borrow().current_log_impl)
+            || !writer
+                .can_branch_directly_between(writer.pc() + 128, self.0.borrow().current_log_impl)
         {
             let after_log_impl = writer.code_offset() + 1;
 
@@ -167,9 +183,9 @@ impl CoverageRuntime {
             #[cfg(target_arch = "aarch64")]
             writer.put_b_label(after_log_impl);
 
-            self.current_log_impl = writer.pc();
-            writer.put_bytes(self.blob_maybe_log());
-            let prev_loc_pointer = addr_of_mut!(self.previous_pc) as u64; // Get the pointer to self.previous_pc
+            self.0.borrow_mut().current_log_impl = writer.pc();
+            writer.put_bytes(&self.blob_maybe_log());
+            let prev_loc_pointer = addr_of_mut!(self.0.borrow_mut().previous_pc) as u64; // Get the pointer to self.previous_pc
 
             writer.put_bytes(&prev_loc_pointer.to_ne_bytes());
 
@@ -180,7 +196,7 @@ impl CoverageRuntime {
             writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, -(redzone_size));
             writer.put_push_reg(X86Register::Rdi);
             writer.put_mov_reg_address(X86Register::Rdi, h64 & (MAP_SIZE as u64 - 1));
-            writer.put_call_address(self.current_log_impl);
+            writer.put_call_address(self.0.borrow().current_log_impl);
             writer.put_pop_reg(X86Register::Rdi);
             writer.put_lea_reg_reg_offset(X86Register::Rsp, X86Register::Rsp, redzone_size);
         }
@@ -195,7 +211,7 @@ impl CoverageRuntime {
             );
             writer.put_ldr_reg_u64(Aarch64Register::X0, h64 & (MAP_SIZE as u64 - 1));
 
-            writer.put_bl_imm(self.current_log_impl);
+            writer.put_bl_imm(self.0.borrow().current_log_impl);
             writer.put_ldp_reg_reg_reg_offset(
                 Aarch64Register::Lr,
                 Aarch64Register::X0,

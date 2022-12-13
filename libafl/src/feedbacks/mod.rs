@@ -963,6 +963,7 @@ where
     T: Debug + Serialize + serde::de::DeserializeOwned,
 {
     name: String,
+    last_addr: usize,
     phantom: PhantomData<T>,
 }
 
@@ -1012,6 +1013,7 @@ where
     pub fn new(name: &'static str) -> Self {
         Self {
             name: name.to_string(),
+            last_addr: 0,
             phantom: PhantomData,
         }
     }
@@ -1021,6 +1023,7 @@ where
     pub fn new_with_observer(observer: &ListObserver<T>) -> Self {
         Self {
             name: observer.name().to_string(),
+            last_addr: 0,
             phantom: PhantomData,
         }
     }

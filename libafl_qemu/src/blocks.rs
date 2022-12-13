@@ -43,27 +43,7 @@ pub fn pc2basicblock(pc: GuestAddr, emu: &Emulator) -> Result<Vec<Instruction>, 
     let mut iaddr = pc;
     let mut block = Vec::<Instruction>::new();
 
-    #[cfg(cpu_target = "x86_64")]
-    let cs = Capstone::new()
-        .x86()
-        .mode(capstone::arch::x86::ArchMode::Mode64)
-        .detail(true)
-        .build()
-        .unwrap();
-    #[cfg(cpu_target = "arm")]
-    let cs = Capstone::new()
-        .arm()
-        .mode(capstone::arch::arm::ArchMode::Arm)
-        .detail(true)
-        .build()
-        .unwrap();
-    #[cfg(cpu_target = "aarch64")]
-    let cs = Capstone::new()
-        .arm64()
-        .mode(capstone::arch::arm64::ArchMode::Arm)
-        .detail(true)
-        .build()
-        .unwrap();
+    let cs = crate::capstone().detail(true).build().unwrap();
 
     'disasm: while let Ok(insns) = cs.disasm_count(code, iaddr.into(), 1) {
         if insns.is_empty() {

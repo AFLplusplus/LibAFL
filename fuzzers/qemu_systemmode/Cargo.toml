@@ -9,9 +9,10 @@ default = ["std"]
 std = []
 
 [profile.release]
-lto = true
-codegen-units = 1
+incremental = true
 debug = true
+lto = "fat"
+codegen-units = 1
 
 [dependencies]
 libafl = { path = "../../libafl/" }

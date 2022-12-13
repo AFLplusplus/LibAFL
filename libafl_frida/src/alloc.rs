@@ -440,8 +440,7 @@ impl Allocator {
             Some(metadata) => metadata.size,
             None => {
                 panic!(
-                    "Attempted to get_usable_size on a pointer ({:?}) which was not allocated!",
-                    ptr
+                    "Attempted to get_usable_size on a pointer ({ptr:?}) which was not allocated!"
                 );
             }
         }

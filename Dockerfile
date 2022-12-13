@@ -72,6 +72,9 @@ COPY scripts/dummy.rs libafl_concolic/symcc_libafl/src/lib.rs
 COPY libafl_nyx/Cargo.toml libafl_nyx/build.rs libafl_nyx/
 COPY scripts/dummy.rs libafl_nyx/src/lib.rs
 
+COPY libafl_tinyinst/Cargo.toml libafl_tinyinst/
+COPY scripts/dummy.rs libafl_tinyinst/src/lib.rs
+
 COPY utils utils
 
 RUN cargo build && cargo build --release

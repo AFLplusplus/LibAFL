@@ -115,8 +115,6 @@ where
 
 /// An helper that feeds `FridaInProcessExecutor` with edge-coverage instrumentation
 pub struct FridaInstrumentationHelper<'a, RT> {
-    /// Transformer that has to be passed to FridaInProcessExecutor
-    transformer: Option<Transformer<'a>>,
     #[cfg(unix)]
     capstone: Capstone,
     ranges: RangeMap<usize, (u16, String)>,
@@ -204,7 +202,6 @@ where
             modules_to_instrument.iter().map(AsRef::as_ref).collect();
 
         let mut helper = Self {
-            transformer: None,
             #[cfg(target_arch = "aarch64")]
             capstone: Capstone::new()
                 .arm64()
@@ -245,122 +242,12 @@ where
                 }
             }
 
-            let transformer = Transformer::from_callback(gum, |basic_block, output| {
-                let mut first = true;
-                for instruction in basic_block {
-                    let instr = instruction.instr();
-                    #[cfg(unix)]
-                    let instr_size = instr.bytes().len();
-                    let address = instr.address();
-                    //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+            // make sure we aren't in the instrumented list, as it would cause recursions
+            assert!(
+                !helper.ranges.contains_key(&(Self::new as usize)),
+                "instrumented libraries must not include the fuzzer"
+            );
 
-                    //println!(
-                    //"address: {:x} contains: {:?}",
-                    //address,
-                    //helper.ranges.contains_key(&(address as usize))
-                    //);
-
-                    // println!("Ranges: {:#?}", helper.ranges);
-                    if helper.ranges.contains_key(&(address as usize)) {
-                        if first {
-                            first = false;
-                            //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
-                            if let Some(rt) = helper.runtime_mut::<CoverageRuntime>() {
-                                rt.emit_coverage_mapping(address, &output);
-                            }
-
-                            #[cfg(unix)]
-                            if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
-                                instruction.put_callout(|context| {
-                                    let real_address = rt.real_address_for_stalked(pc(&context));
-                                    //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
-                                    //println!("{}:0x{:016x}", name, real_address - range.start);
-                                    rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
-                                        real_address,
-                                        real_address + instr_size,
-                                    ));
-                                });
-                            }
-                        }
-
-                        #[cfg(unix)]
-                        let res = if let Some(_rt) = helper.runtime::<AsanRuntime>() {
-                            AsanRuntime::asan_is_interesting_instruction(
-                                &helper.capstone,
-                                address,
-                                instr,
-                            )
-                        } else {
-                            None
-                        };
-
-                        #[cfg(all(target_arch = "x86_64", unix))]
-                        if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
-                            if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
-                                rt.emit_shadow_check(
-                                    address, &output, segment, width, basereg, indexreg, scale,
-                                    disp,
-                                );
-                            }
-                        }
-
-                        #[cfg(target_arch = "aarch64")]
-                        if let Some((basereg, indexreg, displacement, width, shift, extender)) = res
-                        {
-                            if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
-                                rt.emit_shadow_check(
-                                    address,
-                                    &output,
-                                    basereg,
-                                    indexreg,
-                                    displacement,
-                                    width,
-                                    shift,
-                                    extender,
-                                );
-                            }
-                        }
-
-                        #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
-                        if let Some(rt) = helper.runtime::<CmpLogRuntime>() {
-                            if let Some((op1, op2, special_case)) =
-                                CmpLogRuntime::cmplog_is_interesting_instruction(
-                                    &helper.capstone,
-                                    address,
-                                    instr,
-                                )
-                            {
-                                //emit code that saves the relevant data in runtime(passes it to x0, x1)
-                                rt.emit_comparison_handling(
-                                    address,
-                                    &output,
-                                    &op1,
-                                    &op2,
-                                    special_case,
-                                );
-                            }
-                        }
-
-                        #[cfg(unix)]
-                        if let Some(rt) = helper.runtime_mut::<AsanRuntime>() {
-                            rt.add_stalked_address(
-                                output.writer().pc() as usize - instr_size,
-                                address as usize,
-                            );
-                        }
-
-                        #[cfg(unix)]
-                        if let Some(rt) = helper.runtime_mut::<DrCovRuntime>() {
-                            rt.add_stalked_address(
-                                output.writer().pc() as usize - instr_size,
-                                address as usize,
-                            );
-                        }
-                    }
-                    instruction.keep();
-                }
-            });
-            helper.transformer = Some(transformer);
             helper
                 .runtimes
                 .init_all(gum, &helper.ranges, &modules_to_instrument);
@@ -385,8 +272,110 @@ where
     }
 
     /// Returns ref to the Transformer
-    pub fn transformer(&self) -> &Transformer<'a> {
-        self.transformer.as_ref().unwrap()
+    pub fn transformer(&mut self, gum: &'a Gum) -> Transformer<'a> {
+        Transformer::from_callback(gum, |basic_block, output| {
+            let mut first = true;
+            for instruction in basic_block {
+                let instr = instruction.instr();
+                #[cfg(unix)]
+                let instr_size = instr.bytes().len();
+                let address = instr.address();
+                //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+
+                //println!(
+                //"address: {:x} contains: {:?}",
+                //address,
+                //self.ranges().contains_key(&(address as usize))
+                //);
+
+                // println!("Ranges: {:#?}", self.ranges());
+                if self.ranges().contains_key(&(address as usize)) {
+                    if first {
+                        first = false;
+                        //println!("block @ {:x} transformed to {:x}", address, output.writer().pc());
+                        if let Some(rt) = self.runtime_mut::<CoverageRuntime>() {
+                            rt.emit_coverage_mapping(address, &output);
+                        }
+
+                        #[cfg(unix)]
+                        if let Some(rt) = self.runtime_mut::<DrCovRuntime>() {
+                            instruction.put_callout(|context| {
+                                let real_address = rt.real_address_for_stalked(pc(&context));
+                                //let (range, (id, name)) = helper.ranges.get_key_value(&real_address).unwrap();
+                                //println!("{}:0x{:016x}", name, real_address - range.start);
+                                rt.drcov_basic_blocks.push(DrCovBasicBlock::new(
+                                    real_address,
+                                    real_address + instr_size,
+                                ));
+                            });
+                        }
+                    }
+
+                    #[cfg(unix)]
+                    let res = if let Some(_rt) = self.runtime::<AsanRuntime>() {
+                        AsanRuntime::asan_is_interesting_instruction(&self.capstone, address, instr)
+                    } else {
+                        None
+                    };
+
+                    #[cfg(all(target_arch = "x86_64", unix))]
+                    if let Some((segment, width, basereg, indexreg, scale, disp)) = res {
+                        if let Some(rt) = self.runtime_mut::<AsanRuntime>() {
+                            rt.emit_shadow_check(
+                                address, &output, segment, width, basereg, indexreg, scale, disp,
+                            );
+                        }
+                    }
+
+                    #[cfg(target_arch = "aarch64")]
+                    if let Some((basereg, indexreg, displacement, width, shift, extender)) = res {
+                        if let Some(rt) = self.runtime_mut::<AsanRuntime>() {
+                            rt.emit_shadow_check(
+                                address,
+                                &output,
+                                basereg,
+                                indexreg,
+                                displacement,
+                                width,
+                                shift,
+                                extender,
+                            );
+                        }
+                    }
+
+                    #[cfg(all(feature = "cmplog", target_arch = "aarch64"))]
+                    if let Some(rt) = self.runtime::<CmpLogRuntime>() {
+                        if let Some((op1, op2, special_case)) =
+                            CmpLogRuntime::cmplog_is_interesting_instruction(
+                                &self.capstone,
+                                address,
+                                instr,
+                            )
+                        {
+                            //emit code that saves the relevant data in runtime(passes it to x0, x1)
+                            rt.emit_comparison_handling(address, &output, &op1, &op2, special_case);
+                        }
+                    }
+
+                    #[cfg(unix)]
+                    if let Some(rt) = self.runtime_mut::<AsanRuntime>() {
+                        rt.add_stalked_address(
+                            output.writer().pc() as usize - instr_size,
+                            address as usize,
+                        );
+                    }
+
+                    #[cfg(unix)]
+                    if let Some(rt) = self.runtime_mut::<DrCovRuntime>() {
+                        rt.add_stalked_address(
+                            output.writer().pc() as usize - instr_size,
+                            address as usize,
+                        );
+                    }
+                }
+                instruction.keep();
+            }
+        })
     }
 
     /// Initializa all

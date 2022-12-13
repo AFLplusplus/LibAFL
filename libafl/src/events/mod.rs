@@ -8,6 +8,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(all(unix, feature = "std"))]
+use core::ffi::c_void;
 use core::{fmt, hash::Hasher, marker::PhantomData, time::Duration};
 
 use ahash::AHasher;
@@ -16,6 +18,10 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use uuid::Uuid;
 
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::os::unix_signals::{siginfo_t, ucontext_t, Handler, Signal};
+#[cfg(all(unix, feature = "std"))]
+use crate::bolts::{shmem::ShMemProvider, staterestore::StateRestorer};
 use crate::{
     bolts::current_time,
     executors::ExitKind,
@@ -26,6 +32,80 @@ use crate::{
     state::{HasClientPerfMonitor, HasExecutions, HasMetadata},
     Error,
 };
+
+/// Check if ctrl-c is sent with this struct
+#[cfg(all(unix, feature = "std"))]
+pub static mut SHUTDOWN_SIGHANDLER_DATA: ShutdownSignalData = ShutdownSignalData {
+    allocator_pid: 0,
+    staterestorer_ptr: core::ptr::null_mut(),
+    shutdown_handler: core::ptr::null(),
+};
+
+/// A signal handler for releasing `StateRestore` `ShMem`
+/// This struct holds a pointer to `StateRestore` and clean up the `ShMem` segment used by it.
+#[cfg(all(unix, feature = "std"))]
+#[derive(Debug, Clone)]
+pub struct ShutdownSignalData {
+    allocator_pid: usize,
+    staterestorer_ptr: *mut c_void,
+    shutdown_handler: *const c_void,
+}
+
+/// Type for shutdown handler
+#[cfg(all(unix, feature = "std"))]
+pub type ShutdownFuncPtr =
+    unsafe fn(Signal, siginfo_t, &mut ucontext_t, data: &mut ShutdownSignalData);
+
+/// Shutdown handler. `SigTerm`, `SigInterrupt`, `SigQuit` call this
+/// We can't handle SIGKILL in the signal handler, this means that you shouldn't kill your fuzzer with `kill -9` because then the shmem segments are never freed
+///
+/// # Safety
+///
+/// This will acceess `data` and write to the global `data.staterestorer_ptr` if it's not null.
+#[cfg(all(unix, feature = "std"))]
+pub unsafe fn shutdown_handler<SP>(
+    signal: Signal,
+    _info: siginfo_t,
+    _context: &mut ucontext_t,
+    data: &mut ShutdownSignalData,
+) where
+    SP: ShMemProvider,
+{
+    println!(
+        "Fuzzer shutdown by Signal: {} Pid: {}",
+        signal,
+        std::process::id()
+    );
+
+    let ptr = data.staterestorer_ptr;
+    if ptr.is_null() || data.allocator_pid != std::process::id() as usize {
+        // Do nothing
+    } else {
+        // The process allocated the staterestorer map must take care of it
+        let sr = (ptr as *mut StateRestorer<SP>).as_mut().unwrap();
+        // println!("{:#?}", sr);
+        std::ptr::drop_in_place(sr);
+    }
+    println!("Bye!");
+    std::process::exit(0);
+}
+
+#[cfg(all(unix, feature = "std"))]
+impl Handler for ShutdownSignalData {
+    fn handle(&mut self, signal: Signal, info: siginfo_t, context: &mut ucontext_t) {
+        unsafe {
+            let data = &mut SHUTDOWN_SIGHANDLER_DATA;
+            if !data.shutdown_handler.is_null() {
+                let func: ShutdownFuncPtr = std::mem::transmute(data.shutdown_handler);
+                (func)(signal, info, context, data);
+            }
+        }
+    }
+
+    fn signals(&self) -> Vec<Signal> {
+        vec![Signal::SigTerm, Signal::SigInterrupt, Signal::SigQuit]
+    }
+}
 
 /// A per-fuzzer unique `ID`, usually starting with `0` and increasing
 /// by `1` in multiprocessed `EventManager`s, such as [`self::llmp::LlmpEventManager`].

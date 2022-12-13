@@ -249,8 +249,7 @@ impl Forkserver {
             Ok(_) => (),
             Err(err) => {
                 return Err(Error::illegal_state(format!(
-                    "Could not spawn the forkserver: {:#?}",
-                    err
+                    "Could not spawn the forkserver: {err:#?}"
                 )))
             }
         };

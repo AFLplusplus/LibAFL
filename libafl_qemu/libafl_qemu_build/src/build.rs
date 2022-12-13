@@ -8,7 +8,7 @@ use which::which;
 
 const QEMU_URL: &str = "https://github.com/AFLplusplus/qemu-libafl-bridge";
 const QEMU_DIRNAME: &str = "qemu-libafl-bridge";
-const QEMU_REVISION: &str = "9707dd2d211221367915d5da21fe8693d6842eaf";
+const QEMU_REVISION: &str = "e5424c34d223c2b638af6e4c9eef039db8b69dd4";
 
 fn build_dep_check(tools: &[&str]) {
     for tool in tools {
@@ -37,6 +37,10 @@ pub fn build(
         // built for the right endian-ness, so we update the cpu_target for
         // here on down
         cpu_target += "eb";
+    }
+
+    if !is_big_endian && cpu_target == "mips" && !cfg!(feature = "clippy") {
+        cpu_target += "el";
     }
 
     let custum_qemu_dir = env::var_os("CUSTOM_QEMU_DIR").map(|x| x.to_string_lossy().to_string());
@@ -69,10 +73,7 @@ pub fn build(
         }
 
         if !qemu_path.is_dir() {
-            println!(
-                "cargo:warning=Qemu not found, cloning with git ({})...",
-                QEMU_REVISION
-            );
+            println!("cargo:warning=Qemu not found, cloning with git ({QEMU_REVISION})...");
             fs::create_dir_all(&qemu_path).unwrap();
             Command::new("git")
                 .current_dir(&qemu_path)

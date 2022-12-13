@@ -132,8 +132,7 @@ impl Cores {
 
         if cores.is_empty() {
             return Err(Error::illegal_argument(format!(
-                "No cores specified! parsed: {}",
-                args
+                "No cores specified! parsed: {args}"
             )));
         }
 
@@ -591,8 +590,7 @@ mod apple {
                 Ok(())
             } else {
                 Err(Error::unknown(format!(
-                    "Failed to set_for_current {:?}",
-                    result
+                    "Failed to set_for_current {result:?}"
                 )))
             }
         }
@@ -615,8 +613,7 @@ mod apple {
                 Ok(())
             } else {
                 Err(Error::unknown(format!(
-                    "Failed to set_for_current {:?}",
-                    result
+                    "Failed to set_for_current {result:?}"
                 )))
             }
         }
