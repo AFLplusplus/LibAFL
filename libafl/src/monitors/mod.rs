@@ -118,7 +118,7 @@ impl ClientStats {
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(feature = "afl_exec_sec")]
-    pub fn execs_per_sec_f64(&mut self, cur_time: Duration) -> f64 {
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
             return 0.0;
         }
@@ -149,7 +149,7 @@ impl ClientStats {
     /// Get the calculated executions per second for this client
     #[allow(clippy::cast_precision_loss, clippy::cast_sign_loss)]
     #[cfg(not(feature = "afl_exec_sec"))]
-    pub fn execs_per_sec_f64(&mut self, cur_time: Duration) -> f64 {
+    pub fn execs_per_sec(&mut self, cur_time: Duration) -> f64 {
         if self.executions == 0 {
             return 0.0;
         }
@@ -162,12 +162,6 @@ impl ClientStats {
         }
 
         (self.executions as f64) / elapsed
-    }
-
-    #[allow(clippy::cast_sign_loss)]
-    /// Get the calculated executions per second for this client
-    pub fn execs_per_sec(&mut self, cur_time: Duration) -> u64 {
-        self.execs_per_sec_f64(cur_time) as u64
     }
 
     /// Update the user-defined stat with name and value
@@ -226,11 +220,11 @@ pub trait Monitor {
     /// Executions per second
     #[allow(clippy::cast_sign_loss)]
     #[inline]
-    fn execs_per_sec(&mut self) -> u64 {
+    fn execs_per_sec(&mut self) -> f64 {
         let cur_time = current_time();
         self.client_stats_mut()
             .iter_mut()
-            .fold(0.0, |acc, x| acc + x.execs_per_sec_f64(cur_time)) as u64
+            .fold(0.0, |acc, x| acc + x.execs_per_sec(cur_time))
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
