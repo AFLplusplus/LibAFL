@@ -20,17 +20,24 @@ pub fn run_git_diff(args: &[&str]) -> String {
 }
 
 #[must_use]
-pub fn get_diffing_files(commit_name: &str) -> Vec<PathBuf> {
-    let args = vec!["--name-only", commit_name];
-    let diff = run_git_diff(&args);
-    diff.lines()
-        .map(PathBuf::from)
-        .filter(|x| x.is_file())
-        .collect()
+pub fn get_diffing_files(commits: &[String]) -> HashSet<PathBuf> {
+    let mut files = HashSet::<PathBuf>::default();
+    for commit_name in commits {
+        let args = vec!["--name-only", commit_name];
+        for file in run_git_diff(&args)
+            .lines()
+            .map(PathBuf::from)
+            .filter(|x| x.is_file())
+        {
+            files.insert(file);
+        }
+    }
+    files
 }
 
+#[allow(clippy::implicit_hasher)]
 #[must_use]
-pub fn get_diffing_crates(diffing_files: &[PathBuf]) -> HashSet<PathBuf> {
+pub fn get_diffing_crates(diffing_files: &HashSet<PathBuf>) -> HashSet<PathBuf> {
     // TODO maybe consider using a combination of this and https://docs.rs/cargo/0.28.0/cargo/sources/path/struct.PathSource.html
     let mut crates = HashSet::default();
     for file in diffing_files {

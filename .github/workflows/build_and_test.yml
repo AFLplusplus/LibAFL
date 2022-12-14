@@ -201,6 +201,7 @@ jobs:
     - uses: actions/checkout@v3
       with:
         submodules: true # recursively checkout submodules
+        fetch-depth: 0 # to diff with origin/main
     - uses: Swatinem/rust-cache@v2
     - name: Build and run example fuzzers (Linux)
       if: runner.os == 'Linux'
