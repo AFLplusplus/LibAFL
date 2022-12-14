@@ -139,7 +139,7 @@ where
 
         // display stats in a SimpleMonitor format
         let fmt = format!(
-            "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),

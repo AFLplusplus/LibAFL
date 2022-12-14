@@ -49,7 +49,7 @@ where
         };
         let head = format!("{event_msg}{pad} {sender}");
         let global_fmt = format!(
-            "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
             head,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
@@ -66,7 +66,7 @@ where
 
         let pad = " ".repeat(head.len());
         let mut fmt = format!(
-            " {}   (CLIENT) corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            " {}   (CLIENT) corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
             pad, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {

@@ -286,7 +286,7 @@ impl Monitor for TuiMonitor {
         };
         let head = format!("{event_msg}{pad} {sender}");
         let mut fmt = format!(
-            "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {

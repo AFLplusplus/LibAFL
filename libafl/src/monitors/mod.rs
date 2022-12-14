@@ -320,7 +320,7 @@ impl Monitor for SimplePrintingMonitor {
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         println!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),
@@ -389,7 +389,7 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),

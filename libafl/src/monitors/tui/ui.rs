@@ -397,7 +397,7 @@ impl TuiUI {
                 ]));
                 client_items.push(Row::new(vec![
                     Cell::from(Span::raw("exec/sec")),
-                    Cell::from(Span::raw(format!("{}", client.exec_sec))),
+                    Cell::from(Span::raw(format!("{:.2}", client.exec_sec))),
                 ]));
                 client_items.push(Row::new(vec![
                     Cell::from(Span::raw("corpus")),
