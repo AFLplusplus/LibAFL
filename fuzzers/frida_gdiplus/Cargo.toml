@@ -1,6 +1,6 @@
 [package]
 name = "frida_gdiplus"
-version = "0.7.0"
+version = "0.9.0"
 authors = ["Richard Johnson <richinseattle@gmail.com>"]
 edition = "2021"
 
