@@ -20,7 +20,6 @@ pub use cached::CachedOnDiskCorpus;
 pub mod minimizer;
 use core::cell::RefCell;
 
-use hashbrown::HashMap;
 #[cfg(feature = "cmin")]
 pub use minimizer::*;
 use serde::{Deserialize, Serialize};
@@ -63,6 +62,15 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     fn current_mut(&mut self) -> &mut Option<usize>;
 }
 
+#[cfg(not(feature = "corpus_btreemap"))]
+/// The map type in which testcases are stored (enable the feature 'corpus_btreemap' to use a `BTreeMap` instead of `HashMap`)
+pub type TestcaseStorageMap<I> = hashbrown::HashMap<usize, RefCell<Testcase<I>>>;
+
+#[cfg(feature = "corpus_btreemap")]
+/// The map type in which testcases are stored (disable the feature 'corpus_btreemap' to use a `HashMap` instead of `BTreeMap`)
+pub type TestcaseStorageMap<I> =
+    alloc::collections::btree_map::BTreeMap<usize, RefCell<Testcase<I>>>;
+
 /// Storage map for the testcases (used in `Corpus` implementations) with an incremental index
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
 #[serde(bound = "I: serde::de::DeserializeOwned")]
@@ -71,7 +79,7 @@ where
     I: Input,
 {
     /// The map in which testcases are stord
-    pub map: HashMap<usize, RefCell<Testcase<I>>>,
+    pub map: TestcaseStorageMap<I>,
     /// The progressive idx
     pub progressive_idx: usize,
 }
@@ -98,7 +106,7 @@ where
     /// Create new
     pub fn new() -> Self {
         Self {
-            map: HashMap::default(),
+            map: TestcaseStorageMap::default(),
             progressive_idx: 0,
         }
     }
