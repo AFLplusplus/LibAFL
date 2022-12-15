@@ -20,13 +20,18 @@ pub use cached::CachedOnDiskCorpus;
 pub mod minimizer;
 use core::cell::RefCell;
 
+use hashbrown::HashMap;
 #[cfg(feature = "cmin")]
 pub use minimizer::*;
+use serde::{Deserialize, Serialize};
 
-use crate::{inputs::UsesInput, Error};
+use crate::{
+    inputs::{Input, UsesInput},
+    Error,
+};
 
 /// Corpus with all current testcases
-pub trait Corpus: UsesInput + serde::Serialize + for<'de> serde::Deserialize<'de> {
+pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     /// Returns the number of elements
     fn count(&self) -> usize;
 
@@ -56,6 +61,47 @@ pub trait Corpus: UsesInput + serde::Serialize + for<'de> serde::Deserialize<'de
 
     /// Current testcase scheduled (mutable)
     fn current_mut(&mut self) -> &mut Option<usize>;
+}
+
+/// Storage map for the testcases (used in `Corpus` implementations) with an incremental index
+#[derive(Default, Serialize, Deserialize, Clone, Debug)]
+#[serde(bound = "I: serde::de::DeserializeOwned")]
+pub struct TestcaseStorage<I>
+where
+    I: Input,
+{
+    /// The map in which testcases are stord
+    pub map: HashMap<usize, RefCell<Testcase<I>>>,
+    /// The progressive idx
+    pub progressive_idx: usize,
+}
+
+impl<I> UsesInput for TestcaseStorage<I>
+where
+    I: Input,
+{
+    type Input = I;
+}
+
+impl<I> TestcaseStorage<I>
+where
+    I: Input,
+{
+    /// Insert a testcase assigning an index to it
+    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> usize {
+        let idx = self.progressive_idx;
+        self.progressive_idx += 1;
+        self.map.insert(idx, testcase);
+        idx
+    }
+
+    /// Create new
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::default(),
+            progressive_idx: 0,
+        }
+    }
 }
 
 /// `Corpus` Python bindings

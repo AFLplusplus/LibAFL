@@ -1,12 +1,11 @@
 //! In-memory corpus, keeps all test cases in memory at all times
 
-use alloc::vec::Vec;
 use core::cell::RefCell;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, Testcase, TestcaseStorage},
     inputs::{Input, UsesInput},
     Error,
 };
@@ -18,7 +17,7 @@ pub struct InMemoryCorpus<I>
 where
     I: Input,
 {
-    entries: Vec<RefCell<Testcase<I>>>,
+    entries: TestcaseStorage<I>,
     current: Option<usize>,
 }
 
@@ -36,39 +35,38 @@ where
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
-        self.entries.len()
+        self.entries.map.len()
     }
 
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, testcase: Testcase<I>) -> Result<usize, Error> {
-        self.entries.push(RefCell::new(testcase));
-        Ok(self.entries.len() - 1)
+        Ok(self.entries.insert(RefCell::new(testcase)))
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {idx} out of bounds")));
+        if let Some(entry) = self.entries.map.get_mut(&idx) {
+            Ok(entry.replace(testcase))
+        } else {
+            Err(Error::key_not_found(format!("Index {idx} not found")))
         }
-        Ok(self.entries[idx].replace(testcase))
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
     fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
-        if idx >= self.entries.len() {
-            Ok(None)
-        } else {
-            Ok(Some(self.entries.remove(idx).into_inner()))
-        }
+        Ok(self.entries.map.remove(&idx).map(|x| x.take()))
     }
 
     /// Get by id
     #[inline]
     fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
-        Ok(&self.entries[idx])
+        self.entries
+            .map
+            .get(&idx)
+            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
     /// Current testcase scheduled
@@ -93,7 +91,7 @@ where
     #[must_use]
     pub fn new() -> Self {
         Self {
-            entries: vec![],
+            entries: TestcaseStorage::new(),
             current: None,
         }
     }
