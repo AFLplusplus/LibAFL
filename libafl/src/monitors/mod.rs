@@ -167,10 +167,18 @@ impl ClientStats {
     /// Executions per second
     fn execs_per_sec_pretty(&mut self, cur_time: Duration) -> String {
         match self.execs_per_sec(cur_time) {
-            value if value >= 1000.0 => { format!("{}", value) }
-            value if value >= 100.0 => { format!("{:.1}", value) }
-            value if value >= 10.0 => { format!("{:.2}", value) }
-            value => { format!("{:.3}", value) }
+            value if value >= 1000.0 => {
+                format!("{}", value)
+            }
+            value if value >= 100.0 => {
+                format!("{:.1}", value)
+            }
+            value if value >= 10.0 => {
+                format!("{:.2}", value)
+            }
+            value => {
+                format!("{:.3}", value)
+            }
         }
     }
 
@@ -240,9 +248,18 @@ pub trait Monitor {
     /// Executions per second
     fn execs_per_sec_pretty(&mut self) -> String {
         match self.execs_per_sec() {
-            value if value > 1000.0 => { format!("{}", value) }
-            value if value > 100.0 => { format!("{:.1}", value) }
-            value => { format!("{:.2}", value) }
+            value if value >= 1000.0 => {
+                format!("{}", value)
+            }
+            value if value >= 100.0 => {
+                format!("{:.1}", value)
+            }
+            value if value >= 10.0 => {
+                format!("{:.2}", value)
+            }
+            value => {
+                format!("{:.3}", value)
+            }
         }
     }
 
