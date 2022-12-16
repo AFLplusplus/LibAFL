@@ -59,6 +59,46 @@ impl fmt::Display for UserStats {
     }
 }
 
+/// Prettifies float values for human-readable output
+/// ```rust
+/// # use libafl::monitors::prettify;
+/// # fn main() {
+/// assert_eq!(prettify(123423123.0), "123.4M");
+/// assert_eq!(prettify(12342312.3), "12.34M");
+/// assert_eq!(prettify(1234231.23), "1.234M");
+/// assert_eq!(prettify(123423.123), "123.4k");
+/// assert_eq!(prettify(12342.3123), "12.34k");
+/// assert_eq!(prettify(1234.23123), "1.234k");
+/// assert_eq!(prettify(123.423123), "123.4");
+/// assert_eq!(prettify(12.3423123), "12.34");
+/// assert_eq!(prettify(1.23423123), "1.234");
+/// assert_eq!(prettify(0.123423123), "0.123");
+/// assert_eq!(prettify(0.0123423123), "0.012");
+/// # }
+/// ```
+pub fn prettify(value: f64) -> String {
+    let (value, suffix) = match value {
+        value if value >= 1000000.0 => { (value/1000000.0, "M") }
+        value if value >= 1000.0 => { (value/1000.0, "k") }
+        value => { (value, "") }
+    };
+    match value {
+        value if value >= 1000.0 => {
+            format!("{}{}", value, suffix)
+        }
+        value if value >= 100.0 => {
+            format!("{:.1}{}", value, suffix)
+        }
+        value if value >= 10.0 => {
+            format!("{:.2}{}", value, suffix)
+        }
+        value => {
+            format!("{:.3}{}", value, suffix)
+        }
+    }
+}
+
+
 /// A simple struct to keep track of client monitor
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct ClientStats {
@@ -166,20 +206,7 @@ impl ClientStats {
 
     /// Executions per second
     fn execs_per_sec_pretty(&mut self, cur_time: Duration) -> String {
-        match self.execs_per_sec(cur_time) {
-            value if value >= 1000.0 => {
-                format!("{}", value)
-            }
-            value if value >= 100.0 => {
-                format!("{:.1}", value)
-            }
-            value if value >= 10.0 => {
-                format!("{:.2}", value)
-            }
-            value => {
-                format!("{:.3}", value)
-            }
-        }
+        prettify(self.execs_per_sec(cur_time))
     }
 
     /// Update the user-defined stat with name and value
@@ -247,20 +274,7 @@ pub trait Monitor {
 
     /// Executions per second
     fn execs_per_sec_pretty(&mut self) -> String {
-        match self.execs_per_sec() {
-            value if value >= 1000.0 => {
-                format!("{}", value)
-            }
-            value if value >= 100.0 => {
-                format!("{:.1}", value)
-            }
-            value if value >= 10.0 => {
-                format!("{:.2}", value)
-            }
-            value => {
-                format!("{:.3}", value)
-            }
-        }
+        prettify(self.execs_per_sec())
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
