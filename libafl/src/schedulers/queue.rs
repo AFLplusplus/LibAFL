@@ -4,7 +4,7 @@ use alloc::borrow::ToOwned;
 use core::marker::PhantomData;
 
 use crate::{
-    corpus::Corpus,
+    corpus::{CorpusId, Corpus},
     inputs::UsesInput,
     schedulers::Scheduler,
     state::{HasCorpus, UsesState},
@@ -29,20 +29,11 @@ where
     S: HasCorpus,
 {
     /// Gets the next entry in the queue
-    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
-            let id = match state.corpus().current() {
-                Some(cur) => {
-                    if *cur + 1 >= state.corpus().count() {
-                        0
-                    } else {
-                        *cur + 1
-                    }
-                }
-                None => 0,
-            };
+            let id = state.corpus().current().map(|id| state.corpus().next(id)).unwrap_or_else(|| state.corpus().first().unwrap());
             *state.corpus_mut().current_mut() = Some(id);
             Ok(id)
         }

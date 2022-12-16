@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::serdeany::SerdeAnyMap,
-    corpus::{Corpus, CorpusId, TestcaseStorage, Testcase},
+    corpus::{Corpus, CorpusId, Testcase, InMemoryCorpus},
     inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
@@ -47,8 +47,7 @@ pub struct OnDiskCorpus<I>
 where
     I: Input,
 {
-    entries: TestcaseStorage<I>,
-    current: Option<CorpusId>,
+    inner: InMemoryCorpus<I>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
 }
@@ -67,57 +66,69 @@ where
     /// Returns the number of elements
     #[inline]
     fn count(&self) -> usize {
-        self.entries.len()
+        self.inner.count()
     }
 
     /// Add an entry to the corpus and return its index
     #[inline]
     fn add(&mut self, mut testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self.save_testcase(&mut testcase)?;
-        Ok(self.entries.insert(RefCell::new(testcase)))
+        self.inner.add(testcase)
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
     fn replace(&mut self, idx: CorpusId, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        if let Some(entry) = self.entries.map.get_mut(&idx) {
-            self.save_testcase(&mut testcase)?;
-            self.remove_testcase(&entry)?;
-            Ok(entry.replace(testcase))
-        } else {
-            Err(Error::key_not_found(format!("Index {idx} not found")))
-        }
+        self.save_testcase(&mut testcase)?;
+        let entry = self.inner.replace(idx, testcase)?;
+        self.remove_testcase(&entry)?;
+        Ok(entry)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
     fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
-        let prev = self.entries.map.remove(&idx).map(|x| x.take());
-        if let Some(testcase) = prev {
-            self.remove_testcase(&prev)?;
-        }
-        Ok(prev)
+        let entry = self.inner.remove(idx)?;
+        self.remove_testcase(&entry)?;
+        Ok(entry)
     }
 
     /// Get by id
     #[inline]
     fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
-        self.entries
-            .map
-            .get(&idx)
-            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
+        self.inner.get(idx)
     }
 
     /// Current testcase scheduled
     #[inline]
     fn current(&self) -> &Option<CorpusId> {
-        &self.current
+        self.inner.current()
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
     fn current_mut(&mut self) -> &mut Option<CorpusId> {
-        &mut self.current
+        self.inner.current_mut()
+    }
+
+    #[inline]
+    fn next(&self, idx: CorpusId) -> Option<CorpusId> {
+        self.inner.next(idx)
+    }
+
+    #[inline]
+    fn prev(&self, idx: CorpusId) -> Option<CorpusId> {
+        self.inner.prev(idx)
+    }
+
+    #[inline]
+    fn first(&self) -> Option<CorpusId> {
+        self.inner.first()
+    }
+
+    #[inline]
+    fn last(&self) -> Option<CorpusId> {
+        self.inner.last()
     }
 }
 

@@ -1,10 +1,10 @@
 //! Schedule the access to the Corpus.
 
-pub mod queue;
 use core::marker::PhantomData;
 
+pub mod queue;
 pub use queue::QueueScheduler;
-
+/*
 pub mod probabilistic_sampling;
 pub use probabilistic_sampling::ProbabilitySamplingScheduler;
 
@@ -29,10 +29,10 @@ pub use powersched::PowerQueueScheduler;
 
 pub mod tuneable;
 pub use tuneable::*;
-
+*/
 use crate::{
     bolts::rands::Rand,
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, Testcase, CorpusId},
     inputs::UsesInput,
     state::{HasCorpus, HasRand, UsesState},
     Error,
@@ -42,7 +42,7 @@ use crate::{
 /// It has hooks to corpus add/replace/remove to allow complex scheduling algorithms to collect data.
 pub trait Scheduler: UsesState {
     /// Added an entry to the corpus at the given index
-    fn on_add(&self, _state: &mut Self::State, _idx: usize) -> Result<(), Error> {
+    fn on_add(&self, _state: &mut Self::State, _idx: CorpusId) -> Result<(), Error> {
         Ok(())
     }
 
@@ -50,7 +50,7 @@ pub trait Scheduler: UsesState {
     fn on_replace(
         &self,
         _state: &mut Self::State,
-        _idx: usize,
+        _idx: CorpusId,
         _prev: &Testcase<<Self::State as UsesInput>::Input>,
     ) -> Result<(), Error> {
         Ok(())
@@ -60,14 +60,14 @@ pub trait Scheduler: UsesState {
     fn on_remove(
         &self,
         _state: &mut Self::State,
-        _idx: usize,
+        _idx: CorpusId,
         _testcase: &Option<Testcase<<Self::State as UsesInput>::Input>>,
     ) -> Result<(), Error> {
         Ok(())
     }
 
     /// Gets the next entry
-    fn next(&self, state: &mut Self::State) -> Result<usize, Error>;
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error>;
 }
 
 /// Feed the fuzzer simply with a random testcase on request
@@ -88,12 +88,12 @@ where
     S: HasCorpus + HasRand,
 {
     /// Gets the next entry at random
-    fn next(&self, state: &mut Self::State) -> Result<usize, Error> {
+    fn next(&self, state: &mut Self::State) -> Result<CorpusId, Error> {
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
             let len = state.corpus().count();
-            let id = state.rand_mut().below(len as u64) as usize;
+            let id = CorpusId::from(state.rand_mut().below(len as u64) as usize);
             *state.corpus_mut().current_mut() = Some(id);
             Ok(id)
         }
