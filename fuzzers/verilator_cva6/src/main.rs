@@ -1,3 +1,6 @@
+#![feature(array_windows)]
+#![feature(concat_bytes)]
+
 use std::{
     ffi::{c_char, c_int, CString},
     fs::File,
@@ -26,11 +29,13 @@ use libafl::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
     stages::{CalibrationStage, StdPowerMutationalStage},
-    state::{HasCorpus, StdState},
+    state::{HasCorpus, HasMaxSize, StdState},
     Error, Fuzzer, StdFuzzer,
 };
 use libafl_verilator::VerilatorMapObserver;
 use nix::{fcntl::OFlag, sys::stat::Mode};
+
+const BASE_EXECUTABLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/base-executable"));
 
 extern "C" {
     fn ariane_main(argc: c_int, argv: *const *const c_char) -> c_int;
@@ -69,6 +74,7 @@ fn main() -> Result<(), Error> {
         // Same for objective feedbacks
         &mut objective,
     )?;
+    state.set_max_size(1 << 13); // see cva6-base.c for details
 
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let power = StdPowerMutationalStage::new(mutator, &cov_observer);
@@ -97,9 +103,27 @@ fn main() -> Result<(), Error> {
     })?;
     let mut input_file = unsafe { File::from_raw_fd(input_fd) };
     let input_filename = CString::new(format!("/proc/self/fd/{}", input_fd)).unwrap();
+    let jtag_setting = CString::new("+jtag_rbb_enable=0").unwrap();
     let executable_name = CString::new(std::env::current_exe()?.as_os_str().as_bytes()).unwrap();
 
-    let cmd_args = [executable_name.as_ptr(), input_filename.as_ptr()];
+    let cmd_args = [
+        executable_name.as_ptr(),
+        jtag_setting.as_ptr(),
+        input_filename.as_ptr(),
+    ];
+
+    // at least 4 sequential c.nops
+    let needle = Vec::from_iter(std::iter::repeat(1u16.to_le_bytes()).take(4).flatten());
+    let nop_offset = BASE_EXECUTABLE
+        .array_windows::<8>()
+        .enumerate()
+        .find_map(|(i, bytes)| if &needle == bytes { Some(i) } else { None })
+        .unwrap();
+
+    println!("offset: {}", nop_offset);
+
+    // write the base executable
+    input_file.write_all(BASE_EXECUTABLE).unwrap();
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -107,7 +131,9 @@ fn main() -> Result<(), Error> {
 
         // for simplicity, we will write the input to the file
         // with customisation, we could hypothetically load this directly with DPI... but this is a PoC :)
-        input_file.seek(SeekFrom::Start(0)).unwrap();
+
+        // write the assembly instructions into the perscribed needle
+        input_file.seek(SeekFrom::Start(nop_offset as u64)).unwrap();
         input_file.write_all(buf).unwrap();
         input_file.seek(SeekFrom::Start(0)).unwrap();
 
@@ -118,18 +144,17 @@ fn main() -> Result<(), Error> {
         ExitKind::Ok
     };
 
-    // let shmem = StdShMemProvider::new()?;
+    let shmem = StdShMemProvider::new()?;
 
-    let mut executor = TimeoutExecutor::new(
-        InProcessExecutor::new(
-            &mut harness,
-            tuple_list!(cov_observer, time_observer),
-            &mut fuzzer,
-            &mut state,
-            &mut mgr,
-        )?,
-        Duration::from_secs(10),
-    );
+    let mut executor = TimeoutInProcessForkExecutor::new(
+        &mut harness,
+        tuple_list!(cov_observer, time_observer),
+        &mut fuzzer,
+        &mut state,
+        &mut mgr,
+        Duration::from_secs(600),
+        shmem,
+    )?;
 
     if state.corpus().is_empty() {
         let mut generator = RandBytesGenerator::new(128);

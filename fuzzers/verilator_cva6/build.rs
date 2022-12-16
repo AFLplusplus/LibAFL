@@ -1,9 +1,8 @@
 use std::{
-    error::Error,
     fs::{read_dir, File},
     io::{stderr, Write},
     path::PathBuf,
-    process::{Command, ExitStatus, Stdio},
+    process::{Command, Stdio},
 };
 
 const ARIANE_PKG: [&'static str; 13] = [
@@ -26,6 +25,8 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=cva6");
     println!("cargo:rerun-if-changed=ariane_tb.cpp.patch");
+    println!("cargo:rerun-if-changed=cva6-base.c");
+    println!("cargo:rerun-if-changed=riscv-tests");
 
     let riscv_path = std::env::var("RISCV").expect("Path to RISCV root must be defined.");
 
@@ -226,7 +227,7 @@ fn main() {
         .arg("+define+WT_DCACHE")
         .arg(root_dir.join("src/util/sram.sv"))
         .arg("+incdir+src/axi_node")
-        .args(["--threads", "1"]) // ariane requires multiple threads :(
+        .args(["--threads", "72"]) // ariane requires multiple threads :(
         .args(["--unroll-count", "256"])
         .arg("-Werror-PINMISSING")
         .arg("-Werror-IMPLICIT")
@@ -236,6 +237,7 @@ fn main() {
         .arg("-Wno-DECLFILENAME")
         .arg("-Wno-UNUSED")
         .arg("-Wno-UNOPTFLAT")
+        .arg("-Wno-ENUMVALUE")
         .arg("-Wno-style")
         .args([
             "-LDFLAGS".to_string(),
@@ -258,8 +260,9 @@ fn main() {
         ))
         .args(["--top-module", "ariane_testharness"])
         .args(["--Mdir".to_string(), std::env::var("OUT_DIR").unwrap()])
-        .arg("-O3");
-    verilator.arg("--coverage").args(["--build", "-j"]);
+        .arg("--coverage")
+        .args(["--x-assign", "0"])
+        .args(["--build", "-j"]);
 
     let out = verilator.output().unwrap();
     if !out.status.success() {
@@ -274,6 +277,7 @@ fn main() {
         .include(format!("{riscv_path}/include"))
         // .flag("-std=c++11")
         .flag("-fcoroutines")
+        .opt_level(3)
         .include(root_dir.join("tb/dpi"));
     if let Some(root) = std::env::var_os("VERILATOR_ROOT") {
         let mut include = PathBuf::from(root);
@@ -299,6 +303,35 @@ fn main() {
         build.file(root_dir.join(file));
     }
     build.compile("cva6");
+
+    let mut cmd = cc::Build::new()
+        .no_default_flags(true)
+        .compiler(PathBuf::from(&riscv_path).join("bin/riscv64-unknown-elf-gcc"))
+        .include("riscv-tests/env")
+        .include("riscv-tests/benchmarks/common")
+        .include(PathBuf::from(&riscv_path).join("include/riscv"))
+        .define("PREALLOCATE", "1")
+        .flag("-mcmodel=medany")
+        .flag("-std=gnu99")
+        .flag("-fno-common")
+        .flag("-fno-builtin-printf")
+        .flag("-fno-tree-loop-distribute-patterns")
+        .flag("-nostdlib")
+        .flag("-nostartfiles")
+        .flag("-lm")
+        .flag("-lgcc")
+        .flag("-Triscv-tests/benchmarks/common/test.ld")
+        .opt_level(3)
+        .static_flag(true)
+        .get_compiler()
+        .to_command();
+    cmd.arg("cva6-base.c").args([
+        "riscv-tests/benchmarks/common/syscalls.c",
+        "riscv-tests/benchmarks/common/crt.S",
+    ]);
+    cmd.arg("-o")
+        .arg(PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("base-executable"));
+    assert!(cmd.status().unwrap().success());
 
     // sadly, the ariane team did not emit the lib with a lib prefix, and we cannot set the name
     // without thoroughly breaking other things
