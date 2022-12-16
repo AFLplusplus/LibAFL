@@ -3,14 +3,15 @@
 //! that should be able to create new [`CorpusId`]s.
 
 use alloc::vec::Vec;
+use core::num::NonZeroUsize;
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::Corpus;
 use crate::{
     bolts::rands::Rand,
+    corpus::Corpus,
     state::{HasCorpus, HasRand},
     Error,
 };
@@ -44,7 +45,7 @@ impl CorpusId {
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CorpusIdManager {
     /// Maps a CorpusId to an actual id, or returns false if it was removed
-    id_mappings: Vec<Option<usize>>,
+    id_mappings: Vec<Option<NonZeroUsize>>,
     /// A vec of active Ids
     active_ids: Vec<CorpusId>,
 }
@@ -72,7 +73,8 @@ impl CorpusIdManager {
             id: self.id_mappings.len(),
         };
         self.active_ids.push(id);
-        self.id_mappings.push(Some(self.active_ids.len()));
+        self.id_mappings
+            .push(Some(self.active_ids.len().try_into().unwrap()));
         id
     }
 
@@ -82,6 +84,7 @@ impl CorpusIdManager {
     pub(crate) fn remove_id(&mut self, id: CorpusId) -> Option<usize> {
         // debug_assert!(self.active_ids.is_sorted());
         self.id_mappings[id.id].take().map(|idx| {
+            let idx = usize::from(idx) - 1;
             self.active_ids.remove(idx);
             idx
         })
@@ -91,7 +94,7 @@ impl CorpusIdManager {
     #[must_use]
     pub(crate) fn active_index_for(&self, id: CorpusId) -> Option<usize> {
         // debug_assert!(self.active_ids.is_sorted());
-        self.id_mappings[id.id]
+        self.id_mappings[id.id].map(|idx| usize::from(idx) - 1)
     }
 
     /// Get the [`CorpusId`] at the given index. If the index is out of bounds, returns `Err`.
@@ -128,6 +131,7 @@ impl CorpusIdManager {
         // debug_assert!(self.active_ids.is_sorted());
 
         if let Some(idx) = self.id_mappings[id.id] {
+            let idx = usize::from(idx) - 1;
             // get next entry in the active list
             if self.active_ids.len() > idx + 1 {
                 return Some(self.active_ids[idx]);
@@ -139,7 +143,7 @@ impl CorpusIdManager {
     /// Returns the current idx for the given corpus id
     #[must_use]
     pub fn lookup(&self, corpus_id: CorpusId) -> Option<usize> {
-        self.id_mappings[corpus_id.id]
+        self.id_mappings[corpus_id.id].map(|idx| usize::from(idx) - 1)
     }
 }
 
