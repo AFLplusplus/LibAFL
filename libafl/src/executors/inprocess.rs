@@ -1305,7 +1305,7 @@ mod windows_exception_handler {
                     .0,
             )
             .unwrap();
-            eprintln!("Crashed with {}", code);
+            eprintln!("Crashed with {code}");
         } else {
             eprintln!("Crashed without exception (probably due to SIGABRT)");
         };
