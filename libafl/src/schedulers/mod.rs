@@ -95,7 +95,6 @@ where
         if state.corpus().count() == 0 {
             Err(Error::empty("No entries in corpus".to_owned()))
         } else {
-            let len = state.corpus().count();
             random_corpus_entry(state)
         }
     }

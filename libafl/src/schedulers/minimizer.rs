@@ -112,23 +112,14 @@ where
                 .drain_filter(|_, other_idx| *other_idx == idx)
                 .map(|(entry, _)| entry)
                 .collect::<Vec<_>>();
-            meta.map
-                .values_mut()
-                .filter(|other_idx| **other_idx > idx)
-                .for_each(|other_idx| {
-                    // TODO
-                    // *other_idx -= 1;
-                });
             entries
         } else {
             return Ok(());
         };
         entries.sort_unstable(); // this should already be sorted, but just in case
         let mut map = HashMap::new();
-        for i in 0..state.corpus().count() {
-            // TODO: only active corpora
-            let id = state.corpus().id_manager().get(i).unwrap();
-            let mut old = state.corpus().get(id)?.borrow_mut();
+        for id in state.corpus().ids() {
+            let mut old = state.corpus().get(*id)?.borrow_mut();
             let factor = F::compute(&mut *old, state)?;
             if let Some(old_map) = old.metadata_mut().get_mut::<M>() {
                 let mut e_iter = entries.iter();
@@ -149,10 +140,10 @@ where
                                     .and_modify(|(f, idx)| {
                                         if *f > factor {
                                             *f = factor;
-                                            *idx = i;
+                                            *idx = *id;
                                         }
                                     })
-                                    .or_insert((factor, i));
+                                    .or_insert((factor, *id));
                             }
                             Ordering::Greater => {
                                 map_entry = map_iter.next();
@@ -165,9 +156,8 @@ where
             }
         }
         if let Some(meta) = state.metadata_mut().get_mut::<TopRatedsMetadata>() {
-            // TODO
-            // meta.map
-            //.extend(map.into_iter().map(|(entry, (_, idx))| (entry, idx)));
+            meta.map
+                .extend(map.into_iter().map(|(entry, (_, idx))| (entry, idx)));
         }
         Ok(())
     }
