@@ -232,7 +232,7 @@ fn main() {
         .arg("+define+WT_DCACHE")
         .arg(root_dir.join("src/util/sram.sv"))
         .arg("+incdir+src/axi_node")
-        .args(["--threads", "72"]) // ariane requires multiple threads :(
+        .arg("--no-threads") // ariane requires multiple threads :(
         .args(["--unroll-count", "256"])
         .arg("-Werror-PINMISSING")
         .arg("-Werror-IMPLICIT")
@@ -293,7 +293,7 @@ fn main() {
             .file(include.join("verilated_vpi.cpp"))
             .file(include.join("verilated_threads.cpp"))
             .file(include.join("verilated_timing.cpp"));
-        build.define("VL_THREADED", None);
+        // build.define("VL_THREADED", None);
         include.push("vltstd");
         build.include(&include);
     }

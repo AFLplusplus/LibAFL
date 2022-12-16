@@ -22,7 +22,5 @@ int main(void) {
 
   (*((void (*)()) INPUT_BUF))();
 
-  syscall(SYS_exit, 0, 0, 0); // hard terminate execution
-
   return 0;
 }

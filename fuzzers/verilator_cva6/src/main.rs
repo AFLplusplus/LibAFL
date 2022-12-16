@@ -148,7 +148,7 @@ fn main() -> Result<(), Error> {
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        Duration::from_secs(60),
+        Duration::from_secs(15),
         shmem,
     )?;
 
