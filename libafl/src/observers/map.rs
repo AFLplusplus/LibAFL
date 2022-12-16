@@ -70,7 +70,7 @@ fn init_count_class_16() {
 }
 
 /// Compute the hash of a slice
-fn hash_slice<T>(slice: &[T]) -> u64 {
+pub fn hash_slice<T>(slice: &[T]) -> u64 {
     let mut hasher = AHasher::new_with_keys(0, 0);
     let ptr = slice.as_ptr() as *const u8;
     let map_size = slice.len() / core::mem::size_of::<T>();

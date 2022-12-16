@@ -1,0 +1,16 @@
+[package]
+name = "libafl_verilator"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+bindgen = "0.63"
+cc = "1.0"
+
+[dependencies]
+hashbrown = { version = "0.13.1", features = ["serde"] }
+libafl = { path = "../libafl", features = ["std"], no-default-features = true }
+nix = "0.26"
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"] }

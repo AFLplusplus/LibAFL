@@ -100,8 +100,8 @@ macro_rules! none_input_converter {
 }
 
 /// An input for tests, mainly. There is no real use much else.
-#[derive(Copy, Clone, Serialize, Deserialize, Debug, Hash)]
-pub struct NopInput {}
+#[derive(Copy, Clone, Serialize, Deserialize, Debug, Hash, Default)]
+pub struct NopInput;
 impl Input for NopInput {
     fn generate_name(&self, _idx: usize) -> String {
         "nop-input".to_string()

@@ -1,3 +1,6 @@
 [submodule "libafl_concolic/symcc_runtime/symcc"]
 	path = libafl_concolic/symcc_runtime/symcc
 	url = https://github.com/AFLplusplus/symcc.git
+[submodule "fuzzers/verilator_cva6/cva6"]
+	path = fuzzers/verilator_cva6/cva6
+	url = https://github.com/openhwgroup/cva6.git

@@ -1,0 +1,13 @@
+diff --git a/tb/ariane_tb.cpp b/tb/ariane_tb.cpp
+index c64c4db..5b33159 100644
+--- a/tb/ariane_tb.cpp
++++ b/tb/ariane_tb.cpp
+@@ -100,7 +100,7 @@ EMULATOR DEBUG OPTIONS (only supported in debug build -- try `make debug`)\n",
+          );
+ }
+ 
+-int main(int argc, char **argv) {
++extern "C" int ariane_main(int argc, char **argv) {
+   std::clock_t c_start = std::clock();
+   auto t_start = std::chrono::high_resolution_clock::now();
+   bool verbose;
