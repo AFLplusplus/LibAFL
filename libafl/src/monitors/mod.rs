@@ -60,23 +60,7 @@ impl fmt::Display for UserStats {
 }
 
 /// Prettifies float values for human-readable output
-/// ```rust
-/// # use libafl::monitors::prettify;
-/// # fn main() {
-/// assert_eq!(prettify(123423123.0), "123.4M");
-/// assert_eq!(prettify(12342312.3), "12.34M");
-/// assert_eq!(prettify(1234231.23), "1.234M");
-/// assert_eq!(prettify(123423.123), "123.4k");
-/// assert_eq!(prettify(12342.3123), "12.34k");
-/// assert_eq!(prettify(1234.23123), "1.234k");
-/// assert_eq!(prettify(123.423123), "123.4");
-/// assert_eq!(prettify(12.3423123), "12.34");
-/// assert_eq!(prettify(1.23423123), "1.234");
-/// assert_eq!(prettify(0.123423123), "0.123");
-/// assert_eq!(prettify(0.0123423123), "0.012");
-/// # }
-/// ```
-pub fn prettify(value: f64) -> String {
+fn prettify_float(value: f64) -> String {
     let (value, suffix) = match value {
         value if value >= 1000000.0 => { (value/1000000.0, "M") }
         value if value >= 1000.0 => { (value/1000.0, "k") }
@@ -206,7 +190,7 @@ impl ClientStats {
 
     /// Executions per second
     fn execs_per_sec_pretty(&mut self, cur_time: Duration) -> String {
-        prettify(self.execs_per_sec(cur_time))
+        prettify_float(self.execs_per_sec(cur_time))
     }
 
     /// Update the user-defined stat with name and value
@@ -274,7 +258,7 @@ pub trait Monitor {
 
     /// Executions per second
     fn execs_per_sec_pretty(&mut self) -> String {
-        prettify(self.execs_per_sec())
+        prettify_float(self.execs_per_sec())
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
@@ -1083,5 +1067,24 @@ pub mod pybind {
         m.add_class::<PythonSimpleMonitor>()?;
         m.add_class::<PythonMonitor>()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::monitors::prettify_float;
+    #[test]
+    fn test_prettify_float() {
+        assert_eq!(prettify_float(123423123.0), "123.4M");
+        assert_eq!(prettify_float(12342312.3), "12.34M");
+        assert_eq!(prettify_float(1234231.23), "1.234M");
+        assert_eq!(prettify_float(123423.123), "123.4k");
+        assert_eq!(prettify_float(12342.3123), "12.34k");
+        assert_eq!(prettify_float(1234.23123), "1.234k");
+        assert_eq!(prettify_float(123.423123), "123.4");
+        assert_eq!(prettify_float(12.3423123), "12.34");
+        assert_eq!(prettify_float(1.23423123), "1.234");
+        assert_eq!(prettify_float(0.123423123), "0.123");
+        assert_eq!(prettify_float(0.0123423123), "0.012");
     }
 }
