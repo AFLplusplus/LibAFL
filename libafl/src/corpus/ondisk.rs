@@ -1,6 +1,5 @@
 //! The ondisk corpus stores unused testcases to disk.
 
-use alloc::vec::Vec;
 use core::{cell::RefCell, time::Duration};
 #[cfg(feature = "std")]
 use std::{fs, fs::File, io::Write};
@@ -13,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     bolts::serdeany::SerdeAnyMap,
-    corpus::{Corpus, Testcase},
+    corpus::{Corpus, CorpusId, TestcaseStorage, Testcase},
     inputs::{Input, UsesInput},
     state::HasMetadata,
     Error,
@@ -48,8 +47,8 @@ pub struct OnDiskCorpus<I>
 where
     I: Input,
 {
-    entries: Vec<RefCell<Testcase<I>>>,
-    current: Option<usize>,
+    entries: TestcaseStorage<I>,
+    current: Option<CorpusId>,
     dir_path: PathBuf,
     meta_format: Option<OnDiskMetadataFormat>,
 }
@@ -73,51 +72,51 @@ where
 
     /// Add an entry to the corpus and return its index
     #[inline]
-    fn add(&mut self, mut testcase: Testcase<I>) -> Result<usize, Error> {
+    fn add(&mut self, mut testcase: Testcase<I>) -> Result<CorpusId, Error> {
         self.save_testcase(&mut testcase)?;
-        self.entries.push(RefCell::new(testcase));
-        Ok(self.entries.len() - 1)
+        Ok(self.entries.insert(RefCell::new(testcase)))
     }
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
-        if idx >= self.entries.len() {
-            return Err(Error::key_not_found(format!("Index {idx} out of bounds")));
+    fn replace(&mut self, idx: CorpusId, mut testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+        if let Some(entry) = self.entries.map.get_mut(&idx) {
+            self.save_testcase(&mut testcase)?;
+            self.remove_testcase(&entry)?;
+            Ok(entry.replace(testcase))
+        } else {
+            Err(Error::key_not_found(format!("Index {idx} not found")))
         }
-        self.save_testcase(&mut testcase)?;
-        let previous = self.entries[idx].replace(testcase);
-        self.remove_testcase(&previous)?;
-        Ok(previous)
     }
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
-        if idx >= self.entries.len() {
-            Ok(None)
-        } else {
-            let prev = self.entries.remove(idx).into_inner();
+    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
+        let prev = self.entries.map.remove(&idx).map(|x| x.take());
+        if let Some(testcase) = prev {
             self.remove_testcase(&prev)?;
-            Ok(Some(prev))
         }
+        Ok(prev)
     }
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
-        Ok(&self.entries[idx])
+    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
+        self.entries
+            .map
+            .get(&idx)
+            .ok_or_else(|| Error::key_not_found(format!("Index {idx} not found")))
     }
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<usize> {
+    fn current(&self) -> &Option<CorpusId> {
         &self.current
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
+    fn current_mut(&mut self) -> &mut Option<CorpusId> {
         &mut self.current
     }
 }

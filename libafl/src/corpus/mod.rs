@@ -40,36 +40,116 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
     }
 
     /// Add an entry to the corpus and return its index
-    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<usize, Error>;
+    fn add(&mut self, testcase: Testcase<Self::Input>) -> Result<CorpusId, Error>;
 
     /// Replaces the testcase at the given idx, returning the existing.
     fn replace(
         &mut self,
-        idx: usize,
+        idx: CorpusId,
         testcase: Testcase<Self::Input>,
     ) -> Result<Testcase<Self::Input>, Error>;
 
     /// Removes an entry from the corpus, returning it if it was present.
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<Self::Input>>, Error>;
+    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<Self::Input>>, Error>;
 
     /// Get by id
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
+    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<Self::Input>>, Error>;
 
     /// Current testcase scheduled
-    fn current(&self) -> &Option<usize>;
+    fn current(&self) -> &Option<CorpusId>;
 
     /// Current testcase scheduled (mutable)
-    fn current_mut(&mut self) -> &mut Option<usize>;
+    fn current_mut(&mut self) -> &mut Option<CorpusId>;
+}
+
+/// An abstraction for the index that identify a testcase in the corpus
+#[derive(
+    Debug,
+    Clone, Copy,
+    PartialEq, Eq,
+    Hash,
+    PartialOrd, Ord,
+    Serialize, Deserialize
+)]
+#[repr(transparent)]
+pub struct CorpusId(usize);
+
+impl CorpusId {
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn next<I>(&self, storage: &TestcaseStorage<I>) -> Option<CorpusId> where
+    I: Input,{
+        if let Some(item) = storage.map.get(self) {
+            item.next
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn next<I>(&self, storage: &TestcaseStorage<I>) -> Option<CorpusId> where
+    I: Input,{
+        let mut range = storage.map.range(core::ops::Bound::Included(self), core::ops::Bound::Unbounded);
+        if let Some((self_id, _)) = range.next() {
+            if self != self_id {
+                return None;
+            }
+        }
+        if let Some((next_id, _)) = range.next() {
+            Some(next_id)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn prev<I>(&self, storage: &TestcaseStorage<I>) -> Option<CorpusId> where
+    I: Input,{
+        if let Some(item) = storage.map.get(self) {
+            item.prev
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn prev<I>(&self, storage: &TestcaseStorage<I>) -> Option<CorpusId> where
+    I: Input,{
+        let mut range = storage.map.range(core::ops::Bound::Unbounded, core::ops::Bound::Included(self));
+        if let Some((self_id, _)) = range.next_back() {
+            if self != self_id {
+                return None;
+            }
+        }
+        if let Some((prev_id, _)) = range.next_back() {
+            Some(prev_id)
+        } else {
+            None
+        }
+    }
+}
+
+impl From<usize> for CorpusId {
+    fn from(id: usize) -> Self {
+        Self(id)
+    }
+}
+
+#[cfg(not(feature = "corpus_btreemap"))]
+pub struct TestcaseStorageItem<I> where
+    I: Input, {
+    pub testcase: RefCell<Testcase<I>>,
+    pub prev: Option<CorpusId>,
+    pub next: Option<CorpusId>
 }
 
 #[cfg(not(feature = "corpus_btreemap"))]
 /// The map type in which testcases are stored (enable the feature 'corpus_btreemap' to use a `BTreeMap` instead of `HashMap`)
-pub type TestcaseStorageMap<I> = hashbrown::HashMap<usize, RefCell<Testcase<I>>>;
+pub type TestcaseStorageMap<I> = hashbrown::HashMap<CorpusId, TestcaseStorageItem<I>>;
 
 #[cfg(feature = "corpus_btreemap")]
 /// The map type in which testcases are stored (disable the feature 'corpus_btreemap' to use a `HashMap` instead of `BTreeMap`)
 pub type TestcaseStorageMap<I> =
-    alloc::collections::btree_map::BTreeMap<usize, RefCell<Testcase<I>>>;
+    alloc::collections::btree_map::BTreeMap<CorpusId, RefCell<Testcase<I>>>;
 
 /// Storage map for the testcases (used in `Corpus` implementations) with an incremental index
 #[derive(Default, Serialize, Deserialize, Clone, Debug)]
@@ -78,10 +158,13 @@ pub struct TestcaseStorage<I>
 where
     I: Input,
 {
-    /// The map in which testcases are stord
+    /// The map in which testcases are stored
     pub map: TestcaseStorageMap<I>,
     /// The progressive idx
-    pub progressive_idx: usize,
+    progressive_idx: usize,
+    /// Last inserted idx
+    #[cfg(not(feature = "corpus_btreemap"))]
+    last_idx: CorpusId,
 }
 
 impl<I> UsesInput for TestcaseStorage<I>
@@ -95,12 +178,58 @@ impl<I> TestcaseStorage<I>
 where
     I: Input,
 {
-    /// Insert a testcase assigning an index to it
-    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> usize {
-        let idx = self.progressive_idx;
+    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
+        let idx = CorpusId::from(self.progressive_idx);
+        self.progressive_idx += 1;
+        let prev = if let Some(last_idx) = self.last_idx {
+            self.map.get_mut(&last_idx).unwrap().next = Some(idx);
+            Some(last_idx)
+        } else {
+            None
+        };
+        self.map.insert(idx, TestcaseStorageItem { testcase, prev, next: None });
+        idx
+    }
+
+    /// Insert a testcase assigning a `CorpusId` to it
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn insert(&mut self, testcase: RefCell<Testcase<I>>) -> CorpusId {
+        let idx = CorpusId::from(self.progressive_idx);
         self.progressive_idx += 1;
         self.map.insert(idx, testcase);
         idx
+    }
+    
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn remove(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
+        if let Some(item) = self.map.remove(&idx) {
+            if let Some(prev) = item.prev {
+                self.map.get(&prev).unwrap().next = item.next;
+            }
+            if let Some(next) = item.next {
+                self.map.get(&next).unwrap().prev = item.prev;
+            }
+            Some(item)
+        } else {
+            None
+        }
+    }
+
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn remove(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
+        self.map.remove(&idx)
+    }
+
+    #[cfg(not(feature = "corpus_btreemap"))]
+    pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
+        self.map.get(&idx)
+    }
+
+    #[cfg(feature = "corpus_btreemap")]
+    pub fn get(&self, idx: CorpusId) -> Option<&RefCell<Testcase<I>>> {
+        self.map.get(&idx).map(|x| x.testcase)
     }
 
     /// Create new

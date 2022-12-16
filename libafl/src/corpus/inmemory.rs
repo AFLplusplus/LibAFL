@@ -5,7 +5,7 @@ use core::cell::RefCell;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    corpus::{Corpus, Testcase, TestcaseStorage},
+    corpus::{Corpus, CorpusId, Testcase, TestcaseStorage},
     inputs::{Input, UsesInput},
     Error,
 };
@@ -18,7 +18,7 @@ where
     I: Input,
 {
     entries: TestcaseStorage<I>,
-    current: Option<usize>,
+    current: Option<CorpusId>,
 }
 
 impl<I> UsesInput for InMemoryCorpus<I>
@@ -46,7 +46,7 @@ where
 
     /// Replaces the testcase at the given idx
     #[inline]
-    fn replace(&mut self, idx: usize, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
+    fn replace(&mut self, idx: CorpusId, testcase: Testcase<I>) -> Result<Testcase<I>, Error> {
         if let Some(entry) = self.entries.map.get_mut(&idx) {
             Ok(entry.replace(testcase))
         } else {
@@ -56,13 +56,13 @@ where
 
     /// Removes an entry from the corpus, returning it if it was present.
     #[inline]
-    fn remove(&mut self, idx: usize) -> Result<Option<Testcase<I>>, Error> {
+    fn remove(&mut self, idx: CorpusId) -> Result<Option<Testcase<I>>, Error> {
         Ok(self.entries.map.remove(&idx).map(|x| x.take()))
     }
 
     /// Get by id
     #[inline]
-    fn get(&self, idx: usize) -> Result<&RefCell<Testcase<I>>, Error> {
+    fn get(&self, idx: CorpusId) -> Result<&RefCell<Testcase<I>>, Error> {
         self.entries
             .map
             .get(&idx)
@@ -71,13 +71,13 @@ where
 
     /// Current testcase scheduled
     #[inline]
-    fn current(&self) -> &Option<usize> {
+    fn current(&self) -> &Option<CorpusId> {
         &self.current
     }
 
     /// Current testcase scheduled (mutable)
     #[inline]
-    fn current_mut(&mut self) -> &mut Option<usize> {
+    fn current_mut(&mut self) -> &mut Option<CorpusId> {
         &mut self.current
     }
 }
