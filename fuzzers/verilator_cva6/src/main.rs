@@ -2,25 +2,22 @@
 #![feature(concat_bytes)]
 
 use std::{
-    ffi::{c_char, c_int, CString},
+    ffi::CString,
     fs::File,
     io::{Seek, SeekFrom, Write},
-    os::{fd::FromRawFd, unix::ffi::OsStrExt},
+    os::fd::FromRawFd,
     time::Duration,
 };
 
 use libafl::{
     bolts::{current_nanos, AsSlice},
-    corpus::{Corpus, InMemoryCorpus, OnDiskCorpus},
+    corpus::{Corpus, InMemoryCorpus},
     events::SimpleEventManager,
-    executors::{
-        inprocess::TimeoutInProcessForkExecutor, ExitKind, InProcessExecutor, TimeoutExecutor,
-    },
+    executors::{inprocess::TimeoutInProcessForkExecutor, ExitKind},
     feedback_or,
     feedbacks::{MaxMapFeedback, TimeFeedback},
     generators::RandBytesGenerator,
     inputs::{BytesInput, HasTargetBytes},
-    monitors::SimplePrintingMonitor,
     mutators::StdScheduledMutator,
     prelude::{
         havoc_mutations, tuple_list, ShMemProvider, StdRand, StdShMemProvider, TimeObserver,
@@ -37,9 +34,16 @@ use nix::{fcntl::OFlag, sys::stat::Mode};
 
 const BASE_EXECUTABLE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/base-executable"));
 
-extern "C" {
-    fn ariane_main(argc: c_int, argv: *const *const c_char) -> c_int;
+mod wrapper {
+    #![allow(non_snake_case)]
+    #![allow(non_camel_case_types)]
+    #![allow(non_upper_case_globals)]
+    #![allow(unused)]
+
+    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
+
+use wrapper::*;
 
 fn main() -> Result<(), Error> {
     let mut mgr = SimpleEventManager::printing();
@@ -74,7 +78,7 @@ fn main() -> Result<(), Error> {
         // Same for objective feedbacks
         &mut objective,
     )?;
-    state.set_max_size(1 << 13); // see cva6-base.c for details
+    state.set_max_size(1 << 12); // see cva6-base.c for details
 
     let mutator = StdScheduledMutator::new(havoc_mutations());
     let power = StdPowerMutationalStage::new(mutator, &cov_observer);
@@ -103,27 +107,15 @@ fn main() -> Result<(), Error> {
     })?;
     let mut input_file = unsafe { File::from_raw_fd(input_fd) };
     let input_filename = CString::new(format!("/proc/self/fd/{}", input_fd)).unwrap();
-    let jtag_setting = CString::new("+jtag_rbb_enable=0").unwrap();
-    let executable_name = CString::new(std::env::current_exe()?.as_os_str().as_bytes()).unwrap();
-
-    let cmd_args = [
-        executable_name.as_ptr(),
-        jtag_setting.as_ptr(),
-        input_filename.as_ptr(),
-    ];
-
-    // at least 4 sequential c.nops
-    let needle = Vec::from_iter(std::iter::repeat(1u16.to_le_bytes()).take(4).flatten());
-    let nop_offset = BASE_EXECUTABLE
-        .array_windows::<8>()
-        .enumerate()
-        .find_map(|(i, bytes)| if &needle == bytes { Some(i) } else { None })
-        .unwrap();
-
-    println!("offset: {}", nop_offset);
 
     // write the base executable
     input_file.write_all(BASE_EXECUTABLE).unwrap();
+
+    println!("Initialising CVA6, this may take some time...");
+    unsafe {
+        __libafl_ariane_start(input_filename.as_ptr());
+    }
+    println!("Initialised CVA6, ready to fuzz!");
 
     let mut harness = |input: &BytesInput| {
         let target = input.target_bytes();
@@ -132,14 +124,18 @@ fn main() -> Result<(), Error> {
         // for simplicity, we will write the input to the file
         // with customisation, we could hypothetically load this directly with DPI... but this is a PoC :)
 
-        // write the assembly instructions into the perscribed needle
-        input_file.seek(SeekFrom::Start(nop_offset as u64)).unwrap();
+        // write the assembly instructions into the prescribed needle
+        input_file.set_len(buf.len() as u64).unwrap();
+        input_file.seek(SeekFrom::Start(0)).unwrap();
+        input_file
+            .write_all(&(buf.len() as u16 + 2).to_le_bytes())
+            .unwrap();
         input_file.write_all(buf).unwrap();
+        input_file.write_all(&0x8082u16.to_le_bytes()).unwrap(); // c.ret
+        input_file.flush().unwrap();
         input_file.seek(SeekFrom::Start(0)).unwrap();
 
-        unsafe {
-            ariane_main(cmd_args.len() as c_int, cmd_args.as_ptr());
-        }
+        let _ = unsafe { __libafl_ariane_test_one_input(input_fd) }; // result unused for now
 
         ExitKind::Ok
     };
@@ -152,7 +148,7 @@ fn main() -> Result<(), Error> {
         &mut fuzzer,
         &mut state,
         &mut mgr,
-        Duration::from_secs(600),
+        Duration::from_secs(60),
         shmem,
     )?;
 

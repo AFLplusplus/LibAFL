@@ -24,17 +24,19 @@ const ARIANE_PKG: [&'static str; 13] = [
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=cva6");
-    println!("cargo:rerun-if-changed=ariane_tb.cpp.patch");
+    println!("cargo:rerun-if-changed=ariane_tb_libafl.cpp");
     println!("cargo:rerun-if-changed=cva6-base.c");
+    println!("cargo:rerun-if-changed=harness.h");
+    println!("cargo:rerun-if-changed=interop.h");
     println!("cargo:rerun-if-changed=riscv-tests");
 
     let riscv_path = std::env::var("RISCV").expect("Path to RISCV root must be defined.");
 
     let mut root_dir = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap());
-    let patch_file = root_dir.join("ariane_tb.cpp.patch");
-    root_dir.push("cva6");
+    let patch_file = root_dir.join("syscalls.c.patch");
+    root_dir.push("riscv-tests");
 
-    let patch_target = root_dir.join("tb/ariane_tb.cpp");
+    let patch_target = root_dir.join("benchmarks/common/syscalls.c");
     // apply patch if possible
     if patch_target.metadata().unwrap().modified().unwrap()
         < patch_file.metadata().unwrap().modified().unwrap()
@@ -62,6 +64,9 @@ fn main() {
             .unwrap()
             .success());
     }
+
+    root_dir.pop();
+    root_dir.push("cva6");
 
     // code derived from the Makefile for cva6 -- this WILL need to be changed if using a different version
     let mut verilator = if let Some(root) = std::env::var_os("VERILATOR_ROOT") {
@@ -298,11 +303,10 @@ fn main() {
         "tb/dpi/SimJTAG.cc",
         "tb/dpi/remote_bitbang.cc",
         "tb/dpi/msim_helper.cc",
-        "tb/ariane_tb.cpp",
     ] {
         build.file(root_dir.join(file));
     }
-    build.compile("cva6");
+    build.file("ariane_tb_libafl.cpp").compile("cva6");
 
     let mut cmd = cc::Build::new()
         .no_default_flags(true)
@@ -333,6 +337,17 @@ fn main() {
         .arg(PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("base-executable"));
     assert!(cmd.status().unwrap().success());
 
+    let bindings = bindgen::builder()
+        .header("harness.h")
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .generate()
+        .unwrap();
+
+    let out_path = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    bindings
+        .write_to_file(out_path.join("bindings.rs"))
+        .expect("Couldn't write bindings!");
+
     // sadly, the ariane team did not emit the lib with a lib prefix, and we cannot set the name
     // without thoroughly breaking other things
     println!(
@@ -344,4 +359,5 @@ fn main() {
     println!("cargo:rustc-link-search={riscv_path}/lib");
     println!("cargo:rustc-link-arg=-Wl,-rpath,{riscv_path}/lib");
     println!("cargo:rustc-link-lib=fesvr");
+    println!("cargo:rustc-link-lib=dl");
 }

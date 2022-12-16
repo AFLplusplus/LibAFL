@@ -1,0 +1,13 @@
+diff --git a/benchmarks/common/syscalls.c b/benchmarks/common/syscalls.c
+index 39547b3..4041ae8 100644
+--- a/benchmarks/common/syscalls.c
++++ b/benchmarks/common/syscalls.c
+@@ -15,7 +15,7 @@
+ extern volatile uint64_t tohost;
+ extern volatile uint64_t fromhost;
+ 
+-static uintptr_t syscall(uintptr_t which, uint64_t arg0, uint64_t arg1, uint64_t arg2)
++uintptr_t syscall(uintptr_t which, uint64_t arg0, uint64_t arg1, uint64_t arg2)
+ {
+   volatile uint64_t magic_mem[8] __attribute__((aligned(64)));
+   magic_mem[0] = which;

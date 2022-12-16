@@ -1608,10 +1608,10 @@ where
                     // we can't do this from the parent, timerid is unique to each process.
                     libc::timer_create(libc::CLOCK_MONOTONIC, null_mut(), addr_of_mut!(timerid));
 
-                    println!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
-                    let v =
+                    // println!("Set timer! {:#?} {timerid:#?}", self.itimerspec);
+                    let _ =
                         libc::timer_settime(timerid, 0, addr_of_mut!(self.itimerspec), null_mut());
-                    println!("{v:#?} {}", nix::errno::errno());
+                    // println!("{v:#?} {}", nix::errno::errno());
                     (self.harness_fn)(input);
 
                     self.observers
@@ -1628,7 +1628,7 @@ where
                     self.shmem_provider.post_fork(false)?;
 
                     let res = waitpid(child, None)?;
-                    println!("{res:#?}");
+                    // println!("{res:#?}");
                     match res {
                         WaitStatus::Signaled(_, signal, _) => match signal {
                             nix::sys::signal::Signal::SIGALRM

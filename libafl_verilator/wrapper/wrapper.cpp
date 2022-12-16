@@ -13,6 +13,10 @@ void __libafl_set_coverage_file_fd(int fd) {
   __libafl_verilator_coverage_fd = fd;
 }
 
+int __libafl_get_coverage_file_fd() {
+  return __libafl_verilator_coverage_fd;
+}
+
 void __libafl_process_verilator_coverage() {
   if (__libafl_verilator_coverage_filename == nullptr) {
     if (__libafl_verilator_coverage_fd == -1) {

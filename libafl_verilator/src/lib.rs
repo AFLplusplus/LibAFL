@@ -53,11 +53,11 @@ pub unsafe fn initialize_coverage_file<P: ?Sized + NixPath>(dir: &P) -> Result<(
 fn get_coverage_file() -> Result<File, Error> {
     unsafe {
         loop {
-            if let Some(file) = COVERAGE_FILE.as_mut() {
-                file.seek(SeekFrom::Start(0))?; // reseek to the beginning
-                return Ok(file.try_clone()?);
-            }
-            initialize_coverage_file("/tmp")?;
+            let file = COVERAGE_FILE
+                .as_mut()
+                .expect("Must initialise the coverage file before this point!");
+            file.seek(SeekFrom::Start(0))?; // reseek to the beginning
+            return Ok(file.try_clone()?);
         }
     }
 }
@@ -71,6 +71,9 @@ pub struct VerilatorMapObserver {
 
 impl VerilatorMapObserver {
     pub fn new(name: String) -> Self {
+        unsafe {
+            initialize_coverage_file("/tmp").unwrap(); // ensure it is initialised by this point
+        }
         Self {
             name,
             mapping: Default::default(),
@@ -197,8 +200,8 @@ where
         self.process_verilator_coverage()
     }
 
-    fn pre_exec_child(&mut self, _state: &mut S, _input: &S::Input) -> Result<(), Error> {
-        self.reset_map() // we do not need to use __libafl_reset_verilator_coverage() because we fork
+    fn pre_exec_child(&mut self, state: &mut S, input: &S::Input) -> Result<(), Error> {
+        self.pre_exec(state, input)
     }
 
     fn post_exec_child(
