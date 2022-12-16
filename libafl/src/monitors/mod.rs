@@ -62,26 +62,25 @@ impl fmt::Display for UserStats {
 /// Prettifies float values for human-readable output
 fn prettify_float(value: f64) -> String {
     let (value, suffix) = match value {
-        value if value >= 1000000.0 => { (value/1000000.0, "M") }
-        value if value >= 1000.0 => { (value/1000.0, "k") }
-        value => { (value, "") }
+        value if value >= 1000000.0 => (value / 1000000.0, "M"),
+        value if value >= 1000.0 => (value / 1000.0, "k"),
+        value => (value, ""),
     };
     match value {
         value if value >= 1000.0 => {
-            format!("{}{}", value, suffix)
+            format!("{value}{suffix}")
         }
         value if value >= 100.0 => {
-            format!("{:.1}{}", value, suffix)
+            format!("{value:.1}{suffix}")
         }
         value if value >= 10.0 => {
-            format!("{:.2}{}", value, suffix)
+            format!("{value:.2}{suffix}")
         }
         value => {
-            format!("{:.3}{}", value, suffix)
+            format!("{value:.3}{suffix}")
         }
     }
 }
-
 
 /// A simple struct to keep track of client monitor
 #[derive(Debug, Clone, Default, Serialize)]
