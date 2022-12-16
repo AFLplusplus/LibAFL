@@ -90,6 +90,28 @@ pub trait Corpus: UsesInput + Serialize + for<'de> Deserialize<'de> {
 
     /// Get the last inserted corpus id
     fn last(&self) -> Option<CorpusId>;
+    
+    fn indexes<'a>(&'a self) -> CorpusIdIterator<'a, Self> {
+        CorpusIdIterator { corpus: self, cur: self.first() }
+    }
+}
+
+pub struct CorpusIdIterator<'a, C> where C: Corpus {
+    corpus: &'a C,
+    cur: Option<CorpusId>
+}
+
+impl<'a, C> Iterator for CorpusIdIterator<'a, C> {
+    type Item = CorpusId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(cur) = self.cur {
+            self.cur = self.corpus.next(cur);
+            self.cur
+        } else {
+            None
+        }
+    }
 }
 
 /// `Corpus` Python bindings

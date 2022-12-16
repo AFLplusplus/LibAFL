@@ -1,31 +1,31 @@
 //! Schedule the access to the Corpus.
 
 use core::marker::PhantomData;
+use alloc::borrow::ToOwned;
 
 pub mod queue;
 pub use queue::QueueScheduler;
-/*
-pub mod probabilistic_sampling;
-pub use probabilistic_sampling::ProbabilitySamplingScheduler;
-
-pub mod accounting;
-pub use accounting::CoverageAccountingScheduler;
-
-pub mod testcase_score;
-pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
 
 pub mod minimizer;
 pub use minimizer::{
     IndexesLenTimeMinimizerScheduler, LenTimeMinimizerScheduler, MinimizerScheduler,
 };
 
-pub mod weighted;
-pub use weighted::{StdWeightedScheduler, WeightedScheduler};
+/*
+pub mod testcase_score;
+pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
 
 pub mod powersched;
-use alloc::borrow::ToOwned;
-
 pub use powersched::PowerQueueScheduler;
+
+pub mod probabilistic_sampling;
+pub use probabilistic_sampling::ProbabilitySamplingScheduler;
+
+pub mod accounting;
+pub use accounting::CoverageAccountingScheduler;
+
+pub mod weighted;
+pub use weighted::{StdWeightedScheduler, WeightedScheduler};
 
 pub mod tuneable;
 pub use tuneable::*;
