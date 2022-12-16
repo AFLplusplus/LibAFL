@@ -76,7 +76,6 @@ pub use asan::{init_with_asan, QemuAsanHelper};
 
 pub mod blocks;
 
-#[cfg(not(cpu_target = "mips"))]
 pub mod calls;
 pub mod drcov;
 
