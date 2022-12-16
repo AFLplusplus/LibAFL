@@ -3,6 +3,9 @@
 use core::marker::PhantomData;
 use alloc::borrow::ToOwned;
 
+pub mod testcase_score;
+pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
+
 pub mod queue;
 pub use queue::QueueScheduler;
 
@@ -12,9 +15,6 @@ pub use minimizer::{
 };
 
 /*
-pub mod testcase_score;
-pub use testcase_score::{LenTimeMulTestcaseScore, TestcaseScore};
-
 pub mod powersched;
 pub use powersched::PowerQueueScheduler;
 

@@ -101,7 +101,7 @@ pub struct CorpusIdIterator<'a, C> where C: Corpus {
     cur: Option<CorpusId>
 }
 
-impl<'a, C> Iterator for CorpusIdIterator<'a, C> {
+impl<'a, C> Iterator for CorpusIdIterator<'a, C> where C: Corpus {
     type Item = CorpusId;
 
     fn next(&mut self) -> Option<Self::Item> {
