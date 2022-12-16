@@ -39,6 +39,12 @@ impl CorpusId {
     }
 }
 
+impl From<usize> for CorpusId {
+    fn from(id: usize) -> Self {
+        Self { id }
+    }
+}
+
 /// A [`CorpusIdManager`] is responsible for keeping track of active [`CorpusId`]s. It creates new ones, ensures that
 /// they are unique, and maps them to their corresponding indices in the corpus. The `active_ids` field
 #[cfg_attr(feature = "python", pyclass)]
