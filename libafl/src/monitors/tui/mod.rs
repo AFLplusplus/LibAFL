@@ -169,13 +169,14 @@ pub struct ClientTuiContext {
     pub corpus: u64,
     pub objectives: u64,
     pub executions: u64,
-    pub exec_sec: f64,
+    /// Float value formatted as String
+    pub exec_sec: String,
 
     pub user_stats: HashMap<String, UserStats>,
 }
 
 impl ClientTuiContext {
-    pub fn grab_data(&mut self, client: &ClientStats, exec_sec: f64) {
+    pub fn grab_data(&mut self, client: &ClientStats, exec_sec: String) {
         self.corpus = client.corpus_size;
         self.objectives = client.objective_size;
         self.executions = client.executions;
@@ -276,7 +277,7 @@ impl Monitor for TuiMonitor {
         }
 
         let client = self.client_stats_mut_for(sender_id);
-        let exec_sec = client.execs_per_sec(cur_time);
+        let exec_sec = client.execs_per_sec_pretty(cur_time);
 
         let sender = format!("#{sender_id}");
         let pad = if event_msg.len() + sender.len() < 13 {
@@ -286,7 +287,7 @@ impl Monitor for TuiMonitor {
         };
         let head = format!("{event_msg}{pad} {sender}");
         let mut fmt = format!(
-            "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
+            "[{}] corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {

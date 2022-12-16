@@ -139,7 +139,7 @@ where
 
         // display stats in a SimpleMonitor format
         let fmt = format!(
-            "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
+            "[Prometheus] [{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),
@@ -147,7 +147,7 @@ where
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
         (self.print_fn)(fmt);
 

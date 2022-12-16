@@ -49,24 +49,24 @@ where
         };
         let head = format!("{event_msg}{pad} {sender}");
         let global_fmt = format!(
-            "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
+            "[{}]  (GLOBAL) run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             head,
             format_duration_hms(&(current_time() - self.start_time)),
             self.client_stats().len(),
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
         (self.print_fn)(global_fmt);
 
         let client = self.client_stats_mut_for(sender_id);
         let cur_time = current_time();
-        let exec_sec = client.execs_per_sec(cur_time);
+        let exec_sec = client.execs_per_sec_pretty(cur_time);
 
         let pad = " ".repeat(head.len());
         let mut fmt = format!(
-            " {}   (CLIENT) corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
+            " {}   (CLIENT) corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             pad, client.corpus_size, client.objective_size, client.executions, exec_sec
         );
         for (key, val) in &client.user_monitor {

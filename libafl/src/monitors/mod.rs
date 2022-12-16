@@ -164,6 +164,16 @@ impl ClientStats {
         (self.executions as f64) / elapsed
     }
 
+    /// Executions per second
+    fn execs_per_sec_pretty(&mut self, cur_time: Duration) -> String {
+        match self.execs_per_sec(cur_time) {
+            value if value >= 1000.0 => { format!("{}", value) }
+            value if value >= 100.0 => { format!("{:.1}", value) }
+            value if value >= 10.0 => { format!("{:.2}", value) }
+            value => { format!("{:.3}", value) }
+        }
+    }
+
     /// Update the user-defined stat with name and value
     pub fn update_user_stats(&mut self, name: String, value: UserStats) {
         self.user_monitor.insert(name, value);
@@ -225,6 +235,15 @@ pub trait Monitor {
         self.client_stats_mut()
             .iter_mut()
             .fold(0.0, |acc, x| acc + x.execs_per_sec(cur_time))
+    }
+
+    /// Executions per second
+    fn execs_per_sec_pretty(&mut self) -> String {
+        match self.execs_per_sec() {
+            value if value > 1000.0 => { format!("{}", value) }
+            value if value > 100.0 => { format!("{:.1}", value) }
+            value => { format!("{:.2}", value) }
+        }
     }
 
     /// The client monitor for a specific id, creating new if it doesn't exist
@@ -320,7 +339,7 @@ impl Monitor for SimplePrintingMonitor {
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         println!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),
@@ -328,7 +347,7 @@ impl Monitor for SimplePrintingMonitor {
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
 
         // Only print perf monitor if the feature is enabled
@@ -389,7 +408,7 @@ where
 
     fn display(&mut self, event_msg: String, sender_id: u32) {
         let fmt = format!(
-            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {:.2}",
+            "[{} #{}] run time: {}, clients: {}, corpus: {}, objectives: {}, executions: {}, exec/sec: {}",
             event_msg,
             sender_id,
             format_duration_hms(&(current_time() - self.start_time)),
@@ -397,7 +416,7 @@ where
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
         (self.print_fn)(fmt);
 
