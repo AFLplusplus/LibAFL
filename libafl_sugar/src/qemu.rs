@@ -147,10 +147,15 @@ where
                               mut mgr: LlmpRestartingEventManager<_, _>,
                               _core_id| {
             // Create an observation channel using the coverage map
-            let edges = unsafe { &mut edges::EDGES_MAP };
-            let edges_counter = unsafe { &mut edges::MAX_EDGES_NUM };
-            let edges_observer =
-                HitcountsMapObserver::new(VariableMapObserver::new("edges", edges, edges_counter));
+            let edges_observer = unsafe {
+                HitcountsMapObserver::new(VariableMapObserver::new(
+                    "edges",
+                    edges::EDGES_MAP.as_mut_ptr,
+                    edges::EDGES_MAP.len(),
+                    MAX_EDGES_NUM,
+                    edges_counter,
+                ))
+            };
 
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");

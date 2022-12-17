@@ -42,8 +42,7 @@ use libafl::{
 };
 use libafl_targets::{
     CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
-    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, EDGES_MAP_PTR,
-    MAX_EDGES_NUM,
+    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, EDGES_MAP_PTR, MAX_EDGES_NUM,
 };
 
 /// Set up our coverage map.

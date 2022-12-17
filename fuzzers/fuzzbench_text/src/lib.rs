@@ -56,8 +56,7 @@ use libafl::{
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, EDGES_MAP,
-    MAX_EDGES_NUM,
+    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, EDGES_MAP, MAX_EDGES_NUM,
 };
 #[cfg(unix)]
 use nix::{self, unistd::dup};
