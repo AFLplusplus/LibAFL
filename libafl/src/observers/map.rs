@@ -516,8 +516,12 @@ where
     T: Default + Copy + 'static + Serialize + serde::de::DeserializeOwned,
 {
     /// Creates a new [`MapObserver`]
+    ///
+    /// # Safety
+    /// The observer will keep a pointer to the map.
+    /// Hence, the map may never move in memory.
     #[must_use]
-    pub fn new<S>(name: S, map: &'a mut [T]) -> Self
+    pub unsafe fn new<S>(name: S, map: &'a mut [T]) -> Self
     where
         S: Into<String>,
     {

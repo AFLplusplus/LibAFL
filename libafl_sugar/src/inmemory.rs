@@ -33,7 +33,7 @@ use libafl::{
     state::{HasCorpus, HasMetadata, StdState},
     Error,
 };
-use libafl_targets::{CmpLogObserver, CMPLOG_MAP, EDGES_MAP, MAX_EDGES_NUM};
+use libafl_targets::{CmpLogObserver, EDGES_MAP, MAX_EDGES_NUM};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
@@ -149,8 +149,7 @@ where
             // Create an observation channel to keep track of the execution time
             let time_observer = TimeObserver::new("time");
 
-            let cmplog = unsafe { &mut CMPLOG_MAP };
-            let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+            let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR

@@ -156,8 +156,7 @@ where
             let time_observer = TimeObserver::new("time");
 
             // Keep tracks of CMPs
-            let cmplog = unsafe { &mut cmplog::CMPLOG_MAP };
-            let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+            let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
             // Feedback to rate the interestingness of an input
             // This one is composed by two Feedbacks in OR

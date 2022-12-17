@@ -106,7 +106,7 @@ pub fn main() {
         // differential mode
         let map_observer = HitcountsIterableMapObserver::new(MultiMapObserver::differential(
             "combined-edges",
-            unsafe { &mut COMBINED_EDGES },
+            unsafe { COMBINED_EDGES },
         ));
         (
             first_map_observer,
@@ -125,9 +125,9 @@ pub fn main() {
 
         // create the base maps used to observe the different executors by splitting a slice
         let mut first_map_observer =
-            StdMapObserver::new("first-edges", unsafe { &mut EDGES[..MAX_EDGES_NUM] });
+            StdMapObserver::new("first-edges", unsafe { EDGES[..MAX_EDGES_NUM] });
         let mut second_map_observer =
-            StdMapObserver::new("second-edges", unsafe { &mut EDGES[MAX_EDGES_NUM..] });
+            StdMapObserver::new("second-edges", unsafe { EDGES[MAX_EDGES_NUM..] });
 
         // create a map swapper so that we can replace the coverage map pointer (requires feature pointer_maps!)
         let map_swapper =

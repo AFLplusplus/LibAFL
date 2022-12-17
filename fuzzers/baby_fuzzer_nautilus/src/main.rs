@@ -46,7 +46,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+    let observer = StdMapObserver::new("signals", unsafe { SIGNALS });
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(

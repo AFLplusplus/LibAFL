@@ -45,7 +45,7 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper, CMPLOG_MAP_PTR},
+    cmplog::{CmpLogMap, CmpLogObserver, QemuCmpLogChildHelper},
     edges::{QemuEdgeCoverageChildHelper, EDGES_MAP_PTR, EDGES_MAP_SIZE},
     elf::EasyElf,
     emu::Emulator,
@@ -213,7 +213,7 @@ fn fuzz(
         .new_shmem(core::mem::size_of::<CmpLogMap>())
         .unwrap();
     let cmplog = cmp_shmem.as_mut_slice();
-    unsafe { CMPLOG_MAP_PTR = cmplog.as_mut_ptr() as *mut CmpLogMap };
+    unsafe { cmplog_map_ptr = cmplog.as_mut_ptr() as *mut CmpLogMap };
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
@@ -237,8 +237,7 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer =
-        CmpLogObserver::new("cmplog", unsafe { CMPLOG_MAP_PTR.as_mut().unwrap() }, true);
+    let cmplog_observer = CmpLogObserver::with_map_ptr("cmplog", cmplog_map_ptr, true);
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 

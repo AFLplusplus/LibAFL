@@ -56,7 +56,7 @@ use libafl::{
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 use libafl_targets::autotokens;
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, CMPLOG_MAP, EDGES_MAP,
+    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, EDGES_MAP,
     MAX_EDGES_NUM,
 };
 #[cfg(unix)]
@@ -316,8 +316,7 @@ fn fuzz_binary(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog = unsafe { &mut CMPLOG_MAP };
-    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 
@@ -520,8 +519,7 @@ fn fuzz_text(
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
 
-    let cmplog = unsafe { &mut CMPLOG_MAP };
-    let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+    let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
     // New maximization map feedback linked to the edges observer and the feedback state
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, true);

@@ -45,7 +45,7 @@ use libafl_frida::{
     executor::FridaInProcessExecutor,
     helper::FridaInstrumentationHelper,
 };
-use libafl_targets::cmplog::{CmpLogObserver, CMPLOG_MAP};
+use libafl_targets::cmplog::CmpLogObserver;
 
 /// The main fn, usually parsing parameters, and starting the fuzzer
 pub fn main() {
@@ -324,7 +324,7 @@ unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
                 }
 
                 // Create an observation channel using cmplog map
-                let cmplog_observer = CmpLogObserver::new("cmplog", &mut CMPLOG_MAP, true);
+                let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
                 let mut executor = ShadowExecutor::new(executor, tuple_list!(cmplog_observer));
 

@@ -42,7 +42,7 @@ use libafl::{
 };
 use libafl_targets::{
     CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
-    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, CMPLOG_MAP, EDGES_MAP_PTR,
+    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, EDGES_MAP_PTR,
     MAX_EDGES_NUM,
 };
 
@@ -229,8 +229,7 @@ pub fn LLVMFuzzerRunDriver(
         let time_observer = TimeObserver::new("time");
 
         // Create the Cmp observer
-        let cmplog = unsafe { &mut CMPLOG_MAP };
-        let cmplog_observer = CmpLogObserver::new("cmplog", cmplog, true);
+        let cmplog_observer = CmpLogObserver::new("cmplog", true);
 
         // Feedback to rate the interestingness of an input
         // This one is composed by two Feedbacks in OR
