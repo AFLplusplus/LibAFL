@@ -152,7 +152,7 @@ where
                     "edges",
                     edges::EDGES_MAP.as_mut_ptr,
                     edges::EDGES_MAP.len(),
-                    MAX_EDGES_NUM,
+                    edges::MAX_EDGES_NUM,
                     edges_counter,
                 ))
             };
