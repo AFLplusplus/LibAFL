@@ -6,7 +6,7 @@ use alloc::string::{String, ToString};
 use core::fmt::{self, Debug, Formatter};
 
 use libafl::{
-    bolts::{ownedref::OwnedPtrMut, tuples::Named},
+    bolts::{ownedref::OwnedMutPtr, tuples::Named},
     executors::ExitKind,
     inputs::UsesInput,
     observers::{CmpMap, CmpObserver, CmpValues, Observer},
@@ -179,8 +179,8 @@ pub use libafl_cmplog_enabled as CMPLOG_ENABLED;
 /// A [`CmpObserver`] observer for `CmpLog`
 #[derive(Debug)]
 pub struct CmpLogObserver {
-    map: OwnedPtrMut<CmpLogMap>,
-    size: Option<OwnedPtrMut<usize>>,
+    map: OwnedMutPtr<CmpLogMap>,
+    size: Option<OwnedMutPtr<usize>>,
     add_meta: bool,
     name: String,
 }
@@ -252,7 +252,7 @@ impl CmpLogObserver {
             name: name.to_string(),
             size: None,
             add_meta,
-            map: OwnedPtrMut::Ptr(map),
+            map: OwnedMutPtr::Ptr(map),
         }
     }
 

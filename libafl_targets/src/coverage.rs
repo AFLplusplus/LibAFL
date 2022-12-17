@@ -53,7 +53,7 @@ pub fn autotokens() -> Result<Tokens, Error> {
 #[no_mangle]
 pub static mut __afl_map_size: usize = EDGES_MAP_SIZE;
 pub use __afl_map_size as EDGES_MAP_PTR_SIZE;
-use libafl::bolts::ownedref::OwnedSliceMut;
+use libafl::bolts::ownedref::OwnedMutSlice;
 
 /// Gets the edges map from the `EDGES_MAP_PTR` raw pointer.
 ///
@@ -62,9 +62,9 @@ use libafl::bolts::ownedref::OwnedSliceMut;
 /// This function will crash if `EDGES_MAP_PTR` is not a valid pointer.
 /// The `EDGES_MAP_PTR_SIZE` needs to be smaller than, or equal to the size of the map.
 #[must_use]
-pub unsafe fn edges_map_from_ptr<'a>() -> OwnedSliceMut<'a, u8> {
+pub unsafe fn edges_map_from_ptr<'a>() -> OwnedMutSlice<'a, u8> {
     debug_assert!(!EDGES_MAP_PTR.is_null());
-    OwnedSliceMut::from_raw_parts_mut(EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE)
+    OwnedMutSlice::from_raw_parts_mut(EDGES_MAP_PTR, EDGES_MAP_PTR_SIZE)
 }
 
 /// Gets the current maximum number of edges tracked.
@@ -95,7 +95,7 @@ mod swap {
     use core::fmt::Debug;
 
     use libafl::{
-        bolts::{ownedref::OwnedSliceMut, tuples::Named, AsMutSlice},
+        bolts::{ownedref::OwnedMutSlice, tuples::Named, AsMutSlice},
         inputs::UsesInput,
         observers::{DifferentialObserver, Observer, ObserversTuple, StdMapObserver},
         Error,
@@ -110,8 +110,8 @@ mod swap {
     #[allow(clippy::unsafe_derive_deserialize)]
     #[derive(Debug, Serialize, Deserialize)]
     pub struct DifferentialAFLMapSwapObserver<'a, 'b> {
-        first_map: OwnedSliceMut<'a, u8>,
-        second_map: OwnedSliceMut<'b, u8>,
+        first_map: OwnedMutSlice<'a, u8>,
+        second_map: OwnedMutSlice<'b, u8>,
         first_name: String,
         second_name: String,
         name: String,
@@ -129,24 +129,24 @@ mod swap {
                 name: format!("differential_{}_{}", first.name(), second.name()),
                 first_map: unsafe {
                     let slice = first.map_mut().as_mut_slice();
-                    OwnedSliceMut::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
+                    OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
                 },
                 second_map: unsafe {
                     let slice = second.map_mut().as_mut_slice();
-                    OwnedSliceMut::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
+                    OwnedMutSlice::from_raw_parts_mut(slice.as_mut_ptr(), slice.len())
                 },
             }
         }
 
         /// Get the first map
         #[must_use]
-        pub fn first_map(&self) -> &OwnedSliceMut<'a, u8> {
+        pub fn first_map(&self) -> &OwnedMutSlice<'a, u8> {
             &self.first_map
         }
 
         /// Get the second map
         #[must_use]
-        pub fn second_map(&self) -> &OwnedSliceMut<'b, u8> {
+        pub fn second_map(&self) -> &OwnedMutSlice<'b, u8> {
             &self.second_map
         }
 

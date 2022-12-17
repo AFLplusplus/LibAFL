@@ -689,7 +689,7 @@ pub mod pybind {
     use pyo3::{prelude::*, types::PyDict};
 
     use crate::{
-        bolts::{ownedref::OwnedPtrMut, rands::pybind::PythonRand},
+        bolts::{ownedref::OwnedMutPtr, rands::pybind::PythonRand},
         corpus::pybind::PythonCorpus,
         events::pybind::PythonEventManager,
         executors::pybind::PythonExecutor,
@@ -711,13 +711,13 @@ pub mod pybind {
     /// Python class for StdState
     pub struct PythonStdStateWrapper {
         /// Rust wrapped StdState object
-        pub inner: OwnedPtrMut<PythonStdState>,
+        pub inner: OwnedMutPtr<PythonStdState>,
     }
 
     impl PythonStdStateWrapper {
         pub fn wrap(r: &mut PythonStdState) -> Self {
             Self {
-                inner: OwnedPtrMut::Ptr(r),
+                inner: OwnedMutPtr::Ptr(r),
             }
         }
 
@@ -742,7 +742,7 @@ pub mod pybind {
             objective: &mut PythonFeedback,
         ) -> Self {
             Self {
-                inner: OwnedPtrMut::Owned(Box::new(
+                inner: OwnedMutPtr::Owned(Box::new(
                     StdState::new(py_rand, corpus, solutions, feedback, objective)
                         .expect("Failed to create a new StdState"),
                 )),
