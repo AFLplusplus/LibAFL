@@ -1333,8 +1333,7 @@ mod tests {
     fn test_observer_serde() {
         let obv = tuple_list!(
             TimeObserver::new("time"),
-            StdMapObserver::new("map", unsafe { &mut MAP })
-        );
+            unsafe {StdMapObserver::new("map", &mut MAP)});
         let vec = postcard::to_allocvec(&obv).unwrap();
         println!("{vec:?}");
         let obv2: tuple_list_type!(TimeObserver, StdMapObserver<u32, false>) =
