@@ -446,11 +446,6 @@ impl InProcessExecutorHandlerData {
         unsafe { (self.fuzzer_ptr as *mut Z).as_mut().unwrap() }
     }
 
-    #[cfg(all(unix, feature = "std"))]
-    fn current_input<'a, I>(&self) -> &'a I {
-        unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() }
-    }
-
     #[cfg(any(unix, feature = "std"))]
     fn take_current_input<'a, I>(&mut self) -> &'a I {
         let r = unsafe { (self.current_input_ptr as *const I).as_ref().unwrap() };
@@ -527,7 +522,6 @@ pub fn inprocess_get_input<'a, I>() -> Option<&'a I> {
     unsafe { (GLOBAL_STATE.current_input_ptr as *const I).as_ref() }
 }
 
-#[cfg(feature = "std")]
 use crate::{
     corpus::{Corpus, Testcase},
     events::Event,
@@ -535,24 +529,23 @@ use crate::{
 };
 
 #[inline]
-#[cfg(feature = "std")]
+#[allow(clippy::too_many_arguments)]
 /// Save sate if it is interesting
-pub fn save_state_for_restart<E, EM, OF, Z>(exitkind: ExitKind)
-where
+pub fn save_state_for_restart<E, EM, OF, Z>(
+    executor: &mut E,
+    state: &mut E::State,
+    input: &<E::State as UsesInput>::Input,
+    fuzzer: &mut Z,
+    event_mgr: &mut EM,
+    exitkind: ExitKind,
+) where
     E: HasObservers,
     EM: EventFirer<State = E::State> + EventRestarter<State = E::State>,
     OF: Feedback<E::State>,
     E::State: HasSolutions + HasClientPerfMonitor,
     Z: HasObjective<Objective = OF, State = E::State>,
 {
-    let data = unsafe { &mut GLOBAL_STATE };
-
-    let executor = data.executor_mut::<E>();
     let observers = executor.observers_mut();
-    let state = data.state_mut::<E::State>();
-    let input = data.current_input::<<E::State as UsesInput>::Input>();
-    let fuzzer = data.fuzzer_mut::<Z>();
-    let event_mgr = data.event_mgr_mut::<EM>();
 
     let interesting = fuzzer
         .objective_mut()
@@ -681,14 +674,22 @@ mod unix_signal_handler {
                 let executor = data.executor_mut::<E>();
                 let observers = executor.observers_mut();
                 let state = data.state_mut::<E::State>();
-                let input = data.current_input::<<E::State as UsesInput>::Input>();
+                let input = data.take_current_input::<<E::State as UsesInput>::Input>();
+                let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
                 observers
                     .post_exec_all(state, input, &ExitKind::Crash)
                     .expect("Observers post_exec_all failed");
 
-                save_state_for_restart::<E, EM, OF, Z>(ExitKind::Crash);
+                save_state_for_restart::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
 
                 #[cfg(feature = "std")]
                 println!("Waiting for broker...");
@@ -728,7 +729,7 @@ mod unix_signal_handler {
         let observers = executor.observers_mut();
         let state = data.state_mut::<E::State>();
         let event_mgr = data.event_mgr_mut::<EM>();
-
+        let fuzzer = data.fuzzer_mut::<Z>();
         let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
         #[cfg(feature = "std")]
@@ -740,7 +741,14 @@ mod unix_signal_handler {
             .post_exec_all(state, input, &ExitKind::Timeout)
             .expect("Observers post_exec_all failed");
 
-        save_state_for_restart::<E, EM, OF, Z>(ExitKind::Timeout);
+        save_state_for_restart::<E, EM, OF, Z>(
+            executor,
+            state,
+            input,
+            fuzzer,
+            event_mgr,
+            ExitKind::Timeout,
+        );
 
         #[cfg(feature = "std")]
         println!("Waiting for broker...");
@@ -782,7 +790,7 @@ mod unix_signal_handler {
             let observers = executor.observers_mut();
             let state = data.state_mut::<E::State>();
             let event_mgr = data.event_mgr_mut::<EM>();
-
+            let fuzzer = data.fuzzer_mut::<Z>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
             observers
@@ -801,7 +809,14 @@ mod unix_signal_handler {
                 writer.flush().unwrap();
             }
 
-            save_state_for_restart::<E, EM, OF, Z>(ExitKind::Crash);
+            save_state_for_restart::<E, EM, OF, Z>(
+                executor,
+                state,
+                input,
+                fuzzer,
+                event_mgr,
+                ExitKind::Crash,
+            );
 
             #[cfg(feature = "std")]
             eprintln!("Waiting for broker...");
@@ -930,6 +945,7 @@ pub mod windows_asan_handler {
             }
 
             let state = data.state_mut::<E::State>();
+            let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let observers = executor.observers_mut();
 
@@ -950,7 +966,14 @@ pub mod windows_asan_handler {
                 .post_exec_all(state, input, &ExitKind::Crash)
                 .expect("Observers post_exec_all failed");
 
-            save_state_for_restart(ExitKind::Crash);
+            save_state_for_restart::<E, EM, OF, Z>(
+                executor,
+                state,
+                input,
+                fuzzer,
+                event_mgr,
+                ExitKind::Crash,
+            );
 
             #[cfg(feature = "std")]
             eprintln!("Waiting for broker...");
@@ -1064,6 +1087,7 @@ mod windows_exception_handler {
                 let executor = data.executor_mut::<E>();
                 let observers = executor.observers_mut();
                 let state = data.state_mut::<E::State>();
+                let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
@@ -1072,7 +1096,14 @@ mod windows_exception_handler {
                     .post_exec_all(state, input, &ExitKind::Crash)
                     .expect("Observers post_exec_all failed");
 
-                save_state_for_restart(ExitKind::Crash);
+                save_state_for_restart::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Crash,
+                );
 
                 #[cfg(feature = "std")]
                 println!("Waiting for broker...");
@@ -1115,6 +1146,7 @@ mod windows_exception_handler {
         if data.in_target == 1 {
             let executor = data.executor_mut::<E>();
             let state = data.state_mut::<E::State>();
+            let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let observers = executor.observers_mut();
 
@@ -1136,7 +1168,14 @@ mod windows_exception_handler {
                     .post_exec_all(state, input, &ExitKind::Timeout)
                     .expect("Observers post_exec_all failed");
 
-                save_state_for_restart(ExitKind::Timeout);
+                save_state_for_restart::<E, EM, OF, Z>(
+                    executor,
+                    state,
+                    input,
+                    fuzzer,
+                    event_mgr,
+                    ExitKind::Timeout,
+                );
 
                 #[cfg(feature = "std")]
                 eprintln!("Waiting for broker...");
@@ -1239,6 +1278,7 @@ mod windows_exception_handler {
             }
 
             let state = data.state_mut::<E::State>();
+            let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let observers = executor.observers_mut();
 
@@ -1259,7 +1299,14 @@ mod windows_exception_handler {
                 .post_exec_all(state, input, &ExitKind::Crash)
                 .expect("Observers post_exec_all failed");
 
-            save_state_for_restart(ExitKind::Timeout);
+            save_state_for_restart::<E, EM, OF, Z>(
+                executor,
+                state,
+                input,
+                fuzzer,
+                event_mgr,
+                ExitKind::Crash,
+            );
 
             #[cfg(feature = "std")]
             eprintln!("Waiting for broker...");
