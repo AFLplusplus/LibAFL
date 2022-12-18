@@ -535,6 +535,7 @@ use crate::{
 };
 
 #[inline]
+#[cfg(feature = "std")]
 /// Save sate if it is interesting
 pub fn save_state_for_restart<E, EM, OF, Z>(exitkind: ExitKind)
 where
