@@ -530,8 +530,8 @@ use crate::{
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
-/// Save sate if it is interesting
-pub fn save_state_for_restart<E, EM, OF, Z>(
+/// Save state if it is an objective
+pub fn run_observers_and_save_state<E, EM, OF, Z>(
     executor: &mut E,
     state: &mut E::State,
     input: &<E::State as UsesInput>::Input,
@@ -554,7 +554,7 @@ pub fn save_state_for_restart<E, EM, OF, Z>(
     let interesting = fuzzer
         .objective_mut()
         .is_interesting(state, event_mgr, input, observers, &exitkind)
-        .expect("In save_state_for_restart objective failure.");
+        .expect("In run_observers_and_save_state objective failure.");
 
     if interesting {
         let mut new_testcase = Testcase::new(input.clone());
@@ -566,7 +566,7 @@ pub fn save_state_for_restart<E, EM, OF, Z>(
         state
             .solutions_mut()
             .add(new_testcase)
-            .expect("In save_state_for_restart solutions failure.");
+            .expect("In run_observers_and_save_state solutions failure.");
         event_mgr
             .fire(
                 state,
@@ -574,7 +574,7 @@ pub fn save_state_for_restart<E, EM, OF, Z>(
                     objective_size: state.solutions().count(),
                 },
             )
-            .expect("Could not save state in save_state_for_restart");
+            .expect("Could not save state in run_observers_and_save_state");
     }
 
     event_mgr.on_restart(state).unwrap();
@@ -606,7 +606,7 @@ mod unix_signal_handler {
         bolts::os::unix_signals::{ucontext_t, Handler, Signal},
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{save_state_for_restart, InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -686,7 +686,7 @@ mod unix_signal_handler {
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
-                save_state_for_restart::<E, EM, OF, Z>(
+                run_observers_and_save_state::<E, EM, OF, Z>(
                     executor,
                     state,
                     input,
@@ -732,7 +732,7 @@ mod unix_signal_handler {
         #[cfg(feature = "std")]
         let _res = stdout().flush();
 
-        save_state_for_restart::<E, EM, OF, Z>(
+        run_observers_and_save_state::<E, EM, OF, Z>(
             executor,
             state,
             input,
@@ -789,7 +789,7 @@ mod unix_signal_handler {
                 writer.flush().unwrap();
             }
 
-            save_state_for_restart::<E, EM, OF, Z>(
+            run_observers_and_save_state::<E, EM, OF, Z>(
                 executor,
                 state,
                 input,
@@ -853,7 +853,7 @@ pub mod windows_asan_handler {
     use crate::{
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{save_state_for_restart, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
@@ -934,7 +934,7 @@ pub mod windows_asan_handler {
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
-            save_state_for_restart::<E, EM, OF, Z>(
+            run_observers_and_save_state::<E, EM, OF, Z>(
                 executor,
                 state,
                 input,
@@ -1052,7 +1052,7 @@ mod windows_exception_handler {
 
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
 
-                save_state_for_restart::<E, EM, OF, Z>(
+                run_observers_and_save_state::<E, EM, OF, Z>(
                     executor,
                     state,
                     input,
@@ -1111,7 +1111,7 @@ mod windows_exception_handler {
                     .unwrap();
                 data.timeout_input_ptr = ptr::null_mut();
 
-                save_state_for_restart::<E, EM, OF, Z>(
+                run_observers_and_save_state::<E, EM, OF, Z>(
                     executor,
                     state,
                     input,
@@ -1230,7 +1230,7 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
-            save_state_for_restart::<E, EM, OF, Z>(
+            run_observers_and_save_state::<E, EM, OF, Z>(
                 executor,
                 state,
                 input,
