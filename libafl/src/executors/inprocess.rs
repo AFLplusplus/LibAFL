@@ -612,7 +612,6 @@ mod unix_signal_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasSolutions},
     };
 
@@ -860,7 +859,6 @@ pub mod windows_asan_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasSolutions},
     };
 
@@ -984,7 +982,6 @@ mod windows_exception_handler {
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        observers::ObserversTuple,
         state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
     };
 
