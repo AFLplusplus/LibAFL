@@ -537,7 +537,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, not(feature = "std")))]
+#[cfg(all(any(doctest, test), not(feature = "std")))]
 /// Provide custom time in `no_std` tests.
 #[no_mangle]
 pub extern "C" fn external_current_millis() -> u64 {

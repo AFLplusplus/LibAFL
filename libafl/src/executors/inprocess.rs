@@ -973,16 +973,15 @@ mod windows_exception_handler {
         bolts::os::windows_exceptions::{
             ExceptionCode, Handler, CRASH_EXCEPTIONS, EXCEPTION_POINTERS,
         },
-        corpus::{Corpus, Testcase},
-        events::{Event, EventFirer, EventRestarter},
+        events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{save_state_for_restart, InProcessExecutorHandlerData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
         fuzzer::HasObjective,
         inputs::UsesInput,
-        state::{HasClientPerfMonitor, HasMetadata, HasSolutions},
+        state::{HasClientPerfMonitor, HasSolutions},
     };
 
     pub(crate) type HandlerFuncPtr =
