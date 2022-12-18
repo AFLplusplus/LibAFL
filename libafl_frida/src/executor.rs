@@ -172,6 +172,10 @@ where
                 break;
             }
         }
+
+        // Disable exclude on windows for now
+        // See https://github.com/AFLplusplus/LibAFL/issues/830
+        #[cfg(not(windows))]
         for range in ranges.gaps(&(0..usize::MAX)) {
             println!("excluding range: {:x}-{:x}", range.start, range.end);
             stalker.exclude(&MemoryRange::new(
