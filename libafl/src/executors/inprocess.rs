@@ -547,6 +547,10 @@ pub fn save_state_for_restart<E, EM, OF, Z>(
 {
     let observers = executor.observers_mut();
 
+    observers
+        .post_exec_all(state, input, &exitkind)
+        .expect("Observers post_exec_all failed");
+
     let interesting = fuzzer
         .objective_mut()
         .is_interesting(state, event_mgr, input, observers, &exitkind)
@@ -574,6 +578,12 @@ pub fn save_state_for_restart<E, EM, OF, Z>(
     }
 
     event_mgr.on_restart(state).unwrap();
+
+    #[cfg(feature = "std")]
+    println!("Waiting for broker...");
+    event_mgr.await_restart_safe();
+    #[cfg(feature = "std")]
+    println!("Bye!");
 }
 
 #[cfg(unix)]
@@ -672,15 +682,10 @@ mod unix_signal_handler {
             if data.is_valid() {
                 // We are fuzzing!
                 let executor = data.executor_mut::<E>();
-                let observers = executor.observers_mut();
                 let state = data.state_mut::<E::State>();
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
-
-                observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
-                    .expect("Observers post_exec_all failed");
 
                 save_state_for_restart::<E, EM, OF, Z>(
                     executor,
@@ -690,14 +695,6 @@ mod unix_signal_handler {
                     event_mgr,
                     ExitKind::Crash,
                 );
-
-                #[cfg(feature = "std")]
-                println!("Waiting for broker...");
-                event_mgr.await_restart_safe();
-                #[cfg(feature = "std")]
-                println!("Bye!");
-
-                event_mgr.await_restart_safe();
 
                 unsafe {
                     libc::_exit(128 + 6);
@@ -726,7 +723,6 @@ mod unix_signal_handler {
         }
 
         let executor = data.executor_mut::<E>();
-        let observers = executor.observers_mut();
         let state = data.state_mut::<E::State>();
         let event_mgr = data.event_mgr_mut::<EM>();
         let fuzzer = data.fuzzer_mut::<Z>();
@@ -737,10 +733,6 @@ mod unix_signal_handler {
         #[cfg(feature = "std")]
         let _res = stdout().flush();
 
-        observers
-            .post_exec_all(state, input, &ExitKind::Timeout)
-            .expect("Observers post_exec_all failed");
-
         save_state_for_restart::<E, EM, OF, Z>(
             executor,
             state,
@@ -749,12 +741,6 @@ mod unix_signal_handler {
             event_mgr,
             ExitKind::Timeout,
         );
-
-        #[cfg(feature = "std")]
-        println!("Waiting for broker...");
-        event_mgr.await_restart_safe();
-        #[cfg(feature = "std")]
-        println!("Bye!");
 
         event_mgr.await_restart_safe();
 
@@ -787,15 +773,10 @@ mod unix_signal_handler {
             let executor = data.executor_mut::<E>();
             // disarms timeout in case of TimeoutExecutor
             executor.post_run_reset();
-            let observers = executor.observers_mut();
             let state = data.state_mut::<E::State>();
             let event_mgr = data.event_mgr_mut::<EM>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let input = data.take_current_input::<<E::State as UsesInput>::Input>();
-
-            observers
-                .post_exec_all(state, input, &ExitKind::Crash)
-                .expect("Observers post_exec_all failed");
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
@@ -817,12 +798,6 @@ mod unix_signal_handler {
                 event_mgr,
                 ExitKind::Crash,
             );
-
-            #[cfg(feature = "std")]
-            eprintln!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            eprintln!("Bye!");
         } else {
             #[cfg(feature = "std")]
             {
@@ -947,7 +922,6 @@ pub mod windows_asan_handler {
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers_mut();
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
@@ -962,10 +936,6 @@ pub mod windows_asan_handler {
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
-            observers
-                .post_exec_all(state, input, &ExitKind::Crash)
-                .expect("Observers post_exec_all failed");
-
             save_state_for_restart::<E, EM, OF, Z>(
                 executor,
                 state,
@@ -974,12 +944,6 @@ pub mod windows_asan_handler {
                 event_mgr,
                 ExitKind::Crash,
             );
-
-            #[cfg(feature = "std")]
-            eprintln!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            eprintln!("Bye!");
         }
         // Don't need to exit, Asan will exit for us
         // ExitProcess(1);
@@ -1085,16 +1049,11 @@ mod windows_exception_handler {
             if data.is_valid() {
                 // We are fuzzing!
                 let executor = data.executor_mut::<E>();
-                let observers = executor.observers_mut();
                 let state = data.state_mut::<E::State>();
                 let fuzzer = data.fuzzer_mut::<Z>();
                 let event_mgr = data.event_mgr_mut::<EM>();
 
                 let input = data.take_current_input::<<E::State as UsesInput>::Input>();
-
-                observers
-                    .post_exec_all(state, input, &ExitKind::Crash)
-                    .expect("Observers post_exec_all failed");
 
                 save_state_for_restart::<E, EM, OF, Z>(
                     executor,
@@ -1104,14 +1063,6 @@ mod windows_exception_handler {
                     event_mgr,
                     ExitKind::Crash,
                 );
-
-                #[cfg(feature = "std")]
-                println!("Waiting for broker...");
-                event_mgr.await_restart_safe();
-                #[cfg(feature = "std")]
-                println!("Bye!");
-
-                event_mgr.await_restart_safe();
 
                 unsafe {
                     ExitProcess(1);
@@ -1148,7 +1099,6 @@ mod windows_exception_handler {
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers_mut();
 
             if data.timeout_input_ptr.is_null() {
                 #[cfg(feature = "std")]
@@ -1164,10 +1114,6 @@ mod windows_exception_handler {
                     .unwrap();
                 data.timeout_input_ptr = ptr::null_mut();
 
-                observers
-                    .post_exec_all(state, input, &ExitKind::Timeout)
-                    .expect("Observers post_exec_all failed");
-
                 save_state_for_restart::<E, EM, OF, Z>(
                     executor,
                     state,
@@ -1177,13 +1123,6 @@ mod windows_exception_handler {
                     ExitKind::Timeout,
                 );
 
-                #[cfg(feature = "std")]
-                eprintln!("Waiting for broker...");
-                event_mgr.await_restart_safe();
-                #[cfg(feature = "std")]
-                eprintln!("Bye!");
-
-                event_mgr.await_restart_safe();
                 compiler_fence(Ordering::SeqCst);
 
                 ExitProcess(1);
@@ -1280,7 +1219,6 @@ mod windows_exception_handler {
             let state = data.state_mut::<E::State>();
             let fuzzer = data.fuzzer_mut::<Z>();
             let event_mgr = data.event_mgr_mut::<EM>();
-            let observers = executor.observers_mut();
 
             #[cfg(feature = "std")]
             eprintln!("Child crashed!");
@@ -1295,10 +1233,6 @@ mod windows_exception_handler {
             #[cfg(feature = "std")]
             drop(stdout().flush());
 
-            observers
-                .post_exec_all(state, input, &ExitKind::Crash)
-                .expect("Observers post_exec_all failed");
-
             save_state_for_restart::<E, EM, OF, Z>(
                 executor,
                 state,
@@ -1307,12 +1241,6 @@ mod windows_exception_handler {
                 event_mgr,
                 ExitKind::Crash,
             );
-
-            #[cfg(feature = "std")]
-            eprintln!("Waiting for broker...");
-            event_mgr.await_restart_safe();
-            #[cfg(feature = "std")]
-            eprintln!("Bye!");
         }
         ExitProcess(1);
     }
