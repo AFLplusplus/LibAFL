@@ -34,7 +34,7 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::{I2SRandReplace, Tokens},
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::{StdMutationalStage, TracingStage},
     state::{HasCorpus, HasMetadata, StdState},
@@ -42,7 +42,8 @@ use libafl::{
 };
 use libafl_targets::{
     CmpLogObserver, __sanitizer_cov_trace_cmp1, __sanitizer_cov_trace_cmp2,
-    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, std_edges_map_observer,
+    __sanitizer_cov_trace_cmp4, __sanitizer_cov_trace_cmp8, std_edges_map_observer, EDGES_MAP_PTR,
+    MAX_EDGES_NUM,
 };
 
 /// Set up our coverage map.
