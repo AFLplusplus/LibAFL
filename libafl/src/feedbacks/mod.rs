@@ -1,7 +1,8 @@
 //! The feedbacks reduce observer state after each run to a single `is_interesting`-value.
 //! If a testcase is interesting, it may be added to a Corpus.
 //!
-//! TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
+ 
+// TODO: make S of Feedback<S> an associated type when specialisation + AT is stable
 
 pub mod map;
 pub use map::*;

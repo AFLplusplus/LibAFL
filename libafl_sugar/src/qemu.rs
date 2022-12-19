@@ -36,7 +36,7 @@ pub use libafl_qemu::emu::Emulator;
 use libafl_qemu::{
     cmplog, edges, QemuCmpLogHelper, QemuEdgeCoverageHelper, QemuExecutor, QemuHooks,
 };
-use libafl_targets::CmpLogObserver;
+use libafl_targets::{edges_map_mut_slice, CmpLogObserver};
 use typed_builder::TypedBuilder;
 
 use crate::{CORPUS_CACHE_SIZE, DEFAULT_TIMEOUT_SECS};
