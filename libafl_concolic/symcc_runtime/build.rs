@@ -220,6 +220,9 @@ fn build_and_link_symcc_runtime(symcc_src_path: &Path, rename_header_path: &Path
     build_dep_check(&["cmake"]);
     let cpp_lib = cmake::Config::new(symcc_src_path.join("runtime"))
         .define("RUST_BACKEND", "ON")
+        // 2022: Deprecations break -Werror for our symcc build...
+        // We want to build it anyway!
+        .cxxflag("-Wno-error=deprecated-declarations")
         .cxxflag(format!(
             "-include \"{}\"",
             rename_header_path.to_str().unwrap()
