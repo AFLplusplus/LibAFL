@@ -168,14 +168,14 @@ At the same time, we used the change to simplify the common case: creating an `S
 from libafl_target's `EDGES_MAP`.
 In the future, instead of using:
 
-```rust
+```rust,ignore
 let edges = unsafe { &mut EDGES_MAP[0..MAX_EDGES_NUM] };
 let edges_observer = StdMapObserver::new("edges", edges);
 ```
 
 creating the edges observer is as simple as using the new `std_edges_map_observer` function.
 
-```rust
+```rust,ignore
 let edges_observer = unsafe { std_edges_map_observer("edges") };
 ```
 
