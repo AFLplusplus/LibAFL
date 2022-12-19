@@ -83,6 +83,7 @@ where
 /// Gets the current edges map ptr
 /// It will usually take `EDGES_MAP`, but `EDGES_MAP_PTR`,
 /// if built with the `ptr_maps` feature.
+#[must_use]
 pub fn edges_map_mut_ptr() -> *mut u8 {
     unsafe {
         if cfg!(feature = "pointer_maps") {

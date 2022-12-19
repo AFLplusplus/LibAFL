@@ -38,7 +38,7 @@ pub fn main() {
     let shmem_id = signals.id();
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", signals.as_mut_slice());
+    let observer = unsafe { StdMapObserver::new("signals", signals.as_mut_slice()) };
     // Create a stacktrace observer
     let bt_observer = AsanBacktraceObserver::new("AsanBacktraceObserver");
 
