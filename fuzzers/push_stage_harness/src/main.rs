@@ -1,6 +1,6 @@
 //! A fuzzer that uses a `PushStage`, generating input to be subsequently executed,
 //! instead of executing input iteslf in a loop.
-//! Using this method, we can add LibAFL, for example, into an emulation loop
+//! Using this method, we can add `LibAFL`, for example, into an emulation loop
 //! or use its mutations for another fuzzer.
 //! This is a less hacky alternative to the `KloRoutines` based fuzzer, that will also work on non-`Unix`.
 
@@ -34,7 +34,7 @@ fn signals_set(idx: usize) {
 #[allow(clippy::similar_names)]
 pub fn main() {
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = MaxMapFeedback::new(&observer);
