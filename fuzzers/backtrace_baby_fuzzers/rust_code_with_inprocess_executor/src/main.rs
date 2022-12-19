@@ -58,7 +58,7 @@ pub fn main() {
     };
 
     // Create an observation channel using the signals map
-    let observer = StdMapObserver::new("signals", unsafe { &mut SIGNALS });
+    let observer = unsafe { StdMapObserver::new("signals", &mut SIGNALS) };
     // Create a stacktrace observer to add the observers tuple
     let mut bt = None;
     let bt_observer = BacktraceObserver::new(
