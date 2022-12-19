@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer using qemu for binary-only coverage
 //!
-use core::time::Duration;
+use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -31,8 +31,7 @@ use libafl::{
 use libafl_qemu::{
     drcov::QemuDrCovHelper,
     //asan::QemuAsanHelper,
-    edges,
-    edges::QemuEdgeCoverageHelper,
+    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
     MmapPerms,
