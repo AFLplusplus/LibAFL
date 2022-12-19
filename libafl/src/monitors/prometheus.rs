@@ -91,6 +91,7 @@ where
         self.start_time
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn display(&mut self, event_msg: String, sender_id: u32) {
         // Update the prometheus metrics
         // Label each metric with the sender / client_id
@@ -115,7 +116,7 @@ where
                 stat: String::new(),
             })
             .set(total_execs);
-        let execs_per_sec = self.execs_per_sec();
+        let execs_per_sec = self.execs_per_sec() as u64;
         self.exec_rate
             .get_or_create(&Labels {
                 client: sender_id,
@@ -147,7 +148,7 @@ where
             self.corpus_size(),
             self.objective_size(),
             self.total_execs(),
-            self.execs_per_sec()
+            self.execs_per_sec_pretty()
         );
         (self.print_fn)(fmt);
 

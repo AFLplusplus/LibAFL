@@ -5,13 +5,13 @@ pub use diffing::*;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let commit = if args.len() > 1 {
-        &args[1]
+    let commits = if args.len() > 1 {
+        args[1..].to_vec()
     } else {
-        "origin/main"
+        vec!["origin/main".into()]
     };
 
-    let files = get_diffing_files(commit);
+    let files = get_diffing_files(&commits);
     let mut diff_crates = get_diffing_crates(&files);
     let all_crates = find_all_crates();
     extend_diffing_crates_with_deps(&mut diff_crates, &all_crates);

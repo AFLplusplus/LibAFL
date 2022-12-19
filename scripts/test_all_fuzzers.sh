@@ -10,7 +10,7 @@ if [[ -z "${RUN_ON_CI}" ]]; then
   backtrace_fuzzers=$(find ./fuzzers/backtrace_baby_fuzzers -mindepth 1 -maxdepth 1 -type d)
 else
   cargo build -p build_and_test_fuzzers
-  fuzzers=$(cargo run -p build_and_test_fuzzers -- remotes/origin/main)
+  fuzzers=$(cargo run -p build_and_test_fuzzers -- "remotes/origin/main" "HEAD^")
   backtrace_fuzzers=""
 fi
 
