@@ -211,7 +211,7 @@ pub fn LLVMFuzzerRunDriver(
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     // TODO: we need to handle Atheris calls to `exit` on errors somhow.
 

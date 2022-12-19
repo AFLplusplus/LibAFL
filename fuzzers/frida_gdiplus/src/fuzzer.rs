@@ -71,7 +71,7 @@ pub fn main() {
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 unsafe fn fuzz(options: FuzzerOptions) -> Result<(), Error> {
     // 'While the stats are state, they are usually used in the broker - which is likely never restarted
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     let shmem_provider = StdShMemProvider::new()?;
 

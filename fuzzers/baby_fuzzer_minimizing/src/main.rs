@@ -44,7 +44,7 @@ pub fn main() -> Result<(), Error> {
     let mut objective = CrashFeedback::new();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     let mut mgr = SimpleEventManager::new(mon);
 
@@ -116,7 +116,7 @@ pub fn main() -> Result<(), Error> {
     .unwrap();
 
     // The Monitor trait define how the fuzzer stats are displayed to the user
-    let mon = SimpleMonitor::new(|s| println!("{}", s));
+    let mon = SimpleMonitor::new(|s| println!("{s}"));
 
     let mut mgr = SimpleEventManager::new(mon);
 

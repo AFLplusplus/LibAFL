@@ -125,7 +125,7 @@ pub fn libafl_main() {
 
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {
         // Create an observation channel using the coverage map

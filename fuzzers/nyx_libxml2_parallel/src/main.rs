@@ -25,7 +25,7 @@ fn main() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
     let broker_port = 7777;
 
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
     let cores = Cores::all().expect("unable to get all core id");
     let parent_cpu_id = cores.ids.first().expect("unable to get first core id");

@@ -129,7 +129,7 @@ pub fn libafl_main() {
 
     let monitor = OnDiskTOMLMonitor::new(
         "./fuzzer_stats.toml",
-        MultiMonitor::new(|s| println!("{}", s)),
+        MultiMonitor::new(|s| println!("{s}")),
     );
 
     let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id| {

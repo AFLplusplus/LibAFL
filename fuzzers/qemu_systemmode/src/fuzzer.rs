@@ -227,9 +227,9 @@ pub fn fuzz() {
     let shmem_provider = StdShMemProvider::new().expect("Failed to init shared memory");
 
     // The stats reporter for the broker
-    let monitor = MultiMonitor::new(|s| println!("{}", s));
+    let monitor = MultiMonitor::new(|s| println!("{s}"));
 
-    // let monitor = SimpleMonitor::new(|s| println!("{}", s));
+    // let monitor = SimpleMonitor::new(|s| println!("{s}"));
     // let mut mgr = SimpleEventManager::new(monitor);
     // run_client(None, mgr, 0);
 
