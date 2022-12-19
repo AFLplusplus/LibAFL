@@ -285,7 +285,7 @@ fn fuzz_binary(
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
         #[cfg(windows)]
-        println!("{}", s);
+        println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 
@@ -487,7 +487,7 @@ fn fuzz_text(
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{}", s).unwrap();
         #[cfg(windows)]
-        println!("{}", s);
+        println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 

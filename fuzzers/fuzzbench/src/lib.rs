@@ -218,7 +218,7 @@ fn fuzz(
         #[cfg(unix)]
         writeln!(&mut stdout_cpy, "{s}").unwrap();
         #[cfg(windows)]
-        println!("{}", s);
+        println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {s}", current_time()).unwrap();
     });
 

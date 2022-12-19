@@ -225,7 +225,7 @@ fn fuzz(
 
     // 'While the monitor are state, they are usually used in the broker - which is likely never restarted
     let monitor = SimpleMonitor::new(|s| {
-        println!("{}", s);
+        println!("{s}");
         writeln!(log.borrow_mut(), "{:?} {}", current_time(), s).unwrap();
     });
 

@@ -12,7 +12,7 @@
 // use libafl::monitors::PrometheusMonitor;
 // as well as:
 // let listener = "127.0.0.1:8080".to_string(); // point prometheus to scrape here in your prometheus.yml
-// let mon = PrometheusMonitor::new(listener, |s| println!("{}", s));
+// let mon = PrometheusMonitor::new(listener, |s| println!("{s}"));
 // and then like with any other monitor, pass it into the event manager like so:
 // let mut mgr = SimpleEventManager::new(mon);
 // When using docker, you may need to point prometheus.yml to the docker0 interface or host.docker.internal
