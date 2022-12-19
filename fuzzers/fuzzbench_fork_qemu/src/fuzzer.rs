@@ -213,7 +213,10 @@ fn fuzz(
         .new_shmem(core::mem::size_of::<CmpLogMap>())
         .unwrap();
     let cmplog = cmp_shmem.as_mut_slice();
-    unsafe { cmplog_map_ptr = cmplog.as_mut_ptr() as *mut CmpLogMap };
+
+    // Beginning of a page should be properly aligned.
+    #[allow(clippy::cast_ptr_alignment)]
+    let cmplog_map_ptr = cmplog.as_mut_ptr().cast::<libafl_qemu::cmplog::CmpLogMap>();
 
     let (state, mut mgr) = match SimpleRestartingEventManager::launch(monitor, &mut shmem_provider)
     {
@@ -234,7 +237,6 @@ fn fuzz(
         HitcountsMapObserver::new(ConstMapObserver::<_, EDGES_MAP_SIZE>::from_mut_ptr(
             "edges",
             edges.as_mut_ptr(),
-            EDGES_MAP_SIZE,
         ))
     };
 
@@ -242,7 +244,7 @@ fn fuzz(
     let time_observer = TimeObserver::new("time");
 
     // Create an observation channel using cmplog map
-    let cmplog_observer = CmpLogObserver::with_map_ptr("cmplog", cmplog_map_ptr, true);
+    let cmplog_observer = unsafe { CmpLogObserver::with_map_ptr("cmplog", cmplog_map_ptr, true) };
 
     let map_feedback = MaxMapFeedback::new_tracking(&edges_observer, true, false);
 
