@@ -78,13 +78,13 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         };
 
     // Create an observation channel using the coverage map
-    let edges_observer = std_edges_map_observer();
+    let edges_observer = unsafe { std_edges_map_observer("edges") };
 
     // Create an observation channel using the cmp map
-    let cmps_observer = StdMapObserver::new("cmps", unsafe { &mut CMP_MAP });
+    let cmps_observer = unsafe { StdMapObserver::new("cmps", &mut CMP_MAP) };
 
     // Create an observation channel using the allocations map
-    let allocs_observer = StdMapObserver::new("allocs", unsafe { &mut libafl_alloc_map });
+    let allocs_observer = unsafe { StdMapObserver::new("allocs", &mut libafl_alloc_map) };
 
     // Feedback to rate the interestingness of an input
     let mut feedback = feedback_or!(
