@@ -112,8 +112,8 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                edges::edges_map_mut_slice(),
-                edges_counter,
+                edges_map_mut_slice(),
+                addr_of_mut!(MAX_EDGES_NUM),
             ))
         };
 

@@ -31,7 +31,7 @@ use libafl::{
         scheduled::{havoc_mutations, tokens_mutations, StdScheduledMutator},
         token_mutations::Tokens,
     },
-    observers::{HitcountsMapObserver, StdMapObserver, TimeObserver},
+    observers::{HitcountsMapObserver, TimeObserver},
     schedulers::{
         powersched::PowerSchedule, IndexesLenTimeMinimizerScheduler, StdWeightedScheduler,
     },
@@ -82,7 +82,7 @@ fn fuzz(corpus_dirs: &[PathBuf], objective_dir: PathBuf, broker_port: u16) -> Re
         };
 
     // Create an observation channel using the coverage map
-    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") }));
+    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
     let minimizer = StdCorpusMinimizer::new(&edges_observer);
 

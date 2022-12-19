@@ -1,6 +1,6 @@
 //! A libfuzzer-like fuzzer using qemu for binary-only coverage
 //!
-use core::time::Duration;
+use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -30,13 +30,9 @@ use libafl::{
 };
 use libafl_qemu::{
     //asan::QemuAsanHelper,
-    cmplog,
-    cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    edges,
-    edges::QemuEdgeCoverageHelper,
+    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
     elf::EasyElf,
     emu::Emulator,
-    filter_qemu_args,
     //snapshot::QemuSnapshotHelper,
     MmapPerms,
     QemuExecutor,
@@ -52,7 +48,7 @@ pub fn fuzz() {
     let broker_port = 1337;
     let cores = Cores::from_cmdline("0-11").unwrap();
     let corpus_dirs = [PathBuf::from("./corpus")];
-    let mut objective_dir = PathBuf::from("./crashes");
+    let objective_dir = PathBuf::from("./crashes");
 
     // Initialize QEMU
     env::remove_var("LD_LIBRARY_PATH");
@@ -119,8 +115,8 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                edges::edges_map_mut_slice(),
-                edges_counter,
+                edges_map_mut_slice(),
+                addr_of_mut!(MAX_EDGES_NUM),
             ))
         };
 

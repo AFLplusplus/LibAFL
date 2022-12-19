@@ -1,6 +1,6 @@
 //! A singlethreaded QEMU fuzzer that can auto-restart.
 
-use core::{cell::RefCell, time::Duration};
+use core::{cell::RefCell, ptr::addr_of_mut, time::Duration};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd};
 use std::{
@@ -45,11 +45,11 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    //asan::{init_with_asan, QemuAsanHelper},
-    cmplog,
     cmplog::{CmpLogObserver, QemuCmpLogHelper},
-    edges,
+    //asan::{init_with_asan, QemuAsanHelper},
+    edges::edges_map_mut_slice,
     edges::QemuEdgeCoverageHelper,
+    edges::MAX_EDGES_NUM,
     elf::EasyElf,
     emu::Emulator,
     filter_qemu_args,
@@ -250,8 +250,8 @@ fn fuzz(
     let edges_observer = unsafe {
         HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
             "edges",
-            edges::edges_map_mut_slice(),
-            edges_counter,
+            edges_map_mut_slice(),
+            addr_of_mut!(MAX_EDGES_NUM),
         ))
     };
 

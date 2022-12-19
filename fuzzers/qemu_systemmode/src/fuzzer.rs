@@ -1,6 +1,6 @@
 //! A fuzzer using qemu in systemmode for binary-only coverage of kernels
 //!
-use core::time::Duration;
+use core::{ptr::addr_of_mut, time::Duration};
 use std::{env, path::PathBuf, process};
 
 use libafl::{
@@ -22,6 +22,7 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
+    observers::HitcountsMapObserver,
     observers::{TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
@@ -29,8 +30,8 @@ use libafl::{
     Error,
 };
 use libafl_qemu::{
-    edges, edges::QemuEdgeCoverageHelper, elf::EasyElf, emu::Emulator, GuestPhysAddr, QemuExecutor,
-    QemuHooks, Regs,
+    edges::edges_map_mut_slice, edges::QemuEdgeCoverageHelper, edges::MAX_EDGES_NUM, elf::EasyElf,
+    emu::Emulator, GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
 };
 
 pub static mut MAX_INPUT_SIZE: usize = 50;
@@ -141,8 +142,8 @@ pub fn fuzz() {
         let edges_observer = unsafe {
             HitcountsMapObserver::new(VariableMapObserver::from_mut_slice(
                 "edges",
-                edges::edges_map_mut_slice(),
-                edges_counter,
+                edges_map_mut_slice(),
+                addr_of_mut!(MAX_EDGES_NUM),
             ))
         };
 
