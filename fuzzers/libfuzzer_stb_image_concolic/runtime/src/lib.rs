@@ -3,6 +3,9 @@
 //! Additionally, it concretizes all floating point operations for simplicity.
 //! Refer to the `symcc_runtime` crate documentation for building your own runtime.
 
+// The lib needs to be named SymRuntime for SymCC to find it
+#![allow(non_snake_case)]
+
 use symcc_runtime::{
     export_runtime,
     filter::{CallStackCoverage, NoFloat},
