@@ -2,7 +2,7 @@
 //! The target loops and the harness pulls inputs out of `LibAFL`, instead of being called by `LibAFL`.
 use std::path::PathBuf;
 
-use klo_routines::{KloRoutine, yield_};
+use klo_routines::{yield_, KloRoutine};
 use libafl::{
     bolts::{current_nanos, rands::StdRand, tuples::tuple_list, AsSlice},
     corpus::{InMemoryCorpus, OnDiskCorpus},

@@ -49,7 +49,7 @@ use libafl::{
     Error,
 };
 use libafl_targets::{
-    libfuzzer_initialize, libfuzzer_test_one_input, CmpLogObserver, std_edges_map_observer
+    libfuzzer_initialize, libfuzzer_test_one_input, std_edges_map_observer, CmpLogObserver,
 };
 
 #[derive(Debug, Parser)]

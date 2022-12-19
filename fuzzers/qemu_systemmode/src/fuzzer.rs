@@ -22,16 +22,17 @@ use libafl::{
     inputs::{BytesInput, HasTargetBytes},
     monitors::MultiMonitor,
     mutators::scheduled::{havoc_mutations, StdScheduledMutator},
-    observers::HitcountsMapObserver,
-    observers::{TimeObserver, VariableMapObserver},
+    observers::{HitcountsMapObserver, TimeObserver, VariableMapObserver},
     schedulers::{IndexesLenTimeMinimizerScheduler, QueueScheduler},
     stages::StdMutationalStage,
     state::{HasCorpus, StdState},
     Error,
 };
 use libafl_qemu::{
-    edges::edges_map_mut_slice, edges::QemuEdgeCoverageHelper, edges::MAX_EDGES_NUM, elf::EasyElf,
-    emu::Emulator, GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
+    edges::{edges_map_mut_slice, QemuEdgeCoverageHelper, MAX_EDGES_NUM},
+    elf::EasyElf,
+    emu::Emulator,
+    GuestPhysAddr, QemuExecutor, QemuHooks, Regs,
 };
 
 pub static mut MAX_INPUT_SIZE: usize = 50;

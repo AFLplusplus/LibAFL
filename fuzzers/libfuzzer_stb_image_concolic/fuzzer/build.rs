@@ -50,14 +50,16 @@ fn main() {
     let symcc_dir = clone_and_build_symcc(&out_path);
 
     let runtime_dir = std::env::var("CARGO_TARGET_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            std::env::current_dir()
-                .unwrap()
-                .join("..")
-                .join("runtime")
-                .join("target")
-        })
+        .map_or_else(
+            |_| {
+                std::env::current_dir()
+                    .unwrap()
+                    .join("..")
+                    .join("runtime")
+                    .join("target")
+            },
+            PathBuf::from,
+        )
         .join(std::env::var("PROFILE").unwrap());
 
     if !runtime_dir.join("libSymRuntime.so").exists() {
