@@ -309,7 +309,7 @@ fn fuzz_binary(
 
     // Create an observation channel using the coverage map
     // We don't use the hitcounts (see the Cargo.toml, we use pcguard_edges)
-    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer });
+    let edges_observer = HitcountsMapObserver::new(unsafe { std_edges_map_observer("edges") });
 
     // Create an observation channel to keep track of the execution time
     let time_observer = TimeObserver::new("time");
