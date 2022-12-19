@@ -975,7 +975,7 @@ mod windows_exception_handler {
         },
         events::{EventFirer, EventRestarter},
         executors::{
-            inprocess::{save_state_for_restart, InProcessExecutorHandlerData, GLOBAL_STATE},
+            inprocess::{run_observers_and_save_state, InProcessExecutorHandlerData, GLOBAL_STATE},
             Executor, ExitKind, HasObservers,
         },
         feedbacks::Feedback,
