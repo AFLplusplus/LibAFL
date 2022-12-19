@@ -241,7 +241,7 @@ fn fuzz(
                 return Ok(());
             }
             _ => {
-                panic!("Failed to setup the restarter: {}", err);
+                panic!("Failed to setup the restarter: {err}");
             }
         },
     };

@@ -302,7 +302,7 @@ fn fuzz_binary(
                 return Ok(());
             }
             _ => {
-                panic!("Failed to setup the restarter: {}", err);
+                panic!("Failed to setup the restarter: {err}");
             }
         },
     };
@@ -504,7 +504,7 @@ fn fuzz_text(
                 return Ok(());
             }
             _ => {
-                panic!("Failed to setup the restarter: {}", err);
+                panic!("Failed to setup the restarter: {err}");
             }
         },
     };
