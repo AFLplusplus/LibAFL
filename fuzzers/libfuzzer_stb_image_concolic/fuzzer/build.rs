@@ -39,6 +39,7 @@ fn main() {
         // Take advantage of LTO (needs lld-link set in your cargo config)
         //.flag("-flto=thin")
         .flag("-Wno-sign-compare")
+        .flag("-Wunused-but-set-variable")
         .file("./harness.c")
         .compile("harness");
 
@@ -74,6 +75,7 @@ fn main() {
 
     let output = cc::Build::new()
         .flag("-Wno-sign-compare")
+        .flag("-Wunused-but-set-variable")
         .cargo_metadata(false)
         .get_compiler()
         .to_command()
