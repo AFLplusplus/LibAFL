@@ -14,6 +14,7 @@ use libafl::{
     inputs::BytesInput,
     monitors::MultiMonitor,
     mutators::{havoc_mutations, StdScheduledMutator},
+    observers::StdMapObserver,
     schedulers::RandScheduler,
     stages::StdMutationalStage,
     state::StdState,
@@ -31,10 +32,10 @@ fn main() {
     let parent_cpu_id = cores.ids.first().expect("unable to get first core id");
 
     // region: fuzzer start function
-    let mut run_client = |state: Option<_>, mut restarting_mgr, _core_id: usize| {
+    let mut run_client = |state: Option<_>, mut restarting_mgr, core_id: usize| {
         // nyx shared dir, created by nyx-fuzz/packer/packer/nyx_packer.py
         let share_dir = Path::new("/tmp/nyx_libxml2/");
-        let cpu_id = _core_id as u32;
+        let cpu_id = core_id.try_into().unwrap();
         let parallel_mode = true;
         // nyx stuff
         let mut helper = NyxHelper::new(
@@ -42,7 +43,7 @@ fn main() {
             cpu_id,
             true,
             parallel_mode,
-            Some(parent_cpu_id.id as u32),
+            Some(parent_cpu_id.id.try_into().unwrap()),
         )
         .unwrap();
         let observer =
